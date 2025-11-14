@@ -1,16 +1,35 @@
+close all
+clear all
+clc
+rng(1)
 % Setup parameters
 params.n = 100;
-params.n_E = 80;
-params.n_I = 20;
-params.E_indices = 1:80;
-params.I_indices = 81:100;
-params.n_a_E = 2;  % Two adaptation time constants for E neurons
-params.n_a_I = 0;  % No adaptation for I neurons
-params.W = randn(100, 100) * 0.1;  % Example connectivity
-params.tau_d = 0.01;  % 10 ms
-params.tau_a_E = [0.1, 1.0];  % Fast and slow adaptation
-params.tau_a_I = [];  % Empty since n_a_I = 0
+f = 0.5; % fraction of neurons that are E
+params.n_E = round(f*params.n);
+params.n_I = params.n-params.n_E;
+params.E_indices = 1:params.n_E;
+params.I_indices = params.n_E+1:params.n;
+params.n_a_E = 3;  % Two adaptation time constants for E neurons
+params.n_a_I = 3;  % No adaptation for I neurons
+mu_E = 1;
+mu_I = -f*mu_E/(1-f);
+M = [mu_E.*ones(params.n,params.n/2), mu_I.*ones(params.n,params.n/2)];
+b_stdev = 1;
+G = b_stdev*randn(params.n,params.n);
+W = M+G;
+d = 0.2; % density
+Z = rand(params.n,params.n)>d;
+W(Z) = 0;
+W = W-mean(W,2);
+params.W = W;
+spectral_radius = b_stdev * sqrt(params.n * d);  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
+level_of_chaos = 2;
+params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
+params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
+params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.activation_function = @(x) tanh(x);
+params.activation_function_derivative = @(x) 1 - tanh(x).^2;
+% params.activation_function = @(x) max(0,x);
 
 % Initial conditions
 N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n;
@@ -18,13 +37,33 @@ S0 = randn(N_sys_eqs, 1) * 0.01;  % Small random initial state
 
 % External input
 fs = 1000;  % Sampling frequency (Hz)
-T = 1.0;    % Duration (s)
-t_ex = linspace(0, T, T*fs+1)';
-u_ex = randn(params.n, length(t_ex)) * 0.5;  % Random input
+dt = 1/fs;
+T = 60.0;    % Duration (s)
+t_ex = (0:dt:T)';
+nt = length(t_ex);
+
+% Create sine and square wave stimulus similar to SRNN_basic_example.m
+u_ex = zeros(params.n, nt);
+stim_b0 = 0.5; 
+amp = 0.5;
+dur = 5; % duration of sine wave (shorter to fit in 1s window)
+f_sin = 1.*ones(1,fs*dur);
+
+% Square wave stimulus (starting at 0.1s)
+start_idx_1 = fix(fs*nt/4);
+stim_len_1 = min(fix(fs*dur), nt - start_idx_1);
+u_ex(1, start_idx_1 + (1:stim_len_1)) = stim_b0 + amp.*sign(sin(2*pi*f_sin(1:stim_len_1).*t_ex(1:stim_len_1)'));
+
+% Sine wave stimulus (starting at 0.5s)
+start_idx_2 = fix(nt/2;
+stim_len_2 = min(fix(fs*dur), nt - start_idx_2);
+u_ex(1, start_idx_2 + (1:stim_len_2)) = stim_b0 + amp.*-cos(2*pi*f_sin(1:stim_len_2).*t_ex(1:stim_len_2)');
+
+u_ex = u_ex(:,1:nt);
 
 % Integrate
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
-opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
+opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6, 'MaxStep', dt);
 [t_out, S_out] = ode45(rhs, t_ex, S0, opts);
 
 %% Unpack state vector and compute firing rates
@@ -78,20 +117,17 @@ end
 r_ts = params.activation_function(x_eff_ts);  % n x nt
 
 %% Plotting
-figure('Position', [100, 100, 1200, 800]);
+figure('Position', [-1847         378        1200         800]);
 
-% Select neurons to plot
-neurons_to_plot = min(5, params.n);  % Plot up to 5 neurons
-neuron_indices = 1:neurons_to_plot;
+% Plot all neurons
+neuron_indices = 1:params.n;
 
 % Subplot 1: External input
 subplot(4, 1, 1);
 plot(t_out, u_ex(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('External Input');
-title('External Input u(t)');
-legend(arrayfun(@(i) sprintf('Neuron %d', i), neuron_indices, 'UniformOutput', false), ...
-       'Location', 'eastoutside');
+title(sprintf('External Input u(t) - All %d Neurons', params.n));
 grid on;
 
 % Subplot 2: Dendritic states
@@ -99,24 +135,24 @@ subplot(4, 1, 2);
 plot(t_out, x_ts(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('Dendritic State x');
-title('Dendritic States x(t)');
-legend(arrayfun(@(i) sprintf('Neuron %d', i), neuron_indices, 'UniformOutput', false), ...
-       'Location', 'eastoutside');
+title(sprintf('Dendritic States x(t) - All %d Neurons', params.n));
 grid on;
 
-% Subplot 3: Adaptation variables (for first E neuron)
+% Subplot 3: Adaptation variables (for all E neurons)
 subplot(4, 1, 3);
 if ~isempty(a_E_ts)
-    for k = 1:params.n_a_E
-        plot(t_out, squeeze(a_E_ts(1, k, :)), 'DisplayName', ...
-             sprintf('\\tau_a = %.2f s', params.tau_a_E(k)));
-        hold on;
+    % Plot adaptation for all E neurons
+    E_neurons_to_plot = neuron_indices(neuron_indices <= params.n_E);
+    for n_idx = E_neurons_to_plot
+        for k = 1:params.n_a_E
+            plot(t_out, squeeze(a_E_ts(n_idx, k, :)));
+            hold on;
+        end
     end
     hold off;
     xlabel('Time (s)');
     ylabel('Adaptation a');
-    title('Adaptation Variables for E Neuron 1');
-    legend('Location', 'eastoutside');
+    title(sprintf('Adaptation Variables for All %d E Neurons', params.n_E));
     grid on;
 else
     text(0.5, 0.5, 'No adaptation variables', 'HorizontalAlignment', 'center');
@@ -128,7 +164,59 @@ subplot(4, 1, 4);
 plot(t_out, r_ts(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('Firing Rate r');
-title('Firing Rates r(t)');
-legend(arrayfun(@(i) sprintf('Neuron %d', i), neuron_indices, 'UniformOutput', false), ...
-       'Location', 'eastoutside');
+title(sprintf('Firing Rates r(t) - All %d Neurons', params.n));
 grid on;
+
+%% Compute Jacobian eigenvalues at multiple time points
+% Select time indices every 0.05 seconds (50 ms)
+dt_jacobian = fix(T/10); % time interval for Jacobian computation (seconds)
+J_times = round(linspace(1, nt, floor(T/dt_jacobian) + 1));
+J_times = unique(J_times); % ensure unique indices
+
+fprintf('Computing Jacobian at %d time points...\n', length(J_times));
+J_array = compute_Jacobian_at_indices(S_out, J_times, params);
+
+% Compute eigenvalues for each Jacobian
+eigenvalues_all = cell(length(J_times), 1);
+for i = 1:length(J_times)
+    eigenvalues_all{i} = eig(J_array(:,:,i));
+end
+
+%% Plot eigenvalue distributions on complex plane
+n_plots = length(J_times);
+n_cols = ceil(sqrt(n_plots));
+n_rows = ceil(n_plots / n_cols);
+
+figure('Position', [-1847, -500, 1400, 1000]);
+ax_handles = zeros(n_plots, 1);
+
+for i = 1:n_plots
+    ax_handles(i) = subplot(n_rows, n_cols, i);
+    
+    % Get eigenvalues for this time point
+    evals = eigenvalues_all{i};
+    
+    % Scatter plot on complex plane
+    scatter(real(evals), imag(evals), 30, 'filled', 'MarkerFaceAlpha', 0.6);
+    
+    % Add unit circle for reference (stability boundary for continuous systems at Re=0)
+    hold on;
+    plot([0 0], ylim, 'k--', 'LineWidth', 0.5); % imaginary axis
+    plot(xlim, [0 0], 'k--', 'LineWidth', 0.5); % real axis
+    hold off;
+    
+    % Labels and title
+    xlabel('Real');
+    ylabel('Imaginary');
+    title(sprintf('t = %.3f s (idx %d)', t_out(J_times(i)), J_times(i)));
+    grid on;
+    axis equal;
+end
+
+% Link axes of all subplots
+linkaxes(ax_handles, 'xy');
+
+% Add overall title
+sgtitle('Eigenvalue Distribution on Complex Plane');
+
+fprintf('Jacobian analysis complete.\n');
