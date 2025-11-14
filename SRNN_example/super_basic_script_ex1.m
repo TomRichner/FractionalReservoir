@@ -9,7 +9,7 @@ params.n_E = round(f*params.n);
 params.n_I = params.n-params.n_E;
 params.E_indices = 1:params.n_E;
 params.I_indices = params.n_E+1:params.n;
-params.n_a_E = 0;  % Two adaptation time constants for E neurons
+params.n_a_E = 1;  % Two adaptation time constants for E neurons
 params.n_a_I = 0;  % No adaptation for I neurons
 mu_E = 1;
 mu_I = -f*mu_E/(1-f);
@@ -23,78 +23,45 @@ W(Z) = 0;
 W = W-mean(W,2);
 params.W = W;
 spectral_radius = b_stdev * sqrt(params.n * d);  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 1.4;
+level_of_chaos = 2;
 params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 % params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 % params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
-params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.c_E = .2;  % Adaptation scaling for E neurons (scalar, typically 0-3)
-params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
-% params.activation_function = @(x) tanh(x);
-% params.activation_function_derivative = @(x) 1 - tanh(x).^2;
-% params.activation_function = @(x) min(max(0,x),1);
-% params.activation_function_derivative = @(x) double(and(0<=x, x<=1));
-params.activation_function = @(x) 1./(1 + exp(-4*x));
-params.activation_function_derivative = @(x) 4*params.activation_function(x).*(1 - params.activation_function(x));
+params.tau_a_E = logspace(log10(2), log10(2), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
+params.tau_a_I = logspace(log10(5), log10(5), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
+params.activation_function = @(x) tanh(x);
+params.activation_function_derivative = @(x) 1 - tanh(x).^2;
+% params.activation_function = @(x) max(0,x);
 
 % Initial conditions
 N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n;
-% S0 = 0.1+randn(N_sys_eqs, 1) * 0.1;  % Small random initial state
-S0 = 0.5*ones(N_sys_eqs,1);
+S0 = randn(N_sys_eqs, 1) * 0.01;  % Small random initial state
 
 % External input
-rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
-fs = 200;  % Sampling frequency (Hz)
+fs = 1000;  % Sampling frequency (Hz)
 dt = 1/fs;
-T = 600.0;    % Duration (s)
+T = 60.0;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
-% Create random amplitude multidimensional sparse step function
-% step_period = 20;  % Time period for each step (seconds)
-step_density = 0.2;  % Fraction of neurons receiving input at each step
-amp = 1;  % Amplitude scaling factor
-
-% Calculate number of steps
-% n_steps = ceil(T / step_period);
-n_steps = 7;
-step_period = fix(T/n_steps);
-
-step_length = round(step_period * fs);  % Number of time points per step
-
-% Precompute random sparse step matrix (vectorized)
-% Generate all random amplitudes at once: n x n_steps
-random_sparse_step = amp * randn(params.n, n_steps);
-
-% Make it sparse based on step_density
-sparse_mask = rand(params.n, n_steps) < step_density;
-random_sparse_step = random_sparse_step .* sparse_mask;
-
-% Option to zero out entire columns (steps with no stimulation)
-no_stim_steps = false(1, n_steps);  % Logical vector: true = no stimulation for that step
-no_stim_steps(1:2:end) = true;
-% Example: no_stim_steps(1:10) = true;  % No stimulation for first 10 steps
-random_sparse_step(:, no_stim_steps) = 0;
-
-% Create u_ex using the precomputed random sparse steps
+% Create sine and square wave stimulus similar to SRNN_basic_example.m
 u_ex = zeros(params.n, nt);
-for step_idx = 1:n_steps
-    % Determine time indices for this step
-    start_idx = (step_idx - 1) * step_length + 1;
-    end_idx = min(step_idx * step_length, nt);
-    
-    if start_idx > nt
-        break;
-    end
-    
-    % Apply the step to all neurons (broadcasting the column vector)
-    u_ex(:, start_idx:end_idx) = repmat(random_sparse_step(:, step_idx), 1, end_idx - start_idx + 1);
-end
+stim_b0 = 0.5; 
+amp = 0.5;
+dur = 5; % duration of sine wave (shorter to fit in 1s window)
+f_sin = 1.*ones(1,fs*dur);
 
-% add small intrinsic drive to neurons in u_ex
-intrinsic_drive = -0.9+0.2*randn(params.n,1);
-u_ex = u_ex+intrinsic_drive;
+% Square wave stimulus (starting at 0.1s)
+start_idx_1 = fix(fs*nt/4);
+stim_len_1 = min(fix(fs*dur), nt - start_idx_1);
+u_ex(1, start_idx_1 + (1:stim_len_1)) = stim_b0 + amp.*sign(sin(2*pi*f_sin(1:stim_len_1).*t_ex(1:stim_len_1)'));
+
+% Sine wave stimulus (starting at 0.5s)
+start_idx_2 = fix(nt/2);
+stim_len_2 = min(fix(fs*dur), nt - start_idx_2);
+u_ex(1, start_idx_2 + (1:stim_len_2)) = stim_b0 + amp.*-cos(2*pi*f_sin(1:stim_len_2).*t_ex(1:stim_len_2)');
+
+u_ex = u_ex(:,1:nt);
 
 % Integrate
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
@@ -130,23 +97,23 @@ x_ts = S_out(:, current_idx + (1:params.n))';  % n x nt
 % Compute firing rates
 x_eff_ts = x_ts;  % n x nt
 
-% Apply adaptation effect to E neurons (scaled by c_E)
+% Apply adaptation effect to E neurons
 if params.n_E > 0 && params.n_a_E > 0 && ~isempty(a_E_ts)
     % sum(a_E_ts, 2) is n_E x 1 x nt, need to squeeze to n_E x nt
     sum_a_E = squeeze(sum(a_E_ts, 2));  % n_E x nt
     if size(sum_a_E, 1) ~= params.n_E  % Handle case where nt=1
         sum_a_E = sum_a_E';
     end
-    x_eff_ts(params.E_indices, :) = x_eff_ts(params.E_indices, :) - params.c_E * sum_a_E;
+    x_eff_ts(params.E_indices, :) = x_eff_ts(params.E_indices, :) - sum_a_E;
 end
 
-% Apply adaptation effect to I neurons (scaled by c_I)
+% Apply adaptation effect to I neurons (though n_a_I = 0 in this example)
 if params.n_I > 0 && params.n_a_I > 0 && ~isempty(a_I_ts)
     sum_a_I = squeeze(sum(a_I_ts, 2));  % n_I x nt
     if size(sum_a_I, 1) ~= params.n_I
         sum_a_I = sum_a_I';
     end
-    x_eff_ts(params.I_indices, :) = x_eff_ts(params.I_indices, :) - params.c_I * sum_a_I;
+    x_eff_ts(params.I_indices, :) = x_eff_ts(params.I_indices, :) - sum_a_I;
 end
 
 r_ts = params.activation_function(x_eff_ts);  % n x nt
@@ -162,12 +129,16 @@ s(1) = subplot(4, 1, 1);
 plot(t_out, u_ex(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('External Input');
+title(sprintf('External Input u(t) - All %d Neurons', params.n));
+grid on;
 
 % Subplot 2: Dendritic states
 s(2) = subplot(4, 1, 2);
 plot(t_out, x_ts(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('Dendritic State x');
+title(sprintf('Dendritic States x(t) - All %d Neurons', params.n));
+grid on;
 
 % Subplot 3: Adaptation variables (for all E neurons)
 s(3) = subplot(4, 1, 3);
@@ -183,7 +154,8 @@ if ~isempty(a_E_ts)
     hold off;
     xlabel('Time (s)');
     ylabel('Adaptation a');
-
+    title(sprintf('Adaptation Variables for All %d E Neurons', params.n_E));
+    grid on;
 else
     text(0.5, 0.5, 'No adaptation variables', 'HorizontalAlignment', 'center');
     axis off;
@@ -194,30 +166,17 @@ s(4) = subplot(4, 1, 4);
 plot(t_out, r_ts(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('Firing Rate r');
-
+title(sprintf('Firing Rates r(t) - All %d Neurons', params.n));
+grid on;
 
 % Link x-axes of all time series plots
 linkaxes(s,'x');
 
 %% Compute Jacobian eigenvalues at multiple time points
-% Sample at t=0 and 1 second before/after each step change
-step_change_times = (0:step_period:(n_steps-1)*step_period);  % Times when steps change (0, 20, 40, ...)
-J_times_sec = [0];  % Start with t=0
-
-% Add 1 second before and after each step change (except t=0)
-for i = 2:length(step_change_times)
-    t_change = step_change_times(i);
-    if t_change - 1 > 0  % Make sure we don't go below 0
-        J_times_sec = [J_times_sec, t_change - 1];
-    end
-    if t_change + 1 <= T  % Make sure we don't exceed T
-        J_times_sec = [J_times_sec, t_change + 1];
-    end
-end
-
-% Convert times in seconds to indices (MATLAB is 1-indexed)
-J_times = round(J_times_sec * fs) + 1;
-J_times = unique(J_times);  % Ensure unique indices and sort
+% Select time indices every 0.05 seconds (50 ms)
+dt_jacobian = fix(T/10); % time interval for Jacobian computation (seconds)
+J_times = round(linspace(1, nt, floor(T/dt_jacobian) + 1));
+J_times = unique(J_times); % ensure unique indices
 
 fprintf('Computing Jacobian at %d time points...\n', length(J_times));
 J_array = compute_Jacobian_at_indices(S_out, J_times, params);
@@ -254,7 +213,8 @@ for i = 1:n_plots
     % Labels and title
     xlabel('Real');
     ylabel('Imaginary');
-    title(sprintf('t = %.3f s', t_out(J_times(i))));
+    title(sprintf('t = %.3f s (idx %d)', t_out(J_times(i)), J_times(i)));
+    grid on;
     axis equal;
 end
 

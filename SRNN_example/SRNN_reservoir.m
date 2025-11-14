@@ -3,8 +3,10 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 %
 % Implements the following equations:
 %   dx_i/dt = -x_i/tau_d + sum_j(w_ij * r_j) + u_i
-%   r_i = phi(x_i - sum_k(a_i,k))
+%   r_i = phi(x_i - c * sum_k(a_i,k))
 %   da_i,k/dt = (-a_i,k + r_i) / tau_k
+%
+% where c = c_E for excitatory neurons and c = c_I for inhibitory neurons
 %
 % State organization: S = [a_E(:); a_I(:); x(:)]
 
@@ -44,6 +46,19 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
     tau_a_E = params.tau_a_E; % adaptation time constants for E neurons (1 x n_a_E)
     tau_a_I = params.tau_a_I; % adaptation time constants for I neurons (1 x n_a_I)
     
+    % Adaptation scaling parameters
+    if isfield(params, 'c_E')
+        c_E = params.c_E; % adaptation scaling for E neurons (scalar)
+    else
+        c_E = 1.0; % default to 1.0
+    end
+    
+    if isfield(params, 'c_I')
+        c_I = params.c_I; % adaptation scaling for I neurons (scalar)
+    else
+        c_I = 1.0; % default to 1.0
+    end
+    
     % Activation function (nonlinearity)
     if isfield(params, 'activation_function') && isa(params.activation_function, 'function_handle')
         activation_function = params.activation_function;
@@ -80,16 +95,16 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
     %% compute firing rates
     x_eff = x; % n x 1, effective dendritic potential before activation function
 
-    % Apply adaptation effect to E neurons
+    % Apply adaptation effect to E neurons (scaled by c_E)
     if n_E > 0 && n_a_E > 0 && ~isempty(a_E)
         % sum(a_E, 2) is n_E x 1, summing across all adaptation variables
-        x_eff(E_indices) = x_eff(E_indices) - sum(a_E, 2);
+        x_eff(E_indices) = x_eff(E_indices) - c_E * sum(a_E, 2);
     end
     
-    % Apply adaptation effect to I neurons
+    % Apply adaptation effect to I neurons (scaled by c_I)
     if n_I > 0 && n_a_I > 0 && ~isempty(a_I)
         % sum(a_I, 2) is n_I x 1, summing across all adaptation variables
-        x_eff(I_indices) = x_eff(I_indices) - sum(a_I, 2);
+        x_eff(I_indices) = x_eff(I_indices) - c_I * sum(a_I, 2);
     end
     
     r = activation_function(x_eff); % n x 1, firing rate

@@ -9,7 +9,7 @@ params.n_E = round(f*params.n);
 params.n_I = params.n-params.n_E;
 params.E_indices = 1:params.n_E;
 params.I_indices = params.n_E+1:params.n;
-params.n_a_E = 0;  % Two adaptation time constants for E neurons
+params.n_a_E = 1;  % Two adaptation time constants for E neurons
 params.n_a_I = 0;  % No adaptation for I neurons
 mu_E = 1;
 mu_I = -f*mu_E/(1-f);
@@ -23,44 +23,34 @@ W(Z) = 0;
 W = W-mean(W,2);
 params.W = W;
 spectral_radius = b_stdev * sqrt(params.n * d);  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 1.4;
+level_of_chaos = 2.2;
 params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 % params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 % params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
-params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.c_E = .2;  % Adaptation scaling for E neurons (scalar, typically 0-3)
-params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
-% params.activation_function = @(x) tanh(x);
-% params.activation_function_derivative = @(x) 1 - tanh(x).^2;
-% params.activation_function = @(x) min(max(0,x),1);
-% params.activation_function_derivative = @(x) double(and(0<=x, x<=1));
-params.activation_function = @(x) 1./(1 + exp(-4*x));
-params.activation_function_derivative = @(x) 4*params.activation_function(x).*(1 - params.activation_function(x));
+params.tau_a_E = logspace(log10(2), log10(2), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
+params.tau_a_I = logspace(log10(5), log10(5), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
+params.activation_function = @(x) tanh(x);
+params.activation_function_derivative = @(x) 1 - tanh(x).^2;
+% params.activation_function = @(x) max(0,x);
 
 % Initial conditions
 N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n;
-% S0 = 0.1+randn(N_sys_eqs, 1) * 0.1;  % Small random initial state
-S0 = 0.5*ones(N_sys_eqs,1);
+S0 = randn(N_sys_eqs, 1) * 0.01;  % Small random initial state
 
 % External input
-rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
-fs = 200;  % Sampling frequency (Hz)
+fs = 500;  % Sampling frequency (Hz)
 dt = 1/fs;
-T = 600.0;    % Duration (s)
+T = 120.0;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
 % Create random amplitude multidimensional sparse step function
-% step_period = 20;  % Time period for each step (seconds)
-step_density = 0.2;  % Fraction of neurons receiving input at each step
-amp = 1;  % Amplitude scaling factor
+step_period = 20;  % Time period for each step (seconds)
+step_density = 0.1;  % Fraction of neurons receiving input at each step
+amp = 4;  % Amplitude scaling factor
 
 % Calculate number of steps
-% n_steps = ceil(T / step_period);
-n_steps = 7;
-step_period = fix(T/n_steps);
-
+n_steps = ceil(T / step_period);
 step_length = round(step_period * fs);  % Number of time points per step
 
 % Precompute random sparse step matrix (vectorized)
@@ -91,10 +81,6 @@ for step_idx = 1:n_steps
     % Apply the step to all neurons (broadcasting the column vector)
     u_ex(:, start_idx:end_idx) = repmat(random_sparse_step(:, step_idx), 1, end_idx - start_idx + 1);
 end
-
-% add small intrinsic drive to neurons in u_ex
-intrinsic_drive = -0.9+0.2*randn(params.n,1);
-u_ex = u_ex+intrinsic_drive;
 
 % Integrate
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
@@ -130,23 +116,23 @@ x_ts = S_out(:, current_idx + (1:params.n))';  % n x nt
 % Compute firing rates
 x_eff_ts = x_ts;  % n x nt
 
-% Apply adaptation effect to E neurons (scaled by c_E)
+% Apply adaptation effect to E neurons
 if params.n_E > 0 && params.n_a_E > 0 && ~isempty(a_E_ts)
     % sum(a_E_ts, 2) is n_E x 1 x nt, need to squeeze to n_E x nt
     sum_a_E = squeeze(sum(a_E_ts, 2));  % n_E x nt
     if size(sum_a_E, 1) ~= params.n_E  % Handle case where nt=1
         sum_a_E = sum_a_E';
     end
-    x_eff_ts(params.E_indices, :) = x_eff_ts(params.E_indices, :) - params.c_E * sum_a_E;
+    x_eff_ts(params.E_indices, :) = x_eff_ts(params.E_indices, :) - sum_a_E;
 end
 
-% Apply adaptation effect to I neurons (scaled by c_I)
+% Apply adaptation effect to I neurons (though n_a_I = 0 in this example)
 if params.n_I > 0 && params.n_a_I > 0 && ~isempty(a_I_ts)
     sum_a_I = squeeze(sum(a_I_ts, 2));  % n_I x nt
     if size(sum_a_I, 1) ~= params.n_I
         sum_a_I = sum_a_I';
     end
-    x_eff_ts(params.I_indices, :) = x_eff_ts(params.I_indices, :) - params.c_I * sum_a_I;
+    x_eff_ts(params.I_indices, :) = x_eff_ts(params.I_indices, :) - sum_a_I;
 end
 
 r_ts = params.activation_function(x_eff_ts);  % n x nt
@@ -162,12 +148,14 @@ s(1) = subplot(4, 1, 1);
 plot(t_out, u_ex(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('External Input');
+title(sprintf('External Input u(t) - All %d Neurons', params.n));
 
 % Subplot 2: Dendritic states
 s(2) = subplot(4, 1, 2);
 plot(t_out, x_ts(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('Dendritic State x');
+title(sprintf('Dendritic States x(t) - All %d Neurons', params.n));
 
 % Subplot 3: Adaptation variables (for all E neurons)
 s(3) = subplot(4, 1, 3);
@@ -183,7 +171,8 @@ if ~isempty(a_E_ts)
     hold off;
     xlabel('Time (s)');
     ylabel('Adaptation a');
-
+    title(sprintf('Adaptation Variables for All %d E Neurons', params.n_E));
+    
 else
     text(0.5, 0.5, 'No adaptation variables', 'HorizontalAlignment', 'center');
     axis off;
@@ -194,6 +183,7 @@ s(4) = subplot(4, 1, 4);
 plot(t_out, r_ts(neuron_indices, :)');
 xlabel('Time (s)');
 ylabel('Firing Rate r');
+title(sprintf('Firing Rates r(t) - All %d Neurons', params.n));
 
 
 % Link x-axes of all time series plots
@@ -254,7 +244,7 @@ for i = 1:n_plots
     % Labels and title
     xlabel('Real');
     ylabel('Imaginary');
-    title(sprintf('t = %.3f s', t_out(J_times(i))));
+    title(sprintf('t = %.3f s (idx %d)', t_out(J_times(i)), J_times(i)));
     axis equal;
 end
 

@@ -11,6 +11,7 @@ function J = compute_Jacobian(S, params)
 %            .n, .n_E, .n_I, .E_indices, .I_indices
 %            .n_a_E, .n_a_I, .tau_d, .tau_a_E, .tau_a_I
 %            .W (connectivity matrix)
+%            .c_E, .c_I (adaptation scaling parameters, optional, default = 1.0)
 %            .activation_function_derivative (function handle for φ'(x))
 %
 % Output:
@@ -35,6 +36,19 @@ function J = compute_Jacobian(S, params)
     tau_d = params.tau_d;
     tau_a_E = params.tau_a_E;
     tau_a_I = params.tau_a_I;
+    
+    % Adaptation scaling parameters
+    if isfield(params, 'c_E')
+        c_E = params.c_E;
+    else
+        c_E = 1.0;
+    end
+    
+    if isfield(params, 'c_I')
+        c_I = params.c_I;
+    else
+        c_I = 1.0;
+    end
     
     % Activation function derivative
     if isfield(params, 'activation_function_derivative') && isa(params.activation_function_derivative, 'function_handle')
@@ -72,14 +86,14 @@ function J = compute_Jacobian(S, params)
     %% Compute effective dendritic potential and its derivative
     x_eff = x; % n x 1
     
-    % Apply adaptation effect to E neurons
+    % Apply adaptation effect to E neurons (scaled by c_E)
     if n_E > 0 && n_a_E > 0 && ~isempty(a_E)
-        x_eff(E_indices) = x_eff(E_indices) - sum(a_E, 2);
+        x_eff(E_indices) = x_eff(E_indices) - c_E * sum(a_E, 2);
     end
     
-    % Apply adaptation effect to I neurons
+    % Apply adaptation effect to I neurons (scaled by c_I)
     if n_I > 0 && n_a_I > 0 && ~isempty(a_I)
-        x_eff(I_indices) = x_eff(I_indices) - sum(a_I, 2);
+        x_eff(I_indices) = x_eff(I_indices) - c_I * sum(a_I, 2);
     end
     
     % Compute derivative of activation function at x_eff
@@ -109,7 +123,7 @@ function J = compute_Jacobian(S, params)
     
     %% Block 1: ∂(da_E/dt)/∂a_E
     % da_{i,k}/dt = (-a_{i,k} + r_i) / τ_k
-    % ∂(da_{i,k}/dt)/∂a_{i,j} = -δ_{kj}/τ_k - φ'(x_eff_i)/τ_k
+    % ∂(da_{i,k}/dt)/∂a_{i,j} = -δ_{kj}/τ_k - c_E*φ'(x_eff_i)/τ_k
     if len_a_E > 0
         for i = 1:n_E
             neuron_idx = E_indices(i);
@@ -118,9 +132,9 @@ function J = compute_Jacobian(S, params)
                 for j = 1:n_a_E
                     col_idx = (i-1)*n_a_E + j;
                     if k == j
-                        J(row_idx, col_idx) = -1/tau_a_E(k) - phi_prime_x_eff(neuron_idx)/tau_a_E(k);
+                        J(row_idx, col_idx) = -1/tau_a_E(k) - c_E*phi_prime_x_eff(neuron_idx)/tau_a_E(k);
                     else
-                        J(row_idx, col_idx) = -phi_prime_x_eff(neuron_idx)/tau_a_E(k);
+                        J(row_idx, col_idx) = -c_E*phi_prime_x_eff(neuron_idx)/tau_a_E(k);
                     end
                 end
             end
@@ -149,7 +163,7 @@ function J = compute_Jacobian(S, params)
     
     %% Block 5: ∂(da_I/dt)/∂a_I
     % da_{i,k}/dt = (-a_{i,k} + r_i) / τ_k
-    % ∂(da_{i,k}/dt)/∂a_{i,j} = -δ_{kj}/τ_k - φ'(x_eff_i)/τ_k
+    % ∂(da_{i,k}/dt)/∂a_{i,j} = -δ_{kj}/τ_k - c_I*φ'(x_eff_i)/τ_k
     if len_a_I > 0
         for i = 1:n_I
             neuron_idx = I_indices(i);
@@ -158,9 +172,9 @@ function J = compute_Jacobian(S, params)
                 for j = 1:n_a_I
                     col_idx = len_a_E + (i-1)*n_a_I + j;
                     if k == j
-                        J(row_idx, col_idx) = -1/tau_a_I(k) - phi_prime_x_eff(neuron_idx)/tau_a_I(k);
+                        J(row_idx, col_idx) = -1/tau_a_I(k) - c_I*phi_prime_x_eff(neuron_idx)/tau_a_I(k);
                     else
-                        J(row_idx, col_idx) = -phi_prime_x_eff(neuron_idx)/tau_a_I(k);
+                        J(row_idx, col_idx) = -c_I*phi_prime_x_eff(neuron_idx)/tau_a_I(k);
                     end
                 end
             end
@@ -181,7 +195,7 @@ function J = compute_Jacobian(S, params)
     
     %% Block 7: ∂(dx/dt)/∂a_E
     % dx_i/dt = -x_i/τ_d + Σ_j w_ij r_j + u_i
-    % ∂(dx_i/dt)/∂a_{j,k} = w_ij * φ'(x_eff_j) * (-1) for j in E_indices
+    % ∂(dx_i/dt)/∂a_{j,k} = w_ij * φ'(x_eff_j) * (-c_E) for j in E_indices
     if len_a_E > 0
         for i = 1:n
             row_idx = row_x_start + i - 1;
@@ -189,14 +203,14 @@ function J = compute_Jacobian(S, params)
                 neuron_j = E_indices(j);
                 for k = 1:n_a_E
                     col_idx = (j-1)*n_a_E + k;
-                    J(row_idx, col_idx) = -W(i, neuron_j) * phi_prime_x_eff(neuron_j);
+                    J(row_idx, col_idx) = -c_E * W(i, neuron_j) * phi_prime_x_eff(neuron_j);
                 end
             end
         end
     end
     
     %% Block 8: ∂(dx/dt)/∂a_I
-    % ∂(dx_i/dt)/∂a_{j,k} = w_ij * φ'(x_eff_j) * (-1) for j in I_indices
+    % ∂(dx_i/dt)/∂a_{j,k} = w_ij * φ'(x_eff_j) * (-c_I) for j in I_indices
     if len_a_I > 0
         for i = 1:n
             row_idx = row_x_start + i - 1;
@@ -204,7 +218,7 @@ function J = compute_Jacobian(S, params)
                 neuron_j = I_indices(j);
                 for k = 1:n_a_I
                     col_idx = len_a_E + (j-1)*n_a_I + k;
-                    J(row_idx, col_idx) = -W(i, neuron_j) * phi_prime_x_eff(neuron_j);
+                    J(row_idx, col_idx) = -c_I * W(i, neuron_j) * phi_prime_x_eff(neuron_j);
                 end
             end
         end
