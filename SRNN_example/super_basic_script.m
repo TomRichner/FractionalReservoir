@@ -1,7 +1,7 @@
 close all
 clear all
 clc
-rng(1)
+rng(3)
 % Setup parameters
 params.n = 100;
 f = 0.5; % fraction of neurons that are E
@@ -17,13 +17,13 @@ M = [mu_E.*ones(params.n,params.n/2), mu_I.*ones(params.n,params.n/2)];
 b_stdev = 1;
 G = b_stdev*randn(params.n,params.n);
 W = M+G;
-d = 0.3; % density
+d = 0.2; % density
 Z = rand(params.n,params.n)>d;
 W(Z) = 0;
 W = W-mean(W,2);
 params.W = W;
 spectral_radius = b_stdev * sqrt(params.n * d);  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 1.4;
+level_of_chaos = 1.1;
 params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 % params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 % params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
@@ -31,12 +31,12 @@ params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmical
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = .2;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
-% params.activation_function = @(x) tanh(x);
-% params.activation_function_derivative = @(x) 1 - tanh(x).^2;
+params.activation_function = @(x) tanh(x);
+params.activation_function_derivative = @(x) 1 - tanh(x).^2;
 % params.activation_function = @(x) min(max(0,x),1);
 % params.activation_function_derivative = @(x) double(and(0<=x, x<=1));
-params.activation_function = @(x) 1./(1 + exp(-4*x));
-params.activation_function_derivative = @(x) 4*params.activation_function(x).*(1 - params.activation_function(x));
+% params.activation_function = @(x) 1./(1 + exp(-4*x));
+% params.activation_function_derivative = @(x) 4*params.activation_function(x).*(1 - params.activation_function(x));
 
 % Initial conditions
 N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n;
@@ -45,9 +45,9 @@ S0 = 0.5*ones(N_sys_eqs,1);
 
 % External input
 rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
-fs = 200;  % Sampling frequency (Hz)
+fs = 100;  % Sampling frequency (Hz)
 dt = 1/fs;
-T = 600.0;    % Duration (s)
+T = 200.0;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
@@ -93,8 +93,8 @@ for step_idx = 1:n_steps
 end
 
 % add small intrinsic drive to neurons in u_ex
-intrinsic_drive = -0.9+0.2*randn(params.n,1);
-u_ex = u_ex+intrinsic_drive;
+% intrinsic_drive = 0+0.1*randn(params.n,1);
+% u_ex = u_ex+intrinsic_drive;
 
 % Integrate
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);

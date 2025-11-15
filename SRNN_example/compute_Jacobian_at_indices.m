@@ -40,8 +40,8 @@ function J_array = compute_Jacobian_at_indices(S_out, J_times, params)
         % Extract state vector at this time index (convert to column vector)
         S = S_out(J_times(i), :)';
         
-        % Compute Jacobian at this state
-        J_array(:,:,i) = compute_Jacobian(S, params);
+        % Compute Jacobian at this state (sparse fast version -> dense)
+        J_array(:,:,i) = full(compute_Jacobian_fast(S, params));
     end
     
 end

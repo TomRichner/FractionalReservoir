@@ -4,7 +4,7 @@ clc
 rng(1)
 
 % Lyapunov method selection
-Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
+Lya_method = 'qr'; % 'benettin', 'qr', or 'none'
 
 % Setup parameters
 params.n = 100;
@@ -27,7 +27,7 @@ W(Z) = 0;
 W = W-mean(W,2);
 params.W = W;
 spectral_radius = b_stdev * sqrt(params.n * d);  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 1.4;
+level_of_chaos = 2;
 params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 % params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 % params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
@@ -49,9 +49,9 @@ S0 = 0.5*ones(N_sys_eqs,1);
 
 % External input
 rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
-fs = 200;  % Sampling frequency (Hz)
+fs = 100;  % Sampling frequency (Hz)
 dt = 1/fs;
-T = 600.0;    % Duration (s)
+T = 100.0;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
@@ -370,26 +370,4 @@ function D_KY = compute_kaplan_yorke_dimension(lambda)
     else
         D_KY = j + cumsum_lambda(j) / abs(lambda(j+1));
     end
-end
-
-%% Helper function to get min/max bounds for state variables
-function min_max_range = get_minMaxRange(params)
-    % Returns bounds for state variables used in benettin_algorithm
-    % For SRNN, we typically don't have hard bounds, so return NaN (no bounds)
-    % State organization: S = [a_E(:); a_I(:); x(:)]
-    
-    n = params.n;
-    n_E = params.n_E;
-    n_I = params.n_I;
-    n_a_E = params.n_a_E;
-    n_a_I = params.n_a_I;
-    
-    N_sys_eqs = n_E * n_a_E + n_I * n_a_I + n;
-    
-    % Initialize with NaN (no bounds)
-    min_max_range = nan(N_sys_eqs, 2);
-    
-    % You can optionally set bounds here if needed, e.g.:
-    % min_max_range(:, 1) = -10;  % lower bound
-    % min_max_range(:, 2) = 10;   % upper bound
 end

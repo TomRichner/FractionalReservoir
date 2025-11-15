@@ -1,14 +1,16 @@
 function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 % SRNN_reservoir implements a rate network with spike-frequency adaptation
+% and short-term synaptic depression
 %
 % Implements the following equations:
 %   dx_i/dt = -x_i/tau_d + sum_j(w_ij * r_j) + u_i
-%   r_i = phi(x_i - c * sum_k(a_i,k))
+%   r_i = b_i * phi(x_i - c * sum_k(a_i,k))
 %   da_i,k/dt = (-a_i,k + r_i) / tau_k
+%   db_i/dt = (1 - b_i) / tau_rec - (b_i * r_i) / tau_rel
 %
 % where c = c_E for excitatory neurons and c = c_I for inhibitory neurons
 %
-% State organization: S = [a_E(:); a_I(:); x(:)]
+% State organization: S = [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
 
     persistent u_interpolant t_ex_last;
 
@@ -40,11 +42,17 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
     
     n_a_E = params.n_a_E; % number of adaptation time constants for E neurons
     n_a_I = params.n_a_I; % number of adaptation time constants for I neurons
+    n_b_E = params.n_b_E; % number of STD timescales for E neurons (0 or 1)
+    n_b_I = params.n_b_I; % number of STD timescales for I neurons (0 or 1)
     
     W = params.W; % connection matrix (n x n)
     tau_d = params.tau_d; % dendritic time constant (scalar)
     tau_a_E = params.tau_a_E; % adaptation time constants for E neurons (1 x n_a_E)
     tau_a_I = params.tau_a_I; % adaptation time constants for I neurons (1 x n_a_I)
+    tau_b_E_rec = params.tau_b_E_rec; % STD recovery time constant for E neurons (scalar)
+    tau_b_E_rel = params.tau_b_E_rel; % STD release time constant for E neurons (scalar)
+    tau_b_I_rec = params.tau_b_I_rec; % STD recovery time constant for I neurons (scalar)
+    tau_b_I_rel = params.tau_b_I_rel; % STD release time constant for I neurons (scalar)
     
     % Adaptation scaling parameters
     if isfield(params, 'c_E')
@@ -63,11 +71,12 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
     if isfield(params, 'activation_function') && isa(params.activation_function, 'function_handle')
         activation_function = params.activation_function;
     else
-        activation_function = @(x) tanh(x); % default to tanh
+        error('SRNN_reservoir:MissingActivationFunction', ...
+              'params.activation_function must be provided as a function handle');
     end
 
     %% unpack state variables
-    % State organization: S = [a_E(:); a_I(:); x(:)]
+    % State organization: S = [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
     % S is N_sys_eqs x 1 here.
     current_idx = 0;
 
@@ -89,6 +98,24 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
     end
     current_idx = current_idx + len_a_I;
 
+    % --- STD states for E neurons (b_E) ---
+    len_b_E = n_E * n_b_E;
+    if len_b_E > 0
+        b_E = S(current_idx + (1:len_b_E));
+    else
+        b_E = [];
+    end
+    current_idx = current_idx + len_b_E;
+
+    % --- STD states for I neurons (b_I) ---
+    len_b_I = n_I * n_b_I;
+    if len_b_I > 0
+        b_I = S(current_idx + (1:len_b_I));
+    else
+        b_I = [];
+    end
+    current_idx = current_idx + len_b_I;
+
     % --- Dendritic states (x) ---
     x = S(current_idx + (1:n));
 
@@ -107,7 +134,16 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
         x_eff(I_indices) = x_eff(I_indices) - c_I * sum(a_I, 2);
     end
     
-    r = activation_function(x_eff); % n x 1, firing rate
+    % Apply STD effect (b multiplicative factor)
+    b = ones(n, 1);  % Initialize b = 1 for all neurons (no depression)
+    if n_b_E > 0 && ~isempty(b_E)
+        b(E_indices) = b_E;
+    end
+    if n_b_I > 0 && ~isempty(b_I)
+        b(I_indices) = b_I;
+    end
+    
+    r = b .* activation_function(x_eff); % n x 1, firing rate
 
     %% compute derivatives
     % dx/dt = -x/tau_d + W*r + u
@@ -129,9 +165,21 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
         da_I_dt = (r(I_indices) - a_I) ./ tau_a_I;
     end
 
+    % db_E/dt = (1 - b_E) / tau_b_E_rec - (b_E .* r_E) / tau_b_E_rel
+    db_E_dt = [];
+    if n_E > 0 && n_b_E > 0 && ~isempty(b_E)
+        db_E_dt = (1 - b_E) / tau_b_E_rec - (b_E .* r(E_indices)) / tau_b_E_rel;
+    end
+
+    % db_I/dt = (1 - b_I) / tau_b_I_rec - (b_I .* r_I) / tau_b_I_rel
+    db_I_dt = [];
+    if n_I > 0 && n_b_I > 0 && ~isempty(b_I)
+        db_I_dt = (1 - b_I) / tau_b_I_rec - (b_I .* r(I_indices)) / tau_b_I_rel;
+    end
+
     %% pack derivatives into output vector
-    % State organization: S = [a_E(:); a_I(:); x(:)]
-    dS_dt = [da_E_dt(:); da_I_dt(:); dx_dt];
+    % State organization: S = [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
+    dS_dt = [da_E_dt(:); da_I_dt(:); db_E_dt(:); db_I_dt(:); dx_dt];
 
 end
 
