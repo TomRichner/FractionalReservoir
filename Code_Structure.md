@@ -1,5 +1,16 @@
 # SRNN Reservoir Code Structure Documentation
 
+## scripts/setup_paths.m
+
+### Purpose
+`setup_paths.m` lives in the `scripts/` directory and is the one-stop helper for adding the sibling `src/`
+tree to the MATLAB path. Call `scripts/setup_paths` (or `setup_paths` from the same directory) before running any script that needs the shared `src` utilities so they can resolve without hardcoded `addpath` calls.
+
+### Behavior
+- locates the repository root relative to `scripts/`
+- ensures `<root>/src/` exists and errors otherwise
+- adds `src/` (recursively) to the MATLAB path, so downstream scripts can rely on the `src` functions without having to replicate the path-setup logic
+
 ## SRNN_reservoir.m
 
 ### Overview
