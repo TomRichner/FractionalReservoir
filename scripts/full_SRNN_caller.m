@@ -100,7 +100,7 @@ end
 rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
 fs = 100;  % Sampling frequency (Hz)
 dt = 1/fs;
-T = 200.0;    % Duration (s)
+T = 50.0;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
@@ -280,7 +280,7 @@ end
 r_ts = params.activation_function(x_eff_ts);  % n x nt (without b modulation)
 
 %% Plotting
-figure('Position', [-1847         378        1200         800]);
+figure('Position', [200 300        1200         800]);
 
 % Plot all neurons
 neuron_indices = 1:params.n;
@@ -420,7 +420,7 @@ n_plots = length(J_times);
 n_cols = ceil(sqrt(n_plots));
 n_rows = ceil(n_plots / n_cols);
 
-figure('Position', [-1847, -500, 1400, 1000]);
+figure('Position', [300, 400, 1400, 1000]);
 ax_handles = zeros(n_plots, 1);
 
 for i = 1:n_plots
