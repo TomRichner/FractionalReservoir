@@ -6,8 +6,10 @@ function y = piecewiseSigmoid(x, a, c)
 %
 %   Inputs:
 %     x - Input array or scalar.
-%     a - Half-width of the central linear segment (slope=1).
-%         Must be in the range [0, 0.5].
+%     a - Fraction of the domain from -0.5 to 0.5 that is linear (slope=1).
+%         Must be in the range [0, 1].
+%         a=0 gives a purely quadratic sigmoid.
+%         a=1 gives a hard sigmoid (piecewise linear).
 %     c - Horizontal shift (center) of the sigmoid.
 %
 %   Output:
@@ -15,9 +17,12 @@ function y = piecewiseSigmoid(x, a, c)
 %
 
 % --- Input Validation ---
-if a < 0 || a > 0.5
-    error('Parameter "a" must be between 0 and 0.5.');
+if a < 0 || a > 1
+    error('Parameter "a" must be between 0 and 1.');
 end
+
+% Convert a to half-width of the linear segment
+a = a / 2;
 
 % --- Case 1: Hard Sigmoid (a = 0.5) ---
 % This is a special case to avoid division by zero when a=0.5.
