@@ -7,7 +7,7 @@ rng(1)
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 
 % Setup parameters
-params.n = 200;
+params.n = 100;
 f = 0.5; % fraction of neurons that are E
 params.n_E = round(f*params.n);
 params.n_I = params.n-params.n_E;
