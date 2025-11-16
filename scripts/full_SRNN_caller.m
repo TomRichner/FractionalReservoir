@@ -35,8 +35,8 @@ spectral_radius = b_stdev * sqrt(params.n * d);  % Random matrix theory: ρ ≈ 
 level_of_chaos = 1.7;
 params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 
-params.n_a_E = 0;  % Two adaptation time constants for E neurons
-params.n_a_I = 0;  % No adaptation for I neurons
+params.n_a_E = 0;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = .2;  % Adaptation scaling for E neurons (scalar, typically 0-3)
@@ -44,16 +44,14 @@ params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
 params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
-params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
 params.tau_b_E_rel = 0.5;  % STD release time constant for E neurons (s)
-params.tau_b_I_rec = 0.5;  % STD recovery time constant for I neurons (s)
-params.tau_b_I_rel = 2;  % STD release time constant for I neurons (s)
-% params.activation_function = @(x) tanh(x);
-% params.activation_function_derivative = @(x) 1 - tanh(x).^2;
-% params.activation_function = @(x) min(max(0,x),1);
-% params.activation_function_derivative = @(x) double(and(0<=x, x<=1));
-params.activation_function = @(x) 1./(1 + exp(-4*x));
-params.activation_function_derivative = @(x) 4*params.activation_function(x).*(1 - params.activation_function(x));
+params.tau_b_I_rel = 0.5;  % STD release time constant for I neurons (s)
+params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
+params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
+
+
+params.activation_function = @(x) piecewiseSigmoid(x, 0.8, 0.4);
+params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, 0.8, 0.4);
 
 % Initial conditions
 N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n_E * params.n_b_E + params.n_I * params.n_b_I + params.n;
