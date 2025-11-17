@@ -60,22 +60,22 @@ else
     
     % Region 2: y = k * (x - x1)^2 (Left quadratic)
     % Note: x(mask_left_quad) is used for efficient vectorization
-    if any(mask_left_quad)
+    if any(mask_left_quad, 'all')
         y(mask_left_quad) = k * (x(mask_left_quad) - x1).^2;
     end
     
     % Region 3: y = (x - c) + 0.5 (Linear segment)
-    if any(mask_linear)
+    if any(mask_linear, 'all')
         y(mask_linear) = (x(mask_linear) - c) + 0.5;
     end
     
     % Region 4: y = 1 - k * (x - x4)^2 (Right quadratic)
-    if any(mask_right_quad)
+    if any(mask_right_quad, 'all')
         y(mask_right_quad) = 1 - k * (x(mask_right_quad) - x4).^2;
     end
     
     % Region 5: y = 1 (Right saturation)
-    if any(mask_right_sat)
+    if any(mask_right_sat, 'all')
         y(mask_right_sat) = 1;
     end
 end

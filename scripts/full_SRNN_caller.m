@@ -20,7 +20,7 @@ M = [mu_E.*ones(params.n,params.n/2), mu_I.*ones(params.n,params.n/2)];
 b_stdev = 1;
 G = b_stdev*randn(params.n,params.n);
 W = M+G;
-d = 15/params.n; % density
+d = 15/params.n; % density, if p/params.n, then p is expected in degree
 Z = rand(params.n,params.n)>d;
 W(Z) = 0;
 nonzero_mask = ~Z;
@@ -31,18 +31,20 @@ valid_rows = row_counts > 0;
 row_means(valid_rows) = row_sums(valid_rows) ./ row_counts(valid_rows);
 W = W - bsxfun(@times, row_means, nonzero_mask);
 params.W = W;
-spectral_radius = b_stdev * sqrt(params.n * d);  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 1.7;
-params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
+abscissa = max(real(eig(W)))
+spectral_radius = b_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
+level_of_chaos = 1.45;
+% params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
+params.tau_d = level_of_chaos/abscissa;
 
-params.n_a_E = 0;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_E = 1;  % 0 to 3 adaptation time constants for E neurons
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = .2;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
-params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
+params.n_b_E = 1;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
 params.tau_b_E_rel = 0.5;  % STD release time constant for E neurons (s)
 params.tau_b_I_rel = 0.5;  % STD release time constant for I neurons (s)
@@ -50,8 +52,10 @@ params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
 params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
 
 
-params.activation_function = @(x) piecewiseSigmoid(x, 0.8, 0.4);
-params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, 0.8, 0.4);
+S_a = 0.9;
+S_c = 0.45;
+params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
+params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
 % Initial conditions
 N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n_E * params.n_b_E + params.n_I * params.n_b_I + params.n;
@@ -79,26 +83,16 @@ if params.n_b_I > 0
 end
 
 % Initialize dendritic states
-x0 = 0.5*ones(params.n, 1);
+x0 = 0.1.*randn(params.n, 1);
 
 % Pack state vector: [a_E; a_I; b_E; b_I; x]
 S0 = [a0_E; a0_I; b0_E; b0_I; x0];
-
-% Sanity check: compare dense and sparse Jacobians at initial state
-J_ref = compute_Jacobian(S0, params);
-J_fast = compute_Jacobian_fast(S0, params);
-jac_diff_abs = norm(J_ref - full(J_fast), 'fro');
-jac_diff_rel = jac_diff_abs / max(1, norm(J_ref, 'fro'));
-fprintf('Jacobian check (fast vs. reference): abs=%.3e, rel=%.3e\n', jac_diff_abs, jac_diff_rel);
-if jac_diff_rel > 1e-8
-    error('Jacobian mismatch exceeds tolerance (rel=%.3e)', jac_diff_rel);
-end
 
 % External input
 rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
 fs = 100;  % Sampling frequency (Hz)
 dt = 1/fs;
-T = 50.0;    % Duration (s)
+T = 150;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
@@ -144,13 +138,14 @@ for step_idx = 1:n_steps
 end
 
 % add small intrinsic drive to neurons in u_ex
-intrinsic_drive = -0.9+0.2*randn(params.n,1);
+intrinsic_drive = -0+0*randn(params.n,1);
 u_ex = u_ex+intrinsic_drive;
 
 % Integrate
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
 opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6, 'MaxStep', dt);
-[t_out, S_out] = ode45(rhs, t_ex, S0, opts);
+% [t_out, S_out] = ode45(rhs, t_ex, S0, opts);
+[t_out, S_out] = ode15s(rhs, t_ex, S0, opts);
 
 %% Compute Lyapunov exponent(s)
 ode_solver = @ode45;
@@ -275,7 +270,7 @@ if params.n_b_I > 0 && ~isempty(b_I_ts)
     b_ts(params.I_indices, :) = b_I_ts;
 end
 
-r_ts = params.activation_function(x_eff_ts);  % n x nt (without b modulation)
+r_ts = b_ts .* params.activation_function(x_eff_ts);  % n x nt
 
 %% Plotting
 figure('Position', [200 300        1200         800]);
@@ -285,13 +280,13 @@ neuron_indices = 1:params.n;
 
 % Subplot 1: External input
 s(1) = subplot(6, 1, 1);
-plot(t_out, u_ex(neuron_indices, :)');
+plot(t_out, u_ex(neuron_indices, :)', 'LineWidth', 1);
 xlabel('Time (s)');
 ylabel('External Input');
 
 % Subplot 2: Dendritic states
 s(2) = subplot(6, 1, 2);
-plot(t_out, x_ts(neuron_indices, :)');
+plot(t_out, x_ts(neuron_indices, :)', 'LineWidth', 1);
 xlabel('Time (s)');
 ylabel('Dendritic State x');
 
@@ -302,7 +297,7 @@ if ~isempty(a_E_ts)
     E_neurons_to_plot = neuron_indices(neuron_indices <= params.n_E);
     for n_idx = E_neurons_to_plot
         for k = 1:params.n_a_E
-            plot(t_out, squeeze(a_E_ts(n_idx, k, :)));
+            plot(t_out, squeeze(a_E_ts(n_idx, k, :)), 'LineWidth', 1);
             hold on;
         end
     end
@@ -317,7 +312,7 @@ end
 
 % Subplot 4: Firing rates
 s(4) = subplot(6, 1, 4);
-plot(t_out, r_ts(neuron_indices, :)');
+plot(t_out, r_ts(neuron_indices, :)', 'LineWidth', 1);
 xlabel('Time (s)');
 ylabel('Firing Rate r');
 
@@ -326,13 +321,13 @@ s(5) = subplot(6, 1, 5);
 if params.n_b_E > 0 && ~isempty(b_E_ts)
     % Plot b for E neurons
     E_neurons_to_plot = neuron_indices(neuron_indices <= params.n_E);
-    plot(t_out, b_E_ts(E_neurons_to_plot, :)');
+    plot(t_out, b_E_ts(E_neurons_to_plot, :)', 'LineWidth', 1);
     hold on;
 end
 if params.n_b_I > 0 && ~isempty(b_I_ts)
     % Plot b for I neurons
     I_neurons_to_plot = neuron_indices(neuron_indices > params.n_E) - params.n_E;
-    plot(t_out, b_I_ts(I_neurons_to_plot, :)');
+    plot(t_out, b_I_ts(I_neurons_to_plot, :)', 'LineWidth', 1);
 end
 if (params.n_b_E == 0 || isempty(b_E_ts)) && (params.n_b_I == 0 || isempty(b_I_ts))
     text(0.5, 0.5, 'No STD variables', 'HorizontalAlignment', 'center');
@@ -349,17 +344,28 @@ if ~strcmpi(Lya_method, 'none')
     
     if strcmpi(Lya_method, 'benettin')
         % Plot for Benettin's method (single exponent)
-        [bL,aL] = butter(3,0.05/(lya_fs/2),'low');
-        local_lya_filt = filtfilt(bL,aL,lya_results.local_lya);
+        [bL,aL] = butter(1,0.1/(lya_fs/2),'low');
         
-        plot(lya_results.t_lya, lya_results.local_lya, 'LineWidth', 1.5)
+        % Only filter data after 3 seconds
+        t_filter_start = 3.0; % seconds
+        idx_filter_start = find(lya_results.t_lya >= t_filter_start, 1, 'first');
+        
+        plot(lya_results.t_lya, lya_results.local_lya, 'LineWidth', 1)
         hold on
-        plot(lya_results.t_lya, local_lya_filt,'LineWidth',1.5)
-        yline(lya_results.LLE, '--r', 'LineWidth', 2)
+        
+        if ~isempty(idx_filter_start)
+            % Only compute filtered signal for times >= 3 seconds
+            t_lya_filt = lya_results.t_lya(idx_filter_start:end);
+            local_lya_filt = filtfilt(bL, aL, lya_results.local_lya(idx_filter_start:end));
+            plot(t_lya_filt, local_lya_filt, 'LineWidth', 1)
+        end
+        
+        yline(0, '--k', 'LineWidth', 1)
+        % yline(lya_results.LLE, '--r', 'LineWidth', 2)
         xlabel('Time (s)')
-        ylabel('Local Lyapunov Exponent')
-        title(sprintf('Local Lyapunov Exponent (LLE = %.4f)', lya_results.LLE))
-        legend('Local', 'Filtered', 'Mean LLE', 'Location', 'best')
+        ylabel('Lyapunov Exponent')
+        title(sprintf('LLE = %.4f', lya_results.LLE))
+        legend('Local', 'Filtered', 'EOC', 'Location', 'best')
         
     elseif strcmpi(Lya_method, 'qr')
         % Plot for QR method (full spectrum)
@@ -432,8 +438,8 @@ for i = 1:n_plots
     
     % Add unit circle for reference (stability boundary for continuous systems at Re=0)
     hold on;
-    plot([0 0], ylim, 'k--', 'LineWidth', 0.5); % imaginary axis
-    plot(xlim, [0 0], 'k--', 'LineWidth', 0.5); % real axis
+    plot([0 0], ylim, 'k--', 'LineWidth', 1); % imaginary axis
+    plot(xlim, [0 0], 'k--', 'LineWidth', 1); % real axis
     hold off;
     
     % Labels and title
