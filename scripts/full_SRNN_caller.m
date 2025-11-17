@@ -161,9 +161,16 @@ if ~strcmpi(Lya_method, 'none')
     % Adjust lya_dt based on method: QR needs longer interval
     if strcmpi(Lya_method, 'qr')
         lya_dt = 0.1;  % Longer interval for QR method
+    elseif strcmpi(Lya_method, 'benettin')
+        lya_dt = 0.1;  % Standard interval for Benettin
     else
-        lya_dt = 0.1;   % Standard interval for Benettin
+        lya_dt = 0.1; 
     end
+    % check lya_dt is a nice multiple of dt
+    if abs(round(lya_dt/dt) - lya_dt/dt)>1e-11
+        error('lya_dt must be a multiple of dt')
+    end
+
     lya_fs = 1/lya_dt;
     
     switch lower(Lya_method)
