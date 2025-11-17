@@ -1,7 +1,7 @@
 close all
 clear all
 clc
-% rng(1)
+rng(1)
 
 % Lyapunov method selection
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
@@ -33,18 +33,18 @@ W = W - bsxfun(@times, row_means, nonzero_mask);
 params.W = W;
 abscissa = max(real(eig(W)))
 spectral_radius = b_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 5;
+level_of_chaos = 2;
 % params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 params.tau_d = level_of_chaos/abscissa;
 
-params.n_a_E = 3;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_E = 0;  % 0 to 3 adaptation time constants for E neurons
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
-params.n_b_E = 1;  % Number of STD timescales for E neurons (0 or 1)
+params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
 params.tau_b_E_rel = 0.25;  % STD release time constant for E neurons (s)
 params.tau_b_I_rel = 0.25;  % STD release time constant for I neurons (s)
@@ -52,8 +52,8 @@ params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
 params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
 
 
-S_a = 0.8;
-S_c = 0.4;
+S_a = 0.9;
+S_c = 0.45;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
@@ -89,8 +89,8 @@ x0 = 0.1.*randn(params.n, 1);
 S0 = [a0_E; a0_I; b0_E; b0_I; x0];
 
 % External input
-% rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
-fs = 100;  % Sampling frequency (Hz)
+rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
+fs = 100;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
 T = 150;    % Duration (s)
 t_ex = (0:dt:T)';
@@ -142,11 +142,16 @@ intrinsic_drive = -0+0*randn(params.n,1);
 u_ex = u_ex+intrinsic_drive;
 
 % Integrate
-ode_solver = @ode15s;
+ode_solver = @ode45;
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
-opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6, 'MaxStep', dt);
+jac_wrapper = @(t, S) compute_Jacobian_fast(S, params);
+opts = odeset('RelTol', 1e-7, 'AbsTol', 1e-7, 'MaxStep', 1*dt, 'Jacobian', jac_wrapper);
+% opts = odeset('RelTol', 1e-10, 'AbsTol', 1e-10, 'MaxStep', 0.1*dt, 'Jacobian', jac_wrapper); % high precision comparison
 % [t_out, S_out] = ode45(rhs, t_ex, S0, opts);
+disp('Integrating Equations...')
+tic
 [t_out, S_out] = ode_solver(rhs, t_ex, S0, opts);
+toc
 
 %% Compute Lyapunov exponent(s)
 T_interval = [0, T];
@@ -157,7 +162,7 @@ if ~strcmpi(Lya_method, 'none')
     if strcmpi(Lya_method, 'qr')
         lya_dt = 0.1;  % Longer interval for QR method
     else
-        lya_dt = 5*dt;   % Standard interval for Benettin
+        lya_dt = 0.1;   % Standard interval for Benettin
     end
     lya_fs = 1/lya_dt;
     
@@ -165,7 +170,9 @@ if ~strcmpi(Lya_method, 'none')
         case 'benettin'
             fprintf('Computing largest Lyapunov exponent using Benettin''s algorithm...\n');
             d0 = 1e-3;
+            tic
             [LLE, local_lya, finite_lya, t_lya] = benettin_algorithm(S_out, t_out, dt, fs, d0, T_interval, lya_dt, params, opts, @SRNN_reservoir, t_ex, u_ex, ode_solver);
+            toc
             fprintf('Largest Lyapunov Exponent: %.4f\n', LLE);
             lya_results.LLE = LLE; 
             lya_results.local_lya = local_lya; 
@@ -174,7 +181,9 @@ if ~strcmpi(Lya_method, 'none')
             
         case 'qr'
             fprintf('Computing full Lyapunov spectrum using QR decomposition method...\n');
+            tic
             [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya] = lyapunov_spectrum_qr(S_out, t_out, lya_dt, params, ode_solver, opts, @SRNN_Jacobian_wrapper, T_interval, N_sys_eqs, fs);
+            toc
             fprintf('Lyapunov Dimension: %.2f\n', compute_kaplan_yorke_dimension(LE_spectrum));
             lya_results.LE_spectrum = LE_spectrum; 
             lya_results.local_LE_spectrum_t = local_LE_spectrum_t; 
