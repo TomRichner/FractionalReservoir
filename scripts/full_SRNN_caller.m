@@ -1,7 +1,7 @@
 close all
 clear all
 clc
-rng(1)
+% rng(1)
 
 % Lyapunov method selection
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
@@ -33,27 +33,27 @@ W = W - bsxfun(@times, row_means, nonzero_mask);
 params.W = W;
 abscissa = max(real(eig(W)))
 spectral_radius = b_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 1.45;
+level_of_chaos = 5;
 % params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 params.tau_d = level_of_chaos/abscissa;
 
-params.n_a_E = 1;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_E = 3;  % 0 to 3 adaptation time constants for E neurons
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.c_E = .2;  % Adaptation scaling for E neurons (scalar, typically 0-3)
+params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
 params.n_b_E = 1;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
-params.tau_b_E_rel = 0.5;  % STD release time constant for E neurons (s)
-params.tau_b_I_rel = 0.5;  % STD release time constant for I neurons (s)
+params.tau_b_E_rel = 0.25;  % STD release time constant for E neurons (s)
+params.tau_b_I_rel = 0.25;  % STD release time constant for I neurons (s)
 params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
 params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
 
 
-S_a = 0.9;
-S_c = 0.45;
+S_a = 0.8;
+S_c = 0.4;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
@@ -89,7 +89,7 @@ x0 = 0.1.*randn(params.n, 1);
 S0 = [a0_E; a0_I; b0_E; b0_I; x0];
 
 % External input
-rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
+% rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
 fs = 100;  % Sampling frequency (Hz)
 dt = 1/fs;
 T = 150;    % Duration (s)
@@ -142,13 +142,13 @@ intrinsic_drive = -0+0*randn(params.n,1);
 u_ex = u_ex+intrinsic_drive;
 
 % Integrate
+ode_solver = @ode15s;
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
 opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6, 'MaxStep', dt);
 % [t_out, S_out] = ode45(rhs, t_ex, S0, opts);
-[t_out, S_out] = ode15s(rhs, t_ex, S0, opts);
+[t_out, S_out] = ode_solver(rhs, t_ex, S0, opts);
 
 %% Compute Lyapunov exponent(s)
-ode_solver = @ode45;
 T_interval = [0, T];
 lya_results = struct();
 

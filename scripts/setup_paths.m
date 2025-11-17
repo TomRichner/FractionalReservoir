@@ -13,6 +13,7 @@ if ~isfolder(srcPath)
         'Could not find src directory at %s', srcPath);
 end
 
+addpath(genpath(scriptDir));
 addpath(genpath(srcPath));
 end
 

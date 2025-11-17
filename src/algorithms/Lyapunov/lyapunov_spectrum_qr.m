@@ -26,6 +26,19 @@ function [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya_vec] = l
     end
 
     dt_fid = 1/fs_fid;
+
+    fid_dt = diff(t_fid_traj); % check that t_fid_traj is actually sampled at dt_fid
+    if ~isempty(fid_dt)
+        nominal_dt = median(fid_dt);
+        max_dt_dev = max(abs(fid_dt - nominal_dt));
+        tol_dt_dev = max(1e-4 * max(nominal_dt, eps(nominal_dt)), eps(dt_fid));
+        if max_dt_dev > tol_dt_dev
+            error('lyapunov_spectrum_qr:NonUniformSampling', ...
+                'Fiducial trajectory timestamps are not uniformly spaced. Max deviation %.3g s exceeds tolerance %.3g s.', ...
+                max_dt_dev, tol_dt_dev);
+        end
+    end
+
     deci_lya = round(lya_dt_interval / dt_fid);
     if deci_lya == 0
         error('lya_dt_interval is too small compared to the fiducial trajectory sampling time, leading to zero samples per interval.');
