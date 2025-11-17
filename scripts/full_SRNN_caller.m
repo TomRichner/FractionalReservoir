@@ -1,65 +1,86 @@
 close all
 clear all
 clc
-rng(1)
+
+params.rng_seeds = [1 2 3 4 5];
+rng(params.rng_seeds(1))
 
 % Lyapunov method selection
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 
-% Setup parameters
+%% time 
+fs = 100;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
+dt = 1/fs;
+T = 150;    % Duration (s)
+t_ex = (0:dt:T)';
+nt = length(t_ex);
+
+% set simulation parameters
 params.n = 100;
-f = 0.5; % fraction of neurons that are E
-params.n_E = round(f*params.n);
-params.n_I = params.n-params.n_E;
-params.E_indices = 1:params.n_E;
-params.I_indices = params.n_E+1:params.n;
+params.indegree = 15;
+params.f = 0.5; % fraction of neurons that are E
+params.G_stdev = 2;
+params.mu_E = 1;
+params.level_of_chaos = 5; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
 
-mu_E = 1;
-mu_I = -f*mu_E/(1-f);
-M = [mu_E.*ones(params.n,params.n/2), mu_I.*ones(params.n,params.n/2)];
-b_stdev = 1;
-G = b_stdev*randn(params.n,params.n);
-W = M+G;
-d = 15/params.n; % density, if p/params.n, then p is expected in degree
-Z = rand(params.n,params.n)>d;
-W(Z) = 0;
-nonzero_mask = ~Z;
-row_counts = sum(nonzero_mask, 2);
-row_sums = sum(W, 2);
-row_means = zeros(size(row_sums));
-valid_rows = row_counts > 0;
-row_means(valid_rows) = row_sums(valid_rows) ./ row_counts(valid_rows);
-W = W - bsxfun(@times, row_means, nonzero_mask);
-params.W = W;
-abscissa = max(real(eig(W)))
-spectral_radius = b_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 2;
-% params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
-params.tau_d = level_of_chaos/abscissa;
 
-params.n_a_E = 0;  % 0 to 3 adaptation time constants for E neurons
+%% set adaptation params
+params.n_a_E = 1;  % 0 to 3 adaptation time constants for E neurons
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
-params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
+params.n_b_E = 1;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
 params.tau_b_E_rel = 0.25;  % STD release time constant for E neurons (s)
 params.tau_b_I_rel = 0.25;  % STD release time constant for I neurons (s)
 params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
 params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
 
-
+%% set activaiton function
 S_a = 0.9;
 S_c = 0.45;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
-% Initial conditions
-N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n_E * params.n_b_E + params.n_I * params.n_b_I + params.n;
+%% dependent E vs I params
+params.n_E = round(params.f*params.n);
+params.n_I = params.n-params.n_E;
+params.N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n_E * params.n_b_E + params.n_I * params.n_b_I + params.n;
+params.E_indices = 1:params.n_E;
+params.I_indices = params.n_E+1:params.n;
+params.mu_I = -params.f*params.mu_E/(1-params.f);
 
+
+%% make W connection matrix
+M = [params.mu_E.*ones(params.n,params.n/2), params.mu_I.*ones(params.n,params.n/2)];
+G = params.G_stdev*randn(params.n,params.n);
+W = M+G;
+d = params.indegree/params.n; % density, if p/params.n, then p is expected in degree
+Z = rand(params.n,params.n)>d;
+W(Z) = 0;
+
+% % zero out row sum of non-zero elements
+nonzero_mask = ~Z;
+row_counts = sum(nonzero_mask, 2);
+row_sums = sum(W, 2);
+row_means = zeros(size(row_sums));
+valid_rows = row_counts > 0;
+row_means(valid_rows) = row_sums(valid_rows) ./ row_counts(valid_rows);
+W = W - bsxfun(@times, row_means, nonzero_mask); % 
+params.W = W;
+
+%% dependent level of dendritic self-negative feedback to achieve level of chaos given spectral abscissa
+% % compute expected and actual spectral abscissa
+abscissa = max(real(eig(W)))
+spectral_radius = params.G_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
+% params.tau_d = level_of_chaos/spectral_radius  % 10 ms
+params.tau_d = params.level_of_chaos/abscissa;
+params.tau_d=params.tau_d
+
+%% ICs
 % Initialize adaptation states
 a0_E = [];
 if params.n_a_E > 0
@@ -88,13 +109,8 @@ x0 = 0.1.*randn(params.n, 1);
 % Pack state vector: [a_E; a_I; b_E; b_I; x]
 S0 = [a0_E; a0_I; b0_E; b0_I; x0];
 
-% External input
-rng(2);  % Fresh seed for u_ex to keep it independent of S0 size
-fs = 100;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
-dt = 1/fs;
-T = 150;    % Duration (s)
-t_ex = (0:dt:T)';
-nt = length(t_ex);
+%% External input
+rng(params.rng_seeds(2));  % Fresh seed for u_ex to keep it independent of S0 size
 
 % Create random amplitude multidimensional sparse step function
 % step_period = 20;  % Time period for each step (seconds)
@@ -154,7 +170,7 @@ tic
 toc
 
 %% Compute Lyapunov exponent(s)
-T_interval = [0, T];
+T_interval = [3, T];
 lya_results = struct();
 
 if ~strcmpi(Lya_method, 'none')
@@ -189,14 +205,14 @@ if ~strcmpi(Lya_method, 'none')
         case 'qr'
             fprintf('Computing full Lyapunov spectrum using QR decomposition method...\n');
             tic
-            [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya] = lyapunov_spectrum_qr(S_out, t_out, lya_dt, params, ode_solver, opts, @SRNN_Jacobian_wrapper, T_interval, N_sys_eqs, fs);
+            [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya] = lyapunov_spectrum_qr(S_out, t_out, lya_dt, params, ode_solver, opts, @SRNN_Jacobian_wrapper, T_interval, params.N_sys_eqs, fs);
             toc
             fprintf('Lyapunov Dimension: %.2f\n', compute_kaplan_yorke_dimension(LE_spectrum));
             lya_results.LE_spectrum = LE_spectrum; 
             lya_results.local_LE_spectrum_t = local_LE_spectrum_t; 
             lya_results.finite_LE_spectrum_t = finite_LE_spectrum_t; 
             lya_results.t_lya = t_lya; 
-            lya_results.N_sys_eqs = N_sys_eqs;
+            lya_results.params.N_sys_eqs = params.N_sys_eqs;
 
             % sort LE spectra by real component (descending) and keep index map
             [sorted_LE, sort_idx] = sort(real(lya_results.LE_spectrum), 'descend');
@@ -211,7 +227,7 @@ if ~strcmpi(Lya_method, 'none')
 end
 
 %% Unpack state vector and compute firing rates
-% S_out is nt x N_sys_eqs, we need to unpack it
+% S_out is nt x params.N_sys_eqs, we need to unpack it
 % State organization: [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
 nt = size(S_out, 1);
 current_idx = 0;
@@ -360,10 +376,10 @@ if ~strcmpi(Lya_method, 'none')
     
     if strcmpi(Lya_method, 'benettin')
         % Plot for Benettin's method (single exponent)
-        [bL,aL] = butter(1,0.1/(lya_fs/2),'low');
+        [bL,aL] = butter(3,0.1/(lya_fs/2),'low');
         
         % Only filter data after 3 seconds
-        t_filter_start = 3.0; % seconds
+        t_filter_start = 5.0; % seconds
         idx_filter_start = find(lya_results.t_lya >= t_filter_start, 1, 'first');
         
         plot(lya_results.t_lya, lya_results.local_lya, 'LineWidth', 1)
@@ -372,7 +388,7 @@ if ~strcmpi(Lya_method, 'none')
         if ~isempty(idx_filter_start)
             % Only compute filtered signal for times >= 3 seconds
             t_lya_filt = lya_results.t_lya(idx_filter_start:end);
-            local_lya_filt = filtfilt(bL, aL, lya_results.local_lya(idx_filter_start:end));
+            local_lya_filt = filter(bL, aL, lya_results.local_lya(idx_filter_start:end));
             plot(t_lya_filt, local_lya_filt, 'LineWidth', 1)
         end
         
@@ -394,7 +410,7 @@ if ~strcmpi(Lya_method, 'none')
         ylabel('Lyapunov Exponents')
         
         % Add legend with final values (most positive exponents on top)
-        legend_count = min(5, lya_results.N_sys_eqs);
+        legend_count = min(5, lya_results.params.N_sys_eqs);
         legend_entries = cell(1, legend_count);
         for i = 1:legend_count
             legend_entries{i} = sprintf('\\lambda_{%d} = %.3f', i, lya_results.LE_spectrum(i));
