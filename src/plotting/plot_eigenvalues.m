@@ -46,6 +46,12 @@ function ax = plot_eigenvalues(eigenvalues, ax, time_value, x_lim, y_lim)
     if isempty(x_lim)
         x_lim = xlim;
     end
+
+    % Ensure right xlim always includes 0
+    if x_lim(2) < 0
+        x_lim(2) = 0.05;
+    end
+
     if isempty(y_lim)
         y_lim = ylim;
     end
@@ -63,7 +69,7 @@ function ax = plot_eigenvalues(eigenvalues, ax, time_value, x_lim, y_lim)
     
     % Add LaTeX formatted axis labels
     % Position Re label near right edge of x-axis
-    text(1.35*x_lim(2), 0, ' Re($\lambda$)', 'Interpreter', 'latex', ...
+    text(1.02*x_lim(2), 0, ' Re($\lambda$)', 'Interpreter', 'latex', ...
         'VerticalAlignment', 'middle');
     
     % Position Im label near top of y-axis

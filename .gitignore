@@ -50,6 +50,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# NOTE: .fig files (MATLAB figures) are NOT excluded
-# They will be tracked by git
+# Figure and data files
+*.fig
+*.mat
+*.svg
+*.png
+*.pdf
 

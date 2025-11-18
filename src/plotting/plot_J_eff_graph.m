@@ -36,7 +36,7 @@ function h_plot = plot_J_eff_graph(J, max_weight, color_limits)
     % Similar to: LWidths = 2.5*abs(dgA.Edges.Weight)/max_weight+1;
     weights = dgJ.Edges.Weight;
     abs_weights = abs(weights);
-    LWidths = 2.5 * abs_weights / max_weight + 0.5; % Slightly thinner base than before might be good for dense graphs
+    LWidths = 1 * abs_weights / max_weight; % Slightly thinner base than before might be good for dense graphs
     
     % Arrow size
     ASize = 10; 
@@ -49,7 +49,7 @@ function h_plot = plot_J_eff_graph(J, max_weight, color_limits)
         'ArrowSize', ASize, ...
         'ArrowPosition', 0.94, ...
         'NodeColor', [0.6 0.6 0.6], ... % Grey nodes
-        'MarkerSize', 5, ...
+        'MarkerSize', 4, ...
         'NodeLabel', {}, ...
         'LineStyle', '-');
     
