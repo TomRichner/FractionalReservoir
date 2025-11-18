@@ -1,8 +1,9 @@
-function [x, a, b, r] = unpack_and_compute_states(S_out, params)
+function [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
 % unpack_and_compute_states - Unpack state vector and compute dependent variables
 %
 % Syntax:
 %   [x, a, b, r] = unpack_and_compute_states(S_out, params)
+%   [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
 %
 % Description:
 %   Unpacks the state trajectory S_out into individual state variables,
@@ -10,20 +11,34 @@ function [x, a, b, r] = unpack_and_compute_states(S_out, params)
 %   the firing rate r with adaptation and STD effects.
 %
 % Inputs:
-%   S_out  - State trajectory (nt x N_sys_eqs)
-%            State organization: [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
-%   params - Struct containing network parameters
+%   S_out          - State trajectory (nt x N_sys_eqs) or column vector (N_sys_eqs x 1)
+%                    State organization: [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
+%   params         - Struct containing network parameters
+%   a_zeros_b_ones - (Optional) If true, returns a as zeros(n, nt) and b as ones(n, nt)
+%                    Default: false
 %
 % Outputs:
 %   x - Struct with fields .E (n_E x nt) and .I (n_I x nt) - dendritic states
+%       OR if a_zeros_b_ones is true: simple array (n x nt)
 %   a - Struct with fields .E (n_E x n_a_E x nt) and .I (n_I x n_a_I x nt) - adaptation
+%       OR if a_zeros_b_ones is true: zeros(n, nt)
 %   b - Struct with fields .E (n_E x nt) and .I (n_I x nt) - STD variables
+%       OR if a_zeros_b_ones is true: ones(n, nt)
 %   r - Struct with fields .E (n_E x nt) and .I (n_I x nt) - firing rates
+%       OR if a_zeros_b_ones is true: simple array (n x nt)
 %
 % Example:
 %   [x, a, b, r] = unpack_and_compute_states(S_out, params);
 %   plot(t, x.E');  % Plot excitatory dendritic states
+%
+%   [x, a, b, r] = unpack_and_compute_states(S_out, params, true);
+%   % a and b are now simple arrays for Jacobian computation
 
+    % Handle optional parameter
+    if nargin < 3
+        a_zeros_b_ones = false;
+    end
+    
     nt = size(S_out, 1);
     current_idx = 0;
     
@@ -132,5 +147,20 @@ function [x, a, b, r] = unpack_and_compute_states(S_out, params)
     % r: firing rates
     r.E = r_ts(params.E_indices, :);  % n_E x nt
     r.I = r_ts(params.I_indices, :);  % n_I x nt
+    
+    %% Override with zeros/ones if requested (for Jacobian computation)
+    if a_zeros_b_ones
+        % Return x as simple array instead of struct (n x nt)
+        x = x_ts;
+        
+        % Replace a with zeros (n x nt)
+        a = zeros(params.n, nt);
+        
+        % Replace b with ones (n x nt)
+        b = ones(params.n, nt);
+        
+        % Return r as simple array instead of struct (n x nt)
+        r = r_ts;
+    end
 end
 
