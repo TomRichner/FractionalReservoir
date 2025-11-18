@@ -296,10 +296,10 @@ This avoids repeatedly creating the interpolant object on every function call du
 
 ### Block construction highlights
 - `∂a/∂a` blocks: `kron(I_pop, diag(-1./τ)) + kron(diag(-b·c·φ'), τ^{-1}·1ᵀ)` captures both the diagonal leak and the shared adaptation coupling per neuron.
-- `∂a/∂b` & `∂a/∂x`: Formed via sparse triplets so each adaptation row only touches its neuron’s STD and dendritic states.
+- `∂a/∂b` & `∂a/∂x`: Formed via sparse triplets so each adaptation row only touches its neuron's STD and dendritic states.
 - `∂b/∂a`, `∂b/∂b`, `∂b/∂x`: Use diagonal matrices for per-neuron coefficients combined with `kron` replicators over adaptation columns.
-- `∂x/∂a` & `∂x/∂b`: Convert `W` to sparse and multiply by diagonal gain matrices, then replicate across adaptation/STD columns with `kron`.
-- `∂x/∂x`: Implemented exactly as `-I/τ_d + W * diag(b .* φ')`, ensuring consistency with the model equations.
+- `∂x/∂a` & `∂x/∂b`: Convert `W` to sparse and multiply by diagonal gain matrices, then replicate across adaptation/STD columns with `kron`. **All terms divided by τ_d** to match equation `dx/dt = (-x + W*r + u) / τ_d`.
+- `∂x/∂x`: Implemented as `diag(-1/τ_d) + (W * diag(b .* φ')) / τ_d`, with both diagonal and coupling terms properly scaled by τ_d.
 
 ### Usage
 - `full_SRNN_caller.m` now evaluates both Jacobians at the initial state (printing absolute/relative differences) and uses `compute_Jacobian_fast` inside the Lyapunov wrapper.
