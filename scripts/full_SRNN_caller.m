@@ -23,13 +23,17 @@ T = 2*14;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
+%% input
+u_ex_scale = 2;
+
 % set simulation parameters
-params.n = 16;
-params.indegree = 6;
+params.n = 50;
+params.indegree = 6; % expected indegree
+params.d = params.indegree/params.n; % expected density
 params.f = 0.5; % fraction of neurons that are E
-params.G_stdev = 0.1;
+params.G_stdev = 1/sqrt(params.indegree); % fix this equation such that the expected spectral radius of sparse W is 1. 
 params.mu_E = 1;
-params.level_of_chaos = 1.1; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
+params.level_of_chaos = 1.5; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
 
 
 %% set adaptation params
@@ -40,7 +44,7 @@ params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmical
 params.c_E = 0.5*1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
-params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
+params.n_b_E = 1;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
 params.tau_b_E_rel = 0.1;  % STD release time constant for E neurons (s)
 params.tau_b_I_rel = 0.1;  % STD release time constant for I neurons (s)
@@ -63,18 +67,26 @@ params.mu_I = -params.f*params.mu_E/(1-params.f);
 
 
 %% make W connection matrix
-[W, M, G, Z] = create_W_matrix(params);
+[W, M, G, Z] = create_W_matrix(params); % should use params.d not recompute it
 % Scale W based on abscissa to control level of chaos
-abscissa_0 = max(real(eig(W)));
+W_eigs = eig(W);
+radius_0 = max(abs(W_eigs))
+abscissa_0 = max(real(W_eigs))
+
+% add a plot of eigs of W here
+figure;
+plot_eigenvalues(W_eigs, gca, 0);
+title('Eigenvalues of unscaled W');
+
 gamma = 1 / abscissa_0;  % Scaling to reach edge of chaos
 params.W = params.level_of_chaos * gamma * W;
 
-%% Set fixed dendritic time constant
-% tau_d is now fixed; level of chaos is controlled via gamma scaling of W
-d = params.indegree/params.n; % density
-abscissa = max(real(eig(params.W)))  % Spectral abscissa of scaled W
-spectral_radius = params.G_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-params.tau_d = 0.1;  % Fixed at 25 ms
+% verify new abscissa and spectral radius
+W_eigs_1 = eig(params.W);
+radius_1 = max(abs(W_eigs_1))
+abscissa_1 = max(real(W_eigs_1))
+
+params.tau_d = 0.1;  % dentdritic time constant, seconds
 
 %% ICs
 S0 = initialize_state(params);
@@ -90,6 +102,7 @@ input_config.intrinsic_drive = -0 + 0*randn(params.n, 1);  % Intrinsic drive
 
 % Generate external input
 [u_ex, t_ex] = generate_external_input(params, T, fs, params.rng_seeds(2), input_config);
+u_ex = u_ex.*u_ex_scale; % way to turn it off easily
 nt = length(t_ex);
 step_period = fix(T/input_config.n_steps);
 n_steps = input_config.n_steps;
