@@ -31,6 +31,6 @@ function plot_dendritic_state(t, x)
     hold on;
     plot_lines_with_colormap(t, x.E, cmap_E);
     hold off;
-    ylabel('Dendritic State x');
+    ylabel('dendrite');
 end
 

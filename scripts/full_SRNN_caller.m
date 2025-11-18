@@ -14,33 +14,33 @@ params.rng_seeds = [1 2 3 4 5];
 rng(params.rng_seeds(1))
 
 % Lyapunov method selection
-Lya_method = 'qr'; % 'benettin', 'qr', or 'none'
+Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 
 %% time 
-fs = 250;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
+fs = 50;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
-T = 20;    % Duration (s)
+T = 2*14;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
 % set simulation parameters
-params.n = 100;
+params.n = 50;
 params.indegree = 20;
 params.f = 0.5; % fraction of neurons that are E
 params.G_stdev = 0.1;
 params.mu_E = 1;
-params.level_of_chaos = 2; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
+params.level_of_chaos = 1.5; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
 
 
 %% set adaptation params
-params.n_a_E = 3;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_E = 0;  % 0 to 3 adaptation time constants for E neurons
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
-params.n_b_E = 1;  % Number of STD timescales for E neurons (0 or 1)
+params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
 params.tau_b_E_rel = 0.1;  % STD release time constant for E neurons (s)
 params.tau_b_I_rel = 0.1;  % STD release time constant for I neurons (s)
@@ -180,7 +180,96 @@ for i = 1:n_plots
     evals = eigenvalues_all{i};
     time_val = t_out(J_times(i));
     ax_handles(i) = plot_eigenvalues(evals, ax_handles(i), time_val, global_xlim, global_ylim);
+    
+    % Add time annotation in lower left corner
+    x_range = diff(global_xlim);
+    y_range = diff(global_ylim);
+    text_x = global_xlim(1) + 0.05 * x_range;
+    text_y = global_ylim(1) + 0.05 * y_range;
+    text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
+        'FontSize', 14, 'Color', 'k', 'BackgroundColor', 'white', ...
+        'EdgeColor', 'none');
 end
 
 % Link axes of all subplots
 linkaxes(ax_handles, 'xy');
+
+
+%% new figure with imagesc plot of J_eff at J_times
+
+fprintf('Computing J_eff at %d time points...\n', length(J_times));
+
+omit_diagonal_in_J_eff = true;
+
+% Compute J_eff for each time point
+J_eff_array = zeros(params.n, params.n, length(J_times));
+for i = 1:length(J_times)
+    J_eff_array(:,:,i) = full(compute_J_eff(S_out(J_times(i),:)', params));
+    
+    % Optionally zero out diagonal to better visualize off-diagonal terms
+    if omit_diagonal_in_J_eff
+        J_eff_array(:,:,i) = J_eff_array(:,:,i) - diag(diag(J_eff_array(:,:,i)));
+    end
+end
+
+% Compute global color limits across all J_eff matrices
+if omit_diagonal_in_J_eff
+    % Exclude diagonal when computing color limits
+    all_J_eff_values = [];
+    for i = 1:length(J_times)
+        J_temp = J_eff_array(:,:,i);
+        % Get off-diagonal values only
+        all_J_eff_values = [all_J_eff_values; J_temp(~eye(size(J_temp)))];
+    end
+else
+    all_J_eff_values = J_eff_array(:);
+end
+
+% Use 90th percentile of absolute values of non-zero elements
+nonzero_abs_values = abs(all_J_eff_values(all_J_eff_values ~= 0));
+max_abs = prctile(nonzero_abs_values, 90);
+global_clim = [-max_abs, max_abs];
+
+% Create figure with same layout as eigenvalue figure
+figure('Position', [300, 400, 1400, 1000]);
+
+for i = 1:n_plots
+    subplot(n_rows, n_cols, i);
+    
+    % Plot J_eff matrix
+    imagesc(J_eff_array(:,:,i));
+    
+    % Set colormap and color limits
+    colormap(bluewhitered_colormap(256));
+    clim(global_clim);
+    
+    % Make axes square
+    axis square;
+    
+    % Remove ticks, labels, and box
+    set(gca, 'XTick', [], 'YTick', []);
+    box off;
+    
+    % Make axis lines white and send to back
+    set(gca, 'XColor', 'white', 'YColor', 'white', 'Layer', 'bottom');
+    
+    % Add time annotation below the plot
+    % For imagesc, y-axis is inverted (top=1, bottom=n), so below means y > max
+    time_val = t_out(J_times(i));
+    ax_lim = axis;  % Get current axis limits [xmin xmax ymin ymax]
+    text_x = ax_lim(1);
+    text_y = ax_lim(4) + 0 * (ax_lim(4) - ax_lim(3));  % Below the plot
+    text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
+        'FontSize', 14, 'Color', 'k', ...
+        'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+end
+
+%% Create separate colorbar figure for J_eff
+figure('Position', [100   346   285   154], 'Color', 'white');
+ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
+colormap(bluewhitered_colormap(256));
+cb = colorbar('Location', 'east');
+clim(global_clim);
+set(gca, 'Visible', 'off', 'Color', 'white');
+set(cb, 'AxisLocation', 'out', 'Ticks', []);
+ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);

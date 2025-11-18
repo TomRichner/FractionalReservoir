@@ -70,9 +70,6 @@ function ax = plot_eigenvalues(eigenvalues, ax, time_value, x_lim, y_lim)
     text(0, y_lim(2), 'Im($\lambda$)', 'Interpreter', 'latex', ...
         'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center');
     
-    % Add title with time value
-    title(sprintf('t = %.3f s', time_value));
-    
     % Restore axis limits (in case they changed)
     xlim(x_lim);
     ylim(y_lim);

@@ -52,7 +52,9 @@ function plot_std_variable(t, b, params)
     
     if has_std
         hold off;
-        ylabel('STD Variable b');
+        ylabel('depression');
+        ylim([0, 1]);
+        yticks([0, 1]);
     else
         % No STD variables to plot
         text(0.5, 0.5, 'No STD variables', 'HorizontalAlignment', 'center');

@@ -53,7 +53,7 @@ function plot_adaptation(t, a, params)
     
     if has_adaptation
         hold off;
-        ylabel('Adaptation a');
+        ylabel('adaptation');
     else
         % No adaptation variables to plot
         text(0.5, 0.5, 'No adaptation variables', 'HorizontalAlignment', 'center');

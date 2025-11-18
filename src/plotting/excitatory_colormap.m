@@ -6,8 +6,8 @@ function cmap = excitatory_colormap(n_colors)
 %   cmap = excitatory_colormap(n_colors)
 %
 % Description:
-%   Returns a colormap with discrete blues, greens, and cyans suitable
-%   for plotting excitatory neurons. The colormap can be used with
+%   Returns a colormap with discrete blues and cyans with varying saturation
+%   suitable for plotting excitatory neurons. The colormap can be used with
 %   MATLAB's colororder() function or set() for line plots.
 %
 % Inputs:
@@ -28,17 +28,18 @@ function cmap = excitatory_colormap(n_colors)
         n_colors = 8;
     end
     
-    % Base palette of 8 carefully selected blues, greens, and cyans
+    % Base palette of 8 carefully selected blues and cyans with varying saturation
+    % Includes saturated colors and desaturated (grayish) variants
     % Ordered to provide good visual distinction
     base_palette = [
-        0.00, 0.45, 0.74;  % Deep blue (MATLAB default blue)
-        0.00, 0.75, 1.00;  % Sky blue / bright cyan
-        0.00, 0.50, 0.50;  % Teal
-        0.30, 0.75, 0.93;  % Light cyan
-        0.00, 0.80, 0.80;  % Turquoise
-        0.47, 0.67, 0.19;  % Yellow-green
-        0.13, 0.55, 0.13;  % Forest green
-        0.00, 0.60, 0.40;  % Sea green
+        0.00, 0.45, 0.74;  % Deep blue (saturated)
+        0.00, 0.75, 1.00;  % Sky blue / bright cyan (saturated)
+        0.20, 0.47, 0.62;  % Desaturated deep blue (grayish)
+        0.00, 0.50, 0.50;  % Teal (saturated)
+        0.30, 0.75, 0.93;  % Light cyan (saturated)
+        0.25, 0.62, 0.75;  % Desaturated light cyan (grayish)
+        0.00, 0.80, 0.80;  % Turquoise (saturated)
+        0.15, 0.55, 0.65;  % Desaturated teal (grayish)
     ];
     
     n_base = size(base_palette, 1);

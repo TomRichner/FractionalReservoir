@@ -31,6 +31,7 @@ function plot_external_input(t, u)
     hold on;
     plot_lines_with_colormap(t, u.E, cmap_E);
     hold off;
-    ylabel('External Input');
+    ylabel('stim');
+    yticks([-1, 0, 1]);
 end
 

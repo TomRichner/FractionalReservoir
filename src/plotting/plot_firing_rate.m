@@ -31,6 +31,7 @@ function plot_firing_rate(t, r)
     hold on;
     plot_lines_with_colormap(t, r.E, cmap_E);
     hold off;
-    ylabel('Firing Rate r');
+    ylabel('firing rate');
+    yticks([0, 1]);
 end
 

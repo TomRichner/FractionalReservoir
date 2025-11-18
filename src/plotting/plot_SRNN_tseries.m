@@ -52,38 +52,74 @@ ax_handles = [];
 % Always create: External input
 ax_handles(end+1) = nexttile;
 plot_external_input(t_out, u);
+set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 
 % Always create: Dendritic states
 ax_handles(end+1) = nexttile;
 plot_dendritic_state(t_out, x);
+set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 
 % Always create: Firing rates
 ax_handles(end+1) = nexttile;
 plot_firing_rate(t_out, r);
+set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 
 % Conditionally create: Adaptation variables
 if has_adaptation
     ax_handles(end+1) = nexttile;
     plot_adaptation(t_out, a, params);
+    set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 end
 
 % Conditionally create: STD variables (b)
 if has_std
     ax_handles(end+1) = nexttile;
     plot_std_variable(t_out, b, params);
+    set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 end
 
 % Conditionally create: Lyapunov exponent(s)
 if has_lyapunov
     ax_handles(end+1) = nexttile;
-    plot_lyapunov(lya_results, Lya_method);
+    if strcmpi(Lya_method, 'benettin')
+        plot_lyapunov(lya_results, Lya_method, {'filtered', 'EOC', 'value'});
+    else
+        plot_lyapunov(lya_results, Lya_method);
+    end
+    set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 end
 
 % Link x-axes of all time series plots
 linkaxes(ax_handles,'x');
 
-% Add xlabel only to the last subplot
-xlabel(ax_handles(end), 'Time (s)');
+% Add time scale bar overlay in lower right of last subplot
+axes(ax_handles(end));  % Make last subplot current
+hold on;
+
+% Calculate scale bar length (round 1/10 of total time range)
+scale_bar_length = round(0.1 * (t_out(end) - t_out(1)));
+
+% Get current axis limits
+xlims = xlim;
+ylims = ylim;
+
+% Position scale bar in lower right corner
+% X position: end at 95% of x-axis width
+x_end = xlims(1) + 0.95 * (xlims(2) - xlims(1));
+x_start = x_end - scale_bar_length;
+% Y position: at 10% height from bottom
+y_pos = ylims(1) + 0.10 * (ylims(2) - ylims(1));
+
+% Draw scale bar
+plot([x_start, x_end], [y_pos, y_pos], 'k-', 'LineWidth', 4);
+
+% Add text label below scale bar
+text_x = (x_start + x_end) / 2;  % Center of scale bar
+text_y = ylims(1) + 0.05 * (ylims(2) - ylims(1));  % Below scale bar
+text(text_x, text_y, sprintf('%d seconds', scale_bar_length), ...
+    'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
+
+hold off;
 
 end
 
