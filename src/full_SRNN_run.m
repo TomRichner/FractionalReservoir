@@ -346,7 +346,7 @@ if save_workspace
         if ~exist(save_dir, 'dir')
             mkdir(save_dir);
         end
-        save(fullfile(save_dir, 'SRNN_run.mat'), '-v7.3');
+        save(fullfile(save_dir, 'SRNN_run.mat'), '-v7.3', '-nocompression');
     else
         warning('save_workspace is true but save_dir is empty. Workspace not saved.');
     end
