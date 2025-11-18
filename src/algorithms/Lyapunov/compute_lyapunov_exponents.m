@@ -44,7 +44,7 @@ function lya_results = compute_lyapunov_exponents(Lya_method, S_out, t_out, dt, 
     if strcmpi(Lya_method, 'qr')
         lya_dt = 0.1;  % Longer interval for QR method
     elseif strcmpi(Lya_method, 'benettin')
-        lya_dt = 0.1;  % Standard interval for Benettin
+        lya_dt = 0.02;  % Standard interval for Benettin
     else
         lya_dt = 0.1;
     end

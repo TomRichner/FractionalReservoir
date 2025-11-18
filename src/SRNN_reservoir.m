@@ -3,7 +3,7 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 % and short-term synaptic depression
 %
 % Implements the following equations:
-%   dx_i/dt = -x_i/tau_d + sum_j(w_ij * r_j) + u_i
+%   dx_i/dt = (-x_i + sum_j(w_ij * r_j) + u_i) / tau_d
 %   r_i = b_i * phi(x_i - c * sum_k(a_i,k))
 %   da_i,k/dt = (-a_i,k + r_i) / tau_k
 %   db_i/dt = (1 - b_i) / tau_rec - (b_i * r_i) / tau_rel
@@ -147,7 +147,7 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 
     %% compute derivatives
     % dx/dt = -x/tau_d + W*r + u
-    dx_dt = -x / tau_d + W * r + u;
+    dx_dt = (-x + W * r + u) / tau_d;
 
     % da_E/dt = (r_E - a_E) / tau_a_E
     da_E_dt = [];

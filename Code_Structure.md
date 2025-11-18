@@ -26,7 +26,7 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 The function implements the following system of differential equations:
 
 ```
-dx_i/dt = -x_i/τ_d + Σ_j w_ij * r_j + u_i
+dx_i/dt = (-x_i + Σ_j w_ij * r_j + u_i) / τ_d
 
 r_i = b_i * φ(x_i - c * Σ_k a_{i,k})
 
@@ -215,7 +215,7 @@ Firing rate of all neurons: `r = b .* activation_function(x_eff)`
 #### `dx_dt` (n × 1 column vector)
 Time derivative of dendritic states:
 ```matlab
-dx_dt = -x / tau_d + W * r + u
+dx_dt = (-x + W * r + u) / tau_d
 ```
 
 #### `da_E_dt` (n_E × n_a_E matrix, or empty)
@@ -577,7 +577,12 @@ Uses `create_W_matrix(params)` to generate:
 - **G**: Gaussian random perturbations (stdev = G_stdev)
 - **Z**: Binary sparsification mask
 
-Computes spectral abscissa and sets dendritic time constant `tau_d` to achieve desired chaos level.
+Computes spectral abscissa of unscaled W and applies gamma scaling to achieve desired chaos level:
+- **gamma = 1 / abscissa_0**: Scaling factor to reach edge of chaos (where spectral abscissa = 1)
+- **W_scaled = params.level_of_chaos * gamma * W**: Final scaled connectivity matrix
+- **tau_d = 0.025 s**: Fixed dendritic time constant (25 ms)
+
+With the equation `dx/dt = (-x + W*r + u) / tau_d`, the edge of chaos occurs when the spectral abscissa of W equals 1. The gamma scaling normalizes the unscaled matrix to this condition, then `params.level_of_chaos` controls whether the system is subcritical (<1), at the edge (=1), or chaotic (>1).
 
 #### 3. Initial Conditions
 Uses `initialize_state(params)` to create initial state vector `S0`:

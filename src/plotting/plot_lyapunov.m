@@ -25,11 +25,11 @@ function plot_lyapunov(lya_results, Lya_method)
         
         % Design low-pass Butterworth filter
         filter_order = 3;
-        filter_cutoff = 0.1;  % Normalized cutoff frequency
+        filter_cutoff = 1;  % Normalized cutoff frequency
         [bL, aL] = butter(filter_order, filter_cutoff/(lya_results.lya_fs/2), 'low');
         
         % Only filter data after specified time
-        t_filter_start = 5.0; % seconds
+        t_filter_start = 0.5; % seconds
         idx_filter_start = find(lya_results.t_lya >= t_filter_start, 1, 'first');
         
         % Plot raw local Lyapunov exponent
@@ -39,7 +39,7 @@ function plot_lyapunov(lya_results, Lya_method)
         % Plot filtered signal if we have enough data
         if ~isempty(idx_filter_start)
             t_lya_filt = lya_results.t_lya(idx_filter_start:end);
-            local_lya_filt = filter(bL, aL, lya_results.local_lya(idx_filter_start:end));
+            local_lya_filt = filtfilt(bL, aL, lya_results.local_lya(idx_filter_start:end));
             plot(t_lya_filt, local_lya_filt)
         end
         

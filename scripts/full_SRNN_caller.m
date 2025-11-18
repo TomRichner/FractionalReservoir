@@ -14,36 +14,36 @@ params.rng_seeds = [1 2 3 4 5];
 rng(params.rng_seeds(1))
 
 % Lyapunov method selection
-Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
+Lya_method = 'qr'; % 'benettin', 'qr', or 'none'
 
 %% time 
-fs = 100;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
+fs = 250;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
-T = 50;    % Duration (s)
+T = 20;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
 % set simulation parameters
 params.n = 100;
-params.indegree = 15;
+params.indegree = 20;
 params.f = 0.5; % fraction of neurons that are E
-params.G_stdev = 1;
+params.G_stdev = 0.1;
 params.mu_E = 1;
-params.level_of_chaos = 1.5; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
+params.level_of_chaos = 2; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
 
 
 %% set adaptation params
-params.n_a_E = 0;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_E = 3;  % 0 to 3 adaptation time constants for E neurons
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
-params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
+params.n_b_E = 1;  % Number of STD timescales for E neurons (0 or 1)
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
-params.tau_b_E_rel = 0.25;  % STD release time constant for E neurons (s)
-params.tau_b_I_rel = 0.25;  % STD release time constant for I neurons (s)
+params.tau_b_E_rel = 0.1;  % STD release time constant for E neurons (s)
+params.tau_b_I_rel = 0.1;  % STD release time constant for I neurons (s)
 params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
 params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
 
@@ -64,15 +64,17 @@ params.mu_I = -params.f*params.mu_E/(1-params.f);
 
 %% make W connection matrix
 [W, M, G, Z] = create_W_matrix(params);
-params.W = W;
+% Scale W based on abscissa to control level of chaos
+abscissa_0 = max(real(eig(W)));
+gamma = 1 / abscissa_0;  % Scaling to reach edge of chaos
+params.W = params.level_of_chaos * gamma * W;
 
-%% dependent level of dendritic self-negative feedback to achieve level of chaos given spectral abscissa
-% % compute expected and actual spectral abscissa
+%% Set fixed dendritic time constant
+% tau_d is now fixed; level of chaos is controlled via gamma scaling of W
 d = params.indegree/params.n; % density
-abscissa = max(real(eig(W)))
+abscissa = max(real(eig(params.W)))  % Spectral abscissa of scaled W
 spectral_radius = params.G_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-% params.tau_d = level_of_chaos/spectral_radius  % 10 ms
-params.tau_d = params.level_of_chaos/abscissa;
+params.tau_d = 0.025;  % Fixed at 25 ms
 
 %% ICs
 S0 = initialize_state(params);
@@ -81,7 +83,7 @@ S0 = initialize_state(params);
 % Configure external input parameters
 input_config.n_steps = 7;
 input_config.step_density = 0.2;  % Fraction of neurons receiving input at each step
-input_config.amp = 1;  % Amplitude scaling factor
+input_config.amp = 0.5;  % Amplitude scaling factor
 input_config.no_stim_pattern = false(1, input_config.n_steps);
 input_config.no_stim_pattern(1:2:end) = true;  % No stimulation for odd steps
 input_config.intrinsic_drive = -0 + 0*randn(params.n, 1);  % Intrinsic drive
@@ -105,7 +107,7 @@ tic
 toc
 
 %% Compute Lyapunov exponent(s)
-T_interval = [3, T];
+T_interval = [1, T];
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
 lya_results = compute_lyapunov_exponents(Lya_method, S_out, t_out, dt, fs, T_interval, params, opts, ode_solver, rhs, t_ex, u_ex);
 
