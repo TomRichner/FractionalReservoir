@@ -1,7 +1,7 @@
-close all
-clear all
+%close all
+clear
 clc
-rng(1)
+rng(2)
 
 % Lyapunov method selection
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
@@ -33,7 +33,7 @@ W = W - bsxfun(@times, row_means, nonzero_mask);
 params.W = W;
 abscissa = max(real(eig(W)))
 spectral_radius = b_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-level_of_chaos = 1.45;
+level_of_chaos = 1.3;
 % params.tau_d = level_of_chaos/spectral_radius;  % 10 ms
 params.tau_d = level_of_chaos/abscissa;
 
@@ -98,12 +98,12 @@ nt = length(t_ex);
 
 % Create random amplitude multidimensional sparse step function
 % step_period = 20;  % Time period for each step (seconds)
-step_density = 0.2;  % Fraction of neurons receiving input at each step
-amp = 1;  % Amplitude scaling factor
+step_density = 0.5;  % Fraction of neurons receiving input at each step
+amp = 2;  % Amplitude scaling factor
 
 % Calculate number of steps
 % n_steps = ceil(T / step_period);
-n_steps = 7;
+n_steps = 30;
 step_period = fix(T/n_steps);
 
 step_length = round(step_period * fs);  % Number of time points per step
@@ -140,7 +140,6 @@ end
 % add small intrinsic drive to neurons in u_ex
 intrinsic_drive = -0+0*randn(params.n,1);
 u_ex = u_ex+intrinsic_drive;
-
 % Integrate
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
 opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6, 'MaxStep', dt);
@@ -273,7 +272,7 @@ end
 r_ts = b_ts .* params.activation_function(x_eff_ts);  % n x nt
 
 %% Plotting
-figure('Position', [200 300        1200         800]);
+figure;
 
 % Plot all neurons
 neuron_indices = 1:params.n;
@@ -424,7 +423,7 @@ n_plots = length(J_times);
 n_cols = ceil(sqrt(n_plots));
 n_rows = ceil(n_plots / n_cols);
 
-figure('Position', [300, 400, 1400, 1000]);
+figure;
 ax_handles = zeros(n_plots, 1);
 
 for i = 1:n_plots

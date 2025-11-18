@@ -13,7 +13,7 @@
 %   4. Evaluates on validation and test sets
 %   5. Visualizes predictions and performance
 
-clear; close all; clc;
+clear; clc;
 
 fprintf('=================================================================\n');
 fprintf('  Fractional Reservoir ESN: Mackey-Glass Time Series Prediction\n');
@@ -23,7 +23,8 @@ fprintf('=================================================================\n\n')
 fprintf('Step 1: Generating Mackey-Glass time series...\n');
 
 % Generate chaotic time series (tau=17 for chaotic regime)
-[t, x_mg] = generate_mackey_glass('tau', 17, ...
+tau_mackey = 17;
+[t, x_mg] = generate_mackey_glass('tau', tau_mackey, ...
                                    'n_samples', 5000, ...
                                    'dt', 1.0, ...
                                    'discard', 1000);
@@ -52,8 +53,8 @@ fprintf('  Output dimension: %d\n\n', size(Y, 2));
 fprintf('Step 3: Initializing fractional reservoir ESN...\n');
 
 % Reservoir architecture
-n = 200;                    % Total number of neurons
-fraction_E = 0.8;           % 80% excitatory
+n = 40;                    % Total number of neurons
+fraction_E = 0.5;           % 80% excitatory
 n_E = round(n * fraction_E);
 n_I = n - n_E;
 
@@ -145,7 +146,7 @@ fprintf('Step 4: Training readout layer...\n');
 
 % Training configuration
 train_options = struct();
-train_options.train_ratio = 0.6;      % 60% for training
+train_options.train_ratio = 0.4;      % 60% for training
 train_options.val_ratio = 0.2;        % 20% for validation
 train_options.washout_steps = 200;    % Washout period
 train_options.lambda = 1e-6;          % Ridge regularization
@@ -219,7 +220,7 @@ Y_test_plot = Y_test(1:n_plot_samples, :);
 Y_test_pred_plot = Y_test_pred(1:n_plot_samples, :);
 
 % Create figure
-figure('Position', [100, 100, 1200, 800]);
+figure;
 
 % Subplot 1: Training predictions
 subplot(3, 2, 1);
@@ -287,6 +288,99 @@ set(gcf, 'Color', 'w');
 
 fprintf('  Visualization complete!\n\n');
 
+%% 6b. 3D Attractor Visualizations (Delay Embedding)
+fprintf('Step 6b: Creating 3D attractor visualizations...\n');
+
+% Delay for embedding (matches Mackey-Glass generation parameter tau)
+tau_embed = tau_mackey;
+
+% Helper function to create delay embedding coordinates
+create_embedding = @(signal, tau) [...
+    signal(1:end-2*tau), ...
+    signal(1+tau:end-tau), ...
+    signal(1+2*tau:end)];
+
+% Determine number of samples to plot (avoid cluttered visualization)
+n_samples_3d_train = min(1000, length(Y_train_full) - 2*tau_embed);
+n_samples_3d_val = min(1000, length(Y_val) - 2*tau_embed);
+n_samples_3d_test = min(1000, length(Y_test) - 2*tau_embed);
+
+% Create embeddings for training set
+Y_train_embed = create_embedding(Y_train_full(1:n_samples_3d_train+2*tau_embed), tau_embed);
+Y_train_pred_embed = create_embedding(Y_train_pred(1:n_samples_3d_train+2*tau_embed), tau_embed);
+
+% Create embeddings for validation set
+Y_val_embed = create_embedding(Y_val(1:n_samples_3d_val+2*tau_embed), tau_embed);
+Y_val_pred_embed = create_embedding(Y_val_pred(1:n_samples_3d_val+2*tau_embed), tau_embed);
+
+% Create embeddings for test set
+Y_test_embed = create_embedding(Y_test(1:n_samples_3d_test+2*tau_embed), tau_embed);
+Y_test_pred_embed = create_embedding(Y_test_pred(1:n_samples_3d_test+2*tau_embed), tau_embed);
+
+% Create figure with 3D attractor plots
+figure;
+
+% Subplot 1: Training Set Attractor
+subplot(1, 3, 1);
+plot3(Y_train_embed(:,1), Y_train_embed(:,2), Y_train_embed(:,3), ...
+      'b-', 'LineWidth', 1.2);
+hold on;
+plot3(Y_train_pred_embed(:,1), Y_train_pred_embed(:,2), Y_train_pred_embed(:,3), ...
+      'r-', 'LineWidth', 1.0, 'Color', [1, 0.5, 0]);
+xlabel(sprintf('x(t)'));
+ylabel(sprintf('x(t+%d)', tau_embed));
+zlabel(sprintf('x(t+%d)', 2*tau_embed));
+title('Training Set Attractor');
+legend('Ground Truth', 'Predicted', 'Location', 'best');
+grid on;
+view(-37.5, 30);  % Good viewing angle for 3D structure
+axis tight;
+
+% Subplot 2: Validation Set Attractor
+subplot(1, 3, 2);
+plot3(Y_val_embed(:,1), Y_val_embed(:,2), Y_val_embed(:,3), ...
+      'b-', 'LineWidth', 1.2);
+hold on;
+plot3(Y_val_pred_embed(:,1), Y_val_pred_embed(:,2), Y_val_pred_embed(:,3), ...
+      'r-', 'LineWidth', 1.0, 'Color', [1, 0.5, 0]);
+xlabel(sprintf('x(t)'));
+ylabel(sprintf('x(t+%d)', tau_embed));
+zlabel(sprintf('x(t+%d)', 2*tau_embed));
+title('Validation Set Attractor');
+legend('Ground Truth', 'Predicted', 'Location', 'best');
+grid on;
+view(-37.5, 30);
+axis tight;
+
+% Subplot 3: Test Set Attractor
+subplot(1, 3, 3);
+plot3(Y_test_embed(:,1), Y_test_embed(:,2), Y_test_embed(:,3), ...
+      'b-', 'LineWidth', 1.2);
+hold on;
+plot3(Y_test_pred_embed(:,1), Y_test_pred_embed(:,2), Y_test_pred_embed(:,3), ...
+      'r-', 'LineWidth', 1.0, 'Color', [1, 0.5, 0]);
+xlabel(sprintf('x(t)'));
+ylabel(sprintf('x(t+%d)', tau_embed));
+zlabel(sprintf('x(t+%d)', 2*tau_embed));
+title('Test Set Attractor');
+legend('Ground Truth', 'Predicted', 'Location', 'best');
+grid on;
+view(-37.5, 30);
+axis tight;
+
+% Overall title
+sgtitle(sprintf('3D Attractor Reconstruction (Delay Embedding, \\tau=%d)', tau_embed), ...
+        'FontSize', 14, 'FontWeight', 'bold');
+
+% Adjust layout
+set(gcf, 'Color', 'w');
+set(gcf, 'Position', [100, 100, 1400, 450]);  % Wider figure for 3 subplots
+
+fprintf('  3D attractor visualization complete!\n');
+fprintf('  Embedding delay: %d time steps\n', tau_embed);
+fprintf('  Points plotted - Train: %d, Val: %d, Test: %d\n\n', ...
+        n_samples_3d_train, n_samples_3d_val, n_samples_3d_test);
+
 %% 7. Summary
 fprintf('=================================================================\n');
 fprintf('  SUMMARY\n');
@@ -305,7 +399,7 @@ fprintf('  Test:       MSE = %.6f, NRMSE = %.4f\n', test_metrics.mse, test_metri
 fprintf('=================================================================\n');
 
 % Additional scatter plot for test predictions
-figure('Position', [150, 150, 600, 500]);
+figure;
 scatter(Y_test, Y_test_pred, 10, 'filled', 'MarkerFaceAlpha', 0.5);
 hold on;
 plot([min(Y_test), max(Y_test)], [min(Y_test), max(Y_test)], 'r--', 'LineWidth', 2);
