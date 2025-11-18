@@ -24,20 +24,20 @@ t_ex = (0:dt:T)';
 nt = length(t_ex);
 
 % set simulation parameters
-params.n = 50;
-params.indegree = 20;
+params.n = 16;
+params.indegree = 6;
 params.f = 0.5; % fraction of neurons that are E
 params.G_stdev = 0.1;
 params.mu_E = 1;
-params.level_of_chaos = 1.5; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
+params.level_of_chaos = 1.1; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
 
 
 %% set adaptation params
-params.n_a_E = 0;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_E = 3;  % 0 to 3 adaptation time constants for E neurons
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.1), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.1), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
+params.c_E = 0.5*1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
 params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
@@ -74,7 +74,7 @@ params.W = params.level_of_chaos * gamma * W;
 d = params.indegree/params.n; % density
 abscissa = max(real(eig(params.W)))  % Spectral abscissa of scaled W
 spectral_radius = params.G_stdev * sqrt(params.n * d)  % Random matrix theory: ρ ≈ σ√(Np) for sparse random matrix
-params.tau_d = 0.025;  % Fixed at 25 ms
+params.tau_d = 0.1;  % Fixed at 25 ms
 
 %% ICs
 S0 = initialize_state(params);
@@ -122,18 +122,12 @@ u.I = u_ex(params.I_indices, :);
 [~, ~] = plot_SRNN_tseries(t_out, u, x, r, a, b, params, lya_results, Lya_method);
 
 %% Compute Jacobian eigenvalues at multiple time points
-% Sample at t=0 and 1 second before/after each step change
-step_change_times = (0:step_period:(n_steps-1)*step_period);  % Times when steps change (0, 20, 40, ...)
-J_times_sec = [0];  % Start with t=0
-
-% Add 1 second before and after each step change (except t=0)
-for i = 2:length(step_change_times)
-    t_change = step_change_times(i);
-    if t_change - 1 > 0  % Make sure we don't go below 0
-        J_times_sec = [J_times_sec, t_change - 1];
-    end
-    if t_change + 1 <= T  % Make sure we don't exceed T
-        J_times_sec = [J_times_sec, t_change + 1];
+% Sample at the center of each stimulus ON period
+J_times_sec = [];
+for k = 1:n_steps
+    if ~input_config.no_stim_pattern(k)
+        t_center = (k-1)*step_period + step_period/2;
+        J_times_sec = [J_times_sec, t_center];
     end
 end
 
@@ -152,8 +146,13 @@ end
 
 %% Plot eigenvalue distributions on complex plane
 n_plots = length(J_times);
-n_cols = ceil(sqrt(n_plots));
-n_rows = ceil(n_plots / n_cols);
+if n_plots <= 4
+    n_rows = 1;
+    n_cols = n_plots;
+else
+    n_cols = ceil(sqrt(n_plots));
+    n_rows = ceil(n_plots / n_cols);
+end
 
 figure('Position', [300, 400, 1400, 1000]);
 ax_handles = zeros(n_plots, 1);
@@ -273,3 +272,20 @@ clim(global_clim);
 set(gca, 'Visible', 'off', 'Color', 'white');
 set(cb, 'AxisLocation', 'out', 'Ticks', []);
 ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
+
+%% Plot J_eff as directed graph
+figure('Position', [300, 400, 1400, 1000]);
+
+for i = 1:n_plots
+    subplot(n_rows, n_cols, i);
+    
+    % Plot J_eff graph
+    % Reuse max_abs and global_clim from imagesc section
+    plot_J_eff_graph(J_eff_array(:,:,i), max_abs, global_clim);
+    
+    % Add time annotation
+    time_val = t_out(J_times(i));
+    text(-1.3, 1.3, sprintf('t = %.2f s', time_val), ...
+        'FontSize', 14, 'Color', 'k', 'HorizontalAlignment', 'left');
+end
+

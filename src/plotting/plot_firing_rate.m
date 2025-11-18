@@ -33,5 +33,6 @@ function plot_firing_rate(t, r)
     hold off;
     ylabel('firing rate');
     yticks([0, 1]);
+    ylim([0, 1]);
 end
 
