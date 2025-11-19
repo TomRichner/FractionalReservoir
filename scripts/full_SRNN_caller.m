@@ -1,5 +1,5 @@
-close all
-clear all
+%close all
+clear
 clc
 
 % background of all figs should be white
@@ -167,7 +167,7 @@ else
     n_rows = ceil(n_plots / n_cols);
 end
 
-figure('Position', [300, 400, 1400, 1000]);
+figure;
 ax_handles = zeros(n_plots, 1);
 
 % Compute global axis limits across all eigenvalue sets
