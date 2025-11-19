@@ -1,5 +1,6 @@
 %close all
 clear
+clear_SRNN_persistent();
 clc
 
 % background of all figs should be white
