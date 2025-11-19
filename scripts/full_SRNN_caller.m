@@ -54,7 +54,7 @@ params.tau_b_I_rec = 1;  % STD recovery time constant for I neurons (s)
 
 %% set activaiton function
 S_a = 0.9;
-S_c = 0.45;
+S_c = 0.4;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 

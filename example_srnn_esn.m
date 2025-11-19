@@ -53,7 +53,7 @@ fprintf('  Output dimension: %d\n\n', size(Y, 2));
 fprintf('Step 3: Initializing fractional reservoir ESN...\n');
 
 % Reservoir architecture
-n = 50;                    % Total number of neurons
+n = 50;                    % Total number of neurons % often the best looking chaos starts art n = 100
 fraction_E = 0.5;           % 80% excitatory
 n_E = round(n * fraction_E);
 n_I = n - n_E;
@@ -62,15 +62,15 @@ fprintf('  Reservoir size: %d neurons (%d E, %d I)\n', n, n_E, n_I);
 
 % Fractional-order parameters: Multiple adaptation timescales
 n_a_E = 3;  % 3 adaptation timescales for E neurons
-n_a_I = 2;  % 2 adaptation timescales for I neurons
-tau_a_E = logspace(log10(0.25), log10(25), n_a_E);  % Fast, medium, slow adaptation
+n_a_I = 2;  % 2 adaptation timescales for I neurons % this makes I neurons have some adaptation, which may be good
+tau_a_E = logspace(log10(0.25), log10(25), n_a_E);  % Fast, medium, slow adaptation,  if n_a_E == 1, then only 25 is used.  
 tau_a_I = logspace(log10(0.25), log10(25), n_a_I);
 
 fprintf('  Adaptation timescales (E): [%s]\n', num2str(tau_a_E));
 fprintf('  Adaptation timescales (I): [%s]\n', num2str(tau_a_I));
 
 % Short-term depression parameters
-n_b_E = 1;  % Enable STD for E neurons
+n_b_E = 1;  % Enable STD for E neurons  % can set to zero for less stability
 n_b_I = 0;  % No STD for I neurons
 tau_b_E_rec = 2;   % Recovery time constant
 tau_b_E_rel = 0.5;   % Release time constant
@@ -82,19 +82,24 @@ fprintf('  STD enabled for E neurons (tau_rec=%.0f, tau_rel=%.0f)\n', ...
 tau_d = 0.1;
 
 % Adaptation scaling factors
-c_E = 0.25*1/3;  % Moderate adaptation effect for E neurons
+c_E = 0.1*1/3;  % Moderate adaptation effect for E neurons % you can make this lower to allow more "free" dynamics
 c_I = 0.1;  % Weaker adaptation for I neurons
 
 % Create recurrent weight matrix W with spectral radius scaling
-rng(42);  % For reproducibility
+rng(42);  % For reproducibility, % because 42
 W = randn(n, n);
 
 % Dale's law: E neurons have positive weights, I neurons negative
 W(:, 1:n_E) = abs(W(:, 1:n_E));      % E columns positive
-W(:, n_E+1:end) = -abs(W(:, n_E+1:end));  % I columns negative
+W(:, n_E+1:end) = -abs(W(:, n_E+1:end));  % I columns negative 
+% with this construction of W, the random matrix theory of expected spectral radius won't necessarily work
+% but since we are computing the actual abscissa of W, it all should work out fine.
+% my create_W_matrix(params) might improve on this
+W = W-mean(W,2); % this ensures that all rows sum to zero 
+% which reduces the outlier eigs of W, and therefore "richer" dynamics which are not dominated by a single real eig or pair of eigs
 
 % Scale to desired spectral radius
-spectral_radius = 1.45;
+spectral_radius = 1;   %  I'd keep this at 1 here, because it is re-adjusted by level of chaos anyway.  might not matter or might be redundant.
 W_eigs = eig(W);
 rho = max(abs(W_eigs));
 W = (spectral_radius / rho) * W;
@@ -109,19 +114,22 @@ W_in = (2 * rand(n, n_inputs) - 1) * input_scaling;
 fprintf('  Input scaling: %.2f\n', input_scaling);
 
 % Activation function (ReLU-like with threshold)
-activation_function = @(x) max(0, x);
+a_0=0.5; % bias of the activation function.
+activation_function = @(x) min(max(0, x-a_0),1); % hard sigmoid with bias to middle. Sigmoid is much better than relu for chaos, and then you don't need STD to ensure stability
+% if the sigmoid is biased to the center, then the level_of_chaos is true.  
+% if not biased to the center, then actual level of chaos is lower due to rectification or saturation
 
 %level of chaos
-level_of_chaos = 1.5;
-abscissa_0 = max(real(W_eigs));
-gamma = 1 / abscissa_0;
+level_of_chaos = 1.5; % this can go much higher up if adaptation and depression are used.  1.0 assumes no adaptation or depression
+abscissa_0 = max(real(W_eigs)); 
+gamma = 1 / abscissa_0; % calcualtes the adjustment to make 
 
 % Pack parameters
 params = struct();
 params.n = n;
 params.n_E = n_E;
 params.n_I = n_I;
-params.W = level_of_chaos * gamma * W; %Check if this is contradictory with spectral radius
+params.W = level_of_chaos * gamma * W; % this looks good.  gamma corrects W to have absciss of 1, wand then level_of_chaos pushes it into chaos
 params.W_in = W_in;
 params.tau_d = tau_d;
 params.n_a_E = n_a_E;
