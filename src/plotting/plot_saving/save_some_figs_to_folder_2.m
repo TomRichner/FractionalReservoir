@@ -20,6 +20,14 @@ end
 h = get(0,'children');
 h = flipud(h);
 
+% Initialize PDF report if requested
+if any(strcmpi(fig_type, 'pdf'))
+    pdf_file = fullfile(save_folder, [save_name '_report.pdf']);
+    if exist(pdf_file, 'file')
+        delete(pdf_file);
+    end
+end
+
 for i=fig_vec
     set(i,'PaperPositionMode','auto')  
     if any(strcmpi(fig_type,'fig'))
@@ -30,6 +38,10 @@ for i=fig_vec
     end
     if any(strcmpi(fig_type,'svg'))
         set(gcf, 'Renderer', 'painters');
-        saveas(i, fullfile(save_folder, [save_name '_figure_' num2str(i)]), 'svg');
+        exportgraphics(figure(i), fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']), 'BackgroundColor', 'none', 'ContentType', 'vector');
+    end
+    if any(strcmpi(fig_type, 'pdf'))
+        % Append to PDF report
+        exportgraphics(figure(i), pdf_file, 'Append', true, 'ContentType', 'vector');
     end
 end

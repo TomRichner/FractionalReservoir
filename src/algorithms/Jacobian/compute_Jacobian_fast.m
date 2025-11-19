@@ -199,30 +199,30 @@ function J = compute_Jacobian_fast(S, params)
     if len_a_E > 0
         replicate_a_E = kron(speye(n_E), ones(1, n_a_E));
         block = -c_E * W_sparse(:, E_indices) * spdiags(b(E_indices) .* phi_prime_x_eff(E_indices), 0, n_E, n_E);
-        J(row_x, col_a_E) = block * replicate_a_E;
+        J(row_x, col_a_E) = (block * replicate_a_E) / tau_d;
     end
     
     if len_a_I > 0
         replicate_a_I = kron(speye(n_I), ones(1, n_a_I));
         block = -c_I * W_sparse(:, I_indices) * spdiags(b(I_indices) .* phi_prime_x_eff(I_indices), 0, n_I, n_I);
-        J(row_x, col_a_I) = block * replicate_a_I;
+        J(row_x, col_a_I) = (block * replicate_a_I) / tau_d;
     end
     
     if len_b_E > 0
         replicate_b_E = kron(speye(n_E), ones(1, max(1, n_b_E)));
         block = W_sparse(:, E_indices) * spdiags(phi_x_eff(E_indices), 0, n_E, n_E);
-        J(row_x, col_b_E) = block * replicate_b_E;
+        J(row_x, col_b_E) = (block * replicate_b_E) / tau_d;
     end
     
     if len_b_I > 0
         replicate_b_I = kron(speye(n_I), ones(1, max(1, n_b_I)));
         block = W_sparse(:, I_indices) * spdiags(phi_x_eff(I_indices), 0, n_I, n_I);
-        J(row_x, col_b_I) = block * replicate_b_I;
+        J(row_x, col_b_I) = (block * replicate_b_I) / tau_d;
     end
     
     diag_term = spdiags(-ones(n,1)/tau_d, 0, n, n);
     gain_diag = spdiags(b .* phi_prime_x_eff, 0, n, n);
-    J(row_x, col_x) = diag_term + W_sparse * gain_diag;
+    J(row_x, col_x) = diag_term + (W_sparse * gain_diag) / tau_d;
 end
 
 function value = safe_get(params, field, default_value)

@@ -60,7 +60,7 @@ function [LLE, local_lya, finite_lya, t_lya] = benettin_algorithm(X, t, dt, fs, 
         % Pass the now-bounded X_k_pert and the detailed t_seg_detailed to the ODE solver
         % ode_options are passed along; for ode45 they dictate MaxStep=dt, 
         % for ode4/ode_RKn they are mostly ignored for step control but passed to odefun if needed.
-        [~, X_pert_output_all_steps] = ode_solver(@(tt,XX) dynamics_func(tt,XX,t_ex,u_ex,params), t_seg_detailed, X_k_pert, ode_options);
+        [~, X_pert_output_all_steps] = ode_solver(dynamics_func, t_seg_detailed, X_k_pert, ode_options);
         
         X_pert_end = X_pert_output_all_steps(end,:).';
         

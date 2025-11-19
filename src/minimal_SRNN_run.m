@@ -1,6 +1,19 @@
-%close all
-clear
-clc
+function [t_out, S_out, params, lya_results] = minimal_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, save_dir, save_figs, save_workspace, note)
+% MINIMAL_SRNN_RUN Runs the SRNN simulation with specified parameters and minimal plotting.
+%
+% Inputs:
+%   u_ex_scale    - Scaling factor for external input
+%   n_a_E         - Number of adaptation time constants for E neurons
+%   n_b_E         - Number of STD timescales for E neurons
+%   level_of_chaos- Level of chaos parameter
+%   save_dir      - Directory path to save outputs
+%   save_figs     - Boolean, whether to save figures
+%   save_workspace- Boolean, whether to save the workspace
+%   note          - Optional string for naming figures (default: 'SRNN')
+
+if nargin < 8 || isempty(note)
+    note = 'SRNN';
+end
 
 % background of all figs should be white
 set(groot, 'DefaultFigureColor', 'white');
@@ -10,50 +23,50 @@ set(groot, 'DefaultLineLineWidth', 1);
 set(groot, 'DefaultAxesLineWidth', 1);
 set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 
-params.rng_seeds = [1 3 3 4 5];
+% params.rng_seeds = [5 3 3 4 5];
+params.rng_seeds = [5 3 3 4 5];
 rng(params.rng_seeds(1))
 
 % Lyapunov method selection
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 
 %% time 
-fs = 100;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
+fs = 400;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
-T = 60;    % Duration (s)
+T = 30;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
 %% input
-u_ex_scale = 2;
+% u_ex_scale passed as argument
 
 % set simulation parameters
 params.n = 50;
-params.indegree = 6; % expected indegree
+params.indegree = 10; % expected indegree
 params.d = params.indegree/params.n; % expected density
 params.f = 0.5; % fraction of neurons that are E
 params.G_stdev = 1/sqrt(params.indegree); % fix this equation such that the expected spectral radius of sparse W is 1. 
 params.mu_E = 1;
-params.level_of_chaos = 1.5; % 1 = EOC based on computed abscissa of W. if phi(0)=0 and d_phi_dt(0) = 1. Fixed point, being closer to nonlinear inflection, or input drive can change actual level of choas
-
+params.level_of_chaos = level_of_chaos; % Passed as argument
 
 %% set adaptation params
-params.n_a_E = 1;  % 0 to 3 adaptation time constants for E neurons
+params.n_a_E = n_a_E;  % Passed as argument
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.25), log10(25), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.25), log10(25), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = 0.25*1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
-params.n_b_E = 0;  % Number of STD timescales for E neurons (0 or 1)
+params.n_b_E = n_b_E;  % Passed as argument
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
 params.tau_b_E_rel = 0.5;  % STD release time constant for E neurons (s)
 params.tau_b_I_rel = 0.5;  % STD release time constant for I neurons (s)
 params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
-params.tau_b_I_rec = 1;  % STD recovery time constant for I neurons (s)
+params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
 
 %% set activaiton function
 S_a = 0.9;
-S_c = 0.45;
+S_c = 0.4;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
@@ -73,10 +86,10 @@ W_eigs = eig(W);
 radius_0 = max(abs(W_eigs))
 abscissa_0 = max(real(W_eigs))
 
-% add a plot of eigs of W here
-figure;
-plot_eigenvalues(W_eigs, gca, 0);
-title('Eigenvalues of unscaled W');
+% % add a plot of eigs of W here
+% figure;
+% plot_eigenvalues(W_eigs, gca, 0);
+% title('Eigenvalues of unscaled W');
 
 gamma = 1 / abscissa_0;  % Scaling to reach edge of chaos
 params.W = params.level_of_chaos * gamma * W;
@@ -124,15 +137,21 @@ T_interval = [1, T];
 rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
 lya_results = compute_lyapunov_exponents(Lya_method, S_out, t_out, dt, fs, T_interval, params, opts, ode_solver, rhs, t_ex, u_ex);
 
+%% Decimate state vector for plotting
+plot_deci = round(fs/20);
+[t_plot, S_plot, plot_indices] = decimate_states(t_out, S_out, plot_deci);
+
 %% Unpack state vector and compute firing rates
-[x, a, b, r] = unpack_and_compute_states(S_out, params);
+[x_plot, a_plot, b_plot, r_plot] = unpack_and_compute_states(S_plot, params);
 
 % Split external input into E and I
-u.E = u_ex(params.E_indices, :);
-u.I = u_ex(params.I_indices, :);
+u_ex_plot = u_ex(:, plot_indices);
+u_plot.E = u_ex_plot(params.E_indices, :);
+u_plot.I = u_ex_plot(params.I_indices, :);
 
 %% Plotting
-[~, ~] = plot_SRNN_tseries(t_out, u, x, r, a, b, params, lya_results, Lya_method);
+% Use the minimal plotter here
+[~, ~] = plot_SRNN_tseries_minimal(t_plot, u_plot, x_plot, r_plot, a_plot, b_plot, params, lya_results, Lya_method);
 
 %% Compute Jacobian eigenvalues at multiple time points
 % Sample at the center of each stimulus ON period
@@ -167,7 +186,7 @@ else
     n_rows = ceil(n_plots / n_cols);
 end
 
-figure;
+figure('Position', [ 1039         488         904         287]);
 ax_handles = zeros(n_plots, 1);
 
 % Compute global axis limits across all eigenvalue sets
@@ -192,15 +211,16 @@ for i = 1:n_plots
     evals = eigenvalues_all{i};
     time_val = t_out(J_times(i));
     ax_handles(i) = plot_eigenvalues(evals, ax_handles(i), time_val, global_xlim, global_ylim);
+    set(ax_handles(i), 'Color', 'none');
     
     % Add time annotation in lower left corner
-    x_range = diff(global_xlim);
-    y_range = diff(global_ylim);
-    text_x = global_xlim(1) + 0.05 * x_range;
-    text_y = global_ylim(1) + 0.05 * y_range;
-    text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
-        'FontSize', 14, 'Color', 'k', 'BackgroundColor', 'white', ...
-        'EdgeColor', 'none');
+    % x_range = diff(global_xlim);
+    % y_range = diff(global_ylim);
+    % text_x = global_xlim(1) + 0.05 * x_range;
+    % text_y = global_ylim(1) + 0.05 * y_range;
+    % text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
+    %     'FontSize', 14, 'Color', 'k', 'BackgroundColor', 'white', ...
+    %     'EdgeColor', 'none');
 end
 
 % Link axes of all subplots
@@ -243,7 +263,7 @@ max_abs = prctile(nonzero_abs_values, 90);
 global_clim = [-max_abs, max_abs];
 
 % Create figure with same layout as eigenvalue figure
-figure('Position', [300, 400, 1400, 1000]);
+figure('Position', [300, 400,    900,   400]);
 
 for i = 1:n_plots
     subplot(n_rows, n_cols, i);
@@ -261,6 +281,7 @@ for i = 1:n_plots
     % Remove ticks, labels, and box
     set(gca, 'XTick', [], 'YTick', []);
     box off;
+    set(gca, 'Color', 'none');
     
     % Make axis lines white and send to back
     set(gca, 'XColor', 'white', 'YColor', 'white', 'Layer', 'bottom');
@@ -268,12 +289,12 @@ for i = 1:n_plots
     % Add time annotation below the plot
     % For imagesc, y-axis is inverted (top=1, bottom=n), so below means y > max
     time_val = t_out(J_times(i));
-    ax_lim = axis;  % Get current axis limits [xmin xmax ymin ymax]
-    text_x = ax_lim(1);
-    text_y = ax_lim(4) + 0 * (ax_lim(4) - ax_lim(3));  % Below the plot
-    text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
-        'FontSize', 14, 'Color', 'k', ...
-        'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+    % ax_lim = axis;  % Get current axis limits [xmin xmax ymin ymax]
+    % text_x = ax_lim(1);
+    % text_y = ax_lim(4) + 0 * (ax_lim(4) - ax_lim(3));  % Below the plot
+    % text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
+    %     'FontSize', 14, 'Color', 'k', ...
+    %     'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
 end
 
 %% Create separate colorbar figure for J_eff
@@ -282,12 +303,12 @@ ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
 colormap(bluewhitered_colormap(256));
 cb = colorbar('Location', 'east');
 clim(global_clim);
-set(gca, 'Visible', 'off', 'Color', 'white');
+set(gca, 'Visible', 'off', 'Color', 'none');
 set(cb, 'AxisLocation', 'out', 'Ticks', []);
 ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
 
 %% Plot J_eff as directed graph
-figure('Position', [300, 400, 1400, 1000]);
+figure('Position', [300, 400,    900,   400]);
 
 for i = 1:n_plots
     subplot(n_rows, n_cols, i);
@@ -295,10 +316,45 @@ for i = 1:n_plots
     % Plot J_eff graph
     % Reuse max_abs and global_clim from imagesc section
     plot_J_eff_graph(J_eff_array(:,:,i), max_abs, global_clim);
+    set(gca, 'Color', 'none');
     
     % Add time annotation
     time_val = t_out(J_times(i));
-    text(-1.3, 1.3, sprintf('t = %.2f s', time_val), ...
-        'FontSize', 14, 'Color', 'k', 'HorizontalAlignment', 'left');
+    % text(-1.3, 1.3, sprintf('t = %.2f s', time_val), ...
+    %     'FontSize', 14, 'Color', 'k', 'HorizontalAlignment', 'left');
+end
+
+%% Save results
+if save_figs
+    if ~isempty(save_dir)
+        figs_folder = fullfile(save_dir, 'figs');
+        if ~exist(figs_folder, 'dir')
+            mkdir(figs_folder);
+        end
+        
+        % Find all open figures
+        fig_handles = findobj('Type', 'figure');
+        % Sort by figure number
+        [~, idx] = sort([fig_handles.Number]);
+        fig_handles = fig_handles(idx);
+        fig_vec = [fig_handles.Number];
+        
+        save_some_figs_to_folder_2(figs_folder, note, fig_vec, {'fig', 'svg', 'png', 'pdf'});
+    else
+        warning('save_figs is true but save_dir is empty. Figures not saved.');
+    end
+end
+
+if save_workspace
+    if ~isempty(save_dir)
+        if ~exist(save_dir, 'dir')
+            mkdir(save_dir);
+        end
+        save(fullfile(save_dir, 'SRNN_run.mat'), '-v7.3', '-nocompression');
+    else
+        warning('save_workspace is true but save_dir is empty. Workspace not saved.');
+    end
+end
+
 end
 

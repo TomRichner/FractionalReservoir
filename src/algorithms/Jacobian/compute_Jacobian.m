@@ -390,8 +390,8 @@ function J = compute_Jacobian(S, params)
     %% ORIGINAL BLOCKS FOR dx/dt (updated to account for b in r)
     
     %% Block 7: ∂(dx/dt)/∂a_E
-    % dx_i/dt = -x_i/τ_d + Σ_j w_ij r_j + u_i, where r_j = b_j*φ(x_eff_j)
-    % ∂(dx_i/dt)/∂a_{j,k} = w_ij * b_j * φ'(x_eff_j) * (-c_E) for j in E_indices
+    % dx_i/dt = (-x_i + Σ_j w_ij r_j + u_i) / τ_d, where r_j = b_j*φ(x_eff_j)
+    % ∂(dx_i/dt)/∂a_{j,k} = (w_ij * b_j * φ'(x_eff_j) * (-c_E)) / τ_d for j in E_indices
     if len_a_E > 0
         for i = 1:n
             row_idx = row_x_start + i - 1;
@@ -400,14 +400,14 @@ function J = compute_Jacobian(S, params)
                 b_j = b(neuron_j);
                 for k = 1:n_a_E
                     col_idx = (j-1)*n_a_E + k;
-                    J(row_idx, col_idx) = -c_E * W(i, neuron_j) * b_j * phi_prime_x_eff(neuron_j);
+                    J(row_idx, col_idx) = (-c_E * W(i, neuron_j) * b_j * phi_prime_x_eff(neuron_j)) / tau_d;
                 end
             end
         end
     end
     
     %% Block 8: ∂(dx/dt)/∂a_I
-    % ∂(dx_i/dt)/∂a_{j,k} = w_ij * b_j * φ'(x_eff_j) * (-c_I) for j in I_indices
+    % ∂(dx_i/dt)/∂a_{j,k} = (w_ij * b_j * φ'(x_eff_j) * (-c_I)) / τ_d for j in I_indices
     if len_a_I > 0
         for i = 1:n
             row_idx = row_x_start + i - 1;
@@ -416,50 +416,50 @@ function J = compute_Jacobian(S, params)
                 b_j = b(neuron_j);
                 for k = 1:n_a_I
                     col_idx = col_a_I_start + (j-1)*n_a_I + k - 1;
-                    J(row_idx, col_idx) = -c_I * W(i, neuron_j) * b_j * phi_prime_x_eff(neuron_j);
+                    J(row_idx, col_idx) = (-c_I * W(i, neuron_j) * b_j * phi_prime_x_eff(neuron_j)) / tau_d;
                 end
             end
         end
     end
     
     %% Block 8b: ∂(dx/dt)/∂b_E
-    % dx_i/dt = -x_i/τ_d + Σ_j w_ij r_j + u_i, where r_j = b_j*φ(x_eff_j)
-    % ∂(dx_i/dt)/∂b_j = w_ij * φ(x_eff_j) for j in E_indices
+    % dx_i/dt = (-x_i + Σ_j w_ij r_j + u_i) / τ_d, where r_j = b_j*φ(x_eff_j)
+    % ∂(dx_i/dt)/∂b_j = (w_ij * φ(x_eff_j)) / τ_d for j in E_indices
     if len_b_E > 0
         for i = 1:n
             row_idx = row_x_start + i - 1;
             for j = 1:n_E
                 neuron_j = E_indices(j);
                 col_idx = col_b_E_start + (j-1)*n_b_E;
-                J(row_idx, col_idx) = W(i, neuron_j) * phi_x_eff(neuron_j);
+                J(row_idx, col_idx) = (W(i, neuron_j) * phi_x_eff(neuron_j)) / tau_d;
             end
         end
     end
     
     %% Block 8c: ∂(dx/dt)/∂b_I
-    % ∂(dx_i/dt)/∂b_j = w_ij * φ(x_eff_j) for j in I_indices
+    % ∂(dx_i/dt)/∂b_j = (w_ij * φ(x_eff_j)) / τ_d for j in I_indices
     if len_b_I > 0
         for i = 1:n
             row_idx = row_x_start + i - 1;
             for j = 1:n_I
                 neuron_j = I_indices(j);
                 col_idx = col_b_I_start + (j-1)*n_b_I;
-                J(row_idx, col_idx) = W(i, neuron_j) * phi_x_eff(neuron_j);
+                J(row_idx, col_idx) = (W(i, neuron_j) * phi_x_eff(neuron_j)) / tau_d;
             end
         end
     end
     
     %% Block 9: ∂(dx/dt)/∂x
-    % ∂(dx_i/dt)/∂x_j = -δ_{ij}/τ_d + w_ij * b_j * φ'(x_eff_j)
+    % ∂(dx_i/dt)/∂x_j = (-δ_{ij} + w_ij * b_j * φ'(x_eff_j)) / τ_d
     for i = 1:n
         row_idx = row_x_start + i - 1;
         for j = 1:n
             col_idx = col_x_start + j - 1;
             b_j = b(j);
             if i == j
-                J(row_idx, col_idx) = -1/tau_d + W(i, j) * b_j * phi_prime_x_eff(j);
+                J(row_idx, col_idx) = (-1 + W(i, j) * b_j * phi_prime_x_eff(j)) / tau_d;
             else
-                J(row_idx, col_idx) = W(i, j) * b_j * phi_prime_x_eff(j);
+                J(row_idx, col_idx) = (W(i, j) * b_j * phi_prime_x_eff(j)) / tau_d;
             end
         end
     end

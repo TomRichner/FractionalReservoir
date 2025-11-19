@@ -26,7 +26,7 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 The function implements the following system of differential equations:
 
 ```
-dx_i/dt = -x_i/τ_d + Σ_j w_ij * r_j + u_i
+dx_i/dt = (-x_i + Σ_j w_ij * r_j + u_i) / τ_d
 
 r_i = b_i * φ(x_i - c * Σ_k a_{i,k})
 
@@ -215,7 +215,7 @@ Firing rate of all neurons: `r = b .* activation_function(x_eff)`
 #### `dx_dt` (n × 1 column vector)
 Time derivative of dendritic states:
 ```matlab
-dx_dt = -x / tau_d + W * r + u
+dx_dt = (-x + W * r + u) / tau_d
 ```
 
 #### `da_E_dt` (n_E × n_a_E matrix, or empty)
@@ -258,58 +258,6 @@ The function uses persistent variables for efficient input interpolation:
 
 This avoids repeatedly creating the interpolant object on every function call during ODE integration.
 
----
-
-## Usage Example
-
-```matlab
-% Setup parameters
-params.n = 100;
-params.n_E = 80;
-params.n_I = 20;
-params.E_indices = 1:80;
-params.I_indices = 81:100;
-params.n_a_E = 2;  % Two adaptation time constants for E neurons
-params.n_a_I = 0;  % No adaptation for I neurons
-params.n_b_E = 1;  % STD for E neurons
-params.n_b_I = 0;  % No STD for I neurons
-params.W = randn(100, 100) * 0.1;  % Example connectivity
-params.tau_d = 0.01;  % 10 ms
-params.tau_a_E = [0.1, 1.0];  % Fast and slow adaptation
-params.tau_a_I = [];  % Empty since n_a_I = 0
-params.tau_b_E_rec = 0.8;  % 800 ms recovery
-params.tau_b_E_rel = 0.05;  % 50 ms release
-params.tau_b_I_rec = 0.8;  % Only used if n_b_I > 0
-params.tau_b_I_rel = 0.05;  % Only used if n_b_I > 0
-params.c_E = 0.2;  % Adaptation scaling for E neurons
-params.c_I = 0.1;  % Adaptation scaling for I neurons
-params.activation_function = @(x) 1./(1 + exp(-4*x));  % Sigmoid
-params.activation_function_derivative = @(x) 4*params.activation_function(x).*(1 - params.activation_function(x));
-
-% Initial conditions
-N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n_E * params.n_b_E + params.n_I * params.n_b_I + params.n;
-% State organization: [a_E; a_I; b_E; b_I; x]
-a0_E = zeros(params.n_E * params.n_a_E, 1);
-a0_I = zeros(params.n_I * params.n_a_I, 1);
-b0_E = ones(params.n_E * params.n_b_E, 1);  % Initialize to 1 (no depression)
-b0_I = ones(params.n_I * params.n_b_I, 1);
-x0 = randn(params.n, 1) * 0.01;
-S0 = [a0_E; a0_I; b0_E; b0_I; x0];
-
-% External input
-fs = 1000;  % Sampling frequency (Hz)
-T = 1.0;    % Duration (s)
-t_ex = linspace(0, T, T*fs+1)';
-u_ex = randn(params.n, length(t_ex)) * 0.5;  % Random input
-
-% Integrate
-rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
-opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
-[t_out, S_out] = ode45(rhs, t_ex, S0, opts);
-```
-
----
-
 ## Notes
 
 1. **Dale's Law**: The connection matrix `W` should respect Dale's law (excitatory neurons only make excitatory connections, inhibitory neurons only make inhibitory connections).
@@ -348,10 +296,10 @@ opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
 
 ### Block construction highlights
 - `∂a/∂a` blocks: `kron(I_pop, diag(-1./τ)) + kron(diag(-b·c·φ'), τ^{-1}·1ᵀ)` captures both the diagonal leak and the shared adaptation coupling per neuron.
-- `∂a/∂b` & `∂a/∂x`: Formed via sparse triplets so each adaptation row only touches its neuron’s STD and dendritic states.
+- `∂a/∂b` & `∂a/∂x`: Formed via sparse triplets so each adaptation row only touches its neuron's STD and dendritic states.
 - `∂b/∂a`, `∂b/∂b`, `∂b/∂x`: Use diagonal matrices for per-neuron coefficients combined with `kron` replicators over adaptation columns.
-- `∂x/∂a` & `∂x/∂b`: Convert `W` to sparse and multiply by diagonal gain matrices, then replicate across adaptation/STD columns with `kron`.
-- `∂x/∂x`: Implemented exactly as `-I/τ_d + W * diag(b .* φ')`, ensuring consistency with the model equations.
+- `∂x/∂a` & `∂x/∂b`: Convert `W` to sparse and multiply by diagonal gain matrices, then replicate across adaptation/STD columns with `kron`. **All terms divided by τ_d** to match equation `dx/dt = (-x + W*r + u) / τ_d`.
+- `∂x/∂x`: Implemented as `diag(-1/τ_d) + (W * diag(b .* φ')) / τ_d`, with both diagonal and coupling terms properly scaled by τ_d.
 
 ### Usage
 - `full_SRNN_caller.m` now evaluates both Jacobians at the initial state (printing absolute/relative differences) and uses `compute_Jacobian_fast` inside the Lyapunov wrapper.
@@ -360,10 +308,357 @@ opts = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
 
 ---
 
+## create_W_matrix.m
+
+### Overview
+`create_W_matrix.m` generates a sparse connectivity matrix W with structured excitatory/inhibitory balance and row-mean centering. Located in `src/connectivity/`, it encapsulates the network connectivity generation logic.
+
+### Function Signature
+```matlab
+function [W, M, G, Z] = create_W_matrix(params)
+```
+
+### Inputs
+- **params** (struct): Contains network connectivity parameters
+  - `n`: Total number of neurons
+  - `n_E`: Number of excitatory neurons
+  - `n_I`: Number of inhibitory neurons
+  - `mu_E`: Mean excitatory connection strength
+  - `mu_I`: Mean inhibitory connection strength
+  - `G_stdev`: Standard deviation of Gaussian perturbations
+  - `indegree`: Expected in-degree (number of inputs per neuron)
+
+### Outputs
+- **W** (n × n matrix): Final connectivity matrix (sparse, row-mean centered)
+- **M** (n × n matrix): Mean connectivity structure
+- **G** (n × n matrix): Gaussian random perturbations
+- **Z** (n × n binary matrix): Sparsification mask (1 = connection removed)
+
+### Algorithm
+1. Creates mean structure M: first n_E columns get mu_E, remaining n_I columns get mu_I
+2. Adds Gaussian perturbations: W = M + G where G ~ N(0, G_stdev)
+3. Applies sparsification: removes connections with probability (1 - indegree/n)
+4. Row-mean centering: subtracts mean of non-zero elements in each row
+
+### Design Rationale
+- **Row-mean centering**: Ensures balanced input to each neuron on average
+- **Structured sparsity**: Maintains biologically realistic connectivity patterns
+- **Separate outputs**: Returns M, G, Z for analysis while keeping params lightweight
+
+---
+
+## initialize_state.m
+
+### Overview
+`initialize_state.m` creates the initial state vector S0 for the SRNN with adaptation and short-term depression. Located in `src/`, it handles the complex state packing logic.
+
+### Function Signature
+```matlab
+function S0 = initialize_state(params)
+```
+
+### Inputs
+- **params** (struct): Network parameters
+  - `n`, `n_E`, `n_I`: Network size
+  - `n_a_E`, `n_a_I`: Number of adaptation timescales
+  - `n_b_E`, `n_b_I`: Number of STD timescales (0 or 1)
+
+### Output
+- **S0** (N_sys_eqs × 1 vector): Initial state organized as `[a_E(:); a_I(:); b_E(:); b_I(:); x(:)]`
+
+### Initialization Strategy
+- **a_E, a_I** (adaptation): Initialized to zero (no initial adaptation)
+- **b_E, b_I** (STD): Initialized to one (no initial depression)
+- **x** (dendritic): Small random values ~N(0, 0.01²) to break symmetry
+
+### Usage
+Eliminates repetitive initialization code and ensures consistent state packing across simulations.
+
+---
+
+## generate_external_input.m
+
+### Overview
+`generate_external_input.m` creates sparse random step function inputs for network stimulation. Located in `src/`, it provides flexible control over temporal and spatial input patterns.
+
+### Function Signature
+```matlab
+function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_config)
+```
+
+### Inputs
+- **params** (struct): Contains `n` (number of neurons)
+- **T** (scalar): Simulation duration (seconds)
+- **fs** (scalar): Sampling frequency (Hz)
+- **rng_seed** (scalar): Random seed for reproducibility
+- **input_config** (struct):
+  - `n_steps`: Number of temporal steps
+  - `step_density`: Fraction of neurons receiving input per step (0-1)
+  - `amp`: Amplitude scaling factor
+  - `no_stim_pattern`: Logical array (1 × n_steps) specifying no-stim steps
+  - `intrinsic_drive`: Constant background input (n × 1)
+
+### Outputs
+- **u_ex** (n × nt matrix): External input, rows = neurons, columns = time
+- **t_ex** (nt × 1 vector): Time vector
+
+### Algorithm
+1. Generates random step amplitudes for each (neuron, step) pair
+2. Applies spatial sparsity via step_density threshold
+3. Zeros out steps specified in no_stim_pattern
+4. Creates continuous-time signal by replicating steps
+5. Adds constant intrinsic_drive
+
+### Design Features
+- **Vectorized**: Precomputes all random values for efficiency
+- **Flexible patterns**: Supports arbitrary stimulation sequences
+- **Reproducible**: Uses dedicated RNG seed independent of network initialization
+
+---
+
+## compute_lyapunov_exponents.m
+
+### Overview
+`compute_lyapunov_exponents.m` is a unified wrapper for Lyapunov exponent computation supporting multiple methods. Located in `src/algorithms/Lyapunov/`, it simplifies the calling interface and includes helper functions.
+
+### Function Signature
+```matlab
+function lya_results = compute_lyapunov_exponents(Lya_method, S_out, t_out, dt, fs, T_interval, params, opts, ode_solver, rhs_func, t_ex, u_ex)
+```
+
+### Inputs
+- **Lya_method** (string): 'benettin', 'qr', or 'none'
+- **S_out** (nt × N_sys_eqs): State trajectory
+- **t_out** (nt × 1): Time vector
+- **dt, fs**: Time step and sampling frequency
+- **T_interval** ([T_start, T_end]): Analysis time window
+- **params**: SRNN parameters
+- **opts**: ODE solver options
+- **ode_solver**: Function handle (e.g., @ode45)
+- **rhs_func**: RHS function for integration
+- **t_ex, u_ex**: External input data
+
+### Outputs
+- **lya_results** (struct): Method-dependent results
+  - For 'benettin': `LLE`, `local_lya`, `finite_lya`, `t_lya`
+  - For 'qr': `LE_spectrum`, `local_LE_spectrum_t`, `finite_LE_spectrum_t`, `t_lya`, `sort_idx`, `params.N_sys_eqs`
+  - For 'none': empty struct
+
+### Methods
+
+#### Benettin's Algorithm
+- Tracks single perturbation vector to compute largest Lyapunov exponent (LLE)
+- Faster, suitable for chaos detection
+- Returns time series of local and finite-time exponents
+
+#### QR Decomposition Method
+- Integrates tangent space using QR orthogonalization
+- Computes full Lyapunov spectrum
+- Automatically sorts by descending real part
+- Computes Kaplan-Yorke dimension
+
+### Helper Functions
+- **compute_kaplan_yorke_dimension**: Calculates fractal dimension from spectrum
+- **SRNN_Jacobian_wrapper**: Provides Jacobian for QR method
+
+---
+
+## unpack_and_compute_states.m
+
+### Overview
+`unpack_and_compute_states.m` unpacks the state trajectory and computes firing rates with adaptation and STD effects. Located in `src/`, it consolidates state processing logic.
+
+### Function Signature
+```matlab
+function [x, a, b, r] = unpack_and_compute_states(S_out, params)
+```
+
+### Inputs
+- **S_out** (nt × N_sys_eqs): State trajectory from ODE solver
+- **params** (struct): Network parameters
+
+### Outputs
+All outputs are structs with `.E` and `.I` fields:
+- **x**: Dendritic states (`.E` is n_E × nt, `.I` is n_I × nt)
+- **a**: Adaptation variables (`.E` is n_E × n_a_E × nt, `.I` is n_I × n_a_I × nt, may be empty)
+- **b**: STD variables (`.E` is n_E × nt, `.I` is n_I × nt, defaults to ones if disabled)
+- **r**: Firing rates (`.E` is n_E × nt, `.I` is n_I × nt)
+
+### Algorithm
+1. **Unpack**: Extracts a_E, a_I, b_E, b_I, x from state vector
+2. **Compute x_eff**: Applies adaptation: x_eff = x - c * sum(a)
+3. **Compute r**: Applies STD and activation: r = b .* φ(x_eff)
+4. **Split E/I**: Organizes variables into excitatory and inhibitory components
+
+### Design Benefits
+- **Unified processing**: Combines unpacking and dependent variable computation
+- **Consistent interface**: All outputs use `.E`/`.I` struct pattern
+- **Handles edge cases**: Correctly manages empty adaptation/STD arrays
+
+---
+
+## Plotting Functions
+
+The `src/plotting/` directory contains five visualization functions with a consistent interface. All functions:
+- Accept time vector and data structs with `.E` and `.I` fields
+- Use custom colormaps: `inhibitory_colormap(8)` (reds/magentas) and `excitatory_colormap(8)` (blues/greens)
+- Plot inhibitory neurons first (background), then excitatory on top
+- Operate on current axes (for subplot compatibility)
+- Handle empty data gracefully
+
+### plot_external_input.m
+
+```matlab
+function plot_external_input(t, u)
+```
+- **Inputs**: t (time), u (struct with .E and .I fields containing n_E/n_I × nt input)
+- **Purpose**: Visualizes external stimulation patterns
+
+### plot_dendritic_state.m
+
+```matlab
+function plot_dendritic_state(t, x)
+```
+- **Inputs**: t (time), x (struct with .E and .I fields containing n_E/n_I × nt dendritic states)
+- **Purpose**: Shows dendritic potential dynamics
+
+### plot_adaptation.m
+
+```matlab
+function plot_adaptation(t, a, params)
+```
+- **Inputs**: t (time), a (struct with .E and .I fields, n_E/n_I × n_a × nt), params
+- **Purpose**: Displays adaptation variable time courses
+- **Special handling**: Loops over neurons and adaptation timescales, shows 'No adaptation variables' if disabled
+
+### plot_firing_rate.m
+
+```matlab
+function plot_firing_rate(t, r)
+```
+- **Inputs**: t (time), r (struct with .E and .I fields containing n_E/n_I × nt firing rates)
+- **Purpose**: Shows neural activity patterns
+
+### plot_std_variable.m
+
+```matlab
+function plot_std_variable(t, b, params)
+```
+- **Inputs**: t (time), b (struct with .E and .I fields containing n_E/n_I × nt STD variables), params
+- **Purpose**: Visualizes synaptic depression dynamics
+- **Special handling**: Checks if b is all ones (no actual depression), shows 'No STD variables' if disabled
+
+### Colormap Design
+- **excitatory_colormap**: Blues, greens, cyans (cool colors, positive connotation)
+- **inhibitory_colormap**: Reds, magentas, purples (warm colors, negative connotation)
+- **8 discrete colors**: Provides good visual distinction for typical neuron counts in plots
+- **Interpolation**: Automatically extends to more colors if needed
+
+---
+
+## full_SRNN_caller.m
+
+### Overview
+`full_SRNN_caller.m` is the main simulation script for the SRNN reservoir model with spike-frequency adaptation and short-term synaptic depression. It demonstrates a complete workflow including network setup, external input generation, ODE integration, Lyapunov exponent computation, and visualization. The script is highly modular, using dedicated functions from `src/` for each major component.
+
+### Script Workflow
+
+#### 1. Initialization and Parameter Setup
+- Clears workspace and sets random seeds for reproducibility
+- Defines network parameters: size (`n`), E/I fraction (`f`), connectivity (`indegree`), chaos level
+- Configures adaptation timescales (`n_a_E`, `n_a_I`, `tau_a_E`, `tau_a_I`, `c_E`, `c_I`)
+- Configures short-term depression timescales (`n_b_E`, `n_b_I`, `tau_b_E_rec/rel`, `tau_b_I_rec/rel`)
+- Sets activation function (e.g., piecewise sigmoid, tanh)
+
+#### 2. Connectivity Matrix Creation
+Uses `create_W_matrix(params)` to generate:
+- **W**: Sparse connectivity matrix with E/I structure and row-mean centering
+- **M**: Mean connectivity structure (mu_E for E→all, mu_I for I→all)
+- **G**: Gaussian random perturbations (stdev = G_stdev)
+- **Z**: Binary sparsification mask
+
+Computes spectral abscissa of unscaled W and applies gamma scaling to achieve desired chaos level:
+- **gamma = 1 / abscissa_0**: Scaling factor to reach edge of chaos (where spectral abscissa = 1)
+- **W_scaled = params.level_of_chaos * gamma * W**: Final scaled connectivity matrix
+- **tau_d = 0.025 s**: Fixed dendritic time constant (25 ms)
+
+With the equation `dx/dt = (-x + W*r + u) / tau_d`, the edge of chaos occurs when the spectral abscissa of W equals 1. The gamma scaling normalizes the unscaled matrix to this condition, then `params.level_of_chaos` controls whether the system is subcritical (<1), at the edge (=1), or chaotic (>1).
+
+#### 3. Initial Conditions
+Uses `initialize_state(params)` to create initial state vector `S0`:
+- Adaptation variables (`a_E`, `a_I`): initialized to zero
+- STD variables (`b_E`, `b_I`): initialized to one (no depression)
+- Dendritic states (`x`): small random values (~0.1)
+
+#### 4. External Input Generation
+Uses `generate_external_input(params, T, fs, rng_seed, input_config)` to create sparse random step function:
+- **n_steps**: Number of temporal steps
+- **step_density**: Fraction of neurons receiving input per step
+- **amp**: Amplitude scaling
+- **no_stim_pattern**: Logical array specifying steps with no stimulation
+- **intrinsic_drive**: Constant background input
+
+#### 5. ODE Integration
+- Uses `ode45` (or other solver) with adaptive step size
+- Jacobian provided via `compute_Jacobian_fast` for improved performance
+- Integrates `SRNN_reservoir(t, S, t_ex, u_ex, params)` over time interval
+
+#### 6. Lyapunov Exponent Computation
+Uses `compute_lyapunov_exponents(...)` supporting three methods:
+- **'benettin'**: Computes largest Lyapunov exponent (LLE) via perturbation tracking
+- **'qr'**: Computes full Lyapunov spectrum via QR decomposition
+- **'none'**: Skips Lyapunov analysis
+
+Returns `lya_results` struct with exponents, local/finite-time estimates, and time vector.
+
+#### 7. State Unpacking and Analysis
+Uses `unpack_and_compute_states(S_out, params)` to:
+- Unpack state trajectory into individual variables
+- Split into excitatory and inhibitory components
+- Compute firing rates with adaptation and STD effects
+- Returns structs `x`, `a`, `b`, `r` each with `.E` and `.I` fields
+
+#### 8. Visualization
+Creates 6-panel figure using dedicated plotting functions:
+1. **External Input**: `plot_external_input(t, u)` - shows E/I stimulation
+2. **Dendritic States**: `plot_dendritic_state(t, x)` - shows x dynamics
+3. **Adaptation**: `plot_adaptation(t, a, params)` - shows adaptation variables
+4. **Firing Rates**: `plot_firing_rate(t, r)` - shows neural activity
+5. **STD Variables**: `plot_std_variable(t, b, params)` - shows synaptic depression
+6. **Lyapunov**: Plots local/filtered Lyapunov exponents or full spectrum
+
+All plots use custom colormaps: blues/greens for excitatory, reds/magentas for inhibitory.
+
+#### 9. Jacobian Eigenvalue Analysis
+- Computes Jacobian at multiple time points (around step changes)
+- Extracts eigenvalues and plots on complex plane
+- Visualizes stability and oscillatory modes
+
+### Key Design Principles
+
+1. **Modularity**: Major components extracted into reusable functions in `src/`
+2. **Lightweight params**: Only W stored in params (not M, G, Z) for integration efficiency
+3. **Consistent data structures**: State variables returned as structs with `.E` and `.I` fields
+4. **Visualization consistency**: All plots use E/I colormaps, I plotted first (background), then E
+
+### Dependencies
+
+The script uses the following functions from `src/`:
+- `create_W_matrix.m`: Connectivity matrix generation
+- `initialize_state.m`: Initial condition setup
+- `generate_external_input.m`: Input stimulus creation
+- `compute_lyapunov_exponents.m`: Lyapunov analysis wrapper
+- `unpack_and_compute_states.m`: State unpacking and firing rate computation
+- `plot_external_input.m`, `plot_dendritic_state.m`, `plot_adaptation.m`, `plot_firing_rate.m`, `plot_std_variable.m`: Visualization functions
+- `SRNN_reservoir.m`: ODE right-hand side
+- `compute_Jacobian_fast.m`: Jacobian computation
+
+---
+
 ## SRNN_reservoir_caller.m
 
 ### Overview
-`SRNN_reservoir_caller.m` is a complete example script demonstrating how to use `SRNN_reservoir.m` with MATLAB's `ode45` solver. It provides a simplified workflow compared to the full `SRNN_basic_example.m` (which includes Lyapunov exponent calculations), making it ideal for getting started with the SRNN reservoir model.
+`SRNN_reservoir_caller.m` is a simpler example script demonstrating how to use `SRNN_reservoir.m` with MATLAB's `ode45` solver. It provides a simplified workflow compared to `full_SRNN_caller.m` (which includes Lyapunov exponent calculations and more advanced features), making it ideal for getting started with the SRNN reservoir model.
 
 ### Script Structure
 
@@ -484,13 +779,3 @@ u_ex(1:3, stim_start_idx:stim_end_idx) = stim_b0 + amp * sin(2*pi*f_sin*t_stim);
    - `r_ts`: Firing rates (n × nt)
    - `a_E_ts`, `a_I_ts`, `x_ts`: Unpacked state variables
    - `params`: Parameter structure (useful for further analysis)
-
-### Dependencies
-
-The script requires the following helper functions (located in `reference_files/`):
-- `generate_M_no_iso.m`: Network connectivity generation
-- `get_EI_indices.m`: Excitatory/inhibitory indexing
-- `compute_dependent_variables.m`: Firing rate computation
-
-Note: The script adds `../reference_files/` to the path automatically.
-
