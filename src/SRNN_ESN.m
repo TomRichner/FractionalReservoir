@@ -253,6 +253,133 @@ classdef SRNN_ESN < handle
             Y_pred = X_features * obj.W_out + obj.b_out';
         end
         
+        function [Y_gen, X_features] = generateAutonomous(obj, initial_data, n_steps, options)
+            % generateAutonomous: Generate predictions in closed-loop (generative mode)
+            %
+            % This method tests if the reservoir has truly learned the dynamics
+            % by autonomously generating predictions where each predicted output
+            % is fed back as the next input.
+            %
+            % Inputs:
+            %   initial_data - Initial input sequence for washout (n_washout x n_inputs)
+            %                  OR struct with field 'input' containing the sequence
+            %   n_steps - Number of steps to generate autonomously
+            %   options - struct with optional fields:
+            %     horizon - prediction horizon (default: 1 for true closed-loop)
+            %     washout_steps - initial steps from initial_data to use (default: all)
+            %     return_features - whether to return reservoir features (default: false)
+            %
+            % Outputs:
+            %   Y_gen - Generated output sequence (n_steps x n_outputs)
+            %   X_features - Reservoir features during generation (optional)
+            
+            if ~obj.is_trained
+                error('SRNN_ESN:NotTrained', ...
+                      'Readout layer has not been trained. Call trainReadout() first.');
+            end
+            
+            % Parse options
+            if nargin < 4
+                options = struct();
+            end
+            horizon = getFieldOrDefault(options, 'horizon', 1);
+            washout_steps = getFieldOrDefault(options, 'washout_steps', size(initial_data, 1));
+            return_features = getFieldOrDefault(options, 'return_features', false);
+            
+            % Validate inputs
+            if washout_steps > size(initial_data, 1)
+                warning('SRNN_ESN:WashoutTooLarge', ...
+                        'washout_steps (%d) exceeds initial_data length (%d). Using all data.', ...
+                        washout_steps, size(initial_data, 1));
+                washout_steps = size(initial_data, 1);
+            end
+            
+            fprintf('Generating autonomous predictions...\n');
+            fprintf('  Washout steps: %d\n', washout_steps);
+            fprintf('  Generation steps: %d\n', n_steps);
+            fprintf('  Prediction horizon: %d\n', horizon);
+            
+            % Phase 1: Washout with initial data
+            U_washout = initial_data(1:washout_steps, :);
+            [X_washout, ~] = obj.runReservoir(U_washout);
+            
+            % Phase 2: Autonomous generation
+            Y_gen = zeros(n_steps, obj.n_outputs);
+            if return_features
+                % Pre-allocate based on feature dimension
+                n_features = size(obj.W_out, 1);
+                X_features = zeros(n_steps, n_features);
+            else
+                X_features = [];
+            end
+            
+            % Get initial prediction from last washout step
+            current_input = X_washout(end, :) * obj.W_out + obj.b_out';
+            
+            % Prepare parameters for single-step reservoir dynamics
+            dt = 1.0;
+            
+            for t = 1:n_steps
+                % Create input for this time step (reshape to column vector)
+                u_t = (obj.W_in * current_input')';  % (1 x n)
+                
+                % Integrate reservoir for one time step
+                % Need at least 2 time points for ODE solver
+                t_span = [0, dt];
+                
+                % Create interpolation function for constant input over this step
+                t_ex = [0, dt];
+                u_ex = [u_t; u_t]';  % (n x 2) - constant input over time step
+                
+                % Pack parameters for SRNN_reservoir
+                params = struct();
+                params.n = obj.n;
+                params.n_E = obj.n_E;
+                params.n_I = obj.n_I;
+                params.E_indices = obj.E_indices;
+                params.I_indices = obj.I_indices;
+                params.n_a_E = obj.n_a_E;
+                params.n_a_I = obj.n_a_I;
+                params.n_b_E = obj.n_b_E;
+                params.n_b_I = obj.n_b_I;
+                params.W = obj.W;
+                params.tau_d = obj.tau_d;
+                params.tau_a_E = obj.tau_a_E;
+                params.tau_a_I = obj.tau_a_I;
+                params.tau_b_E_rec = obj.tau_b_E_rec;
+                params.tau_b_E_rel = obj.tau_b_E_rel;
+                params.tau_b_I_rec = obj.tau_b_I_rec;
+                params.tau_b_I_rel = obj.tau_b_I_rel;
+                params.c_E = obj.c_E;
+                params.c_I = obj.c_I;
+                params.activation_function = obj.activation_function;
+                
+                % Solve ODE for one time step
+                odefun = @(time, S) SRNN_reservoir(time, S, t_ex, u_ex, params);
+                options_ode = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
+                [~, S_history] = ode23s(odefun, t_span, obj.S, options_ode);
+                
+                % Update state
+                obj.S = S_history(end, :)';
+                
+                % Extract features from final state
+                X_t = obj.extractFeatures(S_history(end, :), current_input);
+                
+                % Generate prediction
+                Y_t = X_t * obj.W_out + obj.b_out';
+                Y_gen(t, :) = Y_t;
+                
+                if return_features
+                    X_features(t, :) = X_t;
+                end
+                
+                % Feedback: use prediction as next input
+                current_input = Y_t;
+            end
+            
+            fprintf('  Autonomous generation complete!\n');
+        end
+        
         function resetState(obj)
             % resetState: Reset reservoir to initial conditions
             
@@ -329,12 +456,23 @@ classdef SRNN_ESN < handle
             dt = 1.0; % Time step (can be made configurable)
             
             % Time vectors for ODE solver
-            t_span = 0:dt:(n_timesteps-1)*dt;
-            t_ex = t_span; % Time points for input interpolation
+            % Ensure t_span has at least 2 elements for ODE solver
+            if n_timesteps == 1
+                t_span = [0, dt];
+                t_ex = [0, dt];
+            else
+                t_span = 0:dt:(n_timesteps-1)*dt;
+                t_ex = t_span; % Time points for input interpolation
+            end
             
             % Prepare external input: u_ex = W_in * U'
             % u_ex should be (n x n_timesteps) for interpolation in SRNN_reservoir
             u_ex = obj.W_in * U'; % (n x n_timesteps)
+            
+            % For single timestep, replicate input to match t_ex length
+            if n_timesteps == 1
+                u_ex = [u_ex, u_ex]; % Replicate to (n x 2)
+            end
             
             % Pack parameters for SRNN_reservoir
             params = struct();
@@ -368,6 +506,11 @@ classdef SRNN_ESN < handle
             
             % Update current state
             obj.S = S_history(end, :)';
+            
+            % For single timestep input, only extract final state
+            if n_timesteps == 1
+                S_history = S_history(end, :); % Only keep final state
+            end
             
             % Extract features from state history
             X_features = obj.extractFeatures(S_history, U);
