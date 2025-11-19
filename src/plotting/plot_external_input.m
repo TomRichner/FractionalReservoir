@@ -35,6 +35,6 @@ function plot_external_input(t, u)
     
     % Set yticks to match ylim
     yl = ylim;
-    yticks(yl);
+    yticks([-1 0 1]);
 end
 

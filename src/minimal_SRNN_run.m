@@ -31,7 +31,7 @@ rng(params.rng_seeds(1))
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 
 %% time 
-fs = 400;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
+fs = 200;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
 T = 30;    % Duration (s)
 t_ex = (0:dt:T)';
@@ -52,21 +52,21 @@ params.level_of_chaos = level_of_chaos; % Passed as argument
 %% set adaptation params
 params.n_a_E = n_a_E;  % Passed as argument
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
-params.tau_a_E = logspace(log10(0.25), log10(25), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
-params.tau_a_I = logspace(log10(0.25), log10(25), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
+params.tau_a_E = logspace(log10(0.25), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
+params.tau_a_I = logspace(log10(0.25), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
 params.c_E = 0.25*1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
 params.n_b_E = n_b_E;  % Passed as argument
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
-params.tau_b_E_rel = 0.5;  % STD release time constant for E neurons (s)
-params.tau_b_I_rel = 0.5;  % STD release time constant for I neurons (s)
+params.tau_b_E_rel = 0.1;  % STD release time constant for E neurons (s)
+params.tau_b_I_rel = 0.1;  % STD release time constant for I neurons (s)
 params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
 params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
 
 %% set activaiton function
 S_a = 0.9;
-S_c = 0.4;
+S_c = 0.35;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
@@ -153,176 +153,176 @@ u_plot.I = u_ex_plot(params.I_indices, :);
 % Use the minimal plotter here
 [~, ~] = plot_SRNN_tseries_minimal(t_plot, u_plot, x_plot, r_plot, a_plot, b_plot, params, lya_results, Lya_method);
 
-%% Compute Jacobian eigenvalues at multiple time points
-% Sample at the center of each stimulus ON period
-J_times_sec = [];
-for k = 1:n_steps
-    if ~input_config.no_stim_pattern(k)
-        t_center = (k-1)*step_period + step_period/2;
-        J_times_sec = [J_times_sec, t_center];
-    end
-end
+% %% Compute Jacobian eigenvalues at multiple time points
+% % Sample at the center of each stimulus ON period
+% J_times_sec = [];
+% for k = 1:n_steps
+%     if ~input_config.no_stim_pattern(k)
+%         t_center = (k-1)*step_period + step_period/2;
+%         J_times_sec = [J_times_sec, t_center];
+%     end
+% end
 
-% Convert times in seconds to indices (MATLAB is 1-indexed)
-J_times = round(J_times_sec * fs) + 1;
-J_times = unique(J_times);  % Ensure unique indices and sort
+% % Convert times in seconds to indices (MATLAB is 1-indexed)
+% J_times = round(J_times_sec * fs) + 1;
+% J_times = unique(J_times);  % Ensure unique indices and sort
 
-fprintf('Computing Jacobian at %d time points...\n', length(J_times));
-J_array = compute_Jacobian_at_indices(S_out, J_times, params);
+% fprintf('Computing Jacobian at %d time points...\n', length(J_times));
+% J_array = compute_Jacobian_at_indices(S_out, J_times, params);
 
-% Compute eigenvalues for each Jacobian
-eigenvalues_all = cell(length(J_times), 1);
-for i = 1:length(J_times)
-    eigenvalues_all{i} = eig(J_array(:,:,i));
-end
+% % Compute eigenvalues for each Jacobian
+% eigenvalues_all = cell(length(J_times), 1);
+% for i = 1:length(J_times)
+%     eigenvalues_all{i} = eig(J_array(:,:,i));
+% end
 
-%% Plot eigenvalue distributions on complex plane
-n_plots = length(J_times);
-if n_plots <= 4
-    n_rows = 1;
-    n_cols = n_plots;
-else
-    n_cols = ceil(sqrt(n_plots));
-    n_rows = ceil(n_plots / n_cols);
-end
+% % %% Plot eigenvalue distributions on complex plane
+% % n_plots = length(J_times);
+% % if n_plots <= 4
+% %     n_rows = 1;
+% %     n_cols = n_plots;
+% % else
+% %     n_cols = ceil(sqrt(n_plots));
+% %     n_rows = ceil(n_plots / n_cols);
+% % end
+% %
+% % figure('Position', [ 1039         488         904         287]);
+% % ax_handles = zeros(n_plots, 1);
+% %
+% % % Compute global axis limits across all eigenvalue sets
+% % all_real = [];
+% % all_imag = [];
+% % for i = 1:n_plots
+% %     evals = eigenvalues_all{i};
+% %     all_real = [all_real; real(evals)];
+% %     all_imag = [all_imag; imag(evals)];
+% % end
+% % global_xlim = [min(all_real), max(all_real)];
+% % global_ylim = [min(all_imag), max(all_imag)];
+% %
+% % % Add some padding (10% of range on each side)
+% % x_range = diff(global_xlim);
+% % y_range = diff(global_ylim);
+% % global_xlim = global_xlim + [-0.1, 0.1] * x_range;
+% % global_ylim = global_ylim + [-0.1, 0.1] * y_range;
+% %
+% % for i = 1:n_plots
+% %     ax_handles(i) = subplot(n_rows, n_cols, i);
+% %     evals = eigenvalues_all{i};
+% %     time_val = t_out(J_times(i));
+% %     ax_handles(i) = plot_eigenvalues(evals, ax_handles(i), time_val, global_xlim, global_ylim);
+% %     set(ax_handles(i), 'Color', 'none');
+% %
+% %     % Add time annotation in lower left corner
+% %     % x_range = diff(global_xlim);
+% %     % y_range = diff(global_ylim);
+% %     % text_x = global_xlim(1) + 0.05 * x_range;
+% %     % text_y = global_ylim(1) + 0.05 * y_range;
+% %     % text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
+% %     %     'FontSize', 14, 'Color', 'k', 'BackgroundColor', 'white', ...
+% %     %     'EdgeColor', 'none');
+% % end
+% %
+% % % Link axes of all subplots
+% % linkaxes(ax_handles, 'xy');
 
-figure('Position', [ 1039         488         904         287]);
-ax_handles = zeros(n_plots, 1);
 
-% Compute global axis limits across all eigenvalue sets
-all_real = [];
-all_imag = [];
-for i = 1:n_plots
-    evals = eigenvalues_all{i};
-    all_real = [all_real; real(evals)];
-    all_imag = [all_imag; imag(evals)];
-end
-global_xlim = [min(all_real), max(all_real)];
-global_ylim = [min(all_imag), max(all_imag)];
+% %% new figure with imagesc plot of J_eff at J_times
 
-% Add some padding (10% of range on each side)
-x_range = diff(global_xlim);
-y_range = diff(global_ylim);
-global_xlim = global_xlim + [-0.1, 0.1] * x_range;
-global_ylim = global_ylim + [-0.1, 0.1] * y_range;
+% fprintf('Computing J_eff at %d time points...\n', length(J_times));
 
-for i = 1:n_plots
-    ax_handles(i) = subplot(n_rows, n_cols, i);
-    evals = eigenvalues_all{i};
-    time_val = t_out(J_times(i));
-    ax_handles(i) = plot_eigenvalues(evals, ax_handles(i), time_val, global_xlim, global_ylim);
-    set(ax_handles(i), 'Color', 'none');
+% omit_diagonal_in_J_eff = true;
+
+% % Compute J_eff for each time point
+% J_eff_array = zeros(params.n, params.n, length(J_times));
+% for i = 1:length(J_times)
+%     J_eff_array(:,:,i) = full(compute_J_eff(S_out(J_times(i),:)', params));
     
-    % Add time annotation in lower left corner
-    % x_range = diff(global_xlim);
-    % y_range = diff(global_ylim);
-    % text_x = global_xlim(1) + 0.05 * x_range;
-    % text_y = global_ylim(1) + 0.05 * y_range;
-    % text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
-    %     'FontSize', 14, 'Color', 'k', 'BackgroundColor', 'white', ...
-    %     'EdgeColor', 'none');
-end
+%     % Optionally zero out diagonal to better visualize off-diagonal terms
+%     if omit_diagonal_in_J_eff
+%         J_eff_array(:,:,i) = J_eff_array(:,:,i) - diag(diag(J_eff_array(:,:,i)));
+%     end
+% end
 
-% Link axes of all subplots
-linkaxes(ax_handles, 'xy');
+% % Compute global color limits across all J_eff matrices
+% if omit_diagonal_in_J_eff
+%     % Exclude diagonal when computing color limits
+%     all_J_eff_values = [];
+%     for i = 1:length(J_times)
+%         J_temp = J_eff_array(:,:,i);
+%         % Get off-diagonal values only
+%         all_J_eff_values = [all_J_eff_values; J_temp(~eye(size(J_temp)))];
+%     end
+% else
+%     all_J_eff_values = J_eff_array(:);
+% end
 
+% % Use 90th percentile of absolute values of non-zero elements
+% nonzero_abs_values = abs(all_J_eff_values(all_J_eff_values ~= 0));
+% max_abs = prctile(nonzero_abs_values, 90);
+% global_clim = [-max_abs, max_abs];
 
-%% new figure with imagesc plot of J_eff at J_times
+% % Create figure with same layout as eigenvalue figure
+% figure('Position', [300, 400,    900,   400]);
 
-fprintf('Computing J_eff at %d time points...\n', length(J_times));
-
-omit_diagonal_in_J_eff = true;
-
-% Compute J_eff for each time point
-J_eff_array = zeros(params.n, params.n, length(J_times));
-for i = 1:length(J_times)
-    J_eff_array(:,:,i) = full(compute_J_eff(S_out(J_times(i),:)', params));
+% for i = 1:n_plots
+%     subplot(n_rows, n_cols, i);
     
-    % Optionally zero out diagonal to better visualize off-diagonal terms
-    if omit_diagonal_in_J_eff
-        J_eff_array(:,:,i) = J_eff_array(:,:,i) - diag(diag(J_eff_array(:,:,i)));
-    end
-end
+%     % Plot J_eff matrix
+%     imagesc(J_eff_array(:,:,i));
+    
+%     % Set colormap and color limits
+%     colormap(bluewhitered_colormap(256));
+%     clim(global_clim);
+    
+%     % Make axes square
+%     axis square;
+    
+%     % Remove ticks, labels, and box
+%     set(gca, 'XTick', [], 'YTick', []);
+%     box off;
+%     set(gca, 'Color', 'none');
+    
+%     % Make axis lines white and send to back
+%     set(gca, 'XColor', 'white', 'YColor', 'white', 'Layer', 'bottom');
+    
+%     % Add time annotation below the plot
+%     % For imagesc, y-axis is inverted (top=1, bottom=n), so below means y > max
+%     time_val = t_out(J_times(i));
+%     % ax_lim = axis;  % Get current axis limits [xmin xmax ymin ymax]
+%     % text_x = ax_lim(1);
+%     % text_y = ax_lim(4) + 0 * (ax_lim(4) - ax_lim(3));  % Below the plot
+%     % text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
+%     %     'FontSize', 14, 'Color', 'k', ...
+%     %     'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+% end
 
-% Compute global color limits across all J_eff matrices
-if omit_diagonal_in_J_eff
-    % Exclude diagonal when computing color limits
-    all_J_eff_values = [];
-    for i = 1:length(J_times)
-        J_temp = J_eff_array(:,:,i);
-        % Get off-diagonal values only
-        all_J_eff_values = [all_J_eff_values; J_temp(~eye(size(J_temp)))];
-    end
-else
-    all_J_eff_values = J_eff_array(:);
-end
+% %% Create separate colorbar figure for J_eff
+% figure('Position', [100   346   285   154], 'Color', 'white');
+% ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
+% colormap(bluewhitered_colormap(256));
+% cb = colorbar('Location', 'east');
+% clim(global_clim);
+% set(gca, 'Visible', 'off', 'Color', 'none');
+% set(cb, 'AxisLocation', 'out', 'Ticks', []);
+% ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
 
-% Use 90th percentile of absolute values of non-zero elements
-nonzero_abs_values = abs(all_J_eff_values(all_J_eff_values ~= 0));
-max_abs = prctile(nonzero_abs_values, 90);
-global_clim = [-max_abs, max_abs];
+% %% Plot J_eff as directed graph
+% figure('Position', [300, 400,    900,   400]);
 
-% Create figure with same layout as eigenvalue figure
-figure('Position', [300, 400,    900,   400]);
-
-for i = 1:n_plots
-    subplot(n_rows, n_cols, i);
+% for i = 1:n_plots
+%     subplot(n_rows, n_cols, i);
     
-    % Plot J_eff matrix
-    imagesc(J_eff_array(:,:,i));
+%     % Plot J_eff graph
+%     % Reuse max_abs and global_clim from imagesc section
+%     plot_J_eff_graph(J_eff_array(:,:,i), max_abs, global_clim);
+%     set(gca, 'Color', 'none');
     
-    % Set colormap and color limits
-    colormap(bluewhitered_colormap(256));
-    clim(global_clim);
-    
-    % Make axes square
-    axis square;
-    
-    % Remove ticks, labels, and box
-    set(gca, 'XTick', [], 'YTick', []);
-    box off;
-    set(gca, 'Color', 'none');
-    
-    % Make axis lines white and send to back
-    set(gca, 'XColor', 'white', 'YColor', 'white', 'Layer', 'bottom');
-    
-    % Add time annotation below the plot
-    % For imagesc, y-axis is inverted (top=1, bottom=n), so below means y > max
-    time_val = t_out(J_times(i));
-    % ax_lim = axis;  % Get current axis limits [xmin xmax ymin ymax]
-    % text_x = ax_lim(1);
-    % text_y = ax_lim(4) + 0 * (ax_lim(4) - ax_lim(3));  % Below the plot
-    % text(text_x, text_y, sprintf('t = %.2f s', time_val), ...
-    %     'FontSize', 14, 'Color', 'k', ...
-    %     'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
-end
-
-%% Create separate colorbar figure for J_eff
-figure('Position', [100   346   285   154], 'Color', 'white');
-ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
-colormap(bluewhitered_colormap(256));
-cb = colorbar('Location', 'east');
-clim(global_clim);
-set(gca, 'Visible', 'off', 'Color', 'none');
-set(cb, 'AxisLocation', 'out', 'Ticks', []);
-ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
-
-%% Plot J_eff as directed graph
-figure('Position', [300, 400,    900,   400]);
-
-for i = 1:n_plots
-    subplot(n_rows, n_cols, i);
-    
-    % Plot J_eff graph
-    % Reuse max_abs and global_clim from imagesc section
-    plot_J_eff_graph(J_eff_array(:,:,i), max_abs, global_clim);
-    set(gca, 'Color', 'none');
-    
-    % Add time annotation
-    time_val = t_out(J_times(i));
-    % text(-1.3, 1.3, sprintf('t = %.2f s', time_val), ...
-    %     'FontSize', 14, 'Color', 'k', 'HorizontalAlignment', 'left');
-end
+%     % Add time annotation
+%     time_val = t_out(J_times(i));
+%     % text(-1.3, 1.3, sprintf('t = %.2f s', time_val), ...
+%     %     'FontSize', 14, 'Color', 'k', 'HorizontalAlignment', 'left');
+% end
 
 %% Save results
 if save_figs
@@ -339,7 +339,7 @@ if save_figs
         fig_handles = fig_handles(idx);
         fig_vec = [fig_handles.Number];
         
-        save_some_figs_to_folder_2(figs_folder, note, fig_vec, {'fig', 'svg', 'png', 'pdf'});
+        save_some_figs_to_folder_2(figs_folder, note, fig_vec, {'fig', 'svg', 'png'});
     else
         warning('save_figs is true but save_dir is empty. Figures not saved.');
     end

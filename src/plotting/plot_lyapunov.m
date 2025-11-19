@@ -66,7 +66,7 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
         end
         
         % Only plot data after specified warm-up time
-        t_filter_start = 0.5; % seconds
+        t_filter_start = 1.5; % seconds
         idx_filter_start = find(lya_results.t_lya >= t_filter_start, 1, 'first');
         
         % Track legend entries and handles

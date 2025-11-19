@@ -16,3 +16,5 @@ function [t_plot, S_plot, indices] = decimate_states(t_out, S_out, deci)
     S_plot = S_out(indices, :);
 end
 
+
+

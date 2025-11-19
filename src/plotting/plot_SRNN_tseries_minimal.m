@@ -21,31 +21,25 @@ function [fig_handle, ax_handles] = plot_SRNN_tseries_minimal(t_out, u, x, r, a,
 %
 % Description:
 %   Creates a tiled layout figure with minimal subplots:
-%   1. External input
-%   2. Dendritic states
-%   3. Lyapunov exponent(s) (if enabled)
+%   1. Dendritic states
+%   2. Lyapunov exponent(s) (if enabled)
 %   All time series plots are linked along the x-axis for synchronized zooming.
 
 % Determine which subplots are needed
 has_lyapunov = ~strcmpi(Lya_method, 'none');
 
 % Calculate total number of subplots
-n_plots = 2;  % Always: External input, Dendritic states
+n_plots = 1;  % Always: Dendritic states
 if has_lyapunov
     n_plots = n_plots + 1;
 end
 
 % Create figure with tiled layout
-fig_handle = figure('Position', [200 300 1200 600]); % Slightly shorter height since fewer plots
+fig_handle = figure('Position', [200         573        1252         326]); % Slightly shorter height since fewer plots
 tiledlayout(n_plots, 1);
 
 % Initialize array to store axes handles
 ax_handles = [];
-
-% Always create: External input
-ax_handles(end+1) = nexttile;
-plot_external_input(t_out, u);
-set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 
 % Always create: Dendritic states
 ax_handles(end+1) = nexttile;
