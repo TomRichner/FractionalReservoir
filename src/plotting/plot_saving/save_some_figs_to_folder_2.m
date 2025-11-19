@@ -38,7 +38,7 @@ for i=fig_vec
     end
     if any(strcmpi(fig_type,'svg'))
         set(gcf, 'Renderer', 'painters');
-        saveas(i, fullfile(save_folder, [save_name '_figure_' num2str(i)]), 'svg');
+        exportgraphics(figure(i), fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']), 'BackgroundColor', 'none', 'ContentType', 'vector');
     end
     if any(strcmpi(fig_type, 'pdf'))
         % Append to PDF report

@@ -32,6 +32,9 @@ function plot_external_input(t, u)
     plot_lines_with_colormap(t, u.E, cmap_E);
     hold off;
     ylabel('stim');
-    yticks([-1, 0, 1]);
+    
+    % Set yticks to match ylim
+    yl = ylim;
+    yticks(yl);
 end
 

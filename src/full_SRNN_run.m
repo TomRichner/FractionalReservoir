@@ -210,6 +210,7 @@ for i = 1:n_plots
     evals = eigenvalues_all{i};
     time_val = t_out(J_times(i));
     ax_handles(i) = plot_eigenvalues(evals, ax_handles(i), time_val, global_xlim, global_ylim);
+    set(ax_handles(i), 'Color', 'none');
     
     % Add time annotation in lower left corner
     % x_range = diff(global_xlim);
@@ -279,6 +280,7 @@ for i = 1:n_plots
     % Remove ticks, labels, and box
     set(gca, 'XTick', [], 'YTick', []);
     box off;
+    set(gca, 'Color', 'none');
     
     % Make axis lines white and send to back
     set(gca, 'XColor', 'white', 'YColor', 'white', 'Layer', 'bottom');
@@ -300,7 +302,7 @@ ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
 colormap(bluewhitered_colormap(256));
 cb = colorbar('Location', 'east');
 clim(global_clim);
-set(gca, 'Visible', 'off', 'Color', 'white');
+set(gca, 'Visible', 'off', 'Color', 'none');
 set(cb, 'AxisLocation', 'out', 'Ticks', []);
 ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
 
@@ -313,6 +315,7 @@ for i = 1:n_plots
     % Plot J_eff graph
     % Reuse max_abs and global_clim from imagesc section
     plot_J_eff_graph(J_eff_array(:,:,i), max_abs, global_clim);
+    set(gca, 'Color', 'none');
     
     % Add time annotation
     time_val = t_out(J_times(i));
