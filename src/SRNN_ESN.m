@@ -317,7 +317,7 @@ classdef SRNN_ESN < handle
             current_input = X_washout(end, :) * obj.W_out + obj.b_out';
             
             % Prepare parameters for single-step reservoir dynamics
-            dt = 1.0;
+            dt = 1.0; this is in seconds, so 1.0 is a 1 second step, very big
             
             for t = 1:n_steps
                 % Create input for this time step (reshape to column vector)
@@ -453,7 +453,7 @@ classdef SRNN_ESN < handle
             %   S_history - Full state history (for analysis)
             
             n_timesteps = size(U, 1);
-            dt = 1.0; % Time step (can be made configurable)
+            dt = 1.0; % Time step (can be made configurable), this is in seconds, so 1.0 is a 1 second step, very big
             
             % Time vectors for ODE solver
             % Ensure t_span has at least 2 elements for ODE solver
@@ -502,7 +502,7 @@ classdef SRNN_ESN < handle
             
             % Use ode23s (stiff solver) for fractional dynamics
             options_ode = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
-            [~, S_history] = ode23s(odefun, t_span, obj.S, options_ode);
+            [~, S_history] = ode23s(odefun, t_span, obj.S, options_ode); % 
             
             % Update current state
             obj.S = S_history(end, :)';
