@@ -1,17 +1,17 @@
 close all; clear all; clc;
 setup_paths();
 
-save_figs = true;
+save_figs = false;
 save_workspace = false;
 
-level_of_chaos = 1;
+level_of_chaos = 3;
 
 %% Run 1: No Adaptation, No Depression (DDE Baseline)
 close all;
 note = 'DDE_paired_no_adapt';
 u_ex_scale = 1;
-n_a_E = 0;
-n_b_E = 0;
+n_a_E = 3;
+n_b_E = 1;
 
 save_dir = fullfile(pwd, 'results_DDE', note);
 

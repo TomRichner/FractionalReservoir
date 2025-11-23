@@ -21,7 +21,7 @@ rng(params.rng_seeds(1))
 %% time 
 fs = 1000;  
 dt = 1/fs;
-T = 30;    % Duration (s)
+T = 100;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
