@@ -1,14 +1,14 @@
-function [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
+function [x, a, b, r, br] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
 % unpack_and_compute_states - Unpack state vector and compute dependent variables
 %
 % Syntax:
-%   [x, a, b, r] = unpack_and_compute_states(S_out, params)
-%   [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
+%   [x, a, b, r, br] = unpack_and_compute_states(S_out, params)
+%   [x, a, b, r, br] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
 %
 % Description:
 %   Unpacks the state trajectory S_out into individual state variables,
 %   splits them into excitatory and inhibitory components, and computes
-%   the firing rate r with adaptation and STD effects.
+%   the firing rate r and synaptic output br.
 %
 % Inputs:
 %   S_out          - State trajectory (nt x N_sys_eqs) or column vector (N_sys_eqs x 1)
@@ -18,14 +18,13 @@ function [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
 %                    Default: false
 %
 % Outputs:
-%   x - Struct with fields .E (n_E x nt) and .I (n_I x nt) - dendritic states
-%       OR if a_zeros_b_ones is true: simple array (n x nt)
-%   a - Struct with fields .E (n_E x n_a_E x nt) and .I (n_I x n_a_I x nt) - adaptation
-%       OR if a_zeros_b_ones is true: zeros(n, nt)
-%   b - Struct with fields .E (n_E x nt) and .I (n_I x nt) - STD variables
-%       OR if a_zeros_b_ones is true: ones(n, nt)
-%   r - Struct with fields .E (n_E x nt) and .I (n_I x nt) - firing rates
-%       OR if a_zeros_b_ones is true: simple array (n x nt)
+%   x  - Struct with fields .E and .I - dendritic states
+%   a  - Struct with fields .E and .I - adaptation variables
+%   b  - Struct with fields .E and .I - STD variables
+%   r  - Struct with fields .E and .I - firing rates (raw, phi(x_eff))
+%   br - Struct with fields .E and .I - synaptic output (b .* r)
+%
+%   If a_zeros_b_ones is true, all outputs are returned as simple arrays/zeros/ones.
 %
 % Example:
 %   [x, a, b, r] = unpack_and_compute_states(S_out, params);
@@ -118,8 +117,11 @@ function [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
         b_ts(params.I_indices, :) = b_I_ts;
     end
     
-    % Compute firing rates: r = b .* phi(x_eff)
-    r_ts = b_ts .* params.activation_function(x_eff_ts);  % n x nt
+    % Compute firing rates: r = phi(x_eff) (raw rate)
+    r_ts = params.activation_function(x_eff_ts);  % n x nt
+    
+    % Compute synaptic output: br = b .* r (presynaptically depressed)
+    br_ts = b_ts .* r_ts; % n x nt
     
     %% Split into E and I components and package into structs
     
@@ -148,6 +150,10 @@ function [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
     r.E = r_ts(params.E_indices, :);  % n_E x nt
     r.I = r_ts(params.I_indices, :);  % n_I x nt
     
+    % br: synaptic output
+    br.E = br_ts(params.E_indices, :);
+    br.I = br_ts(params.I_indices, :);
+    
     %% Override with zeros/ones if requested (for Jacobian computation)
     if a_zeros_b_ones
         % Return x as simple array instead of struct (n x nt)
@@ -161,6 +167,9 @@ function [x, a, b, r] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
         
         % Return r as simple array instead of struct (n x nt)
         r = r_ts;
+        
+        % Return br as simple array (equal to r since b=1)
+        br = r_ts;
     end
 end
 

@@ -139,7 +139,7 @@ S_out = deval(sol, t_out)'; % deval returns cols as time points, we want rows
 plot_deci = round(fs/20);
 [t_plot, S_plot, plot_indices] = decimate_states(t_out, S_out, plot_deci);
 
-[x_plot, a_plot, b_plot, r_plot] = unpack_and_compute_states(S_plot, params);
+[x_plot, a_plot, b_plot, r_plot, br_plot] = unpack_and_compute_states(S_plot, params);
 
 u_ex_plot = u_ex(:, plot_indices);
 u_plot.E = u_ex_plot(params.E_indices, :);
@@ -149,7 +149,7 @@ u_plot.I = u_ex_plot(params.I_indices, :);
 lya_results = [];
 Lya_method = 'none';
 
-[~, ~] = plot_SRNN_tseries(t_plot, u_plot, x_plot, r_plot, a_plot, b_plot, params, lya_results, Lya_method);
+[~, ~] = plot_SRNN_tseries(t_plot, u_plot, x_plot, r_plot, a_plot, b_plot, br_plot, params, lya_results, Lya_method);
 
 %% Save
 if save_figs

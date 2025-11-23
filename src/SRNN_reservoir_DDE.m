@@ -29,13 +29,14 @@ function dS_dt = SRNN_reservoir_DDE(t, S, S_delay, t_ex, u_ex, params)
     u = u_interpolant(t)'; 
 
     %% 2. Compute current firing rates and unpack state
-    [r_current, x_current, a_current, b_current] = compute_rates_and_unpack(S, params);
+    [r_current, x_current, a_current, b_current, b_vec_current] = compute_rates_and_unpack(S, params);
 
     %% 3. Compute recurrent input (Instantaneous + Delayed)
     
     % Instantaneous contribution (Lag 0)
     W_inst = params.W_components{1};
-    input_recurrent = W_inst * r_current;
+    % Apply presynaptic depression (b * r)
+    input_recurrent = W_inst * (b_vec_current .* r_current);
     
     % Delayed contributions
     % params.lags matches columns of Z
@@ -43,10 +44,11 @@ function dS_dt = SRNN_reservoir_DDE(t, S, S_delay, t_ex, u_ex, params)
         for k = 1:length(params.lags)
             S_delayed_k = S_delay(:, k);
             % We only need r from the delayed state
-            [r_delayed, ~, ~, ~] = compute_rates_and_unpack(S_delayed_k, params);
+            [r_delayed, ~, ~, ~, b_vec_delayed] = compute_rates_and_unpack(S_delayed_k, params);
             
             W_delayed = params.W_components{k+1};
-            input_recurrent = input_recurrent + W_delayed * r_delayed;
+            % Apply presynaptic depression (b * r)
+            input_recurrent = input_recurrent + W_delayed * (b_vec_delayed .* r_delayed);
         end
     end
 
@@ -111,7 +113,7 @@ function dS_dt = SRNN_reservoir_DDE(t, S, S_delay, t_ex, u_ex, params)
 
 end
 
-function [r, x, a_cell, b_cell] = compute_rates_and_unpack(S, params)
+function [r, x, a_cell, b_cell, b] = compute_rates_and_unpack(S, params)
     % Unpacks state and computes firing rates
     
     n = params.n;
@@ -186,7 +188,8 @@ function [r, x, a_cell, b_cell] = compute_rates_and_unpack(S, params)
         b(I_indices) = b_I;
     end
     
-    r = b .* activation_function(x_eff);
+    % r is the raw firing rate (phi), not scaled by b
+    r = activation_function(x_eff);
     
     % Pack aux outputs for derivative calc
     a_cell = {a_E, a_I};

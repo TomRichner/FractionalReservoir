@@ -143,11 +143,13 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
         b(I_indices) = b_I;
     end
     
-    r = b .* activation_function(x_eff); % n x 1, firing rate
+    % Corrected: r is the raw firing rate (phi), not scaled by b
+    r = activation_function(x_eff); % n x 1, firing rate
 
     %% compute derivatives
-    % dx/dt = -x/tau_d + W*r + u
-    dx_dt = (-x + W * r + u) / tau_d;
+    % dx/dt = -x/tau_d + W*(b.*r) + u
+    % Corrected: Apply b (presynaptic depression) here
+    dx_dt = (-x + W * (b .* r) + u) / tau_d;
 
     % da_E/dt = (r_E - a_E) / tau_a_E
     da_E_dt = [];

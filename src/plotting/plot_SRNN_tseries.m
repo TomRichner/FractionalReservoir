@@ -1,8 +1,8 @@
-function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, params, lya_results, Lya_method)
+function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method)
 % PLOT_SRNN_TSERIES Create comprehensive time series plots for SRNN simulation
 %
 % Syntax:
-%   [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, params, lya_results, Lya_method)
+%   [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method)
 %
 % Inputs:
 %   t_out       - Time vector from ODE solver
@@ -11,6 +11,7 @@ function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, para
 %   r           - Firing rates (n x nt)
 %   a           - Adaptation variables (n_a x nt)
 %   b           - STD variables (n_b x nt)
+%   br          - Synaptic output (n x nt)
 %   params      - Parameters structure containing network configuration
 %   lya_results - Results from Lyapunov exponent computation
 %   Lya_method  - String indicating Lyapunov method ('benettin', 'qr', or 'none')
@@ -32,6 +33,9 @@ has_lyapunov = ~strcmpi(Lya_method, 'none');
 
 % Calculate total number of subplots
 n_plots = 3;  % Always: External input, Dendritic states, Firing rates
+if has_std
+    n_plots = n_plots + 1; % Synaptic output (br)
+end
 if has_adaptation
     n_plots = n_plots + 1;
 end
@@ -67,6 +71,13 @@ set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 ax_handles(end+1) = nexttile;
 plot_firing_rate(t_out, r);
 set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+
+% Conditionally create: Synaptic output (br)
+if has_std
+    ax_handles(end+1) = nexttile;
+    plot_synaptic_output(t_out, br);
+    set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+end
 
 % Conditionally create: Adaptation variables
 if has_adaptation
