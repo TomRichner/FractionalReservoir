@@ -1,10 +1,10 @@
 close all; clear all; clc;
 setup_paths();
 
-save_figs = true;
+save_figs = false;
 save_workspace = false;
 
-level_of_chaos = 2;
+level_of_chaos = 3;
 
 %% Run 0: no stim
 % note = 'no_stim_no_adapt_no_depress';
@@ -58,7 +58,7 @@ clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos,
 %% Run 4
 close all;
 note = 'STD_and_3TS_SFA';
-u_ex_scale = 1;
+u_ex_scale = 0.5;
 n_a_E = 3;
 n_b_E = 1;
 

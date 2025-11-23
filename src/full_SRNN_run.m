@@ -33,7 +33,7 @@ Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 %% time 
 fs = 400;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
-T = 30;    % Duration (s)
+T = 500;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
@@ -41,7 +41,7 @@ nt = length(t_ex);
 % u_ex_scale passed as argument
 
 % set simulation parameters
-params.n = 50;
+params.n = 100;
 params.indegree = 10; % expected indegree
 params.d = params.indegree/params.n; % expected density
 params.f = 0.5; % fraction of neurons that are E
@@ -54,15 +54,15 @@ params.n_a_E = n_a_E;  % Passed as argument
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
 params.tau_a_E = logspace(log10(0.25), log10(25), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
 params.tau_a_I = logspace(log10(0.25), log10(25), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.c_E = 0.25*1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
+params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
 params.n_b_E = n_b_E;  % Passed as argument
 params.n_b_I = 0;  % Number of STD timescales for I neurons (0 or 1)
-params.tau_b_E_rel = 0.5;  % STD release time constant for E neurons (s)
-params.tau_b_I_rel = 0.5;  % STD release time constant for I neurons (s)
-params.tau_b_E_rec = 2;  % STD recovery time constant for E neurons (s)
-params.tau_b_I_rec = 2;  % STD recovery time constant for I neurons (s)
+params.tau_b_E_rel = 0.25;  % STD release time constant for E neurons (s)
+params.tau_b_I_rel = 0.25;  % STD release time constant for I neurons (s)
+params.tau_b_E_rec = 1;  % STD recovery time constant for E neurons (s)
+params.tau_b_I_rec = 1;  % STD recovery time constant for I neurons (s)
 
 %% set activaiton function
 S_a = 0.9;
@@ -76,7 +76,8 @@ params.n_I = params.n-params.n_E;
 params.N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n_E * params.n_b_E + params.n_I * params.n_b_I + params.n;
 params.E_indices = 1:params.n_E;
 params.I_indices = params.n_E+1:params.n;
-params.mu_I = -params.f*params.mu_E/(1-params.f);
+imbalance = 1.01;
+params.mu_I = -imbalance*params.f*params.mu_E/(1-params.f);
 
 
 %% make W connection matrix
