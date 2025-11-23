@@ -11,6 +11,7 @@ function clear_SRNN_persistent()
 % only checks for changes in t_ex to decide whether to rebuild the interpolant.
 
     clear SRNN_reservoir;
+    clear SRNN_reservoir_DDE;
 
 end
 
