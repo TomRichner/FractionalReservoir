@@ -1,4 +1,4 @@
-function [t_out, S_out, params, lya_results] = full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, save_dir, save_figs, save_workspace, note)
+function [t_out, S_out, params, lya_results] = full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note)
 % FULL_SRNN_RUN Runs the SRNN simulation with specified parameters.
 %
 % Inputs:
@@ -6,12 +6,13 @@ function [t_out, S_out, params, lya_results] = full_SRNN_run(u_ex_scale, n_a_E, 
 %   n_a_E         - Number of adaptation time constants for E neurons
 %   n_b_E         - Number of STD timescales for E neurons
 %   level_of_chaos- Level of chaos parameter
+%   rng_seeds     - Seeds for random number generation
 %   save_dir      - Directory path to save outputs
 %   save_figs     - Boolean, whether to save figures
 %   save_workspace- Boolean, whether to save the workspace
 %   note          - Optional string for naming figures (default: 'SRNN')
 
-if nargin < 8 || isempty(note)
+if nargin < 9 || isempty(note)
     note = 'SRNN';
 end
 
@@ -24,16 +25,16 @@ set(groot, 'DefaultAxesLineWidth', 1);
 set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 
 % params.rng_seeds = [5 3 3 4 5];
-params.rng_seeds = [5 3 3 4 5];
+params.rng_seeds = rng_seeds;
 rng(params.rng_seeds(1))
 
 % Lyapunov method selection
 Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 
 %% time 
-fs = 400;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
+fs = 200;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
-T = 500;    % Duration (s)
+T = 50;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
@@ -42,7 +43,7 @@ nt = length(t_ex);
 
 % set simulation parameters
 params.n = 100;
-params.indegree = 10; % expected indegree
+params.indegree = 20; % expected indegree
 params.d = params.indegree/params.n; % expected density
 params.f = 0.5; % fraction of neurons that are E
 params.G_stdev = 1/sqrt(params.indegree); % fix this equation such that the expected spectral radius of sparse W is 1. 
@@ -52,9 +53,9 @@ params.level_of_chaos = level_of_chaos; % Passed as argument
 %% set adaptation params
 params.n_a_E = n_a_E;  % Passed as argument
 params.n_a_I = 0;  % 0 to 3 adaptation for I neurons
-params.tau_a_E = logspace(log10(0.25), log10(25), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
-params.tau_a_I = logspace(log10(0.25), log10(25), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
-params.c_E = 1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
+params.tau_a_E = logspace(log10(0.25), log10(10), params.n_a_E);  % Logarithmically spaced from 0.1 to 10
+params.tau_a_I = logspace(log10(0.25), log10(10), params.n_a_I);  % Logarithmically spaced from 0.1 to 10
+params.c_E = 0.1/3;  % Adaptation scaling for E neurons (scalar, typically 0-3)
 params.c_I = .1;  % Adaptation scaling for I neurons (scalar, typically 0-3)
 
 params.n_b_E = n_b_E;  % Passed as argument
@@ -66,7 +67,7 @@ params.tau_b_I_rec = 1;  % STD recovery time constant for I neurons (s)
 
 %% set activaiton function
 S_a = 0.9;
-S_c = 0.4;
+S_c = 0.35;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
@@ -76,7 +77,7 @@ params.n_I = params.n-params.n_E;
 params.N_sys_eqs = params.n_E * params.n_a_E + params.n_I * params.n_a_I + params.n_E * params.n_b_E + params.n_I * params.n_b_I + params.n;
 params.E_indices = 1:params.n_E;
 params.I_indices = params.n_E+1:params.n;
-imbalance = 1.01;
+imbalance = 1;
 params.mu_I = -imbalance*params.f*params.mu_E/(1-params.f);
 
 
@@ -107,7 +108,7 @@ S0 = initialize_state(params);
 
 %% External input
 % Configure external input parameters
-input_config.n_steps = 7;
+input_config.n_steps = 5;
 input_config.step_density = 0.2;  % Fraction of neurons receiving input at each step
 input_config.amp = 0.5;  % Amplitude scaling factor
 input_config.no_stim_pattern = false(1, input_config.n_steps);
@@ -143,7 +144,7 @@ plot_deci = round(fs/20);
 [t_plot, S_plot, plot_indices] = decimate_states(t_out, S_out, plot_deci);
 
 %% Unpack state vector and compute firing rates
-[x_plot, a_plot, b_plot, r_plot, br_plot] = unpack_and_compute_states(S_plot, params);
+[x_plot, a_plot, b_plot, ~, ~] = unpack_and_compute_states(S_plot, params);
 
 % Split external input into E and I
 u_ex_plot = u_ex(:, plot_indices);
@@ -151,7 +152,7 @@ u_plot.E = u_ex_plot(params.E_indices, :);
 u_plot.I = u_ex_plot(params.I_indices, :);
 
 %% Plotting
-[~, ~] = plot_SRNN_tseries(t_plot, u_plot, x_plot, r_plot, a_plot, b_plot, br_plot, params, lya_results, Lya_method);
+[~, ~] = plot_SRNN_tseries(t_plot, u_plot, x_plot, [], a_plot, b_plot, [], params, lya_results, Lya_method);
 
 %% Compute Jacobian eigenvalues at multiple time points
 % Sample at the center of each stimulus ON period
@@ -186,7 +187,7 @@ else
     n_rows = ceil(n_plots / n_cols);
 end
 
-figure('Position', [ 1039         488         904         287]);
+figure('Position', [  1312         526         600         360]);
 ax_handles = zeros(n_plots, 1);
 
 % Compute global axis limits across all eigenvalue sets
@@ -263,7 +264,7 @@ max_abs = prctile(nonzero_abs_values, 90);
 global_clim = [-max_abs, max_abs];
 
 % Create figure with same layout as eigenvalue figure
-figure('Position', [300, 400,    900,   400]);
+figure('Position', [1312         940         600         310]);
 
 for i = 1:n_plots
     subplot(n_rows, n_cols, i);

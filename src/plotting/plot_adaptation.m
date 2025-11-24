@@ -6,8 +6,8 @@ function plot_adaptation(t, a, params)
 %
 % Description:
 %   Plots adaptation variable (a) time series for excitatory and inhibitory
-%   neurons on the current axes. Handles multiple adaptation timescales per
-%   neuron. Uses custom colormaps: reds/magentas for inhibitory and
+%   neurons on the current axes. Sums multiple adaptation timescales per
+%   neuron before plotting (one line per neuron). Uses custom colormaps: reds/magentas for inhibitory and
 %   blues/greens for excitatory neurons. Inhibitory neurons are plotted
 %   first (background), then excitatory on top.
 %
@@ -34,9 +34,11 @@ function plot_adaptation(t, a, params)
     
     % Plot inhibitory adaptation first (background layer)
     if ~isempty(a.I) && params.n_a_I > 0
-        % Reshape from (n_I x n_a_I x nt) to ((n_I * n_a_I) x nt)
-        a_I_reshaped = reshape(a.I, params.n_I * params.n_a_I, []);
-        plot_lines_with_colormap(t, a_I_reshaped, cmap_I);
+        % Sum across timescales: (n_I x n_a_I x nt) -> (n_I x 1 x nt)
+        a_I_sum = sum(a.I, 2);
+        % Reshape to (n_I x nt)
+        a_I_summed = reshape(a_I_sum, params.n_I, []);
+        plot_lines_with_colormap(t, a_I_summed, cmap_I);
         has_adaptation = true;
     end
     
@@ -45,9 +47,11 @@ function plot_adaptation(t, a, params)
         if has_adaptation
             hold on;
         end
-        % Reshape from (n_E x n_a_E x nt) to ((n_E * n_a_E) x nt)
-        a_E_reshaped = reshape(a.E, params.n_E * params.n_a_E, []);
-        plot_lines_with_colormap(t, a_E_reshaped, cmap_E);
+        % Sum across timescales: (n_E x n_a_E x nt) -> (n_E x 1 x nt)
+        a_E_sum = sum(a.E, 2);
+        % Reshape to (n_E x nt)
+        a_E_summed = reshape(a_E_sum, params.n_E, []);
+        plot_lines_with_colormap(t, a_E_summed, cmap_E);
         has_adaptation = true;
     end
     

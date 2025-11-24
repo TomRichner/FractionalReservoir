@@ -28,26 +28,31 @@ function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, 
 
 % Determine which subplots are needed
 has_adaptation = params.n_a_E > 0 || params.n_a_I > 0;
-has_std = params.n_b_E > 0 || params.n_b_I > 0;
+has_std_vars = (params.n_b_E > 0 || params.n_b_I > 0) && ~isempty(b); % Checks if 'b' (STD variables) should be plotted
+has_synaptic_output = ~isempty(br); % Checks if 'br' (synaptic output) should be plotted
 has_lyapunov = ~strcmpi(Lya_method, 'none');
+has_firing_rate = ~isempty(r);
 
 % Calculate total number of subplots
-n_plots = 3;  % Always: External input, Dendritic states, Firing rates
-if has_std
+n_plots = 2;  % Always: External input, Dendritic states
+if has_firing_rate
+    n_plots = n_plots + 1;
+end
+if has_synaptic_output
     n_plots = n_plots + 1; % Synaptic output (br)
 end
 if has_adaptation
     n_plots = n_plots + 1;
 end
-if has_std
-    n_plots = n_plots + 1;
+if has_std_vars
+    n_plots = n_plots + 1; % STD variables (b)
 end
 if has_lyapunov
     n_plots = n_plots + 1;
 end
 
 % Create figure with tiled layout
-fig_handle = figure('Position', [200 300 1200 800]);
+fig_handle = figure('Position', [413   623   880   640]);
 tiledlayout(n_plots, 1);
 
 % Initialize array to store axes handles
@@ -67,13 +72,15 @@ end
 plot_dendritic_state(t_out, x, plot_mean);
 set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
 
-% Always create: Firing rates
-ax_handles(end+1) = nexttile;
-plot_firing_rate(t_out, r);
-set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+% Conditionally create: Firing rates
+if has_firing_rate
+    ax_handles(end+1) = nexttile;
+    plot_firing_rate(t_out, r);
+    set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+end
 
 % Conditionally create: Synaptic output (br)
-if has_std
+if has_synaptic_output
     ax_handles(end+1) = nexttile;
     plot_synaptic_output(t_out, br);
     set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
@@ -87,7 +94,7 @@ if has_adaptation
 end
 
 % Conditionally create: STD variables (b)
-if has_std
+if has_std_vars
     ax_handles(end+1) = nexttile;
     plot_std_variable(t_out, b, params);
     set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
