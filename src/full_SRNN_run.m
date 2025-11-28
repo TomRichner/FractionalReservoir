@@ -34,7 +34,7 @@ Lya_method = 'benettin'; % 'benettin', 'qr', or 'none'
 %% time 
 fs = 200;  % 100 Hz is good enough for 0.01, 200 Hz is good for 0.001 resolution of LLE Sampling frequency (Hz)
 dt = 1/fs;
-T = 100;    % Duration (s)
+T = 50;    % Duration (s)
 t_ex = (0:dt:T)';
 nt = length(t_ex);
 
@@ -42,7 +42,7 @@ nt = length(t_ex);
 % u_ex_scale passed as argument
 
 % set simulation parameters
-params.n = 200;
+params.n = 100;
 params.indegree = 20; % expected indegree
 params.d = params.indegree/params.n; % expected density
 params.f = 0.5; % fraction of neurons that are E
@@ -67,7 +67,7 @@ params.tau_b_I_rec = 1;  % STD recovery time constant for I neurons (s)
 
 %% set activaiton function
 S_a = 0.9;
-S_c = 0.4;
+S_c = 0.35;
 params.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 params.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
