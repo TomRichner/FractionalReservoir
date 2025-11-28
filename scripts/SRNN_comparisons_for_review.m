@@ -59,12 +59,12 @@ clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos,
 % clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);
 
 %% Run 4
-close all;
-note = 'review_STD_and_3TS_SFA_ex';
-n_a_E = 3;
-n_b_E = 1;
-
-save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
-
-fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
-clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);
+% close all;
+% note = 'review_STD_and_3TS_SFA_ex';
+% n_a_E = 3;
+% n_b_E = 1;
+% 
+% save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
+% 
+% fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
+% clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);

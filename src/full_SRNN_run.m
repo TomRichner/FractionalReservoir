@@ -108,7 +108,7 @@ S0 = initialize_state(params);
 
 %% External input
 % Configure external input parameters
-input_config.n_steps = 5;
+input_config.n_steps = 3;
 input_config.step_density = 0.2;  % Fraction of neurons receiving input at each step
 input_config.amp = 0.5;  % Amplitude scaling factor
 input_config.no_stim_pattern = false(1, input_config.n_steps);
