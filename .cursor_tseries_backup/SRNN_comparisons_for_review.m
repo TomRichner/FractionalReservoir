@@ -6,12 +6,10 @@ save_workspace = false;
 
 level_of_chaos = 1.8;
 
-% u_ex_scale = 1.6;
-u_ex_scale = 2;
-rng_seeds = [8 25 3 4 5];
-% rng_seeds = [21 16 3 4 5];
+u_ex_scale = 1.7;
+rng_seeds = [8 16 3 4 5];
 
-time_config.T_range = [-5, 30];
+time_config.T_range = [-15, 30];
 time_config.T_plot = [0, 30];
 
 combined_runs = {};
@@ -52,4 +50,4 @@ run4.Lya_method = 'benettin';
 combined_runs{2} = run4;
 
 %% Plot Combined
-plot_SRNN_combined_tseries(combined_runs, 3, {'u_ex', 'x', 'br', 'a', 'b', 'lya'});
+plot_SRNN_combined_tseries(combined_runs, 5, {'u_ex', 'x', 'br', 'a', 'b', 'lya'});

@@ -1,8 +1,8 @@
-function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method)
+function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method, T_plot)
 % PLOT_SRNN_TSERIES Create comprehensive time series plots for SRNN simulation
 %
 % Syntax:
-%   [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method)
+%   [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method, T_plot)
 %
 % Inputs:
 %   t_out       - Time vector from ODE solver
@@ -15,6 +15,7 @@ function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, 
 %   params      - Parameters structure containing network configuration
 %   lya_results - Results from Lyapunov exponent computation
 %   Lya_method  - String indicating Lyapunov method ('benettin', 'qr', or 'none')
+%   T_plot      - Optional [start, end] time range for plotting
 %
 % Outputs:
 %   fig_handle  - Handle to the created figure
@@ -25,6 +26,10 @@ function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, 
 %   features are active in the simulation (adaptation, STD, Lyapunov).
 %   Always includes: External input, Dendritic states, and Firing rates.
 %   All time series plots are linked along the x-axis for synchronized zooming.
+
+if nargin < 11
+    T_plot = [];
+end
 
 % Determine which subplots are needed
 has_adaptation = params.n_a_E > 0 || params.n_a_I > 0;
@@ -114,16 +119,25 @@ end
 % Link x-axes of all time series plots
 linkaxes(ax_handles,'x');
 
+% Apply T_plot limit if provided
+if ~isempty(T_plot)
+    xlim(ax_handles(end), T_plot);
+end
+
 % Add time scale bar overlay in lower right of last subplot
 axes(ax_handles(end));  % Make last subplot current
 hold on;
 
-% Calculate scale bar length (round 1/10 of total time range)
-scale_bar_length = round(0.1 * (t_out(end) - t_out(1)));
-
 % Get current axis limits
 xlims = xlim;
 ylims = ylim;
+
+% Calculate scale bar length (round 1/10 of visible time range)
+scale_bar_length = round(0.1 * (xlims(2) - xlims(1)));
+if scale_bar_length < 1
+    % For very short durations, don't round to integer
+    scale_bar_length = 0.1 * (xlims(2) - xlims(1));
+end
 
 % Position scale bar in lower right corner
 % X position: end at 95% of x-axis width
@@ -138,7 +152,7 @@ plot([x_start, x_end], [y_pos, y_pos], 'k-', 'LineWidth', 4);
 % Add text label below scale bar
 text_x = (x_start + x_end) / 2;  % Center of scale bar
 text_y = ylims(1) + 0.05 * (ylims(2) - ylims(1));  % Below scale bar
-text(text_x, text_y, sprintf('%d seconds', scale_bar_length), ...
+text(text_x, text_y, sprintf('%g seconds', scale_bar_length), ...
     'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
 
 hold off;
