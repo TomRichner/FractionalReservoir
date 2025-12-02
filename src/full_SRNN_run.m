@@ -29,14 +29,6 @@ if ~isfield(time_config, 'T_plot')
     time_config.T_plot = time_config.T_range;
 end
 
-% background of all figs should be white
-set(groot, 'DefaultFigureColor', 'white');
-set(groot, 'DefaultAxesFontSize', 18);
-set(groot, 'DefaultTextFontSize', 18);
-set(groot, 'DefaultLineLineWidth', 1);
-set(groot, 'DefaultAxesLineWidth', 1);
-set(groot, 'DefaultAxesTitleFontWeight', 'normal');
-
 % params.rng_seeds = [5 3 3 4 5];
 params.rng_seeds = rng_seeds;
 rng(params.rng_seeds(1))

@@ -112,7 +112,7 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
             % legend_entries{end+1} = 'EOC';
         end
         
-        ylabel('growth rate')
+        ylabel('\lambda_1')
         
         % % Add legend if there are entries
         % if ~isempty(legend_entries)
@@ -143,7 +143,7 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
         
         hold on
         yline(0, '--k')
-        ylabel('growth rate')
+        ylabel('\lambda_1')
         
         % Add legend with final values (most positive exponents on top)
         legend_count = min(5, lya_results.params.N_sys_eqs);

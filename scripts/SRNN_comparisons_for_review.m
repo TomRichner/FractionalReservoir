@@ -1,15 +1,21 @@
 close all; clear all; clc;
 setup_paths();
 
+set(groot, 'DefaultFigureColor', 'white');
+set(groot, 'DefaultAxesFontSize', 16);
+set(groot, 'DefaultTextFontSize', 16);
+set(groot, 'DefaultLineLineWidth', 1.25);
+set(groot, 'DefaultAxesLineWidth', 2);
+set(groot, 'DefaultAxesTitleFontWeight', 'normal');
+
 save_figs = false;
-save_workspace = false;
+save_workspace = true;
 
 level_of_chaos = 1.8;
 
 % u_ex_scale = 1.6;
 u_ex_scale = 2;
-rng_seeds = [8 25 3 4 5];
-% rng_seeds = [21 16 3 4 5];
+rng_seeds = [8 25];
 
 time_config.T_range = [-5, 30];
 time_config.T_plot = [0, 30];
@@ -18,7 +24,7 @@ combined_runs = {};
 
 %% Run 1: no adapt no depression
 close all;
-note = 'review_no_adapt_ex';
+note = 'Review_no_adapt_ex';
 
 n_a_E = 0;
 n_b_E = 0;
@@ -36,7 +42,7 @@ combined_runs{1} = run1;
 
 %% Run 4
 close all;
-note = 'review_STD_and_3TS_SFA_ex';
+note = 'Review_STD_and_3TS_SFA_ex';
 n_a_E = 3;
 n_b_E = 1;
 
@@ -52,4 +58,18 @@ run4.Lya_method = 'benettin';
 combined_runs{2} = run4;
 
 %% Plot Combined
-plot_SRNN_combined_tseries(combined_runs, 3, {'u_ex', 'x', 'br', 'a', 'b', 'lya'});
+[fig_handle, ~] = plot_SRNN_combined_tseries(combined_runs, 3, {'u_ex', 'x', 'br', 'a', 'b', 'lya'});
+
+% Add letters to subplots
+AddLetters2Plots(fig_handle, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)'}, 'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.065, 'VShift', -0.025);
+
+save_figs = true;
+
+if save_figs
+    save_dir_combined = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review');
+    save_name_base = 'combined_comparison';
+    
+    % Use the existing helper function
+    save_some_figs_to_folder_2(save_dir_combined, save_name_base, [fig_handle.Number], {'fig', 'svg', 'png'});
+    fprintf('Combined plot saved to %s\n', save_dir_combined);
+end

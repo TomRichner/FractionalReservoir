@@ -65,7 +65,7 @@ end
 n_plots = length(subplots_to_plot);
 
 % Create figure
-fig_handle = figure('Position', [413   623   880   640]);
+fig_handle = figure('Position', [200        371        1135         726]);
 tiledlayout(n_plots, 1, 'TileSpacing', 'tight', 'Padding', 'compact');
 ax_handles = gobjects(n_plots, 1);
 
@@ -147,7 +147,6 @@ for curr_ax_idx = 1:n_plots
                         plot_lines_with_colormap(t_shifted, zeros_E, cmap_E);
                     end
                 end
-                ylabel('adaptation');
                 
             case 'b'
                 b = r.plot_data.b;
@@ -188,14 +187,14 @@ for curr_ax_idx = 1:n_plots
                     end
                 end
                 ylabel('depression');
-                ylim([0, 1.1]);
+                ylim([0, 1.05]);
                 yticks([0, 1]);
                 
             case 'lya'
                 if isfield(r.lya_results, 't_lya')
                      lya_res_shifted = r.lya_results;
                      lya_res_shifted.t_lya = get_t_shifted(lya_res_shifted.t_lya, offset);
-                     plot_lyapunov(lya_res_shifted, r.Lya_method, {'filtered', 'EOC', 'value'});
+                     plot_lyapunov(lya_res_shifted, r.Lya_method, {'filtered', 'EOC'});
                 end
                 
             otherwise
@@ -206,6 +205,12 @@ for curr_ax_idx = 1:n_plots
         if i < n_runs
             offset = t_shifted(end) + gap_duration;
         end
+    end
+    
+    if strcmp(subplot_type, 'a')
+        ylabel('adaptation');
+        yl = ylim;
+        ylim([-0.05, yl(2)]);
     end
     
     hold off;
@@ -221,10 +226,10 @@ if ~isempty(ax_handles)
     hold on;
     xlims = xlim;
     ylims = ylim;
-    scale_bar_length = round(0.1 * (xlims(2) - xlims(1)));
-    if scale_bar_length < 1, scale_bar_length = 0.1 * (xlims(2) - xlims(1)); end
+    scale_bar_length = round(0.1 * (xlims(2) - xlims(1)) / 5) * 5;
+    if scale_bar_length < 5, scale_bar_length = 5; end
     
-    x_end = xlims(1) + 0.95 * (xlims(2) - xlims(1));
+    x_end = xlims(1) + 0.85 * (xlims(2) - xlims(1));
     x_start = x_end - scale_bar_length;
     y_pos = ylims(1) + 0.10 * (ylims(2) - ylims(1));
     
