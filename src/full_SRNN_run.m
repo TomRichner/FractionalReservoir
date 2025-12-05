@@ -306,12 +306,16 @@ omit_diagonal_in_J_eff = true;
 
 % Compute J_eff for each time point
 J_eff_array = zeros(params.n, params.n, length(J_times));
+J_eff_full_array = zeros(params.n, params.n, length(J_times));
 for i = 1:length(J_times)
-    J_eff_array(:,:,i) = full(compute_J_eff(S_out(J_times(i),:)', params));
+    J_temp = full(compute_J_eff(S_out(J_times(i),:)', params));
+    J_eff_full_array(:,:,i) = J_temp;
     
     % Optionally zero out diagonal to better visualize off-diagonal terms
     if omit_diagonal_in_J_eff
-        J_eff_array(:,:,i) = J_eff_array(:,:,i) - diag(diag(J_eff_array(:,:,i)));
+        J_eff_array(:,:,i) = J_temp - diag(diag(J_temp));
+    else
+        J_eff_array(:,:,i) = J_temp;
     end
 end
 
@@ -394,6 +398,48 @@ for i = 1:n_plots
     % text(-1.3, 1.3, sprintf('t = %.2f s', time_val), ...
     %     'FontSize', 14, 'Color', 'k', 'HorizontalAlignment', 'left');
 end
+
+%% Plot eigenvalues of J_eff
+% Compute eigenvalues for each J_eff
+J_eff_eigenvalues_all = cell(length(J_times), 1);
+for i = 1:length(J_times)
+    J_eff_eigenvalues_all{i} = eig(J_eff_full_array(:,:,i));
+end
+
+figure('Position', [1312         100         600         360]);
+ax_handles_jeff = zeros(n_plots, 1);
+
+% Compute global axis limits across all J_eff eigenvalue sets
+all_real_jeff = [];
+all_imag_jeff = [];
+for i = 1:n_plots
+    evals = J_eff_eigenvalues_all{i};
+    all_real_jeff = [all_real_jeff; real(evals)];
+    all_imag_jeff = [all_imag_jeff; imag(evals)];
+end
+global_xlim_jeff = [min(all_real_jeff), max(all_real_jeff)];
+global_ylim_jeff = [min(all_imag_jeff), max(all_imag_jeff)];
+
+% Add some padding (10% of range on each side)
+x_range_jeff = diff(global_xlim_jeff);
+y_range_jeff = diff(global_ylim_jeff);
+if x_range_jeff == 0, x_range_jeff = 1; end
+if y_range_jeff == 0, y_range_jeff = 1; end
+global_xlim_jeff = global_xlim_jeff + [-0.1, 0.1] * x_range_jeff;
+global_ylim_jeff = global_ylim_jeff + [-0.1, 0.1] * y_range_jeff;
+
+for i = 1:n_plots
+    ax_handles_jeff(i) = subplot(n_rows, n_cols, i);
+    evals = J_eff_eigenvalues_all{i};
+    time_val = t_out(J_times(i));
+    ax_handles_jeff(i) = plot_eigenvalues(evals, ax_handles_jeff(i), time_val, global_xlim_jeff, global_ylim_jeff);
+    set(ax_handles_jeff(i), 'Color', 'none');
+    title(ax_handles_jeff(i), sprintf('J_{eff} Eigs t=%.2fs', time_val));
+end
+
+% Link axes of all subplots
+linkaxes(ax_handles_jeff, 'xy');
+
 
 %% Save results
 if save_figs
