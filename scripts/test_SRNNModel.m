@@ -58,7 +58,7 @@ assert(isfield(model4.lya_results, 'LLE'), 'LLE should be computed');
 fprintf('LLE: %.4f\n', model4.lya_results.LLE);
 fprintf('Test 4 PASSED\n\n');
 
-%% Test 5: Run with adaptation and STD
+%% Test 5-7: Run with adaptation/STD, plotting, and get_params
 fprintf('=== Test 5: Run with SFA and STD ===\n');
 model5 = SRNNModel('n', 100, 'level_of_chaos', 1.8, ...
     'n_a_E', 3, 'n_b_E', 1, 'T_range', [0, 10], ...
@@ -70,7 +70,7 @@ assert(isempty(model5.S_out), 'S_out should be cleared (store_full_state=false)'
 assert(~isempty(model5.plot_data), 'plot_data should exist');
 fprintf('Test 5 PASSED\n\n');
 
-%% Test 6: Plotting
+% Test 6: Plotting (uses model5 from above)
 fprintf('=== Test 6: Plotting ===\n');
 [fig, ax] = model5.plot();
 assert(~isempty(fig), 'Figure handle should exist');
@@ -78,7 +78,7 @@ assert(~isempty(ax), 'Axes handles should exist');
 title(ax(1), 'Test 6: SFA + STD');
 fprintf('Test 6 PASSED\n\n');
 
-%% Test 7: get_params compatibility
+% Test 7: get_params compatibility (uses model5 from above)
 fprintf('=== Test 7: get_params compatibility ===\n');
 params = model5.get_params();
 assert(isfield(params, 'W'), 'params should have W');
@@ -87,7 +87,7 @@ assert(isfield(params, 'activation_function'), 'params should have activation_fu
 assert(isa(params.activation_function, 'function_handle'), 'activation_function should be function handle');
 fprintf('Test 7 PASSED\n\n');
 
-%% Test 8: Eigenvalue plotting
+%% Test 8-9: Eigenvalue plotting and memory management
 fprintf('=== Test 8: Eigenvalue plotting ===\n');
 model8 = SRNNModel('n', 100, 'level_of_chaos', 1.8, 'T_range', [0, 10], ...
     'store_full_state', true, 'lya_method', 'none');
@@ -97,7 +97,7 @@ model8.run();
 assert(~isempty(fig_eig), 'Eigenvalue figure should exist');
 fprintf('Test 8 PASSED\n\n');
 
-%% Test 9: Memory management with clear_results
+% Test 9: Memory management with clear_results (uses model8 from above)
 fprintf('=== Test 9: Memory management ===\n');
 model8.clear_results();
 assert(isempty(model8.S_out), 'S_out should be cleared');
