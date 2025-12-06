@@ -65,7 +65,7 @@ classdef SRNNModel < handle
     properties
         input_config                % Struct with stimulus parameters
         u_ex_scale = 1.7            % Scaling factor for external input
-        rng_seeds = [8 16 3 4 5]    % RNG seeds [network, stimulus, ...]
+        rng_seeds = [1 2]    % RNG seeds [network, stimulus, ...]
     end
     
     %% Lyapunov Settings Properties
