@@ -97,6 +97,7 @@ classdef SRNNModel < handle
         u_ex                        % External input matrix (n x nt)
         u_interpolant               % griddedInterpolant for external input (avoids persistent vars)
         S0                          % Initial state vector
+        cached_params               % Cached params struct (set by build)
     end
     
     %% Results Properties (conditionally stored)
@@ -194,6 +195,9 @@ classdef SRNNModel < handle
             % Validate configuration
             obj.validate();
             
+            % Cache params struct for fast access in run/plot methods
+            obj.cached_params = obj.get_params();
+            
             obj.is_built = true;
             fprintf('Model built successfully. Ready to run.\n');
         end
@@ -209,8 +213,8 @@ classdef SRNNModel < handle
                     'Model must be built before running. Call build() first.');
             end
             
-            % Get params struct for Jacobian computation
-            params = obj.get_params();
+            % Use cached params struct
+            params = obj.cached_params;
             
             % Set up ODE options
             dt = 1 / obj.fs;
@@ -232,6 +236,13 @@ classdef SRNNModel < handle
             [t_raw, S_raw] = obj.ode_solver(rhs, obj.t_ex, obj.S0, obj.ode_opts);
             integration_time = toc;
             fprintf('Integration complete in %.2f seconds.\n', integration_time);
+            
+            % Verify output times match input times
+            if length(t_raw) ~= length(obj.t_ex) || max(abs(t_raw - obj.t_ex)) > 1e-9
+                error('SRNNModel:TimeMismatch', ...
+                    'ODE solver output times do not match input times. Max diff: %.2e', ...
+                    max(abs(t_raw(:) - obj.t_ex(:))));
+            end
             
             % Store temporarily for Lyapunov and decimation
             obj.t_out = t_raw;
@@ -265,7 +276,7 @@ classdef SRNNModel < handle
             end
             
             dt = 1 / obj.fs;
-            params = obj.get_params();
+            params = obj.cached_params;
             
             % Set Lyapunov time interval
             if isempty(obj.lya_T_interval)
@@ -316,7 +327,7 @@ classdef SRNNModel < handle
                 T_plot_arg = obj.T_range;
             end
             
-            params = obj.get_params();
+            params = obj.cached_params;
             
             [fig_handle, ax_handles] = plot_SRNN_tseries(...
                 obj.plot_data.t, ...
@@ -343,7 +354,7 @@ classdef SRNNModel < handle
                     'State data required. Set store_full_state=true.');
             end
             
-            params = obj.get_params();
+            params = obj.cached_params;
             
             % Convert times to indices
             J_times = round((J_times_sec - obj.t_out(1)) * obj.fs) + 1;
@@ -388,10 +399,10 @@ classdef SRNNModel < handle
             ax_handles = zeros(n_plots, 1);
             
             for i = 1:n_plots
-                ax_handles(i) = subplot(n_rows, n_cols, i);
+                ax = subplot(n_rows, n_cols, i);
                 evals = eigenvalues_all{i};
                 time_val = obj.t_out(J_times(i));
-                ax_handles(i) = plot_eigenvalues(evals, ax_handles(i), time_val, ...
+                ax_handles(i) = plot_eigenvalues(evals, ax, time_val, ...
                     global_xlim, global_ylim);
                 set(ax_handles(i), 'Color', 'none');
             end
@@ -465,6 +476,25 @@ classdef SRNNModel < handle
             fprintf('Results cleared.\n');
         end
         
+        function reset(obj)
+            % RESET Clear built state to allow rebuilding with new parameters
+            %
+            % Usage:
+            %   model.reset();
+            %   model.n = 200;  % Change parameters
+            %   model.build();  % Rebuild with new settings
+            
+            obj.is_built = false;
+            obj.W = [];
+            obj.u_interpolant = [];
+            obj.t_ex = [];
+            obj.u_ex = [];
+            obj.S0 = [];
+            obj.cached_params = [];
+            obj.clear_results();
+            fprintf('Model reset. Modify parameters and call build() to reinitialize.\n');
+        end
+        
         function dS_dt = dynamics(obj, t, S)
             % DYNAMICS Compute the right-hand side of the SRNN ODE system
             %
@@ -472,7 +502,7 @@ classdef SRNNModel < handle
             % For performance-critical code (e.g., ODE integration), use
             % dynamics_fast directly with a params struct.
             
-            params = obj.get_params();
+            params = obj.cached_params;
             params.u_interpolant = obj.u_interpolant;
             dS_dt = SRNNModel.dynamics_fast(t, S, params);
         end
@@ -596,7 +626,7 @@ classdef SRNNModel < handle
         function decimate_and_unpack(obj)
             % DECIMATE_AND_UNPACK Decimate state data and unpack for plotting
             
-            params = obj.get_params();
+            params = obj.cached_params;
             
             % Decimate
             [t_plot, S_plot, plot_indices] = decimate_states(obj.t_out, obj.S_out, obj.plot_deci);
