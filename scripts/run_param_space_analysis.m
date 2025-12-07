@@ -39,7 +39,8 @@ psa = ParamSpaceAnalysis(...
 % Network structure parameters
 psa.add_grid_parameter('level_of_chaos', [0.5, 2.5]);    % Abscissa scaling
 psa.add_grid_parameter('n', [50, 200]);                   % Number of neurons
-% psa.add_grid_parameter('EI_imbalance', [0.5, 1.5]);     % E/I imbalance
+psa.add_grid_parameter('EI_imbalance', [0.5, 1.5]);     % E/I imbalance
+psa.add_grid_parameter('f', [0.25, 0.75]);     % E/I imbalance
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant

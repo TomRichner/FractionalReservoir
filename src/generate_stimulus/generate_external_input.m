@@ -9,24 +9,32 @@ function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_c
 %   The input consists of steps with random amplitudes applied to a sparse
 %   subset of neurons. Optionally adds constant intrinsic drive.
 %
+%   If input_config contains a 'generator' field with a function handle,
+%   that function is called instead to generate custom stimulus patterns.
+%
 % Inputs:
 %   params       - Struct containing:
 %                  .n - Total number of neurons
 %   T            - Duration of simulation (seconds)
 %   fs           - Sampling frequency (Hz)
 %   rng_seed     - Random seed for reproducibility
-%   input_config - Struct containing:
+%   input_config - Struct containing either:
+%                  (Standard mode):
 %                  .n_steps          - Number of steps in the input
 %                  .step_density     - Fraction of neurons receiving input (0-1)
 %                  .amp              - Amplitude scaling factor
 %                  .no_stim_pattern  - Logical array (1 x n_steps) where true = no stim
 %                  .intrinsic_drive  - Constant drive added to all neurons (n x 1)
 %
+%                  (Custom mode):
+%                  .generator        - Function handle: @(params, T, fs, rng_seed, cfg)
+%                                      Must return [u_ex, t_ex]
+%
 % Outputs:
 %   u_ex - n x nt external input matrix
 %   t_ex - nt x 1 time vector
 %
-% Example:
+% Example (standard mode):
 %   params.n = 100;
 %   input_config.n_steps = 7;
 %   input_config.step_density = 0.2;
@@ -35,7 +43,18 @@ function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_c
 %   input_config.no_stim_pattern(1:2:end) = true;
 %   input_config.intrinsic_drive = zeros(100, 1);
 %   [u_ex, t_ex] = generate_external_input(params, 150, 100, 2, input_config);
+%
+% Example (custom generator):
+%   input_config.generator = @my_custom_stimulus_generator;
+%   [u_ex, t_ex] = generate_external_input(params, 150, 100, 2, input_config);
 
+    % Check for custom generator function
+    if isfield(input_config, 'generator') && isa(input_config.generator, 'function_handle')
+        [u_ex, t_ex] = input_config.generator(params, T, fs, rng_seed, input_config);
+        return;
+    end
+
+    % Standard sparse step stimulus generation
     rng(rng_seed);  % Set random seed for reproducibility
     
     % Create time vector
@@ -83,4 +102,5 @@ function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_c
     % Add intrinsic drive to neurons
     u_ex = u_ex + intrinsic_drive;
 end
+
 
