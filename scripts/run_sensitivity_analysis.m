@@ -30,7 +30,7 @@ sa = SensitivityAnalysis(...
 
 % Network structure parameters
 sa.add_parameter('level_of_chaos', [0.5, 2.5]);  % Abscissa scaling
-sa.add_parameter('n', [50, 100]);                 % Number of neurons
+sa.add_parameter('n', [50, 250]);                 % Number of neurons
 sa.add_parameter('EI_imbalance', [0.5, 1.5]);    % E/I imbalance (1 = balanced)
 % sa.add_parameter('indegree', [10, 50]);         % Expected in-degree
 
