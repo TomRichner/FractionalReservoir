@@ -137,10 +137,23 @@ classdef PairedPulseMIAnalysis < handle
         end
         
         function run(obj)
-            % RUN Execute the paired-pulse MI analysis
+            % RUN Execute the paired-pulse MI analysis with batched parfor
+            %
+            % Uses parfor for parallel execution with checkpoint files for
+            % resume capability. Each batch saves intermediate results.
             
             if isempty(obj.conditions)
                 error('PairedPulseMIAnalysis:NoConditions', 'No conditions defined.');
+            end
+            
+            % Generate grid if parameters specified
+            has_grid = ~isempty(obj.grid_params);
+            if has_grid
+                obj.generate_grid();
+                num_configs = length(obj.all_configs);
+            else
+                num_configs = 1;
+                obj.all_configs = {struct()};  % Single empty config
             end
             
             % Create timestamped output directory
@@ -160,66 +173,50 @@ classdef PairedPulseMIAnalysis < handle
                 mkdir(obj.output_dir);
             end
             
+            % Create temp directory for batch results
+            temp_dir = fullfile(obj.output_dir, 'temp_batches');
+            if ~exist(temp_dir, 'dir')
+                mkdir(temp_dir);
+            end
+            
+            % Create condition output directories
+            for c_idx = 1:length(obj.conditions)
+                cond_dir = fullfile(obj.output_dir, obj.conditions{c_idx}.name);
+                if ~exist(cond_dir, 'dir')
+                    mkdir(cond_dir);
+                end
+            end
+            
+            % Calculate total jobs
+            n_conditions = length(obj.conditions);
+            total_runs = num_configs * obj.n_networks;
+            total_jobs = total_runs * n_conditions;
+            num_batches = ceil(total_runs / obj.batch_size);
+            
             % Print summary
             fprintf('\n========================================\n');
             fprintf('=== Paired-Pulse MI Analysis ===\n');
             fprintf('========================================\n');
-            fprintf('Number of networks: %d\n', obj.n_networks);
-            fprintf('Amplitude levels: %d\n', obj.n_amp_levels);
+            if has_grid
+                fprintf('Grid parameters: %s\n', strjoin(obj.grid_params, ', '));
+                fprintf('Levels per parameter: %d\n', obj.n_levels);
+                fprintf('Total grid combinations: %d\n', num_configs);
+            end
+            fprintf('Networks per config: %d\n', obj.n_networks);
+            fprintf('Total runs: %d\n', total_runs);
             fprintf('Conditions: %s\n', strjoin(cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false), ', '));
+            fprintf('Total simulations: %d\n', total_jobs);
+            fprintf('Batch size: %d | Num batches: %d\n', obj.batch_size, num_batches);
             fprintf('Output directory: %s\n', obj.output_dir);
             fprintf('========================================\n\n');
             
             overall_start = tic;
             
-            % Initialize results
-            n_conditions = length(obj.conditions);
-            for c_idx = 1:n_conditions
-                cond_name = obj.conditions{c_idx}.name;
-                obj.results.(cond_name) = struct();
-                obj.results.(cond_name).MI_vs_delay_all = {};
-                obj.results.(cond_name).delay_vec_sec = [];
-                obj.results.(cond_name).network_results = {};
-            end
+            % Run batched simulation
+            obj.run_batched_parfor(temp_dir, num_configs, total_runs, num_batches);
             
-            % Run simulations
-            for net_idx = 1:obj.n_networks
-                fprintf('\n--- Network %d/%d ---\n', net_idx, obj.n_networks);
-                
-                % Same network seed for all conditions
-                network_seed = net_idx;
-                
-                for c_idx = 1:n_conditions
-                    condition = obj.conditions{c_idx};
-                    
-                    try
-                        result = obj.run_single_network(network_seed, condition);
-                        result.success = true;
-                    catch ME
-                        result = struct();
-                        result.success = false;
-                        result.error_message = ME.message;
-                        result.MI_vs_delay = [];
-                        result.delay_vec_sec = [];
-                        if obj.verbose
-                            fprintf('  ERROR (%s): %s\n', condition.name, ME.message);
-                        end
-                    end
-                    
-                    result.network_seed = network_seed;
-                    result.condition = condition;
-                    
-                    % Store results
-                    cond_name = condition.name;
-                    obj.results.(cond_name).network_results{end+1} = result;
-                    if result.success && ~isempty(result.MI_vs_delay)
-                        obj.results.(cond_name).MI_vs_delay_all{end+1} = result.MI_vs_delay;
-                        if isempty(obj.results.(cond_name).delay_vec_sec)
-                            obj.results.(cond_name).delay_vec_sec = result.delay_vec_sec;
-                        end
-                    end
-                end
-            end
+            % Consolidate batch results
+            obj.consolidate_batch_results(temp_dir, num_batches, total_runs);
             
             overall_elapsed = toc(overall_start);
             fprintf('\n========================================\n');
@@ -229,7 +226,7 @@ classdef PairedPulseMIAnalysis < handle
             
             obj.has_run = true;
             
-            % Save results
+            % Save final results
             obj.save_results();
         end
         
@@ -792,6 +789,316 @@ classdef PairedPulseMIAnalysis < handle
             obj.model_defaults.lya_method = 'benettin';  % Enable LLE for plots
         end
         
+        function generate_grid(obj)
+            % GENERATE_GRID Create the multi-dimensional parameter grid
+            %
+            % Uses ndgrid to generate all combinations of grid parameters.
+            % Results stored in obj.all_configs cell array.
+            
+            integer_params = {'n', 'indegree', 'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I'};
+            n_params = length(obj.grid_params);
+            param_vectors = cell(1, n_params);
+            
+            for i = 1:n_params
+                param_name = obj.grid_params{i};
+                param_range = obj.param_ranges.(param_name);
+                
+                if ismember(param_name, integer_params)
+                    param_vectors{i} = round(linspace(param_range(1), param_range(2), obj.n_levels));
+                else
+                    param_vectors{i} = linspace(param_range(1), param_range(2), obj.n_levels);
+                end
+            end
+            
+            % Generate all combinations using ndgrid
+            grid_cells = cell(size(param_vectors));
+            [grid_cells{:}] = ndgrid(param_vectors{:});
+            
+            num_combinations = numel(grid_cells{1});
+            obj.all_configs = cell(num_combinations, 1);
+            
+            for i = 1:num_combinations
+                config = struct();
+                for j = 1:n_params
+                    config.(obj.grid_params{j}) = grid_cells{j}(i);
+                end
+                obj.all_configs{i} = config;
+            end
+            
+            fprintf('Generated %d parameter combinations\n', num_combinations);
+        end
+        
+        function run_batched_parfor(obj, temp_dir, num_configs, total_runs, num_batches)
+            % RUN_BATCHED_PARFOR Execute simulations in parallel with batching
+            
+            conditions_local = obj.conditions;
+            num_conditions = length(conditions_local);
+            all_configs_local = obj.all_configs;
+            n_networks_local = obj.n_networks;
+            
+            fprintf('Running %d runs in %d batches (parfor enabled)...\n', total_runs, num_batches);
+            
+            for batch_idx = 1:num_batches
+                batch_file = fullfile(temp_dir, sprintf('batch_%d.mat', batch_idx));
+                
+                % Skip if batch already completed (resume capability)
+                if exist(batch_file, 'file')
+                    fprintf('Batch %d/%d already completed. Skipping.\n', batch_idx, num_batches);
+                    continue;
+                end
+                
+                % Calculate run indices for this batch
+                start_run = (batch_idx - 1) * obj.batch_size + 1;
+                end_run = min(batch_idx * obj.batch_size, total_runs);
+                batch_run_indices = start_run:end_run;
+                current_batch_size = length(batch_run_indices);
+                
+                fprintf('\n--- Batch %d/%d (runs %d-%d) ---\n', ...
+                    batch_idx, num_batches, start_run, end_run);
+                
+                % Create jobs: each run x each condition
+                total_jobs = current_batch_size * num_conditions;
+                jobs = cell(total_jobs, 1);
+                job_idx = 1;
+                
+                for k = 1:current_batch_size
+                    run_idx = batch_run_indices(k);
+                    
+                    % Convert flat run index to config + network indices
+                    cfg_idx = ceil(run_idx / n_networks_local);
+                    net_idx = run_idx - (cfg_idx - 1) * n_networks_local;
+                    
+                    config = all_configs_local{cfg_idx};
+                    network_seed = run_idx;  % Unique seed per run
+                    
+                    for c_idx = 1:num_conditions
+                        job = struct();
+                        job.config = config;
+                        job.config_idx = cfg_idx;
+                        job.net_idx = net_idx;
+                        job.run_idx = run_idx;
+                        job.condition = conditions_local{c_idx};
+                        job.condition_idx = c_idx;
+                        job.network_seed = network_seed;
+                        jobs{job_idx} = job;
+                        job_idx = job_idx + 1;
+                    end
+                end
+                
+                % Extract object properties for parfor
+                model_defaults_local = obj.model_defaults;
+                grid_params_local = obj.grid_params;
+                pp_config = obj.get_pp_config();  % Paired-pulse parameters
+                
+                % Run parfor
+                parallel_results = cell(total_jobs, 1);
+                batch_start = tic;
+                
+                parfor j = 1:total_jobs
+ 
+                    job = jobs{j};
+                    run_start = tic;
+                    
+                    try
+                        % Build model arguments
+                        model_args = { ...
+                            'n_a_E', job.condition.n_a_E, ...
+                            'n_b_E', job.condition.n_b_E, ...
+                            'rng_seeds', [job.network_seed, job.network_seed + 1] ...
+                        };
+                        
+                        % Add grid parameters
+                        for p_idx = 1:length(grid_params_local)
+                            pname = grid_params_local{p_idx};
+                            if isfield(job.config, pname)
+                                model_args = [model_args, {pname, job.config.(pname)}];
+                            end
+                        end
+                        
+                        % Add model defaults (don't override grid params or condition)
+                        default_fields = fieldnames(model_defaults_local);
+                        for d_idx = 1:length(default_fields)
+                            fname = default_fields{d_idx};
+                            if ~ismember(fname, grid_params_local) && ...
+                               ~strcmp(fname, 'n_a_E') && ~strcmp(fname, 'n_b_E')
+                                model_args = [model_args, {fname, model_defaults_local.(fname)}];
+                            end
+                        end
+                        
+                        % Create paired-pulse input config
+                        input_config = PairedPulseMIAnalysis.create_pp_input_config_static(...
+                            pp_config, job.network_seed);
+                        model_args = [model_args, {'input_config', input_config}];
+                        
+                        % Create and run model
+                        model = SRNNModel(model_args{:});
+                        model.build();
+                        model.run();
+                        
+                        % Extract dendritic potential
+                        t = model.plot_data.t;
+                        x_all = [model.plot_data.x.E; model.plot_data.x.I];
+                        x_stim = x_all(pp_config.stim_channel, :);
+                        fs = model_defaults_local.fs / model.plot_deci;
+                        
+                        % Compute MI vs delay
+                        [MI_vs_delay, delay_vec_sec] = ...
+                            PairedPulseMIAnalysis.compute_MI_vs_delay_static(...
+                                input_config, x_stim, t, fs, pp_config);
+                        
+                        % Extract LLE
+                        LLE_val = NaN;
+                        if ~isempty(model.lya_results) && isfield(model.lya_results, 'LLE')
+                            LLE_val = model.lya_results.LLE;
+                        end
+                        
+                        % Compute mean firing rate
+                        r_all = [model.plot_data.r.E; model.plot_data.r.I];
+                        mean_rate = mean(r_all(:), 'omitnan');
+                        
+                        result = struct();
+                        result.success = true;
+                        result.MI_vs_delay = MI_vs_delay;
+                        result.delay_vec_sec = delay_vec_sec;
+                        result.LLE = LLE_val;
+                        result.mean_rate = mean_rate;
+                        result.config = job.config;
+                        result.config_idx = job.config_idx;
+                        result.condition_name = job.condition.name;
+                        result.network_seed = job.network_seed;
+                        result.run_duration = toc(run_start);
+                        
+                        parallel_results{j} = result;
+                        
+                    catch ME
+                        % Print error for debugging
+                        fprintf('ERROR in job %d (config %d, %s, seed %d): %s\n', ...
+                            j, job.config_idx, job.condition.name, job.network_seed, ME.message);
+                        
+                        result = struct();
+                        result.success = false;
+                        result.error_message = ME.message;
+                        result.MI_vs_delay = [];
+                        result.delay_vec_sec = [];
+                        result.LLE = NaN;
+                        result.mean_rate = NaN;
+                        result.config = job.config;
+                        result.config_idx = job.config_idx;
+                        result.condition_name = job.condition.name;
+                        result.network_seed = job.network_seed;
+                        result.run_duration = toc(run_start);
+                        
+                        parallel_results{j} = result;
+                    end
+                end
+                
+                batch_elapsed = toc(batch_start);
+                
+                % Organize results by condition
+                batch_results = struct();
+                for c_idx = 1:num_conditions
+                    cond_name = conditions_local{c_idx}.name;
+                    batch_results.(cond_name) = {};
+                end
+                
+                for j = 1:total_jobs
+                    res = parallel_results{j};
+                    cond_name = res.condition_name;
+                    batch_results.(cond_name){end+1} = res;
+                end
+                
+                % Save batch checkpoint
+                save(batch_file, 'batch_results', 'batch_run_indices', '-v7.3');
+                
+                % Report progress
+                n_success = sum(cellfun(@(r) r.success, parallel_results));
+                fprintf('Batch %d completed in %.1f min (%d/%d successful)\n', ...
+                    batch_idx, batch_elapsed/60, n_success, total_jobs);
+            end
+        end
+        
+        function consolidate_batch_results(obj, temp_dir, num_batches, total_runs)
+            % CONSOLIDATE_BATCH_RESULTS Merge batch checkpoints into final results
+            
+            fprintf('\nConsolidating batch results...\n');
+            
+            % Initialize results storage
+            n_conditions = length(obj.conditions);
+            for c_idx = 1:n_conditions
+                cond_name = obj.conditions{c_idx}.name;
+                obj.results.(cond_name) = struct();
+                obj.results.(cond_name).MI_vs_delay_all = {};
+                obj.results.(cond_name).delay_vec_sec = [];
+                obj.results.(cond_name).network_results = {};
+            end
+            
+            % Load and merge batches
+            all_found = true;
+            for batch_idx = 1:num_batches
+                batch_file = fullfile(temp_dir, sprintf('batch_%d.mat', batch_idx));
+                
+                if exist(batch_file, 'file')
+                    loaded = load(batch_file);
+                    batch_results = loaded.batch_results;
+                    
+                    for c_idx = 1:n_conditions
+                        cond_name = obj.conditions{c_idx}.name;
+                        cond_results = batch_results.(cond_name);
+                        
+                        for k = 1:length(cond_results)
+                            res = cond_results{k};
+                            obj.results.(cond_name).network_results{end+1} = res;
+                            
+                            if res.success && ~isempty(res.MI_vs_delay)
+                                obj.results.(cond_name).MI_vs_delay_all{end+1} = res.MI_vs_delay;
+                                if isempty(obj.results.(cond_name).delay_vec_sec) && ...
+                                   ~isempty(res.delay_vec_sec)
+                                    obj.results.(cond_name).delay_vec_sec = res.delay_vec_sec;
+                                end
+                            end
+                        end
+                    end
+                else
+                    fprintf('Warning: Batch file %d not found\n', batch_idx);
+                    all_found = false;
+                end
+            end
+            
+            % Report and cleanup
+            for c_idx = 1:n_conditions
+                cond_name = obj.conditions{c_idx}.name;
+                n_results = length(obj.results.(cond_name).network_results);
+                n_success = sum(cellfun(@(r) r.success, obj.results.(cond_name).network_results));
+                fprintf('Condition %s: %d/%d successful\n', cond_name, n_success, n_results);
+            end
+            
+            if all_found
+                rmdir(temp_dir, 's');
+                fprintf('Temp directory cleaned up.\n');
+            else
+                fprintf('Temp directory retained due to missing batches.\n');
+            end
+        end
+        
+        function pp_config = get_pp_config(obj)
+            % GET_PP_CONFIG Extract paired-pulse parameters for parfor
+            pp_config = struct();
+            pp_config.pulse1_width = obj.pulse1_width;
+            pp_config.pulse2_width = obj.pulse2_width;
+            pp_config.inter_pulse_interval = obj.inter_pulse_interval;
+            pp_config.repeat_interval = obj.repeat_interval;
+            pp_config.pulse2_amp = obj.pulse2_amp;
+            pp_config.n_amp_levels = obj.n_amp_levels;
+            pp_config.amp_scale = obj.amp_scale;
+            pp_config.DC_level = obj.DC_level;
+            pp_config.ramp_duration = obj.ramp_duration;
+            pp_config.stim_channel = obj.stim_channel;
+            pp_config.delay_step_samples = obj.delay_step_samples;
+            pp_config.n_bins_in = obj.n_bins_in;
+            pp_config.n_bins_out = obj.n_bins_out;
+            pp_config.T_end = obj.model_defaults.T_range(2);  % Simulation end time
+        end
+        
         function result = run_single_network(obj, network_seed, condition, config)
             % RUN_SINGLE_NETWORK Run simulation for one network and condition
             %
@@ -1011,6 +1318,123 @@ classdef PairedPulseMIAnalysis < handle
             save_file = fullfile(obj.output_dir, 'paired_pulse_MI_results.mat');
             save(save_file, 'results', 'config', '-v7.3');
             fprintf('Results saved to: %s\n', save_file);
+        end
+    end
+    
+    %% Static Methods (for use in parfor)
+    methods (Static)
+        function input_config = create_pp_input_config_static(pp_config, seed)
+            % CREATE_PP_INPUT_CONFIG_STATIC Static version for parfor
+            %
+            % Creates paired-pulse stimulus configuration without object reference.
+            
+            rng(seed + 1000, 'twister');
+            
+            % Generate random pulse 1 amplitudes
+            % Use actual simulation time from pp_config.T_end (not hardcoded 300s)
+            T_end = pp_config.T_end;
+            n_pairs = floor((T_end - pp_config.ramp_duration) / pp_config.repeat_interval);
+            amp_levels = linspace(0.5, 2.5, pp_config.n_amp_levels) * pp_config.amp_scale;
+            pulse1_amps = amp_levels(randi(pp_config.n_amp_levels, 1, n_pairs));
+            
+            % Calculate pulse timing
+            pair_starts = pp_config.ramp_duration + (0:n_pairs-1) * pp_config.repeat_interval;
+            pulse1_start_times = pair_starts;
+            pulse1_end_times = pulse1_start_times + pp_config.pulse1_width;
+            pulse2_start_times = pair_starts + pp_config.inter_pulse_interval;
+            pulse2_end_times = pulse2_start_times + pp_config.pulse2_width;
+            
+            input_config = struct();
+            input_config.pulse1_amps = pulse1_amps;
+            input_config.pulse1_start_times = pulse1_start_times;
+            input_config.pulse1_end_times = pulse1_end_times;
+            input_config.pulse2_start_times = pulse2_start_times;
+            input_config.pulse2_end_times = pulse2_end_times;
+            input_config.pulse2_amp = pp_config.pulse2_amp;
+            input_config.DC_level = pp_config.DC_level;
+            input_config.ramp_duration = pp_config.ramp_duration;
+            input_config.stim_channel = pp_config.stim_channel;
+            input_config.intrinsic_drive = [];  % Will be set by SRNNModel.build()
+            
+            % Store generator function - must match signature expected by generate_external_input.m
+            % Expected: @(params, T, fs, rng_seed, cfg) returning [u_ex, t_ex]
+            input_config.generator = @(params, T, fs, rng_seed, cfg) ...
+                PairedPulseMIAnalysis.generate_pp_stimulus_static(...
+                    params, T, fs, pp_config, cfg);
+        end
+        
+        function [u_ex, t_ex] = generate_pp_stimulus_static(params, T, fs, pp_config, input_config)
+            % GENERATE_PP_STIMULUS_STATIC Static stimulus generator for parfor
+            %
+            % Signature matches generate_external_input.m expectation
+            
+            % Generate time vector
+            dt = 1 / fs;
+            t_ex = (0:dt:T)';
+            n_channels = params.n;
+            nt = length(t_ex);
+            
+            % Initialize with DC level
+            u_ex = pp_config.DC_level * ones(n_channels, nt);
+            
+            % Apply ramp
+            ramp_idx = t_ex <= pp_config.ramp_duration;
+            ramp_scale = t_ex(ramp_idx) / pp_config.ramp_duration;
+            u_ex(:, ramp_idx) = u_ex(:, ramp_idx) .* ramp_scale';
+            
+            stim_ch = pp_config.stim_channel;
+            
+            % Add pulses
+            for p = 1:length(input_config.pulse1_amps)
+                % Pulse 1
+                p1_idx = t_ex >= input_config.pulse1_start_times(p) & ...
+                         t_ex < input_config.pulse1_end_times(p);
+                u_ex(stim_ch, p1_idx) = u_ex(stim_ch, p1_idx) + input_config.pulse1_amps(p);
+                
+                % Pulse 2
+                p2_idx = t_ex >= input_config.pulse2_start_times(p) & ...
+                         t_ex < input_config.pulse2_end_times(p);
+                u_ex(stim_ch, p2_idx) = u_ex(stim_ch, p2_idx) + input_config.pulse2_amp;
+            end
+        end
+        
+        function [MI_vs_delay, delay_vec_sec] = compute_MI_vs_delay_static(input_config, x_stim, t, fs, pp_config)
+            % COMPUTE_MI_VS_DELAY_STATIC Static MI computation for parfor
+            
+            pulse1_amps = input_config.pulse1_amps;
+            pulse2_start_times = input_config.pulse2_start_times;
+            
+            n_pairs = length(pulse1_amps);
+            pulse2_duration_samples = round(pp_config.pulse2_width * fs);
+            
+            delay_vec_samples = 1:pp_config.delay_step_samples:pulse2_duration_samples;
+            delay_vec_sec = delay_vec_samples / fs;
+            n_delays = length(delay_vec_samples);
+            
+            MI_vs_delay = zeros(1, n_delays);
+            
+            for d_idx = 1:n_delays
+                delay_samples = delay_vec_samples(d_idx);
+                x_at_delay = zeros(1, n_pairs);
+                
+                for p = 1:n_pairs
+                    pulse2_start_sec = pulse2_start_times(p);
+                    sample_time = pulse2_start_sec + delay_samples / fs;
+                    [~, sample_idx] = min(abs(t - sample_time));
+                    
+                    if sample_idx <= length(x_stim)
+                        x_at_delay(p) = x_stim(sample_idx);
+                    end
+                end
+                
+                try
+                    [MI_corr, ~] = mutual_info_SISO(pulse1_amps, x_at_delay, ...
+                        pp_config.n_bins_in, pp_config.n_bins_out);
+                    MI_vs_delay(d_idx) = MI_corr;
+                catch
+                    MI_vs_delay(d_idx) = 0;
+                end
+            end
         end
     end
 end
