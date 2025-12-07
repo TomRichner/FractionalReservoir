@@ -18,8 +18,8 @@ setup_paths();
 % Configure the number of levels and repetitions
 % (reduce these for faster testing)
 sa = SensitivityAnalysis(...
-    'n_levels', 11, ...       % Number of parameter values to test
-    'n_reps', 10, ...         % Number of repetitions per value (for statistics)
+    'n_levels', 5, ...       % Number of parameter values to test
+    'n_reps', 3, ...         % Number of repetitions per value (for statistics)
     'note', 'example_run', ...% Optional note for output folder naming
     'verbose', true ...       % Print progress during execution
 );
@@ -30,19 +30,20 @@ sa = SensitivityAnalysis(...
 
 % Network structure parameters
 sa.add_parameter('level_of_chaos', [0.5, 2.5]);  % Abscissa scaling
-sa.add_parameter('n', [50, 150]);                 % Number of neurons
-% sa.add_parameter('indegree', [10, 40]);         % Expected in-degree
+sa.add_parameter('n', [50, 100]);                 % Number of neurons
+sa.add_parameter('EI_imbalance', [0.5, 1.5]);    % E/I imbalance (1 = balanced)
+% sa.add_parameter('indegree', [10, 50]);         % Expected in-degree
 
 % Dynamics parameters
 % sa.add_parameter('tau_d', [0.05, 0.2]);         % Dendritic time constant
 % sa.add_parameter('u_ex_scale', [1.0, 3.0]);     % External input scaling
 
 % Adaptation parameters
-% sa.add_parameter('c_E', [0.01, 0.1]);           % SFA strength for E neurons
+sa.add_parameter('c_E', [0.01, 1]);           % SFA strength for E neurons
 
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
-sa.model_defaults.T_range = [0, 30];       % Shorter simulation for faster runs
+sa.model_defaults.T_range = [0, 20];       % Shorter simulation for faster runs
 sa.model_defaults.fs = 200;                 % Sampling frequency
 sa.model_defaults.lya_method = 'benettin';  % Lyapunov computation method
 

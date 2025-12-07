@@ -20,6 +20,7 @@ classdef SRNNModel < handle
         indegree = 20               % Expected in-degree
         G_stdev                     % Gaussian weight perturbation (computed from indegree)
         mu_E = 1                    % Mean excitatory weight
+        EI_imbalance = 1            % E/I imbalance: how much stronger mu_E is than |mu_I| (1 = balanced)
         level_of_chaos = 1.8        % Abscissa scaling factor for edge of chaos
     end
     
@@ -64,7 +65,7 @@ classdef SRNNModel < handle
     %% Input Configuration Properties
     properties
         input_config                % Struct with stimulus parameters
-        u_ex_scale = 1.7            % Scaling factor for external input
+        u_ex_scale = 1.0            % Scaling factor for external input
         rng_seeds = [1 2]    % RNG seeds [network, stimulus, ...]
     end
     
@@ -280,7 +281,7 @@ classdef SRNNModel < handle
             
             % Set Lyapunov time interval
             if isempty(obj.lya_T_interval)
-                obj.lya_T_interval = [obj.T_range(1) + 1, obj.T_range(2)];
+                obj.lya_T_interval = [obj.T_range(1) + 2, obj.T_range(2)]; % by default skip the first two seconds
             end
             
             % Define RHS function using closure (avoids OOP overhead)
@@ -542,9 +543,9 @@ classdef SRNNModel < handle
             obj.N_sys_eqs = obj.n_E * obj.n_a_E + obj.n_I * obj.n_a_I + ...
                             obj.n_E * obj.n_b_E + obj.n_I * obj.n_b_I + obj.n;
             
-            % Compute mu_I for E/I balance
-            imbalance = 1;
-            obj.mu_I = -imbalance * obj.f * obj.mu_E / (1 - obj.f);
+            % Compute mu_I for E/I balance (EI_imbalance=1 means balanced)
+            % EI_imbalance > 1 means excitation dominates (mu_I weaker)
+            obj.mu_I = -(1/obj.EI_imbalance) * obj.f * obj.mu_E / (1 - obj.f);
         end
         
         function validate(obj)
