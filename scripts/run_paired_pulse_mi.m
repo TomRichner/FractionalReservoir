@@ -24,9 +24,9 @@ setup_paths();
 
 %% Create PairedPulseMIAnalysis object
 pp = PairedPulseMIAnalysis(...
-    'n_networks', 1, ...           % Number of different network realizations
-    'n_levels', 5, ...              % Number of levels per grid parameter
-    'note', 'demo', ...             % Optional note for folder naming
+    'n_networks', 50, ...           % Number of different network realizations
+    'n_levels', 11, ...              % Number of levels per grid parameter
+    'note', 'bigger_mi', ...             % Optional note for folder naming
     'verbose', true ...             % Print progress during execution
 );
 
@@ -35,14 +35,13 @@ pp = PairedPulseMIAnalysis(...
 pp.model_defaults.n = 30;                   % Network size
 pp.model_defaults.fs = 200;                 % Sampling frequency
 pp.model_defaults.T_range = [0, 150];       % Simulation time
-pp.model_defaults.level_of_chaos = 1.5;     % Abscissa scaling
+pp.model_defaults.level_of_chaos = 1.8;     % Abscissa scaling
 % pp.model_defaults.lya_method = 'benettin'; % Already default
 
 %% Optional: Add grid parameters for parameter space exploration
 % Uncomment to test across parameter combinations:
 %
-pp.add_grid_parameter('level_of_chaos', [0.25, 3.0]);
-pp.add_grid_parameter('EI_imbalance', [0.5, 1.5]);
+pp.add_grid_parameter('level_of_chaos', [0.5, 2.5]);
 % pp.add_grid_parameter('n', [50, 200]);
 
 %% Run the analysis

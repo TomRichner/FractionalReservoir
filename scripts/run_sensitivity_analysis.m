@@ -18,8 +18,8 @@ setup_paths();
 % Configure the number of levels and repetitions
 % (reduce these for faster testing)
 sa = SensitivityAnalysis(...
-    'n_levels', 5, ...       % Number of parameter values to test
-    'n_reps', 3, ...         % Number of repetitions per value (for statistics)
+    'n_levels', 21, ...       % Number of parameter values to test
+    'n_reps', 25, ...         % Number of repetitions per value (for statistics)
     'note', 'example_run', ...% Optional note for output folder naming
     'verbose', true ...       % Print progress during execution
 );
@@ -31,7 +31,7 @@ sa = SensitivityAnalysis(...
 % Network structure parameters
 sa.add_parameter('level_of_chaos', [0.5, 2.5]);  % Abscissa scaling
 sa.add_parameter('n', [50, 250]);                 % Number of neurons
-sa.add_parameter('EI_imbalance', [0.5, 1.5]);    % E/I imbalance (1 = balanced)
+sa.add_parameter('EI_imbalance', [0.25, 4]);    % E/I imbalance (1 = balanced)
 % sa.add_parameter('indegree', [10, 50]);         % Expected in-degree
 
 % Dynamics parameters
@@ -45,6 +45,7 @@ sa.add_parameter('c_E', [0.01, 1]);           % SFA strength for E neurons
 % Set any SRNNModel properties that should be constant across all runs
 sa.model_defaults.T_range = [0, 20];       % Shorter simulation for faster runs
 sa.model_defaults.fs = 200;                 % Sampling frequency
+sa.model_defaults.c_E = 0.5;
 sa.model_defaults.lya_method = 'benettin';  % Lyapunov computation method
 
 %% Configure conditions (optional)

@@ -26,9 +26,9 @@ setup_paths();
 %       e.g., 4 levels x 3 params x 4 conditions = 256 simulations
 
 psa = ParamSpaceAnalysis(...
-    'n_levels', 4, ...          % Number of levels per parameter
-    'batch_size', 16, ...       % Configs per batch (for checkpointing)
-    'note', 'demo', ...         % Optional note for folder naming
+    'n_levels', 5, ...          % Number of levels per parameter
+    'batch_size', 50, ...       % Configs per batch (for checkpointing)
+    'note', 'bigger_paramspace', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
 );
 
@@ -38,9 +38,10 @@ psa = ParamSpaceAnalysis(...
 
 % Network structure parameters
 psa.add_grid_parameter('level_of_chaos', [0.5, 2.5]);    % Abscissa scaling
-psa.add_grid_parameter('n', [50, 200]);                   % Number of neurons
-psa.add_grid_parameter('EI_imbalance', [0.5, 1.5]);     % E/I imbalance
+psa.add_grid_parameter('n', [50, 250]);                   % Number of neurons
+psa.add_grid_parameter('EI_imbalance', [0.5, 2]);     % E/I imbalance
 psa.add_grid_parameter('f', [0.25, 0.75]);     % E/I imbalance
+psa.add_grid_parameter('mu_E', [0.2, 2]);
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
@@ -51,8 +52,9 @@ psa.add_grid_parameter('f', [0.25, 0.75]);     % E/I imbalance
 
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
-psa.model_defaults.T_range = [0, 20];        % Simulation time (shorter for faster runs)
+psa.model_defaults.T_range = [0, 30];        % Simulation time (shorter for faster runs)
 psa.model_defaults.fs = 200;                  % Sampling frequency
+pas.model_defaults.c_E = 0.5;
 psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
 
 %% Configure conditions (optional)
