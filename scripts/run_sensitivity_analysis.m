@@ -19,8 +19,8 @@ setup_paths();
 % (reduce these for faster testing)
 sa = SensitivityAnalysis(...
     'n_levels', 21, ...       % Number of parameter values to test
-    'n_reps', 25, ...         % Number of repetitions per value (for statistics)
-    'note', 'example_run', ...% Optional note for output folder naming
+    'n_reps', 50, ...         % Number of repetitions per value (for statistics)
+    'note', 'bigger_run', ...% Optional note for output folder naming
     'verbose', true ...       % Print progress during execution
 );
 

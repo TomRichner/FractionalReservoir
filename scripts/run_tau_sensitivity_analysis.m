@@ -18,7 +18,7 @@ setup_paths();
 
 %% Analysis Configuration
 n_levels = 25;      % Number of parameter values to test
-n_reps = 50;        % Number of repetitions per value
+n_reps = 100;        % Number of repetitions per value
 note = 'tau_timescales';
 
 % Parameter ranges (matching SRNN analysis)
@@ -36,6 +36,7 @@ model_defaults = struct();
 model_defaults.T_range = [0, 20];       % Simulation time
 model_defaults.fs = 200;                % Sampling frequency
 model_defaults.lya_method = 'benettin'; % Lyapunov method
+% Note: tau_a_E(end) range starts at 5 via param_config.tau_a_E_max.range = [5, 60]
 
 %% Create output directory
 dt_str = lower(strrep(datestr(now, 'mmm_dd_yy_HH_MM_AM'), ':', '_'));
@@ -124,7 +125,11 @@ for p_idx = 1:length(param_names)
                 tau_a_E_vec = logspace(log10(0.25), log10(param_value), n_a_E_val);
                 model_args = [model_args, {'tau_a_E', tau_a_E_vec}];
             else
-                % For scalar parameters like tau_b_E_rec
+                % For scalar parameters like tau_b_E_rec:
+                % Set default tau_a_E with tau_a_E(end) = 5 (matching original analysis)
+                default_tau_a_E_max = 5;
+                tau_a_E_vec = logspace(log10(0.25), log10(default_tau_a_E_max), n_a_E_val);
+                model_args = [model_args, {'tau_a_E', tau_a_E_vec}];
                 model_args = [model_args, {param_name, param_value}];
             end
             

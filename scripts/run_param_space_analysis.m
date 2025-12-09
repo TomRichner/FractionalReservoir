@@ -40,7 +40,7 @@ psa = ParamSpaceAnalysis(...
 psa.add_grid_parameter('level_of_chaos', [0.5, 2.5]);    % Abscissa scaling
 psa.add_grid_parameter('n', [50, 250]);                   % Number of neurons
 psa.add_grid_parameter('EI_imbalance', [0.5, 2]);     % E/I imbalance
-psa.add_grid_parameter('f', [0.25, 0.75]);     % E/I imbalance
+psa.add_grid_parameter('f', [0.2, 0.8]);     % E/I imbalance
 psa.add_grid_parameter('mu_E', [0.2, 2]);
 
 % Dynamics parameters (uncomment to include)
