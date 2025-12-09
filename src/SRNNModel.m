@@ -82,8 +82,8 @@ classdef SRNNModel < handle
         plot_deci = 10              % Decimation factor for plotting
     end
     
-    %% Computed Properties (SetAccess = private)
-    properties (SetAccess = private)
+    %% Computed Properties (SetAccess = protected for subclass access)
+    properties (SetAccess = protected)
         W                           % Connection matrix (n x n)
         n_E                         % Number of excitatory neurons
         n_I                         % Number of inhibitory neurons
@@ -102,7 +102,7 @@ classdef SRNNModel < handle
     end
     
     %% Results Properties (conditionally stored)
-    properties (SetAccess = private)
+    properties (SetAccess = protected)
         t_out                       % Time vector from ODE solver
         S_out                       % State trajectory (nt x N_sys_eqs)
         plot_data                   % Struct with decimated data for plotting
