@@ -61,7 +61,7 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
         % Design filter if needed
         if plot_filtered
             filter_order = 3;
-            filter_cutoff = 0.2;  % Normalized cutoff frequency
+            filter_cutoff = 1;  % Normalized cutoff frequency
             [bL, aL] = butter(filter_order, filter_cutoff/(lya_results.lya_fs/2), 'low');
         end
         

@@ -689,7 +689,7 @@ classdef SRNNModel < handle
         end
     end
     
-    methods (Static, Access = private)
+    methods (Static, Access = protected)
         function s_out = trim_struct_data(s_in, dim, mask)
             % TRIM_STRUCT_DATA Helper to trim fields of a struct along a dimension
             s_out = s_in;

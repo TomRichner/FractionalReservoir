@@ -15,15 +15,20 @@ clear; clc; close all;
 addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'src')));
 
 %% Common parameters
-n = 100;                    % Number of neurons
-level_of_chaos = 2;       % Moderate chaos level
-rng_seed_net = 43;          % Fixed seed for reproducibility
+n = 200;                    % Number of neurons
+level_of_chaos = 1.3;       % Moderate chaos level
+rng_seed_net = 42;          % Fixed seed for reproducibility
 
 % MC protocol parameters (reduced for faster demo)
-T_wash = 200*5;               % Washout samples
+T_wash = 200*10;               % Washout samples
 T_train = 200*60;             % Training samples  
 T_test = 200*60;              % Test samples
-d_max = 200*5;                 % Maximum delay
+d_max = 200*5;                % Maximum delay
+
+% Input type: 'white' (standard ESN) or 'bandlimited' (fair for systems with tau_d)
+% Bandlimited uses low-pass filtered noise matching the system bandwidth
+input_type = 'bandlimited';
+u_f_cutoff = 5;               % Cutoff frequency for bandlimited input (Hz)
 
 %% Condition 1: Baseline (no SFA, no STD)
 fprintf('\n==============================\n');
@@ -38,6 +43,8 @@ esn_baseline = SRNN_ESN_reservoir(...
     'n_a_I', 0, ...            % No SFA for I neurons
     'n_b_E', 0, ...            % No STD for E neurons
     'n_b_I', 0, ...            % No STD for I neurons
+    'input_type', input_type, ...
+    'u_f_cutoff', u_f_cutoff, ...
     'T_wash', T_wash, ...
     'T_train', T_train, ...
     'T_test', T_test, ...
@@ -60,6 +67,8 @@ esn_sfa = SRNN_ESN_reservoir(...
     'n_b_E', 0, ...            % No STD
     'n_b_I', 0, ...
     'c_E', 0.1, ...            % Adaptation strength
+    'input_type', input_type, ...
+    'u_f_cutoff', u_f_cutoff, ...
     'T_wash', T_wash, ...
     'T_train', T_train, ...
     'T_test', T_test, ...
@@ -84,6 +93,8 @@ esn_full = SRNN_ESN_reservoir(...
     'c_E', 0.1, ...
     'tau_b_E_rec', 1.0, ...    % STD recovery time
     'tau_b_E_rel', 0.25, ...   % STD release time
+    'input_type', input_type, ...
+    'u_f_cutoff', u_f_cutoff, ...
     'T_wash', T_wash, ...
     'T_train', T_train, ...
     'T_test', T_test, ...
@@ -152,6 +163,22 @@ for i = 1:3
 end
 
 sgtitle('Memory Capacity Analysis: Effect of Spike-Frequency Adaptation and Short-Term Depression');
+
+%% Time Series Plots for Each Condition
+delays_to_plot = [1, 50, 100, 200, 400, 800, 1600, 3200];
+
+fprintf('\nGenerating time series plots...\n');
+
+% Baseline time series
+esn_baseline.plot_esn_timeseries(delays_to_plot, 'title', 'Baseline (No Adaptation)');
+
+% SFA only time series
+esn_sfa.plot_esn_timeseries(delays_to_plot, 'title', 'SFA Only');
+
+% SFA + STD time series  
+esn_full.plot_esn_timeseries(delays_to_plot, 'title', 'SFA + STD');
+
+fprintf('Time series plots generated.\n');
 
 %% Save results
 results = struct();

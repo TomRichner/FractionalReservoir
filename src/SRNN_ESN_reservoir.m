@@ -24,6 +24,9 @@ classdef SRNN_ESN_reservoir < SRNNModel
         sigma_in = 0.5          % Input scaling parameter
         W_in                    % Input weight vector (n x 1)
         rng_seed_input = 3      % RNG seed for input weight generation
+        input_type = 'white'    % Input type: 'white' or 'bandlimited'
+        u_f_cutoff = []         % Cutoff frequency for bandlimited input (Hz)
+                                % If empty, defaults to 1/(2*pi*tau_d)
     end
     
     %% Memory Capacity Protocol Properties
@@ -56,7 +59,8 @@ classdef SRNN_ESN_reservoir < SRNNModel
             
             % Define ESN-specific property names (not in SRNNModel)
             esn_props = {'f_in', 'sigma_in', 'W_in', 'rng_seed_input', ...
-                         'T_wash', 'T_train', 'T_test', 'd_max', 'eta', 'dt_sample'};
+                         'T_wash', 'T_train', 'T_test', 'd_max', 'eta', 'dt_sample', ...
+                         'input_type', 'u_f_cutoff'};
             
             % Parse ESN-specific name-value pairs
             for i = 1:2:length(varargin)
@@ -153,14 +157,48 @@ classdef SRNN_ESN_reservoir < SRNNModel
             
             %% Step 1: Generate scalar random input sequence
             rng(obj.rng_seeds(2));  % Use stimulus seed for reproducibility
-            u_scalar = rand(T_total, 1);  % U(0,1) input
+            
+            if strcmpi(obj.input_type, 'bandlimited')
+                % Generate zero-mean white noise for filtering
+                u_raw = rand(T_total, 1) - 0.5;
+                
+                % Determine cutoff frequency
+                if isempty(obj.u_f_cutoff)
+                    f_cut = 1 / (2 * pi * obj.tau_d);
+                else
+                    f_cut = obj.u_f_cutoff;
+                end
+                
+                % Design 4th-order Butterworth low-pass filter
+                f_nyq = obj.fs / 2;
+                [b_filt, a_filt] = butter(3, f_cut / f_nyq, 'low');
+                
+                % Apply zero-phase filtering
+                u_filtered = filtfilt(b_filt, a_filt, u_raw);
+                
+                % Rescale to [0, 1]
+                u_scalar = (u_filtered - min(u_filtered)) / (max(u_filtered) - min(u_filtered));
+                
+                if verbose
+                    fprintf('  Using bandlimited input (f_cutoff = %.2f Hz)\n', f_cut);
+                end
+            else
+                u_scalar = rand(T_total, 1);  % U(0,1) white noise
+            end
             
             %% Step 2: Run reservoir and collect states
             if verbose
                 fprintf('  Running reservoir simulation...\n');
             end
             
-            [R_all, t_all] = obj.run_reservoir_esn(u_scalar);
+            obj.run_reservoir_esn(u_scalar);
+            t_all = obj.t_out;
+            
+            % Unpack states using standard utility
+            [x_all, a_all, b_all, r_all, br_all] = unpack_and_compute_states(obj.S_out, obj.cached_params);
+            
+            % Combine E and I firing rates for training (need n x T matrix)
+            R_all = [r_all.E; r_all.I];  % n x T
             
             %% Step 3: Discard washout and split into train/test
             T_eff = obj.T_train + obj.T_test;
@@ -182,6 +220,9 @@ classdef SRNN_ESN_reservoir < SRNNModel
             
             R2_d = zeros(1, obj.d_max);
             weights_all = zeros(obj.n, obj.d_max);
+            
+            % Store predictions for selected delays (for plotting)
+            predictions = struct();
             
             for d = 1:obj.d_max
                 % Build delayed targets for training
@@ -218,6 +259,11 @@ classdef SRNN_ESN_reservoir < SRNNModel
                 % Compute predictions
                 y_test_pred = X_test * w_d;
                 
+                % Store predictions for this delay
+                predictions(d).y_true = y_test_true;
+                predictions(d).y_pred = y_test_pred;
+                predictions(d).t_indices = test_indices;
+                
                 % Compute R^2
                 R2_d(d) = obj.compute_R2(y_test_true, y_test_pred);
                 
@@ -233,7 +279,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
                 fprintf('  Total Memory Capacity: %.4f\n', MC);
             end
             
-            %% Store results
+            %% Store results including time series for plotting
             mc_results = struct();
             mc_results.MC = MC;
             mc_results.R2_d = R2_d;
@@ -244,159 +290,68 @@ classdef SRNN_ESN_reservoir < SRNNModel
             mc_results.T_test = obj.T_test;
             mc_results.eta = obj.eta;
             mc_results.u_scalar = u_scalar;
+            mc_results.predictions = predictions;
+            
+            % Store time series data for test period (for plotting)
+            % Use decimated data following SRNNModel pattern
+            test_start_idx = obj.T_wash + obj.T_train + 1;
+            mc_results.t_test = t_all(test_start_idx:end);
+            mc_results.u_test = u_test;
+            
+            % Store unpacked states for test period
+            mc_results.x = x_all;
+            mc_results.a = a_all;
+            mc_results.b = b_all;
+            mc_results.r = r_all;
+            mc_results.br = br_all;
+            
+            %% Step 7: Compute Lyapunov exponents using parent class method
+            if ~strcmpi(obj.lya_method, 'none')
+                obj.lya_T_interval = [t_all(obj.T_wash + 1), t_all(end)];  % After washout
+                obj.compute_lyapunov();
+            end
+            
+            mc_results.lya_results = obj.lya_results;
             
             obj.mc_results = mc_results;
         end
         
-        function [R_all, t_all] = run_reservoir_esn(obj, u_scalar)
-            % RUN_RESERVOIR_ESN Run the reservoir with scalar input sequence
+        function run_reservoir_esn(obj, u_scalar)
+            % RUN_RESERVOIR_ESN Run reservoir with single ODE integration
             %
-            % [R_all, t_all] = run_reservoir_esn(u_scalar)
+            % run_reservoir_esn(u_scalar)
+            %
+            % Runs the reservoir simulation using a single ODE solver call,
+            % matching the pattern used in SRNNModel.run().
             %
             % Inputs:
             %   u_scalar - Scalar input sequence (T x 1)
             %
-            % Outputs:
-            %   R_all    - Reservoir states (firing rates) (n x T)
-            %   t_all    - Time vector (T x 1)
+            % Results are stored in inherited properties:
+            %   obj.S_out - State trajectory (T x N_sys_eqs)
+            %   obj.t_out - Time vector (T x 1)
             
-            T = length(u_scalar);
-            dt = obj.dt_sample;
+            % Generate ESN stimulus (sets u_ex, t_ex, u_interpolant, S0)
+            obj.generate_esn_stimulus(u_scalar);
             
-            % Initialize storage
-            R_all = zeros(obj.n, T);
-            t_all = (0:(T-1))' * dt;
-            
-            % Initialize state
             params = obj.cached_params;
-            S = initialize_state(params);
+            dt = 1 / obj.fs;
             
-            % Set up ODE options if not already set
+            % Set up ODE options (matching SRNNModel pattern)
             if isempty(obj.ode_opts)
                 obj.ode_opts = odeset('RelTol', 1e-5, 'AbsTol', 1e-5, 'MaxStep', dt);
             end
             
-            % Map scalar input to neural input
-            u_neural_func = @(u) obj.W_in * u;
+            % Define RHS function using static method (avoids OOP overhead)
+            params.u_interpolant = obj.u_interpolant;
+            rhs = @(t, S) SRNNModel.dynamics_fast(t, S, params);
             
-            % Create a temporary interpolant for each step
-            params.u_interpolant = [];  % Will be set each step
-            
-            % Simulation loop
-            for t_idx = 1:T
-                % Current and next time
-                t_now = (t_idx - 1) * dt;
-                t_next = t_idx * dt;
-                
-                % Current input (piecewise constant)
-                u_current = u_neural_func(u_scalar(t_idx));
-                
-                % Create interpolant for this step (constant value)
-                % Update the object's u_interpolant so obj.dynamics() can use it
-                t_interp = [t_now, t_next];
-                u_interp = [u_current, u_current];  % n x 2
-                obj.u_interpolant = griddedInterpolant(t_interp, u_interp', 'previous', 'nearest');
-                
-                % Also update cached_params for consistency
-                obj.cached_params.u_interpolant = obj.u_interpolant;
-                
-                % Define RHS using the public dynamics method
-                rhs = @(t, S) obj.dynamics(t, S);
-                
-                % Integrate one step
-                [~, S_out] = obj.ode_solver(rhs, [t_now, t_next], S, obj.ode_opts);
-                S = S_out(end, :)';
-                
-                % Extract firing rates from state
-                r = obj.extract_firing_rates(S);
-                R_all(:, t_idx) = r;
-            end
-        end
-        
-        function r = extract_firing_rates(obj, S)
-            % EXTRACT_FIRING_RATES Extract firing rates from state vector
-            %
-            % r = extract_firing_rates(S)
-            %
-            % Extracts the firing rates r = phi(x_eff) from the state vector,
-            % accounting for adaptation variables.
-            
-            params = obj.cached_params;
-            n = params.n;
-            n_E = params.n_E;
-            n_I = params.n_I;
-            n_a_E = params.n_a_E;
-            n_a_I = params.n_a_I;
-            n_b_E = params.n_b_E;
-            n_b_I = params.n_b_I;
-            E_indices = params.E_indices;
-            I_indices = params.I_indices;
-            c_E = params.c_E;
-            c_I = params.c_I;
-            activation_fn = params.activation_function;
-            
-            % Unpack state variables
-            current_idx = 0;
-            
-            % Adaptation states for E neurons
-            len_a_E = n_E * n_a_E;
-            if len_a_E > 0
-                a_E = reshape(S(current_idx + (1:len_a_E)), n_E, n_a_E);
-            else
-                a_E = [];
-            end
-            current_idx = current_idx + len_a_E;
-            
-            % Adaptation states for I neurons
-            len_a_I = n_I * n_a_I;
-            if len_a_I > 0
-                a_I = reshape(S(current_idx + (1:len_a_I)), n_I, n_a_I);
-            else
-                a_I = [];
-            end
-            current_idx = current_idx + len_a_I;
-            
-            % STD states for E neurons
-            len_b_E = n_E * n_b_E;
-            if len_b_E > 0
-                b_E = S(current_idx + (1:len_b_E));
-            else
-                b_E = [];
-            end
-            current_idx = current_idx + len_b_E;
-            
-            % STD states for I neurons
-            len_b_I = n_I * n_b_I;
-            if len_b_I > 0
-                b_I = S(current_idx + (1:len_b_I));
-            else
-                b_I = [];
-            end
-            current_idx = current_idx + len_b_I;
-            
-            % Dendritic states
-            x = S(current_idx + (1:n));
-            
-            % Compute effective input with adaptation
-            x_eff = x;
-            if n_E > 0 && n_a_E > 0 && ~isempty(a_E)
-                x_eff(E_indices) = x_eff(E_indices) - c_E * sum(a_E, 2);
-            end
-            if n_I > 0 && n_a_I > 0 && ~isempty(a_I)
-                x_eff(I_indices) = x_eff(I_indices) - c_I * sum(a_I, 2);
-            end
-            
-            % Apply STD effect for output (b * r)
-            b = ones(n, 1);
-            if n_b_E > 0 && ~isempty(b_E)
-                b(E_indices) = b_E;
-            end
-            if n_b_I > 0 && ~isempty(b_I)
-                b(I_indices) = b_I;
-            end
-            
-            % Compute firing rates
-            r = b .* activation_fn(x_eff);
+            % Integrate entire trajectory at once
+            fprintf('  Integrating ESN dynamics...\n');
+            tic
+            [obj.t_out, obj.S_out] = obj.ode_solver(rhs, obj.t_ex, obj.S0, obj.ode_opts);
+            integration_time = toc;
+            fprintf('  Integration complete in %.2f seconds.\n', integration_time);
         end
         
         function [fig_handle, ax_handles] = plot_memory_capacity(obj, varargin)
@@ -437,6 +392,276 @@ classdef SRNN_ESN_reservoir < SRNNModel
             sgtitle(sprintf('Memory Capacity Analysis (MC = %.2f)', obj.mc_results.MC));
         end
         
+        function [fig_handle, ax_handles] = plot_esn_timeseries(obj, delays_to_plot, varargin)
+            % PLOT_ESN_TIMESERIES Plot comprehensive time series for ESN reservoir
+            %
+            % [fig, axes] = plot_esn_timeseries(delays_to_plot)
+            % [fig, axes] = plot_esn_timeseries(delays_to_plot, 'title', 'My Title')
+            %
+            % Inputs:
+            %   delays_to_plot - Vector of delays to show (e.g., [1, 10, 30, 50])
+            %
+            % Creates a figure with:
+            %   - u(t): Scalar input
+            %   - x(t): Dendritic states (line plots)
+            %   - r(t): Firing rates (line plots)
+            %   - br(t): Synaptic output (if STD enabled)
+            %   - a(t): Adaptation states (if SFA enabled)
+            %   - b(t): STD states (if STD enabled)
+            %   - Lyapunov exponent (if computed)
+            %   - For each delay d: u(t-d) vs y_d(t) overlay
+            
+            if isempty(obj.mc_results) || ~isfield(obj.mc_results, 'x')
+                error('SRNN_ESN_reservoir:NoResults', ...
+                    'No time series data. Run run_memory_capacity() first.');
+            end
+            
+            if nargin < 2 || isempty(delays_to_plot)
+                delays_to_plot = [1, 10, 30, 50];
+            end
+            
+            % Filter delays that exist in results
+            delays_to_plot = delays_to_plot(delays_to_plot <= obj.d_max);
+            n_delays = length(delays_to_plot);
+            
+            % Parse optional arguments
+            fig_title = '';
+            for i = 1:2:length(varargin)
+                if strcmpi(varargin{i}, 'title')
+                    fig_title = varargin{i+1};
+                end
+            end
+            
+            % Get stored data (using new format from unpack_and_compute_states)
+            t = obj.mc_results.t_test;
+            u_scalar = obj.mc_results.u_test;
+            x = obj.mc_results.x;      % Struct with .E and .I
+            r = obj.mc_results.r;      % Struct with .E and .I
+            br = obj.mc_results.br;    % Struct with .E and .I
+            a = obj.mc_results.a;      % Struct with .E and .I
+            b = obj.mc_results.b;      % Struct with .E and .I
+            params = obj.cached_params;
+            
+            % Slice to test period only
+            test_start_idx = obj.T_wash + obj.T_train + 1;
+            test_end_idx = size(x.E, 2);
+            test_indices = test_start_idx:test_end_idx;
+            
+            % Determine which subplots are needed
+            has_adaptation = params.n_a_E > 0 || params.n_a_I > 0;
+            has_std = params.n_b_E > 0 || params.n_b_I > 0;
+            
+            % Check for Lyapunov results
+            has_lyapunov = isfield(obj.mc_results, 'lya_results') && ...
+                           ~isempty(obj.mc_results.lya_results) && ...
+                           isfield(obj.mc_results.lya_results, 'LLE');
+            
+            % Calculate number of base plots
+            n_base_plots = 3;  % u(t), x(t), r(t) always present
+            if has_std && ~isempty(br.E)
+                n_base_plots = n_base_plots + 1;  % br(t)
+            end
+            if has_adaptation && (~isempty(a.E) || ~isempty(a.I))
+                n_base_plots = n_base_plots + 1;  % a(t)
+            end
+            if has_std
+                n_base_plots = n_base_plots + 1;  % b(t)
+            end
+            if has_lyapunov
+                n_base_plots = n_base_plots + 1;  % Lyapunov exponent
+            end
+            
+            n_total_plots = n_base_plots + n_delays;
+            
+            % Create figure
+            fig_height = min(100 + 80 * n_total_plots, 1000);
+            fig_handle = figure('Position', [100, 100, 1000, fig_height]);
+            tiledlayout(n_total_plots, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+            
+            ax_handles = [];
+            
+            % Get colormaps
+            cmap_I = inhibitory_colormap(8);
+            cmap_E = excitatory_colormap(8);
+            
+            %% Plot 1: Scalar input u(t)
+            ax_handles(end+1) = nexttile;
+            plot(t, u_scalar, 'k-', 'LineWidth', 0.5);
+            ylabel('u(t)');
+            set(gca, 'XTickLabel', []);
+            grid on;
+            
+            %% Plot 2: Dendritic states x(t) as line plots
+            ax_handles(end+1) = nexttile;
+            % Use test period indices
+            x_E_test = x.E(:, test_indices);
+            x_I_test = x.I(:, test_indices);
+            % Plot I neurons first (background)
+            plot_lines_with_colormap(t, x_I_test, cmap_I);
+            hold on;
+            % Plot E neurons on top
+            plot_lines_with_colormap(t, x_E_test, cmap_E);
+            hold off;
+            ylabel('dendrite');
+            set(gca, 'XTickLabel', []);
+            
+            %% Plot 3: Firing rates r(t) as line plots
+            ax_handles(end+1) = nexttile;
+            r_E_test = r.E(:, test_indices);
+            r_I_test = r.I(:, test_indices);
+            % Plot I neurons first (background)
+            plot_lines_with_colormap(t, r_I_test, cmap_I);
+            hold on;
+            % Plot E neurons on top
+            plot_lines_with_colormap(t, r_E_test, cmap_E);
+            hold off;
+            ylabel('firing rate');
+            ylim([0, 1]);
+            yticks([0, 1]);
+            set(gca, 'XTickLabel', []);
+            
+            %% Plot 4 (conditional): Synaptic output br(t)
+            if has_std && ~isempty(br.E)
+                ax_handles(end+1) = nexttile;
+                br_E_test = br.E(:, test_indices);
+                br_I_test = br.I(:, test_indices);
+                % Plot I neurons first (background)
+                plot_lines_with_colormap(t, br_I_test, cmap_I);
+                hold on;
+                % Plot E neurons on top
+                plot_lines_with_colormap(t, br_E_test, cmap_E);
+                hold off;
+                ylabel('synaptic output');
+                ylim([0, 1]);
+                yticks([0, 1]);
+                set(gca, 'XTickLabel', []);
+            end
+            
+            %% Plot 5 (conditional): Adaptation states a(t)
+            if has_adaptation && (~isempty(a.E) || ~isempty(a.I))
+                ax_handles(end+1) = nexttile;
+                has_plotted = false;
+                % Plot I adaptation first (background)
+                if ~isempty(a.I) && params.n_a_I > 0
+                    % Sum across timescales: (n_I x n_a_I x T) -> (n_I x T)
+                    a_I_sum = squeeze(sum(a.I(:, :, test_indices), 2));
+                    if size(a_I_sum, 2) == 1
+                        a_I_sum = a_I_sum';  % Ensure n_I x T
+                    end
+                    plot_lines_with_colormap(t, a_I_sum, cmap_I);
+                    has_plotted = true;
+                end
+                % Plot E adaptation on top
+                if ~isempty(a.E) && params.n_a_E > 0
+                    if has_plotted
+                        hold on;
+                    end
+                    % Sum across timescales: (n_E x n_a_E x T) -> (n_E x T)
+                    a_E_sum = squeeze(sum(a.E(:, :, test_indices), 2));
+                    if size(a_E_sum, 2) == 1
+                        a_E_sum = a_E_sum';  % Ensure n_E x T
+                    end
+                    plot_lines_with_colormap(t, a_E_sum, cmap_E);
+                end
+                hold off;
+                ylabel('adaptation');
+                set(gca, 'XTickLabel', []);
+                grid on;
+            end
+            
+            %% Plot 6 (conditional): STD states b(t)
+            if has_std
+                ax_handles(end+1) = nexttile;
+                has_plotted = false;
+                % Plot I STD first (background)
+                if ~isempty(b.I) && params.n_b_I > 0
+                    b_I_test = b.I(:, test_indices);
+                    if ~all(b_I_test(:) == 1)  % Check if actual STD dynamics
+                        plot_lines_with_colormap(t, b_I_test, cmap_I);
+                        has_plotted = true;
+                    end
+                end
+                % Plot E STD on top
+                if ~isempty(b.E) && params.n_b_E > 0
+                    b_E_test = b.E(:, test_indices);
+                    if ~all(b_E_test(:) == 1)  % Check if actual STD dynamics
+                        if has_plotted
+                            hold on;
+                        end
+                        plot_lines_with_colormap(t, b_E_test, cmap_E);
+                    end
+                end
+                hold off;
+                ylabel('depression');
+                ylim([0, 1]);
+                yticks([0, 1]);
+                set(gca, 'XTickLabel', []);
+                grid on;
+            end
+            
+            %% Plot (conditional): Lyapunov exponent
+            if has_lyapunov
+                ax_handles(end+1) = nexttile;
+                plot_lyapunov(obj.mc_results.lya_results, 'benettin', {'filtered', 'local', 'EOC', 'value'});
+                set(gca, 'XTickLabel', []);
+            end
+            
+            %% Delay reconstruction plots
+            colors_pred = lines(n_delays);
+            
+            for i = 1:n_delays
+                d = delays_to_plot(i);
+                ax_handles(end+1) = nexttile;
+                
+                if d <= length(obj.mc_results.predictions) && ...
+                        isfield(obj.mc_results.predictions(d), 'y_true') && ...
+                        ~isempty(obj.mc_results.predictions(d).y_true)
+                    
+                    y_true = obj.mc_results.predictions(d).y_true;
+                    y_pred = obj.mc_results.predictions(d).y_pred;
+                    t_indices = obj.mc_results.predictions(d).t_indices;
+                    t_delay = t(t_indices);
+                    
+                    % Plot true delayed input
+                    plot(t_delay, y_true, 'k-', 'LineWidth', 0.8, 'DisplayName', sprintf('u(t-%d)', d));
+                    hold on;
+                    % Plot prediction
+                    plot(t_delay, y_pred, '-', 'Color', colors_pred(i,:), 'LineWidth', 1.2, ...
+                        'DisplayName', sprintf('\\hat{y}_{%d}(t)', d));
+                    hold off;
+                    
+                    R2 = obj.mc_results.R2_d(d);
+                    title(sprintf('Delay d=%d: R^2=%.3f', d, R2), 'FontWeight', 'normal');
+                    ylabel('Value');
+                    legend('Location', 'best', 'FontSize', 7);
+                else
+                    text(0.5, 0.5, sprintf('No data for delay %d', d), ...
+                        'HorizontalAlignment', 'center');
+                    title(sprintf('Delay d=%d', d), 'FontWeight', 'normal');
+                end
+                
+                if i < n_delays
+                    set(gca, 'XTickLabel', []);
+                else
+                    xlabel('Time (s)');
+                end
+                grid on;
+            end
+            
+            % Link all axes
+            linkaxes(ax_handles, 'x');
+            
+            % Limit x-axis to test period
+            xlim([t(1), t(end)]);
+            
+            % Add figure title
+            if ~isempty(fig_title)
+                sgtitle(fig_title);
+            else
+                sgtitle(sprintf('ESN Time Series (MC = %.2f)', obj.mc_results.MC));
+            end
+        end
+        
         function reset(obj)
             % RESET Clear built state and memory capacity results
             
@@ -444,6 +669,35 @@ classdef SRNN_ESN_reservoir < SRNNModel
             obj.W_in = [];
             obj.mc_results = [];
             fprintf('ESN reservoir reset.\n');
+        end
+    end
+    
+    %% Private Methods
+    methods (Access = private)
+        function generate_esn_stimulus(obj, u_scalar)
+            % GENERATE_ESN_STIMULUS Generate ESN input stimulus from scalar input
+            %
+            % Builds the full u_ex matrix, t_ex time vector, u_interpolant,
+            % and initial state S0. Follows the pattern in SRNNModel.generate_stimulus().
+            %
+            % Inputs:
+            %   u_scalar - Scalar input sequence (T x 1)
+            
+            T = length(u_scalar);
+            dt = 1 / obj.fs;
+            
+            % Build time vector
+            obj.t_ex = (0:(T-1))' * dt;
+            
+            % Map scalar input to neural input
+            obj.u_ex = obj.W_in * u_scalar';  % n x T
+            
+            % Create interpolant (piecewise constant, matching ESN discrete input)
+            obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'previous', 'nearest');
+            obj.cached_params.u_interpolant = obj.u_interpolant;
+            
+            % Initialize state
+            obj.S0 = initialize_state(obj.cached_params);
         end
     end
     
