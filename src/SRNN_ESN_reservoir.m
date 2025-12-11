@@ -602,7 +602,9 @@ classdef SRNN_ESN_reservoir < SRNNModel
             %% Plot (conditional): Lyapunov exponent
             if has_lyapunov
                 ax_handles(end+1) = nexttile;
-                plot_lyapunov(obj.mc_results.lya_results, 'benettin', {'filtered', 'local', 'EOC', 'value'});
+                plot_lyapunov(obj.mc_results.lya_results, 'benettin', {'filtered', 'local', 'EOC'});
+                % Add LLE value to subplot title
+                title(sprintf('\\lambda_1 = %.2f', obj.mc_results.lya_results.LLE), 'FontWeight', 'normal');
                 set(gca, 'XTickLabel', []);
             end
             
