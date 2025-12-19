@@ -17,7 +17,7 @@ addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'src')));
 %% Common parameters
 n = 200;                    % Number of neurons
 level_of_chaos = 1.8;       % Moderate chaos level
-rng_seed_net = 42;          % Fixed seed for reproducibility
+rng_seed_net = 1;          % Fixed seed for reproducibility
 
 % MC protocol parameters (reduced for faster demo)
 T_wash = 200*10;               % Washout samples

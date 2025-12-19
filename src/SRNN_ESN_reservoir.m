@@ -20,13 +20,15 @@ classdef SRNN_ESN_reservoir < SRNNModel
     
     %% ESN Input Properties
     properties
-        f_in = 0.3              % Fraction of neurons receiving input
-        sigma_in = 0.5          % Input scaling parameter
+        f_in = 0.1              % Fraction of neurons receiving input
+        sigma_in = 0.5          % Input weight scaling parameter
         W_in                    % Input weight vector (n x 1)
         rng_seed_input = 3      % RNG seed for input weight generation
         input_type = 'white'    % Input type: 'white' or 'bandlimited'
         u_f_cutoff = []         % Cutoff frequency for bandlimited input (Hz)
                                 % If empty, defaults to 1/(2*pi*tau_d)
+        u_scale = 1             % Stimulus amplitude scaling
+        u_offset = 0            % Stimulus DC offset
     end
     
     %% Memory Capacity Protocol Properties
@@ -60,7 +62,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
             % Define ESN-specific property names (not in SRNNModel)
             esn_props = {'f_in', 'sigma_in', 'W_in', 'rng_seed_input', ...
                          'T_wash', 'T_train', 'T_test', 'd_max', 'eta', 'dt_sample', ...
-                         'input_type', 'u_f_cutoff'};
+                         'input_type', 'u_f_cutoff', 'u_scale', 'u_offset'};
             
             % Parse ESN-specific name-value pairs
             for i = 1:2:length(varargin)
@@ -106,7 +108,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
             n_input = round(obj.f_in * obj.n);
             input_neurons = randperm(obj.n, n_input);
             
-            % Assign random weights
+            % Assign random weights centered at 0 with spread sigma_in
             obj.W_in(input_neurons) = obj.sigma_in * (rand(n_input, 1) - 0.5);
             
             fprintf('Input weights generated: %d neurons receive input (%.1f%%)\n', ...
@@ -169,21 +171,24 @@ classdef SRNN_ESN_reservoir < SRNNModel
                     f_cut = obj.u_f_cutoff;
                 end
                 
-                % Design 4th-order Butterworth low-pass filter
+                % Design 3rd-order Butterworth low-pass filter
                 f_nyq = obj.fs / 2;
                 [b_filt, a_filt] = butter(3, f_cut / f_nyq, 'low');
                 
                 % Apply zero-phase filtering
                 u_filtered = filtfilt(b_filt, a_filt, u_raw);
                 
-                % Rescale to [0, 1]
-                u_scalar = (u_filtered - min(u_filtered)) / (max(u_filtered) - min(u_filtered));
+                % Normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
+                u_normalized = (u_filtered - min(u_filtered)) / (max(u_filtered) - min(u_filtered)) - 0.5;
+                u_scalar = obj.u_offset + obj.u_scale * u_normalized;
                 
                 if verbose
-                    fprintf('  Using bandlimited input (f_cutoff = %.2f Hz)\n', f_cut);
+                    fprintf('  Using bandlimited input (f_cutoff = %.2f Hz, offset = %.2f, scale = %.2f)\n', ...
+                        f_cut, obj.u_offset, obj.u_scale);
                 end
             else
-                u_scalar = rand(T_total, 1);  % U(0,1) white noise
+                % White noise: normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
+                u_scalar = obj.u_offset + obj.u_scale * (rand(T_total, 1) - 0.5);
             end
             
             %% Step 2: Run reservoir and collect states
@@ -297,6 +302,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
             test_start_idx = obj.T_wash + obj.T_train + 1;
             mc_results.t_test = t_all(test_start_idx:end);
             mc_results.u_test = u_test;
+            mc_results.u_ex = obj.u_ex;  % Store actual neural input (n x T)
             
             % Store unpacked states for test period
             mc_results.x = x_all;
@@ -434,7 +440,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
             
             % Get stored data (using new format from unpack_and_compute_states)
             t = obj.mc_results.t_test;
-            u_scalar = obj.mc_results.u_test;
+            u_ex = obj.mc_results.u_ex;   % Actual neural input (n x T)
             x = obj.mc_results.x;      % Struct with .E and .I
             r = obj.mc_results.r;      % Struct with .E and .I
             br = obj.mc_results.br;    % Struct with .E and .I
@@ -484,10 +490,20 @@ classdef SRNN_ESN_reservoir < SRNNModel
             cmap_I = inhibitory_colormap(8);
             cmap_E = excitatory_colormap(8);
             
-            %% Plot 1: Scalar input u(t)
+            %% Plot 1: Actual neural input u_ex(t)
             ax_handles(end+1) = nexttile;
-            plot(t, u_scalar, 'k-', 'LineWidth', 0.5);
-            ylabel('u(t)');
+            % Plot actual neural input for neurons that receive input
+            u_ex_test = u_ex(:, test_indices);
+            % Only plot neurons with non-zero input weights
+            input_mask = any(u_ex_test ~= 0, 2);
+            u_ex_active = u_ex_test(input_mask, :);
+            if ~isempty(u_ex_active)
+                % Use a neutral colormap for input
+                n_active = size(u_ex_active, 1);
+                cmap_input = parula(max(n_active, 8));
+                plot_lines_with_colormap(t, u_ex_active, cmap_input);
+            end
+            ylabel('u_{ex}(t)');
             set(gca, 'XTickLabel', []);
             grid on;
             

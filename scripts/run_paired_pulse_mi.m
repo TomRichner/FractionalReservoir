@@ -24,25 +24,35 @@ setup_paths();
 
 %% Create PairedPulseMIAnalysis object
 pp = PairedPulseMIAnalysis(...
-    'n_networks', 50, ...           % Number of different network realizations
-    'n_levels', 11, ...              % Number of levels per grid parameter
+    'n_networks', 5, ...           % Number of different network realizations
+    'n_levels', 5, ...              % Number of levels per grid parameter
     'note', 'bigger_mi', ...             % Optional note for folder naming
     'verbose', true ...             % Print progress during execution
 );
 
 %% Configure model defaults
 % Benettin LLE is enabled by default for the new plotting methods
-pp.model_defaults.n = 30;                   % Network size
+pp.model_defaults.n = 20;                   % Network size
 pp.model_defaults.fs = 200;                 % Sampling frequency
-pp.model_defaults.T_range = [0, 150];       % Simulation time
-pp.model_defaults.level_of_chaos = 1.8;     % Abscissa scaling
+pp.model_defaults.T_range = [0, 200];       % Simulation time
+pp.model_defaults.level_of_chaos = 1.5;     % Abscissa scaling
 % pp.model_defaults.lya_method = 'benettin'; % Already default
 
 %% Optional: Add grid parameters for parameter space exploration
 % Uncomment to test across parameter combinations:
 %
-pp.add_grid_parameter('level_of_chaos', [0.5, 2.5]);
+pp.add_grid_parameter('level_of_chaos', [0.5, 3]);
 % pp.add_grid_parameter('n', [50, 200]);
+
+%% Debug: Visualize time series for parameter tuning
+% Run simulations to see stimulus and response before full analysis
+fprintf('\n=== Debug: Visualizing time series for parameter tuning ===\n');
+pp.plot_debug(1, 'no_adaptation');
+pp.plot_debug(1, 'sfa_only');
+pp.plot_debug(1, 'std_only');
+pp.plot_debug(1, 'sfa_and_std');
+fprintf('Press any key to continue with full analysis (or Ctrl+C to abort and tune parameters)...\n');
+pause;
 
 %% Run the analysis
 % Loops over networks and conditions, computing LLE, mean rate, and MI vs delay
@@ -59,7 +69,7 @@ pp.plot_histograms();
 pp.plot_mi_imagesc();
 
 % LLE vs MI slice with bootstrap CIs
-pp.plot_mi_vs_lle('delay_window', [0.5, 1.5]);
+pp.plot_mi_vs_lle('delay_window', [0.5, 1.5],'lle_range', [-5, 3]);
 
 %% Display summary
 fprintf('\n=== Paired-Pulse MI Analysis Summary ===\n');

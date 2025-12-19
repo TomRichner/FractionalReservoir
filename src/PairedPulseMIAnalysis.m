@@ -25,15 +25,15 @@ classdef PairedPulseMIAnalysis < handle
         pulse1_width = 2            % Width of first pulse (s)
         pulse2_width = 2            % Width of second pulse (s)
         inter_pulse_interval = 3    % Time from pulse 1 start to pulse 2 start (s)
-        repeat_interval = 15        % Time between pair starts (s)
+        repeat_interval = 15      % Time between pair starts (s)
         
         % Pulse amplitudes
-        pulse2_amp = 2.5            % Fixed amplitude of second pulse
+        pulse2_amp = 0.5            % Fixed amplitude of second pulse
         n_amp_levels = 5            % Number of discrete amplitude levels for pulse 1
         amp_scale = 0.5             % Scaling factor for pulse 1 amplitudes
         
         % Baseline
-        DC_level = 0.1              % DC baseline input level
+        DC_level = 0              % DC baseline input level
         ramp_duration = 10          % Ramp-up duration to DC (s)
         
         % Stimulus channel
