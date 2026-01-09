@@ -1,13 +1,13 @@
 close all; clear all; clc;
 setup_paths();
 
-save_figs = true;
-save_workspace = true;
+save_figs = false;
+save_workspace = false;
 
 level_of_chaos = 1.8;
 
 u_ex_scale = 1.7;
-rng_seeds = [8 8 3 4 5];
+rng_seeds = [8 16 3 4 5];
 
 %% Run 0: no stim
 % note = 'no_stim_no_adapt_no_depress';

@@ -61,26 +61,17 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
         % Design filter if needed
         if plot_filtered
             filter_order = 3;
-            filter_cutoff = 0.5;  % Normalized cutoff frequency
+            filter_cutoff = 1;  % Normalized cutoff frequency
             [bL, aL] = butter(filter_order, filter_cutoff/(lya_results.lya_fs/2), 'low');
         end
-        
-        % Only plot data after specified warm-up time
-        t_filter_start = 1.5; % seconds
-        idx_filter_start = find(lya_results.t_lya >= t_filter_start, 1, 'first');
         
         % Track legend entries and handles
         legend_entries = {};
         plot_started = false;
         
-        % Plot raw local Lyapunov exponent (after warm-up)
+        % Plot raw local Lyapunov exponent
         if plot_local
-            if ~isempty(idx_filter_start)
-                plot(lya_results.t_lya(idx_filter_start:end), lya_results.local_lya(idx_filter_start:end))
-            else
-                % If no data after warm-up, plot all data
-                plot(lya_results.t_lya, lya_results.local_lya)
-            end
+            plot(lya_results.t_lya, lya_results.local_lya)
             hold on
             plot_started = true;
             legend_entries{end+1} = 'Local LLE';
@@ -92,14 +83,9 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
                 hold on
                 plot_started = true;
             end
-            if ~isempty(idx_filter_start)
-                t_lya_filt = lya_results.t_lya(idx_filter_start:end);
-                local_lya_filt = filtfilt(bL, aL, lya_results.local_lya(idx_filter_start:end));
-                plot(t_lya_filt, local_lya_filt)
-            else
-                local_lya_filt = filtfilt(bL, aL, lya_results.local_lya);
-                plot(lya_results.t_lya, local_lya_filt)
-            end
+            local_lya_filt = filtfilt(bL, aL, lya_results.local_lya);
+            colors = lines(1);
+            plot(lya_results.t_lya, local_lya_filt, 'Color', colors(1,:))
             legend_entries{end+1} = 'Local LLE';
         end
         
@@ -109,8 +95,10 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
                 hold on
                 plot_started = true;
             end
-            yline(lya_results.LLE, '--r', 'LineWidth', 1.5)
-            legend_entries{end+1} = 'LLE';
+            % yline(lya_results.LLE, '--r', 'LineWidth', 1.5)
+            plot([lya_results.t_lya(1), lya_results.t_lya(end)], ...
+                 [lya_results.LLE, lya_results.LLE], '--r', 'LineWidth', 1.5);
+            % legend_entries{end+1} = 'LLE';
         end
         
         % Add reference line at zero (EOC)
@@ -119,11 +107,12 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
                 hold on
                 plot_started = true;
             end
-            yline(0, '--k')
-            legend_entries{end+1} = 'EOC';
+            % yline(0, '--k')
+            plot([lya_results.t_lya(1), lya_results.t_lya(end)], [0, 0], '--k');
+            % legend_entries{end+1} = 'EOC';
         end
         
-        ylabel('growth rate')
+        ylabel('\lambda_1')
         
         % % Add legend if there are entries
         % if ~isempty(legend_entries)
@@ -154,7 +143,7 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
         
         hold on
         yline(0, '--k')
-        ylabel('growth rate')
+        ylabel('\lambda_1')
         
         % Add legend with final values (most positive exponents on top)
         legend_count = min(5, lya_results.params.N_sys_eqs);
