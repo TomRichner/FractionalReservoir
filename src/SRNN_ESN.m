@@ -57,6 +57,11 @@ classdef SRNN_ESN < handle
         which_states   % Which states to use as features ('x', 'r', 'all')
         include_input  % Whether to include raw input in features
         lambda         % Ridge regression regularization parameter
+        dt             % Time step for ODE integration (seconds)
+        
+        % Synaptic delay (DDE mode)
+        lags           % Synaptic delay values (empty = no delay, uses ODE)
+        W_components   % Cell array: {W_instant, W_delayed} for DDE mode
         
         % Metadata
         n_inputs       % Number of input dimensions
@@ -87,6 +92,7 @@ classdef SRNN_ESN < handle
             %       which_states - 'x' (default), 'r', or 'all'
             %       include_input - true/false (default: false)
             %       lambda - regularization (default: 1e-6)
+            %       dt - time step for ODE integration in seconds (default: 1.0)
             
             % Required parameters
             obj.n = params.n;
@@ -126,6 +132,24 @@ classdef SRNN_ESN < handle
             obj.which_states = getFieldOrDefault(params, 'which_states', 'x');
             obj.include_input = getFieldOrDefault(params, 'include_input', false);
             obj.lambda = getFieldOrDefault(params, 'lambda', 1e-6);
+            obj.dt = getFieldOrDefault(params, 'dt', 1.0);
+            
+            % Synaptic delay configuration (DDE mode)
+            % E connections are instant, I connections are delayed
+            obj.lags = getFieldOrDefault(params, 'lags', []);
+            if ~isempty(obj.lags) && obj.lags(1) > 0
+                % Build W_components: {W_instant, W_delayed}
+                % W_instant: only E columns (I columns zeroed)
+                W_inst = zeros(obj.n);
+                W_inst(:, obj.E_indices) = obj.W(:, obj.E_indices);
+                % W_delayed: only I columns (E columns zeroed)
+                W_delayed = zeros(obj.n);
+                W_delayed(:, obj.I_indices) = obj.W(:, obj.I_indices);
+                obj.W_components = {W_inst, W_delayed};
+            else
+                obj.lags = [];
+                obj.W_components = {};
+            end
             
             % Initialize state
             obj.resetState();
@@ -242,7 +266,7 @@ classdef SRNN_ESN < handle
             %   X_features - Extracted features (optional, for analysis)
             
             if ~obj.is_trained
-                error('SRNN_ESN:NotTrained', ...
+                warning('SRNN_ESN:NotTrained', ...
                       'Readout layer has not been trained. Call trainReadout() first.');
             end
             
@@ -316,19 +340,16 @@ classdef SRNN_ESN < handle
             % Get initial prediction from last washout step
             current_input = X_washout(end, :) * obj.W_out + obj.b_out';
             
-            % Prepare parameters for single-step reservoir dynamics
-            dt = 1.0; this is in seconds, so 1.0 is a 1 second step, very big
-            
             for t = 1:n_steps
                 % Create input for this time step (reshape to column vector)
                 u_t = (obj.W_in * current_input')';  % (1 x n)
                 
                 % Integrate reservoir for one time step
                 % Need at least 2 time points for ODE solver
-                t_span = [0, dt];
+                t_span = [0, obj.dt];
                 
                 % Create interpolation function for constant input over this step
-                t_ex = [0, dt];
+                t_ex = [0, obj.dt];
                 u_ex = [u_t; u_t]';  % (n x 2) - constant input over time step
                 
                 % Pack parameters for SRNN_reservoir
@@ -354,10 +375,24 @@ classdef SRNN_ESN < handle
                 params.c_I = obj.c_I;
                 params.activation_function = obj.activation_function;
                 
-                % Solve ODE for one time step
-                odefun = @(time, S) SRNN_reservoir(time, S, t_ex, u_ex, params);
-                options_ode = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
-                [~, S_history] = ode23s(odefun, t_span, obj.S, options_ode);
+                % Choose solver based on delay configuration
+                if isempty(obj.lags)
+                    % No delay: use ODE solver
+                    odefun = @(time, S) SRNN_reservoir(time, S, t_ex, u_ex, params);
+                    options_ode = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
+                    [~, S_history] = ode23s(odefun, t_span, obj.S, options_ode);
+                else
+                    % With delay: use DDE solver
+                    params.lags = obj.lags;
+                    params.W_components = obj.W_components;
+                    
+                    history = obj.S;
+                    options_dde = ddeset('RelTol', 1e-5, 'AbsTol', 1e-5);
+                    
+                    sol = dde23(@(time, y, Z) SRNN_reservoir_DDE(time, y, Z, t_ex, u_ex, params), ...
+                                obj.lags, history, t_span, options_dde);
+                    S_history = deval(sol, t_span)';
+                end
                 
                 % Update state
                 obj.S = S_history(end, :)';
@@ -391,7 +426,8 @@ classdef SRNN_ESN < handle
             len_x = obj.n;
             
             % Initialize state to zeros (or small random values)
-            obj.S0 = zeros(len_a_E + len_a_I + len_b_E + len_b_I + len_x, 1);
+            rng(42)
+            obj.S0 = 0 + 0.1*rand(len_a_E + len_a_I + len_b_E + len_b_I + len_x, 1);
             
             % Initialize b states to 1 (no depression initially)
             if obj.n_b_E > 0
@@ -426,6 +462,7 @@ classdef SRNN_ESN < handle
             %     lambda - regularization parameter
             %     which_states - feature extraction mode
             %     include_input - whether to include raw input
+            %     dt - time step for ODE integration
             
             if isfield(hyperparams, 'lambda')
                 obj.lambda = hyperparams.lambda;
@@ -436,11 +473,14 @@ classdef SRNN_ESN < handle
             if isfield(hyperparams, 'include_input')
                 obj.include_input = hyperparams.include_input;
             end
+            if isfield(hyperparams, 'dt')
+                obj.dt = hyperparams.dt;
+            end
         end
         
     end
     
-    methods (Access = private)
+    methods (Access = public)
         
         function [X_features, S_history] = runReservoir(obj, U)
             % runReservoir: Simulate reservoir dynamics over input sequence
@@ -453,15 +493,14 @@ classdef SRNN_ESN < handle
             %   S_history - Full state history (for analysis)
             
             n_timesteps = size(U, 1);
-            dt = 1.0; % Time step (can be made configurable), this is in seconds, so 1.0 is a 1 second step, very big
             
             % Time vectors for ODE solver
             % Ensure t_span has at least 2 elements for ODE solver
             if n_timesteps == 1
-                t_span = [0, dt];
-                t_ex = [0, dt];
+                t_span = [0, obj.dt];
+                t_ex = [0, obj.dt];
             else
-                t_span = 0:dt:(n_timesteps-1)*dt;
+                t_span = 0:obj.dt:(n_timesteps-1)*obj.dt;
                 t_ex = t_span; % Time points for input interpolation
             end
             
@@ -497,12 +536,32 @@ classdef SRNN_ESN < handle
             params.c_I = obj.c_I;
             params.activation_function = obj.activation_function;
             
-            % Solve ODE
-            odefun = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
-            
-            % Use ode23s (stiff solver) for fractional dynamics
-            options_ode = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
-            [~, S_history] = ode23s(odefun, t_span, obj.S, options_ode); % 
+            % Choose solver based on delay configuration
+            if isempty(obj.lags)
+                % No delay: use ODE solver with SRNN_reservoir
+                odefun = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
+                
+                % Use ode23s (stiff solver) for fractional dynamics
+                options_ode = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
+                [~, S_history] = ode23s(odefun, t_span, obj.S, options_ode);
+            else
+                % With delay: use DDE solver with SRNN_reservoir_DDE
+                params.lags = obj.lags;
+                params.W_components = obj.W_components;
+                
+                % History function: constant initial state for t < 0
+                history = obj.S;
+                
+                % DDE solver options
+                options_dde = ddeset('RelTol', 1e-5, 'AbsTol', 1e-5);
+                
+                % Solve DDE
+                sol = dde23(@(t, y, Z) SRNN_reservoir_DDE(t, y, Z, t_ex, u_ex, params), ...
+                            obj.lags, history, [t_span(1), t_span(end)], options_dde);
+                
+                % Evaluate solution at requested time points
+                S_history = deval(sol, t_span)';
+            end
             
             % Update current state
             obj.S = S_history(end, :)';
@@ -629,8 +688,9 @@ classdef SRNN_ESN < handle
                 b(obj.I_indices) = b_I;
             end
             
-            % Compute firing rates
-            r = b .* obj.activation_function(x_eff);
+            % Corrected: r is the raw firing rate (phi), not scaled by b
+            % The b factor represents presynaptic depression applied in dx/dt
+            r = obj.activation_function(x_eff);
         end
         
     end
