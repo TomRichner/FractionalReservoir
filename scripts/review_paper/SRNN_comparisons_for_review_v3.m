@@ -9,7 +9,7 @@ set(groot, 'DefaultAxesLineWidth', 2);
 set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 
 save_figs = false;
-save_workspace = true;
+save_workspace = false;
 
 level_of_chaos = 1.7;
 
@@ -66,8 +66,6 @@ combined_runs{2} = run4;
 AddLetters2Plots(fig_handle, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)'}, 'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.065, 'VShift', -0.025);
 
 ylim([-1.8 1.8])
-
-save_figs = true;
 
 if save_figs
     save_dir_combined = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review');
