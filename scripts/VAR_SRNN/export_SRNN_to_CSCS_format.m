@@ -62,15 +62,12 @@ data{2} = stim_data;
 Fs_final = result.fs;
 Fs_initial = result.fs;  % Same for simulation
 
-% Create channel names (neuron IDs)
+% Create channel names - simple format: Ch1, Ch2, ...
 Files = cell(n_channels, 1);
+channel_labels = cell(n_channels, 1);
 for i = 1:n_channels
-    neuron_idx = subset_idx(i);
-    if neuron_idx <= result.params.n_E
-        Files{i} = sprintf('E_%03d.sim', neuron_idx);
-    else
-        Files{i} = sprintf('I_%03d.sim', neuron_idx - result.params.n_E);
-    end
+    Files{i} = sprintf('Ch%d.sim', i);
+    channel_labels{i} = sprintf('Ch%d', i);
 end
 
 % Create header struct with metadata
@@ -91,11 +88,19 @@ header.creation_date = datestr(now);
 % Create Label array (all neurons labeled as "nSOZ" equivalent = 3)
 Label = 3 * ones(1, n_channels);
 
-% Save to file
+% Decimation mode (none for raw simulation output)
+deci_mode = 'none';
+
+% Set Fs = Fs_final (for CSCS compatibility)
+Fs = Fs_final;
+
+% Save to file with all CSCS-compatible fields
 output_file = fullfile(output_dir, sprintf('%s.mat', subject_name));
-save(output_file, 'data', 'Fs_final', 'Fs_initial', 'Files', 'header', 'Label', '-v7.3');
+save(output_file, 'data', 'Fs', 'Fs_final', 'Fs_initial', 'Files', 'Label', ...
+    'header', 'deci_mode', 'channel_labels', '-v7.3');
 
 fprintf('    Saved: %s\n', output_file);
 fprintf('    Block 1 (baseline): %d samples x %d channels\n', size(data{1}, 1), size(data{1}, 2));
 fprintf('    Block 2 (stim): %d samples x %d channels\n', size(data{2}, 1), size(data{2}, 2));
 end
+

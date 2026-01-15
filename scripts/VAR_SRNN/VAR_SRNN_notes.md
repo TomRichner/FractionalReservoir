@@ -4,70 +4,104 @@
 
 This module applies Vector Autoregression (VAR) analysis to SRNN simulation output, using the same pipeline as the cscs_dynamics SEEG analysis. The goal is to compare stability metrics between simulated neural networks and real brain recordings.
 
-## Current Implementation
+---
 
-### Simulation Conditions
-Four SRNN conditions are treated as pseudo-subjects:
-| Condition | Description | Expected Stability |
-|-----------|-------------|-------------------|
-| `SRNN_none` | No adaptation, no STD | Most unstable (eigenvalues near 1) |
-| `SRNN_SFA` | Spike-frequency adaptation only | Moderately stable |
-| `SRNN_STD` | Short-term depression only | Moderately stable |
-| `SRNN_both` | Both SFA and STD | Most stable |
+## Status
 
-### Data Flow
-1. **Simulate** → `VAR_SRNN_comparison.m` generates SRNN dynamics
-2. **Export** → `export_SRNN_to_CSCS_format.m` saves as `.mat` files
-3. **Preprocess** → `SRNN_VAR_load_simulated.m` applies filters and downsampling
-4. **Analyze** → Standard cscs_dynamics pipeline (ICA → VAR → eigenvalue stats)
+### ✅ Complete
 
-### Key Parameters
-- **Neuron subset**: Option to use all 100 neurons or random subset (both E and I)
-- **`max_minutes`**: Controls data duration for VAR fitting (matches `CSCS_run_VAR.m`)
-- **ICA**: Run by default for consistency; `skip_ica` flag to disable
+| Script | Purpose | Status |
+|--------|---------|--------|
+| `VAR_SRNN_comparison.m` | Simulate 4 conditions with Lyapunov | ✅ Working |
+| `export_SRNN_to_CSCS_format.m` | Export to CSCS format | ✅ Working |
+| `SRNN_VAR_subject_structure.m` | Generate subject struct | ✅ Working |
+| `SRNN_load_and_preprocess.m` | Filter/downsample data | ✅ Working |
+| `test_VAR_SRNN_export.m` | 7 unit tests | ✅ All pass |
 
-### Output Location
-`FractionalResevoir/data/VAR_SRNN/`
+### 🔄 To Do
+
+- [ ] Run `CSCS_run_ICA.m` on preprocessed data  
+- [ ] Run `CSCS_run_VAR.m` on ICA-cleaned data
+- [ ] Compare eigenvalue distributions across conditions
+- [ ] Validate expected stability pattern: none → SFA → STD → both
+
+### 📋 Future Enhancements
+
+1. **Higher Fs production runs** (5000 Hz simulation → 500 Hz after decimation)
+2. **Add 1/f noise** to simulate distant neural activity
+3. **Stimulation artifact modeling** for ICA validation
+4. **Cross-project visualization** (SRNN vs SEEG eigenvalues)
 
 ---
 
-## Future Enhancements
+## Simulation Conditions
 
-### 1. Add Realistic Noise (Priority: Medium)
-Simulated data is "too clean" compared to SEEG. Future additions:
-- **1/f (pink) noise**: Simulate distant neural activity
-- **White noise floor**: Match recording system noise
-- **Implementation**: Add noise before export in `export_SRNN_to_CSCS_format.m`
-
-### 2. Stimulation Artifact Modeling (Priority: Low)
-SEEG has stimulation artifacts that ICA removes. To test artifact removal:
-- Add step/impulse artifacts at stimulation onset
-- Verify ICA correctly identifies and removes them
-- Compare VAR results with/without artifact removal
-
-### 3. Extended Condition Comparisons (Priority: High)
-After basic implementation works:
-- Vary `level_of_chaos` parameter
-- Explore different adaptation timescales
-- Compare multiple network instantiations (different seeds)
-
-### 4. Cross-Project Visualization (Priority: Medium)
-Create unified plots comparing:
-- Simulated vs SEEG eigenvalue distributions
-- Effect of stimulation in both domains
-- Lyapunov exponents (SRNN) vs VAR eigenvalues
+| Condition | n_a_E | n_b_E | LLE (dev) | Expected Stability |
+|-----------|-------|-------|-----------|-------------------|
+| `SRNN_none` | 0 | 0 | -0.40 | Most unstable |
+| `SRNN_SFA` | 3 | 0 | -0.04 | Moderately stable |
+| `SRNN_STD` | 0 | 1 | — | Moderately stable |
+| `SRNN_both` | 3 | 1 | — | Most stable |
 
 ---
 
-## Testing Strategy
+## Data Flow
 
-Use MATLAB testing framework via MCP server tools:
-- `run_matlab_test_file`: For comprehensive test results
-- `run_matlab_file`: For command window output
-- `evaluate_matlab_code`: For inspecting variables (avoid large arrays)
+```
+VAR_SRNN_comparison.m
+    ↓ (simulate)
+export_SRNN_to_CSCS_format.m
+    ↓ (save raw .mat)
+SRNN_load_and_preprocess.m
+    ↓ (filter, detrend)
+data/VAR_SRNN_processed/*.mat
+    ↓
+CSCS_run_ICA.m → CSCS_pick_ICA_components.m → CSCS_run_VAR.m
+```
+
+---
+
+## Output Directories
+
+- **Raw simulation**: `data/VAR_SRNN/`
+- **Preprocessed**: `data/VAR_SRNN_processed/`
+- **Figures**: `data/VAR_SRNN/figs/`
+
+---
+
+## Key Parameters
+
+| Parameter | Dev Value | Prod Value |
+|-----------|-----------|------------|
+| `fs` | 200 Hz | 5000 Hz |
+| `T_baseline` | 30 sec | 15 min |
+| `T_stim` | 30 sec | 15 min |
+| `Fs_final` | 200 Hz | 500 Hz |
+| `deci_mode` | 'no_deci' | 'butter' |
+
+---
+
+## Testing
+
+```matlab
+% Run unit tests
+cd scripts/VAR_SRNN
+results = runtests('test_VAR_SRNN_export');
+```
+
+All 7 tests pass:
+- Export format structure
+- Data dimensions [time × channels]
+- Channel count matches Files
+- Sampling rate preservation
+- Subject structure format
+- Neuron subset option
+- Baseline/stim split
 
 ---
 
 ## References
-- `FractionalResevoir/Code_Structure.md`: SRNN implementation details
+
+- `FractionalResevoir/Code_Structure.md`: SRNN model details
 - `cscs_dynamics/Workflow.md`: 10-step SEEG analysis pipeline
+- `cscs_dynamics/CSCSreview_loadfunction_revived.m`: Output format reference
