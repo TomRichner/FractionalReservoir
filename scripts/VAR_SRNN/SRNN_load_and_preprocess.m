@@ -34,12 +34,24 @@ subject_file = fullfile(input_dir, 'SRNN_subjects.mat');
 
 % Decimation settings
 % Options: 'no_deci', 'butter', 'use_decimate', 'box_car_deci'
-deci_mode = 'no_deci';
+deci_mode = 'no_deci';  % No decimation - simulation already at target Fs
 
 % Target sampling rate (Hz)
-% Development: use same as simulation Fs (typically 200 Hz) with no_deci
 % Production: 500 Hz with 'butter' mode (requires simulation at >= 500 Hz)
-Fs_final_target = 200;
+% Development: use same as simulation Fs (typically 200 Hz) with no_deci
+Fs_final_target = 500;
+
+% Plotting settings
+plot_comparison = true;         % Generate before/after comparison plots
+plot_time_window = [0, 120];     % Time window to plot (seconds)
+save_figs = true;               % Save comparison figures
+
+% Detrend settings
+% Options: 'none', 'dc', 'linear'
+%   'none'   - No detrending
+%   'dc'     - Remove DC offset (mean) only
+%   'linear' - Remove DC and linear slope (MATLAB's detrend default)
+detrend_mode = 'dc';
 
 % Create output directory if needed
 if ~exist(output_dir, 'dir')
@@ -108,6 +120,11 @@ for i = 1:n_subjects
         fprintf('  Loaded: %d blocks, %d channels, Fs_initial = %d Hz\n', ...
             n_blocks, n_channels, Fs_initial);
 
+        % Store pre-decimation data for comparison plot
+        if plot_comparison
+            data_orig = data;
+        end
+
         % Validate: cannot upsample
         if Fs_initial < Fs_final_target
             error('Cannot upsample: Fs_initial (%d) < Fs_final_target (%d)', ...
@@ -156,10 +173,15 @@ for i = 1:n_subjects
 
                     case 'butter'
                         % Butterworth lowpass filter then downsample
+                        % Remove DC before filtering to avoid filtfilt edge effects
+                        dc_offset = mean(tmp);
+                        tmp = tmp - dc_offset;
                         % Cutoff at 0.45*Fs_final normalized to Nyquist (Fs_initial/2)
                         Wn = 0.45 * Fs_final / (Fs_initial / 2);
                         [b_filt, a_filt] = butter(2, Wn, 'low');
                         tmp = filtfilt(b_filt, a_filt, tmp);
+                        % Add DC back (will be removed later if detrending)
+                        tmp = tmp + dc_offset;
                         % Downsample by taking every deci_factor-th sample
                         tmp = tmp(1:deci_factor:end);
 
@@ -167,8 +189,19 @@ for i = 1:n_subjects
                         error('Unknown decimation mode: %s', deci_mode);
                 end
 
-                % Detrend
-                tmp = detrend(tmp);
+                % Detrend based on mode
+                switch detrend_mode
+                    case 'none'
+                        % No detrending
+                    case 'dc'
+                        % Remove DC offset (mean) only
+                        tmp = tmp - mean(tmp);
+                    case 'linear'
+                        % Remove DC and linear slope
+                        tmp = detrend(tmp);
+                    otherwise
+                        error('Unknown detrend mode: %s', detrend_mode);
+                end
 
                 % Store back (resize on first channel)
                 if ch == 1
@@ -191,6 +224,40 @@ for i = 1:n_subjects
             'header', 'deci_mode', 'channel_labels', '-v7.3');
 
         fprintf('  Saved: %s\n', output_file);
+
+        % Generate comparison plot
+        if plot_comparison
+            fprintf('  Generating comparison plot...\n');
+
+            % Use block 1 (baseline) for comparison
+            x_orig = data_orig{1};
+            x_deci = data{1};
+
+            % Create time vectors
+            n_samples_orig = size(x_orig, 1);
+            n_samples_deci = size(x_deci, 1);
+            t_orig = (0:n_samples_orig-1)' / Fs_initial;
+            t_deci = (0:n_samples_deci-1)' / Fs_final;
+
+            % Set up plotting parameters
+            plot_params = struct();
+            plot_params.time_window = plot_time_window;
+            plot_params.n_E = header.n_E;
+            plot_params.linewidth_orig = 1.5;
+            plot_params.linewidth_deci = 0.5;
+            plot_params.detrend_mode = detrend_mode;
+
+            % Create comparison figure
+            fig = plot_decimation_comparison(t_orig, x_orig, t_deci, x_deci, ...
+                plot_params, s.SaveName);
+
+            % Save figure
+            if save_figs
+                fig_file = fullfile(output_dir, sprintf('%s_decimation.png', s.SaveName));
+                saveas(fig, fig_file);
+                fprintf('  Saved figure: %s\n', fig_file);
+            end
+        end
 
         success(i) = true;
 

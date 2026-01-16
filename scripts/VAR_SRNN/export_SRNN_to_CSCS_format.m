@@ -52,6 +52,24 @@ x_data = x_all';  % [nt x n_channels]
 baseline_data = x_data(result.baseline_mask, :);
 stim_data = x_data(result.stim_mask, :);
 
+% Trim transient period from start of each block
+T_transient = sim_config.T_transient;
+n_trim = round(T_transient * result.fs);
+
+if n_trim > 0
+    if n_trim < size(baseline_data, 1)
+        baseline_data = baseline_data(n_trim+1:end, :);
+    else
+        warning('T_transient (%.1f s) exceeds baseline duration, keeping all data', T_transient);
+    end
+    if n_trim < size(stim_data, 1)
+        stim_data = stim_data(n_trim+1:end, :);
+    else
+        warning('T_transient (%.1f s) exceeds stim duration, keeping all data', T_transient);
+    end
+    fprintf('    Trimmed first %.1f sec (%.0f samples) from each block\n', T_transient, n_trim);
+end
+
 % Create data cell array (matching cscs_dynamics format)
 % Block 1: baseline, Block 2: stim
 data = cell(1, 2);

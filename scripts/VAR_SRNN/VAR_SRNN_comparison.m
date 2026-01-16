@@ -30,28 +30,29 @@ set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 % Simulation parameters
 sim_config = struct();
 
-% Development settings (quick testing)
-sim_config.fs = 200;               % Hz
-sim_config.T_baseline = 30;        % seconds without stimulation
-sim_config.T_stim = 30;            % seconds with stimulation
-sim_config.max_minutes = 2;        % Max minutes per block (for testing)
+% Quick test settings: 500 Hz, 30 sec baseline, 30 sec stim
+sim_config.fs = 2000;               % Hz (no downsampling needed)
+sim_config.T_baseline = 300;        % 30 seconds without stimulation
+sim_config.T_stim = 300;            % 30 seconds with stimulation
+sim_config.T_transient = 10;        % Seconds to discard from start of each block
 
-% Production settings (uncomment for final analysis)
-% sim_config.fs = 5000;            % Hz
-% sim_config.T_baseline = 900;     % 15 minutes
-% sim_config.T_stim = 900;         % 15 minutes
-% sim_config.max_minutes = Inf;    % Use all data
+% Development settings (comment out for production)
+% sim_config.fs = 200;             % Hz
+% sim_config.T_baseline = 30;      % seconds
+% sim_config.T_stim = 30;          % seconds
 
-% Neuron subset (empty = all 100, or specify number for random subset)
-sim_config.n_neurons_subset = [];   % e.g., 50 to use random 50 neurons
+% Neuron subset (empty = all, or specify number for random subset)
+sim_config.n_neurons_subset = [];   % Not used when n is already small
 
 % Network parameters
-sim_config.n = 100;                 % Total neurons
+sim_config.n = 500;                  % Total neurons (reduced for speed)
 sim_config.level_of_chaos = 1.7;    % Level of chaos
-sim_config.u_ex_scale = 1.5;        % Stimulus scaling
+sim_config.u_ex_scale = 0.25;        % Stimulus scaling
+sim_config.sigma_noise = 1e-6;       % Process noise std (set to 0 to disable)
 
 % Random seeds for reproducibility
 sim_config.rng_seeds = [105 25 33 44 55];
+% sim_config.rng_seeds = [105 25 33 44 55]+1;
 
 % Time config for plotting (negative time for settling before stim)
 sim_config.T_settle = -20;          % Pre-simulation settling time
@@ -113,7 +114,6 @@ fprintf('Configuration:\n');
 fprintf('  Sampling rate: %d Hz\n', sim_config.fs);
 fprintf('  Baseline duration: %.1f sec\n', sim_config.T_baseline);
 fprintf('  Stim duration: %.1f sec\n', sim_config.T_stim);
-fprintf('  Max minutes per block: %s\n', num2str(sim_config.max_minutes));
 fprintf('  Compute Lyapunov: %s\n', mat2str(sim_config.compute_lyapunov));
 fprintf('  Output directory: %s\n\n', output_dir);
 
@@ -301,7 +301,7 @@ S0 = initialize_state(params);
 
 % Generate external input with stim pattern
 input_config.n_steps = 2;  % Baseline + Stim
-input_config.step_density = 0.2;
+input_config.step_density = 0.1;
 input_config.amp = 0.5;
 input_config.no_stim_pattern = [true, false];  % First half no stim, second half stim
 input_config.intrinsic_drive = zeros(params.n, 1);
@@ -320,9 +320,18 @@ else
 end
 u_ex = u_ex * sim_config.u_ex_scale;
 
+% Generate process noise (pre-generated for reproducibility with ODE solver)
+sigma_noise = sim_config.sigma_noise;
+if sigma_noise > 0
+    rng(sim_config.rng_seeds(3));  % Use seed 3 for noise
+    noise_ex = sigma_noise * randn(params.n, length(t_ex));
+else
+    noise_ex = zeros(params.n, length(t_ex));
+end
+
 % Integrate
 ode_solver = @ode45;
-rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params);
+rhs = @(t, S) SRNN_reservoir(t, S, t_ex, u_ex, params, noise_ex);
 jac_wrapper = @(t, S) compute_Jacobian_fast(S, params);
 opts = odeset('RelTol', 1e-7, 'AbsTol', 1e-7, 'MaxStep', dt, 'Jacobian', jac_wrapper);
 

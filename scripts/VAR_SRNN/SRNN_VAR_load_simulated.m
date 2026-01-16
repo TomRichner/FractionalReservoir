@@ -37,7 +37,7 @@ filter_mode = 'none';
 % Downsampling
 % Set to target Fs if production data is at 5000 Hz
 % Set to 0 or same as input Fs to skip downsampling
-Fs_target = 500;  % Target sampling rate (Hz)
+Fs_target = 100;  % Target sampling rate (Hz)
 
 % Skip subjects that are already processed
 skip_completed = false;
