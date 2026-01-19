@@ -1,3 +1,5 @@
+.venv
+
 # MATLAB autosave files
 *.asv
 

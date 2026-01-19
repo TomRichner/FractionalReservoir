@@ -39,7 +39,7 @@ deci_mode = 'no_deci';  % No decimation - simulation already at target Fs
 % Target sampling rate (Hz)
 % Production: 500 Hz with 'butter' mode (requires simulation at >= 500 Hz)
 % Development: use same as simulation Fs (typically 200 Hz) with no_deci
-Fs_final_target = 500;
+Fs_final_target = 100;
 
 % Plotting settings
 plot_comparison = true;         % Generate before/after comparison plots

@@ -31,9 +31,9 @@ set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 sim_config = struct();
 
 % Quick test settings: 500 Hz, 30 sec baseline, 30 sec stim
-sim_config.fs = 2000;               % Hz (no downsampling needed)
-sim_config.T_baseline = 300;        % 30 seconds without stimulation
-sim_config.T_stim = 300;            % 30 seconds with stimulation
+sim_config.fs = 100;               % Hz (no downsampling needed)
+sim_config.T_baseline = 50;        % 30 seconds without stimulation
+sim_config.T_stim = 50;            % 30 seconds with stimulation
 sim_config.T_transient = 10;        % Seconds to discard from start of each block
 
 % Development settings (comment out for production)

@@ -68,7 +68,7 @@ AddLetters2Plots(fig_handle, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)'}, 'FontSi
 ylim([-1.8 1.8])
 
 if save_figs
-    save_dir_combined = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review');
+    save_dir_combined = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'revised_results_review');
     save_name_base = 'combined_comparison_v3';
 
     % Use the existing helper function
