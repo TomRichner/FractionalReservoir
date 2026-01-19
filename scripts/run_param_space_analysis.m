@@ -30,18 +30,16 @@ psa = ParamSpaceAnalysis(...
     'batch_size', 50, ...       % Configs per batch (for checkpointing)
     'note', 'bigger_paramspace', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
-);
+    );
 
 %% Add parameters to the grid
 % All combinations of these parameters will be tested
 % The order in which parameters are added doesn't matter
 
 % Network structure parameters
-psa.add_grid_parameter('level_of_chaos', [0.5, 2.5]);    % Abscissa scaling
-psa.add_grid_parameter('n', [50, 250]);                   % Number of neurons
+psa.add_grid_parameter('level_of_chaos', [1, 2]);    % Abscissa scaling
 psa.add_grid_parameter('EI_imbalance', [0.5, 2]);     % E/I imbalance
-psa.add_grid_parameter('f', [0.2, 0.8]);     % E/I imbalance
-psa.add_grid_parameter('mu_E', [0.2, 2]);
+psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
@@ -52,9 +50,14 @@ psa.add_grid_parameter('mu_E', [0.2, 2]);
 
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
-psa.model_defaults.T_range = [0, 30];        % Simulation time (shorter for faster runs)
+% Match example script (full_SRNN_run_v3.m) parameters:
+psa.model_defaults.T_range = [-20, 40];       % With settling time, similar to example
 psa.model_defaults.fs = 200;                  % Sampling frequency
-pas.model_defaults.c_E = 0.5;
+psa.model_defaults.c_E = 0.15/3;              % SFA strength (≈0.05), matches example
+psa.model_defaults.tau_b_E_rec = 2;           % STD recovery time for E neurons
+psa.model_defaults.tau_b_I_rec = 2;           % STD recovery time for I neurons
+psa.model_defaults.S_c = 0.3;                 % Activation function center
+psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
 psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
 
 %% Configure conditions (optional)
