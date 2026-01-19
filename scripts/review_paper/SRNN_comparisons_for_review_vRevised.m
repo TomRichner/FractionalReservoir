@@ -19,8 +19,8 @@ u_ex_scale = 1.5;
 
 rng_seeds = [105 25];
 
-time_config.T_range = [-20, 40];
-time_config.T_plot = [0, 40];
+time_config.T_range = [-20, 50];
+time_config.T_plot = [0, 50];
 
 combined_runs = {};
 
@@ -34,7 +34,7 @@ n_b_E = 0;
 save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
 fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 clear_SRNN_persistent();
-[~, ~, params_1, lya_1, plot_data_1] = full_SRNN_run_v3(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config);
+[~, ~, params_1, lya_1, plot_data_1] = full_SRNN_run_vRevised(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config);
 
 run1.plot_data = plot_data_1;
 run1.params = params_1;
@@ -51,7 +51,7 @@ n_b_E = 1;
 save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
 fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 clear_SRNN_persistent();
-[~, ~, params_4, lya_4, plot_data_4] = full_SRNN_run_v3(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config);
+[~, ~, params_4, lya_4, plot_data_4] = full_SRNN_run_vRevised(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config);
 
 run4.plot_data = plot_data_4;
 run4.params = params_4;
