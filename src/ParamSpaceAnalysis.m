@@ -355,6 +355,7 @@ classdef ParamSpaceAnalysis < handle
             end
 
             % Link y-axes
+            drawnow;  % Force figure to render before linking
             ax_handles = findobj(fig, 'Type', 'Axes');
             linkaxes(ax_handles, 'y');
 
@@ -554,6 +555,92 @@ classdef ParamSpaceAnalysis < handle
                 obj.save_summary();
                 obj.has_run = true;
                 fprintf('Consolidation complete. Results available in psa.results\n');
+            end
+        end
+
+        function s = saveobj(obj)
+            % SAVEOBJ Convert object to struct for saving with MATLAB's save()
+            %
+            % This method is called automatically by MATLAB's save() function.
+            % Use load() to restore the object via the static loadobj() method.
+            %
+            % Usage:
+            %   save('psa_saved.mat', 'psa');  % Automatically calls saveobj
+            %   loaded = load('psa_saved.mat');
+            %   psa_restored = loaded.psa;     % Automatically calls loadobj
+
+            s = struct();
+
+            % Configuration Properties (public)
+            s.grid_params = obj.grid_params;
+            s.param_ranges = obj.param_ranges;
+            s.n_levels = obj.n_levels;
+            s.conditions = obj.conditions;
+            s.integer_params = obj.integer_params;
+
+            % Model Default Properties (public)
+            s.model_defaults = obj.model_defaults;
+            s.verbose = obj.verbose;
+
+            % Execution Properties (public)
+            s.batch_size = obj.batch_size;
+            s.output_dir = obj.output_dir;
+            s.note = obj.note;
+            s.store_local_lya = obj.store_local_lya;
+            s.store_local_lya_dt = obj.store_local_lya_dt;
+
+            % Results Properties (private)
+            s.results = obj.results;
+            s.has_run = obj.has_run;
+            s.analysis_start_time = obj.analysis_start_time;
+            s.param_vectors = obj.param_vectors;
+            s.all_configs = obj.all_configs;
+            s.shuffled_indices = obj.shuffled_indices;
+            s.num_combinations = obj.num_combinations;
+        end
+    end
+
+    %% Static Methods
+    methods (Static)
+        function obj = loadobj(s)
+            % LOADOBJ Reconstruct object from struct when loading
+            %
+            % This method is called automatically by MATLAB's load() function
+            % when loading a ParamSpaceAnalysis object that was saved with save().
+
+            if isstruct(s)
+                % Reconstruct object from struct
+                obj = ParamSpaceAnalysis();
+
+                % Configuration Properties (public)
+                if isfield(s, 'grid_params'), obj.grid_params = s.grid_params; end
+                if isfield(s, 'param_ranges'), obj.param_ranges = s.param_ranges; end
+                if isfield(s, 'n_levels'), obj.n_levels = s.n_levels; end
+                if isfield(s, 'conditions'), obj.conditions = s.conditions; end
+                if isfield(s, 'integer_params'), obj.integer_params = s.integer_params; end
+
+                % Model Default Properties (public)
+                if isfield(s, 'model_defaults'), obj.model_defaults = s.model_defaults; end
+                if isfield(s, 'verbose'), obj.verbose = s.verbose; end
+
+                % Execution Properties (public)
+                if isfield(s, 'batch_size'), obj.batch_size = s.batch_size; end
+                if isfield(s, 'output_dir'), obj.output_dir = s.output_dir; end
+                if isfield(s, 'note'), obj.note = s.note; end
+                if isfield(s, 'store_local_lya'), obj.store_local_lya = s.store_local_lya; end
+                if isfield(s, 'store_local_lya_dt'), obj.store_local_lya_dt = s.store_local_lya_dt; end
+
+                % Results Properties (private) - need to set via internal assignment
+                if isfield(s, 'results'), obj.results = s.results; end
+                if isfield(s, 'has_run'), obj.has_run = s.has_run; end
+                if isfield(s, 'analysis_start_time'), obj.analysis_start_time = s.analysis_start_time; end
+                if isfield(s, 'param_vectors'), obj.param_vectors = s.param_vectors; end
+                if isfield(s, 'all_configs'), obj.all_configs = s.all_configs; end
+                if isfield(s, 'shuffled_indices'), obj.shuffled_indices = s.shuffled_indices; end
+                if isfield(s, 'num_combinations'), obj.num_combinations = s.num_combinations; end
+            else
+                % Object was saved directly (already a ParamSpaceAnalysis)
+                obj = s;
             end
         end
     end
