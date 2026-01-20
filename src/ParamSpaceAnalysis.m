@@ -225,8 +225,8 @@ classdef ParamSpaceAnalysis < handle
             % Run batched simulation
             obj.run_batched_simulation(temp_dir);
 
-            % Consolidate batch results
-            obj.consolidate_results(temp_dir);
+            % Consolidate batch results (internal call - skip validation/recovery)
+            obj.consolidate(temp_dir);
 
             overall_elapsed = toc(overall_start);
             fprintf('\n========================================\n');
@@ -402,6 +402,159 @@ classdef ParamSpaceAnalysis < handle
             end
 
             obj.has_run = true;
+        end
+
+        function consolidate(obj, temp_dir)
+            % CONSOLIDATE Merge batch results into per-condition MAT files
+            %
+            % Usage:
+            %   psa.consolidate()           % Standalone recovery after interrupted run
+            %   psa.consolidate(temp_dir)   % Internal call from run() with explicit path
+            %
+            % When called without arguments:
+            %   - Validates that output_dir is set and temp_batches/ exists
+            %   - Recovers configuration from summary file or batch files
+            %   - Saves summary and sets has_run = true after completion
+            %
+            % When called with temp_dir (internal use by run()):
+            %   - Assumes configuration is already set
+            %   - Does not save summary (run() handles that)
+
+            % Determine if this is a standalone call or internal call from run()
+            standalone_call = (nargin < 2 || isempty(temp_dir));
+
+            if standalone_call
+                % Standalone recovery mode - do validation and config recovery
+                if isempty(obj.output_dir)
+                    error('ParamSpaceAnalysis:NoOutputDir', ...
+                        'output_dir is not set. Set it to the run directory first.');
+                end
+
+                temp_dir = fullfile(obj.output_dir, 'temp_batches');
+
+                if ~exist(temp_dir, 'dir')
+                    error('ParamSpaceAnalysis:NoTempDir', ...
+                        'No temp_batches directory found in %s.\nRun may have already been consolidated, or output_dir is incorrect.', ...
+                        obj.output_dir);
+                end
+
+                % Load summary if it exists (to get grid configuration)
+                summary_file = fullfile(obj.output_dir, 'param_space_summary.mat');
+                if exist(summary_file, 'file')
+                    loaded = load(summary_file);
+                    if isfield(loaded, 'summary_data')
+                        obj.grid_params = loaded.summary_data.grid_params;
+                        obj.param_ranges = loaded.summary_data.param_ranges;
+                        obj.n_levels = loaded.summary_data.n_levels;
+                        obj.conditions = loaded.summary_data.conditions;
+                        if isfield(loaded.summary_data, 'num_combinations')
+                            obj.num_combinations = loaded.summary_data.num_combinations;
+                        end
+                        if isfield(loaded.summary_data, 'param_vectors')
+                            obj.param_vectors = loaded.summary_data.param_vectors;
+                        end
+                        if isfield(loaded.summary_data, 'model_defaults')
+                            obj.model_defaults = loaded.summary_data.model_defaults;
+                        end
+                    end
+                else
+                    % Try to infer from batch files
+                    batch_files = dir(fullfile(temp_dir, 'batch_*.mat'));
+                    if isempty(batch_files)
+                        error('ParamSpaceAnalysis:NoBatchFiles', ...
+                            'No batch files found in %s', temp_dir);
+                    end
+
+                    % Load first batch to get conditions
+                    first_batch = load(fullfile(temp_dir, batch_files(1).name));
+                    cond_names = fieldnames(first_batch.batch_results);
+                    obj.conditions = cell(length(cond_names), 1);
+                    for i = 1:length(cond_names)
+                        obj.conditions{i} = struct('name', cond_names{i});
+                    end
+
+                    % Estimate num_combinations from batch indices
+                    all_indices = [];
+                    for i = 1:length(batch_files)
+                        b = load(fullfile(temp_dir, batch_files(i).name), 'batch_indices');
+                        all_indices = [all_indices, b.batch_indices];
+                    end
+                    obj.num_combinations = max(all_indices);
+
+                    warning('ParamSpaceAnalysis:NoSummary', ...
+                        'No summary file found. Inferred %d combinations from batch files.', ...
+                        obj.num_combinations);
+                end
+
+                fprintf('Consolidating results from %s...\n', temp_dir);
+            end
+
+            %% Core consolidation logic
+            fprintf('\nConsolidating batch results...\n');
+
+            num_batches = ceil(obj.num_combinations / obj.batch_size);
+
+            % Initialize results storage
+            for c_idx = 1:length(obj.conditions)
+                cond_name = obj.conditions{c_idx}.name;
+                obj.results.(cond_name) = cell(obj.num_combinations, 1);
+            end
+
+            % Load and merge batches
+            all_found = true;
+            for batch_idx = 1:num_batches
+                batch_file = fullfile(temp_dir, sprintf('batch_%d.mat', batch_idx));
+
+                if exist(batch_file, 'file')
+                    loaded = load(batch_file);
+                    batch_results = loaded.batch_results;
+
+                    for c_idx = 1:length(obj.conditions)
+                        cond_name = obj.conditions{c_idx}.name;
+                        cond_results = batch_results.(cond_name);
+
+                        for k = 1:length(cond_results)
+                            res = cond_results{k};
+                            if isstruct(res) && isfield(res, 'config_idx')
+                                obj.results.(cond_name){res.config_idx} = res;
+                            end
+                        end
+                    end
+                else
+                    fprintf('Warning: Batch file %d not found\n', batch_idx);
+                    all_found = false;
+                end
+            end
+
+            % Save per-condition results
+            for c_idx = 1:length(obj.conditions)
+                cond_name = obj.conditions{c_idx}.name;
+                results = obj.results.(cond_name);
+
+                save_file = fullfile(obj.output_dir, cond_name, ...
+                    sprintf('param_space_results_%s.mat', cond_name));
+                save(save_file, 'results', '-v7.3');
+
+                % Count successes
+                n_success = sum(cellfun(@(r) isstruct(r) && isfield(r, 'success') && r.success, results));
+                fprintf('Condition %s: %d/%d successful, saved to %s\n', ...
+                    cond_name, n_success, obj.num_combinations, save_file);
+            end
+
+            % Clean up temp directory if all successful
+            if all_found
+                rmdir(temp_dir, 's');
+                fprintf('Temp directory cleaned up.\n');
+            else
+                fprintf('Temp directory retained due to missing batches.\n');
+            end
+
+            %% Finalize for standalone calls
+            if standalone_call
+                obj.save_summary();
+                obj.has_run = true;
+                fprintf('Consolidation complete. Results available in psa.results\n');
+            end
         end
     end
 
@@ -634,70 +787,6 @@ classdef ParamSpaceAnalysis < handle
                 n_success = sum(cellfun(@(r) r.success, parallel_results));
                 fprintf('Batch %d completed in %.1f min (%d/%d successful)\n', ...
                     batch_idx, batch_elapsed/60, n_success, total_jobs);
-            end
-        end
-
-        function consolidate_results(obj, temp_dir)
-            % CONSOLIDATE_RESULTS Merge batch files into per-condition MAT files
-
-            fprintf('\nConsolidating batch results...\n');
-
-            num_batches = ceil(obj.num_combinations / obj.batch_size);
-
-            % Initialize results storage
-            for c_idx = 1:length(obj.conditions)
-                cond_name = obj.conditions{c_idx}.name;
-                obj.results.(cond_name) = cell(obj.num_combinations, 1);
-            end
-
-            % Load and merge batches
-            all_found = true;
-            for batch_idx = 1:num_batches
-                batch_file = fullfile(temp_dir, sprintf('batch_%d.mat', batch_idx));
-
-                if exist(batch_file, 'file')
-                    loaded = load(batch_file);
-                    batch_results = loaded.batch_results;
-                    batch_indices = loaded.batch_indices;
-
-                    for c_idx = 1:length(obj.conditions)
-                        cond_name = obj.conditions{c_idx}.name;
-                        cond_results = batch_results.(cond_name);
-
-                        for k = 1:length(cond_results)
-                            res = cond_results{k};
-                            if isstruct(res) && isfield(res, 'config_idx')
-                                obj.results.(cond_name){res.config_idx} = res;
-                            end
-                        end
-                    end
-                else
-                    fprintf('Warning: Batch file %d not found\n', batch_idx);
-                    all_found = false;
-                end
-            end
-
-            % Save per-condition results
-            for c_idx = 1:length(obj.conditions)
-                cond_name = obj.conditions{c_idx}.name;
-                results = obj.results.(cond_name);
-
-                save_file = fullfile(obj.output_dir, cond_name, ...
-                    sprintf('param_space_results_%s.mat', cond_name));
-                save(save_file, 'results', '-v7.3');
-
-                % Count successes
-                n_success = sum(cellfun(@(r) isstruct(r) && isfield(r, 'success') && r.success, results));
-                fprintf('Condition %s: %d/%d successful, saved to %s\n', ...
-                    cond_name, n_success, obj.num_combinations, save_file);
-            end
-
-            % Clean up temp directory if all successful
-            if all_found
-                rmdir(temp_dir, 's');
-                fprintf('Temp directory cleaned up.\n');
-            else
-                fprintf('Temp directory retained due to missing batches.\n');
             end
         end
 
