@@ -16,7 +16,7 @@ function [t_out, S_out, params, lya_results, plot_data] = full_SRNN_run_v3(u_ex_
 %                   .T_plot  - [start, end] plotting time (default: T_range)
 
 if nargin < 9 || isempty(note)
-    note = 'SRNN';
+    note = 'FrontPaper';
 end
 
 if nargin < 10 || isempty(time_config)

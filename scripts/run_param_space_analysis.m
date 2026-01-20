@@ -27,8 +27,8 @@ setup_paths();
 
 psa = ParamSpaceAnalysis(...
     'n_levels', 5, ...          % Number of levels per parameter
-    'batch_size', 50, ...       % Configs per batch (for checkpointing)
-    'note', 'bigger_paramspace', ...         % Optional note for folder naming
+    'batch_size', 25, ...       % Configs per batch (for checkpointing)
+    'note', 'FrontReview500n', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
     );
 
@@ -51,6 +51,7 @@ psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
 % Match example script (full_SRNN_run_v3.m) parameters:
+psa.model_defaults.n = 500;                   % Number of neurons
 psa.model_defaults.T_range = [-20, 40];       % With settling time, similar to example
 psa.model_defaults.fs = 200;                  % Sampling frequency
 psa.model_defaults.c_E = 0.15/3;              % SFA strength (≈0.05), matches example
