@@ -80,7 +80,10 @@ classdef ParamSpaceAnalysis < handle
 
             % Set default output directory
             if isempty(obj.output_dir)
-                obj.output_dir = pwd;
+                % Default to 'data/param_space' in the project root
+                src_path = fileparts(mfilename('fullpath'));
+                project_root = fileparts(src_path);
+                obj.output_dir = fullfile(project_root, 'data', 'param_space');
             end
         end
     end

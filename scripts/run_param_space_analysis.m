@@ -28,7 +28,7 @@ setup_paths();
 psa = ParamSpaceAnalysis(...
     'n_levels', 5, ...          % Number of levels per parameter
     'batch_size', 25, ...       % Configs per batch (for checkpointing)
-    'note', 'FrontReview500_25_sims', ...         % Optional note for folder naming
+    'note', 'FrontReview500_100_sims', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
     );
 
@@ -61,6 +61,7 @@ psa.model_defaults.S_c = 0.3;                 % Activation function center
 psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
 psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
 psa.model_defaults.level_of_chaos = 1.5;
+psa.model_defaults.row_zero_W = false;        % Do NOT apply row-mean centering to W
 psa.store_local_lya = true;                   % Store decimated local LLE time series
 psa.store_local_lya_dt = 0.1;                 % Time resolution for local_lya (seconds)
 

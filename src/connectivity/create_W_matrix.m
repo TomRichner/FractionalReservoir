@@ -21,9 +21,10 @@ function [W, M, G, Z] = create_W_matrix(params)
 %            .mu_I      - Mean inhibitory connection strength
 %            .G_stdev   - Standard deviation of Gaussian perturbations
 %            .indegree  - Expected in-degree (number of inputs per neuron)
+%            .row_zero_W - (optional) Apply row-mean centering (default: true)
 %
 % Outputs:
-%   W - n x n connectivity matrix (sparse, row-mean centered)
+%   W - n x n connectivity matrix (sparse, optionally row-mean centered)
 %   M - n x n mean structure matrix
 %   G - n x n Gaussian perturbation matrix
 %   Z - n x n binary sparsification mask (1 = connection removed)
@@ -38,21 +39,22 @@ function [W, M, G, Z] = create_W_matrix(params)
 %   params.indegree = 15;
 %   [W, M, G, Z] = create_W_matrix(params);
 
-    % Create mean structure matrix M
-    % First n_E columns get mu_E (excitatory), remaining get mu_I (inhibitory)
-    M = [params.mu_E .* ones(params.n, params.n_E), ...
-         params.mu_I .* ones(params.n, params.n_I)];
-    
-    % Add Gaussian perturbations
-    G = params.G_stdev * randn(params.n, params.n);
-    W = M + G;
-    
-    % Apply sparsification
-    d = params.indegree / params.n;  % density
-    Z = rand(params.n, params.n) > d;  % 1 where connections are removed
-    W(Z) = 0;
-    
-    % Zero out row mean of non-zero elements
+% Create mean structure matrix M
+% First n_E columns get mu_E (excitatory), remaining get mu_I (inhibitory)
+M = [params.mu_E .* ones(params.n, params.n_E), ...
+    params.mu_I .* ones(params.n, params.n_I)];
+
+% Add Gaussian perturbations
+G = params.G_stdev * randn(params.n, params.n);
+W = M + G;
+
+% Apply sparsification
+d = params.indegree / params.n;  % density
+Z = rand(params.n, params.n) > d;  % 1 where connections are removed
+W(Z) = 0;
+
+% Zero out row mean of non-zero elements (unless disabled)
+if ~isfield(params, 'row_zero_W') || params.row_zero_W
     nonzero_mask = ~Z;
     row_counts = sum(nonzero_mask, 2);
     row_sums = sum(W, 2);
@@ -60,5 +62,6 @@ function [W, M, G, Z] = create_W_matrix(params)
     valid_rows = row_counts > 0;
     row_means(valid_rows) = row_sums(valid_rows) ./ row_counts(valid_rows);
     W = W - bsxfun(@times, row_means, nonzero_mask);
+end
 end
 

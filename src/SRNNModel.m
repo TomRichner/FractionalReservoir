@@ -22,6 +22,7 @@ classdef SRNNModel < handle
         mu_E = 1                    % Mean excitatory weight
         EI_imbalance = 1            % E/I imbalance: how much stronger mu_E is than |mu_I| (1 = balanced)
         level_of_chaos = 1.8        % Abscissa scaling factor for edge of chaos
+        row_zero_W = true           % Whether to apply row-mean centering to W
     end
 
     %% Spike-Frequency Adaptation (SFA) Properties
@@ -427,6 +428,7 @@ classdef SRNNModel < handle
             params.G_stdev = obj.G_stdev;
             params.mu_E = obj.mu_E;
             params.level_of_chaos = obj.level_of_chaos;
+            params.row_zero_W = obj.row_zero_W;
 
             % Computed E/I params
             params.n_E = obj.n_E;

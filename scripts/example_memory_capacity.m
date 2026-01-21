@@ -21,7 +21,7 @@ rng_seed_net = 1;          % Fixed seed for reproducibility
 
 % MC protocol parameters (reduced for faster demo)
 T_wash = 200*10;               % Washout samples
-T_train = 200*60;             % Training samples  
+T_train = 200*60;             % Training samples
 T_test = 200*60;              % Test samples
 d_max = 200*5;                % Maximum delay
 
@@ -180,7 +180,7 @@ esn_baseline.plot_esn_timeseries(delays_to_plot, 'title', 'Baseline (No Adaptati
 % SFA only time series
 esn_sfa.plot_esn_timeseries(delays_to_plot, 'title', 'SFA Only');
 
-% SFA + STD time series  
+% SFA + STD time series
 esn_full.plot_esn_timeseries(delays_to_plot, 'title', 'SFA + STD');
 
 fprintf('Time series plots generated.\n');
@@ -193,5 +193,14 @@ results.full = results_full;
 results.MC = [MC_baseline, MC_sfa, MC_full];
 results.conditions = {'Baseline', 'SFA only', 'SFA+STD'};
 
-save('memory_capacity_results.mat', 'results');
+% Save results
+script_dir = fileparts(mfilename('fullpath'));
+project_root = fileparts(script_dir);
+output_dir = fullfile(project_root, 'data', 'memory_capacity');
+if ~exist(output_dir, 'dir')
+    mkdir(output_dir);
+end
+
+save_file = fullfile(output_dir, 'memory_capacity_results.mat');
+save(save_file, 'results');
 fprintf('\nResults saved to memory_capacity_results.mat\n');

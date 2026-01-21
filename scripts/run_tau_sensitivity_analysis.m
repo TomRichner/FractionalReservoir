@@ -38,9 +38,13 @@ model_defaults.fs = 200;                % Sampling frequency
 model_defaults.lya_method = 'benettin'; % Lyapunov method
 % Note: tau_a_E(end) range starts at 5 via param_config.tau_a_E_max.range = [5, 60]
 
-%% Create output directory
+% Create output directory
 dt_str = lower(strrep(datestr(now, 'mmm_dd_yy_HH_MM_AM'), ':', '_'));
-output_dir_base = fullfile(pwd, sprintf('sensitivity_%s_nLevs_%d_nReps_%d_%s', ...
+script_dir = fileparts(mfilename('fullpath'));
+project_root = fileparts(script_dir);
+output_root = fullfile(project_root, 'data', 'sensitivity');
+
+output_dir_base = fullfile(output_root, sprintf('sensitivity_%s_nLevs_%d_nReps_%d_%s', ...
     note, n_levels, n_reps, dt_str));
 
 if ~exist(output_dir_base, 'dir')
@@ -77,48 +81,48 @@ for p_idx = 1:length(param_names)
     config = param_config.(param_name);
     param_range = config.range;
     param_type = config.type;
-    
+
     fprintf('\n--- Processing: %s [%.1f, %.1f] (%d/%d) ---\n', ...
         param_name, param_range(1), param_range(2), p_idx, length(param_names));
-    
+
     param_start = tic;
-    
+
     % Create parameter levels
     param_levels = linspace(param_range(1), param_range(2), n_levels);
-    
+
     total_runs = n_levels * n_reps;
     results = cell(total_runs, 1);
-    
+
     % Extract condition values for parfor
     n_a_E_val = condition.n_a_E;
     n_b_E_val = condition.n_b_E;
-    
+
     parfor k = 1:total_runs
         level_idx = floor((k-1) / n_reps) + 1;
         rep_idx = mod(k-1, n_reps) + 1;
-        
+
         param_value = param_levels(level_idx);
         sim_seed = k + (p_idx-1)*total_runs*100;
-        
+
         % Progress reporting (sparse)
         if mod(k, max(1, floor(total_runs/10))) == 1 || k == total_runs
             fprintf('  Run %d/%d: %s=%.1f, rep=%d, seed=%d\n', ...
                 k, total_runs, param_name, param_value, rep_idx, sim_seed);
         end
-        
+
         run_start = tic;
         try
             % Build model arguments
             model_args = {'n_a_E', n_a_E_val, 'n_b_E', n_b_E_val, ...
-                          'rng_seeds', [sim_seed, sim_seed+1]};
-            
+                'rng_seeds', [sim_seed, sim_seed+1]};
+
             % Add model defaults
             default_fields = fieldnames(model_defaults);
             for d_idx = 1:length(default_fields)
                 field_name = default_fields{d_idx};
                 model_args = [model_args, {field_name, model_defaults.(field_name)}];
             end
-            
+
             % Handle parameter type
             if strcmp(param_type, 'vector_max')
                 % For tau_a_E_max: generate logspaced vector from 0.25 to max value
@@ -132,26 +136,26 @@ for p_idx = 1:length(param_names)
                 model_args = [model_args, {'tau_a_E', tau_a_E_vec}];
                 model_args = [model_args, {param_name, param_value}];
             end
-            
+
             % Create and run model
             model = SRNNModel(model_args{:});
             model.build();
             model.run();
-            
+
             % Extract results
             result = struct();
             result.success = true;
             result.param_value = param_value;
             result.seed = sim_seed;
             result.run_duration = toc(run_start);
-            
+
             % Extract LLE
             if ~isempty(model.lya_results) && isfield(model.lya_results, 'LLE')
                 result.LLE = model.lya_results.LLE;
             else
                 result.LLE = NaN;
             end
-            
+
             % Extract mean firing rate
             if ~isempty(model.plot_data) && isfield(model.plot_data, 'r')
                 r_E = model.plot_data.r.E;
@@ -161,12 +165,12 @@ for p_idx = 1:length(param_names)
             else
                 result.mean_rate = NaN;
             end
-            
+
             results{k} = result;
-            
+
         catch ME
             run_duration = toc(run_start);
-            
+
             results{k} = struct(...
                 'success', false, ...
                 'error_message', ME.message, ...
@@ -175,24 +179,24 @@ for p_idx = 1:length(param_names)
                 'run_duration', run_duration, ...
                 'LLE', NaN, ...
                 'mean_rate', NaN ...
-            );
-            
+                );
+
             fprintf('  ERROR in run %d: %s\n', k, ME.message);
         end
     end
-    
+
     % Reshape results to n_levels x n_reps
     results_reshaped = reshape(results, [n_reps, n_levels])';
-    
+
     % Calculate statistics
     success_mask = cellfun(@(x) isfield(x, 'success') && x.success, results);
     n_success = sum(success_mask);
     n_failed = total_runs - n_success;
-    
+
     param_elapsed = toc(param_start);
     fprintf('Parameter %s completed in %.2f minutes.\n', param_name, param_elapsed/60);
     fprintf('Success rate: %d/%d (%.1f%%)\n', n_success, total_runs, 100*n_success/total_runs);
-    
+
     % Create metadata
     metadata = struct();
     metadata.param_name = param_name;
@@ -208,12 +212,12 @@ for p_idx = 1:length(param_names)
     metadata.condition = condition;
     metadata.model_defaults = model_defaults;
     metadata.analysis_date = datestr(now);
-    
+
     % Save results
     save_filename = fullfile(condition_dir, sprintf('sensitivity_%s.mat', param_name));
     save(save_filename, 'results_reshaped', 'metadata', '-v7.3');
     fprintf('Saved to: %s\n', save_filename);
-    
+
     all_results_summary.(param_name) = metadata;
 end
 
@@ -255,13 +259,13 @@ fig_lle = figure('Name', 'Tau Sensitivity - LLE', ...
 
 for p_idx = 1:n_params
     param_name = param_names{p_idx};
-    
+
     % Load results
     load_file = fullfile(condition_dir, sprintf('sensitivity_%s.mat', param_name));
     data = load(load_file);
     results_reshaped = data.results_reshaped;
     metadata = data.metadata;
-    
+
     ax = subplot(1, n_params, p_idx);
     plot_sensitivity_heatmap(ax, results_reshaped, metadata, lle_bins, 'LLE', ...
         '$\lambda_1$', param_name, p_idx == 1);
@@ -281,66 +285,66 @@ beep; pause(0.5); beep; pause(0.2); beep  % Notification sound
 
 %% Helper function for heatmap plotting
 function plot_sensitivity_heatmap(ax, results_reshaped, metadata, hist_bins, metric, y_label, param_name, show_ylabel)
-    n_levels = metadata.n_levels;
-    n_reps = metadata.n_reps;
-    param_levels = metadata.param_levels;
-    
-    num_bins = length(hist_bins) - 1;
-    histogram_matrix = zeros(num_bins, n_levels);
-    median_values = NaN(n_levels, 1);
-    
-    % Build histogram for each level
-    for level_idx = 1:n_levels
-        values_level = [];
-        
-        for rep_idx = 1:n_reps
-            result = results_reshaped{level_idx, rep_idx};
-            
-            if isfield(result, 'success') && result.success && isfield(result, metric)
-                val = result.(metric);
-                if ~isnan(val)
-                    values_level(end+1) = val;
-                end
+n_levels = metadata.n_levels;
+n_reps = metadata.n_reps;
+param_levels = metadata.param_levels;
+
+num_bins = length(hist_bins) - 1;
+histogram_matrix = zeros(num_bins, n_levels);
+median_values = NaN(n_levels, 1);
+
+% Build histogram for each level
+for level_idx = 1:n_levels
+    values_level = [];
+
+    for rep_idx = 1:n_reps
+        result = results_reshaped{level_idx, rep_idx};
+
+        if isfield(result, 'success') && result.success && isfield(result, metric)
+            val = result.(metric);
+            if ~isnan(val)
+                values_level(end+1) = val;
             end
         end
-        
-        if ~isempty(values_level)
-            [counts, ~] = histcounts(values_level, hist_bins);
-            histogram_matrix(:, level_idx) = counts;
-            median_values(level_idx) = median(values_level);
-        end
     end
-    
-    % Compute y-coordinates
-    finite_edges = hist_bins(~isinf(hist_bins));
-    step_size = finite_edges(2) - finite_edges(1);
-    y_coords = zeros(num_bins, 1);
-    y_coords(1) = finite_edges(1) - step_size/2;
-    for k = 2:length(finite_edges)
-        y_coords(k) = (finite_edges(k-1) + finite_edges(k)) / 2;
+
+    if ~isempty(values_level)
+        [counts, ~] = histcounts(values_level, hist_bins);
+        histogram_matrix(:, level_idx) = counts;
+        median_values(level_idx) = median(values_level);
     end
-    y_coords(end) = finite_edges(end) + step_size/2;
-    
-    % Plot
-    imagesc(ax, param_levels, y_coords, histogram_matrix);
-    hold(ax, 'on');
-    yline(ax, 0, '--', 'Color', [0 0.7 0], 'LineWidth', 4, 'Alpha', 0.5);
-    plot(ax, param_levels, median_values, 'b-', 'LineWidth', 4, 'Color', [0 0 1 0.55]);
-    hold(ax, 'off');
-    
-    colormap(ax, flipud(gray));
-    caxis(ax, [0, n_reps]);
-    axis(ax, 'xy');
-    box(ax, 'on');
-    
-    % Labels
-    xlabel(ax, strrep(param_name, '_', '\_'), 'FontSize', 14);
-    if show_ylabel
-        ylabel(ax, y_label, 'Interpreter', 'latex', 'FontSize', 18);
-    end
-    
-    title(ax, sprintf('%s', strrep(param_name, '_', ' ')), 'FontSize', 12);
-    
-    % Set y-ticks
-    yticks(ax, [-0.3, -0.15, 0, 0.1]);
+end
+
+% Compute y-coordinates
+finite_edges = hist_bins(~isinf(hist_bins));
+step_size = finite_edges(2) - finite_edges(1);
+y_coords = zeros(num_bins, 1);
+y_coords(1) = finite_edges(1) - step_size/2;
+for k = 2:length(finite_edges)
+    y_coords(k) = (finite_edges(k-1) + finite_edges(k)) / 2;
+end
+y_coords(end) = finite_edges(end) + step_size/2;
+
+% Plot
+imagesc(ax, param_levels, y_coords, histogram_matrix);
+hold(ax, 'on');
+yline(ax, 0, '--', 'Color', [0 0.7 0], 'LineWidth', 4, 'Alpha', 0.5);
+plot(ax, param_levels, median_values, 'b-', 'LineWidth', 4, 'Color', [0 0 1 0.55]);
+hold(ax, 'off');
+
+colormap(ax, flipud(gray));
+caxis(ax, [0, n_reps]);
+axis(ax, 'xy');
+box(ax, 'on');
+
+% Labels
+xlabel(ax, strrep(param_name, '_', '\_'), 'FontSize', 14);
+if show_ylabel
+    ylabel(ax, y_label, 'Interpreter', 'latex', 'FontSize', 18);
+end
+
+title(ax, sprintf('%s', strrep(param_name, '_', ' ')), 'FontSize', 12);
+
+% Set y-ticks
+yticks(ax, [-0.3, -0.15, 0, 0.1]);
 end
