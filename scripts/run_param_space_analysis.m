@@ -13,7 +13,7 @@
 %
 % See also: ParamSpaceAnalysis, SRNNModel, SensitivityAnalysis
 
-clear;
+clear all;
 clc;
 close all;
 
@@ -28,7 +28,7 @@ setup_paths();
 psa = ParamSpaceAnalysis(...
     'n_levels', 5, ...          % Number of levels per parameter
     'batch_size', 25, ...       % Configs per batch (for checkpointing)
-    'note', 'FrontReview500n', ...         % Optional note for folder naming
+    'note', 'FrontReview500_25_sims', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
     );
 
@@ -37,7 +37,7 @@ psa = ParamSpaceAnalysis(...
 % The order in which parameters are added doesn't matter
 
 % Network structure parameters
-psa.add_grid_parameter('level_of_chaos', [1, 2]);    % Abscissa scaling
+% psa.add_grid_parameter('level_of_chaos', [1, 2]);    % Abscissa scaling
 psa.add_grid_parameter('EI_imbalance', [0.5, 2]);     % E/I imbalance
 psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
 
@@ -55,11 +55,14 @@ psa.model_defaults.n = 500;                   % Number of neurons
 psa.model_defaults.T_range = [-20, 40];       % With settling time, similar to example
 psa.model_defaults.fs = 200;                  % Sampling frequency
 psa.model_defaults.c_E = 0.15/3;              % SFA strength (≈0.05), matches example
-psa.model_defaults.tau_b_E_rec = 2;           % STD recovery time for E neurons
-psa.model_defaults.tau_b_I_rec = 2;           % STD recovery time for I neurons
+psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
+psa.model_defaults.tau_b_I_rec = 1;           % STD recovery time for I neurons
 psa.model_defaults.S_c = 0.3;                 % Activation function center
 psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
 psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
+psa.model_defaults.level_of_chaos = 1.5;
+psa.store_local_lya = true;                   % Store decimated local LLE time series
+psa.store_local_lya_dt = 0.1;                 % Time resolution for local_lya (seconds)
 
 %% Configure conditions (optional)
 % By default, all four adaptation conditions are tested:
@@ -88,6 +91,11 @@ psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
 % Results are automatically saved during execution
 
 psa.run();
+
+%% Save the PSA object
+save_file = fullfile(psa.output_dir, 'psa_object.mat');
+save(save_file, 'psa');
+fprintf('PSA object saved to: %s\n', save_file);
 
 %% Plot results
 % Generate histograms showing metric distributions across the parameter space

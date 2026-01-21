@@ -30,6 +30,7 @@ psa.model_defaults.n = 20;
 psa.model_defaults.T_range = [-5, 10];
 psa.model_defaults.fs = 100;
 psa.model_defaults.lya_method = 'benettin';
+psa.store_local_lya = true;
 
 %% Run the analysis
 fprintf('\nRunning analysis (16 simulations)...\n');
