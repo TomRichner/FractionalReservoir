@@ -14,9 +14,9 @@ rng_seeds = [8 16 3 4 5];
 % u_ex_scale = 0;
 % n_a_E = 0;
 % n_b_E = 0;
-% 
+%
 % save_dir = fullfile('/Users/tom/Desktop/local_code/FractionalReservoir', 'results', note);
-% 
+%
 % fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 % clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);
 
@@ -30,6 +30,8 @@ n_a_E = 0;
 n_b_E = 0;
 
 save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
+if ~exist(save_dir, 'dir'), mkdir(save_dir); end
+copyfile([mfilename('fullpath') '.m'], save_dir);
 
 fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);
@@ -40,9 +42,9 @@ clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos,
 % u_ex_scale = 1;
 % n_a_E = 0;
 % n_b_E = 1;
-% 
+%
 % save_dir = fullfile(pwd, 'results', note);
-% 
+%
 % fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 % clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);
 
@@ -52,9 +54,9 @@ clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos,
 % u_ex_scale = 1;
 % n_a_E = 3;
 % n_b_E = 0;
-% 
+%
 % save_dir = fullfile(pwd, 'results', note);
-% 
+%
 % fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 % clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);
 
@@ -65,6 +67,8 @@ n_a_E = 3;
 n_b_E = 1;
 
 save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
+if ~exist(save_dir, 'dir'), mkdir(save_dir); end
+copyfile([mfilename('fullpath') '.m'], save_dir);
 
 fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 clear_SRNN_persistent(); full_SRNN_run(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note);

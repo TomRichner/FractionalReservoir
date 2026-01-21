@@ -22,7 +22,10 @@ sa = SensitivityAnalysis(...
     'n_reps', 50, ...         % Number of repetitions per value (for statistics)
     'note', 'bigger_run', ...% Optional note for output folder naming
     'verbose', true ...       % Print progress during execution
-);
+    );
+
+% Copy this script to the output directory
+copyfile([mfilename('fullpath') '.m'], sa.output_dir);
 
 %% Add parameters to sweep
 % Specify which parameters to vary and their ranges

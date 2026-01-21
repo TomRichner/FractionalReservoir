@@ -28,7 +28,10 @@ pp = PairedPulseMIAnalysis(...
     'n_levels', 5, ...              % Number of levels per grid parameter
     'note', 'bigger_mi', ...             % Optional note for folder naming
     'verbose', true ...             % Print progress during execution
-);
+    );
+
+% Copy this script to the output directory
+copyfile([mfilename('fullpath') '.m'], pp.output_dir);
 
 %% Configure model defaults
 % Benettin LLE is enabled by default for the new plotting methods

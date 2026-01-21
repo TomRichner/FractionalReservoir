@@ -32,6 +32,9 @@ psa = ParamSpaceAnalysis(...
     'verbose', true ...         % Print progress during execution
     );
 
+% Copy this script to the output directory
+copyfile([mfilename('fullpath') '.m'], psa.output_dir);
+
 %% Add parameters to the grid
 % All combinations of these parameters will be tested
 % The order in which parameters are added doesn't matter
