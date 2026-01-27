@@ -67,7 +67,7 @@ classdef SRNNModel < handle
     properties
         input_config                % Struct with stimulus parameters
         u_ex_scale = 1.0            % Scaling factor for external input
-        rng_seeds = [1 2]    % RNG seeds [network, stimulus, ...]
+        rng_seeds = [1 2]    % RNG seeds [network, stimulus, etc]
     end
 
     %% Lyapunov Settings Properties
@@ -129,8 +129,7 @@ classdef SRNNModel < handle
                 if isprop(obj, varargin{i})
                     obj.(varargin{i}) = varargin{i+1};
                 else
-                    warning('SRNNModel:UnknownProperty', ...
-                        'Unknown property: %s', varargin{i});
+                    warning('SRNNModel:UnknownProperty', 'Unknown property: %s', varargin{i});
                 end
             end
         end
@@ -181,8 +180,7 @@ classdef SRNNModel < handle
 
             % Report eigenvalue info
             W_eigs_scaled = eig(obj.W);
-            fprintf('W matrix created: spectral radius = %.3f, abscissa = %.3f\n', ...
-                max(abs(W_eigs_scaled)), max(real(W_eigs_scaled)));
+            fprintf('W matrix created: spectral radius = %.3f, abscissa = %.3f\n', max(abs(W_eigs_scaled)), max(real(W_eigs_scaled)));
 
             % Generate external stimulus
             obj.generate_stimulus();
@@ -211,8 +209,7 @@ classdef SRNNModel < handle
             % Lyapunov exponents. Results are stored based on storage options.
 
             if ~obj.is_built
-                error('SRNNModel:NotBuilt', ...
-                    'Model must be built before running. Call build() first.');
+                error('SRNNModel:NotBuilt', 'Model must be built before running. Call build() first.');
             end
 
             % Use cached params struct
@@ -222,8 +219,7 @@ classdef SRNNModel < handle
             dt = 1 / obj.fs;
             if isempty(obj.ode_opts)
                 jac_wrapper = @(t, S) compute_Jacobian_fast(S, params);
-                obj.ode_opts = odeset('RelTol', 1e-7, 'AbsTol', 1e-7, ...
-                    'MaxStep', dt, 'Jacobian', jac_wrapper);
+                obj.ode_opts = odeset('RelTol', 1e-7, 'AbsTol', 1e-7, 'MaxStep', dt, 'Jacobian', jac_wrapper);
             end
 
             % Define RHS function using closure (avoids OOP overhead)
@@ -233,7 +229,7 @@ classdef SRNNModel < handle
             rhs = @(t, S) SRNNModel.dynamics_fast(t, S, params);
 
             % Integrate
-            fprintf('Integrating equations...\n');
+            fprintf('Integrating equations\n');
             tic
             [t_raw, S_raw] = obj.ode_solver(rhs, obj.t_ex, obj.S0, obj.ode_opts);
             integration_time = toc;
@@ -241,9 +237,7 @@ classdef SRNNModel < handle
 
             % Verify output times match input times
             if length(t_raw) ~= length(obj.t_ex) || max(abs(t_raw - obj.t_ex)) > 1e-9
-                error('SRNNModel:TimeMismatch', ...
-                    'ODE solver output times do not match input times. Max diff: %.2e', ...
-                    max(abs(t_raw(:) - obj.t_ex(:))));
+                error('SRNNModel:TimeMismatch', 'ODE solver output times do not match input times. Max diff: %.2e', max(abs(t_raw(:) - obj.t_ex(:))));
             end
 
             % Store temporarily for Lyapunov and decimation
@@ -273,8 +267,7 @@ classdef SRNNModel < handle
             % COMPUTE_LYAPUNOV Compute Lyapunov exponents based on lya_method
 
             if isempty(obj.S_out)
-                error('SRNNModel:NoStateData', ...
-                    'State data not available. Set store_full_state=true or call before clearing.');
+                error('SRNNModel:NoStateData', 'State data not available. Set store_full_state=true or call before clearing.');
             end
 
             dt = 1 / obj.fs;
@@ -289,10 +282,8 @@ classdef SRNNModel < handle
             params.u_interpolant = obj.u_interpolant;
             rhs = @(t, S) SRNNModel.dynamics_fast(t, S, params);
 
-            fprintf('Computing Lyapunov exponents using %s method...\n', obj.lya_method);
-            obj.lya_results = compute_lyapunov_exponents(obj.lya_method, ...
-                obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, ...
-                params, obj.ode_opts, obj.ode_solver, rhs, obj.t_ex, obj.u_ex);
+            fprintf('Computing Lyapunov exponents using %s method\n', obj.lya_method);
+            obj.lya_results = compute_lyapunov_exponents(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, params, obj.ode_opts, obj.ode_solver, rhs, obj.t_ex, obj.u_ex);
 
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
@@ -308,13 +299,11 @@ classdef SRNNModel < handle
             %   [fig, axes] = model.plot()
 
             if ~obj.has_run
-                error('SRNNModel:NotRun', ...
-                    'Model must be run before plotting. Call run() first.');
+                error('SRNNModel:NotRun', 'Model must be run before plotting. Call run() first.');
             end
 
             if isempty(obj.plot_data)
-                error('SRNNModel:NoPlotData', ...
-                    'Plot data not available. Set store_decimated_state=true.');
+                error('SRNNModel:NoPlotData', 'Plot data not available. Set store_decimated_state=true.');
             end
 
             % Parse optional arguments
@@ -331,18 +320,7 @@ classdef SRNNModel < handle
 
             params = obj.cached_params;
 
-            [fig_handle, ax_handles] = plot_SRNN_tseries(...
-                obj.plot_data.t, ...
-                obj.plot_data.u, ...
-                obj.plot_data.x, ...
-                obj.plot_data.r, ...
-                obj.plot_data.a, ...
-                obj.plot_data.b, ...
-                obj.plot_data.br, ...
-                params, ...
-                obj.lya_results, ...
-                obj.lya_method, ...
-                T_plot_arg);
+            [fig_handle, ax_handles] = plot_SRNN_tseries(obj.plot_data.t, obj.plot_data.u, obj.plot_data.x, obj.plot_data.r, obj.plot_data.a, obj.plot_data.b, obj.plot_data.br, params, obj.lya_results, obj.lya_method, T_plot_arg);
         end
 
         function [fig_handle, ax_handles] = plot_eigenvalues(obj, J_times_sec)
@@ -352,8 +330,7 @@ classdef SRNNModel < handle
             %   model.plot_eigenvalues([5, 10, 15])  % Times in seconds
 
             if isempty(obj.S_out)
-                error('SRNNModel:NoStateData', ...
-                    'State data required. Set store_full_state=true.');
+                error('SRNNModel:NoStateData', 'State data required. Set store_full_state=true.');
             end
 
             params = obj.cached_params;
@@ -362,7 +339,7 @@ classdef SRNNModel < handle
             J_times = round((J_times_sec - obj.t_out(1)) * obj.fs) + 1;
             J_times = unique(max(1, min(J_times, size(obj.S_out, 1))));
 
-            fprintf('Computing Jacobian at %d time points...\n', length(J_times));
+            fprintf('Computing Jacobian at %d time points\n', length(J_times));
             J_array = compute_Jacobian_at_indices(obj.S_out, J_times, params);
 
             % Compute eigenvalues
@@ -404,8 +381,7 @@ classdef SRNNModel < handle
                 ax = subplot(n_rows, n_cols, i);
                 evals = eigenvalues_all{i};
                 time_val = obj.t_out(J_times(i));
-                ax_handles(i) = plot_eigenvalues(evals, ax, time_val, ...
-                    global_xlim, global_ylim);
+                ax_handles(i) = plot_eigenvalues(evals, ax, time_val, global_xlim, global_ylim);
                 set(ax_handles(i), 'Color', 'none');
             end
 
@@ -542,8 +518,7 @@ classdef SRNNModel < handle
             obj.I_indices = obj.n_E + 1:obj.n;
 
             % Calculate total state dimension
-            obj.N_sys_eqs = obj.n_E * obj.n_a_E + obj.n_I * obj.n_a_I + ...
-                obj.n_E * obj.n_b_E + obj.n_I * obj.n_b_I + obj.n;
+            obj.N_sys_eqs = obj.n_E * obj.n_a_E + obj.n_I * obj.n_a_I + obj.n_E * obj.n_b_E + obj.n_I * obj.n_b_I + obj.n;
 
             % Compute mu_I for E/I balance (EI_imbalance=1 means balanced)
             % EI_imbalance > 1 means excitation dominates (mu_I weaker)
@@ -555,36 +530,29 @@ classdef SRNNModel < handle
 
             % Check n_E and n_I
             if obj.n_E < 1
-                error('SRNNModel:InvalidParams', ...
-                    'n_E must be >= 1. Current: %d (n=%d, f=%.2f)', ...
-                    obj.n_E, obj.n, obj.f);
+                error('SRNNModel:InvalidParams', 'n_E must be >= 1. Current: %d (n=%d, f=%.2f)', obj.n_E, obj.n, obj.f);
             end
 
             if obj.n_I < 1
-                warning('SRNNModel:NoInhibitory', ...
-                    'No inhibitory neurons (n_I=%d). Network may be unstable.', obj.n_I);
+                warning('SRNNModel:NoInhibitory', 'No inhibitory neurons (n_I=%d). Network may be unstable.', obj.n_I);
             end
 
             % Check adaptation consistency
             if obj.n_a_E > 0 && isempty(obj.tau_a_E)
-                error('SRNNModel:InvalidParams', ...
-                    'tau_a_E must be set when n_a_E > 0');
+                error('SRNNModel:InvalidParams', 'tau_a_E must be set when n_a_E > 0');
             end
             if obj.n_a_I > 0 && isempty(obj.tau_a_I)
-                error('SRNNModel:InvalidParams', ...
-                    'tau_a_I must be set when n_a_I > 0');
+                error('SRNNModel:InvalidParams', 'tau_a_I must be set when n_a_I > 0');
             end
 
             % Check T_range
             if obj.T_range(2) <= obj.T_range(1)
-                error('SRNNModel:InvalidParams', ...
-                    'T_range(2) must be > T_range(1)');
+                error('SRNNModel:InvalidParams', 'T_range(2) must be > T_range(1)');
             end
 
             % Check level_of_chaos
             if obj.level_of_chaos <= 0
-                warning('SRNNModel:InvalidParams', ...
-                    'level_of_chaos should be > 0. Current: %.2f', obj.level_of_chaos);
+                warning('SRNNModel:InvalidParams', 'level_of_chaos should be > 0. Current: %.2f', obj.level_of_chaos);
             end
         end
 
@@ -603,8 +571,7 @@ classdef SRNNModel < handle
             params_stim = struct('n', obj.n);
 
             % Generate stimulus
-            [u_stim, t_stim] = generate_external_input(params_stim, T_stim, obj.fs, ...
-                obj.rng_seeds(2), obj.input_config);
+            [u_stim, t_stim] = generate_external_input(params_stim, T_stim, obj.fs, obj.rng_seeds(2), obj.input_config);
 
             % Handle negative start time (prepend zeros for settling)
             if obj.T_range(1) < 0
@@ -622,8 +589,7 @@ classdef SRNNModel < handle
             % Apply scaling
             obj.u_ex = obj.u_ex .* obj.u_ex_scale;
 
-            fprintf('External stimulus generated: %d time points, %d neurons\n', ...
-                length(obj.t_ex), obj.n);
+            fprintf('External stimulus generated: %d time points, %d neurons\n', length(obj.t_ex), obj.n);
         end
 
         function decimate_and_unpack(obj)
@@ -661,8 +627,7 @@ classdef SRNNModel < handle
 
             % Trim Lyapunov results if present
             if ~isempty(obj.lya_results) && isfield(obj.lya_results, 't_lya')
-                keep_mask_lya = obj.lya_results.t_lya >= T_plot_range(1) & ...
-                    obj.lya_results.t_lya <= T_plot_range(2);
+                keep_mask_lya = obj.lya_results.t_lya >= T_plot_range(1) & obj.lya_results.t_lya <= T_plot_range(2);
                 obj.lya_results.t_lya = obj.lya_results.t_lya(keep_mask_lya);
 
                 if isfield(obj.lya_results, 'local_lya')

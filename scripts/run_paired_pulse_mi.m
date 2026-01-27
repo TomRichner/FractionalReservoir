@@ -30,9 +30,6 @@ pp = PairedPulseMIAnalysis(...
     'verbose', true ...             % Print progress during execution
     );
 
-% Copy this script to the output directory
-copyfile([mfilename('fullpath') '.m'], pp.output_dir);
-
 %% Configure model defaults
 % Benettin LLE is enabled by default for the new plotting methods
 pp.model_defaults.n = 20;                   % Network size
@@ -60,6 +57,9 @@ pause;
 %% Run the analysis
 % Loops over networks and conditions, computing LLE, mean rate, and MI vs delay
 pp.run();
+
+% Copy this script to the output directory for reproducibility
+copyfile([mfilename('fullpath') '.m'], pp.output_dir);
 
 %% Create all plots
 % MI vs delay comparison

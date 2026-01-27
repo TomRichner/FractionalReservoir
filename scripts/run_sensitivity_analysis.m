@@ -24,9 +24,6 @@ sa = SensitivityAnalysis(...
     'verbose', true ...       % Print progress during execution
     );
 
-% Copy this script to the output directory
-copyfile([mfilename('fullpath') '.m'], sa.output_dir);
-
 %% Add parameters to sweep
 % Specify which parameters to vary and their ranges
 % You can add any property of SRNNModel
@@ -69,6 +66,9 @@ sa.model_defaults.lya_method = 'benettin';  % Lyapunov computation method
 % This will loop over all conditions and parameters using parfor
 % Results are automatically saved to disk during execution
 sa.run();
+
+% Copy this script to the output directory for reproducibility
+copyfile([mfilename('fullpath') '.m'], sa.output_dir);
 
 %% Plot results
 % Generate heatmaps showing LLE distribution across parameter values

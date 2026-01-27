@@ -43,7 +43,7 @@ run1.Lya_method = 'benettin';
 combined_runs{1} = run1;
 
 %% Run 4
-close all;
+% close all;
 note = 'Review_STD_and_3TS_SFA_ex';
 n_a_E = 3;
 n_b_E = 1;

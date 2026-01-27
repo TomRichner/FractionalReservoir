@@ -229,13 +229,11 @@ plot_data.br = br_plot;
 [~, ~] = plot_SRNN_tseries(t_plot, u_plot, x_plot, r_plot, a_plot, b_plot, br_plot, params, lya_results, Lya_method, time_config.T_plot);
 
 %% Compute Jacobian eigenvalues at multiple time points
-% Sample at the center of each stimulus ON period
+% Sample at the center of each period (both stim and non-stim)
 J_times_sec = [];
 for k = 1:n_steps
-    if ~input_config.no_stim_pattern(k)
-        t_center = (k-1)*step_period + step_period/2;
-        J_times_sec = [J_times_sec, t_center];
-    end
+    t_center = (k-1)*step_period + step_period/2;
+    J_times_sec = [J_times_sec, t_center];
 end
 
 % Convert times in seconds to indices (MATLAB is 1-indexed)
@@ -399,7 +397,7 @@ for i = 1:length(J_times)
 end
 
 % Create J_eff figure with same layout as eigenvalue figure
-figure('Position', [1312         940         600         310]);
+figure('Position', [100 100         600         310]);
 
 for i = 1:n_plots
     subplot(n_rows, n_cols, i);

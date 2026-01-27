@@ -51,8 +51,8 @@ psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
 % Match example script (full_SRNN_run_v3.m) parameters:
-psa.model_defaults.n = 100;                   % Number of neurons
-psa.model_defaults.T_range = [-20, 30];       % With settling time, similar to example
+psa.model_defaults.n = 500;                   % Number of neurons
+psa.model_defaults.T_range = [-20, 40];       % With settling time, similar to example
 psa.model_defaults.fs = 200;                  % Sampling frequency
 psa.model_defaults.c_E = 0.15/3;              % SFA strength (≈0.05), matches example
 psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
