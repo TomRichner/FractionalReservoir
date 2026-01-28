@@ -179,7 +179,7 @@ classdef ParamSpaceAnalysis < handle
 
             % Create timestamped output directory
             obj.analysis_start_time = datetime('now');
-            dt_str = lower(strrep(datestr(obj.analysis_start_time, 'mmm_dd_yy_HH_MM_AM'), ':', '_'));
+            dt_str = lower(datestr(obj.analysis_start_time, 'mmm_dd_yy_HH_MM'));
 
             if ~isempty(obj.note)
                 folder_name = sprintf('param_space_%s_nLevs_%d_%s', ...

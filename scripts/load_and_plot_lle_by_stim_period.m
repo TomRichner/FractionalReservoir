@@ -4,6 +4,7 @@ function load_and_plot_lle_by_stim_period(results_dir, options)
 % Usage:
 %   load_and_plot_lle_by_stim_period('/path/to/param_space_...')
 %   load_and_plot_lle_by_stim_period(results_dir, 'transient_skip', 1.0)
+%   load_and_plot_lle_by_stim_period(results_dir, 'periods_to_plot', [1 1 0])
 %
 % This function:
 %   1. Loads the PSA object from psa_object.mat
@@ -14,13 +15,17 @@ function load_and_plot_lle_by_stim_period(results_dir, options)
 % Input:
 %   results_dir     - Path to a param_space_* output directory
 %   options         - Name-value pairs:
-%       'transient_skip' - Seconds to skip at start of each step (default: 0)
+%       'transient_skip'  - Seconds to skip at start of each step (default: 0)
+%       'periods_to_plot' - Logical vector selecting which periods to plot
+%                           e.g., [1 1 0] plots first 2 periods but not 3rd
+%                           (default: all periods)
 %
 % See also: ParamSpaceAnalysis, load_and_plot_param_space_analysis
 
 arguments
     results_dir (1,:) char
     options.transient_skip (1,1) double = 0
+    options.periods_to_plot (1,:) logical = logical([])
 end
 
 if ~exist(results_dir, 'dir')
@@ -187,15 +192,33 @@ for c_idx = 1:num_conditions
         end
     end
 
+    % Apply periods_to_plot filter
+    if isempty(options.periods_to_plot)
+        % Default: plot all periods
+        periods_mask = true(1, n_steps);
+    else
+        if length(options.periods_to_plot) ~= n_steps
+            error('load_and_plot_lle_by_stim_period:InvalidPeriodsToPlot', ...
+                'periods_to_plot length (%d) must match n_steps (%d)', ...
+                length(options.periods_to_plot), n_steps);
+        end
+        periods_mask = options.periods_to_plot;
+    end
+
+    % Filter data to selected periods
+    means_matrix_filtered = means_matrix(:, periods_mask);
+    step_labels_filtered = step_labels(periods_mask);
+    n_steps_plot = sum(periods_mask);
+
     % Use paired_beeswarm for beeswarm chart with connecting lines
-    paired_beeswarm(means_matrix, 'Axes', ax, ...
+    paired_beeswarm(means_matrix_filtered, 'Axes', ax, ...
         'Colors', sim_colors, ...
         'MarkerSize', 0.8, ...
         'LineWidth', 0.5, ...
-        'Labels', step_labels, ...
+        'Labels', step_labels_filtered, ...
         'Alpha', 0.7, ...
         'SortStyle', 'hex', ...
-        'ShowYAxis', c_idx == 1);
+        'ShowYAxis', true);
 
     % Labels
     if condition_titles.isKey(cond_name)
@@ -213,15 +236,73 @@ for c_idx = 1:num_conditions
 
 end
 
-% Link y-axes and set tight ylims
+% Link y-axes for last 3 conditions only (not the first "no adaptation" condition)
 drawnow;
 ax_handles = findobj(fig, 'Type', 'Axes');
-linkaxes(ax_handles, 'y');
-axis(ax_handles, 'tight');
-% Restore x-limits since axis tight affects both x and y
-for i = 1:length(ax_handles)
-    xlim(ax_handles(i), [0.5, n_steps + 0.5]);
+
+% Link axes for last 3 conditions only (ax_handles is in reverse order from findobj)
+% ax_handles(end) is subplot 1 (no_adaptation), ax_handles(1:end-1) are subplots 2-4
+if length(ax_handles) >= 3
+    linkaxes(ax_handles(1:end-1), 'y');  % Link only conditions 2, 3, 4
 end
+
+% Set x-limits for all axes (use n_steps_plot for filtered count)
+for i = 1:length(ax_handles)
+    xlim(ax_handles(i), [0.5, n_steps_plot + 0.5]);
+end
+
+% Compute y-limits for linked axes (conditions 2-4) first
+linked_ymin = inf;
+linked_ymax = -inf;
+for i = 1:length(ax_handles)-1
+    children = ax_handles(i).Children;
+    for j = 1:length(children)
+        if isprop(children(j), 'YData')
+            ydata = children(j).YData;
+            ydata = ydata(isfinite(ydata));
+            if ~isempty(ydata)
+                linked_ymin = min(linked_ymin, min(ydata));
+                linked_ymax = max(linked_ymax, max(ydata));
+            end
+        end
+    end
+end
+linked_range = linked_ymax - linked_ymin;
+if linked_range > 0
+    linked_padding = 0.05 * linked_range;
+else
+    linked_padding = 0.1;
+end
+linked_upper = max(linked_ymax + linked_padding, 0.05);  % Ensure 0 is visible
+linked_lower = linked_ymin - linked_padding;
+
+% Set ylim on one of the linked axes (will apply to all linked)
+if length(ax_handles) >= 2
+    ylim(ax_handles(1), [linked_lower, linked_upper]);
+end
+
+% Set y-limits for first condition (no_adaptation): own lower bound, shared upper bound
+ax_first = ax_handles(end);  % First subplot (no_adaptation)
+first_ymin = inf;
+children = ax_first.Children;
+for j = 1:length(children)
+    if isprop(children(j), 'YData')
+        ydata = children(j).YData;
+        ydata = ydata(isfinite(ydata));
+        if ~isempty(ydata)
+            first_ymin = min(first_ymin, min(ydata));
+        end
+    end
+end
+first_range = linked_upper - first_ymin;
+if first_range > 0
+    first_padding = 0.05 * first_range;
+else
+    first_padding = 0.1;
+end
+% Use same upper bound as linked axes, but own lower bound
+first_upper = max(linked_upper, 0.05);  % Ensure 0 is visible
+ylim(ax_first, [first_ymin - first_padding, first_upper]);
 
 %% Save figure
 fig_dir = fullfile(results_dir, 'figures');

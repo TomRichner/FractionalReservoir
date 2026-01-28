@@ -26,7 +26,7 @@ setup_paths();
 %       e.g., 4 levels x 3 params x 4 conditions = 256 simulations
 
 psa = ParamSpaceAnalysis(...
-    'n_levels', 4, ...          % Number of levels per parameter
+    'n_levels', 5, ...          % Number of levels per parameter
     'batch_size', 25, ...       % Configs per batch (for checkpointing)
     'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
@@ -37,8 +37,9 @@ psa = ParamSpaceAnalysis(...
 % The order in which parameters are added doesn't matter
 
 % Network structure parameters
-psa.add_grid_parameter('E_W', [-0.2, 0.2] ./ sqrt(100));  % Mean offset (scaled by 1/sqrt(n))
-psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
+N = 100;
+psa.add_grid_parameter('E_W', [-0.1, 0.1] ./ sqrt(N));  % Mean offset (scaled by 1/sqrt(n))
+psa.add_grid_parameter('f', [0.25, 0.75]);     % fraction of neurons that are E
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
@@ -50,18 +51,19 @@ psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
 % Match example script (full_SRNN_run_v3.m) parameters:
-psa.model_defaults.n = 100;                   % Number of neurons
+psa.model_defaults.n = N;                   % Number of neurons
 psa.model_defaults.T_range = [-20, 30];       % With settling time, similar to example
 psa.model_defaults.fs = 200;                  % Sampling frequency
-psa.model_defaults.c_E = 0.15/3;              % SFA strength (≈0.05), matches example
+psa.model_defaults.c_E = 0.1/3;              % SFA strength (≈0.05), matches example
 psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
 psa.model_defaults.tau_b_I_rec = 1;           % STD recovery time for I neurons
-psa.model_defaults.S_c = 0;                 % Activation function center
-psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
+psa.model_defaults.S_c = 0.3;                 % Activation function center
+psa.model_defaults.u_ex_scale = 1.3;          % External input scaling
 psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
-psa.model_defaults.level_of_chaos = 1.5;
-psa.model_defaults.activation_function = @logisticSigmoid;
-psa.model_defaults.activation_function_derivative = @logisticSigmoidDerivative;
+psa.model_defaults.zrs_mode = 'Partial_SZRS'
+psa.model_defaults.level_of_chaos = 1.3;
+% psa.model_defaults.activation_function = @logisticSigmoid;
+% psa.model_defaults.activation_function_derivative = @logisticSigmoidDerivative;
 psa.store_local_lya = true;                   % Store decimated local LLE time series
 psa.store_local_lya_dt = 0.1;                 % Time resolution for local_lya (seconds)
 
@@ -106,6 +108,7 @@ fprintf('PSA object saved to: %s\n', save_file);
 
 psa.plot('metric', 'LLE');
 psa.plot('metric', 'mean_rate');
+load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_skip', 3);
 
 %% Display summary
 fprintf('\n=== Parameter Space Analysis Summary ===\n');

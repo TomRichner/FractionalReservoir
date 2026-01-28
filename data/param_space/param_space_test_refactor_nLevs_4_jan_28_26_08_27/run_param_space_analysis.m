@@ -50,7 +50,7 @@ psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
 % Match example script (full_SRNN_run_v3.m) parameters:
-psa.model_defaults.n = 100;                   % Number of neurons
+psa.model_defaults.n = 50;                   % Number of neurons
 psa.model_defaults.T_range = [-20, 30];       % With settling time, similar to example
 psa.model_defaults.fs = 200;                  % Sampling frequency
 psa.model_defaults.c_E = 0.15/3;              % SFA strength (≈0.05), matches example
@@ -59,9 +59,8 @@ psa.model_defaults.tau_b_I_rec = 1;           % STD recovery time for I neurons
 psa.model_defaults.S_c = 0;                 % Activation function center
 psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
 psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
-psa.model_defaults.level_of_chaos = 1.5;
-psa.model_defaults.activation_function = @logisticSigmoid;
-psa.model_defaults.activation_function_derivative = @logisticSigmoidDerivative;
+psa.model_defaults.level_of_chaos = 1.25;
+psa.model_defaults.row_zero_W = false;        % Do NOT apply row-mean centering to W
 psa.store_local_lya = true;                   % Store decimated local LLE time series
 psa.store_local_lya_dt = 0.1;                 % Time resolution for local_lya (seconds)
 
