@@ -28,7 +28,7 @@ setup_paths();
 psa = ParamSpaceAnalysis(...
     'n_levels', 3, ...          % Number of levels per parameter
     'batch_size', 25, ...       % Configs per batch (for checkpointing)
-    'note', 'Front', ...         % Optional note for folder naming
+    'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
     );
 
@@ -37,8 +37,7 @@ psa = ParamSpaceAnalysis(...
 % The order in which parameters are added doesn't matter
 
 % Network structure parameters
-psa.add_grid_parameter('level_of_chaos', [1, 2]);    % Abscissa scaling
-psa.add_grid_parameter('EI_imbalance', [0.8, 1.2]);     % E/I imbalance
+psa.add_grid_parameter('E_W', [-0.2, 0.2] ./ sqrt(100));  % Mean offset (scaled by 1/sqrt(n))
 psa.add_grid_parameter('f', [0.5, 0.8]);     % fraction of neurons that are E
 
 % Dynamics parameters (uncomment to include)
@@ -57,10 +56,10 @@ psa.model_defaults.fs = 200;                  % Sampling frequency
 psa.model_defaults.c_E = 0.15/3;              % SFA strength (≈0.05), matches example
 psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
 psa.model_defaults.tau_b_I_rec = 1;           % STD recovery time for I neurons
-psa.model_defaults.S_c = 0.3;                 % Activation function center
+psa.model_defaults.S_c = 0;                 % Activation function center
 psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
 psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
-psa.model_defaults.level_of_chaos = 1.5;
+psa.model_defaults.level_of_chaos = 1.2;
 psa.model_defaults.row_zero_W = false;        % Do NOT apply row-mean centering to W
 psa.store_local_lya = true;                   % Store decimated local LLE time series
 psa.store_local_lya_dt = 0.1;                 % Time resolution for local_lya (seconds)
