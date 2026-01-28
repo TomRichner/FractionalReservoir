@@ -38,12 +38,8 @@ psa = ParamSpaceAnalysis(...
 
 % Network structure parameters
 N = 100;
-% psa.add_grid_parameter('E_W', [-0.1, 0.1] ./ sqrt(N));  % Mean offset (scaled by 1/sqrt(n))
-% psa.add_grid_parameter('f', [0.25, 0.75]);     % fraction of neurons that are E
-
-% Repetition index (creates unique network seeds per parameter combo)
-n_reps = 10;
-psa.add_grid_parameter('rep_idx', [1, n_reps]);
+psa.add_grid_parameter('E_W', [-0.1, 0.1] ./ sqrt(N));  % Mean offset (scaled by 1/sqrt(n))
+psa.add_grid_parameter('f', [0.25, 0.75]);     % fraction of neurons that are E
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
@@ -113,7 +109,7 @@ fprintf('PSA object saved to: %s\n', save_file);
 
 psa.plot('metric', 'LLE');
 psa.plot('metric', 'mean_rate');
-load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_skip', 3, 'periods_to_plot', [0 1 1]);
+load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_skip', 3);
 
 %% Display summary
 fprintf('\n=== Parameter Space Analysis Summary ===\n');

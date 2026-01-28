@@ -1,4 +1,4 @@
-gitfunction [t_out, S_out, params, lya_results, plot_data] = full_SRNN_run_SRNNModel(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config)
+function [t_out, S_out, params, lya_results, plot_data] = full_SRNN_run_SRNNModel(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config)
 % FULL_SRNN_RUN_SRNNMODEL Runs the SRNN simulation using SRNNModel class.
 %
 % This is a refactored version that uses the SRNNModel class internally
@@ -17,6 +17,8 @@ gitfunction [t_out, S_out, params, lya_results, plot_data] = full_SRNN_run_SRNNM
 %   time_config   - Optional struct with fields:
 %                   .T_range - [start, end] simulation time (default: [0, 50])
 %                   .T_plot  - [start, end] plotting time (default: T_range)
+%                   .J_periods - logical vector for which periods to compute
+%                                J_eff/eigenspectrum (default: all true)
 
 if nargin < 9 || isempty(note)
     note = 'SRNN';
@@ -31,27 +33,32 @@ end
 if ~isfield(time_config, 'T_plot')
     time_config.T_plot = time_config.T_range;
 end
+% J_periods default set after n_steps is known (see below)
 
 %% Create and configure SRNNModel
 model = SRNNModel();
 
 % Network architecture (explicitly set for hand-tuning)
 model.n = 100;
-model.indegree = 20;
+model.indegree = 50;
 model.f = 0.5;
+model.tau_d = 0.1;
+model.fs = 100;
 
 % RMT tilde-notation parameters (Harris 2023)
 % Default val gives R=1: 1 / sqrt(n * alpha * (2 - alpha)) where alpha = indegree/n
 alpha = model.indegree / model.n;
 default_tilde_val = 1 / sqrt(model.n * alpha * (2 - alpha));
-model.mu_E_tilde = default_tilde_val;
-model.mu_I_tilde = -default_tilde_val;
-model.sigma_E_tilde = default_tilde_val;
-model.sigma_I_tilde = default_tilde_val;
+model.mu_E_tilde = 3*default_tilde_val;
+model.mu_I_tilde = -3*default_tilde_val;
+model.sigma_E_tilde = default_tilde_val/1;
+model.sigma_I_tilde = default_tilde_val/1;
+model.E_W = -0.1 / sqrt(model.n * alpha * (2 - alpha));
 model.E_W = 0;  % Mean offset added to both mu_E_tilde and mu_I_tilde
+model.zrs_mode = 'Partial_SZRS';  % ZRS mode: 'none', 'ZRS', 'SZRS', 'Partial_SZRS'
 
 model.level_of_chaos = level_of_chaos;
-model.rescale_by_abscissa = true;  % Scale W so abscissa matches level_of_chaos
+model.rescale_by_abscissa = false;  % Scale W so abscissa matches level_of_chaos
 
 % Adaptation parameters
 model.n_a_E = n_a_E;
@@ -110,10 +117,18 @@ T_stim = time_config.T_range(2);
 n_steps = model.input_config.n_steps;
 step_period = fix(T_stim / n_steps);
 
+% Set default J_periods if not specified (all periods)
+if ~isfield(time_config, 'J_periods')
+    time_config.J_periods = true(1, n_steps);
+end
+J_periods = time_config.J_periods;
+
 J_times_sec = [];
 for k = 1:n_steps
-    t_center = (k-1)*step_period + step_period/2;
-    J_times_sec = [J_times_sec, t_center];
+    if J_periods(k)  % Only include periods where J_periods is true
+        t_center = (k-1)*step_period + step_period/2;
+        J_times_sec = [J_times_sec, t_center];
+    end
 end
 
 % Convert times in seconds to indices

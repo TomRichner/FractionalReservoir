@@ -113,7 +113,7 @@ fprintf('PSA object saved to: %s\n', save_file);
 
 psa.plot('metric', 'LLE');
 psa.plot('metric', 'mean_rate');
-load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_skip', 3, 'periods_to_plot', [0 1 1]);
+load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_skip', 3);
 
 %% Display summary
 fprintf('\n=== Parameter Space Analysis Summary ===\n');

@@ -11,16 +11,18 @@ set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 save_figs = false;
 save_workspace = false;
 
-level_of_chaos = 1.7;
+level_of_chaos = 1.0;
 
 % u_ex_scale = 1.6;
-u_ex_scale = 1.5;
+u_ex_scale = 1.0;
 
 
-rng_seeds = [105 25];
+% rng_seeds = [105 25];
+rng_seeds = [2 1]+6;
 
-time_config.T_range = [-20, 50];
-time_config.T_plot = [0, 50];
+time_config.T_range = [-20, 45];
+time_config.T_plot = [10, 50];  % Cutoff halfway through second no-stim period
+time_config.J_periods = [false true true];  % Only plot J_eff/eigenspectrum for first two periods
 
 combined_runs = {};
 

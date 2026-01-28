@@ -251,7 +251,22 @@ for i = 1:length(ax_handles)
     xlim(ax_handles(i), [0.5, n_steps_plot + 0.5]);
 end
 
-% Compute y-limits for linked axes (conditions 2-4) first
+% Compute global y-max across ALL conditions for shared upper limit
+global_ymax = -inf;
+for i = 1:length(ax_handles)
+    children = ax_handles(i).Children;
+    for j = 1:length(children)
+        if isprop(children(j), 'YData')
+            ydata = children(j).YData;
+            ydata = ydata(isfinite(ydata));
+            if ~isempty(ydata)
+                global_ymax = max(global_ymax, max(ydata));
+            end
+        end
+    end
+end
+
+% Compute y-limits for linked axes (conditions 2-4)
 linked_ymin = inf;
 linked_ymax = -inf;
 for i = 1:length(ax_handles)-1
@@ -273,12 +288,21 @@ if linked_range > 0
 else
     linked_padding = 0.1;
 end
-linked_upper = max(linked_ymax + linked_padding, 0.05);  % Ensure 0 is visible
+
+% Compute global upper bound: max across ALL conditions, with 0.05 minimum
+global_range = global_ymax - linked_ymin;
+if global_range > 0
+    global_padding = 0.05 * global_range;
+else
+    global_padding = 0.1;
+end
+global_upper = max(global_ymax + global_padding, 0.05);  % Ensure 0 is visible
+
 linked_lower = linked_ymin - linked_padding;
 
 % Set ylim on one of the linked axes (will apply to all linked)
 if length(ax_handles) >= 2
-    ylim(ax_handles(1), [linked_lower, linked_upper]);
+    ylim(ax_handles(1), [linked_lower, global_upper]);
 end
 
 % Set y-limits for first condition (no_adaptation): own lower bound, shared upper bound
@@ -294,15 +318,14 @@ for j = 1:length(children)
         end
     end
 end
-first_range = linked_upper - first_ymin;
+first_range = global_upper - first_ymin;
 if first_range > 0
     first_padding = 0.05 * first_range;
 else
     first_padding = 0.1;
 end
-% Use same upper bound as linked axes, but own lower bound
-first_upper = max(linked_upper, 0.05);  % Ensure 0 is visible
-ylim(ax_first, [first_ymin - first_padding, first_upper]);
+% Use same upper bound as all axes, but own lower bound
+ylim(ax_first, [first_ymin - first_padding, global_upper]);
 
 %% Save figure
 fig_dir = fullfile(results_dir, 'figures');
