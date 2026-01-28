@@ -1,3 +1,4 @@
+$$
 \begin{aligned}
 \dot{x}_i &= \frac{-x_i + u_i + \sum_{j=1}^{J} w_{ij}\, b_j r_{j}}{\tau_d}\\[4pt]
 r_i &= \phi\!\left(
@@ -8,3 +9,4 @@ r_i &= \phi\!\left(
 \dot{b}_i &= \frac{1-b_i}{\tau_{rec}}
             - \frac{b_i\, r_i}{\tau_{rel}}
 \end{aligned}
+$$

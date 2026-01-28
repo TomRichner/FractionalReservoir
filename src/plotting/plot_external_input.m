@@ -20,21 +20,21 @@ function plot_external_input(t, u)
 %   subplot(5, 1, 1);
 %   plot_external_input(t_out, u);
 
-    % Get colormaps (8 colors each)
-    cmap_I = inhibitory_colormap(8);
-    cmap_E = excitatory_colormap(8);
-    
-    % Plot inhibitory neurons first (background layer)
-    plot_lines_with_colormap(t, u.I, cmap_I);
-    
-    % Plot excitatory neurons on top
-    hold on;
-    plot_lines_with_colormap(t, u.E, cmap_E);
-    hold off;
-    ylabel('stim');
-    
-    % Set yticks to match ylim
-    yl = ylim;
-    yticks([-1 0 1]);
+% Get colormaps (8 colors each)
+cmap_I = inhibitory_colormap(8);
+cmap_E = excitatory_colormap(8);
+
+% Plot inhibitory neurons first (background layer)
+plot_lines_with_colormap(t, u.I, cmap_I);
+
+% Plot excitatory neurons on top
+hold on;
+plot_lines_with_colormap(t, u.E, cmap_E);
+hold off;
+ylabel('stim');
+
+% Set yticks to match ylim
+yl = ylim;
+yticks([-0.5 0 0.5]);
 end
 

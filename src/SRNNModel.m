@@ -38,8 +38,8 @@ classdef SRNNModel < handle
         n_a_I = 0                   % Number of adaptation timescales for I neurons
         tau_a_E                     % Adaptation time constants for E neurons (1 x n_a_E)
         tau_a_I                     % Adaptation time constants for I neurons (1 x n_a_I)
-        c_E = 0.1/3                 % Adaptation scaling for E neurons
-        c_I = 0.1                   % Adaptation scaling for I neurons
+        c_E = 0.15/3                 % Adaptation scaling for E neurons
+        c_I = 0.15/3                  % Adaptation scaling for I neurons
     end
 
     %% Short-Term Depression (STD) Properties
@@ -87,7 +87,7 @@ classdef SRNNModel < handle
     properties
         store_full_state = false    % Whether to keep full S_out in memory
         store_decimated_state = true % Whether to keep decimated plot data
-        plot_deci = 10              % Decimation factor for plotting
+        plot_deci = 20              % Decimation factor for plotting
     end
 
     %% RMT Dependent Properties (computed from tilde parameters)
@@ -653,6 +653,8 @@ classdef SRNNModel < handle
             obj.input_config.no_stim_pattern = false(1, 3);
             obj.input_config.no_stim_pattern(1:2:end) = true;
             obj.input_config.intrinsic_drive = [];  % Will be set in build
+            obj.input_config.positive_only = false;  % Default: allow positive and negative amplitudes
+            % step_density_E/I not set by default (uses step_density uniformly)
 
             % T_plot defaults to T_range (set in build if not specified)
             obj.T_plot = [];
@@ -713,7 +715,8 @@ classdef SRNNModel < handle
             end
 
             % Create params struct for generate_external_input
-            params_stim = struct('n', obj.n);
+            params_stim = struct('n', obj.n, 'f', obj.f, ...
+                'E_indices', obj.E_indices, 'I_indices', obj.I_indices);
 
             % Generate stimulus
             [u_stim, t_stim] = generate_external_input(params_stim, T_stim, obj.fs, obj.rng_seeds(2), obj.input_config);

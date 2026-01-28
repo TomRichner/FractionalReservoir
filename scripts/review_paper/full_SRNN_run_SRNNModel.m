@@ -39,22 +39,22 @@ end
 model = SRNNModel();
 
 % Network architecture (explicitly set for hand-tuning)
-model.n = 100;
-model.indegree = 50;
+model.n = 300;
+model.indegree = 100;
 model.f = 0.5;
 model.tau_d = 0.1;
 model.fs = 100;
+model.c_E = 0.25/3;
 
 % RMT tilde-notation parameters (Harris 2023)
 % Default val gives R=1: 1 / sqrt(n * alpha * (2 - alpha)) where alpha = indegree/n
 alpha = model.indegree / model.n;
 default_tilde_val = 1 / sqrt(model.n * alpha * (2 - alpha));
-model.mu_E_tilde = 3*default_tilde_val;
-model.mu_I_tilde = -3*default_tilde_val;
+model.mu_E_tilde = 3.5*default_tilde_val;
+model.mu_I_tilde = -3.5*default_tilde_val;
 model.sigma_E_tilde = default_tilde_val/1;
 model.sigma_I_tilde = default_tilde_val/1;
-model.E_W = -0.1 / sqrt(model.n * alpha * (2 - alpha));
-model.E_W = 0;  % Mean offset added to both mu_E_tilde and mu_I_tilde
+model.E_W = -0.5 / sqrt(model.n * alpha * (2 - alpha));
 model.zrs_mode = 'Partial_SZRS';  % ZRS mode: 'none', 'ZRS', 'SZRS', 'Partial_SZRS'
 
 model.level_of_chaos = level_of_chaos;
@@ -63,18 +63,17 @@ model.rescale_by_abscissa = false;  % Scale W so abscissa matches level_of_chaos
 % Adaptation parameters
 model.n_a_E = n_a_E;
 model.n_a_I = 0;
-model.tau_a_E = logspace(log10(0.5), log10(10), n_a_E);
-% c_E and c_I use class defaults (c_E = 0.1/3, c_I = 0.1)
+model.tau_a_E = logspace(log10(0.1), log10(10), n_a_E);
 
 % STD parameters
 model.n_b_E = n_b_E;
 model.n_b_I = 0;
-model.tau_b_E_rec = 2;  % Match old value
-model.tau_b_E_rel = 0.25;
+model.tau_b_E_rec = 1;  % Match old value
+model.tau_b_E_rel = 0.5;
 
 % Activation function
 S_a = 0.9;
-S_c = 0.3;
+S_c = 0.40;
 model.S_a = S_a;
 model.S_c = S_c;
 model.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
@@ -92,10 +91,13 @@ model.store_full_state = true;  % Need full state for Jacobian plots
 
 % Input configuration (match old defaults)
 model.input_config.n_steps = 3;
-model.input_config.step_density = 0.2;
+model.input_config.positive_only = true;
+model.input_config.step_density_E = 0.15;
+model.input_config.step_density_I = 0;
 model.input_config.amp = 0.5;
 model.input_config.no_stim_pattern = false(1, 3);
 model.input_config.no_stim_pattern(1:2:end) = true;
+model.input_config.intrinsic_drive = 0 * ones(model.n, 1);
 
 %% Build and run model
 model.build();
@@ -289,14 +291,14 @@ set(gca, 'Visible', 'off', 'Color', 'none');
 set(cb, 'AxisLocation', 'out', 'Ticks', []);
 ylabel(cb, 'W / J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
 
-%% Plot J_eff as directed graph
-figure('Position', [300, 400, 900, 400]);
-
-for i = 1:n_plots
-    subplot(n_rows, n_cols, i);
-    plot_J_eff_graph(J_eff_array(:,:,i), max_abs, global_clim);
-    set(gca, 'Color', 'none');
-end
+% %% Plot J_eff as directed graph
+% figure('Position', [300, 400, 900, 400]);
+%
+% for i = 1:n_plots
+%     subplot(n_rows, n_cols, i);
+%     plot_J_eff_graph(J_eff_array(:,:,i), max_abs, global_clim);
+%     set(gca, 'Color', 'none');
+% end
 
 %% eigenspectra plot of I-W
 figure;
