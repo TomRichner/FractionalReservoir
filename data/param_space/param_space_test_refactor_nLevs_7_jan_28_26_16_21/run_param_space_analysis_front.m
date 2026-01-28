@@ -44,7 +44,7 @@ alpha = indegree / N;
 default_tilde_val = 1 / sqrt(N * alpha * (2 - alpha));
 
 % psa.add_grid_parameter('E_W', [-2 2] .* default_tilde_val);  % Mean offset (scaled by 1/sqrt(n))
-psa.add_grid_parameter('f', [0.4 0.6]);     % fraction of neurons that are E
+psa.add_grid_parameter('f', [0.5 0.5]);     % fraction of neurons that are E
 
 % Repetition index (creates unique network seeds per parameter combo)
 
@@ -76,14 +76,14 @@ psa.model_defaults.mu_E_tilde = 3.5 * default_tilde_val;
 psa.model_defaults.mu_I_tilde = -3.5 * default_tilde_val;
 psa.model_defaults.sigma_E_tilde = default_tilde_val;
 psa.model_defaults.sigma_I_tilde = default_tilde_val;
-psa.model_defaults.E_W = 0 / sqrt(N * alpha * (2 - alpha));
+psa.model_defaults.E_W = -0.5 / sqrt(N * alpha * (2 - alpha));
 psa.model_defaults.zrs_mode = 'Partial_SZRS';
 psa.model_defaults.level_of_chaos = 1.0;      % Edge of chaos
 psa.model_defaults.rescale_by_abscissa = false;
 
 % Adaptation parameters
-psa.model_defaults.c_E = 0.15/3;              % SFA strength
-psa.model_defaults.tau_b_E_rec = 2;           % STD recovery time for E neurons
+psa.model_defaults.c_E = 0.25/3;              % SFA strength
+psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
 psa.model_defaults.tau_b_E_rel = 0.5;         % STD release time for E neurons
 
 % Activation function

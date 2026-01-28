@@ -22,7 +22,7 @@ u_ex_scale = 0.75;
 rng_seeds = [100 100];
 
 time_config.T_range = [-20, 45];
-time_config.T_plot = [7.5, 45];  % Cutoff halfway through second no-stim period
+time_config.T_plot = [7, 45];  % Cutoff halfway through second no-stim period
 time_config.J_periods = [false true true];  % Only plot J_eff/eigenspectrum for first two periods
 
 combined_runs = {};

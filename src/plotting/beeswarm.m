@@ -59,9 +59,9 @@ parse(p,x,y,varargin{:});
 % extra parameters
 rwid = .05; % width of overlay box/dash
 
-dcut=8; % spacing factor
+dcut=9; % spacing factor
 nxloc=512; % resolution for optimization
-chanwid = .9; % percent width of channel to use
+chanwid = 0.9; % percent width of channel to use
 yl = [min(y) max(y)]; % default y-limits
 asp_rat = 1;
 keep_hold = false;

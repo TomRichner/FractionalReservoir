@@ -103,6 +103,7 @@ num_conditions = length(cond_names);
 
 % Pre-allocate storage
 all_means = cell(num_conditions, 1);
+all_f_values = cell(num_conditions, 1);  % Store f values for coloring
 
 for c_idx = 1:num_conditions
     cond_name = cond_names{c_idx};
@@ -119,6 +120,7 @@ for c_idx = 1:num_conditions
     end
 
     means_matrix = NaN(n_valid, n_steps);
+    f_values = NaN(n_valid, 1);  % Store f values for each simulation
     sim_idx = 0;
 
     for k = 1:length(results_cell)
@@ -133,6 +135,13 @@ for c_idx = 1:num_conditions
         sim_idx = sim_idx + 1;
         t_lya = res.t_lya;
         local_lya = res.local_lya;
+
+        % Extract f value if available
+        if isfield(res, 'config') && isfield(res.config, 'f')
+            f_values(sim_idx) = res.config.f;
+        elseif isfield(psa.model_defaults, 'f')
+            f_values(sim_idx) = psa.model_defaults.f;
+        end
 
         % Truncate to t >= 0
         valid_mask = t_lya >= 0;
@@ -153,7 +162,30 @@ for c_idx = 1:num_conditions
     end
 
     all_means{c_idx} = means_matrix;
+    all_f_values{c_idx} = f_values;
     fprintf('Condition %s: %d valid simulations\n', cond_name, sim_idx);
+end
+
+%% Determine global f value range for consistent coloring
+% Collect all f values across conditions
+all_f_combined = [];
+for c_idx = 1:num_conditions
+    all_f_combined = [all_f_combined; all_f_values{c_idx}];
+end
+all_f_combined = all_f_combined(~isnan(all_f_combined));
+
+if ~isempty(all_f_combined)
+    f_min = min(all_f_combined);
+    f_max = max(all_f_combined);
+    has_f_variation = (f_max > f_min);
+else
+    f_min = 0;
+    f_max = 1;
+    has_f_variation = false;
+end
+
+if has_f_variation
+    fprintf('Coloring by f value: [%.3f, %.3f]\n', f_min, f_max);
 end
 
 %% Create figure
@@ -164,22 +196,31 @@ condition_titles = containers.Map(...
 fig = figure('Name', 'Mean Local LLE by Step', ...
     'Position', [100, 100, 300 * num_conditions, 350]);
 
-% Get lines colormap
-cmap_lines = lines;
+% Get colormap for f-value coloring (use turbo for good perceptual uniformity)
+cmap_f = parula(256);
 
 for c_idx = 1:num_conditions
     cond_name = cond_names{c_idx};
     means_matrix = all_means{c_idx};
+    f_values = all_f_values{c_idx};
 
     ax = subplot(1, num_conditions, c_idx);
 
     n_sims = size(means_matrix, 1);
 
-    % Build color matrix for each simulation
+    % Build color matrix for each simulation based on f value
     sim_colors = zeros(n_sims, 3);
     for sim_idx = 1:n_sims
-        color_idx = mod(sim_idx - 1, size(cmap_lines, 1)) + 1;
-        sim_colors(sim_idx, :) = cmap_lines(color_idx, :);
+        if has_f_variation && ~isnan(f_values(sim_idx))
+            % Map f value to colormap index
+            f_normalized = (f_values(sim_idx) - f_min) / (f_max - f_min);
+            f_normalized = max(0, min(1, f_normalized));  % Clamp to [0, 1]
+            color_idx = round(f_normalized * 255) + 1;
+            sim_colors(sim_idx, :) = cmap_f(color_idx, :);
+        else
+            % Default gray if no f variation or missing f value
+            sim_colors(sim_idx, :) = [0.5 0.5 0.5];
+        end
     end
 
     % Build labels for steps
@@ -210,15 +251,24 @@ for c_idx = 1:num_conditions
     step_labels_filtered = step_labels(periods_mask);
     n_steps_plot = sum(periods_mask);
 
+    % Add dashed black line at y=0 (stability reference) - plot first so it's behind data
+    line(ax, [0.3, n_steps_plot + 0.7], [0, 0], ...
+        'Color', [0 0 0 0.5], ...  % Black with 50% opacity
+        'LineStyle', '--', ...
+        'LineWidth', 1, ...
+        'HandleVisibility', 'off');  % Don't show in legend
+    hold(ax, 'on');
+
     % Use paired_beeswarm for beeswarm chart with connecting lines
+    % Only show y-axis for first subplot since all are linked
     paired_beeswarm(means_matrix_filtered, 'Axes', ax, ...
         'Colors', sim_colors, ...
-        'MarkerSize', 0.8, ...
-        'LineWidth', 0.5, ...
+        'MarkerSize', 0.9, ...
+        'LineWidth', 0.75, ...
         'Labels', step_labels_filtered, ...
         'Alpha', 0.7, ...
         'SortStyle', 'hex', ...
-        'ShowYAxis', true);
+        'ShowYAxis', (c_idx == 1));
 
     % Labels
     if condition_titles.isKey(cond_name)
@@ -229,21 +279,25 @@ for c_idx = 1:num_conditions
 
     if c_idx == 1
         ylabel('Mean Local LLE');
+    else
+        % Hide y-axis for subplots 2-4 (same scale as first)
+        ax.YAxis.Visible = 'off';
     end
+
+    hold(ax, 'off');
 
     xtickangle(ax, 45);
     box(ax, 'off');
 
 end
 
-% Link y-axes for last 3 conditions only (not the first "no adaptation" condition)
+% Link y-axes for ALL conditions (same scale across all subplots)
 drawnow;
 ax_handles = findobj(fig, 'Type', 'Axes');
 
-% Link axes for last 3 conditions only (ax_handles is in reverse order from findobj)
-% ax_handles(end) is subplot 1 (no_adaptation), ax_handles(1:end-1) are subplots 2-4
-if length(ax_handles) >= 3
-    linkaxes(ax_handles(1:end-1), 'y');  % Link only conditions 2, 3, 4
+% Link ALL axes together
+if length(ax_handles) >= 2
+    linkaxes(ax_handles, 'y');
 end
 
 % Set x-limits for all axes (use n_steps_plot for filtered count)
@@ -251,7 +305,8 @@ for i = 1:length(ax_handles)
     xlim(ax_handles(i), [0.5, n_steps_plot + 0.5]);
 end
 
-% Compute global y-max across ALL conditions for shared upper limit
+% Compute global y-limits across ALL conditions
+global_ymin = inf;
 global_ymax = -inf;
 for i = 1:length(ax_handles)
     children = ax_handles(i).Children;
@@ -260,72 +315,29 @@ for i = 1:length(ax_handles)
             ydata = children(j).YData;
             ydata = ydata(isfinite(ydata));
             if ~isempty(ydata)
+                global_ymin = min(global_ymin, min(ydata));
                 global_ymax = max(global_ymax, max(ydata));
             end
         end
     end
 end
 
-% Compute y-limits for linked axes (conditions 2-4)
-linked_ymin = inf;
-linked_ymax = -inf;
-for i = 1:length(ax_handles)-1
-    children = ax_handles(i).Children;
-    for j = 1:length(children)
-        if isprop(children(j), 'YData')
-            ydata = children(j).YData;
-            ydata = ydata(isfinite(ydata));
-            if ~isempty(ydata)
-                linked_ymin = min(linked_ymin, min(ydata));
-                linked_ymax = max(linked_ymax, max(ydata));
-            end
-        end
-    end
-end
-linked_range = linked_ymax - linked_ymin;
-if linked_range > 0
-    linked_padding = 0.05 * linked_range;
-else
-    linked_padding = 0.1;
-end
-
-% Compute global upper bound: max across ALL conditions, with 0.05 minimum
-global_range = global_ymax - linked_ymin;
+% Compute padding and limits
+global_range = global_ymax - global_ymin;
 if global_range > 0
     global_padding = 0.05 * global_range;
 else
     global_padding = 0.1;
 end
-global_upper = max(global_ymax + global_padding, 0.05);  % Ensure 0 is visible
 
-linked_lower = linked_ymin - linked_padding;
+% Ensure upper limit is at least 0.05 so 0 is visible
+global_upper = max(global_ymax + global_padding, 0.05);
+global_lower = global_ymin - global_padding;
 
 % Set ylim on one of the linked axes (will apply to all linked)
-if length(ax_handles) >= 2
-    ylim(ax_handles(1), [linked_lower, global_upper]);
+if ~isempty(ax_handles)
+    ylim(ax_handles(1), [global_lower, global_upper]);
 end
-
-% Set y-limits for first condition (no_adaptation): own lower bound, shared upper bound
-ax_first = ax_handles(end);  % First subplot (no_adaptation)
-first_ymin = inf;
-children = ax_first.Children;
-for j = 1:length(children)
-    if isprop(children(j), 'YData')
-        ydata = children(j).YData;
-        ydata = ydata(isfinite(ydata));
-        if ~isempty(ydata)
-            first_ymin = min(first_ymin, min(ydata));
-        end
-    end
-end
-first_range = global_upper - first_ymin;
-if first_range > 0
-    first_padding = 0.05 * first_range;
-else
-    first_padding = 0.1;
-end
-% Use same upper bound as all axes, but own lower bound
-ylim(ax_first, [first_ymin - first_padding, global_upper]);
 
 %% Save figure
 fig_dir = fullfile(results_dir, 'figures');
@@ -336,5 +348,35 @@ saveas(fig, fullfile(fig_dir, 'lle_by_stim_period.png'));
 saveas(fig, fullfile(fig_dir, 'lle_by_stim_period.fig'));
 fprintf('\nFigure saved to: %s\n', fig_dir);
 
+%% Create separate colorbar figure for f values
+if has_f_variation
+    fig_cb = figure('Name', 'f Value Colorbar', ...
+        'Position', [500, 100, 150, 350]);
+
+    % Create a dummy image to get a colorbar
+    ax_cb = axes(fig_cb);
+
+    % Create gradient image (low values at bottom, high at top)
+    n_colors = 256;
+    gradient_img = repmat(linspace(0, 1, n_colors)', 1, 2);
+    imagesc(ax_cb, [0 1], [f_min f_max], gradient_img);
+    colormap(ax_cb, cmap_f);
+
+    % Configure axes
+    ax_cb.XTick = [];
+    ax_cb.YDir = 'normal';
+    ylabel(ax_cb, 'f (Fraction Excitatory)', 'FontSize', 12);
+    box(ax_cb, 'off');
+
+    % Set aspect ratio
+    pbaspect(ax_cb, [0.3 1 1]);
+
+    % Save colorbar figure
+    saveas(fig_cb, fullfile(fig_dir, 'lle_by_stim_period_colorbar.png'));
+    saveas(fig_cb, fullfile(fig_dir, 'lle_by_stim_period_colorbar.fig'));
+    fprintf('Colorbar figure saved to: %s\n', fig_dir);
+end
+
 fprintf('\nDone!\n');
 end
+

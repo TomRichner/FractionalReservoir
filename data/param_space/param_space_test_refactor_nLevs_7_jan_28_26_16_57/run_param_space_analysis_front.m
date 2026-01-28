@@ -82,7 +82,7 @@ psa.model_defaults.level_of_chaos = 1.0;      % Edge of chaos
 psa.model_defaults.rescale_by_abscissa = false;
 
 % Adaptation parameters
-psa.model_defaults.c_E = 0.15/3;              % SFA strength
+psa.model_defaults.c_E = 1/3;              % SFA strength
 psa.model_defaults.tau_b_E_rec = 2;           % STD recovery time for E neurons
 psa.model_defaults.tau_b_E_rel = 0.5;         % STD release time for E neurons
 

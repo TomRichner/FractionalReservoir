@@ -106,9 +106,9 @@ classdef ParamSpaceAnalysis < handle
                     'param_range must be a 2-element numeric array [min, max]');
             end
 
-            if param_range(2) <= param_range(1)
+            if param_range(2) < param_range(1)
                 error('ParamSpaceAnalysis:InvalidInput', ...
-                    'param_range(2) must be > param_range(1)');
+                    'param_range(2) must be >= param_range(1)');
             end
 
             % Add to grid_params if not already present
@@ -270,9 +270,9 @@ classdef ParamSpaceAnalysis < handle
                 n_bins = 25;
                 y_label = 'LLE (\lambda_1)';
             elseif strcmpi(metric, 'mean_rate')
-                hist_range = [0, 10];
+                hist_range = [0, 1];  % Activation function caps at 1
                 n_bins = 25;
-                y_label = 'Mean Firing Rate (Hz)';
+                y_label = 'Mean Firing Rate';
             else
                 hist_range = [-10, 10];
                 n_bins = 25;
@@ -736,7 +736,7 @@ classdef ParamSpaceAnalysis < handle
                     config = obj.all_configs{config_idx};
 
                     % Same network seed for all conditions of this config
-                    network_seed = config_idx;
+                    network_seed = config_idx*100;
 
                     for c_idx = 1:num_conditions
                         job = struct();

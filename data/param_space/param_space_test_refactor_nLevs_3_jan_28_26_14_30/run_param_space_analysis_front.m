@@ -26,7 +26,7 @@ setup_paths();
 %       e.g., 4 levels x 3 params x 4 conditions = 256 simulations
 
 psa = ParamSpaceAnalysis(...
-    'n_levels', 7, ...          % Number of levels per parameter
+    'n_levels', 3, ...          % Number of levels per parameter
     'batch_size', 25, ...       % Configs per batch (for checkpointing)
     'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
@@ -38,17 +38,12 @@ psa = ParamSpaceAnalysis(...
 
 % Network structure parameters
 N = 300;
-indegree = 100;
-alpha = indegree / N;
-
-default_tilde_val = 1 / sqrt(N * alpha * (2 - alpha));
-
-% psa.add_grid_parameter('E_W', [-2 2] .* default_tilde_val);  % Mean offset (scaled by 1/sqrt(n))
-psa.add_grid_parameter('f', [0.4 0.6]);     % fraction of neurons that are E
+% psa.add_grid_parameter('E_W', [-0.1, 0.1] ./ sqrt(N));  % Mean offset (scaled by 1/sqrt(n))
+% psa.add_grid_parameter('f', [0.25, 0.75]);     % fraction of neurons that are E
 
 % Repetition index (creates unique network seeds per parameter combo)
-
-% psa.add_grid_parameter('rep_idx', [1, 2]);
+n_reps = 10;
+psa.add_grid_parameter('rep_idx', [1, n_reps]);
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
@@ -63,8 +58,8 @@ psa.add_grid_parameter('f', [0.4 0.6]);     % fraction of neurons that are E
 
 % Network architecture
 psa.model_defaults.n = N;                     % Number of neurons
-psa.model_defaults.indegree = indegree;            % Sparse connectivity
-% psa.model_defaults.f = 0.5;                   % E/I fraction
+psa.model_defaults.indegree = 100;            % Sparse connectivity
+psa.model_defaults.f = 0.5;                   % E/I fraction
 
 % Timing
 psa.model_defaults.T_range = [-20, 45];       % Longer simulation (matches review scripts)
@@ -72,18 +67,20 @@ psa.model_defaults.fs = 100;                  % Sampling frequency
 psa.model_defaults.tau_d = 0.1;               % Dendritic time constant
 
 % RMT tilde-parameters (Harris 2023)
+alpha = psa.model_defaults.indegree / N;
+default_tilde_val = 1 / sqrt(N * alpha * (2 - alpha));
 psa.model_defaults.mu_E_tilde = 3.5 * default_tilde_val;
 psa.model_defaults.mu_I_tilde = -3.5 * default_tilde_val;
 psa.model_defaults.sigma_E_tilde = default_tilde_val;
 psa.model_defaults.sigma_I_tilde = default_tilde_val;
-psa.model_defaults.E_W = 0 / sqrt(N * alpha * (2 - alpha));
+psa.model_defaults.E_W = -0.5 / sqrt(N * alpha * (2 - alpha));
 psa.model_defaults.zrs_mode = 'Partial_SZRS';
 psa.model_defaults.level_of_chaos = 1.0;      % Edge of chaos
 psa.model_defaults.rescale_by_abscissa = false;
 
 % Adaptation parameters
-psa.model_defaults.c_E = 0.15/3;              % SFA strength
-psa.model_defaults.tau_b_E_rec = 2;           % STD recovery time for E neurons
+psa.model_defaults.c_E = 0.25/3;              % SFA strength
+psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
 psa.model_defaults.tau_b_E_rel = 0.5;         % STD release time for E neurons
 
 % Activation function
@@ -151,7 +148,7 @@ fprintf('PSA object saved to: %s\n', save_file);
 
 psa.plot('metric', 'LLE');
 psa.plot('metric', 'mean_rate');
-load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_skip', 5, 'periods_to_plot', [0 1 1]);
+load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_skip', 3, 'periods_to_plot', [0 1 1]);
 
 %% Display summary
 fprintf('\n=== Parameter Space Analysis Summary ===\n');
