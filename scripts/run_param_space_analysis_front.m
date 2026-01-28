@@ -54,21 +54,52 @@ psa.add_grid_parameter('rep_idx', [1, n_reps]);
 
 %% Configure model defaults (optional)
 % Set any SRNNModel properties that should be constant across all runs
-% Match example script (full_SRNN_run_v3.m) parameters:
-psa.model_defaults.n = N;                   % Number of neurons
-psa.model_defaults.T_range = [-20, 30];       % With settling time, similar to example
-psa.model_defaults.fs = 200;                  % Sampling frequency
-psa.model_defaults.c_E = 1/3;              % SFA strength (≈0.05), matches example
+% Parameters tuned to edge-of-chaos from full_SRNN_run_SRNNModel.m
+
+% Network architecture
+psa.model_defaults.n = N;                     % Number of neurons
+psa.model_defaults.indegree = 100;            % Sparse connectivity
+psa.model_defaults.f = 0.5;                   % E/I fraction
+
+% Timing
+psa.model_defaults.T_range = [-20, 45];       % Longer simulation (matches review scripts)
+psa.model_defaults.fs = 100;                  % Sampling frequency
+psa.model_defaults.tau_d = 0.1;               % Dendritic time constant
+
+% RMT tilde-parameters (Harris 2023)
+alpha = psa.model_defaults.indegree / N;
+default_tilde_val = 1 / sqrt(N * alpha * (2 - alpha));
+psa.model_defaults.mu_E_tilde = 3.5 * default_tilde_val;
+psa.model_defaults.mu_I_tilde = -3.5 * default_tilde_val;
+psa.model_defaults.sigma_E_tilde = default_tilde_val;
+psa.model_defaults.sigma_I_tilde = default_tilde_val;
+psa.model_defaults.E_W = -0.5 / sqrt(N * alpha * (2 - alpha));
+psa.model_defaults.zrs_mode = 'Partial_SZRS';
+psa.model_defaults.level_of_chaos = 1.0;      % Edge of chaos
+psa.model_defaults.rescale_by_abscissa = false;
+
+% Adaptation parameters
+psa.model_defaults.c_E = 0.25/3;              % SFA strength
 psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
-psa.model_defaults.tau_b_I_rec = 1;           % STD recovery time for I neurons
-psa.model_defaults.S_c = 0.3;                 % Activation function center
-psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
-psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
-psa.model_defaults.zrs_mode = 'Partial_SZRS'
-psa.model_defaults.level_of_chaos = 1.3;
-psa.model_defaults.tau_d = 1;
-% psa.model_defaults.activation_function = @logisticSigmoid;
-% psa.model_defaults.activation_function_derivative = @logisticSigmoidDerivative;
+
+% Activation function
+S_a = 0.9;
+S_c = 0.40;
+psa.model_defaults.S_a = S_a;
+psa.model_defaults.S_c = S_c;
+psa.model_defaults.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
+psa.model_defaults.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
+
+% Input configuration
+psa.model_defaults.u_ex_scale = 0.75;         % External input scaling
+psa.model_defaults.input_config.n_steps = 3;
+psa.model_defaults.input_config.positive_only = true;
+psa.model_defaults.input_config.step_density_E = 0.15;
+psa.model_defaults.input_config.step_density_I = 0;
+psa.model_defaults.input_config.amp = 0.5;
+
+% Lyapunov settings
+psa.model_defaults.lya_method = 'benettin';
 psa.store_local_lya = true;                   % Store decimated local LLE time series
 psa.store_local_lya_dt = 0.1;                 % Time resolution for local_lya (seconds)
 
