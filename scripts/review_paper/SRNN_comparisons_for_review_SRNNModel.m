@@ -14,28 +14,24 @@ save_workspace = false;
 level_of_chaos = 1.0;
 
 % u_ex_scale = 1.6;
-u_ex_scale = 0.75;
+u_ex_scale = 1;
 
+rng_seeds = [42 42]; % seed 1 is for connection matrix, seed 2 is for sitmulus. Setting these ensures comparison between SFA vs SFA+STD use the same connection matrix and stimulus
 
-% rng_seeds = [105 25];
-% rng_seeds = [10 10];
-% rng_seeds = [100 100];
-rng_seeds = [1 1];
+time_config.J_periods = [false true true];  % there are three periods: no-stim, stim, no-stim.  The first no-stim period is ignored for stats and plots
+time_config.T_range = [-15, 45]; % seconds. simulation time starts at -25 seconds to allow for IC transient to settle and local lyapunov vector to alignt to dynamcis
+time_config.T_plot = [7.5, 45];  % seconds. time period to be included in plot. Trim off half of the first no-stim period since it is not used for stats
 
-time_config.T_range = [-25, 45];
-time_config.T_plot = [7, 45];  % Cutoff halfway through second no-stim period
-time_config.J_periods = [false true true];  % Only plot J_eff/eigenspectrum for first two periods
+combined_runs = {}; % cell array to hold multiple simulations
 
-combined_runs = {};
-
-% Run 1: no adapt no depression
+%% Run 1: spike frequency adaptation (SFA) only
 close all;
-note = 'Review_no_adapt_ex';
+note = 'SFA_only';
 
-n_a_E = 3;
-n_b_E = 0;
+n_a_E = 3; % three timeconstants of SFA
+n_b_E = 0; % no short-term synaptic depression
 
-save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
+save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review_revised', note);
 fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 clear_SRNN_persistent();
 [~, ~, params_1, lya_1, plot_data_1] = full_SRNN_run_SRNNModel(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config);
@@ -43,20 +39,19 @@ clear_SRNN_persistent();
 run1.plot_data = plot_data_1;
 run1.params = params_1;
 run1.lya_results = lya_1;
-run1.Lya_method = 'benettin';
+run1.Lya_method = 'benettin'; % reshooting method to get the largest lyapunov exponent
 combined_runs{1} = run1;
 
 %% Run 4
 % close all;
-note = 'Review_STD_and_3TS_SFA_ex';
+note = 'STD_and_SFA';
 n_a_E = 3;
 n_b_E = 1;
 
-save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review', note);
+save_dir = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review_revised', note);
 fprintf('Running SRNN with u_ex_scale=%g, n_a_E=%d, n_b_E=%d, level_of_chaos=%g\n', u_ex_scale, n_a_E, n_b_E, level_of_chaos);
 clear_SRNN_persistent();
 [~, ~, params_4, lya_4, plot_data_4] = full_SRNN_run_SRNNModel(u_ex_scale, n_a_E, n_b_E, level_of_chaos, rng_seeds, save_dir, save_figs, save_workspace, note, time_config);
-
 run4.plot_data = plot_data_4;
 run4.params = params_4;
 run4.lya_results = lya_4;
@@ -69,11 +64,11 @@ combined_runs{2} = run4;
 % Add letters to subplots
 AddLetters2Plots(fig_handle, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)'}, 'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.065, 'VShift', -0.025);
 
-ylim([-1.8 1.8])
+ylim([-2.5 2.5])
 
 if save_figs
-    save_dir_combined = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'revised_results_review');
-    save_name_base = 'combined_comparison_v3';
+    save_dir_combined = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review_revised');
+    save_name_base = 'combined_comparison';
 
     % Use the existing helper function
     save_some_figs_to_folder_2(save_dir_combined, save_name_base, [fig_handle.Number], {'fig', 'svg', 'png'});

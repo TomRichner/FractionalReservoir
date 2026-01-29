@@ -81,6 +81,9 @@ classdef SRNNModel < handle
     properties
         lya_method = 'benettin'     % Lyapunov method: 'benettin', 'qr', or 'none'
         lya_T_interval              % Time interval for Lyapunov computation
+        filter_local_lya = false    % Whether to filter local Lyapunov exponent
+        lya_filter_order = 2        % Butterworth filter order
+        lya_filter_cutoff = 0.25    % Normalized cutoff frequency (fraction of Nyquist)
     end
 
     %% Storage Options Properties
@@ -328,6 +331,10 @@ classdef SRNNModel < handle
             % Compute Lyapunov exponents
             if ~strcmpi(obj.lya_method, 'none')
                 obj.compute_lyapunov();
+                % Filter local Lyapunov exponent (before decimation to avoid edge effects)
+                if obj.filter_local_lya
+                    obj.filter_lyapunov();
+                end
             end
 
             % Decimate and unpack for plotting
@@ -368,6 +375,34 @@ classdef SRNNModel < handle
 
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
+            end
+        end
+
+        function filter_lyapunov(obj)
+            % FILTER_LYAPUNOV Apply lowpass filter to local Lyapunov exponent
+            %
+            % This filters the local_lya signal BEFORE decimation to avoid
+            % edge effects that would occur if filtering after trimming.
+            % Uses a Butterworth filter with parameters from obj properties.
+
+            if isempty(obj.lya_results)
+                return;
+            end
+
+            % Design filter (cutoff in Hz, normalized by Nyquist = lya_fs/2)
+            Wn = obj.lya_filter_cutoff / (obj.lya_results.lya_fs / 2);
+            [b, a] = butter(obj.lya_filter_order, Wn, 'low');
+
+            % Filter local_lya for Benettin method
+            if isfield(obj.lya_results, 'local_lya') && ~isempty(obj.lya_results.local_lya)
+                obj.lya_results.local_lya = filtfilt(b, a, obj.lya_results.local_lya);
+            end
+
+            % Filter local_LE_spectrum_t for QR method (each column)
+            if isfield(obj.lya_results, 'local_LE_spectrum_t') && ~isempty(obj.lya_results.local_LE_spectrum_t)
+                for col = 1:size(obj.lya_results.local_LE_spectrum_t, 2)
+                    obj.lya_results.local_LE_spectrum_t(:, col) = filtfilt(b, a, obj.lya_results.local_LE_spectrum_t(:, col));
+                end
             end
         end
 

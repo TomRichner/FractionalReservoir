@@ -89,6 +89,7 @@ model.u_ex_scale = u_ex_scale;
 
 % Lyapunov settings
 model.lya_method = 'benettin';
+model.filter_local_lya = true;  % Filter before decimation to avoid edge effects
 model.store_full_state = true;  % Need full state for Jacobian plots
 
 % Input configuration (match old defaults)

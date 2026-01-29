@@ -109,7 +109,7 @@ end
 if has_lyapunov
     ax_handles(end+1) = nexttile;
     if strcmpi(Lya_method, 'benettin')
-        plot_lyapunov(lya_results, Lya_method, {'filtered', 'EOC', 'value'});
+        plot_lyapunov(lya_results, Lya_method, {'local', 'EOC', 'value'});
     else
         plot_lyapunov(lya_results, Lya_method);
     end

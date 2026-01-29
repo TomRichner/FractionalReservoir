@@ -8,8 +8,11 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
 % Description:
 %   Plots Lyapunov exponent analysis results on the current axes.
 %   Handles two methods:
-%     - 'benettin': Plots single largest exponent with filtered version
+%     - 'benettin': Plots single largest exponent
 %     - 'qr': Plots full Lyapunov spectrum with legend
+%
+%   Note: Filtering of local_lya now occurs in SRNNModel.filter_lyapunov()
+%   before decimation to avoid edge effects. Set model.filter_local_lya = true.
 %
 % Inputs:
 %   lya_results  - Struct containing Lyapunov analysis results:
@@ -17,30 +20,34 @@ function plot_lyapunov(lya_results, Lya_method, plot_options)
 %                  For 'qr': LE_spectrum, local_LE_spectrum_t, t_lya, params.N_sys_eqs
 %   Lya_method   - String: 'benettin' or 'qr'
 %   plot_options - (Optional) Cell array of strings specifying what to plot for 'benettin':
-%                  'local': Raw local Lyapunov exponent time series
-%                  'filtered': Filtered version of local exponent
+%                  'local': Local Lyapunov exponent time series
 %                  'asym': Asymptotic line at final LLE value
 %                  'EOC': Edge of chaos line at zero
 %                  'value': Text showing LLE value
-%                  Default: {'local', 'filtered', 'asym', 'EOC', 'value'}
+%                  Default: {'local', 'asym', 'EOC', 'value'}
 %
 % Example:
 %   subplot(6, 1, 6);
 %   plot_lyapunov(lya_results, 'benettin');
-%   plot_lyapunov(lya_results, 'benettin', {'filtered', 'EOC', 'value'});
+%   plot_lyapunov(lya_results, 'benettin', {'local', 'EOC', 'value'});
 
 % Parse input arguments
 if nargin < 3
-    plot_options = {'local', 'filtered', 'asym', 'EOC', 'value'};
+    plot_options = {'local', 'asym', 'EOC', 'value'};
 end
 
 % Validate plot_options for benettin method
 if strcmpi(Lya_method, 'benettin')
-    valid_options = {'local', 'filtered', 'asym', 'EOC', 'value'};
+    valid_options = {'local', 'asym', 'EOC', 'value'};
     if ~iscell(plot_options)
         error('plot_options must be a cell array of strings');
     end
     for i = 1:length(plot_options)
+        if strcmpi(plot_options{i}, 'filtered')
+            error(['The ''filtered'' option has been removed. ', ...
+                'Filtering now occurs in SRNNModel before decimation. ', ...
+                'Set model.filter_local_lya = true and use ''local'' instead.']);
+        end
         if ~any(strcmpi(plot_options{i}, valid_options))
             error('Invalid plot_option: %s. Valid options are: %s', ...
                 plot_options{i}, strjoin(valid_options, ', '));
@@ -53,39 +60,20 @@ if strcmpi(Lya_method, 'benettin')
 
     % Check which components to plot
     plot_local = any(strcmpi('local', plot_options));
-    plot_filtered = any(strcmpi('filtered', plot_options));
     plot_asym = any(strcmpi('asym', plot_options));
     plot_EOC = any(strcmpi('EOC', plot_options));
     plot_value = any(strcmpi('value', plot_options));
-
-    % Design filter if needed
-    if plot_filtered
-        filter_order = 2;
-        filter_cutoff = 0.25;  % Normalized cutoff frequency
-        [bL, aL] = butter(filter_order, filter_cutoff/(lya_results.lya_fs/2), 'low');
-    end
 
     % Track legend entries and handles
     legend_entries = {};
     plot_started = false;
 
-    % Plot raw local Lyapunov exponent
+    % Plot local Lyapunov exponent (already filtered if filter_local_lya=true)
     if plot_local
-        plot(lya_results.t_lya, lya_results.local_lya)
+        colors = lines(1);  % Use first color (blue) for consistency
+        plot(lya_results.t_lya, lya_results.local_lya, 'Color', colors(1,:))
         hold on
         plot_started = true;
-        legend_entries{end+1} = 'Local LLE';
-    end
-
-    % Plot filtered signal
-    if plot_filtered
-        if ~plot_started
-            hold on
-            plot_started = true;
-        end
-        local_lya_filt = filtfilt(bL, aL, lya_results.local_lya);
-        colors = lines(1);
-        plot(lya_results.t_lya, local_lya_filt, 'Color', colors(1,:))
         legend_entries{end+1} = 'Local LLE';
     end
 

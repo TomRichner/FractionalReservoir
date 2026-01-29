@@ -87,7 +87,7 @@ end
 if has_lyapunov
     ax_handles(end+1) = nexttile;
     if strcmpi(Lya_method, 'benettin')
-        plot_lyapunov(lya_results, Lya_method, {'filtered', 'EOC', 'value'});
+        plot_lyapunov(lya_results, Lya_method, {'local', 'EOC', 'value'});
     else
         plot_lyapunov(lya_results, Lya_method);
     end
@@ -145,22 +145,22 @@ function plot_external_input_paired_pulse(t, u)
 %       .E - External input for E neurons (n_E x nt)
 %       .I - External input for I neurons (n_I x nt)
 
-    % Get colormaps (8 colors each)
-    cmap_I = inhibitory_colormap(8);
-    cmap_E = excitatory_colormap(8);
-    
-    % Plot inhibitory neurons first (background layer) with LineWidth 1.0
-    plot_lines_with_colormap(t, u.I, cmap_I, 'LineWidth', 1.0);
-    
-    % Plot excitatory neurons on top with LineWidth 1.0
-    hold on;
-    plot_lines_with_colormap(t, u.E, cmap_E, 'LineWidth', 1.0);
-    hold off;
-    ylabel('stim');
-    
-    % Set yticks to match ylim
-    yl = ylim;
-    yticks(yl);
+% Get colormaps (8 colors each)
+cmap_I = inhibitory_colormap(8);
+cmap_E = excitatory_colormap(8);
+
+% Plot inhibitory neurons first (background layer) with LineWidth 1.0
+plot_lines_with_colormap(t, u.I, cmap_I, 'LineWidth', 1.0);
+
+% Plot excitatory neurons on top with LineWidth 1.0
+hold on;
+plot_lines_with_colormap(t, u.E, cmap_E, 'LineWidth', 1.0);
+hold off;
+ylabel('stim');
+
+% Set yticks to match ylim
+yl = ylim;
+yticks(yl);
 end
 
 
