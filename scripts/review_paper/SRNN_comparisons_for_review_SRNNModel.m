@@ -2,8 +2,8 @@ close all; clear all; clc;
 setup_paths();
 
 set(groot, 'DefaultFigureColor', 'white');
-set(groot, 'DefaultAxesFontSize', 16);
-set(groot, 'DefaultTextFontSize', 16);
+set(groot, 'DefaultAxesFontSize', 14);
+set(groot, 'DefaultTextFontSize', 14);
 set(groot, 'DefaultLineLineWidth', 1.25);
 set(groot, 'DefaultAxesLineWidth', 2);
 set(groot, 'DefaultAxesTitleFontWeight', 'normal');
@@ -11,12 +11,11 @@ set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 save_figs = false;
 save_workspace = false;
 
-level_of_chaos = 1.0;
+level_of_chaos = 1.0; % gamma from somplinsky
 
-% u_ex_scale = 1.6;
-u_ex_scale = 1;
+u_ex_scale = 1; % can change scale of stimulus.
 
-rng_seeds = [42 42]; % seed 1 is for connection matrix, seed 2 is for sitmulus. Setting these ensures comparison between SFA vs SFA+STD use the same connection matrix and stimulus
+rng_seeds = [42 42]; % M.O.L., seed 1 is for connection matrix, seed 2 is for sitmulus. Setting these ensures comparison between SFA vs SFA+STD use the same connection matrix and stimulus
 
 time_config.J_periods = [false true true];  % there are three periods: no-stim, stim, no-stim.  The first no-stim period is ignored for stats and plots
 time_config.T_range = [-15, 45]; % seconds. simulation time starts at -25 seconds to allow for IC transient to settle and local lyapunov vector to alignt to dynamcis
@@ -62,9 +61,9 @@ combined_runs{2} = run4;
 [fig_handle, ~] = plot_SRNN_combined_tseries(combined_runs, 3, {'u_ex', 'x', 'br', 'a', 'b', 'lya'});
 
 % Add letters to subplots
-AddLetters2Plots(fig_handle, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)'}, 'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.065, 'VShift', -0.025);
+AddLetters2Plots(fig_handle, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)'}, 'FontSize', 16, 'FontWeight', 'normal', 'HShift', -0.06, 'VShift', -0.02);
 
-ylim([-2.5 2.5])
+ylim([-1.9 1.9]) % y limits of the local lyapunov exponent
 
 if save_figs
     save_dir_combined = fullfile('/Users/richner.thomas/Desktop/local_code/FractionalResevoir/figs', 'results_review_revised');

@@ -162,22 +162,26 @@ end
 figure('Position', [1312, 526, 600, 360]);
 ax_handles = zeros(n_plots, 1);
 
-% Compute global axis limits across all eigenvalue sets
-all_real = [];
-all_imag = [];
-for i = 1:n_plots
-    evals = eigenvalues_all{i};
-    all_real = [all_real; real(evals)];
-    all_imag = [all_imag; imag(evals)];
-end
-global_xlim = [min(all_real), max(all_real)];
-global_ylim = [min(all_imag), max(all_imag)];
+% % Compute global axis limits across all eigenvalue sets
+% all_real = [];
+% all_imag = [];
+% for i = 1:n_plots
+%     evals = eigenvalues_all{i};
+%     all_real = [all_real; real(evals)];
+%     all_imag = [all_imag; imag(evals)];
+% end
+% global_xlim = [min(all_real), max(all_real)];
+% global_ylim = [min(all_imag), max(all_imag)];
 
-% Add some padding (10% of range on each side)
-x_range = diff(global_xlim);
-y_range = diff(global_ylim);
-global_xlim = global_xlim + [-0.1, 0.1] * x_range;
-global_ylim = global_ylim + [-0.1, 0.1] * y_range;
+% % Add some padding (10% of range on each side)
+% x_range = diff(global_xlim);
+% y_range = diff(global_ylim);
+% global_xlim = global_xlim + [-0.1, 0.1] * x_range;
+% global_ylim = global_ylim + [-0.1, 0.1] * y_range;
+
+% Hard-coded global axis limits for eigenvalue plots.  hard coded so they match between SFA and SFA+STD comparisons
+global_xlim = [-28.0, 4.5];
+global_ylim = [-17.0, 17.0];
 
 for i = 1:n_plots
     ax_handles(i) = subplot(n_rows, n_cols, i);
@@ -191,8 +195,8 @@ end
 linkaxes(ax_handles, 'xy');
 
 %% Compute color limits from static W matrix (W sets the scale)
-omit_diagonal_in_J_eff = true;
-normalize_tau_d_for_J_eff = true;
+omit_diagonal_in_J_eff = false;
+normalize_tau_d_for_J_eff = false;
 
 % Prepare W matrix for plotting
 W_plot = full(model.W);
@@ -215,8 +219,8 @@ figure('Position', [1312, 940, 600, 310]);
 
 subplot(n_rows, n_cols, 1);
 imagesc(W_plot);
-colormap(bluewhitered_colormap(256));
-clim(global_clim);
+colormap(redwhiteblue_colormap(256));
+clim([-0.5, 0.5]);  % Hard-coded clim for W
 axis square;
 set(gca, 'XTick', [], 'YTick', []);
 box off;
@@ -275,8 +279,8 @@ figure('Position', [100, 100, 600, 310]);
 for i = 1:n_plots
     subplot(n_rows, n_cols, i);
     imagesc(J_eff_array(:,:,i));
-    colormap(bluewhitered_colormap(256));
-    clim(global_clim);
+    colormap(redwhiteblue_colormap(256));
+    clim([-5, 5]);  % Hard-coded clim for J_eff
     axis square;
     set(gca, 'XTick', [], 'YTick', []);
     box off;
@@ -284,15 +288,25 @@ for i = 1:n_plots
     set(gca, 'XColor', 'white', 'YColor', 'white', 'Layer', 'bottom');
 end
 
-%% Create separate colorbar figure for W and J_eff
+%% Create separate colorbar figure for W
 figure('Position', [100, 346, 285, 154], 'Color', 'white');
 ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
-colormap(bluewhitered_colormap(256));
+colormap(redwhiteblue_colormap(256));
 cb = colorbar('Location', 'east');
-clim(global_clim);
+clim([-0.5, 0.5]);
 set(gca, 'Visible', 'off', 'Color', 'none');
-set(cb, 'AxisLocation', 'out', 'Ticks', []);
-ylabel(cb, 'W / J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
+set(cb, 'AxisLocation', 'out', 'Ticks', [-0.5, 0.5]);
+ylabel(cb, 'W', 'Interpreter', 'tex', 'FontSize', 14);
+
+%% Create separate colorbar figure for J_eff
+figure('Position', [100, 500, 285, 154], 'Color', 'white');
+ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
+colormap(redwhiteblue_colormap(256));
+cb = colorbar('Location', 'east');
+clim([-5, 5]);
+set(gca, 'Visible', 'off', 'Color', 'none');
+set(cb, 'AxisLocation', 'out', 'Ticks', [-5, 5]);
+ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
 
 % %% Plot J_eff as directed graph
 % figure('Position', [300, 400, 900, 400]);
