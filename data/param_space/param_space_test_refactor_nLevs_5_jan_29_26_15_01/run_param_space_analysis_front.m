@@ -67,7 +67,7 @@ psa.model_defaults.indegree = indegree;            % Sparse connectivity
 % psa.model_defaults.f = 0.5;                   % E/I fraction
 
 % Timing
-psa.model_defaults.T_range = [-15, 45];       % Match full_SRNN_run_SRNNModel timing
+psa.model_defaults.T_range = [-20, 45];       % Longer simulation (matches review scripts)
 psa.model_defaults.fs = 100;                  % Sampling frequency
 psa.model_defaults.tau_d = 0.1;               % Dendritic time constant
 
@@ -84,7 +84,6 @@ psa.model_defaults.rescale_by_abscissa = false;
 
 % Adaptation parameters
 psa.model_defaults.c_E = 0.25/3;              % SFA strength
-psa.model_defaults.tau_a_E = logspace(log10(0.1), log10(10), 3);  % Match full_SRNN_run range
 psa.model_defaults.tau_b_E_rec = 1;           % STD recovery time for E neurons
 psa.model_defaults.tau_b_E_rel = 0.5;         % STD release time for E neurons
 
@@ -97,7 +96,7 @@ psa.model_defaults.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
 psa.model_defaults.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
 % Input configuration
-psa.model_defaults.u_ex_scale = 1.0;          % Match full_SRNN_run_SRNNModel
+psa.model_defaults.u_ex_scale = 0.75;         % External input scaling
 psa.model_defaults.input_config.n_steps = 3;
 psa.model_defaults.input_config.positive_only = true;
 psa.model_defaults.input_config.step_density = 0.15;    % Fallback density (required)
