@@ -55,7 +55,9 @@ model.mu_I_tilde = -3.5*default_tilde_val;
 model.sigma_E_tilde = default_tilde_val/1;
 model.sigma_I_tilde = default_tilde_val/1;
 model.E_W = -0.5 / sqrt(model.n * alpha * (2 - alpha));
-model.zrs_mode = 'Partial_SZRS';  % ZRS mode: 'none', 'ZRS', 'SZRS', 'Partial_SZRS'
+% model.zrs_mode = 'Partial_SZRS';  % ZRS mode: 'none', 'ZRS', 'SZRS', 'Partial_SZRS'
+model.zrs_mode = 'none';
+
 
 model.level_of_chaos = level_of_chaos;
 model.rescale_by_abscissa = false;  % Scale W so abscissa matches level_of_chaos

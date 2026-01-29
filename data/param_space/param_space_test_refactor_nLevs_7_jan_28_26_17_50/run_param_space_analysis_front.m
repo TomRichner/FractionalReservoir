@@ -26,7 +26,7 @@ setup_paths();
 %       e.g., 4 levels x 3 params x 4 conditions = 256 simulations
 
 psa = ParamSpaceAnalysis(...
-    'n_levels', 5, ...          % Number of levels per parameter
+    'n_levels', 7, ...          % Number of levels per parameter
     'batch_size', 25, ...       % Configs per batch (for checkpointing)
     'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
@@ -48,7 +48,7 @@ psa.add_grid_parameter('f', [0.4 0.6]);     % fraction of neurons that are E
 
 % Repetition index (creates unique network seeds per parameter combo)
 
-psa.add_grid_parameter('rep_idx', [1, 2]);
+% psa.add_grid_parameter('rep_idx', [1, 2]);
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
@@ -76,9 +76,8 @@ psa.model_defaults.mu_E_tilde = 3.5 * default_tilde_val;
 psa.model_defaults.mu_I_tilde = -3.5 * default_tilde_val;
 psa.model_defaults.sigma_E_tilde = default_tilde_val;
 psa.model_defaults.sigma_I_tilde = default_tilde_val;
-psa.model_defaults.E_W = -0.5 / sqrt(N * alpha * (2 - alpha));
-% psa.model_defaults.zrs_mode = 'Partial_SZRS';
-psa.model_defaults.zrs_mode = 'none';
+psa.model_defaults.E_W = 0 / sqrt(N * alpha * (2 - alpha));
+psa.model_defaults.zrs_mode = 'Partial_SZRS';
 psa.model_defaults.level_of_chaos = 1.0;      % Edge of chaos
 psa.model_defaults.rescale_by_abscissa = false;
 

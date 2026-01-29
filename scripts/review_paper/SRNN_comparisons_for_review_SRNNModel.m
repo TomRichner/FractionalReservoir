@@ -19,9 +19,10 @@ u_ex_scale = 0.75;
 
 % rng_seeds = [105 25];
 % rng_seeds = [10 10];
-rng_seeds = [100 100];
+% rng_seeds = [100 100];
+rng_seeds = [1 1];
 
-time_config.T_range = [-20, 45];
+time_config.T_range = [-25, 45];
 time_config.T_plot = [7, 45];  % Cutoff halfway through second no-stim period
 time_config.J_periods = [false true true];  % Only plot J_eff/eigenspectrum for first two periods
 
