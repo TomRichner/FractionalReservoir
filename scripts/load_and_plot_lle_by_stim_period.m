@@ -196,8 +196,9 @@ condition_titles = containers.Map(...
 fig = figure('Name', 'Mean Local LLE by Step', ...
     'Position', [100, 100, 300 * num_conditions, 350]);
 
-% Get colormap for f-value coloring (use turbo for good perceptual uniformity)
-cmap_f = parula(256);
+% Get colormap for f-value coloring (blue=low f, red=high f, gray middle)
+cmap_f = blue_gray_red_colormap(256);
+n_colors = size(cmap_f, 1);
 
 for c_idx = 1:num_conditions
     cond_name = cond_names{c_idx};
@@ -215,7 +216,7 @@ for c_idx = 1:num_conditions
             % Map f value to colormap index
             f_normalized = (f_values(sim_idx) - f_min) / (f_max - f_min);
             f_normalized = max(0, min(1, f_normalized));  % Clamp to [0, 1]
-            color_idx = round(f_normalized * 255) + 1;
+            color_idx = round(f_normalized * (n_colors - 1)) + 1;
             sim_colors(sim_idx, :) = cmap_f(color_idx, :);
         else
             % Default gray if no f variation or missing f value
