@@ -118,7 +118,7 @@ fprintf('  SFA only:                 MC = %.2f\n', MC_sfa);
 fprintf('  SFA + STD:                MC = %.2f\n', MC_full);
 
 % Create comparison figure
-figure('Position', [100, 100, 1200, 500]);
+figure();
 
 % Plot 1: R^2 vs delay for all conditions
 subplot(1, 3, 1);

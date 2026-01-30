@@ -65,7 +65,7 @@ end
 n_plots = length(subplots_to_plot);
 
 % Create figure
-fig_handle = figure('Position', [200        371        1135         726]);
+fig_handle = figure();
 tiledlayout(n_plots, 1, 'TileSpacing', 'tight', 'Padding', 'compact');
 ax_handles = gobjects(n_plots, 1);
 

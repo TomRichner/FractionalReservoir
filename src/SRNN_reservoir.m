@@ -12,22 +12,26 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 %
 % State organization: S = [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
 
-    persistent u_interpolant t_ex_last;
+    persistent u_interpolant t_ex_last u_ex_size_last;
 
     % To improve performance, create a griddedInterpolant for the external
     % input u_ex and store it in a persistent variable. This avoids
     % repeatedly setting up the interpolation on every function call.
     % The interpolant is rebuilt only if the time vector t_ex appears
-    % to have changed between simulations.
-    if isempty(u_interpolant) || isempty(t_ex_last) || ...
-       numel(t_ex_last) ~= numel(t_ex) || t_ex_last(1) ~= t_ex(1) || t_ex_last(end) ~= t_ex(end)
-        
+    % to have changed between simulations, OR if u_ex dimensions changed.
+    u_ex_size = size(u_ex);
+    needs_rebuild = isempty(u_interpolant) || isempty(t_ex_last) || ...
+       numel(t_ex_last) ~= numel(t_ex) || t_ex_last(1) ~= t_ex(1) || t_ex_last(end) ~= t_ex(end) || ...
+       isempty(u_ex_size_last) || ~isequal(u_ex_size, u_ex_size_last);
+    
+    if needs_rebuild
         % We use 'none' for extrapolation to match the behavior of the
         % previous interp1qr implementation, which returns NaN for
         % out-of-bounds queries. This can help catch errors if the
         % ODE solver attempts to step outside the defined time range of u_ex.
         u_interpolant = griddedInterpolant(t_ex, u_ex', 'linear', 'none');
         t_ex_last = t_ex;
+        u_ex_size_last = u_ex_size;
     end
 
     %% interpolate u vector

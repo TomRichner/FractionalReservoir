@@ -35,7 +35,7 @@ if has_lyapunov
 end
 
 % Create figure with tiled layout
-fig_handle = figure('Position', [200         573        1252         326]); % Slightly shorter height since fewer plots
+fig_handle = figure(); % Slightly shorter height since fewer plots
 tiledlayout(n_plots, 1);
 
 % Initialize array to store axes handles

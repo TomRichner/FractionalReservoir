@@ -44,7 +44,7 @@ if has_lyapunov
 end
 
 % Create figure with tiled layout
-fig_handle = figure('Position', [200 300 1200 800]);
+fig_handle = figure();
 tiledlayout(n_plots, 1);
 
 % Initialize array to store axes handles

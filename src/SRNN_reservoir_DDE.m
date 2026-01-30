@@ -16,13 +16,18 @@ function dS_dt = SRNN_reservoir_DDE(t, S, S_delay, t_ex, u_ex, params)
 %   params.W_components - Cell array where W_components{1} is instantaneous connectivity,
 %                         and W_components{k+1} corresponds to params.lags(k).
 
-    persistent u_interpolant t_ex_last;
+    persistent u_interpolant t_ex_last u_ex_size_last;
 
-    % Initialize interpolant if needed
-    if isempty(u_interpolant) || isempty(t_ex_last) || ...
-       numel(t_ex_last) ~= numel(t_ex) || t_ex_last(1) ~= t_ex(1) || t_ex_last(end) ~= t_ex(end)
+    % Initialize interpolant if needed - also check u_ex dimensions
+    u_ex_size = size(u_ex);
+    needs_rebuild = isempty(u_interpolant) || isempty(t_ex_last) || ...
+       numel(t_ex_last) ~= numel(t_ex) || t_ex_last(1) ~= t_ex(1) || t_ex_last(end) ~= t_ex(end) || ...
+       isempty(u_ex_size_last) || ~isequal(u_ex_size, u_ex_size_last);
+    
+    if needs_rebuild
         u_interpolant = griddedInterpolant(t_ex, u_ex', 'linear', 'none');
         t_ex_last = t_ex;
+        u_ex_size_last = u_ex_size;
     end
 
     %% 1. Interpolate external input

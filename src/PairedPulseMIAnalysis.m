@@ -256,7 +256,7 @@ classdef PairedPulseMIAnalysis < handle
                 {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
             
             % Create figure
-            fig = figure('Name', 'Paired-Pulse MI Comparison', 'Position', [100, 100, 800, 600]);
+            fig = figure('Name', 'Paired-Pulse MI Comparison');
             hold on;
             
             condition_names = fieldnames(obj.results);
@@ -519,7 +519,7 @@ classdef PairedPulseMIAnalysis < handle
                 {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
                 {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
             
-            fig = figure('Name', 'LLE and Rate Distributions', 'Position', [100, 100, 650, 1020]);
+            fig = figure('Name', 'LLE and Rate Distributions');
             
             ax_lle = gobjects(n_conditions, 1);
             ax_rate = gobjects(n_conditions, 1);
@@ -645,7 +645,7 @@ classdef PairedPulseMIAnalysis < handle
                 end
             end
             
-            fig = figure('Name', 'MI vs Delay by LLE', 'Position', [643, 500, 404, 364]);
+            fig = figure('Name', 'MI vs Delay by LLE');
             imagesc(template_delay_vec, lle_centers, mi_img);
             axis xy;
             colormap(hot);
@@ -749,7 +749,7 @@ classdef PairedPulseMIAnalysis < handle
                 end
             end
             
-            fig = figure('Name', 'LLE vs MI', 'Position', [700, 400, 380, 300]);
+            fig = figure('Name', 'LLE vs MI');
             y_neg = mi_mean - mi_ci_lower;
             y_pos = mi_ci_upper - mi_mean;
             errorbar(lle_centers, mi_mean, y_neg, y_pos, 'ko-', 'LineWidth', 1.5, 'CapSize', 4);

@@ -396,7 +396,7 @@ classdef SRNNModel < handle
             global_ylim = global_ylim + [-0.1, 0.1] * y_range;
             
             % Create figure
-            fig_handle = figure('Position', [1312, 526, 600, 360]);
+            fig_handle = figure();
             ax_handles = zeros(n_plots, 1);
             
             for i = 1:n_plots

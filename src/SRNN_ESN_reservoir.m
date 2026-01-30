@@ -374,7 +374,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
                     'No memory capacity results. Run run_memory_capacity() first.');
             end
             
-            fig_handle = figure('Position', [100, 100, 800, 400]);
+            fig_handle = figure();
             
             % Plot R^2 vs delay
             ax1 = subplot(1, 2, 1);
@@ -481,7 +481,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
             
             % Create figure
             fig_height = min(100 + 80 * n_total_plots, 1000);
-            fig_handle = figure('Position', [100, 100, 1000, fig_height]);
+            fig_handle = figure();
             tiledlayout(n_total_plots, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
             
             ax_handles = [];

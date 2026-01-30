@@ -114,7 +114,7 @@ end
 % Plot: activity over time (all neurons)
 figure(2);
 set(2,'Color', 'w')
-set(gcf,'Position',[-2302         726        1574         543])
+% set(gcf,'Position',[-2302         726        1574         543])  % Position removed to allow default screen placement
 imagesc(t_out, 1:n, X.');
 axis xy tight
 colormap turbo
@@ -127,7 +127,7 @@ ylabel('Neuron index')
 if ~strcmpi(Lya_method, 'none')
     figure(3);
     clf;
-    set(gcf,'Position',[-2244          82        1340         1000])
+    % set(gcf,'Position',[-2244          82        1340         1000])  % Position removed to allow default screen placement
 
     % Subplot 1: External input stimulus
     subplot(3,1,1)
@@ -203,7 +203,7 @@ clf;
 set(gcf, 'Color', 'w')
 eig_J_times = 50:50:tspan(2);
 num_times = length(eig_J_times);
-set(gcf, 'Position', [-2302, 100, 400*num_times, 400])
+% set(gcf, 'Position', [-2302, 100, 400*num_times, 400])  % Position removed to allow default screen placement
 
 for i = 1:num_times
     % Find closest time index in t_out
