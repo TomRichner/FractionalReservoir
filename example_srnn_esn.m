@@ -24,9 +24,10 @@ fprintf('Step 1: Generating Mackey-Glass time series...\n');
 
 % Generate chaotic time series (tau=17 for chaotic regime)
 tau_mackey = 17;
+dt = 1;  % Time step (seconds) - used for both data sampling and reservoir integration
 [t, x_mg] = generate_mackey_glass('tau', tau_mackey, ...
-                                   'n_samples', 5000, ...
-                                   'dt', 1.0, ...
+                                   'n_samples', 9000, ...
+                                   'dt', dt, ...
                                    'discard', 1000);
 
 fprintf('  Generated %d samples\n', length(x_mg));
@@ -53,7 +54,7 @@ fprintf('  Output dimension: %d\n\n', size(Y, 2));
 fprintf('Step 3: Initializing fractional reservoir ESN...\n');
 
 % Reservoir architecture
-n = 50;                    % Total number of neurons % often the best looking chaos starts art n = 100
+n = 100;                    % Total number of neurons % often the best looking chaos starts art n = 100
 fraction_E = 0.5;           % 80% excitatory
 n_E = round(n * fraction_E);
 n_I = n - n_E;
@@ -70,23 +71,34 @@ fprintf('  Adaptation timescales (E): [%s]\n', num2str(tau_a_E));
 fprintf('  Adaptation timescales (I): [%s]\n', num2str(tau_a_I));
 
 % Short-term depression parameters
-n_b_E = 1;  % Enable STD for E neurons  % can set to zero for less stability
+n_b_E = 0;  % Enable STD for E neurons  % can set to zero for less stability
 n_b_I = 0;  % No STD for I neurons
 tau_b_E_rec = 2;   % Recovery time constant
 tau_b_E_rel = 0.5;   % Release time constant
 
-fprintf('  STD enabled for E neurons (tau_rec=%.0f, tau_rel=%.0f)\n', ...
+if n_b_E ~= 0
+    fprintf('  STD enabled for E neurons (tau_rec=%.0f, tau_rel=%.0f)\n', ...
         tau_b_E_rec, tau_b_E_rel);
+else
+    fprintf('  STD disabled for E neurons\n');
+end
+
+if n_b_I ~=0
+    fprintf('  STD enabled for I neurons (tau_rec=%.0f, tau_rel=%.0f)\n', ...
+            tau_b_I_rec, tau_b_I_rel);
+else
+    fprintf('  STD disabled for I neurons\n');
+end
 
 % Dendritic time constant
-tau_d = 0.1;
+tau_d = 1;
 
 % Adaptation scaling factors
 c_E = 0.1*1/3;  % Moderate adaptation effect for E neurons % you can make this lower to allow more "free" dynamics
 c_I = 0.1;  % Weaker adaptation for I neurons
 
 % Create recurrent weight matrix W with spectral radius scaling
-rng(42);  % For reproducibility, % because 42
+  % For reproducibility, % because 42
 W = randn(n, n);
 
 % Dale's law: E neurons have positive weights, I neurons negative
@@ -97,30 +109,24 @@ W(:, n_E+1:end) = -abs(W(:, n_E+1:end));  % I columns negative
 % my create_W_matrix(params) might improve on this
 W = W-mean(W,2); % this ensures that all rows sum to zero 
 % which reduces the outlier eigs of W, and therefore "richer" dynamics which are not dominated by a single real eig or pair of eigs
-
-% Scale to desired spectral radius
-spectral_radius = 1;   %  I'd keep this at 1 here, because it is re-adjusted by level of chaos anyway.  might not matter or might be redundant.
-W_eigs = eig(W);
-rho = max(abs(W_eigs));
-W = (spectral_radius / rho) * W;
-
-fprintf('  Spectral radius: %.2f\n', spectral_radius);
-
 % Create input weight matrix with uniform random scaling
 input_scaling = 0.5;
 n_inputs = size(U, 2);
 W_in = (2 * rand(n, n_inputs) - 1) * input_scaling;
+W_in(rand(n, n_inputs) > 0.8) = 0;  % Make W_in sparse with X% of neurons getting input
 
 fprintf('  Input scaling: %.2f\n', input_scaling);
 
 % Activation function (ReLU-like with threshold)
 a_0=0.5; % bias of the activation function.
-activation_function = @(x) min(max(0, x-a_0),1); % hard sigmoid with bias to middle. Sigmoid is much better than relu for chaos, and then you don't need STD to ensure stability
+%activation_function = @(x) min(max(0, x-a_0),1); % hard sigmoid with bias to middle. Sigmoid is much better than relu for chaos, and then you don't need STD to ensure stability
+activation_function = @(x) tanh(x)+1;
 % if the sigmoid is biased to the center, then the level_of_chaos is true.  
 % if not biased to the center, then actual level of chaos is lower due to rectification or saturation
 
 %level of chaos
 level_of_chaos = 1.5; % this can go much higher up if adaptation and depression are used.  1.0 assumes no adaptation or depression
+W_eigs = eig(W);
 abscissa_0 = max(real(W_eigs)); 
 gamma = 1 / abscissa_0; % calcualtes the adjustment to make 
 
@@ -148,12 +154,14 @@ params.activation_function = activation_function;
 params.which_states = 'x';  % Use dendritic states as features (default)
 params.include_input = false;  % Don't include raw input in features
 params.lambda = 1e-6;  % Ridge regularization
+params.dt = dt;  % Time step for ODE integration (matches Mackey-Glass sampling rate)
 
 % Create ESN
 esn = SRNN_ESN(params);
 
 fprintf('  Feature extraction: using dendritic states (x)\n');
-fprintf('  Include raw input: %s\n\n', mat2str(params.include_input));
+fprintf('  Include raw input: %s\n', mat2str(params.include_input));
+fprintf('  Integration time step (dt): %.2f seconds\n\n', params.dt);
 
 %% 4. Train the Readout Layer
 fprintf('Step 4: Training readout layer...\n');
@@ -526,7 +534,7 @@ fprintf('Step 7g: Performing spectral analysis...\n');
 
 % Compute power spectral density using FFT
 n_fft = 2^nextpow2(gen_length_test);
-fs_signal = 1.0;  % Sampling frequency (matches dt=1.0)
+fs_signal = 1/dt;  % Sampling frequency in Hz (inverse of time step)
 
 % True signal spectrum
 Y_test_fft = fft(Y_test_true, n_fft);
@@ -679,7 +687,6 @@ fprintf('  SUMMARY\n');
 fprintf('=================================================================\n');
 fprintf('Reservoir Configuration:\n');
 fprintf('  - Size: %d neurons (%d E, %d I)\n', n, n_E, n_I);
-fprintf('  - Spectral radius: %.2f\n', spectral_radius);
 fprintf('  - Adaptation timescales (E): %d\n', n_a_E);
 fprintf('  - Adaptation timescales (I): %d\n', n_a_I);
 fprintf('  - STD enabled: E neurons only\n\n');

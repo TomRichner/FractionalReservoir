@@ -77,7 +77,7 @@ condition_args = { ...
     {'n_a_E', 0, 'n_b_E', 0}, ...   % Baseline: no adaptation
     {'n_a_E', 3, 'n_b_E', 0}, ...   % SFA only: 3 adaptation timescales
     {'n_a_E', 3, 'n_b_E', 1}, ...   % SFA + STD: adaptation + depression
-};
+    };
 n_cond = numel(condition_names);
 
 %% Build all conditions
@@ -119,8 +119,8 @@ end
 
 %% Comparison Plot
 colors = [0.7, 0.7, 0.7;   % Gray for baseline
-          0.3, 0.6, 0.9;   % Blue for SFA
-          0.9, 0.4, 0.3];  % Red for SFA+STD
+    0.3, 0.6, 0.9;   % Blue for SFA
+    0.9, 0.4, 0.3];  % Red for SFA+STD
 
 figure();
 

@@ -123,7 +123,7 @@ for i_g = 1:length(ax)
     hold off
 end
 axis equal
-set(f1, 'Position', [200   200   713   434])
+% set(f1, 'Position', [200   200   713   434])  % Position removed to allow default screen placement
 
 %% figure 2, modified imagesc plot of A
 % Collect all A matrix values to determine clims
@@ -207,7 +207,7 @@ end
 
 % Plot the concatenated matrix
 f2 = figure(2);
-set(f2, 'Position', [100 100 2400 1000], 'Color', 'white')
+set(f2, 'Color', 'white')  % Position removed to allow default screen placement
 ax2 = axes('Parent', f2);
 
 h = imagesc(ax2, concat_matrix);
@@ -257,7 +257,7 @@ end
 show_colorbar_ticks = false; % set to false to hide all ticks
 
 f3 = figure(3);
-set(f3, 'Position', [100 100 291 213], 'Color', 'white')
+set(f3, 'Color', 'white')  % Position removed to allow default screen placement
 ax3 = axes('Parent', f3);
 colormap(ax3, custom_cmap_white);
 cb = colorbar(ax3, 'Location', 'west');
@@ -272,7 +272,7 @@ ylabel(cb, 'Connection Strength');
 
 %% Figure 4: Histograms of A matrices (ignoring NaNs)
 f4 = figure(4);
-set(f4, 'Position', [100 100 800 400], 'Color', 'white')
+set(f4, 'Color', 'white')  % Position removed to allow default screen placement
 tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 ax4 = gobjects(length(g_to_plot), 1);
@@ -322,7 +322,7 @@ linkaxes(ax4, 'xy');
 %% Figure 5: Row sums as vertical plots
 f5 = figure(5);
 set(f5, 'Renderer', 'painters');
-set(f5, 'Position', [588         197        1200        1040], 'Color', 'white')
+set(f5, 'Color', 'white')  % Position removed to allow default screen placement
 tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 ax5 = gobjects(length(g_to_plot), 1);
@@ -380,7 +380,7 @@ bw_cmap = [0 0 0; 1 1 1];  % [black; white]
 % Plot the concatenated activation vectors
 f6 = figure(6);
 set(f6, 'Renderer', 'painters');
-set(f6, 'Position', [100 100 1200 65], 'Color', 'white')
+set(f6, 'Color', 'white')  % Position removed to allow default screen placement
 ax6 = axes('Parent', f6);
 
 h6 = imagesc(ax6, concat_activation);

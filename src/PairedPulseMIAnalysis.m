@@ -259,7 +259,7 @@ classdef PairedPulseMIAnalysis < handle
                 {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
 
             % Create figure
-            fig = figure('Name', 'Paired-Pulse MI Comparison', 'Position', [100, 100, 800, 600]);
+            fig = figure('Name', 'Paired-Pulse MI Comparison');
             hold on;
 
             condition_names = fieldnames(obj.results);

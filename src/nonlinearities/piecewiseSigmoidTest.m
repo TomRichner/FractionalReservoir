@@ -17,7 +17,7 @@ test_params = [
     1.0, 1.0;   % Hard sigmoid, shifted right
 ];
 
-figure('Position', [100, 100, 1400, 800]);
+figure();
 
 for i = 1:size(test_params, 1)
     a = test_params(i, 1);

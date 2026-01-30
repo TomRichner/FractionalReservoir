@@ -257,7 +257,7 @@ else
     n_rows = ceil(n_plots / n_cols);
 end
 
-figure('Position', [  1312         526         600         360]);
+figure();
 ax_handles = zeros(n_plots, 1);
 
 % Compute global axis limits across all eigenvalue sets
@@ -338,7 +338,7 @@ max_abs = prctile(nonzero_abs_values, 90);
 global_clim = [-max_abs, max_abs];
 
 % Create figure with same layout as eigenvalue figure
-figure('Position', [1312         940         600         310]);
+figure();
 
 for i = 1:n_plots
     subplot(n_rows, n_cols, i);
@@ -373,7 +373,7 @@ for i = 1:n_plots
 end
 
 %% Create separate colorbar figure for J_eff
-figure('Position', [100   346   285   154], 'Color', 'white');
+figure('Color', 'white');
 ax = axes('Position', [0.3, 0.1, 0.3, 0.8]);
 colormap(bluewhitered_colormap(256));
 cb = colorbar('Location', 'east');
@@ -383,7 +383,7 @@ set(cb, 'AxisLocation', 'out', 'Ticks', []);
 ylabel(cb, 'J_{eff}', 'Interpreter', 'tex', 'FontSize', 14);
 
 %% Plot J_eff as directed graph
-figure('Position', [300, 400,    900,   400]);
+figure();
 
 for i = 1:n_plots
     subplot(n_rows, n_cols, i);
@@ -406,7 +406,7 @@ for i = 1:length(J_times)
     J_eff_eigenvalues_all{i} = eig(J_eff_full_array(:,:,i));
 end
 
-figure('Position', [1312         100         600         360]);
+figure();
 ax_handles_jeff = zeros(n_plots, 1);
 
 % Compute global axis limits across all J_eff eigenvalue sets
