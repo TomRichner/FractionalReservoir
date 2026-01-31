@@ -40,7 +40,7 @@ end
 axes(ax);
 
 % Scatter plot of eigenvalues on complex plane (unfilled black circles)
-scatter(real(eigenvalues), imag(eigenvalues), 36, 'MarkerEdgeColor', [0 0 0], 'MarkerFaceColor', 'none', 'LineWidth', 0.5);
+scatter(real(eigenvalues), imag(eigenvalues), 30, 'MarkerEdgeColor', [0 0 0], 'MarkerFaceColor', 'none', 'LineWidth', 0.5);
 
 % Get axis limits (use auto-scaled if not provided)
 if isempty(x_lim)
@@ -84,5 +84,7 @@ hold off;
 
 % Set equal aspect ratio for proper circular representation
 axis equal;
+
+xlim(x_lim);
 end
 

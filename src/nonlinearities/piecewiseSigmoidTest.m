@@ -11,7 +11,7 @@ x = linspace(-2.5, 3.5, 1000);
 % Test different parameter combinations
 test_params = [
     0.0, 0.0;   % Purely quadratic, centered at 0
-    0.5, 0.0;   % Half linear, centered at 0
+    0.9, 0.4;   % Half linear, centered at 0
     0.8, 0.0;   % Mostly linear, centered at 0
     1.0, 0.0;   % Hard sigmoid, centered at 0
     1.0, 1.0;   % Hard sigmoid, shifted right

@@ -35,6 +35,7 @@ ylabel('stim');
 
 % Set yticks to match ylim
 yl = ylim;
-yticks([-0.5 0 0.5]);
+ylim(yl+[-0.05 0])
+yticks([-1 0 1]);
 end
 
