@@ -1,7 +1,7 @@
-classdef SRNN_ESN_reservoir < SRNNModel
+classdef SRNN_ESN_reservoir < SRNNModel2
     % SRNN_ESN_RESERVOIR Echo State Network reservoir with memory capacity measurement
     %
-    % This class extends SRNNModel to provide Echo State Network (ESN)
+    % This class extends SRNNModel2 to provide Echo State Network (ESN)
     % functionality with the ability to measure memory capacity using the
     % protocol described in Memory_capacity_protocol.md.
     %
@@ -57,7 +57,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
 
             % Call superclass constructor first (MATLAB requirement)
             % SRNNModel will ignore unknown properties with a warning
-            obj = obj@SRNNModel(varargin{:});
+            obj = obj@SRNNModel2(varargin{:});
 
             % Define ESN-specific property names (not in SRNNModel)
             esn_props = {'f_in', 'sigma_in', 'W_in', 'rng_seed_input', ...
@@ -84,7 +84,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
             % Extends SRNNModel.build() to also generate input weights.
 
             % Call superclass build
-            build@SRNNModel(obj);
+            build@SRNNModel2(obj);
 
             % Generate input weights
             obj.generate_input_weights();
@@ -350,7 +350,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
 
             % Define RHS function using static method (avoids OOP overhead)
             params.u_interpolant = obj.u_interpolant;
-            rhs = @(t, S) SRNNModel.dynamics_fast(t, S, params);
+            rhs = @(t, S) SRNNModel2.dynamics_fast(t, S, params);
 
             % Integrate entire trajectory at once
             fprintf('  Integrating ESN dynamics...\n');
@@ -683,7 +683,7 @@ classdef SRNN_ESN_reservoir < SRNNModel
         function reset(obj)
             % RESET Clear built state and memory capacity results
 
-            reset@SRNNModel(obj);
+            reset@SRNNModel2(obj);
             obj.W_in = [];
             obj.mc_results = [];
             fprintf('ESN reservoir reset.\n');
