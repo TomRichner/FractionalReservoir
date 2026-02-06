@@ -24,9 +24,10 @@ classdef SRNN_ESN_reservoir < SRNNModel2
         sigma_in = 0.5          % Input weight scaling parameter
         W_in                    % Input weight vector (n x 1)
         rng_seed_input = 3      % RNG seed for input weight generation
-        input_type = 'white'    % Input type: 'white' or 'bandlimited'
+        input_type = 'white'    % Input type: 'white', 'bandlimited', or 'one_over_f'
         u_f_cutoff = []         % Cutoff frequency for bandlimited input (Hz)
         % If empty, defaults to 1/(2*pi*tau_d)
+        u_alpha = 1             % Spectral exponent for 1/f^alpha noise (default=1 for pink noise)
         u_scale = 1             % Stimulus amplitude scaling
         u_offset = 0            % Stimulus DC offset
     end
@@ -62,7 +63,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % Define ESN-specific property names (not in SRNNModel)
             esn_props = {'f_in', 'sigma_in', 'W_in', 'rng_seed_input', ...
                 'T_wash', 'T_train', 'T_test', 'd_max', 'eta', 'dt_sample', ...
-                'input_type', 'u_f_cutoff', 'u_scale', 'u_offset'};
+                'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset'};
 
             % Parse ESN-specific name-value pairs
             for i = 1:2:length(varargin)
@@ -186,9 +187,63 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                     fprintf('  Using bandlimited input (f_cutoff = %.2f Hz, offset = %.2f, scale = %.2f)\n', ...
                         f_cut, obj.u_offset, obj.u_scale);
                 end
-            else
+            elseif strcmpi(obj.input_type, 'one_over_f')
+                % Generate 1/f^alpha noise using Fourier filtering method
+                % This creates noise with power spectrum ~ 1/f^alpha
+                % alpha=1: pink noise (typical EEG/SEEG)
+                % alpha=2: Brownian/red noise
+
+                alpha = obj.u_alpha;
+
+                % Generate white noise in frequency domain
+                % Use complex Gaussian (randn for both real and imaginary)
+                N = T_total;
+                X = randn(N, 1) + 1i * randn(N, 1);
+
+                % Compute frequency vector (Hz)
+                df = obj.fs / N;
+                f = (0:(N-1))' * df;
+
+                % For frequencies above Nyquist, wrap around to negative frequencies
+                f(f > obj.fs/2) = f(f > obj.fs/2) - obj.fs;
+                f = abs(f);  % Use absolute frequency for shaping
+
+                % Avoid division by zero at DC (f=0)
+                f(f < df) = df;
+
+                % Scale amplitude by 1/f^(alpha/2) to get power ~ 1/f^alpha
+                % Power spectrum = |X(f)|^2, so scaling amplitude by f^(-alpha/2)
+                % gives power spectrum ~ f^(-alpha)
+                scale_factor = f.^(-alpha/2);
+
+                % Apply scaling
+                X_shaped = X .* scale_factor;
+
+                % Ensure Hermitian symmetry for real output
+                % Set DC and Nyquist to real values
+                X_shaped(1) = real(X_shaped(1));
+                if mod(N, 2) == 0
+                    X_shaped(N/2 + 1) = real(X_shaped(N/2 + 1));
+                end
+
+                % Inverse FFT to get time-domain signal
+                u_raw = real(ifft(X_shaped));
+
+                % Normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
+                u_normalized = (u_raw - min(u_raw)) / (max(u_raw) - min(u_raw)) - 0.5;
+                u_scalar = obj.u_offset + obj.u_scale * u_normalized;
+
+                if verbose
+                    fprintf('  Using 1/f^%.2f noise input (offset = %.2f, scale = %.2f)\n', ...
+                        alpha, obj.u_offset, obj.u_scale);
+                end
+            elseif strcmpi(obj.input_type, 'white')
                 % White noise: normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
                 u_scalar = obj.u_offset + obj.u_scale * (rand(T_total, 1) - 0.5);
+            else
+                error('SRNN_ESN_reservoir:InvalidInputType', ...
+                    'Unknown input_type ''%s''. Valid options: ''white'', ''bandlimited'', ''one_over_f''', ...
+                    obj.input_type);
             end
 
             %% Step 2: Run reservoir and collect states
