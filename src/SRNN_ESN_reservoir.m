@@ -22,7 +22,6 @@ classdef SRNN_ESN_reservoir < SRNNModel2
     properties
         f_in = 0.1              % Fraction of neurons receiving input
         sigma_in = 0.5          % Input weight scaling parameter
-        W_in                    % Input weight vector (n x 1)
         rng_seed_input = 3      % RNG seed for input weight generation
         input_type = 'white'    % Input type: 'white', 'bandlimited', or 'one_over_f'
         u_f_cutoff = []         % Cutoff frequency for bandlimited input (Hz)
@@ -39,7 +38,17 @@ classdef SRNN_ESN_reservoir < SRNNModel2
         T_test = 5000           % Test samples
         d_max = 70              % Maximum delay for memory capacity
         eta = 1e-7              % Ridge regression regularization
-        dt_sample               % Sampling time step (computed from fs)
+    end
+
+    %% Dependent Properties
+    properties (Dependent)
+        dt_sample               % Sampling time step (= 1/fs)
+    end
+
+    %% Build-output Properties (set during build, not user-modifiable)
+    properties (SetAccess = protected)
+        W_in                    % Input weight vector (n x 1), set during build
+        u_scalar                % Scalar input sequence (T_total x 1), set during build
     end
 
     %% Memory Capacity Results
@@ -57,12 +66,12 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             %   esn = SRNN_ESN_reservoir('n', 200, 'd_max', 100)
 
             % Call superclass constructor first (MATLAB requirement)
-            % SRNNModel will ignore unknown properties with a warning
+            % SRNNModel2 will ignore unknown properties with a warning
             obj = obj@SRNNModel2(varargin{:});
 
-            % Define ESN-specific property names (not in SRNNModel)
-            esn_props = {'f_in', 'sigma_in', 'W_in', 'rng_seed_input', ...
-                'T_wash', 'T_train', 'T_test', 'd_max', 'eta', 'dt_sample', ...
+            % Define ESN-specific property names (not in SRNNModel2)
+            esn_props = {'f_in', 'sigma_in', 'rng_seed_input', ...
+                'T_wash', 'T_train', 'T_test', 'd_max', 'eta', ...
                 'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset'};
 
             % Parse ESN-specific name-value pairs
@@ -71,28 +80,18 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                     obj.(varargin{i}) = varargin{i+1};
                 end
             end
+        end
+    end
 
-            % Set default sampling time step
-            obj.dt_sample = 1 / obj.fs;
+    %% Dependent Property Getters
+    methods
+        function val = get.dt_sample(obj)
+            val = 1 / obj.fs;
         end
     end
 
     %% Public Methods
     methods
-        function build(obj)
-            % BUILD Initialize the ESN reservoir
-            %
-            % Extends SRNNModel.build() to also generate input weights.
-
-            % Call superclass build
-            build@SRNNModel2(obj);
-
-            % Generate input weights
-            obj.generate_input_weights();
-
-            fprintf('ESN reservoir built. Ready for memory capacity measurement.\n');
-        end
-
         function generate_input_weights(obj)
             % GENERATE_INPUT_WEIGHTS Create the input weight vector W_in
             %
@@ -149,8 +148,6 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 end
             end
 
-            T_total = obj.T_wash + obj.T_train + obj.T_test;
-
             if verbose
                 fprintf('Running memory capacity measurement...\n');
                 fprintf('  Washout: %d, Train: %d, Test: %d samples\n', ...
@@ -158,100 +155,15 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 fprintf('  Max delay: %d\n', obj.d_max);
             end
 
-            %% Step 1: Generate scalar random input sequence
-            rng(obj.rng_seeds(2));  % Use stimulus seed for reproducibility
+            % Use u_scalar generated during build
+            u_scalar = obj.u_scalar;
 
-            if strcmpi(obj.input_type, 'bandlimited')
-                % Generate zero-mean white noise for filtering
-                u_raw = rand(T_total, 1) - 0.5;
-
-                % Determine cutoff frequency
-                if isempty(obj.u_f_cutoff)
-                    f_cut = 1 / (2 * pi * obj.tau_d);
-                else
-                    f_cut = obj.u_f_cutoff;
-                end
-
-                % Design 3rd-order Butterworth low-pass filter
-                f_nyq = obj.fs / 2;
-                [b_filt, a_filt] = butter(3, f_cut / f_nyq, 'low');
-
-                % Apply zero-phase filtering
-                u_filtered = filtfilt(b_filt, a_filt, u_raw);
-
-                % Normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
-                u_normalized = (u_filtered - min(u_filtered)) / (max(u_filtered) - min(u_filtered)) - 0.5;
-                u_scalar = obj.u_offset + obj.u_scale * u_normalized;
-
-                if verbose
-                    fprintf('  Using bandlimited input (f_cutoff = %.2f Hz, offset = %.2f, scale = %.2f)\n', ...
-                        f_cut, obj.u_offset, obj.u_scale);
-                end
-            elseif strcmpi(obj.input_type, 'one_over_f')
-                % Generate 1/f^alpha noise using Fourier filtering method
-                % This creates noise with power spectrum ~ 1/f^alpha
-                % alpha=1: pink noise (typical EEG/SEEG)
-                % alpha=2: Brownian/red noise
-
-                alpha = obj.u_alpha;
-
-                % Generate white noise in frequency domain
-                % Use complex Gaussian (randn for both real and imaginary)
-                N = T_total;
-                X = randn(N, 1) + 1i * randn(N, 1);
-
-                % Compute frequency vector (Hz)
-                df = obj.fs / N;
-                f = (0:(N-1))' * df;
-
-                % For frequencies above Nyquist, wrap around to negative frequencies
-                f(f > obj.fs/2) = f(f > obj.fs/2) - obj.fs;
-                f = abs(f);  % Use absolute frequency for shaping
-
-                % Avoid division by zero at DC (f=0)
-                f(f < df) = df;
-
-                % Scale amplitude by 1/f^(alpha/2) to get power ~ 1/f^alpha
-                % Power spectrum = |X(f)|^2, so scaling amplitude by f^(-alpha/2)
-                % gives power spectrum ~ f^(-alpha)
-                scale_factor = f.^(-alpha/2);
-
-                % Apply scaling
-                X_shaped = X .* scale_factor;
-
-                % Ensure Hermitian symmetry for real output
-                % Set DC and Nyquist to real values
-                X_shaped(1) = real(X_shaped(1));
-                if mod(N, 2) == 0
-                    X_shaped(N/2 + 1) = real(X_shaped(N/2 + 1));
-                end
-
-                % Inverse FFT to get time-domain signal
-                u_raw = real(ifft(X_shaped));
-
-                % Normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
-                u_normalized = (u_raw - min(u_raw)) / (max(u_raw) - min(u_raw)) - 0.5;
-                u_scalar = obj.u_offset + obj.u_scale * u_normalized;
-
-                if verbose
-                    fprintf('  Using 1/f^%.2f noise input (offset = %.2f, scale = %.2f)\n', ...
-                        alpha, obj.u_offset, obj.u_scale);
-                end
-            elseif strcmpi(obj.input_type, 'white')
-                % White noise: normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
-                u_scalar = obj.u_offset + obj.u_scale * (rand(T_total, 1) - 0.5);
-            else
-                error('SRNN_ESN_reservoir:InvalidInputType', ...
-                    'Unknown input_type ''%s''. Valid options: ''white'', ''bandlimited'', ''one_over_f''', ...
-                    obj.input_type);
-            end
-
-            %% Step 2: Run reservoir and collect states
+            %% Step 1: Run reservoir and collect states
             if verbose
                 fprintf('  Running reservoir simulation...\n');
             end
 
-            obj.run_reservoir_esn(u_scalar);
+            obj.run_reservoir_esn();
             t_all = obj.t_out;
 
             % Unpack states using standard utility
@@ -377,23 +289,14 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             obj.mc_results = mc_results;
         end
 
-        function run_reservoir_esn(obj, u_scalar)
+        function run_reservoir_esn(obj)
             % RUN_RESERVOIR_ESN Run reservoir with single ODE integration
             %
-            % run_reservoir_esn(u_scalar)
-            %
-            % Runs the reservoir simulation using a single ODE solver call,
-            % matching the pattern used in SRNNModel.run().
-            %
-            % Inputs:
-            %   u_scalar - Scalar input sequence (T x 1)
+            % Uses pre-built stimulus (t_ex, u_interpolant, S0) from build().
             %
             % Results are stored in inherited properties:
             %   obj.S_out - State trajectory (T x N_sys_eqs)
             %   obj.t_out - Time vector (T x 1)
-
-            % Generate ESN stimulus (sets u_ex, t_ex, u_interpolant, S0)
-            obj.generate_esn_stimulus(u_scalar);
 
             params = obj.cached_params;
             dt = 1 / obj.fs;
@@ -740,37 +643,105 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             reset@SRNNModel2(obj);
             obj.W_in = [];
+            obj.u_scalar = [];
             obj.mc_results = [];
             fprintf('ESN reservoir reset.\n');
         end
     end
 
-    %% Private Methods
-    methods (Access = private)
-        function generate_esn_stimulus(obj, u_scalar)
-            % GENERATE_ESN_STIMULUS Generate ESN input stimulus from scalar input
+    %% Protected Build Sub-Methods (override parent)
+    methods (Access = protected)
+        function build_stimulus(obj)
+            % BUILD_STIMULUS Generate ESN-specific stimulus at build time
             %
-            % Builds the full u_ex matrix, t_ex time vector, u_interpolant,
-            % and initial state S0. Follows the pattern in SRNNModel.generate_stimulus().
-            %
-            % Inputs:
-            %   u_scalar - Scalar input sequence (T x 1)
+            % Overrides SRNNModel2.build_stimulus() to generate:
+            %   1. Input weight vector W_in
+            %   2. Scalar input sequence u_scalar (white/bandlimited/1_over_f)
+            %   3. Neural input matrix u_ex = W_in * u_scalar'
+            %   4. Piecewise-constant griddedInterpolant for ODE solver
+            %   5. Initial state vector S0
 
-            T = length(u_scalar);
+            % 1. Generate input weights W_in
+            obj.generate_input_weights();
+
+            % 2. Generate scalar input sequence
+            T_total = obj.T_wash + obj.T_train + obj.T_test;
+            rng(obj.rng_seeds(2));  % Use stimulus seed for reproducibility
+
+            if strcmpi(obj.input_type, 'bandlimited')
+                % Generate zero-mean white noise for filtering
+                u_raw = rand(T_total, 1) - 0.5;
+
+                % Determine cutoff frequency
+                if isempty(obj.u_f_cutoff)
+                    f_cut = 1 / (2 * pi * obj.tau_d);
+                else
+                    f_cut = obj.u_f_cutoff;
+                end
+
+                % Design 3rd-order Butterworth low-pass filter
+                f_nyq = obj.fs / 2;
+                [b_filt, a_filt] = butter(3, f_cut / f_nyq, 'low');
+
+                % Apply zero-phase filtering
+                u_filtered = filtfilt(b_filt, a_filt, u_raw);
+
+                % Normalize to [-0.5, 0.5] (zero-mean), then apply scaling and offset
+                u_normalized = (u_filtered - min(u_filtered)) / (max(u_filtered) - min(u_filtered)) - 0.5;
+                obj.u_scalar = obj.u_offset + obj.u_scale * u_normalized;
+
+                fprintf('ESN stimulus: bandlimited input (f_cutoff = %.2f Hz)\n', f_cut);
+
+            elseif strcmpi(obj.input_type, 'one_over_f')
+                % Generate 1/f^alpha noise using Fourier filtering method
+                alpha_val = obj.u_alpha;
+
+                N = T_total;
+                X = randn(N, 1) + 1i * randn(N, 1);
+
+                df = obj.fs / N;
+                f = (0:(N-1))' * df;
+                f(f > obj.fs/2) = f(f > obj.fs/2) - obj.fs;
+                f = abs(f);
+                f(f < df) = df;
+
+                scale_factor = f.^(-alpha_val/2);
+                X_shaped = X .* scale_factor;
+
+                X_shaped(1) = real(X_shaped(1));
+                if mod(N, 2) == 0
+                    X_shaped(N/2 + 1) = real(X_shaped(N/2 + 1));
+                end
+
+                u_raw = real(ifft(X_shaped));
+                u_normalized = (u_raw - min(u_raw)) / (max(u_raw) - min(u_raw)) - 0.5;
+                obj.u_scalar = obj.u_offset + obj.u_scale * u_normalized;
+
+                fprintf('ESN stimulus: 1/f^%.2f noise input\n', alpha_val);
+
+            elseif strcmpi(obj.input_type, 'white')
+                obj.u_scalar = obj.u_offset + obj.u_scale * (rand(T_total, 1) - 0.5);
+                fprintf('ESN stimulus: white noise input\n');
+            else
+                error('SRNN_ESN_reservoir:InvalidInputType', ...
+                    'Unknown input_type ''%s''. Valid options: ''white'', ''bandlimited'', ''one_over_f''', ...
+                    obj.input_type);
+            end
+
+            % 3. Map scalar input to neural input
             dt = 1 / obj.fs;
+            obj.t_ex = (0:(T_total-1))' * dt;
+            obj.u_ex = obj.W_in * obj.u_scalar';  % n x T
 
-            % Build time vector
-            obj.t_ex = (0:(T-1))' * dt;
-
-            % Map scalar input to neural input
-            obj.u_ex = obj.W_in * u_scalar';  % n x T
-
-            % Create interpolant (piecewise constant, matching ESN discrete input)
+            % 4. Create piecewise-constant interpolant for ODE solver
             obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'previous', 'nearest');
-            obj.cached_params.u_interpolant = obj.u_interpolant;
 
-            % Initialize state
-            obj.S0 = initialize_state(obj.cached_params);
+            % 5. Initialize state vector
+            params_init = obj.get_params();
+            obj.S0 = initialize_state(params_init);
+
+            fprintf('ESN stimulus built: %d samples, %d neurons receive input\n', ...
+                T_total, sum(obj.W_in ~= 0));
         end
     end
 
