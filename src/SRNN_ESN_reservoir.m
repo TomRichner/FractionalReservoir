@@ -23,7 +23,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
         f_in = 0.1              % Fraction of neurons receiving input
         sigma_in = 0.5          % Input weight scaling parameter
         rng_seed_input = 3      % RNG seed for input weight generation
-        input_type = 'white'    % Input type: 'white', 'bandlimited', or 'one_over_f'
+        input_type = 'one_over_f'    % Input type: 'white', 'bandlimited', or 'one_over_f'
         u_f_cutoff = []         % Cutoff frequency for bandlimited input (Hz)
         % If empty, defaults to 1/(2*pi*tau_d)
         u_alpha = 1             % Spectral exponent for 1/f^alpha noise (default=1 for pink noise)
@@ -733,8 +733,8 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             obj.t_ex = (0:(T_total-1))' * dt;
             obj.u_ex = obj.W_in * obj.u_scalar';  % n x T
 
-            % 4. Create piecewise-constant interpolant for ODE solver
-            obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'previous', 'nearest');
+            % 4. Create linear interpolant for ODE solver
+            obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'linear', 'none');
 
             % 5. Initialize state vector
             params_init = obj.get_params();

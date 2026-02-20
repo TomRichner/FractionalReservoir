@@ -40,7 +40,7 @@ d_max = 3*fs;                 % Maximum delay
 % Input type: 'white' (standard ESN), 'bandlimited' (fair for systems with tau_d),
 %             or 'one_over_f' (1/f^alpha noise, mimics SEEG/EEG power spectrum)
 % Bandlimited uses low-pass filtered noise matching the system bandwidth
-input_type = 'bandlimited';
+input_type = 'white'; % options: 'white', 'bandlimited', 'one_over_f'
 u_f_cutoff = 5;               % Cutoff frequency for bandlimited input (Hz)
 u_alpha = 1;                  % Spectral exponent for 1/f^alpha noise (1=pink, 2=red/Brownian)
 
