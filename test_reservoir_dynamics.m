@@ -44,7 +44,7 @@ tau_b_I_rel = 0.5;
 
 % === Network Dynamics ===
 tau_d = 0.55;                % Dendritic time constant
-level_of_chaos = 3.7;        % Chaos level (try: 0.5-2.5) - higher = more chaotic
+level_of_chaos = 1.7;        % Chaos level (try: 0.5-2.5) - higher = more chaotic
 lags = 0.03; %or 0.04
 % === Activation Function ===
 %a_0 = 0.000000001;                   % Activation bias (0.5 = centered)
@@ -475,6 +475,8 @@ fprintf('=================================================================\n\n')
 
 fprintf('Test script completed!\n');
 
+
+return
 %% 10. SPEECH RECOGNITION CLASSIFICATION TASK
 % =========================================================================
 % This section implements a speech command classification task using the
@@ -549,17 +551,21 @@ end
 % === 10.2 Audio Preprocessing ===
 fprintf('\nStep 10.2: Preprocessing audio data...\n');
 
-% Audio parameters - use frame-based features to match reservoir dynamics
+% Audio parameters - use MFCC features for spectral information
 originalFs = 16000;    % Original sample rate (16 kHz)
 intermediateSamples = 16000;  % Keep 1 second of audio at original rate first
 
-% Frame-based processing to match reservoir timescale (tau_d = 0.55s, dt = 0.1s)
-nFrames = 10;          % Number of frames (matches ~1 second with dt=0.1)
+% MFCC frame-based processing
+nCoeffs = 13;          % Number of MFCC coefficients (standard for speech)
+nFrames = 20;          % Number of temporal frames
 dt_speech = dt;        % Use same dt as reservoir (0.1s)
+mfccWindow = hamming(round(intermediateSamples / nFrames), 'periodic');  % ~320 samples (20ms)
+mfccOverlapLength = 0; % Non-overlapping to get exactly nFrames frames
 
 fprintf('  Original sample rate: %d Hz\n', originalFs);
-fprintf('  Frame-based processing: %d frames (dt=%.2fs, total=%.1fs)\n', nFrames, dt_speech, nFrames*dt_speech);
-fprintf('  This matches reservoir dynamics (tau_d=%.2fs)\n', tau_d);
+fprintf('  MFCC processing: %d frames x %d coefficients\n', nFrames, nCoeffs);
+fprintf('  Window length: %d samples (%.1f ms)\n', length(mfccWindow), length(mfccWindow)/originalFs*1000);
+fprintf('  Reservoir dt: %.2fs, total simulation: %.1fs\n', dt_speech, nFrames*dt_speech);
 
 % Balance the dataset by subsampling majority classes
 fprintf('  Balancing dataset...\n');
@@ -589,7 +595,7 @@ fprintf('  Balanced dataset size: %d samples\n', numel(adsBalanced.Files));
 % Load and preprocess all audio files into frame-based features
 fprintf('  Loading and preprocessing audio files...\n');
 numSamples = numel(adsBalanced.Files);
-audioFrames = zeros(numSamples, nFrames);  % Frame-based RMS amplitude
+audioFrames = zeros(numSamples, nFrames, nCoeffs);  % MFCC features (3D)
 audioRaw = cell(numSamples, 1);  % Keep raw audio for visualization
 labels = adsBalanced.Labels;
 
@@ -621,32 +627,36 @@ for i = 1:numSamples
     % Store raw audio for visualization
     audioRaw{i} = audio;
     
-    % Compute frame-based RMS amplitude (envelope)
-    frameSize = floor(intermediateSamples / nFrames);
-    for f = 1:nFrames
-        frameStart = (f-1) * frameSize + 1;
-        frameEnd = min(f * frameSize, intermediateSamples);
-        frameData = audio(frameStart:frameEnd);
-        % RMS amplitude of frame
-        audioFrames(i, f) = sqrt(mean(frameData.^2));
-    end
+    % Compute MFCC features (replaces single RMS scalar with 13-dim spectral features)
+    coeffs = mfcc(audio, originalFs, 'NumCoeffs', nCoeffs, ...
+        'Window', mfccWindow, 'OverlapLength', mfccOverlapLength, ...
+        'LogEnergy', 'Ignore');
     
-    % NOTE: Per-sample normalization removed - using global normalization instead
-    % This preserves relative differences between samples
+    % Truncate or pad to exactly nFrames
+    nActual = size(coeffs, 1);
+    if nActual >= nFrames
+        audioFrames(i, :, :) = coeffs(1:nFrames, :);
+    else
+        audioFrames(i, 1:nActual, :) = coeffs;
+    end
 end
 
 fprintf('  Audio preprocessing complete!\n');
 
-% Global normalization (preserves relative differences between samples)
-globalMax = max(audioFrames(:));
-globalMin = min(audioFrames(:));
-fprintf('  RMS range before normalization: [%.4f, %.4f]\n', globalMin, globalMax);
-if globalMax > 0
-    audioFrames = audioFrames / globalMax;  % Scale to [0, 1] globally
+% Z-score normalization per MFCC coefficient (equalizes scales across coefficients)
+fprintf('  Applying per-coefficient z-score normalization...\n');
+for c = 1:nCoeffs
+    coeff_data = audioFrames(:, :, c);  % (numSamples x nFrames)
+    mu = mean(coeff_data(:));
+    sigma = std(coeff_data(:)) + 1e-8;
+    audioFrames(:, :, c) = (coeff_data - mu) / sigma;
+    if c <= 3
+        fprintf('    MFCC %d: mean=%.2f, std=%.2f\n', c, mu, sigma);
+    end
 end
-fprintf('  Applied global normalization (preserves inter-sample differences)\n');
+fprintf('  Applied z-score normalization per coefficient\n');
 
-fprintf('  Frame-based data shape: %d samples x %d frames\n', size(audioFrames, 1), size(audioFrames, 2));
+fprintf('  MFCC data shape: %d samples x %d frames x %d coeffs\n', size(audioFrames, 1), size(audioFrames, 2), size(audioFrames, 3));
 
 % Split into train/validation/test sets
 fprintf('\n  Splitting dataset...\n');
@@ -666,9 +676,9 @@ trainIdx = shuffleIdx(1:nTrain);
 valIdx = shuffleIdx(nTrain+1:nTrain+nVal);
 testIdx = shuffleIdx(nTrain+nVal+1:end);
 
-audioTrain = audioFrames(trainIdx, :);
-audioVal = audioFrames(valIdx, :);
-audioTest = audioFrames(testIdx, :);
+audioTrain = audioFrames(trainIdx, :, :);
+audioVal = audioFrames(valIdx, :, :);
+audioTest = audioFrames(testIdx, :, :);
 
 % Also keep raw audio for visualization
 audioRawTrain = audioRaw(trainIdx);
@@ -719,9 +729,9 @@ fprintf('  STD: E(%d), I(%d)\n', n_b_E, n_b_I);
 % Create new input weight matrix with STRONGER scaling to drive reservoir
 % This ensures the reservoir responds differently to different inputs
 rng(123);
-input_scaling_speech = 3.0;  % Strong input scaling to overcome autonomous dynamics
-W_in_speech = (2 * rand(n, 1) - 1) * input_scaling_speech;
-fprintf('  Input scaling for speech: %.1f (stronger to drive reservoir)\n', input_scaling_speech);
+input_scaling_speech = 25.0;  % Must compete with spectral abscissa 3.7
+W_in_speech = (2 * rand(n, nCoeffs) - 1) * input_scaling_speech;
+fprintf('  Input scaling for speech: %.1f, W_in shape: (%d x %d)\n', input_scaling_speech, n, nCoeffs);
 lambda_speech = 1e-6;
 % Create ESN parameters struct reusing existing reservoir params
 params_speech = struct();
@@ -729,7 +739,7 @@ params_speech.n = n;
 params_speech.n_E = n_E;
 params_speech.n_I = n_I;
 params_speech.W = W;                             % Reuse recurrent weights
-params_speech.W_in = W_in_speech;                % New input weights for 1D audio
+params_speech.W_in = W_in_speech;                % Multi-dim input weights for MFCCs
 params_speech.tau_d = tau_d;                     % Reuse dendritic time constant
 params_speech.n_a_E = n_a_E;                     % Reuse adaptation config
 params_speech.n_a_I = n_a_I;
@@ -745,7 +755,7 @@ params_speech.c_E = c_E;                         % Reuse adaptation scaling
 params_speech.c_I = c_I;
 params_speech.lags = lags;                       % Reuse synaptic delays
 params_speech.activation_function = activation_function;  % Reuse activation
-params_speech.which_states = 'x';
+params_speech.which_states = 'r';           % Use firing rates (bounded [0,1])
 params_speech.include_input = false;
 params_speech.lambda = lambda_speech;
 params_speech.dt = dt_speech;                    % Time step for audio
@@ -766,9 +776,8 @@ function [features, stateHistory] = processAudioThroughReservoir(esn, audioSampl
     % Reset reservoir state
     esn.resetState();
     
-    % Reshape audio to column vector (n_timesteps x 1)
-    U = audioSample(:);
-    nTimesteps = length(U);
+    % audioSample is (1 x nFrames x nCoeffs) from 3D array indexing
+    U = squeeze(audioSample);  % (nFrames x nCoeffs)
     
     % Run reservoir and get full state history
     [X, ~] = esn.runReservoir(U);
@@ -783,9 +792,9 @@ end
 
 % Feature dimension = T * N (flattened reservoir states)
 nTimesteps = nFrames;  % Number of timesteps = number of audio frames
-nFeatures = nTimesteps * n;  % T * N = 10 * 210 = 2100 features
+nFeatures = nTimesteps * n;  % T * N = 20 * 210 = 4200 features
 fprintf('  Feature extraction: flattened reservoir states (T*N)\n');
-fprintf('  Timesteps: %d, Neurons: %d\n', nTimesteps, n);
+fprintf('  Timesteps: %d, Neurons: %d, Input dims: %d\n', nTimesteps, n, nCoeffs);
 fprintf('  Feature dimension: %d (%d x %d)\n', nFeatures, nTimesteps, n);
 
 % Extract features for training set
@@ -800,7 +809,7 @@ for i = 1:nTrain
         eta = elapsed / i * (nTrain - i);
         fprintf('    Sample %d/%d (ETA: %.1f sec)...\n', i, nTrain, eta);
     end
-    [XTrain(i, :), stateHistoryTrain{i}] = processAudioThroughReservoir(esn_speech, audioTrain(i, :), n);
+    [XTrain(i, :), stateHistoryTrain{i}] = processAudioThroughReservoir(esn_speech, audioTrain(i, :, :), n);
 end
 fprintf('  Training features extracted in %.1f seconds\n', toc);
 
@@ -811,7 +820,7 @@ stateHistoryVal = cell(nVal, 1);
 
 tic;
 for i = 1:nVal
-    [XVal(i, :), stateHistoryVal{i}] = processAudioThroughReservoir(esn_speech, audioVal(i, :), n);
+    [XVal(i, :), stateHistoryVal{i}] = processAudioThroughReservoir(esn_speech, audioVal(i, :, :), n);
 end
 fprintf('  Validation features extracted in %.1f seconds\n', toc);
 
@@ -822,7 +831,7 @@ stateHistoryTest = cell(nTest, 1);  % Store for visualization
 
 tic;
 for i = 1:nTest
-    [XTest(i, :), stateHistoryTest{i}] = processAudioThroughReservoir(esn_speech, audioTest(i, :), n);
+    [XTest(i, :), stateHistoryTest{i}] = processAudioThroughReservoir(esn_speech, audioTest(i, :, :), n);
 end
 fprintf('  Test features extracted in %.1f seconds\n', toc);
 
@@ -1073,39 +1082,25 @@ ylim([0 100]);
 grid on;
 xtickangle(45);
 
-% Subplot 6: Frame-based Audio Features
+% Subplot 6: MFCC Spectrogram Example
 subplot(2, 4, 6);
-nSamplesToShow = 6;
 rng(123);
-sampleIdx = randperm(nTest, min(nSamplesToShow, nTest));
+exIdx = randperm(nTest, 1);
 t_frames = (0:nFrames-1) * dt_speech;
-
-hold on;
-colors = lines(nSamplesToShow);
-for i = 1:nSamplesToShow
-    idx = sampleIdx(i);
-    offset = (i-1) * 1.2;
-    plot(t_frames, audioTest(idx, :) + offset, '-o', 'Color', colors(i,:), 'LineWidth', 1.5, 'MarkerSize', 4);
-    
-    % Add label
-    trueLabel = char(trueTest(idx));
-    predLabel = char(predTest(idx));
-    if strcmp(trueLabel, predLabel)
-        labelStr = sprintf('%s (OK)', trueLabel);
-        textColor = [0 0.5 0];
-    else
-        labelStr = sprintf('%s->%s', trueLabel, predLabel);
-        textColor = [0.8 0 0];
-    end
-    text(t_frames(end) + 0.02, offset + 0.5, labelStr, ...
-         'Color', textColor, 'FontSize', 7, 'FontWeight', 'bold');
-end
-hold off;
+mfccData = squeeze(audioTest(exIdx, :, :));  % (nFrames x nCoeffs)
+imagesc(t_frames, 1:nCoeffs, mfccData');
+colormap(gca, 'parula');
+colorbar;
 xlabel('Time (s)');
-ylabel('RMS Amplitude');
-title('Sample Predictions');
-xlim([0, max(t_frames) + 0.25]);
-grid on;
+ylabel('MFCC Coefficient');
+trueLabel = char(trueTest(exIdx));
+predLabel = char(predTest(exIdx));
+if strcmp(trueLabel, predLabel)
+    title(sprintf('MFCC: "%s" (correct)', trueLabel), 'Color', [0 0.5 0]);
+else
+    title(sprintf('MFCC: "%s"->"%s"', trueLabel, predLabel), 'Color', [0.8 0 0]);
+end
+set(gca, 'YDir', 'normal');
 
 % Subplot 7: Feature Distribution (Flattened States)
 subplot(2, 4, 7);
