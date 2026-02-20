@@ -1,0 +1,17 @@
+Run: MC_white_20260220_120636_trials50
+Input: white | n=300 | fs=200 Hz | trials=50 | d_max=3.00 s
+
+Total MC (mean ± SEM) and 95% CI:
+  Baseline: 1.607 ± 0.428 | CI [0.852, 2.524]
+  SFA: 1.802 ± 0.436 | CI [1.020, 2.712]
+  SFA+STD: 6.627 ± 0.490 | CI [5.612, 7.527]
+
+Horizon (R^2>0.10) (mean ± SEM) and 95% CI:
+  Baseline: 0.007 ± 0.002 s | CI [0.004, 0.010]
+  SFA: 0.007 ± 0.002 s | CI [0.004, 0.011]
+  SFA+STD: 0.031 ± 0.002 s | CI [0.026, 0.035]
+
+Paired permutation tests (sign-flip) on Total MC:
+  Baseline vs SFA: mean diff = -0.195 | p_perm = 0.7358 | Cohen's dz = -0.051
+  Baseline vs SFA+STD: mean diff = -5.020 | p_perm = 0 | Cohen's dz = -1.034
+  SFA vs SFA+STD: mean diff = -4.825 | p_perm = 0 | Cohen's dz = -1.232

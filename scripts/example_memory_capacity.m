@@ -122,7 +122,7 @@ colors = [0.7, 0.7, 0.7;   % Gray for baseline
           0.3, 0.6, 0.9;   % Blue for SFA
           0.9, 0.4, 0.3];  % Red for SFA+STD
 
-figure('Position', [100, 100, 1200, 500]);
+figure();
 
 % Plot 1: R^2 vs delay for all conditions
 subplot(1, 3, 1);
