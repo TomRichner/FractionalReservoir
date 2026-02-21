@@ -15,9 +15,9 @@ function psa = load_and_plot_param_space_analysis(results_dir)
 %   results_dir - Path to a param_space_* output directory
 %
 % Output:
-%   psa - The loaded ParamSpaceAnalysis object
+%   psa - The loaded ParamSpaceAnalysis2 object
 %
-% See also: ParamSpaceAnalysis, run_param_space_analysis
+% See also: ParamSpaceAnalysis2, run_param_space_analysis
 
 if nargin < 1 || isempty(results_dir)
     error('load_and_plot_param_space_analysis:NoInput', ...
@@ -42,7 +42,7 @@ if exist(psa_file, 'file')
 else
     % Fall back to creating new object and loading results
     fprintf('No psa_object.mat found. Creating new object and loading results...\n');
-    psa = ParamSpaceAnalysis();
+    psa = ParamSpaceAnalysis2();
     psa.output_dir = results_dir;
 end
 
