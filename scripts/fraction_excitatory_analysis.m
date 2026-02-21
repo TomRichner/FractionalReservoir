@@ -157,7 +157,7 @@ fig_paired_swarm = load_and_plot_lle_by_stim_period(psa.output_dir, 'transient_s
 fig_combined = concatenate_figs([figs_hist, fig_paired_swarm], 'vertical', 'HideTitlesAfterFirstRow', true);
 % Add letters to subplots (a) through (l) for 3x4 = 12 subplots
 drawnow
-AddLetters2Plots(fig_combined, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)', '(g)', '(h)', '(i)', '(j)', '(k)', '(l)'}, 'FontSize', 14, 'FontWeight', 'normal', 'HShift', -0.03, 'VShift', -0.04);
+AddLetters2Plots(fig_combined, {'(a)', '(b)', '(c)', '(d)', '(e)', '(f)', '(g)', '(h)', '(i)', '(j)', '(k)', '(l)'}, 'FontSize', 14, 'FontWeight', 'normal', 'HShift', 0, 'VShift', 0);
 
 %% Save figures
 if save_figs
