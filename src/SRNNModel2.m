@@ -282,7 +282,7 @@ classdef SRNNModel2 < handle
             % Set up ODE options
             dt = 1 / obj.fs;
             if isempty(obj.ode_opts)
-                jac_wrapper = @(t, S) compute_Jacobian_fast(S, params);
+                jac_wrapper = @(t, S) SRNNModel2.compute_Jacobian_fast(S, params);
                 obj.ode_opts = odeset('RelTol', 1e-9, 'AbsTol', 1e-9, 'MaxStep', dt, 'Jacobian', jac_wrapper);
             end
 
@@ -420,7 +420,7 @@ classdef SRNNModel2 < handle
 
             params = obj.cached_params;
 
-            [fig_handle, ax_handles] = plot_SRNN_tseries(obj.plot_data.t, obj.plot_data.u, obj.plot_data.x, obj.plot_data.r, obj.plot_data.a, obj.plot_data.b, obj.plot_data.br, params, obj.lya_results, obj.lya_method, T_plot_arg);
+            [fig_handle, ax_handles] = SRNNModel2.plot_SRNN_tseries(obj.plot_data.t, obj.plot_data.u, obj.plot_data.x, obj.plot_data.r, obj.plot_data.a, obj.plot_data.b, obj.plot_data.br, params, obj.lya_results, obj.lya_method, T_plot_arg);
         end
 
         function [fig_handle, ax_handles] = plot_eigenvalues(obj, J_times_sec)
@@ -440,7 +440,7 @@ classdef SRNNModel2 < handle
             J_times = unique(max(1, min(J_times, size(obj.S_out, 1))));
 
             fprintf('Computing Jacobian at %d time points\n', length(J_times));
-            J_array = compute_Jacobian_at_indices(obj.S_out, J_times, params);
+            J_array = SRNNModel2.compute_Jacobian_at_indices(obj.S_out, J_times, params);
 
             % Compute eigenvalues
             n_plots = length(J_times);
@@ -750,13 +750,13 @@ classdef SRNNModel2 < handle
     end
 
     %% Private Methods
-    methods (Access = private)
+    methods (Access = protected)
         function set_defaults(obj)
             % SET_DEFAULTS Initialize all properties to default values
 
             % Set default activation function (piecewiseSigmoid)
-            obj.activation_function = @(x) piecewiseSigmoid(x, obj.S_a, obj.S_c);
-            obj.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, obj.S_a, obj.S_c);
+            obj.activation_function = @(x) SRNNModel2.piecewiseSigmoid(x, obj.S_a, obj.S_c);
+            obj.activation_function_derivative = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, obj.S_a, obj.S_c);
 
             % Set default input configuration
             obj.input_config = struct();
@@ -821,7 +821,7 @@ classdef SRNNModel2 < handle
                 'E_indices', obj.E_indices, 'I_indices', obj.I_indices);
 
             % Generate stimulus
-            [u_stim, t_stim] = generate_external_input(params_stim, T_stim, obj.fs, obj.rng_seeds(2), obj.input_config);
+            [u_stim, t_stim] = SRNNModel2.generate_external_input(params_stim, T_stim, obj.fs, obj.rng_seeds(2), obj.input_config);
 
             % Handle negative start time (prepend zeros for settling)
             if obj.T_range(1) < 0
@@ -1186,34 +1186,56 @@ classdef SRNNModel2 < handle
 
         function ax = plot_eigenvalues_helper(eigenvalues, ax, time_value, x_lim, y_lim, circle_params)
             % PLOT_EIGENVALUES_HELPER Plot eigenvalue distribution on complex plane
-            % Divergent from FractionalResevoir version. Embedded to avoid conflicts.
+            % Internalized from src/plotting/plot_eigenvalues.m (Option B: 3-tier outlier coloring)
 
             if nargin < 6, circle_params = []; end
             if nargin < 5, y_lim = []; end
             if nargin < 4, x_lim = []; end
 
             axes(ax);
-            is_outlier = false(size(eigenvalues));
-            if ~isempty(circle_params) && isfield(circle_params, 'center') && isfield(circle_params, 'radius')
-                dists = abs(eigenvalues - circle_params.center);
-                is_outlier = dists > circle_params.radius;
-            end
-
+            mSize = 4;
             hold on;
-            if any(~is_outlier)
-                scatter(real(eigenvalues(~is_outlier)), imag(eigenvalues(~is_outlier)), 36, ...
-                    'MarkerEdgeColor', [0 0 0], 'MarkerFaceColor', 'none', 'LineWidth', 0.5);
-            end
-            if any(is_outlier)
-                scatter(real(eigenvalues(is_outlier)), imag(eigenvalues(is_outlier)), 36, ...
-                    'MarkerEdgeColor', [0 0 0], 'Marker', 'x', 'LineWidth', 1.0);
-            end
 
-            if ~isempty(circle_params) && isfield(circle_params, 'center') && isfield(circle_params, 'radius')
+            has_circle = ~isempty(circle_params) && isfield(circle_params, 'center') && isfield(circle_params, 'radius');
+
+            if has_circle
+                R = circle_params.radius;
+                xc = real(circle_params.center);
+                yc = imag(circle_params.center);
+
+                if isfield(circle_params, 'outlier_threshold')
+                    outlier_threshold = circle_params.outlier_threshold;
+                else
+                    outlier_threshold = 1.04;
+                end
+
+                distances = abs(eigenvalues - circle_params.center);
+
+                % Interior eigenvalues (within R): black unfilled circles
+                interior_mask = distances <= R;
+                interior_eigs = eigenvalues(interior_mask);
+                plot(real(interior_eigs), imag(interior_eigs), 'ko', 'MarkerSize', mSize, 'MarkerFaceColor', 'none', 'LineWidth', 0.5);
+
+                % Near outlier eigenvalues (between R and outlier_threshold*R): black Xs
+                near_outlier_mask = (distances > R) & (distances <= outlier_threshold * R);
+                near_outlier_eigs = eigenvalues(near_outlier_mask);
+                if ~isempty(near_outlier_eigs)
+                    plot(real(near_outlier_eigs), imag(near_outlier_eigs), 'kx', 'MarkerSize', mSize, 'LineWidth', 0.5);
+                end
+
+                % Far outlier eigenvalues (beyond outlier_threshold*R): green filled circles
+                far_outlier_mask = distances > outlier_threshold * R;
+                far_outlier_eigs = eigenvalues(far_outlier_mask);
+                if ~isempty(far_outlier_eigs)
+                    plot(real(far_outlier_eigs), imag(far_outlier_eigs), 'o', 'MarkerSize', mSize, 'MarkerFaceColor', [0 .7 0], 'MarkerEdgeColor', [0 .7 0]);
+                end
+
+                % Draw theoretical radius as solid black circle
                 theta = linspace(0, 2*pi, 100);
-                x_circ = real(circle_params.center) + circle_params.radius * cos(theta);
-                y_circ = imag(circle_params.center) + circle_params.radius * sin(theta);
-                plot(x_circ, y_circ, 'k--', 'LineWidth', 1.0);
+                plot(xc + R*cos(theta), yc + R*sin(theta), 'k-', 'LineWidth', 2);
+            else
+                % No circle params: plot all eigenvalues as black unfilled circles
+                plot(real(eigenvalues), imag(eigenvalues), 'ko', 'MarkerSize', mSize, 'MarkerFaceColor', 'none', 'LineWidth', 0.5);
             end
 
             if isempty(x_lim), x_lim = xlim; end
@@ -1423,7 +1445,7 @@ classdef SRNNModel2 < handle
                 case 'qr'
                     fprintf('Computing full Lyapunov spectrum using QR decomposition method...\n');
                     tic
-                    jacobian_wrapper = @(tt, S, p) compute_Jacobian_fast(S, p);
+                    jacobian_wrapper = @(tt, S, p) SRNNModel2.compute_Jacobian_fast(S, p);
                     [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya] = SRNNModel2.lyapunov_spectrum_qr_internal(S_out, t_out, lya_dt, params, ode_solver, opts, jacobian_wrapper, T_interval, params.N_sys_eqs, fs);
                     toc
                     fprintf('Lyapunov Dimension: %.2f\n', SRNNModel2.compute_kaplan_yorke_dimension_internal(LE_spectrum));
@@ -1710,6 +1732,860 @@ classdef SRNNModel2 < handle
                 D_KY = length(lambda);
             else
                 D_KY = j + cumsum_lambda(j) / abs(lambda(j + 1));
+            end
+        end
+    end
+
+    %% ====================================================================
+    %              INTERNALIZED ACTIVATION FUNCTIONS
+    % =====================================================================
+    % Internalized from src/nonlinearities/ to make SRNNModel2 standalone.
+
+    methods (Static)
+        function y = piecewiseSigmoid(x, a, c)
+            % PIECEWISESIGMOID A piecewise linear/quadratic sigmoid activation function.
+            % Internalized from src/nonlinearities/piecewiseSigmoid.m
+
+            if a < 0 || a > 1
+                error('Parameter "a" must be between 0 and 1.');
+            end
+            a = a / 2;
+
+            if a == 0.5
+                y_linear = (x - c) + 0.5;
+                y = min(max(y_linear, 0), 1);
+            else
+                y = zeros(size(x));
+                k = 0.5 / (1 - 2*a);
+                x1 = c + a - 1;
+                x2 = c - a;
+                x3 = c + a;
+                x4 = c + 1 - a;
+
+                mask_left_quad = (x >= x1) & (x < x2);
+                mask_linear = (x >= x2) & (x <= x3);
+                mask_right_quad = (x > x3) & (x <= x4);
+                mask_right_sat = (x > x4);
+
+                if any(mask_left_quad, 'all')
+                    y(mask_left_quad) = k * (x(mask_left_quad) - x1).^2;
+                end
+                if any(mask_linear, 'all')
+                    y(mask_linear) = (x(mask_linear) - c) + 0.5;
+                end
+                if any(mask_right_quad, 'all')
+                    y(mask_right_quad) = 1 - k * (x(mask_right_quad) - x4).^2;
+                end
+                if any(mask_right_sat, 'all')
+                    y(mask_right_sat) = 1;
+                end
+            end
+        end
+
+        function dy = piecewiseSigmoidDerivative(x, a, c)
+            % PIECEWISESIGMOIDDERIVATIVE First derivative of the piecewise sigmoid.
+            % Internalized from src/nonlinearities/piecewiseSigmoidDerivative.m
+
+            if a < 0 || a > 1
+                error('Parameter "a" must be between 0 and 1.');
+            end
+            a = a / 2;
+            dy = zeros(size(x), 'like', x);
+
+            if a == 0.5
+                breakpoint1 = c - 0.5;
+                breakpoint2 = c + 0.5;
+                mask_linear = (x >= breakpoint1) & (x <= breakpoint2);
+                dy(mask_linear) = 1;
+            else
+                k = 0.5 / (1 - 2*a);
+                x1 = c + a - 1;
+                x2 = c - a;
+                x3 = c + a;
+                x4 = c + 1 - a;
+
+                mask_left_quad = (x >= x1) & (x < x2);
+                mask_linear = (x >= x2) & (x <= x3);
+                mask_right_quad = (x > x3) & (x <= x4);
+
+                if any(mask_left_quad)
+                    dy(mask_left_quad) = 2 * k * (x(mask_left_quad) - x1);
+                end
+                if any(mask_linear)
+                    dy(mask_linear) = 1;
+                end
+                if any(mask_right_quad)
+                    dy(mask_right_quad) = -2 * k * (x(mask_right_quad) - x4);
+                end
+            end
+        end
+
+        function y = logisticSigmoid(x)
+            % LOGISTICSIGMOID Standard logistic sigmoid activation function.
+            % Internalized from src/nonlinearities/logisticSigmoid.m
+            y = 1 ./ (1 + exp(-4 * x));
+        end
+
+        function dy = logisticSigmoidDerivative(x)
+            % LOGISTICSIGMOIDDERIVATIVE First derivative of the logistic sigmoid.
+            % Internalized from src/nonlinearities/logisticSigmoidDerivative.m
+            sigmoid_val = 1 ./ (1 + exp(-4 * x));
+            dy = 4 * sigmoid_val .* (1 - sigmoid_val);
+        end
+
+        function y = tanhActivation(x)
+            % TANHACTIVATION Hyperbolic tangent activation function.
+            % Internalized from src/nonlinearities/tanhActivation.m
+            y = tanh(x);
+        end
+
+        function dy = tanhActivationDerivative(x)
+            % TANHACTIVATIONDERIVATIVE First derivative of the hyperbolic tangent.
+            % Internalized from src/nonlinearities/tanhActivationDerivative.m
+            dy = 1 - tanh(x).^2;
+        end
+    end
+
+    %% ====================================================================
+    %              INTERNALIZED STIMULUS GENERATION
+    % =====================================================================
+    % Internalized from src/generate_stimulus/ to make SRNNModel2 standalone.
+
+    methods (Static, Access = protected)
+        function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_config)
+            % GENERATE_EXTERNAL_INPUT Generate external input for SRNN simulation.
+            % Internalized from src/generate_stimulus/generate_external_input.m
+
+            % Check for custom generator function
+            if isfield(input_config, 'generator') && isa(input_config.generator, 'function_handle')
+                [u_ex, t_ex] = input_config.generator(params, T, fs, rng_seed, input_config);
+                return;
+            end
+
+            % Standard sparse step stimulus generation
+            rng(rng_seed);
+
+            dt = 1 / fs;
+            t_ex = (0:dt:T)';
+            nt = length(t_ex);
+
+            n_steps = input_config.n_steps;
+            step_density = input_config.step_density;
+            amp = input_config.amp;
+            no_stim_pattern = input_config.no_stim_pattern;
+            intrinsic_drive = input_config.intrinsic_drive;
+
+            step_period = fix(T / n_steps);
+            step_length = round(step_period * fs);
+
+            if isfield(input_config, 'positive_only') && input_config.positive_only
+                random_sparse_step = amp * abs(randn(params.n, n_steps));
+            else
+                random_sparse_step = amp * randn(params.n, n_steps);
+            end
+
+            sparse_mask = false(params.n, n_steps);
+
+            if isfield(input_config, 'step_density_E')
+                density_E = input_config.step_density_E;
+            else
+                density_E = step_density;
+            end
+
+            if isfield(input_config, 'step_density_I')
+                density_I = input_config.step_density_I;
+            else
+                density_I = step_density;
+            end
+
+            if isfield(params, 'E_indices') && isfield(params, 'I_indices')
+                E_idx = params.E_indices;
+                I_idx = params.I_indices;
+            else
+                f_val = 0.5;
+                if isfield(params, 'f')
+                    f_val = params.f;
+                end
+                n_E = round(params.n * f_val);
+                E_idx = 1:n_E;
+                I_idx = (n_E + 1):params.n;
+            end
+
+            sparse_mask(E_idx, :) = rand(length(E_idx), n_steps) < density_E;
+            sparse_mask(I_idx, :) = rand(length(I_idx), n_steps) < density_I;
+
+            random_sparse_step = random_sparse_step .* sparse_mask;
+            random_sparse_step(:, no_stim_pattern) = 0;
+
+            u_ex = zeros(params.n, nt);
+            for step_idx = 1:n_steps
+                start_idx = (step_idx - 1) * step_length + 1;
+                end_idx = min(step_idx * step_length, nt);
+                if start_idx > nt
+                    break;
+                end
+                u_ex(:, start_idx:end_idx) = repmat(random_sparse_step(:, step_idx), 1, end_idx - start_idx + 1);
+            end
+
+            u_ex = u_ex + intrinsic_drive;
+        end
+    end
+
+    %% ====================================================================
+    %              INTERNALIZED JACOBIAN COMPUTATION
+    % =====================================================================
+    % Internalized from src/algorithms/Jacobian/ to make SRNNModel2 standalone.
+
+    methods (Static)
+        function J = compute_Jacobian_fast(S, params)
+            % COMPUTE_JACOBIAN_FAST Sparse/vectorized Jacobian assembly for the SRNN system.
+            % Internalized from src/algorithms/Jacobian/compute_Jacobian_fast.m
+
+            n = params.n;
+            n_E = params.n_E;
+            n_I = params.n_I;
+            E_indices = params.E_indices;
+            I_indices = params.I_indices;
+
+            n_a_E = params.n_a_E;
+            n_a_I = params.n_a_I;
+            n_b_E = params.n_b_E;
+            n_b_I = params.n_b_I;
+
+            if n_b_E > 1 || n_b_I > 1
+                error('compute_Jacobian_fast:UnsupportedSTDStates', ...
+                      'Fast Jacobian currently supports at most one STD state per neuron.');
+            end
+
+            W = params.W;
+            tau_d = params.tau_d;
+            tau_a_E = params.tau_a_E;
+            tau_a_I = params.tau_a_I;
+            tau_b_E_rec = params.tau_b_E_rec;
+            tau_b_E_rel = params.tau_b_E_rel;
+            tau_b_I_rec = params.tau_b_I_rec;
+            tau_b_I_rel = params.tau_b_I_rel;
+
+            c_E = SRNNModel2.safe_get_param(params, 'c_E', 1.0);
+            c_I = SRNNModel2.safe_get_param(params, 'c_I', 1.0);
+
+            if ~isfield(params, 'activation_function_derivative') || ...
+               ~isa(params.activation_function_derivative, 'function_handle')
+                error('compute_Jacobian_fast:MissingActivationFunctionDerivative', ...
+                      'params.activation_function_derivative must be provided as a function handle');
+            end
+            phi_prime = params.activation_function_derivative;
+
+            if ~isfield(params, 'activation_function') || ...
+               ~isa(params.activation_function, 'function_handle')
+                error('compute_Jacobian_fast:MissingActivationFunction', ...
+                      'params.activation_function must be provided as a function handle');
+            end
+            phi_fun = params.activation_function;
+
+            %% Unpack state variables
+            current_idx = 0;
+            len_a_E = n_E * n_a_E;
+            len_a_I = n_I * n_a_I;
+            len_b_E = n_E * n_b_E;
+            len_b_I = n_I * n_b_I;
+
+            if len_a_E > 0
+                a_E = reshape(S(current_idx + (1:len_a_E)), n_E, n_a_E);
+            else
+                a_E = [];
+            end
+            current_idx = current_idx + len_a_E;
+
+            if len_a_I > 0
+                a_I = reshape(S(current_idx + (1:len_a_I)), n_I, n_a_I);
+            else
+                a_I = [];
+            end
+            current_idx = current_idx + len_a_I;
+
+            if len_b_E > 0
+                b_E = S(current_idx + (1:len_b_E));
+            else
+                b_E = [];
+            end
+            current_idx = current_idx + len_b_E;
+
+            if len_b_I > 0
+                b_I = S(current_idx + (1:len_b_I));
+            else
+                b_I = [];
+            end
+            current_idx = current_idx + len_b_I;
+
+            x = S(current_idx + (1:n));
+
+            %% Effective potentials and rates
+            x_eff = x;
+            if len_a_E > 0
+                x_eff(E_indices) = x_eff(E_indices) - c_E * sum(a_E, 2);
+            end
+            if len_a_I > 0
+                x_eff(I_indices) = x_eff(I_indices) - c_I * sum(a_I, 2);
+            end
+
+            b = ones(n, 1);
+            if len_b_E > 0
+                b(E_indices) = b_E;
+            end
+            if len_b_I > 0
+                b(I_indices) = b_I;
+            end
+
+            phi_x_eff = phi_fun(x_eff);
+            phi_prime_x_eff = phi_prime(x_eff);
+            r_vec = b .* phi_x_eff;
+
+            %% Dimensions and indexing
+            N_sys_eqs = len_a_E + len_a_I + len_b_E + len_b_I + n;
+
+            row_a_E = 1:len_a_E;
+            row_a_I = len_a_E + (1:len_a_I);
+            row_b_E = len_a_E + len_a_I + (1:len_b_E);
+            row_b_I = len_a_E + len_a_I + len_b_E + (1:len_b_I);
+            row_x   = len_a_E + len_a_I + len_b_E + len_b_I + (1:n);
+
+            col_a_E = row_a_E;
+            col_a_I = row_a_I;
+            col_b_E = row_b_E;
+            col_b_I = row_b_I;
+            col_x   = row_x;
+
+            W_sparse = sparse(W);
+            J = sparse(N_sys_eqs, N_sys_eqs);
+
+            %% SFA blocks (E)
+            if len_a_E > 0
+                tau_inv_E = 1 ./ tau_a_E(:);
+                diag_block_E = kron(speye(n_E), spdiags(-tau_inv_E, 0, n_a_E, n_a_E));
+                gamma_E = c_E * (b(E_indices) .* phi_prime_x_eff(E_indices));
+                row_template_E = sparse(tau_inv_E * ones(1, n_a_E));
+                coupling_block_E = kron(spdiags(-gamma_E, 0, n_E, n_E), row_template_E);
+                J(row_a_E, col_a_E) = diag_block_E + coupling_block_E;
+
+                beta_E = b(E_indices) .* phi_prime_x_eff(E_indices);
+                vals = kron(beta_E, tau_inv_E);
+                rows = (1:len_a_E)';
+                cols = repelem(E_indices(:), n_a_E);
+                J(row_a_E, col_x) = sparse(rows, cols, vals, len_a_E, n);
+
+                if len_b_E > 0
+                    phi_E = phi_x_eff(E_indices);
+                    J(row_a_E, col_b_E) = kron(spdiags(phi_E, 0, n_E, n_E), sparse(tau_inv_E));
+                end
+            end
+
+            %% SFA blocks (I)
+            if len_a_I > 0
+                tau_inv_I = 1 ./ tau_a_I(:);
+                diag_block_I = kron(speye(n_I), spdiags(-tau_inv_I, 0, n_a_I, n_a_I));
+                gamma_I = c_I * (b(I_indices) .* phi_prime_x_eff(I_indices));
+                row_template_I = sparse(tau_inv_I * ones(1, n_a_I));
+                coupling_block_I = kron(spdiags(-gamma_I, 0, n_I, n_I), row_template_I);
+                J(row_a_I, col_a_I) = diag_block_I + coupling_block_I;
+
+                beta_I = b(I_indices) .* phi_prime_x_eff(I_indices);
+                vals = kron(beta_I, tau_inv_I);
+                rows = (1:len_a_I)';
+                cols = repelem(I_indices(:), n_a_I);
+                J(row_a_I, col_x) = sparse(rows, cols, vals, len_a_I, n);
+
+                if len_b_I > 0
+                    phi_I = phi_x_eff(I_indices);
+                    J(row_a_I, col_b_I) = kron(spdiags(phi_I, 0, n_I, n_I), sparse(tau_inv_I));
+                end
+            end
+
+            %% STD blocks (E)
+            if len_b_E > 0
+                phi_prime_E = phi_prime_x_eff(E_indices);
+                coeff_a_E = (b(E_indices).^2) * c_E .* phi_prime_E / tau_b_E_rel;
+                if len_a_E > 0
+                    J(row_b_E, col_a_E) = kron(spdiags(coeff_a_E, 0, n_E, n_E), sparse(ones(1, n_a_E)));
+                end
+                diag_vals_b_E = -1/tau_b_E_rec - 2 * r_vec(E_indices) / tau_b_E_rel;
+                J(row_b_E, col_b_E) = spdiags(diag_vals_b_E, 0, len_b_E, len_b_E);
+                J(row_b_E, col_x) = sparse(1:n_E, E_indices, - (b(E_indices).^2) .* phi_prime_E / tau_b_E_rel, n_E, n);
+            end
+
+            %% STD blocks (I)
+            if len_b_I > 0
+                phi_prime_I = phi_prime_x_eff(I_indices);
+                coeff_a_I = (b(I_indices).^2) * c_I .* phi_prime_I / tau_b_I_rel;
+                if len_a_I > 0
+                    J(row_b_I, col_a_I) = kron(spdiags(coeff_a_I, 0, n_I, n_I), sparse(ones(1, n_a_I)));
+                end
+                diag_vals_b_I = -1/tau_b_I_rec - 2 * r_vec(I_indices) / tau_b_I_rel;
+                J(row_b_I, col_b_I) = spdiags(diag_vals_b_I, 0, len_b_I, len_b_I);
+                J(row_b_I, col_x) = sparse(1:n_I, I_indices, - (b(I_indices).^2) .* phi_prime_I / tau_b_I_rel, n_I, n);
+            end
+
+            %% dx/dt blocks
+            if len_a_E > 0
+                replicate_a_E = kron(speye(n_E), ones(1, n_a_E));
+                block = -c_E * W_sparse(:, E_indices) * spdiags(b(E_indices) .* phi_prime_x_eff(E_indices), 0, n_E, n_E);
+                J(row_x, col_a_E) = (block * replicate_a_E) / tau_d;
+            end
+
+            if len_a_I > 0
+                replicate_a_I = kron(speye(n_I), ones(1, n_a_I));
+                block = -c_I * W_sparse(:, I_indices) * spdiags(b(I_indices) .* phi_prime_x_eff(I_indices), 0, n_I, n_I);
+                J(row_x, col_a_I) = (block * replicate_a_I) / tau_d;
+            end
+
+            if len_b_E > 0
+                replicate_b_E = kron(speye(n_E), ones(1, max(1, n_b_E)));
+                block = W_sparse(:, E_indices) * spdiags(phi_x_eff(E_indices), 0, n_E, n_E);
+                J(row_x, col_b_E) = (block * replicate_b_E) / tau_d;
+            end
+
+            if len_b_I > 0
+                replicate_b_I = kron(speye(n_I), ones(1, max(1, n_b_I)));
+                block = W_sparse(:, I_indices) * spdiags(phi_x_eff(I_indices), 0, n_I, n_I);
+                J(row_x, col_b_I) = (block * replicate_b_I) / tau_d;
+            end
+
+            diag_term = spdiags(-ones(n,1)/tau_d, 0, n, n);
+            gain_diag = spdiags(b .* phi_prime_x_eff, 0, n, n);
+            J(row_x, col_x) = diag_term + (W_sparse * gain_diag) / tau_d;
+        end
+
+        function J_array = compute_Jacobian_at_indices(S_out, J_times, params)
+            % COMPUTE_JACOBIAN_AT_INDICES Computes Jacobian matrices at multiple time indices.
+            % Internalized from src/algorithms/Jacobian/compute_Jacobian_at_indices.m
+
+            N_sys_eqs = size(S_out, 2);
+            n_times = length(J_times);
+
+            nt = size(S_out, 1);
+            if any(J_times < 1) || any(J_times > nt)
+                error('J_times contains invalid indices. Must be between 1 and %d', nt);
+            end
+
+            J_array = zeros(N_sys_eqs, N_sys_eqs, n_times);
+
+            for i = 1:n_times
+                S = S_out(J_times(i), :)';
+                J_array(:,:,i) = full(SRNNModel2.compute_Jacobian_fast(S, params));
+            end
+        end
+    end
+
+    methods (Static, Access = private)
+        function value = safe_get_param(params, field, default_value)
+            % SAFE_GET_PARAM Helper to get a field from params with a default.
+            if isfield(params, field)
+                value = params.(field);
+            else
+                value = default_value;
+            end
+        end
+    end
+
+    %% ====================================================================
+    %              INTERNALIZED PLOTTING FUNCTIONS
+    % =====================================================================
+    % Internalized from src/plotting/ to make SRNNModel2 standalone.
+
+    methods (Static, Access = protected)
+        function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method, T_plot)
+            % PLOT_SRNN_TSERIES Create comprehensive time series plots for SRNN simulation.
+            % Internalized from src/plotting/plot_SRNN_tseries.m
+
+            if nargin < 11
+                T_plot = [];
+            end
+
+            % Determine which subplots are needed
+            has_adaptation = params.n_a_E > 0 || params.n_a_I > 0;
+            has_std_vars = (params.n_b_E > 0 || params.n_b_I > 0) && ~isempty(b);
+            has_synaptic_output = ~isempty(br);
+            has_lyapunov = ~strcmpi(Lya_method, 'none');
+            has_firing_rate = ~isempty(r);
+
+            n_plots = 2;  % Always: External input, Dendritic states
+            if has_firing_rate, n_plots = n_plots + 1; end
+            if has_synaptic_output, n_plots = n_plots + 1; end
+            if has_adaptation, n_plots = n_plots + 1; end
+            if has_std_vars, n_plots = n_plots + 1; end
+            if has_lyapunov, n_plots = n_plots + 1; end
+
+            fig_handle = figure();
+            tiledlayout(n_plots, 1);
+            ax_handles = [];
+
+            % Always: External input
+            ax_handles(end+1) = nexttile;
+            SRNNModel2.plot_external_input(t_out, u);
+            set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+
+            % Always: Dendritic states
+            ax_handles(end+1) = nexttile;
+            plot_mean = false;
+            if isfield(params, 'plot_mean_dendrite')
+                plot_mean = params.plot_mean_dendrite;
+            end
+            SRNNModel2.plot_dendritic_state(t_out, x, plot_mean);
+            set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+
+            % Conditionally: Firing rates
+            if has_firing_rate
+                ax_handles(end+1) = nexttile;
+                SRNNModel2.plot_firing_rate(t_out, r);
+                set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+            end
+
+            % Conditionally: Synaptic output (br)
+            if has_synaptic_output
+                ax_handles(end+1) = nexttile;
+                SRNNModel2.plot_synaptic_output(t_out, br);
+                set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+            end
+
+            % Conditionally: Adaptation variables
+            if has_adaptation
+                ax_handles(end+1) = nexttile;
+                SRNNModel2.plot_adaptation(t_out, a, params);
+                set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+            end
+
+            % Conditionally: STD variables (b)
+            if has_std_vars
+                ax_handles(end+1) = nexttile;
+                SRNNModel2.plot_std_variable(t_out, b, params);
+                set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+            end
+
+            % Conditionally: Lyapunov exponent(s)
+            if has_lyapunov
+                ax_handles(end+1) = nexttile;
+                if strcmpi(Lya_method, 'benettin')
+                    SRNNModel2.plot_lyapunov(lya_results, Lya_method, {'local', 'EOC', 'value'});
+                else
+                    SRNNModel2.plot_lyapunov(lya_results, Lya_method);
+                end
+                set(gca, 'XTick', [], 'XTickLabel', [], 'XColor', 'white');
+            end
+
+            linkaxes(ax_handles,'x');
+
+            if ~isempty(T_plot)
+                xlim(ax_handles(end), T_plot);
+            end
+
+            % Add time scale bar overlay in lower right of last subplot
+            axes(ax_handles(end));
+            hold on;
+            xlims = xlim;
+            ylims = ylim;
+
+            scale_bar_length = round(0.1 * (xlims(2) - xlims(1)));
+            if scale_bar_length < 1
+                scale_bar_length = 0.1 * (xlims(2) - xlims(1));
+            end
+
+            x_end = xlims(1) + 0.95 * (xlims(2) - xlims(1));
+            x_start = x_end - scale_bar_length;
+            y_pos = ylims(1) + 0.10 * (ylims(2) - ylims(1));
+            plot([x_start, x_end], [y_pos, y_pos], 'k-', 'LineWidth', 4);
+
+            text_x = (x_start + x_end) / 2;
+            text_y = ylims(1) + 0.05 * (ylims(2) - ylims(1));
+            text(text_x, text_y, sprintf('%g seconds', scale_bar_length), ...
+                'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
+            hold off;
+        end
+
+        function plot_external_input(t, u)
+            % PLOT_EXTERNAL_INPUT Plot external input for E and I neurons.
+            % Internalized from src/plotting/plot_external_input.m
+            cmap_I = SRNNModel2.inhibitory_colormap(8);
+            cmap_E = SRNNModel2.excitatory_colormap(8);
+            SRNNModel2.plot_lines_with_colormap(t, u.I, cmap_I);
+            hold on;
+            SRNNModel2.plot_lines_with_colormap(t, u.E, cmap_E);
+            hold off;
+            ylabel('stim');
+            yl = ylim;
+            ylim(yl+[-0.05 0])
+            yticks([-1 0 1]);
+        end
+
+        function plot_dendritic_state(t, x, plot_mean)
+            % PLOT_DENDRITIC_STATE Plot dendritic states for E and I neurons.
+            % Internalized from src/plotting/plot_dendritic_state.m
+            if nargin < 3, plot_mean = false; end
+            cmap_I = SRNNModel2.inhibitory_colormap(8);
+            cmap_E = SRNNModel2.excitatory_colormap(8);
+            SRNNModel2.plot_lines_with_colormap(t, x.I, cmap_I);
+            hold on;
+            SRNNModel2.plot_lines_with_colormap(t, x.E, cmap_E);
+            if plot_mean
+                mean_x = mean(x.E, 1);
+                plot(t, mean_x, 'k', 'LineWidth', 3);
+            end
+            hold off;
+            ylabel('dendrite');
+        end
+
+        function plot_firing_rate(t, r)
+            % PLOT_FIRING_RATE Plot firing rates for E and I neurons.
+            % Internalized from src/plotting/plot_firing_rate.m
+            cmap_I = SRNNModel2.inhibitory_colormap(8);
+            cmap_E = SRNNModel2.excitatory_colormap(8);
+            SRNNModel2.plot_lines_with_colormap(t, r.I, cmap_I);
+            hold on;
+            SRNNModel2.plot_lines_with_colormap(t, r.E, cmap_E);
+            hold off;
+            ylabel('firing rate');
+            yticks([0, 1]);
+            ylim([0, 1]);
+        end
+
+        function plot_synaptic_output(t, br)
+            % PLOT_SYNAPTIC_OUTPUT Plot synaptic output (br = b .* r) for E and I neurons.
+            % Internalized from src/plotting/plot_synaptic_output.m
+            cmap_I = SRNNModel2.inhibitory_colormap(8);
+            cmap_E = SRNNModel2.excitatory_colormap(8);
+            SRNNModel2.plot_lines_with_colormap(t, br.I, cmap_I);
+            hold on;
+            SRNNModel2.plot_lines_with_colormap(t, br.E, cmap_E);
+            hold off;
+            ylabel('synaptic output');
+            yticks([0, 1]);
+            ylim([0, 1]);
+        end
+
+        function plot_adaptation(t, a, params)
+            % PLOT_ADAPTATION Plot adaptation variables for E and I neurons.
+            % Internalized from src/plotting/plot_adaptation.m
+            cmap_I = SRNNModel2.inhibitory_colormap(8);
+            cmap_E = SRNNModel2.excitatory_colormap(8);
+            has_adaptation = false;
+
+            if ~isempty(a.I) && params.n_a_I > 0
+                a_I_sum = sum(a.I, 2);
+                a_I_summed = reshape(a_I_sum, params.n_I, []);
+                SRNNModel2.plot_lines_with_colormap(t, a_I_summed, cmap_I);
+                has_adaptation = true;
+            end
+
+            if ~isempty(a.E) && params.n_a_E > 0
+                if has_adaptation, hold on; end
+                a_E_sum = sum(a.E, 2);
+                a_E_summed = reshape(a_E_sum, params.n_E, []);
+                SRNNModel2.plot_lines_with_colormap(t, a_E_summed, cmap_E);
+                has_adaptation = true;
+            end
+
+            if has_adaptation
+                hold off;
+                ylabel('adaptation');
+            else
+                text(0.5, 0.5, 'No adaptation variables', 'HorizontalAlignment', 'center');
+                axis off;
+            end
+        end
+
+        function plot_std_variable(t, b, params)
+            % PLOT_STD_VARIABLE Plot short-term depression variables for E and I neurons.
+            % Internalized from src/plotting/plot_std_variable.m
+            cmap_I = SRNNModel2.inhibitory_colormap(8);
+            cmap_E = SRNNModel2.excitatory_colormap(8);
+            has_std = false;
+
+            if params.n_b_I > 0 && ~isempty(b.I) && size(b.I, 1) > 0
+                if ~all(b.I(:) == 1)
+                    SRNNModel2.plot_lines_with_colormap(t, b.I, cmap_I);
+                    has_std = true;
+                end
+            end
+
+            if params.n_b_E > 0 && ~isempty(b.E) && size(b.E, 1) > 0
+                if ~all(b.E(:) == 1)
+                    if has_std, hold on; end
+                    SRNNModel2.plot_lines_with_colormap(t, b.E, cmap_E);
+                    has_std = true;
+                end
+            end
+
+            if has_std
+                hold off;
+                ylabel('depression');
+                ylim([0, 1]);
+                yticks([0, 1]);
+            else
+                text(0.5, 0.5, 'No STD variables', 'HorizontalAlignment', 'center');
+                axis off;
+            end
+        end
+
+        function plot_lyapunov(lya_results, Lya_method, plot_options)
+            % PLOT_LYAPUNOV Plot Lyapunov exponent(s) on current axes.
+            % Internalized from src/plotting/plot_lyapunov.m
+
+            if nargin < 3
+                plot_options = {'local', 'asym', 'EOC', 'value'};
+            end
+
+            if strcmpi(Lya_method, 'benettin')
+                valid_options = {'local', 'asym', 'EOC', 'value'};
+                if ~iscell(plot_options)
+                    error('plot_options must be a cell array of strings');
+                end
+                for i = 1:length(plot_options)
+                    if strcmpi(plot_options{i}, 'filtered')
+                        error(['The ''filtered'' option has been removed. ', ...
+                            'Filtering now occurs in SRNNModel before decimation. ', ...
+                            'Set model.filter_local_lya = true and use ''local'' instead.']);
+                    end
+                    if ~any(strcmpi(plot_options{i}, valid_options))
+                        error('Invalid plot_option: %s. Valid options are: %s', ...
+                            plot_options{i}, strjoin(valid_options, ', '));
+                    end
+                end
+            end
+
+            if strcmpi(Lya_method, 'benettin')
+                plot_local = any(strcmpi('local', plot_options));
+                plot_asym = any(strcmpi('asym', plot_options));
+                plot_EOC = any(strcmpi('EOC', plot_options));
+                plot_value = any(strcmpi('value', plot_options));
+
+                legend_entries = {};
+                plot_started = false;
+
+                if plot_local
+                    colors = lines(1);
+                    plot(lya_results.t_lya, lya_results.local_lya, 'Color', colors(1,:))
+                    hold on
+                    plot_started = true;
+                    legend_entries{end+1} = 'Local LLE';
+                end
+
+                if plot_asym
+                    if ~plot_started, hold on; plot_started = true; end
+                    plot([lya_results.t_lya(1), lya_results.t_lya(end)], ...
+                        [lya_results.LLE, lya_results.LLE], '--r', 'LineWidth', 1.5);
+                end
+
+                if plot_EOC
+                    if ~plot_started, hold on; plot_started = true; end
+                    plot([lya_results.t_lya(1), lya_results.t_lya(end)], [0, 0], '--k');
+                end
+
+                ylabel('\lambda_1')
+
+                if plot_value
+                    ylims = ylim;
+                    xlims = xlim;
+                    text_y = 0.05 * (ylims(2) - ylims(1));
+                    text_x = xlims(2);
+                    text(text_x, text_y, ['$\lambda_1 = ' sprintf('%.2f', lya_results.LLE) '$'], ...
+                        'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom', ...
+                        'Interpreter', 'latex');
+                end
+
+                hold off
+                box off
+
+            elseif strcmpi(Lya_method, 'qr')
+                plot_data = lya_results.local_LE_spectrum_t(:, end:-1:1);
+                line_handles = plot(lya_results.t_lya, plot_data);
+                line_handles = line_handles(end:-1:1);
+
+                hold on
+                yline(0, '--k')
+                ylabel('\lambda_1')
+
+                legend_count = min(5, lya_results.params.N_sys_eqs);
+                legend_entries = cell(1, legend_count);
+                for i = 1:legend_count
+                    legend_entries{i} = sprintf('\\lambda_{%d} = %.3f', i, lya_results.LE_spectrum(i));
+                end
+                legend(line_handles(1:legend_count), legend_entries, 'Location', 'best')
+                hold off
+                box off
+            end
+        end
+
+        function plot_lines_with_colormap(t, data, cmap, varargin)
+            % PLOT_LINES_WITH_COLORMAP Plot multiple lines with explicit colormap assignment.
+            % Internalized from src/plotting/plot_lines_with_colormap.m
+            if isempty(data), return; end
+            n_lines = size(data, 1);
+            n_colors = size(cmap, 1);
+            hold on;
+            for i = 1:n_lines
+                color_idx = mod(i - 1, n_colors) + 1;
+                plot(t, data(i, :), 'Color', cmap(color_idx, :), varargin{:});
+            end
+        end
+
+        function cmap = inhibitory_colormap(n_colors)
+            % INHIBITORY_COLORMAP Custom colormap for inhibitory neurons.
+            % Internalized from src/plotting/inhibitory_colormap.m
+            if nargin < 1, n_colors = 8; end
+            base_palette = [
+                0.00, 0.45, 0.74;
+                0.00, 0.75, 1.00;
+                0.20, 0.47, 0.62;
+                0.00, 0.50, 0.50;
+                0.30, 0.75, 0.93;
+                0.25, 0.62, 0.75;
+                0.00, 0.80, 0.80;
+                0.15, 0.55, 0.65;
+                ];
+            n_base = size(base_palette, 1);
+            if n_colors == n_base
+                cmap = base_palette;
+            elseif n_colors < n_base
+                indices = round(linspace(1, n_base, n_colors));
+                cmap = base_palette(indices, :);
+            else
+                x_base = linspace(1, n_colors, n_base);
+                x_new = 1:n_colors;
+                cmap = zeros(n_colors, 3);
+                for i = 1:3
+                    cmap(:, i) = interp1(x_base, base_palette(:, i), x_new, 'pchip');
+                end
+                cmap = max(0, min(1, cmap));
+            end
+        end
+
+        function cmap = excitatory_colormap(n_colors)
+            % EXCITATORY_COLORMAP Custom colormap for excitatory neurons.
+            % Internalized from src/plotting/excitatory_colormap.m
+            if nargin < 1, n_colors = 8; end
+            base_palette = [
+                1.00, 0.00, 0.00;
+                1.00, 0.75, 0.00;
+                0.85, 0.20, 0.45;
+                0.90, 0.10, 0.60;
+                0.90, 0.55, 0.00;
+                0.55, 0.27, 0.27;
+                0.86, 0.08, 0.24;
+                0.60, 0.15, 0.45;
+                ];
+            n_base = size(base_palette, 1);
+            if n_colors == n_base
+                cmap = base_palette;
+            elseif n_colors < n_base
+                indices = round(linspace(1, n_base, n_colors));
+                cmap = base_palette(indices, :);
+            else
+                x_base = linspace(1, n_colors, n_base);
+                x_new = 1:n_colors;
+                cmap = zeros(n_colors, 3);
+                for i = 1:3
+                    cmap(:, i) = interp1(x_base, base_palette(:, i), x_new, 'pchip');
+                end
+                cmap = max(0, min(1, cmap));
             end
         end
     end

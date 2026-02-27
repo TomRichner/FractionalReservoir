@@ -167,7 +167,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             t_all = obj.t_out;
 
             % Unpack states using standard utility
-            [x_all, a_all, b_all, r_all, br_all] = unpack_and_compute_states(obj.S_out, obj.cached_params);
+            [x_all, a_all, b_all, r_all, br_all] = obj.unpack_and_compute_states(obj.S_out, obj.cached_params);
 
             % Combine E and I firing rates for training (need n x T matrix)
             R_all = [r_all.E; r_all.I];  % n x T
@@ -445,8 +445,8 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             ax_handles = [];
 
             % Get colormaps
-            cmap_I = inhibitory_colormap(8);
-            cmap_E = excitatory_colormap(8);
+            cmap_I = SRNNModel2.inhibitory_colormap(8);
+            cmap_E = SRNNModel2.excitatory_colormap(8);
 
             %% Plot 1: Actual neural input u_ex(t)
             ax_handles(end+1) = nexttile;
@@ -459,7 +459,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 % Use a neutral colormap for input
                 n_active = size(u_ex_active, 1);
                 cmap_input = parula(max(n_active, 8));
-                plot_lines_with_colormap(t, u_ex_active, cmap_input);
+                SRNNModel2.plot_lines_with_colormap(t, u_ex_active, cmap_input);
             end
             ylabel('u_{ex}(t)');
             set(gca, 'XTickLabel', []);
@@ -471,10 +471,10 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             x_E_test = x.E(:, test_indices);
             x_I_test = x.I(:, test_indices);
             % Plot I neurons first (background)
-            plot_lines_with_colormap(t, x_I_test, cmap_I);
+            SRNNModel2.plot_lines_with_colormap(t, x_I_test, cmap_I);
             hold on;
             % Plot E neurons on top
-            plot_lines_with_colormap(t, x_E_test, cmap_E);
+            SRNNModel2.plot_lines_with_colormap(t, x_E_test, cmap_E);
             hold off;
             ylabel('dendrite');
             set(gca, 'XTickLabel', []);
@@ -484,10 +484,10 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             r_E_test = r.E(:, test_indices);
             r_I_test = r.I(:, test_indices);
             % Plot I neurons first (background)
-            plot_lines_with_colormap(t, r_I_test, cmap_I);
+            SRNNModel2.plot_lines_with_colormap(t, r_I_test, cmap_I);
             hold on;
             % Plot E neurons on top
-            plot_lines_with_colormap(t, r_E_test, cmap_E);
+            SRNNModel2.plot_lines_with_colormap(t, r_E_test, cmap_E);
             hold off;
             ylabel('firing rate');
             ylim([0, 1]);
@@ -500,10 +500,10 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 br_E_test = br.E(:, test_indices);
                 br_I_test = br.I(:, test_indices);
                 % Plot I neurons first (background)
-                plot_lines_with_colormap(t, br_I_test, cmap_I);
+                SRNNModel2.plot_lines_with_colormap(t, br_I_test, cmap_I);
                 hold on;
                 % Plot E neurons on top
-                plot_lines_with_colormap(t, br_E_test, cmap_E);
+                SRNNModel2.plot_lines_with_colormap(t, br_E_test, cmap_E);
                 hold off;
                 ylabel('synaptic output');
                 ylim([0, 1]);
@@ -522,7 +522,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                     if size(a_I_sum, 2) == 1
                         a_I_sum = a_I_sum';  % Ensure n_I x T
                     end
-                    plot_lines_with_colormap(t, a_I_sum, cmap_I);
+                    SRNNModel2.plot_lines_with_colormap(t, a_I_sum, cmap_I);
                     has_plotted = true;
                 end
                 % Plot E adaptation on top
@@ -535,7 +535,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                     if size(a_E_sum, 2) == 1
                         a_E_sum = a_E_sum';  % Ensure n_E x T
                     end
-                    plot_lines_with_colormap(t, a_E_sum, cmap_E);
+                    SRNNModel2.plot_lines_with_colormap(t, a_E_sum, cmap_E);
                 end
                 hold off;
                 ylabel('adaptation');
@@ -551,7 +551,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 if ~isempty(b.I) && params.n_b_I > 0
                     b_I_test = b.I(:, test_indices);
                     if ~all(b_I_test(:) == 1)  % Check if actual STD dynamics
-                        plot_lines_with_colormap(t, b_I_test, cmap_I);
+                        SRNNModel2.plot_lines_with_colormap(t, b_I_test, cmap_I);
                         has_plotted = true;
                     end
                 end
@@ -562,7 +562,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                         if has_plotted
                             hold on;
                         end
-                        plot_lines_with_colormap(t, b_E_test, cmap_E);
+                        SRNNModel2.plot_lines_with_colormap(t, b_E_test, cmap_E);
                     end
                 end
                 hold off;
@@ -576,7 +576,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             %% Plot (conditional): Lyapunov exponent
             if has_lyapunov
                 ax_handles(end+1) = nexttile;
-                plot_lyapunov(obj.mc_results.lya_results, 'benettin', {'local', 'EOC'});
+                SRNNModel2.plot_lyapunov(obj.mc_results.lya_results, 'benettin', {'local', 'EOC'});
                 % Add LLE value to subplot title
                 title(sprintf('\\lambda_1 = %.2f', obj.mc_results.lya_results.LLE), 'FontWeight', 'normal');
                 set(gca, 'XTickLabel', []);
@@ -738,7 +738,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             % 5. Initialize state vector
             params_init = obj.get_params();
-            obj.S0 = initialize_state(params_init);
+            obj.S0 = obj.initialize_state(params_init);
 
             fprintf('ESN stimulus built: %d samples, %d neurons receive input\n', ...
                 T_total, sum(obj.W_in ~= 0));
