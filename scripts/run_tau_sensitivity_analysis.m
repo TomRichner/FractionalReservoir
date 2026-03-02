@@ -9,9 +9,23 @@
 %
 % See also: ParamSpaceAnalysis2, SRNNModel2
 
-clear;
-clc;
-close all;
+if ~exist('master_output_dir', 'var')
+    clear;
+    clc;
+    close all;
+end
+
+%% Figure saving configuration
+if exist('master_save_figs', 'var')
+    if strcmp(master_save_figs, 'save_all_figs')
+        save_figs = true;
+    elseif strcmp(master_save_figs, 'save_no_figs')
+        save_figs = false;
+    end
+end
+if ~exist('save_figs', 'var')
+    save_figs = false;
+end
 
 %% Setup paths
 setup_paths();
@@ -66,6 +80,13 @@ psa_tau_a.plot_sensitivity('metric', 'mean_rate');
 
 save(fullfile(psa_tau_a.output_dir, 'psa_object.mat'), 'psa_tau_a');
 
+if save_figs
+    fig_dir = fullfile(psa_tau_a.output_dir, 'figures');
+    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_a', [], {'fig', 'svg'});
+    fprintf('Figures saved to %s\n', fig_dir);
+end
+close all;
+
 %% 2. tau_b_E_rec sweep — scalar parameter
 fprintf('\n========================================\n');
 fprintf('=== Tau Sensitivity: tau_b_E_rec [5, 60] ===\n');
@@ -96,6 +117,13 @@ psa_tau_b.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);
 psa_tau_b.plot_sensitivity('metric', 'mean_rate');
 
 save(fullfile(psa_tau_b.output_dir, 'psa_object.mat'), 'psa_tau_b');
+
+if save_figs
+    fig_dir = fullfile(psa_tau_b.output_dir, 'figures');
+    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_b', [], {'fig', 'svg'});
+    fprintf('Figures saved to %s\n', fig_dir);
+end
+close all;
 
 %% Summary
 fprintf('\n========================================\n');

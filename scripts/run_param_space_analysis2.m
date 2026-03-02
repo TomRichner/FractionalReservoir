@@ -13,9 +13,23 @@
 %
 % See also: ParamSpaceAnalysis2, SRNNModel2, SensitivityAnalysis
 
-clear all;
-clc;
-close all;
+if ~exist('master_output_dir', 'var')
+    clear all;
+    clc;
+    close all;
+end
+
+%% Figure saving configuration
+if exist('master_save_figs', 'var')
+    if strcmp(master_save_figs, 'save_all_figs')
+        save_figs = true;
+    elseif strcmp(master_save_figs, 'save_no_figs')
+        save_figs = false;
+    end
+end
+if ~exist('save_figs', 'var')
+    save_figs = false;
+end
 
 %% Setup paths
 setup_paths();
@@ -110,6 +124,12 @@ fprintf('PSA object saved to: %s\n', save_file);
 
 psa.plot('metric', 'LLE');
 psa.plot('metric', 'mean_rate');
+
+if save_figs
+    fig_dir = fullfile(psa.output_dir, 'figures');
+    save_some_figs_to_folder_2(fig_dir, 'param_space', [], {'fig', 'svg'});
+    fprintf('Figures saved to %s\n', fig_dir);
+end
 
 %% Display summary
 fprintf('\n=== Parameter Space Analysis Summary ===\n');

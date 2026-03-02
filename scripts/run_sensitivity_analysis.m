@@ -7,9 +7,23 @@
 %
 % See also: ParamSpaceAnalysis2, SRNNModel2
 
-clear;
-clc;
-close all;
+if ~exist('master_output_dir', 'var')
+    clear;
+    clc;
+    close all;
+end
+
+%% Figure saving configuration
+if exist('master_save_figs', 'var')
+    if strcmp(master_save_figs, 'save_all_figs')
+        save_figs = true;
+    elseif strcmp(master_save_figs, 'save_no_figs')
+        save_figs = false;
+    end
+end
+if ~exist('save_figs', 'var')
+    save_figs = false;
+end
 
 %% Setup paths
 setup_paths();
@@ -21,9 +35,9 @@ note = 'sensitivity';
 
 % Parameters to sweep: {param_name, [min, max]}
 params_to_sweep = {
-    'n',              [50, 250];
+    'n',              [100, 300];
     'f',              [0.4, 0.6];
-    'S_c'             [0, 0.6];
+    'S_c',            [0, 0.6];
 };
 
 %% Run sensitivity analysis for each parameter
@@ -69,6 +83,15 @@ for p_idx = 1:size(params_to_sweep, 1)
     save(fullfile(psa.output_dir, 'psa_object.mat'), 'psa');
 
     all_output_dirs{end+1} = psa.output_dir; %#ok<SAGROW>
+
+    % Save figures in additional formats
+    if save_figs
+        fig_dir = fullfile(psa.output_dir, 'figures');
+        save_some_figs_to_folder_2(fig_dir, ...
+            sprintf('sensitivity_%s', param_name), [], {'fig', 'svg'});
+        fprintf('Figures saved to %s\n', fig_dir);
+    end
+    close all;
 end
 
 %% Summary

@@ -27,6 +27,12 @@ if ~exist(master_output_dir, 'dir')
 end
 fprintf('Master output directory: %s\n\n', master_output_dir);
 
+% Control figure saving across all sub-scripts:
+%   'save_all_figs'            - Override all scripts to save figures
+%   'save_no_figs'             - Override all scripts to NOT save figures
+%   'follow_scripts_save_figs' - Let each script use its own save_figs setting
+master_save_figs = 'save_all_figs';
+
 %% 1. Tau Sensitivity Analysis
 fprintf('========================================\n');
 fprintf('[1/4] Running Tau Sensitivity Analysis...\n');
