@@ -17,8 +17,8 @@ close all;
 setup_paths();
 
 %% Analysis Configuration
-n_levels = 7; % 25
-n_reps = 7; % 100
+n_levels = 5; % 25
+n_reps = 2; % 100
 note = 'tau_timescales';
 
 % Condition: SFA + STD (n_a_E=3, n_b_E=1)

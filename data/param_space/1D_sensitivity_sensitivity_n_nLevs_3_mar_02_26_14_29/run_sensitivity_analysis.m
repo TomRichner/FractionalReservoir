@@ -15,15 +15,14 @@ close all;
 setup_paths();
 
 %% Analysis Configuration
-n_levels = 7;      % Number of parameter values to test
-n_reps = 7;        % Number of repetitions per level (for statistics)
+n_levels = 3;      % Number of parameter values to test
+n_reps = 3;        % Number of repetitions per level (for statistics)
 note = 'sensitivity';
 
 % Parameters to sweep: {param_name, [min, max]}
 params_to_sweep = {
     'n',              [50, 250];
     'f',              [0.4, 0.6];
-    'S_c'             [0, 0.6];
 };
 
 %% Run sensitivity analysis for each parameter
@@ -50,6 +49,9 @@ for p_idx = 1:size(params_to_sweep, 1)
     if exist('master_output_dir', 'var')
         psa.output_dir = master_output_dir;
     end
+
+    % Override defaults to ensure indegree <= min(n)
+    psa.model_defaults.indegree = 50;
 
     % Add the swept parameter and reps
     psa.add_grid_parameter(param_name, param_range);

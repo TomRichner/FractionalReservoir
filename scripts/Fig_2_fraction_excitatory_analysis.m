@@ -46,7 +46,7 @@ end
 
 %% Add parameters to the grid
 psa.add_grid_parameter('f', [0.4, 0.6]);
-psa.add_grid_parameter('reps', 1:5);
+psa.add_grid_parameter('reps', 1:3);
 
 %% Configure model defaults
 psa.model_defaults.n = N;
