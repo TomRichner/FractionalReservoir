@@ -1,5 +1,8 @@
 # SRNN Reservoir Code Structure Documentation
 
+> [!NOTE]
+> **Post-internalization state (2026-02-27).** Many standalone functions documented below have been internalized as static methods on `SRNNModel2` (commit `6e2c58f`) and `SRNN_ESN_reservoir` (commit `49945cb`). The original `src/` files still exist for backward compatibility, but the classes now call their own static methods. See [internalize_functions_into_classes.md](file:///Users/tom/Desktop/local_code/FractionalReservoir/docs/refactors/internalize_functions_into_classes.md) for the complete mapping.
+
 ## scripts/setup_paths.m
 
 ### Purpose
@@ -131,54 +134,54 @@ Dendritic states for all neurons (both excitatory and inhibitory).
 
 ### Network Size Parameters
 
-| Field | Type | Size | Description |
-|-------|------|------|-------------|
-| `n` | scalar | 1×1 | Total number of neurons (n = n_E + n_I) |
-| `n_E` | scalar | 1×1 | Number of excitatory neurons |
-| `n_I` | scalar | 1×1 | Number of inhibitory neurons |
-| `n_a_E` | scalar | 1×1 | Number of adaptation time constants for E neurons (0 to disable) |
-| `n_a_I` | scalar | 1×1 | Number of adaptation time constants for I neurons (0 to disable) |
-| `n_b_E` | scalar | 1×1 | Number of STD timescales for E neurons (0 or 1; 0 to disable) |
-| `n_b_I` | scalar | 1×1 | Number of STD timescales for I neurons (0 or 1; 0 to disable) |
+| Field   | Type   | Size | Description                                                      |
+| ------- | ------ | ---- | ---------------------------------------------------------------- |
+| `n`     | scalar | 1×1  | Total number of neurons (n = n_E + n_I)                          |
+| `n_E`   | scalar | 1×1  | Number of excitatory neurons                                     |
+| `n_I`   | scalar | 1×1  | Number of inhibitory neurons                                     |
+| `n_a_E` | scalar | 1×1  | Number of adaptation time constants for E neurons (0 to disable) |
+| `n_a_I` | scalar | 1×1  | Number of adaptation time constants for I neurons (0 to disable) |
+| `n_b_E` | scalar | 1×1  | Number of STD timescales for E neurons (0 or 1; 0 to disable)    |
+| `n_b_I` | scalar | 1×1  | Number of STD timescales for I neurons (0 or 1; 0 to disable)    |
 
 ### Neuron Indices
 
-| Field | Type | Size | Description |
-|-------|------|------|-------------|
+| Field       | Type   | Size  | Description                                       |
+| ----------- | ------ | ----- | ------------------------------------------------- |
 | `E_indices` | vector | n_E×1 | Indices of excitatory neurons in the full network |
 | `I_indices` | vector | n_I×1 | Indices of inhibitory neurons in the full network |
 
 ### Connectivity
 
-| Field | Type | Size | Description |
-|-------|------|------|-------------|
-| `W` | matrix | n×n | Connection weight matrix. `W(i,j)` is the weight from neuron j to neuron i. Should obey Dale's law (excitatory neurons have non-negative outgoing weights, inhibitory neurons have non-positive outgoing weights). |
+| Field | Type   | Size | Description                                                                                                                                                                                                        |
+| ----- | ------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `W`   | matrix | n×n  | Connection weight matrix. `W(i,j)` is the weight from neuron j to neuron i. Should obey Dale's law (excitatory neurons have non-negative outgoing weights, inhibitory neurons have non-positive outgoing weights). |
 
 ### Time Constants
 
-| Field | Type | Size | Description |
-|-------|------|------|-------------|
-| `tau_d` | scalar | 1×1 | Dendritic time constant (seconds) |
-| `tau_a_E` | vector | 1×n_a_E | Adaptation time constants for E neurons (seconds). Can be empty if n_a_E = 0. |
-| `tau_a_I` | vector | 1×n_a_I | Adaptation time constants for I neurons (seconds). Can be empty if n_a_I = 0. |
-| `tau_b_E_rec` | scalar | 1×1 | STD recovery time constant for E neurons (seconds). Time constant for b to recover toward 1. |
-| `tau_b_E_rel` | scalar | 1×1 | STD release time constant for E neurons (seconds). Time constant for depression during firing. |
-| `tau_b_I_rec` | scalar | 1×1 | STD recovery time constant for I neurons (seconds). Only used if n_b_I > 0. |
-| `tau_b_I_rel` | scalar | 1×1 | STD release time constant for I neurons (seconds). Only used if n_b_I > 0. |
+| Field         | Type   | Size    | Description                                                                                    |
+| ------------- | ------ | ------- | ---------------------------------------------------------------------------------------------- |
+| `tau_d`       | scalar | 1×1     | Dendritic time constant (seconds)                                                              |
+| `tau_a_E`     | vector | 1×n_a_E | Adaptation time constants for E neurons (seconds). Can be empty if n_a_E = 0.                  |
+| `tau_a_I`     | vector | 1×n_a_I | Adaptation time constants for I neurons (seconds). Can be empty if n_a_I = 0.                  |
+| `tau_b_E_rec` | scalar | 1×1     | STD recovery time constant for E neurons (seconds). Time constant for b to recover toward 1.   |
+| `tau_b_E_rel` | scalar | 1×1     | STD release time constant for E neurons (seconds). Time constant for depression during firing. |
+| `tau_b_I_rec` | scalar | 1×1     | STD recovery time constant for I neurons (seconds). Only used if n_b_I > 0.                    |
+| `tau_b_I_rel` | scalar | 1×1     | STD release time constant for I neurons (seconds). Only used if n_b_I > 0.                     |
 
 ### Adaptation and STD Scaling Parameters
 
-| Field | Type | Size | Description |
-|-------|------|------|-------------|
-| `c_E` | scalar | 1×1 | Adaptation scaling for E neurons. Multiplies the sum of adaptation variables. Default: 1.0. Typical range: 0-3. |
-| `c_I` | scalar | 1×1 | Adaptation scaling for I neurons. Multiplies the sum of adaptation variables. Default: 1.0. Typical range: 0-3. |
+| Field | Type   | Size | Description                                                                                                     |
+| ----- | ------ | ---- | --------------------------------------------------------------------------------------------------------------- |
+| `c_E` | scalar | 1×1  | Adaptation scaling for E neurons. Multiplies the sum of adaptation variables. Default: 1.0. Typical range: 0-3. |
+| `c_I` | scalar | 1×1  | Adaptation scaling for I neurons. Multiplies the sum of adaptation variables. Default: 1.0. Typical range: 0-3. |
 
 ### Activation Function
 
-| Field | Type | Size | Description |
-|-------|------|------|-------------|
-| `activation_function` | function handle | - | **[Required]** Nonlinear activation function φ. Should accept a vector and return a vector of the same size. Common choices: `@(x) tanh(x)`, `@(x) 1./(1 + exp(-4*x))` (sigmoid), `@(x) max(0, x)` (ReLU). |
-| `activation_function_derivative` | function handle | - | **[Required]** Derivative of activation function φ'(x). Required for Jacobian computation (Lyapunov analysis). Should accept a vector and return a vector of the same size. **Example**: For tanh, `@(x) 1 - tanh(x).^2`; for sigmoid, `@(x) 4*sigmoid(x).*(1 - sigmoid(x))`. |
+| Field                            | Type            | Size | Description                                                                                                                                                                                                                                                                   |
+| -------------------------------- | --------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activation_function`            | function handle | -    | **[Required]** Nonlinear activation function φ. Should accept a vector and return a vector of the same size. Common choices: `@(x) tanh(x)`, `@(x) 1./(1 + exp(-4*x))` (sigmoid), `@(x) max(0, x)` (ReLU).                                                                    |
+| `activation_function_derivative` | function handle | -    | **[Required]** Derivative of activation function φ'(x). Required for Jacobian computation (Lyapunov analysis). Should accept a vector and return a vector of the same size. **Example**: For tanh, `@(x) 1 - tanh(x).^2`; for sigmoid, `@(x) 4*sigmoid(x).*(1 - sigmoid(x))`. |
 
 ---
 
@@ -283,10 +286,13 @@ This avoids repeatedly creating the interpolant object on every function call du
 
 ---
 
-## compute_Jacobian_fast.m
+## compute_Jacobian_fast
+
+> **Now a static method:** `SRNNModel2.compute_Jacobian_fast(S, params)` (internalized from `src/algorithms/Jacobian/compute_Jacobian_fast.m`).  
+> A companion method `SRNNModel2.compute_Jacobian_at_indices(S_out, J_times, params)` wraps it for multi-timepoint computation.
 
 ### Overview
-`compute_Jacobian_fast.m` assembles the SRNN Jacobian with sparse matrices and Kronecker products. It produces the same matrix as `compute_Jacobian.m`, but the block-wise vectorization makes it far more efficient when Jacobians are needed repeatedly (e.g., Lyapunov spectrum via QR).
+Assembles the SRNN Jacobian with sparse matrices and Kronecker products. It produces the same matrix as `compute_Jacobian.m`, but the block-wise vectorization makes it far more efficient when Jacobians are needed repeatedly (e.g., Lyapunov spectrum via QR).
 
 ### Key characteristics
 - **Sparse blocks**: Each sub-block (`∂a/∂a`, `∂b/∂x`, `∂x/∂x`, …) is built with `spdiags`, `kron`, or sparse triplets. The final Jacobian is sparse, which accelerates the `J * Ψ` products integrated inside `lyapunov_spectrum_qr`.
@@ -302,9 +308,10 @@ This avoids repeatedly creating the interpolant object on every function call du
 - `∂x/∂x`: Implemented as `diag(-1/τ_d) + (W * diag(b .* φ')) / τ_d`, with both diagonal and coupling terms properly scaled by τ_d.
 
 ### Usage
-- `full_SRNN_caller.m` now evaluates both Jacobians at the initial state (printing absolute/relative differences) and uses `compute_Jacobian_fast` inside the Lyapunov wrapper.
-- `compute_Jacobian_at_indices.m` calls the fast version and converts the sparse result to dense so downstream visualization scripts remain unchanged.
-- Other scripts can opt-in by replacing calls to `compute_Jacobian` with the fast variant; for backward compatibility, keep both implementations available.
+The QR Lyapunov method references it via:
+```matlab
+jacobian_wrapper = @(tt, S, p) SRNNModel2.compute_Jacobian_fast(S, p);
+```
 
 ---
 
@@ -347,14 +354,16 @@ function [W, M, G, Z] = create_W_matrix(params)
 
 ---
 
-## initialize_state.m
+## initialize_state
+
+> **Now a protected instance method:** `obj.initialize_state(params)` on `SRNNModel2` (internalized from `src/initialize_state.m` in an earlier refactor).
 
 ### Overview
-`initialize_state.m` creates the initial state vector S0 for the SRNN with adaptation and short-term depression. Located in `src/`, it handles the complex state packing logic.
+Creates the initial state vector S0 for the SRNN with adaptation and short-term depression. Handles the complex state packing logic.
 
-### Function Signature
+### Method Signature
 ```matlab
-function S0 = initialize_state(params)
+function S0 = initialize_state(~, params)
 ```
 
 ### Inputs
@@ -372,22 +381,24 @@ function S0 = initialize_state(params)
 - **x** (dendritic): Small random values ~N(0, 0.01²) to break symmetry
 
 ### Usage
-Eliminates repetitive initialization code and ensures consistent state packing across simulations.
+Called by `build_stimulus()` during the build process. Eliminates repetitive initialization code and ensures consistent state packing across simulations.
 
 ---
 
-## generate_external_input.m
+## generate_external_input
+
+> **Now a static protected method:** `SRNNModel2.generate_external_input(params, T, fs, rng_seed, input_config)` (internalized from `src/generate_stimulus/generate_external_input.m`).
 
 ### Overview
-`generate_external_input.m` creates sparse random step function inputs for network stimulation. Located in `src/`, it provides flexible control over temporal and spatial input patterns.
+Creates sparse random step function inputs for network stimulation. Provides flexible control over temporal and spatial input patterns. Also supports custom generator functions via `input_config.generator`.
 
-### Function Signature
+### Method Signature
 ```matlab
 function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_config)
 ```
 
 ### Inputs
-- **params** (struct): Contains `n` (number of neurons)
+- **params** (struct): Contains `n` (number of neurons), `E_indices`, `I_indices`
 - **T** (scalar): Simulation duration (seconds)
 - **fs** (scalar): Sampling frequency (Hz)
 - **rng_seed** (scalar): Random seed for reproducibility
@@ -397,21 +408,24 @@ function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_c
   - `amp`: Amplitude scaling factor
   - `no_stim_pattern`: Logical array (1 × n_steps) specifying no-stim steps
   - `intrinsic_drive`: Constant background input (n × 1)
+  - `generator` (optional): Custom function handle for alternative input generation
+  - `step_density_E` / `step_density_I` (optional): Per-population density overrides
 
 ### Outputs
 - **u_ex** (n × nt matrix): External input, rows = neurons, columns = time
 - **t_ex** (nt × 1 vector): Time vector
 
 ### Algorithm
-1. Generates random step amplitudes for each (neuron, step) pair
-2. Applies spatial sparsity via step_density threshold
-3. Zeros out steps specified in no_stim_pattern
-4. Creates continuous-time signal by replicating steps
-5. Adds constant intrinsic_drive
+1. If `input_config.generator` exists, delegates to the custom generator
+2. Otherwise, generates random step amplitudes for each (neuron, step) pair
+3. Applies spatial sparsity via step_density threshold (supports separate E/I densities)
+4. Zeros out steps specified in no_stim_pattern
+5. Creates continuous-time signal by replicating steps
+6. Adds constant intrinsic_drive
 
 ### Design Features
 - **Vectorized**: Precomputes all random values for efficiency
-- **Flexible patterns**: Supports arbitrary stimulation sequences
+- **Flexible patterns**: Supports arbitrary stimulation sequences and custom generators
 - **Reproducible**: Uses dedicated RNG seed independent of network initialization
 
 ---
@@ -499,58 +513,87 @@ All outputs are structs with `.E` and `.I` fields:
 
 ## Plotting Functions
 
-The `src/plotting/` directory contains five visualization functions with a consistent interface. All functions:
+> **Now static protected methods on `SRNNModel2`** (internalized from `src/plotting/`). Called via `SRNNModel2.plot_external_input(...)`, etc. These are protected, so external code should use `obj.plot()` to generate figures.
+
+All plotting functions share a consistent interface:
 - Accept time vector and data structs with `.E` and `.I` fields
-- Use custom colormaps: `inhibitory_colormap(8)` (reds/magentas) and `excitatory_colormap(8)` (blues/greens)
+- Use custom colormaps: `SRNNModel2.inhibitory_colormap(8)` (reds/magentas) and `SRNNModel2.excitatory_colormap(8)` (blues/greens)
 - Plot inhibitory neurons first (background), then excitatory on top
 - Operate on current axes (for subplot compatibility)
 - Handle empty data gracefully
 
-### plot_external_input.m
+### plot_SRNN_tseries (orchestrator)
 
 ```matlab
-function plot_external_input(t, u)
+SRNNModel2.plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method, T_plot)
+```
+- **Purpose**: Creates the full multi-panel time series figure, calling individual plot functions below
+- **Panels**: External input, dendritic states, firing rates, synaptic output (b·r), adaptation, STD, Lyapunov (conditional)
+
+### plot_external_input
+
+```matlab
+SRNNModel2.plot_external_input(t, u)
 ```
 - **Inputs**: t (time), u (struct with .E and .I fields containing n_E/n_I × nt input)
 - **Purpose**: Visualizes external stimulation patterns
 
-### plot_dendritic_state.m
+### plot_dendritic_state
 
 ```matlab
-function plot_dendritic_state(t, x)
+SRNNModel2.plot_dendritic_state(t, x, plot_mean)
 ```
-- **Inputs**: t (time), x (struct with .E and .I fields containing n_E/n_I × nt dendritic states)
+- **Inputs**: t (time), x (struct with .E and .I fields containing n_E/n_I × nt dendritic states), plot_mean (optional boolean)
 - **Purpose**: Shows dendritic potential dynamics
 
-### plot_adaptation.m
+### plot_firing_rate
 
 ```matlab
-function plot_adaptation(t, a, params)
+SRNNModel2.plot_firing_rate(t, r)
+```
+- **Inputs**: t (time), r (struct with .E and .I fields containing n_E/n_I × nt firing rates)
+- **Purpose**: Shows neural activity patterns
+
+### plot_synaptic_output
+
+```matlab
+SRNNModel2.plot_synaptic_output(t, br)
+```
+- **Inputs**: t (time), br (struct with .E and .I fields containing n_E/n_I × nt values of b·r)
+- **Purpose**: Visualizes the combined effect of STD and firing rate
+
+### plot_adaptation
+
+```matlab
+SRNNModel2.plot_adaptation(t, a, params)
 ```
 - **Inputs**: t (time), a (struct with .E and .I fields, n_E/n_I × n_a × nt), params
 - **Purpose**: Displays adaptation variable time courses
 - **Special handling**: Loops over neurons and adaptation timescales, shows 'No adaptation variables' if disabled
 
-### plot_firing_rate.m
+### plot_std_variable
 
 ```matlab
-function plot_firing_rate(t, r)
-```
-- **Inputs**: t (time), r (struct with .E and .I fields containing n_E/n_I × nt firing rates)
-- **Purpose**: Shows neural activity patterns
-
-### plot_std_variable.m
-
-```matlab
-function plot_std_variable(t, b, params)
+SRNNModel2.plot_std_variable(t, b, params)
 ```
 - **Inputs**: t (time), b (struct with .E and .I fields containing n_E/n_I × nt STD variables), params
 - **Purpose**: Visualizes synaptic depression dynamics
 - **Special handling**: Checks if b is all ones (no actual depression), shows 'No STD variables' if disabled
 
+### plot_lyapunov
+
+```matlab
+SRNNModel2.plot_lyapunov(lya_results, Lya_method, plot_options)
+```
+- **Purpose**: Plots local/filtered Lyapunov exponents (Benettin) or full spectrum (QR)
+
+### Utility functions
+
+- `plot_lines_with_colormap(t, data, cmap, ...)` — Shared line-plotting helper used by multiple plot functions
+- `inhibitory_colormap(n_colors)` — Reds, magentas, purples (warm colors)
+- `excitatory_colormap(n_colors)` — Blues, greens, cyans (cool colors)
+
 ### Colormap Design
-- **excitatory_colormap**: Blues, greens, cyans (cool colors, positive connotation)
-- **inhibitory_colormap**: Reds, magentas, purples (warm colors, negative connotation)
 - **8 discrete colors**: Provides good visual distinction for typical neuron counts in plots
 - **Interpolation**: Automatically extends to more colors if needed
 
@@ -644,14 +687,16 @@ All plots use custom colormaps: blues/greens for excitatory, reds/magentas for i
 ### Dependencies
 
 The script uses the following functions from `src/`:
-- `create_W_matrix.m`: Connectivity matrix generation
-- `initialize_state.m`: Initial condition setup
-- `generate_external_input.m`: Input stimulus creation
-- `compute_lyapunov_exponents.m`: Lyapunov analysis wrapper
-- `unpack_and_compute_states.m`: State unpacking and firing rate computation
-- `plot_external_input.m`, `plot_dendritic_state.m`, `plot_adaptation.m`, `plot_firing_rate.m`, `plot_std_variable.m`: Visualization functions
-- `SRNN_reservoir.m`: ODE right-hand side
-- `compute_Jacobian_fast.m`: Jacobian computation
+- `RMTMatrix.m`: Random Matrix Theory connectivity generation (external class, still in `src/`)
+- `SRNN_reservoir.m`: ODE right-hand side (standalone function)
+
+The following are now **static methods on `SRNNModel2`** (previously standalone files):
+- `SRNNModel2.compute_Jacobian_fast()`: Jacobian computation
+- `SRNNModel2.generate_external_input()`: Input stimulus creation
+- `SRNNModel2.piecewiseSigmoid()` / derivatives: Activation functions
+- `SRNNModel2.plot_*()`: Visualization functions
+- `obj.initialize_state()`: Initial condition setup (protected instance method)
+- `obj.unpack_and_compute_states()`: State unpacking and firing rate computation (protected instance method)
 
 ---
 
@@ -719,15 +764,15 @@ Creates a 3-panel figure:
 
 ### Key Parameter Choices and Rationale
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| `n = 10` | Small network | Fast simulation, easy visualization |
-| `EI = 0.7` | 70% excitatory | Biologically realistic ratio |
-| `mean_in_out_degree = 5` | Moderate connectivity | Ensures strong connectivity without being fully connected |
-| `scale = 0.5/0.79782` | Weight scaling | Provides stable dynamics (not too weak, not too strong) |
-| `tau_d = 0.025` s | Fast dendritic time constant | Typical for rate models, allows quick responses |
-| `n_a_E = 3` | Multiple timescales | Captures rich adaptation dynamics |
-| `DC = 0.1` | Small positive offset | Keeps network in sensitive regime |
+| Parameter                | Value                        | Rationale                                                 |
+| ------------------------ | ---------------------------- | --------------------------------------------------------- |
+| `n = 10`                 | Small network                | Fast simulation, easy visualization                       |
+| `EI = 0.7`               | 70% excitatory               | Biologically realistic ratio                              |
+| `mean_in_out_degree = 5` | Moderate connectivity        | Ensures strong connectivity without being fully connected |
+| `scale = 0.5/0.79782`    | Weight scaling               | Provides stable dynamics (not too weak, not too strong)   |
+| `tau_d = 0.025` s        | Fast dendritic time constant | Typical for rate models, allows quick responses           |
+| `n_a_E = 3`              | Multiple timescales          | Captures rich adaptation dynamics                         |
+| `DC = 0.1`               | Small positive offset        | Keeps network in sensitive regime                         |
 
 ### Modifying for Different Configurations
 

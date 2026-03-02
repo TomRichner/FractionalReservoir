@@ -1,10 +1,13 @@
 {
 	"folders": [
 		{
-			"path": ".."
+			"path": "../../Intersect-LNNs-SRNNs"
 		},
 		{
-			"path": "../../Intersect-LNNs-SRNNs"
+			"path": "../../liquid_time_constant_networks"
+		},
+		{
+			"path": ".."
 		}
 	]
 }
