@@ -10,9 +10,22 @@
 % Each analysis saves its results to disk automatically.
 
 %% Setup
+setup_paths();
+
 fprintf('=== Starting All Analyses ===\n');
 fprintf('Start time: %s\n\n', datetime('now'));
 tic;
+
+% Create shared output directory for this run
+script_path = fileparts(mfilename('fullpath'));
+project_root = fileparts(script_path);
+dt_str = lower(datestr(now, 'mmm_dd_yy_HH_MM')); %#ok<TNOW1,DATST>
+master_output_dir = fullfile(project_root, 'data', 'param_space', ...
+    sprintf('run_all_%s', dt_str));
+if ~exist(master_output_dir, 'dir')
+    mkdir(master_output_dir);
+end
+fprintf('Master output directory: %s\n\n', master_output_dir);
 
 %% 1. Tau Sensitivity Analysis
 fprintf('========================================\n');

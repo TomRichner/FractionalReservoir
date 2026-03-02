@@ -31,6 +31,9 @@ psa = ParamSpaceAnalysis2(...
     'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
     );
+if exist('master_output_dir', 'var')
+    psa.output_dir = master_output_dir;
+end
 
 %% Add parameters to the grid
 % All combinations of these parameters will be tested

@@ -36,6 +36,10 @@ psa_tau_a = ParamSpaceAnalysis2(...
     'randomize_order', false, ...
     'verbose', true ...
     );
+psa_tau_a.folder_prefix = 'tau_sensitivity';
+if exist('master_output_dir', 'var')
+    psa_tau_a.output_dir = master_output_dir;
+end
 
 psa_tau_a.set_conditions(condition);
 
@@ -74,6 +78,10 @@ psa_tau_b = ParamSpaceAnalysis2(...
     'randomize_order', false, ...
     'verbose', true ...
     );
+psa_tau_b.folder_prefix = 'tau_sensitivity';
+if exist('master_output_dir', 'var')
+    psa_tau_b.output_dir = master_output_dir;
+end
 
 psa_tau_b.set_conditions(condition);
 

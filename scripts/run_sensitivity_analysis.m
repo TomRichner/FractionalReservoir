@@ -47,6 +47,10 @@ for p_idx = 1:size(params_to_sweep, 1)
         'randomize_order', false, ...
         'verbose', true ...
         );
+    psa.folder_prefix = '1D_sensitivity';
+    if exist('master_output_dir', 'var')
+        psa.output_dir = master_output_dir;
+    end
 
     % Add the swept parameter and reps
     psa.add_grid_parameter(param_name, param_range);

@@ -45,6 +45,7 @@ classdef ParamSpaceAnalysis2 < handle
         batch_size = 25             % Number of configs per batch
         output_dir                  % Base directory for saving results
         note = ''                   % Optional note for folder naming
+        folder_prefix = 'param_space'  % Prefix for output folder name
         store_local_lya = false     % Whether to store decimated local Lyapunov time series
         store_local_lya_dt = 0.1    % Time resolution for stored local_lya (seconds)
         use_parallel = true         % Whether to use parfor (requires Parallel Computing Toolbox)
@@ -275,11 +276,11 @@ classdef ParamSpaceAnalysis2 < handle
             dt_str = lower(datestr(obj.analysis_start_time, 'mmm_dd_yy_HH_MM'));
 
             if ~isempty(obj.note)
-                folder_name = sprintf('param_space_%s_nLevs_%d_%s', ...
-                    obj.note, obj.n_levels, dt_str);
+                folder_name = sprintf('%s_%s_nLevs_%d_%s', ...
+                    obj.folder_prefix, obj.note, obj.n_levels, dt_str);
             else
-                folder_name = sprintf('param_space_nLevs_%d_%s', ...
-                    obj.n_levels, dt_str);
+                folder_name = sprintf('%s_nLevs_%d_%s', ...
+                    obj.folder_prefix, obj.n_levels, dt_str);
             end
 
             obj.output_dir = fullfile(obj.output_dir, folder_name);
@@ -1440,6 +1441,7 @@ classdef ParamSpaceAnalysis2 < handle
             s.batch_size = obj.batch_size;
             s.output_dir = obj.output_dir;
             s.note = obj.note;
+            s.folder_prefix = obj.folder_prefix;
             s.store_local_lya = obj.store_local_lya;
             s.store_local_lya_dt = obj.store_local_lya_dt;
             s.use_parallel = obj.use_parallel;
@@ -1486,6 +1488,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'batch_size'), obj.batch_size = s.batch_size; end
                 if isfield(s, 'output_dir'), obj.output_dir = s.output_dir; end
                 if isfield(s, 'note'), obj.note = s.note; end
+                if isfield(s, 'folder_prefix'), obj.folder_prefix = s.folder_prefix; end
                 if isfield(s, 'store_local_lya'), obj.store_local_lya = s.store_local_lya; end
                 if isfield(s, 'store_local_lya_dt'), obj.store_local_lya_dt = s.store_local_lya_dt; end
                 if isfield(s, 'use_parallel'), obj.use_parallel = s.use_parallel; end
