@@ -653,6 +653,573 @@ classdef ParamSpaceAnalysis2 < handle
             end
         end
 
+        function [fig_handles, f_colorbar_fig] = plot_unit_histograms(obj, varargin)
+            % PLOT_UNIT_HISTOGRAMS Create unit histograms colored by f value
+            %
+            % Creates one figure per metric, each with one subplot per condition.
+            % Points are colored by fraction excitatory (f value).
+            %
+            % Usage:
+            %   psa.plot_unit_histograms()
+            %   psa.plot_unit_histograms('Metrics', {'lle', 'br'})
+            %   [figs, cb_fig] = psa.plot_unit_histograms('NormalizeMode', 'probability')
+            %
+            % Name-value args:
+            %   Metrics       - Cell array: 'lle', 'r', 'br' (default {'lle','r'})
+            %   NormalizeMode - 'count' (default) or 'probability'
+
+            if ~obj.has_run && isempty(fieldnames(obj.results))
+                error('ParamSpaceAnalysis2:NotRun', ...
+                    'Analysis has not been run yet. Call run() first.');
+            end
+
+            % Parse name-value args
+            normalize_mode = 'count';
+            metrics_to_plot = {'lle', 'r'};
+            for i = 1:2:length(varargin)
+                switch lower(varargin{i})
+                    case 'normalizemode', normalize_mode = varargin{i+1};
+                    case 'metrics', metrics_to_plot = lower(varargin{i+1});
+                end
+            end
+
+            % Condition info
+            condition_names = cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false);
+            num_conditions = length(condition_names);
+
+            condition_titles = containers.Map(...
+                {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
+                {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+
+            % Metric configuration
+            metric_config = struct();
+            metric_config.lle = struct('field', 'LLE', 'label', '\lambda_1', 'range', [-2.3, 1.5], 'inf_both', true);
+            metric_config.r = struct('field', 'mean_rate', 'label', 'Mean Firing Rate', 'range', [0, 1], 'inf_both', false);
+            metric_config.br = struct('field', 'mean_synaptic_output', 'label', 'Mean Synaptic Output', 'range', [0, 1], 'inf_both', false);
+
+            % Filter to requested metrics
+            metrics = {};
+            metric_labels = {};
+            metric_ranges = {};
+            metric_inf_both = {};
+            for i = 1:length(metrics_to_plot)
+                key = metrics_to_plot{i};
+                if isfield(metric_config, key)
+                    cfg = metric_config.(key);
+                    metrics{end+1} = cfg.field; %#ok<AGROW>
+                    metric_labels{end+1} = cfg.label; %#ok<AGROW>
+                    metric_ranges{end+1} = cfg.range; %#ok<AGROW>
+                    metric_inf_both{end+1} = cfg.inf_both; %#ok<AGROW>
+                else
+                    warning('ParamSpaceAnalysis2:UnknownMetric', ...
+                        'Unknown metric: %s. Valid: lle, r, br', key);
+                end
+            end
+
+            if isempty(metrics)
+                error('ParamSpaceAnalysis2:NoValidMetrics', 'No valid metrics specified.');
+            end
+
+            n_bins = 25;
+
+            % Precompute bin edges
+            metric_edges = cell(1, length(metrics));
+            for m_idx = 1:length(metrics)
+                hist_range = metric_ranges{m_idx};
+                edges = linspace(hist_range(1), hist_range(2), n_bins + 1);
+                if metric_inf_both{m_idx}
+                    edges = [-inf, edges, inf];
+                else
+                    edges = [edges, inf];
+                end
+                metric_edges{m_idx} = edges;
+            end
+
+            % Collect all f values for global normalization
+            all_f_combined = [];
+            for c_idx = 1:num_conditions
+                cond_name = condition_names{c_idx};
+                if isfield(obj.results, cond_name)
+                    results_cell = obj.results.(cond_name);
+                    for k = 1:length(results_cell)
+                        res = results_cell{k};
+                        if isstruct(res) && isfield(res, 'success') && res.success
+                            if isfield(res, 'config') && isfield(res.config, 'f')
+                                all_f_combined(end+1) = res.config.f; %#ok<AGROW>
+                            elseif isfield(obj.model_defaults, 'f')
+                                all_f_combined(end+1) = obj.model_defaults.f; %#ok<AGROW>
+                            end
+                        end
+                    end
+                end
+            end
+
+            if ~isempty(all_f_combined)
+                f_min = min(all_f_combined);
+                f_max = max(all_f_combined);
+                has_f_variation = (f_max > f_min);
+            else
+                f_min = 0; f_max = 1; has_f_variation = false;
+            end
+
+            if has_f_variation
+                fprintf('Coloring by f value: [%.3f, %.3f]\n', f_min, f_max);
+            end
+
+            cmap_f = blue_gray_red_colormap(256);
+
+            % Create figures for each metric
+            fig_handles = gobjects(1, length(metrics));
+
+            for m_idx = 1:length(metrics)
+                metric = metrics{m_idx};
+                metric_label = metric_labels{m_idx};
+                metric_range = metric_ranges{m_idx};
+
+                fig = figure('Name', sprintf('%s Unit Histogram', metric), ...
+                    'Position', [100, 100, 300 * num_conditions, 300]);
+
+                for c_idx = 1:num_conditions
+                    cond_name = condition_names{c_idx};
+                    ax = subplot(1, num_conditions, c_idx);
+
+                    values = [];
+                    f_values = [];
+
+                    if isfield(obj.results, cond_name)
+                        results_cell = obj.results.(cond_name);
+                        for k = 1:length(results_cell)
+                            res = results_cell{k};
+                            if isstruct(res) && isfield(res, 'success') && res.success
+                                if isfield(res, metric) && ~isnan(res.(metric))
+                                    values(end+1) = res.(metric); %#ok<AGROW>
+                                    if isfield(res, 'config') && isfield(res.config, 'f')
+                                        f_values(end+1) = res.config.f; %#ok<AGROW>
+                                    elseif isfield(obj.model_defaults, 'f')
+                                        f_values(end+1) = obj.model_defaults.f; %#ok<AGROW>
+                                    else
+                                        f_values(end+1) = 0.5; %#ok<AGROW>
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if ~isempty(values)
+                        unit_histogram_patch(values(:), f_values(:), ...
+                            'BinEdges', metric_edges{m_idx}, ...
+                            'SortMode', 'sorted', ...
+                            'Axes', ax, ...
+                            'Colormap', cmap_f, ...
+                            'CLim', [f_min, f_max], ...
+                            'Normalize', normalize_mode, ...
+                            'EdgeColor', 'none');
+
+                        if strcmpi(metric, 'LLE')
+                            hold(ax, 'on');
+                            xline(ax, 0, '--', 'Color', [0 0 0], 'LineWidth', 2);
+                            hold(ax, 'off');
+                        end
+                    end
+
+                    if condition_titles.isKey(cond_name)
+                        title(ax, condition_titles(cond_name), 'FontWeight', 'normal');
+                    else
+                        title(ax, strrep(cond_name, '_', ' '), 'FontWeight', 'normal');
+                    end
+
+                    if c_idx == 1
+                        if strcmpi(normalize_mode, 'probability')
+                            ylabel(ax, 'Probability');
+                        else
+                            ylabel(ax, 'Count');
+                        end
+                    end
+                    xlabel(ax, metric_label);
+                    xlim(ax, 1.05 .* metric_range);
+                end
+
+                drawnow;
+                ax_handles = findobj(fig, 'Type', 'Axes');
+                linkaxes(ax_handles, 'y');
+                fig_handles(m_idx) = fig;
+            end
+
+            % Create colorbar figure for f values
+            f_colorbar_fig = gobjects(0);
+            if has_f_variation
+                f_colorbar_fig = figure('Name', 'f Value Colorbar', ...
+                    'Position', [500, 200, 300, 300]);
+                ax_cb = axes(f_colorbar_fig);
+                gradient_img = repmat(linspace(0, 1, 256)', 1, 2);
+                imagesc(ax_cb, [0 1], [f_min f_max], gradient_img);
+                colormap(ax_cb, cmap_f);
+                ax_cb.XTick = [];
+                ax_cb.YDir = 'normal';
+                ax_cb.XColor = 'none';
+                ylabel(ax_cb, 'fraction excitatory', 'FontSize', 12);
+                box(ax_cb, 'off');
+                pbaspect(ax_cb, [0.1 1 1]);
+            end
+
+            fprintf('Unit histograms generated.\n');
+        end
+
+        function [fig, p_values] = plot_lle_by_stim_period(obj, varargin)
+            % PLOT_LLE_BY_STIM_PERIOD Paired beeswarm of mean local LLE per stimulus step
+            %
+            % Creates a figure with one subplot per condition showing mean local
+            % LLE during each stimulus step, colored by f value, with significance
+            % brackets (Wilcoxon signed-rank test).
+            %
+            % Requires that the analysis was run with store_local_lya = true.
+            %
+            % Usage:
+            %   psa.plot_lle_by_stim_period()
+            %   psa.plot_lle_by_stim_period('transient_skip', 3)
+            %   [fig, p] = psa.plot_lle_by_stim_period('periods_to_plot', [0 1 1])
+
+            if ~obj.has_run && isempty(fieldnames(obj.results))
+                error('ParamSpaceAnalysis2:NotRun', ...
+                    'Analysis has not been run yet. Call run() first.');
+            end
+
+            % Parse args
+            transient_skip = 0;
+            periods_to_plot_arg = [];
+            for i = 1:2:length(varargin)
+                switch lower(varargin{i})
+                    case 'transient_skip', transient_skip = varargin{i+1};
+                    case 'periods_to_plot', periods_to_plot_arg = logical(varargin{i+1});
+                end
+            end
+
+            % Validate local_lya exists
+            cond_names = cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false);
+            has_local_lya = false;
+            for c_idx = 1:length(cond_names)
+                cond_name = cond_names{c_idx};
+                if isfield(obj.results, cond_name)
+                    for k = 1:length(obj.results.(cond_name))
+                        res = obj.results.(cond_name){k};
+                        if isstruct(res) && isfield(res, 'local_lya') && ~isempty(res.local_lya)
+                            has_local_lya = true;
+                            break;
+                        end
+                    end
+                end
+                if has_local_lya, break; end
+            end
+
+            if ~has_local_lya
+                error('ParamSpaceAnalysis2:NoLocalLya', ...
+                    'Results do not contain local_lya. Re-run with store_local_lya = true.');
+            end
+
+            % Step configuration
+            if isfield(obj.model_defaults, 'input_config')
+                n_steps = obj.model_defaults.input_config.n_steps;
+                no_stim_pattern = obj.model_defaults.input_config.no_stim_pattern;
+            else
+                n_steps = 3;
+                no_stim_pattern = false(1, 3);
+                no_stim_pattern(1:2:end) = true;
+            end
+
+            if isfield(obj.model_defaults, 'T_range')
+                T_stim = obj.model_defaults.T_range(2);
+            else
+                T_stim = 50;
+            end
+            step_period = T_stim / n_steps;
+
+            num_conditions = length(cond_names);
+
+            % Compute mean LLE per step for each simulation
+            all_means = cell(num_conditions, 1);
+            all_f_values = cell(num_conditions, 1);
+
+            for c_idx = 1:num_conditions
+                cond_name = cond_names{c_idx};
+                results_cell = obj.results.(cond_name);
+
+                n_valid = 0;
+                for k = 1:length(results_cell)
+                    res = results_cell{k};
+                    if isstruct(res) && isfield(res, 'success') && res.success && ...
+                            isfield(res, 'local_lya') && ~isempty(res.local_lya)
+                        n_valid = n_valid + 1;
+                    end
+                end
+
+                means_matrix = NaN(n_valid, n_steps);
+                f_values = NaN(n_valid, 1);
+                sim_idx = 0;
+
+                for k = 1:length(results_cell)
+                    res = results_cell{k};
+                    if ~isstruct(res) || ~isfield(res, 'success') || ~res.success
+                        continue;
+                    end
+                    if ~isfield(res, 'local_lya') || isempty(res.local_lya)
+                        continue;
+                    end
+
+                    sim_idx = sim_idx + 1;
+                    t_lya = res.t_lya;
+                    local_lya = res.local_lya;
+
+                    if isfield(res, 'config') && isfield(res.config, 'f')
+                        f_values(sim_idx) = res.config.f;
+                    elseif isfield(obj.model_defaults, 'f')
+                        f_values(sim_idx) = obj.model_defaults.f;
+                    end
+
+                    valid_mask = t_lya >= 0;
+                    t_lya = t_lya(valid_mask);
+                    local_lya = local_lya(valid_mask);
+
+                    for step_idx = 1:n_steps
+                        step_start = (step_idx - 1) * step_period + transient_skip;
+                        step_end = step_idx * step_period;
+                        step_mask = t_lya >= step_start & t_lya < step_end;
+                        if any(step_mask)
+                            means_matrix(sim_idx, step_idx) = mean(local_lya(step_mask), 'omitnan');
+                        end
+                    end
+                end
+
+                all_means{c_idx} = means_matrix;
+                all_f_values{c_idx} = f_values;
+            end
+
+            % Global f-value range
+            all_f_combined = [];
+            for c_idx = 1:num_conditions
+                all_f_combined = [all_f_combined; all_f_values{c_idx}]; %#ok<AGROW>
+            end
+            all_f_combined = all_f_combined(~isnan(all_f_combined));
+
+            if ~isempty(all_f_combined)
+                f_min = min(all_f_combined);
+                f_max = max(all_f_combined);
+                has_f_variation = (f_max > f_min);
+            else
+                f_min = 0; f_max = 1; has_f_variation = false;
+            end
+
+            % Create figure
+            condition_titles = containers.Map(...
+                {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
+                {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+
+            fig = figure('Name', 'Mean Local LLE by Step', ...
+                'Position', [100, 100, 300 * num_conditions, 300]);
+
+            cmap_f = blue_gray_red_colormap(256);
+            n_colors = size(cmap_f, 1);
+
+            p_values = NaN(num_conditions, 1);
+            ax_cell = cell(num_conditions, 1);
+
+            for c_idx = 1:num_conditions
+                cond_name = cond_names{c_idx};
+                means_matrix = all_means{c_idx};
+                f_vals = all_f_values{c_idx};
+
+                ax = subplot(1, num_conditions, c_idx);
+                n_sims = size(means_matrix, 1);
+
+                % Build color matrix
+                sim_colors = zeros(n_sims, 3);
+                for s = 1:n_sims
+                    if has_f_variation && ~isnan(f_vals(s))
+                        f_normalized = max(0, min(1, (f_vals(s) - f_min) / (f_max - f_min)));
+                        color_idx = round(f_normalized * (n_colors - 1)) + 1;
+                        sim_colors(s, :) = cmap_f(color_idx, :);
+                    else
+                        sim_colors(s, :) = [0.5 0.5 0.5];
+                    end
+                end
+
+                % Step labels
+                step_labels = cell(1, n_steps);
+                for step_idx = 1:n_steps
+                    if no_stim_pattern(step_idx)
+                        step_labels{step_idx} = 'no-stim';
+                    else
+                        step_labels{step_idx} = 'stim';
+                    end
+                end
+
+                % Apply periods_to_plot filter
+                if isempty(periods_to_plot_arg)
+                    periods_mask = true(1, n_steps);
+                else
+                    periods_mask = periods_to_plot_arg;
+                end
+
+                means_filtered = means_matrix(:, periods_mask);
+                labels_filtered = step_labels(periods_mask);
+                n_steps_plot = sum(periods_mask);
+
+                % Stability reference line
+                line(ax, [0.3, n_steps_plot + 0.7], [0, 0], ...
+                    'Color', [0 0 0 0.5], 'LineStyle', '--', 'LineWidth', 1, ...
+                    'HandleVisibility', 'off');
+                hold(ax, 'on');
+
+                paired_beeswarm(means_filtered, 'Axes', ax, ...
+                    'Colors', sim_colors, ...
+                    'MarkerSize', 0.9, ...
+                    'LineWidth', 0.75, ...
+                    'Labels', labels_filtered, ...
+                    'Alpha', 1, ...
+                    'SortStyle', 'hex', ...
+                    'ShowYAxis', (c_idx == 1));
+
+                if condition_titles.isKey(cond_name)
+                    title(condition_titles(cond_name), 'FontWeight', 'normal');
+                else
+                    title(strrep(cond_name, '_', ' '), 'FontWeight', 'normal');
+                end
+
+                if c_idx == 1
+                    ylabel('Mean Local LLE');
+                else
+                    ax.YAxis.Visible = 'off';
+                end
+
+                hold(ax, 'off');
+                xtickangle(ax, 45);
+                box(ax, 'off');
+
+                % Significance test
+                stim_means = mean(means_matrix(:, ~no_stim_pattern), 2, 'omitnan');
+                no_stim_means_col = mean(means_matrix(:, no_stim_pattern), 2, 'omitnan');
+                valid_pairs = ~isnan(stim_means) & ~isnan(no_stim_means_col);
+
+                if sum(valid_pairs) >= 2
+                    [p_val, ~, ~] = signrank(stim_means(valid_pairs), no_stim_means_col(valid_pairs));
+                    p_values(c_idx) = p_val;
+                end
+
+                ax_cell{c_idx} = ax;
+            end
+
+            % Link y-axes
+            drawnow;
+            ax_handles = findobj(fig, 'Type', 'Axes');
+            if length(ax_handles) >= 2
+                linkaxes(ax_handles, 'y');
+            end
+            for i = 1:length(ax_handles)
+                xlim(ax_handles(i), [0.5, n_steps_plot + 0.5]);
+            end
+
+            % Compute global y-limits
+            global_ymin = inf;
+            global_ymax = -inf;
+            for i = 1:length(ax_handles)
+                children = ax_handles(i).Children;
+                for j = 1:length(children)
+                    if isprop(children(j), 'YData')
+                        ydata = children(j).YData;
+                        ydata = ydata(isfinite(ydata));
+                        if ~isempty(ydata)
+                            global_ymin = min(global_ymin, min(ydata));
+                            global_ymax = max(global_ymax, max(ydata));
+                        end
+                    end
+                end
+            end
+
+            global_range = global_ymax - global_ymin;
+            if global_range <= 0, global_range = 0.2; end
+            global_padding = 0.05 * global_range;
+            global_upper = max(global_ymax + global_padding, 0.05);
+            global_lower = global_ymin - global_padding;
+            global_upper_with_bracket = global_upper + 0.15 * global_range;
+
+            if ~isempty(ax_handles)
+                ylim(ax_handles(1), [global_lower, global_upper_with_bracket]);
+            end
+
+            % Add significance brackets
+            bracket_y = global_upper + 0.03 * global_range;
+            vert_height = 0.03 * global_range;
+            text_y = bracket_y + 0.05 * global_range;
+
+            for c_idx = 1:num_conditions
+                ax = ax_cell{c_idx};
+                p_val = p_values(c_idx);
+                if isnan(p_val), continue; end
+
+                hold(ax, 'on');
+                x_left = 1; x_right = 2;
+                bracket_x = [x_left, x_left, x_right, x_right];
+                bracket_y_pts = [bracket_y - vert_height, bracket_y, bracket_y, bracket_y - vert_height];
+                plot(ax, bracket_x, bracket_y_pts, 'k-', 'LineWidth', 2.5, 'HandleVisibility', 'off');
+
+                p_str = sprintf('p = %.2g', p_val);
+                text(ax, (x_left + x_right) / 2, text_y, p_str, ...
+                    'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+                    'FontSize', 9, 'HandleVisibility', 'off');
+                hold(ax, 'off');
+            end
+
+            drawnow;
+
+            % Create colorbar figure for f values
+            if has_f_variation
+                fig_cb = figure('Name', 'f Value Colorbar', ...
+                    'Position', [500, 200, 300, 300]);
+                ax_cb = axes(fig_cb);
+                gradient_img = repmat(linspace(0, 1, 256)', 1, 2);
+                imagesc(ax_cb, [0 1], [f_min f_max], gradient_img);
+                colormap(ax_cb, cmap_f);
+                ax_cb.XTick = [];
+                ax_cb.YDir = 'normal';
+                ax_cb.XColor = 'none';
+                ylabel(ax_cb, 'fraction excitatory', 'FontSize', 12);
+                box(ax_cb, 'off');
+                pbaspect(ax_cb, [0.1 1 1]);
+            end
+
+            % Print stats
+            fprintf('\n=== Statistical Analysis: Stim vs No-Stim ===\n');
+            for c_idx = 1:num_conditions
+                cond_name = cond_names{c_idx};
+                means_matrix = all_means{c_idx};
+
+                stim_means = mean(means_matrix(:, ~no_stim_pattern), 2, 'omitnan');
+                no_stim_means_col = mean(means_matrix(:, no_stim_pattern), 2, 'omitnan');
+                valid_pairs = ~isnan(stim_means) & ~isnan(no_stim_means_col);
+                n_pairs = sum(valid_pairs);
+
+                if condition_titles.isKey(cond_name)
+                    display_name = condition_titles(cond_name);
+                else
+                    display_name = strrep(cond_name, '_', ' ');
+                end
+
+                if n_pairs >= 2
+                    stim_valid = stim_means(valid_pairs);
+                    no_stim_valid = no_stim_means_col(valid_pairs);
+                    [p_value, ~, ~] = signrank(stim_valid, no_stim_valid);
+                    differences = stim_valid - no_stim_valid;
+                    cohens_d = mean(differences) / std(differences);
+
+                    fprintf('%s (n=%d pairs):\n', display_name, n_pairs);
+                    fprintf('  p-value: %.4g, Cohen''s d: %.4f\n', p_value, cohens_d);
+                    fprintf('  Median diff (stim-nostim): %.4f\n', ...
+                        median(stim_valid) - median(no_stim_valid));
+                else
+                    fprintf('%s: Insufficient pairs (n=%d)\n', display_name, n_pairs);
+                end
+            end
+        end
+
         function load_results(obj, results_dir)
             % LOAD_RESULTS Load results from a previous run
             %
