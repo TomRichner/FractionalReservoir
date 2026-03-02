@@ -131,4 +131,3 @@ fprintf('=== Tau Sensitivity Analysis Complete ===\n');
 fprintf('tau_a_E results: %s\n', psa_tau_a.output_dir);
 fprintf('tau_b_E_rec results: %s\n', psa_tau_b.output_dir);
 fprintf('========================================\n');
-beep; pause(0.5); beep; pause(0.2); beep
