@@ -1,11 +1,11 @@
 % run_sensitivity_analysis.m
-% Example script demonstrating how to use the SensitivityAnalysis class
+% Sensitivity analysis using ParamSpaceAnalysis2 in 1D mode
 %
-% This script performs a sensitivity analysis on the SRNN model by varying
-% specified parameters across multiple levels and repetitions, comparing
-% different adaptation conditions.
+% Sweeps individual parameters across multiple levels and repetitions,
+% comparing different adaptation conditions. Each parameter is swept
+% independently (one PSA run per parameter).
 %
-% See also: SensitivityAnalysis, SRNNModel
+% See also: ParamSpaceAnalysis2, SRNNModel2
 
 clear;
 clc;
@@ -14,91 +14,64 @@ close all;
 %% Setup paths
 setup_paths();
 
-%% Create SensitivityAnalysis object
-% Configure the number of levels and repetitions
-% (reduce these for faster testing)
-sa = SensitivityAnalysis(...
-    'n_levels', 21, ...       % Number of parameter values to test
-    'n_reps', 50, ...         % Number of repetitions per value (for statistics)
-    'note', 'bigger_run', ...% Optional note for output folder naming
-    'verbose', true ...       % Print progress during execution
-    );
+%% Analysis Configuration
+n_levels = 21;      % Number of parameter values to test
+n_reps = 50;        % Number of repetitions per level (for statistics)
+note = 'sensitivity';
 
-%% Add parameters to sweep
-% Specify which parameters to vary and their ranges
-% You can add any property of SRNNModel
+% Parameters to sweep: {param_name, [min, max]}
+params_to_sweep = {
+    'level_of_chaos', [0.5, 2.5];
+    'n',              [50, 250];
+    'f',              [2/3, 3/2];
+    'c_E',            [0.01, 1];
+};
 
-% Network structure parameters
-sa.add_parameter('level_of_chaos', [0.5, 2.5]);  % Abscissa scaling
-sa.add_parameter('n', [50, 250]);                 % Number of neurons
-sa.add_parameter('EI_imbalance', [0.25, 4]);    % E/I imbalance (1 = balanced)
-% sa.add_parameter('indegree', [10, 50]);         % Expected in-degree
+%% Run sensitivity analysis for each parameter
+all_output_dirs = {};
 
-% Dynamics parameters
-% sa.add_parameter('tau_d', [0.05, 0.2]);         % Dendritic time constant
-% sa.add_parameter('u_ex_scale', [1.0, 3.0]);     % External input scaling
+for p_idx = 1:size(params_to_sweep, 1)
+    param_name = params_to_sweep{p_idx, 1};
+    param_range = params_to_sweep{p_idx, 2};
 
-% Adaptation parameters
-sa.add_parameter('c_E', [0.01, 1]);           % SFA strength for E neurons
+    fprintf('\n========================================\n');
+    fprintf('=== Sensitivity: %s [%.3g, %.3g] (%d/%d) ===\n', ...
+        param_name, param_range(1), param_range(2), p_idx, size(params_to_sweep, 1));
+    fprintf('========================================\n');
 
-%% Configure model defaults (optional)
-% Set any SRNNModel properties that should be constant across all runs
-sa.model_defaults.T_range = [0, 20];       % Shorter simulation for faster runs
-sa.model_defaults.fs = 200;                 % Sampling frequency
-sa.model_defaults.c_E = 0.5;
-sa.model_defaults.lya_method = 'benettin';  % Lyapunov computation method
+    % Create PSA for this parameter
+    psa = ParamSpaceAnalysis2(...
+        'n_levels', n_levels, ...
+        'batch_size', 25, ...
+        'note', sprintf('%s_%s', note, param_name), ...
+        'randomize_order', false, ...
+        'verbose', true ...
+        );
 
-%% Configure conditions (optional)
-% By default, all four adaptation conditions are tested:
-%   - no_adaptation: n_a_E=0, n_b_E=0
-%   - sfa_only:      n_a_E=3, n_b_E=0
-%   - std_only:      n_a_E=0, n_b_E=1
-%   - sfa_and_std:   n_a_E=3, n_b_E=1
-%
-% To use only a subset of conditions, uncomment and modify below:
-%
-% sa.set_conditions({
-%     struct('name', 'no_adaptation', 'n_a_E', 0, 'n_b_E', 0),
-%     struct('name', 'sfa_and_std',   'n_a_E', 3, 'n_b_E', 1)
-% });
+    % Add the swept parameter and reps
+    psa.add_grid_parameter(param_name, param_range);
+    psa.add_grid_parameter('reps', 1:n_reps);
 
-%% Run the sensitivity analysis
-% This will loop over all conditions and parameters using parfor
-% Results are automatically saved to disk during execution
-sa.run();
+    % Run
+    psa.run();
 
-% Copy this script to the output directory for reproducibility
-copyfile([mfilename('fullpath') '.m'], sa.output_dir);
+    % Copy this script for reproducibility
+    copyfile([mfilename('fullpath') '.m'], psa.output_dir);
 
-%% Plot results
-% Generate heatmaps showing LLE distribution across parameter values
-sa.plot('metric', 'LLE');
+    % Plot sensitivity heatmaps
+    psa.plot_sensitivity('metric', 'LLE');
+    psa.plot_sensitivity('metric', 'mean_rate');
 
-% Optionally plot mean firing rate
-sa.plot('metric', 'mean_rate');
+    % Save PSA object
+    save(fullfile(psa.output_dir, 'psa_object.mat'), 'psa');
 
-%% Display summary
-fprintf('\n=== Analysis Summary ===\n');
-fprintf('Output directory: %s\n', sa.output_dir);
-fprintf('Parameters analyzed: %s\n', strjoin(fieldnames(sa.param_ranges), ', '));
-fprintf('Conditions: %s\n', strjoin(cellfun(@(c) c.name, sa.conditions, 'UniformOutput', false), ', '));
+    all_output_dirs{end+1} = psa.output_dir; %#ok<SAGROW>
+end
 
-%% Optional: Access raw results programmatically
-% The results are stored in sa.results structure:
-%
-%   sa.results.<condition_name>.<param_name>.results_reshaped
-%   sa.results.<condition_name>.<param_name>.metadata
-%
-% Example: Get LLE values for 'level_of_chaos' under 'sfa_only' condition:
-%
-%   res = sa.results.sfa_only.level_of_chaos.results_reshaped;
-%   LLE_values = cellfun(@(r) r.LLE, res);
-%   param_levels = sa.results.sfa_only.level_of_chaos.metadata.param_levels;
-%
-%   figure;
-%   plot(param_levels, mean(LLE_values, 2), 'o-');
-%   xlabel('level\_of\_chaos');
-%   ylabel('Mean LLE');
-
-fprintf('\nDone! Results saved to: %s\n', sa.output_dir);
-
+%% Summary
+fprintf('\n=== Sensitivity Analysis Complete ===\n');
+fprintf('Parameters analyzed:\n');
+for p_idx = 1:size(params_to_sweep, 1)
+    fprintf('  %s: %s\n', params_to_sweep{p_idx, 1}, all_output_dirs{p_idx});
+end
+fprintf('Done!\n');

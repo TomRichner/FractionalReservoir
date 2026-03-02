@@ -30,6 +30,8 @@ classdef ParamSpaceAnalysis2 < handle
         integer_params = {'n', 'indegree', 'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I'}
         reps                        % Repetition index for multiple runs per grid point
         explicit_vectors = struct() % Struct: param_name -> explicit vector (when length > 2)
+        vector_param_config = struct() % Struct: param_name -> config for vector params
+        randomize_order = true         % Whether to randomize execution order (false for sensitivity)
     end
 
     %% Model Default Properties
@@ -55,8 +57,9 @@ classdef ParamSpaceAnalysis2 < handle
         analysis_start_time         % Timestamp when analysis started
         param_vectors               % Cell array of parameter level vectors
         all_configs                 % Cell array of all config structs
-        shuffled_indices            % Randomized order for execution
+        shuffled_indices            % Randomized/sequential order for execution
         num_combinations            % Total number of grid points
+        vector_param_lookup = struct() % Struct: param_name -> cell array of pre-generated vectors
     end
 
     %% Constructor
@@ -158,6 +161,77 @@ classdef ParamSpaceAnalysis2 < handle
             else
                 warning('ParamSpaceAnalysis2:ParamNotFound', ...
                     'Parameter %s not found in grid', param_name);
+            end
+        end
+
+        function add_vector_parameter(obj, param_name, varargin)
+            % ADD_VECTOR_PARAMETER Add a vector-valued parameter to the grid
+            %
+            % For parameters like tau_a_E where the parameter is a vector and
+            % one end is varied across levels. Internally, the grid uses integer
+            % indices that map to pre-generated vectors.
+            %
+            % Usage:
+            %   psa.add_vector_parameter('tau_a_E', ...
+            %       'vary_element', 'last', ...
+            %       'fixed_value', 0.25, ...
+            %       'vary_range', [5, 60], ...
+            %       'n_elements', 3, ...
+            %       'spacing', 'log', ...
+            %       'level_spacing', 'linear')
+
+            % Parse name-value pairs
+            p = inputParser;
+            addRequired(p, 'param_name', @(x) ischar(x) || isstring(x));
+            addParameter(p, 'vary_element', 'last', @(x) ismember(x, {'first', 'last'}));
+            addParameter(p, 'fixed_value', [], @isnumeric);
+            addParameter(p, 'vary_range', [], @(x) isnumeric(x) && length(x) == 2);
+            addParameter(p, 'n_elements', [], @(x) isnumeric(x) && x >= 2);
+            addParameter(p, 'spacing', 'linear', @(x) ismember(x, {'linear', 'log'}));
+            addParameter(p, 'level_spacing', 'linear', @(x) ismember(x, {'linear', 'log'}));
+            parse(p, param_name, varargin{:});
+
+            % Validate required parameters
+            if isempty(p.Results.fixed_value)
+                error('ParamSpaceAnalysis2:InvalidInput', 'fixed_value is required');
+            end
+            if isempty(p.Results.vary_range)
+                error('ParamSpaceAnalysis2:InvalidInput', 'vary_range is required');
+            end
+            if isempty(p.Results.n_elements)
+                error('ParamSpaceAnalysis2:InvalidInput', 'n_elements is required');
+            end
+            if p.Results.vary_range(2) < p.Results.vary_range(1)
+                error('ParamSpaceAnalysis2:InvalidInput', 'vary_range(2) must be >= vary_range(1)');
+            end
+
+            % Store config
+            vpc = struct();
+            vpc.vary_element = p.Results.vary_element;
+            vpc.fixed_value = p.Results.fixed_value;
+            vpc.vary_range = p.Results.vary_range;
+            vpc.n_elements = p.Results.n_elements;
+            vpc.spacing = p.Results.spacing;
+            vpc.level_spacing = p.Results.level_spacing;
+            obj.vector_param_config.(param_name) = vpc;
+
+            % Add to grid_params if not already present
+            if ~ismember(param_name, obj.grid_params)
+                obj.grid_params{end+1} = param_name;
+            end
+
+            % Remove from scalar param storage if previously set
+            if isfield(obj.param_ranges, param_name)
+                obj.param_ranges = rmfield(obj.param_ranges, param_name);
+            end
+            if isfield(obj.explicit_vectors, param_name)
+                obj.explicit_vectors = rmfield(obj.explicit_vectors, param_name);
+            end
+
+            if obj.verbose
+                fprintf('Added vector parameter: %s, vary_%s [%.3g, %.3g], %d elements, %s spacing, %s level_spacing\n', ...
+                    param_name, vpc.vary_element, vpc.vary_range(1), vpc.vary_range(2), ...
+                    vpc.n_elements, vpc.spacing, vpc.level_spacing);
             end
         end
 
@@ -391,6 +465,194 @@ classdef ParamSpaceAnalysis2 < handle
             fprintf('Figure saved to: %s\n', fig_dir);
         end
 
+        function plot_sensitivity(obj, varargin)
+            % PLOT_SENSITIVITY Generate imagesc heatmap plots for 1D sensitivity analysis
+            %
+            % Creates one subplot per condition showing histogram of metric values
+            % across levels of each swept parameter (non-reps grid params).
+            %
+            % Usage:
+            %   psa.plot_sensitivity()
+            %   psa.plot_sensitivity('metric', 'LLE')
+            %   psa.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1], 'n_bins', 35)
+
+            if ~obj.has_run && isempty(fieldnames(obj.results))
+                error('ParamSpaceAnalysis2:NotRun', ...
+                    'Analysis has not been run yet. Call run() first.');
+            end
+
+            % Parse arguments
+            metric = 'LLE';
+            hist_range = [];
+            n_bins = 35;
+            for i = 1:2:length(varargin)
+                switch lower(varargin{i})
+                    case 'metric', metric = varargin{i+1};
+                    case 'hist_range', hist_range = varargin{i+1};
+                    case 'n_bins', n_bins = varargin{i+1};
+                end
+            end
+
+            % Default hist_range by metric
+            if isempty(hist_range)
+                if strcmpi(metric, 'LLE')
+                    hist_range = [-0.3, 0.1];
+                elseif strcmpi(metric, 'mean_rate')
+                    hist_range = [0, 1];
+                else
+                    hist_range = [-1, 1];
+                end
+            end
+
+            % Identify swept parameters (non-reps grid params)
+            swept_params = setdiff(obj.grid_params, {'reps'}, 'stable');
+            if isempty(swept_params)
+                error('ParamSpaceAnalysis2:NoSweptParam', ...
+                    'No non-reps grid parameter found for sensitivity plot.');
+            end
+
+            % Build histogram bins
+            hist_bins = [-inf, linspace(hist_range(1), hist_range(2), n_bins), inf];
+
+            % Get condition info
+            condition_names = cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false);
+            num_conditions = length(condition_names);
+
+            % Readable condition titles
+            condition_titles = containers.Map(...
+                {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
+                {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+
+            % Grid sizes for sub2ind
+            grid_sizes = cellfun(@length, obj.param_vectors);
+
+            % Loop over each swept parameter
+            for sp_idx = 1:length(swept_params)
+                swept_param = swept_params{sp_idx};
+                param_dim = find(strcmp(obj.grid_params, swept_param));
+                reps_dim = find(strcmp(obj.grid_params, 'reps'));
+
+                % Get x-axis values
+                if isfield(obj.vector_param_config, swept_param)
+                    vpc = obj.vector_param_config.(swept_param);
+                    vecs = obj.vector_param_lookup.(swept_param);
+                    x_values = zeros(1, length(vecs));
+                    for v = 1:length(vecs)
+                        if strcmp(vpc.vary_element, 'last')
+                            x_values(v) = vecs{v}(end);
+                        else
+                            x_values(v) = vecs{v}(1);
+                        end
+                    end
+                    x_label = sprintf('%s(%s)', strrep(swept_param, '_', '\_'), vpc.vary_element);
+                else
+                    x_values = obj.param_vectors{param_dim};
+                    x_label = strrep(swept_param, '_', '\_');
+                end
+
+                n_levels_param = length(x_values);
+                n_reps = length(obj.param_vectors{reps_dim});
+
+                % Create figure
+                fig = figure('Name', sprintf('%s Sensitivity - %s', metric, swept_param), ...
+                    'Position', [100, 100, 350 * num_conditions, 400]);
+
+                for c_idx = 1:num_conditions
+                    cond_name = condition_names{c_idx};
+                    ax = subplot(1, num_conditions, c_idx);
+
+                    num_hist_bins = length(hist_bins) - 1;
+                    histogram_matrix = zeros(num_hist_bins, n_levels_param);
+                    median_values = NaN(n_levels_param, 1);
+
+                    if isfield(obj.results, cond_name)
+                        results_cell = obj.results.(cond_name);
+
+                        for level_idx = 1:n_levels_param
+                            values_level = [];
+
+                            for rep_idx = 1:n_reps
+                                % Build subscripts for this (level, rep) combination
+                                subs = cell(1, length(obj.grid_params));
+                                for d = 1:length(obj.grid_params)
+                                    if d == param_dim
+                                        subs{d} = level_idx;
+                                    elseif d == reps_dim
+                                        subs{d} = rep_idx;
+                                    else
+                                        subs{d} = 1;
+                                    end
+                                end
+                                linear_idx = sub2ind(grid_sizes, subs{:});
+
+                                if linear_idx <= length(results_cell)
+                                    res = results_cell{linear_idx};
+                                    if isstruct(res) && isfield(res, 'success') && res.success
+                                        if isfield(res, metric) && ~isnan(res.(metric))
+                                            values_level(end+1) = res.(metric); %#ok<AGROW>
+                                        end
+                                    end
+                                end
+                            end
+
+                            if ~isempty(values_level)
+                                [counts, ~] = histcounts(values_level, hist_bins);
+                                histogram_matrix(:, level_idx) = counts;
+                                median_values(level_idx) = median(values_level);
+                            end
+                        end
+                    end
+
+                    % Compute y-coordinates
+                    finite_edges = hist_bins(~isinf(hist_bins));
+                    step_size = finite_edges(2) - finite_edges(1);
+                    y_coords = zeros(num_hist_bins, 1);
+                    y_coords(1) = finite_edges(1) - step_size/2;
+                    for k = 2:length(finite_edges)
+                        y_coords(k) = (finite_edges(k-1) + finite_edges(k)) / 2;
+                    end
+                    y_coords(end) = finite_edges(end) + step_size/2;
+
+                    % Plot
+                    imagesc(ax, x_values, y_coords, histogram_matrix);
+                    hold(ax, 'on');
+                    yline(ax, 0, '--', 'Color', [0 0.7 0], 'LineWidth', 4, 'Alpha', 0.5);
+                    plot(ax, x_values, median_values, 'b-', 'LineWidth', 4, 'Color', [0 0 1 0.55]);
+                    hold(ax, 'off');
+
+                    colormap(ax, flipud(gray));
+                    caxis(ax, [0, n_reps]);
+                    axis(ax, 'xy');
+                    box(ax, 'on');
+
+                    % Labels
+                    xlabel(ax, x_label, 'FontSize', 14);
+                    if c_idx == 1
+                        if strcmpi(metric, 'LLE')
+                            ylabel(ax, '$\lambda_1$', 'Interpreter', 'latex', 'FontSize', 18);
+                        else
+                            ylabel(ax, strrep(metric, '_', '\_'), 'FontSize', 14);
+                        end
+                    end
+
+                    if condition_titles.isKey(cond_name)
+                        title(ax, condition_titles(cond_name), 'FontSize', 14);
+                    else
+                        title(ax, strrep(cond_name, '_', ' '), 'FontSize', 14);
+                    end
+                end
+
+                % Save figure
+                fig_dir = fullfile(obj.output_dir, 'figures');
+                if ~exist(fig_dir, 'dir')
+                    mkdir(fig_dir);
+                end
+                saveas(fig, fullfile(fig_dir, sprintf('sensitivity_%s_%s.png', metric, swept_param)));
+                saveas(fig, fullfile(fig_dir, sprintf('sensitivity_%s_%s.fig', metric, swept_param)));
+                fprintf('Figure saved to: %s\n', fig_dir);
+            end
+        end
+
         function load_results(obj, results_dir)
             % LOAD_RESULTS Load results from a previous run
             %
@@ -600,6 +862,8 @@ classdef ParamSpaceAnalysis2 < handle
             s.conditions = obj.conditions;
             s.integer_params = obj.integer_params;
             s.explicit_vectors = obj.explicit_vectors;
+            s.vector_param_config = obj.vector_param_config;
+            s.randomize_order = obj.randomize_order;
 
             % Model Default Properties (public)
             s.model_defaults = obj.model_defaults;
@@ -621,6 +885,7 @@ classdef ParamSpaceAnalysis2 < handle
             s.all_configs = obj.all_configs;
             s.shuffled_indices = obj.shuffled_indices;
             s.num_combinations = obj.num_combinations;
+            s.vector_param_lookup = obj.vector_param_lookup;
         end
     end
 
@@ -643,6 +908,8 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'conditions'), obj.conditions = s.conditions; end
                 if isfield(s, 'integer_params'), obj.integer_params = s.integer_params; end
                 if isfield(s, 'explicit_vectors'), obj.explicit_vectors = s.explicit_vectors; end
+                if isfield(s, 'vector_param_config'), obj.vector_param_config = s.vector_param_config; end
+                if isfield(s, 'randomize_order'), obj.randomize_order = s.randomize_order; end
 
                 % Model Default Properties (public)
                 if isfield(s, 'model_defaults'), obj.model_defaults = s.model_defaults; end
@@ -664,6 +931,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'all_configs'), obj.all_configs = s.all_configs; end
                 if isfield(s, 'shuffled_indices'), obj.shuffled_indices = s.shuffled_indices; end
                 if isfield(s, 'num_combinations'), obj.num_combinations = s.num_combinations; end
+                if isfield(s, 'vector_param_lookup'), obj.vector_param_lookup = s.vector_param_lookup; end
             else
                 % Object was saved directly (already a ParamSpaceAnalysis2)
                 obj = s;
@@ -671,7 +939,7 @@ classdef ParamSpaceAnalysis2 < handle
         end
 
         function result = run_single_job(job, model_defaults_local, grid_params_local, ...
-                verbose_local, store_local_lya_local, store_local_lya_dt_local)
+                verbose_local, store_local_lya_local, store_local_lya_dt_local, vector_param_lookup_local)
             % RUN_SINGLE_JOB Execute a single simulation job
             % Extracted to allow use with both parfor and for loops
 
@@ -693,7 +961,13 @@ classdef ParamSpaceAnalysis2 < handle
                 % Add grid parameters
                 for p_idx = 1:length(grid_params_local)
                     pname = grid_params_local{p_idx};
-                    model_args = [model_args, {pname, job.config.(pname)}]; %#ok<AGROW>
+                    if isfield(vector_param_lookup_local, pname)
+                        % Vector parameter: look up pre-generated vector by index
+                        vec_idx = job.config.(pname);
+                        model_args = [model_args, {pname, vector_param_lookup_local.(pname){vec_idx}}]; %#ok<AGROW>
+                    else
+                        model_args = [model_args, {pname, job.config.(pname)}]; %#ok<AGROW>
+                    end
                 end
 
                 % Add model defaults (don't override grid params or condition params)
@@ -799,14 +1073,54 @@ classdef ParamSpaceAnalysis2 < handle
 
             for i = 1:n_params
                 param_name = obj.grid_params{i};
+                is_int = ismember(param_name, obj.integer_params);
 
-                if isfield(obj.explicit_vectors, param_name)
+                if isfield(obj.vector_param_config, param_name)
+                    % Vector parameter: use integer indices as grid values
+                    obj.param_vectors{i} = 1:obj.n_levels;
+
+                    % Pre-generate vectors for each level
+                    vpc = obj.vector_param_config.(param_name);
+
+                    % Generate vary values across levels
+                    if strcmp(vpc.level_spacing, 'log')
+                        vary_values = logspace(log10(vpc.vary_range(1)), log10(vpc.vary_range(2)), obj.n_levels);
+                    else
+                        vary_values = linspace(vpc.vary_range(1), vpc.vary_range(2), obj.n_levels);
+                    end
+                    if is_int
+                        vary_values = round(vary_values);
+                    end
+
+                    % Generate vectors for each level
+                    vectors = cell(obj.n_levels, 1);
+                    for lev = 1:obj.n_levels
+                        if strcmp(vpc.vary_element, 'last')
+                            start_val = vpc.fixed_value;
+                            end_val = vary_values(lev);
+                        else  % 'first'
+                            start_val = vary_values(lev);
+                            end_val = vpc.fixed_value;
+                        end
+
+                        if strcmp(vpc.spacing, 'log')
+                            vectors{lev} = logspace(log10(start_val), log10(end_val), vpc.n_elements);
+                        else
+                            vectors{lev} = linspace(start_val, end_val, vpc.n_elements);
+                        end
+                        if is_int
+                            vectors{lev} = round(vectors{lev});
+                        end
+                    end
+                    obj.vector_param_lookup.(param_name) = vectors;
+
+                elseif isfield(obj.explicit_vectors, param_name)
                     % Use explicit vector directly
                     obj.param_vectors{i} = obj.explicit_vectors.(param_name);
                 else
                     % Generate from range using n_levels
                     param_range = obj.param_ranges.(param_name);
-                    if ismember(param_name, obj.integer_params)
+                    if is_int
                         obj.param_vectors{i} = round(linspace(param_range(1), param_range(2), obj.n_levels));
                     else
                         obj.param_vectors{i} = linspace(param_range(1), param_range(2), obj.n_levels);
@@ -829,11 +1143,15 @@ classdef ParamSpaceAnalysis2 < handle
                 obj.all_configs{i} = config;
             end
 
-            % Randomize order for representative early-stopping
-            rng('shuffle');
-            obj.shuffled_indices = randperm(obj.num_combinations);
-
-            fprintf('Generated %d parameter combinations (randomized order)\n', obj.num_combinations);
+            % Set execution order
+            if obj.randomize_order
+                rng('shuffle');
+                obj.shuffled_indices = randperm(obj.num_combinations);
+                fprintf('Generated %d parameter combinations (randomized order)\n', obj.num_combinations);
+            else
+                obj.shuffled_indices = 1:obj.num_combinations;
+                fprintf('Generated %d parameter combinations (sequential order)\n', obj.num_combinations);
+            end
         end
 
         function run_batched_simulation(obj, temp_dir)
@@ -892,6 +1210,7 @@ classdef ParamSpaceAnalysis2 < handle
                 verbose_local = obj.verbose;
                 store_local_lya_local = obj.store_local_lya;
                 store_local_lya_dt_local = obj.store_local_lya_dt;
+                vector_param_lookup_local = obj.vector_param_lookup;
 
                 % Determine execution mode
                 run_parallel = obj.use_parallel && canUseParallelPool;
@@ -909,13 +1228,13 @@ classdef ParamSpaceAnalysis2 < handle
                     parfor j = 1:total_jobs
                         parallel_results{j} = ParamSpaceAnalysis2.run_single_job(...
                             jobs{j}, model_defaults_local, grid_params_local, ...
-                            verbose_local, store_local_lya_local, store_local_lya_dt_local);
+                            verbose_local, store_local_lya_local, store_local_lya_dt_local, vector_param_lookup_local);
                     end
                 else
                     for j = 1:total_jobs
                         parallel_results{j} = ParamSpaceAnalysis2.run_single_job(...
                             jobs{j}, model_defaults_local, grid_params_local, ...
-                            verbose_local, store_local_lya_local, store_local_lya_dt_local);
+                            verbose_local, store_local_lya_local, store_local_lya_dt_local, vector_param_lookup_local);
                     end
                 end
 
