@@ -31,8 +31,8 @@ end
 setup_paths();
 
 %% Analysis Configuration
-n_levels = 25; % 25
-n_reps = 50; % 100
+n_levels = 7; % 25
+n_reps = 7; % 100
 note = 'tau_timescales';
 
 % Condition: SFA + STD (n_a_E=3, n_b_E=1)
@@ -82,7 +82,7 @@ save(fullfile(psa_tau_a.output_dir, 'psa_object.mat'), 'psa_tau_a');
 
 if save_figs
     fig_dir = fullfile(psa_tau_a.output_dir, 'figures');
-    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_a', [], {'fig', 'png'});
+    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_a', [], {'fig', 'svg'});
     fprintf('Figures saved to %s\n', fig_dir);
 end
 close all;
@@ -120,7 +120,7 @@ save(fullfile(psa_tau_b.output_dir, 'psa_object.mat'), 'psa_tau_b');
 
 if save_figs
     fig_dir = fullfile(psa_tau_b.output_dir, 'figures');
-    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_b', [], {'fig', 'png'});
+    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_b', [], {'fig', 'svg'});
     fprintf('Figures saved to %s\n', fig_dir);
 end
 close all;
