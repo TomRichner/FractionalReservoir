@@ -29,8 +29,8 @@ end
 setup_paths();
 
 %% Analysis Configuration
-n_levels = 25;      % Number of parameter values to test
-n_reps = 50;        % Number of repetitions per level (for statistics)
+n_levels = 7;      % Number of parameter values to test
+n_reps = 7;        % Number of repetitions per level (for statistics)
 note = 'sensitivity';
 
 % Parameters to sweep: {param_name, [min, max]}

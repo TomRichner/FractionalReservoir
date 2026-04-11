@@ -14,7 +14,7 @@ if isempty(fig_vec)
 end
 
 if isempty(fig_type)
-    fig_type = {'fig','svg','png'};
+    fig_type = {'fig','png'};
 end
     
 h = get(0,'children');

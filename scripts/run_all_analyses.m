@@ -51,11 +51,11 @@ fprintf('[3/4] Running Parameter Space Analysis...\n');
 fprintf('========================================\n');
 run_param_space_analysis2;
 
-%% 4. Fig 2: Fraction Excitatory Analysis
-fprintf('========================================\n');
-fprintf('[4/4] Running Fig 2 Fraction Excitatory Analysis...\n');
-fprintf('========================================\n');
-Fig_2_fraction_excitatory_analysis;
+% %% 4. Fig 2: Fraction Excitatory Analysis
+% fprintf('========================================\n');
+% fprintf('[4/4] Running Fig 2 Fraction Excitatory Analysis...\n');
+% fprintf('========================================\n');
+% Fig_2_fraction_excitatory_analysis;
 
 %% Summary
 fprintf('========================================\n');

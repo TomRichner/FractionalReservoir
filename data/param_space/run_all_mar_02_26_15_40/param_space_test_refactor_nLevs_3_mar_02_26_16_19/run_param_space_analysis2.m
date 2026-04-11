@@ -40,7 +40,7 @@ setup_paths();
 %       e.g., 4 levels x 3 params x 4 conditions = 256 simulations
 
 psa = ParamSpaceAnalysis2(...
-    'n_levels', 5, ...          % Number of levels per parameter
+    'n_levels', 3, ...          % Number of levels per parameter
     'batch_size', 25, ...       % Configs per batch (for checkpointing)
     'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
@@ -55,9 +55,9 @@ end
 
 % Network structure parameters
 
-psa.add_grid_parameter('E_W', [-0.5, 0.5] ./ sqrt(300));  % Mean offset (scaled by 1/sqrt(n))
+psa.add_grid_parameter('E_W', [-0.2, 0.2] ./ sqrt(300));  % Mean offset (scaled by 1/sqrt(n))
 psa.add_grid_parameter('f', [0.4, 0.6]);     % fraction of neurons that are E
-psa.add_grid_parameter('c_E', 0.15/3.*[0.5, 2]);             % SFA strength
+psa.add_grid_parameter('c_E', [0.1/3, 1/3]);             % SFA strength
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
