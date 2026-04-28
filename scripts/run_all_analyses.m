@@ -27,6 +27,9 @@ if ~exist(master_output_dir, 'dir')
 end
 fprintf('Master output directory: %s\n\n', master_output_dir);
 
+% Capture git provenance so the run can be retraced later
+capture_git_provenance(master_output_dir, project_root);
+
 % Control figure saving across all sub-scripts:
 %   'save_all_figs'            - Override all scripts to save figures
 %   'save_no_figs'             - Override all scripts to NOT save figures
