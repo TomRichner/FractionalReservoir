@@ -643,14 +643,14 @@ classdef ParamSpaceAnalysis2 < handle
                     end
                 end
 
-                % Save figure
-                fig_dir = fullfile(obj.output_dir, 'figures');
-                if ~exist(fig_dir, 'dir')
-                    mkdir(fig_dir);
-                end
-                saveas(fig, fullfile(fig_dir, sprintf('sensitivity_%s_%s.png', metric, swept_param)));
-                saveas(fig, fullfile(fig_dir, sprintf('sensitivity_%s_%s.fig', metric, swept_param)));
-                fprintf('Figure saved to: %s\n', fig_dir);
+                % Figure saving disabled here -- handled by calling scripts via save_some_figs_to_folder_2
+                % fig_dir = fullfile(obj.output_dir, 'figures');
+                % if ~exist(fig_dir, 'dir')
+                %     mkdir(fig_dir);
+                % end
+                % saveas(fig, fullfile(fig_dir, sprintf('sensitivity_%s_%s.png', metric, swept_param)));
+                % saveas(fig, fullfile(fig_dir, sprintf('sensitivity_%s_%s.fig', metric, swept_param)));
+                % fprintf('Figure saved to: %s\n', fig_dir);
             end
         end
 
