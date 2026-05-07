@@ -456,14 +456,14 @@ classdef ParamSpaceAnalysis2 < handle
             ax_handles = findobj(fig, 'Type', 'Axes');
             linkaxes(ax_handles, 'y');
 
-            % Save figure
-            fig_dir = fullfile(obj.output_dir, 'figures');
-            if ~exist(fig_dir, 'dir')
-                mkdir(fig_dir);
-            end
-            saveas(fig, fullfile(fig_dir, sprintf('%s_distribution.png', metric)));
-            saveas(fig, fullfile(fig_dir, sprintf('%s_distribution.fig', metric)));
-            fprintf('Figure saved to: %s\n', fig_dir);
+            % Figure saving disabled here -- handled by calling scripts via save_some_figs_to_folder_2
+            % fig_dir = fullfile(obj.output_dir, 'figures');
+            % if ~exist(fig_dir, 'dir')
+            %     mkdir(fig_dir);
+            % end
+            % saveas(fig, fullfile(fig_dir, sprintf('%s_distribution.png', metric)));
+            % saveas(fig, fullfile(fig_dir, sprintf('%s_distribution.fig', metric)));
+            % fprintf('Figure saved to: %s\n', fig_dir);
         end
 
         function plot_sensitivity(obj, varargin)
