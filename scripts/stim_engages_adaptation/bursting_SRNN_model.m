@@ -18,11 +18,14 @@ close all; clc;
 % increment both seeds so each execution explores a new network / stimulus
 % realization. clearvars wipes everything EXCEPT rng_seeds, so the value
 % survives from one run to the next (it lives in the base workspace).
-if exist('rng_seeds', 'var')
-    rng_seeds = rng_seeds + 1
-else
-    rng_seeds = [1 2]
-end
+% if exist('rng_seeds', 'var')
+%     rng_seeds = rng_seeds + 1
+% else
+%     rng_seeds = [1 2]
+% end
+
+rng_seeds = [19 20]
+
 clearvars -except rng_seeds;
 
 % Add src/ and scripts/ to the MATLAB path
@@ -127,8 +130,8 @@ end
 %  NOTE: SRNNModel2 forces u = 0 during the negative warmup (t < 0), so this
 %  profile applies to t in [0, T_range(2)]. The ramp into the first level runs
 %  over the first ramp_dur seconds of the positive window, not the warmup.
-dc_levels = [0.02 0.1 0.2 0.3 0.5];   % absolute DC per level (all neurons); edit this sweep
-hold_dur  = 30;                       % seconds each level is held
+dc_levels = [0.0 0.025 0.05 0.1 0.2 0.4];   % absolute DC per level (all neurons); edit this sweep
+hold_dur  = 120;                       % seconds each level is held
 % White-noise INTENSITY (fs-invariant): the generator adds noise_intensity*sqrt(fs)*randn
 % per neuron, so the continuous-time noise PSD (~noise_intensity^2) is independent of fs.
 % Effective per-sample std = noise_intensity*sqrt(fs); 0.001*sqrt(400) = 0.02 at fs=400.
@@ -149,7 +152,7 @@ u_ex_scale = 1.0;     % global scale on the external input (default 1.0)
 %  ======================================================================
 fs         = 400;          % sampling frequency (Hz)            (default 400)
 % Positive window must span the whole staircase: numel(dc_levels)*hold_dur.
-T_range    = [-30, numel(dc_levels)*hold_dur];   % warmup + staircase (e.g. [-30 300])
+T_range    = [-10, numel(dc_levels)*hold_dur];   % warmup + staircase (e.g. [-30 300])
 T_plot     = [];           % plotting window; [] -> T_range
 % ODE solver:
 %   @ode45    - adaptive RK4(5); accurate, but VERY slow with noisy forcing.
@@ -243,7 +246,7 @@ t_full = model.t_out;
 nL = numel(dc_levels);
 figure('Name', 'PSD of Mean Dendritic Potential vs DC level');
 hold on;
-cmap = parula(nL);
+cmap = parula(nL+1);
 labels = cell(nL, 1);
 for k = 1:nL
     % Steady window for level k: skip the first psd_settle s after the step.
