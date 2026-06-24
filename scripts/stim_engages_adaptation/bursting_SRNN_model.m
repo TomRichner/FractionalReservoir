@@ -281,7 +281,22 @@ legend(labels, 'Location', 'southwest');
 grid on;
 
 %% ======================================================================
-%  SAVE FIGURES  (time-series + PSD) -> data/<timestamped subfolder>
+%  NETWORK GRAPH  (directed connectivity W)
+%  ======================================================================
+%  Circle-layout digraph of the connectivity: E nodes colored, I nodes dark
+%  red, inhibitory edges red, edge width ~ |weight|. Only legible for small
+%  networks, so gated on n <= 50 (matches the SRNN convention).
+if n <= 50
+    figure('Name', 'Network connectivity graph');
+    EI_vec     = [ones(model.n_E, 1); -ones(model.n_I, 1)];   % +1 = E, -1 = I
+    max_weight = max(abs(model.W(:)));                        % normalize edge widths to this W
+    plot_network_graph_widthRange_color_R(model.W, max_weight, EI_vec);
+    box off; axis equal; axis off;
+    title(sprintf('Network connectivity  (n=%d, indegree=%d, R=%.2f)', n, indegree, model.R));
+end
+
+%% ======================================================================
+%  SAVE FIGURES  (time-series + PSD + network graph) -> data/<timestamped subfolder>
 %  ======================================================================
 if save_figs
     project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));  % .../FractionalResevoir
