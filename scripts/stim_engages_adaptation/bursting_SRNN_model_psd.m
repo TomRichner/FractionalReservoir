@@ -18,11 +18,12 @@ close all; clc;
 % increment both seeds so each execution explores a new network / stimulus
 % realization. clearvars wipes everything EXCEPT rng_seeds, so the value
 % survives from one run to the next (it lives in the base workspace).
-if exist('rng_seeds', 'var')
-    rng_seeds = rng_seeds + 1
-else
-    rng_seeds = [1 2]
-end
+% if exist('rng_seeds', 'var')
+%     rng_seeds = rng_seeds + 1
+% else
+%     rng_seeds = [1 2]
+% end
+rng_seeds = [8, 9];
 clearvars -except rng_seeds;
 
 % Add src/ and scripts/ to the MATLAB path
