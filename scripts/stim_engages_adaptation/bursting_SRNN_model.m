@@ -115,11 +115,12 @@ switch lower(nonlinearity)
 end
 
 %% ======================================================================
-%  6. EXTERNAL STIMULUS  (DC staircase: hold each DC level for a long time)
+%  6. EXTERNAL STIMULUS  (DC staircase + white-noise probe)
 %  ======================================================================
 %  A tonic DC applied UNIFORMLY to every neuron, stepped through a sequence of
-%  levels, each HELD for hold_dur seconds. This lets us compute one PSD per DC
-%  level (see Section 10) to see how the drive level shapes the burst spectrum.
+%  levels, each HELD for hold_dur seconds, PLUS independent white noise added
+%  per neuron. The staircase sets the operating point; the noise probes how the
+%  network filters its input, revealed by the per-level PSD (Section 10).
 %  Built by the custom generator dc_staircase_stimulus() at the BOTTOM of this
 %  file, wired in via input_config.generator (overrides the built-in generator).
 %
@@ -127,12 +128,17 @@ end
 %  profile applies to t in [0, T_range(2)]. The ramp into the first level runs
 %  over the first ramp_dur seconds of the positive window, not the warmup.
 dc_levels = [0.02 0.1 0.2 0.3 0.5];   % absolute DC per level (all neurons); edit this sweep
-hold_dur  = 60;                       % seconds each level is held
+hold_dur  = 30;                       % seconds each level is held
+% White-noise INTENSITY (fs-invariant): the generator adds noise_intensity*sqrt(fs)*randn
+% per neuron, so the continuous-time noise PSD (~noise_intensity^2) is independent of fs.
+% Effective per-sample std = noise_intensity*sqrt(fs); 0.001*sqrt(400) = 0.02 at fs=400.
+noise_intensity = 0.001;              % white-noise intensity (input units * sqrt(s)); 0 = off
 
 input_config = struct();
 input_config.dc_levels = dc_levels;   % staircase levels
 input_config.hold_dur  = hold_dur;    % seconds per level
 input_config.ramp_dur  = 10;          % ramp 0 -> dc_levels(1) over first ramp_dur s
+input_config.noise_intensity = noise_intensity;  % fs-invariant noise intensity (to the generator)
 input_config.intrinsic_drive = [];    % unused by this generator; required by the class
 input_config.generator = @dc_staircase_stimulus;  % custom generator (see bottom of file)
 
@@ -145,7 +151,11 @@ fs         = 400;          % sampling frequency (Hz)            (default 400)
 % Positive window must span the whole staircase: numel(dc_levels)*hold_dur.
 T_range    = [-30, numel(dc_levels)*hold_dur];   % warmup + staircase (e.g. [-30 300])
 T_plot     = [];           % plotting window; [] -> T_range
-ode_solver = @ode45;       % ODE solver handle                  (default @ode45)
+% ODE solver:
+%   @ode45    - adaptive RK4(5); accurate, but VERY slow with noisy forcing.
+%   @ode_rk4  - fixed-step classic RK4 at the fs grid (local fn, bottom of file);
+%               fast and well-behaved when white noise is added. Recommended here.
+ode_solver = @ode_rk4;     % @ode45 (adaptive) | @ode_rk4 (fixed-step, fast with noise)
 % rng_seeds is set & auto-incremented at the TOP of this script (see header).
 % [network seed, stimulus seed]. Do not reassign it here, or the per-run
 % increment will be clobbered.
@@ -175,10 +185,10 @@ store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 %  NOTE: the slowest adaptation timescale is ~15 s, so psd_settle ~ 20 s covers
 %  ~1.3 tau; raise hold_dur / psd_settle for cleaner level separation, and raise
 %  hold_dur (and psd_win_len_s) for finer low-frequency resolution (~1/win).
-psd_settle       = 20;    % seconds to skip after each DC step before the PSD window
-psd_win_len_s    = 15;    % Hamming window length (s)   [template used 15]
-psd_overlap_frac = 0.75;  % segment overlap fraction    [template used 0.75]
-psd_f            = logspace(log10(0.05), log10(100), 50);  % requested freqs (Hz)
+psd_settle       = 5;    % seconds to skip after each DC step before the PSD window
+psd_win_len_s    = 10;    % Hamming window length (s)   [template used 15]
+psd_overlap_frac = 0.5;  % segment overlap fraction    [template used 0.75]
+psd_f            = logspace(log10(0.1), log10(100), 100);  % requested freqs (Hz)
 
 %% ======================================================================
 %  11. CONSTRUCT, BUILD, RUN, PLOT
@@ -257,19 +267,22 @@ hold off;
 set(gca, 'XScale', 'log', 'YScale', 'log');
 xlabel('Frequency (Hz)');
 ylabel('Dendritic Potential^2/Hz');
-title('PSD of Mean Dendritic Potential (x) vs DC level');
+title(sprintf('PSD of Mean Dendritic Potential (x) vs DC level  (noise intensity = %.3g)', noise_intensity));
 legend(labels, 'Location', 'southwest');
 grid on;
 
 %% ======================================================================
 %  LOCAL FUNCTIONS
 %  ======================================================================
-function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, ~, input_config)
-    % DC_STAIRCASE_STIMULUS Uniform tonic DC stepped through a sequence of levels.
+function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, rng_seed, input_config)
+    % DC_STAIRCASE_STIMULUS Uniform tonic DC stepped through a sequence of levels,
+    % plus independent per-neuron white noise.
     %
     % Each level dc_levels(k) is held for hold_dur seconds, applied identically
     % to every neuron over [0, T]. The first hold ramps in linearly from 0 over
-    % the first ramp_dur seconds. Signature matches the SRNNModel2 generator hook:
+    % the first ramp_dur seconds. fs-invariant white noise
+    % (input_config.noise_intensity) is added per neuron on top. Signature
+    % matches the SRNNModel2 generator hook:
     %   [u_ex, t_ex] = generator(params, T, fs, rng_seed, input_config)
     dt   = 1 / fs;
     t_ex = (0:dt:T)';          % nt x 1, matches built-in generator
@@ -294,4 +307,40 @@ function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, ~, input_config)
 
     % Same drive to every neuron: n x nt
     u_ex = repmat(dc_profile', params.n, 1);
+
+    % Add independent white noise per neuron over [0, T] (probes the network's
+    % filtering). The sqrt(fs) factor makes this an fs-invariant white noise: the
+    % continuous-time PSD ~ noise_intensity^2 is independent of fs (standard
+    % Euler-Maruyama 1/sqrt(dt) scaling). The model's linear interpolant
+    % band-limits it to ~Nyquist (fs/2), flat over our <100 Hz band. Seeded for
+    % reproducibility.
+    if isfield(input_config, 'noise_intensity') && input_config.noise_intensity > 0
+        rng(rng_seed);
+        u_ex = u_ex + input_config.noise_intensity * sqrt(fs) * randn(params.n, numel(t_ex));
+    end
+end
+
+function [t, Y] = ode_rk4(odefun, tspan, y0, ~)
+    % ODE_RK4 Fixed-step classic RK4, matching the @ode45 call signature used by
+    % SRNNModel2: solver(rhs, t_ex, S0, opts). Steps at the native spacing of the
+    % supplied time vector tspan (uniform fs grid) and returns the solution at
+    % exactly those times, so the class's output-time check passes. opts ignored.
+    %
+    % Much faster than adaptive ode45 when the forcing is noisy (no step-size
+    % control thrashing). rhs is evaluated 4x per step.
+    t  = tspan(:);
+    nt = numel(t);
+    y  = y0(:);
+    Y  = zeros(nt, numel(y));
+    Y(1, :) = y.';
+    for k = 1:nt-1
+        h  = t(k+1) - t(k);
+        tk = t(k);
+        k1 = odefun(tk,       y);
+        k2 = odefun(tk + h/2, y + (h/2)*k1);
+        k3 = odefun(tk + h/2, y + (h/2)*k2);
+        k4 = odefun(tk + h,   y + h*k3);
+        y  = y + (h/6)*(k1 + 2*k2 + 2*k3 + k4);
+        Y(k+1, :) = y.';
+    end
 end
