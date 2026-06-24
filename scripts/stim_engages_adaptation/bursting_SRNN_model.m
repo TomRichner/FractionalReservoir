@@ -115,24 +115,26 @@ switch lower(nonlinearity)
 end
 
 %% ======================================================================
-%  6. EXTERNAL STIMULUS  (old IED-example drive: tonic DC + elevated epochs)
+%  6. EXTERNAL STIMULUS  (DC staircase: hold each DC level for a long time)
 %  ======================================================================
-%  Reproduces the stimulus from SRNN_caller_example_tseries.m: a small tonic
-%  DC applied UNIFORMLY to every neuron (ramped on over the first ramp_dur
-%  seconds), with two elevated-drive epochs added on top. Built by the custom
-%  generator dc_step_stimulus() at the BOTTOM of this file, wired in via
-%  input_config.generator (which overrides the built-in sparse-step generator).
+%  A tonic DC applied UNIFORMLY to every neuron, stepped through a sequence of
+%  levels, each HELD for hold_dur seconds. This lets us compute one PSD per DC
+%  level (see Section 10) to see how the drive level shapes the burst spectrum.
+%  Built by the custom generator dc_staircase_stimulus() at the BOTTOM of this
+%  file, wired in via input_config.generator (overrides the built-in generator).
 %
 %  NOTE: SRNNModel2 forces u = 0 during the negative warmup (t < 0), so this
-%  profile applies to t in [0, T_range(2)]. The ramp therefore runs over the
-%  first ramp_dur seconds of the positive window, not during the warmup.
+%  profile applies to t in [0, T_range(2)]. The ramp into the first level runs
+%  over the first ramp_dur seconds of the positive window, not the warmup.
+dc_levels = [0.02 0.1 0.2 0.3 0.5];   % absolute DC per level (all neurons); edit this sweep
+hold_dur  = 60;                       % seconds each level is held
+
 input_config = struct();
-input_config.DC       = 0.02;   % tonic baseline drive, all neurons (old DC = 0.02)
-input_config.ramp_dur = 10;     % seconds to ramp 0 -> DC at start  (old ramp_duration = 10)
-input_config.epochs   = [20 35 0.08;    % [t_start  t_end  amp_added] elevated epochs
-                         35 45 0.48];    % old: +0.08 (20-35s) then +0.48 (35-45s), all neurons
-input_config.intrinsic_drive = [];      % unused by this generator; kept for class compatibility
-input_config.generator = @dc_step_stimulus;  % custom generator (see bottom of file)
+input_config.dc_levels = dc_levels;   % staircase levels
+input_config.hold_dur  = hold_dur;    % seconds per level
+input_config.ramp_dur  = 10;          % ramp 0 -> dc_levels(1) over first ramp_dur s
+input_config.intrinsic_drive = [];    % unused by this generator; required by the class
+input_config.generator = @dc_staircase_stimulus;  % custom generator (see bottom of file)
 
 u_ex_scale = 1.0;     % global scale on the external input (default 1.0)
 
@@ -140,7 +142,8 @@ u_ex_scale = 1.0;     % global scale on the external input (default 1.0)
 %  7. SIMULATION / INTEGRATION
 %  ======================================================================
 fs         = 400;          % sampling frequency (Hz)            (default 400)
-T_range    = [-30, 100];   % integration interval [start end] s (default [0 50]); negative start = warmup
+% Positive window must span the whole staircase: numel(dc_levels)*hold_dur.
+T_range    = [-30, numel(dc_levels)*hold_dur];   % warmup + staircase (e.g. [-30 300])
 T_plot     = [];           % plotting window; [] -> T_range
 ode_solver = @ode45;       % ODE solver handle                  (default @ode45)
 % rng_seeds is set & auto-incremented at the TOP of this script (see header).
@@ -163,11 +166,16 @@ plot_deci = 10;            % decimation factor for plotting (fs/plot_deci = 40 H
 store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 
 %% ======================================================================
-%  10. PSD ANALYSIS (pwelch of mean dendritic potential x)
+%  10. PSD ANALYSIS (pwelch of mean dendritic potential x, per DC level)
 %  ======================================================================
-%  Single overall PSD of the mean dendritic potential, full-resolution (fs Hz).
-%  Mirrors the old template (SRNN_caller_example_tseries_raster_adapt_psd.m).
-psd_t_start      = 0;     % analysis window start (s); use t > this (drop warmup/transient)
+%  One PSD per DC staircase level (full-resolution, fs Hz), overlaid to show
+%  how the drive level shapes the burst spectrum. For each level we skip the
+%  first psd_settle seconds after the DC step (settling) before the PSD window.
+%  Mirrors the per-period overlay in SRNN_caller_example_tseries_raster_adapt_psd.m.
+%  NOTE: the slowest adaptation timescale is ~15 s, so psd_settle ~ 20 s covers
+%  ~1.3 tau; raise hold_dur / psd_settle for cleaner level separation, and raise
+%  hold_dur (and psd_win_len_s) for finer low-frequency resolution (~1/win).
+psd_settle       = 20;    % seconds to skip after each DC step before the PSD window
 psd_win_len_s    = 15;    % Hamming window length (s)   [template used 15]
 psd_overlap_frac = 0.75;  % segment overlap fraction    [template used 0.75]
 psd_f            = logspace(log10(0.05), log10(100), 50);  % requested freqs (Hz)
@@ -211,7 +219,7 @@ for k = 1:numel(ax_handles)
 end
 
 %% ======================================================================
-%  PSD of mean dendritic potential (x)  --  pwelch, full-resolution
+%  PSD of mean dendritic potential (x), per DC level  --  pwelch, full-res
 %  ======================================================================
 % Extract full-resolution x (last n columns of S_out) and average over neurons.
 nE = model.n_E; nI = model.n_I;
@@ -221,52 +229,68 @@ x_cols = (len_a + len_b) + (1:model.n);      % x is the last n state columns
 x_mean = mean(model.S_out(:, x_cols), 2);    % nt x 1, mean dendritic potential
 t_full = model.t_out;
 
-% Post-transient window; remove DC so we get the PSD of fluctuations
-sel   = t_full > psd_t_start;
-x_seg = x_mean(sel) - mean(x_mean(sel));
+% One PSD per DC staircase level, overlaid on a log-log axis.
+nL = numel(dc_levels);
+figure('Name', 'PSD of Mean Dendritic Potential vs DC level');
+hold on;
+cmap = parula(nL);
+labels = cell(nL, 1);
+for k = 1:nL
+    % Steady window for level k: skip the first psd_settle s after the step.
+    lo  = (k-1)*hold_dur + psd_settle;
+    hi  = k*hold_dur;
+    sel = t_full > lo & t_full <= hi;
 
-% Clamp Hamming window to available signal length (guards short signals)
-win_len  = min(round(psd_win_len_s * model.fs), numel(x_seg));
-win      = hamming(win_len);
-noverlap = floor(psd_overlap_frac * win_len);
+    % Remove DC so we get the PSD of fluctuations
+    x_seg = x_mean(sel) - mean(x_mean(sel));
 
-[pxx, f] = pwelch(x_seg, win, noverlap, psd_f, model.fs);
+    % Clamp Hamming window to available signal length (guards short windows)
+    win_len  = min(round(psd_win_len_s * model.fs), numel(x_seg));
+    win      = hamming(win_len);
+    noverlap = floor(psd_overlap_frac * win_len);
 
-figure('Name', 'PSD of Mean Dendritic Potential');
-loglog(f, pxx, 'LineWidth', 1.5);
+    [pxx, fpx] = pwelch(x_seg, win, noverlap, psd_f, model.fs);
+    plot(fpx, pxx, 'LineWidth', 1.5, 'Color', cmap(k, :));
+    labels{k} = sprintf('DC = %.3g', dc_levels(k));
+end
+hold off;
+set(gca, 'XScale', 'log', 'YScale', 'log');
 xlabel('Frequency (Hz)');
 ylabel('Dendritic Potential^2/Hz');
-title('PSD of Mean Dendritic Potential (x)');
+title('PSD of Mean Dendritic Potential (x) vs DC level');
+legend(labels, 'Location', 'southwest');
 grid on;
 
 %% ======================================================================
 %  LOCAL FUNCTIONS
 %  ======================================================================
-function [u_ex, t_ex] = dc_step_stimulus(params, T, fs, ~, input_config)
-    % DC_STEP_STIMULUS Reproduces the old SRNN IED-example drive.
+function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, ~, input_config)
+    % DC_STAIRCASE_STIMULUS Uniform tonic DC stepped through a sequence of levels.
     %
-    % Uniform tonic DC (ramped on over the first ramp_dur seconds) plus
-    % elevated-drive epochs, applied identically to every neuron, over [0, T].
-    % Signature matches the SRNNModel2 generator hook:
+    % Each level dc_levels(k) is held for hold_dur seconds, applied identically
+    % to every neuron over [0, T]. The first hold ramps in linearly from 0 over
+    % the first ramp_dur seconds. Signature matches the SRNNModel2 generator hook:
     %   [u_ex, t_ex] = generator(params, T, fs, rng_seed, input_config)
     dt   = 1 / fs;
     t_ex = (0:dt:T)';          % nt x 1, matches built-in generator
     nt   = numel(t_ex);
 
-    DC       = input_config.DC;
-    ramp_dur = input_config.ramp_dur;
-    epochs   = input_config.epochs;   % rows: [t_start  t_end  amp_added]
+    dc_levels = input_config.dc_levels;
+    hold_dur  = input_config.hold_dur;
+    ramp_dur  = input_config.ramp_dur;
+    nL        = numel(dc_levels);
 
-    % Tonic DC with a linear ramp 0 -> DC over the first ramp_dur seconds
-    dc_profile = DC * ones(nt, 1);
-    ramp_idx   = t_ex <= ramp_dur;
-    dc_profile(ramp_idx) = linspace(0, DC, nnz(ramp_idx))';
-
-    % Add elevated-drive epochs on top of the baseline
-    for k = 1:size(epochs, 1)
-        in_epoch = t_ex > epochs(k, 1) & t_ex < epochs(k, 2);
-        dc_profile(in_epoch) = dc_profile(in_epoch) + epochs(k, 3);
+    % Staircase: level k over [(k-1)*hold_dur, k*hold_dur)
+    dc_profile = zeros(nt, 1);
+    for k = 1:nL
+        seg = t_ex >= (k-1)*hold_dur & t_ex < k*hold_dur;
+        dc_profile(seg) = dc_levels(k);
     end
+    dc_profile(t_ex >= nL*hold_dur) = dc_levels(nL);   % final boundary sample
+
+    % Ramp the first hold in linearly: 0 -> dc_levels(1) over the first ramp_dur s
+    ramp_idx = t_ex <= ramp_dur;
+    dc_profile(ramp_idx) = linspace(0, dc_levels(1), nnz(ramp_idx))';
 
     % Same drive to every neuron: n x nt
     u_ex = repmat(dc_profile', params.n, 1);
