@@ -160,9 +160,20 @@ lya_method = 'none';       % 'none' | 'benettin' | 'qr'         (default 'benett
 %  Set explicitly here so it overrides the class default (round(fs/plot_freq)
 %  = 40 -> 10 Hz). plot_deci = 10 with fs = 400 -> 40 Hz plotting.
 plot_deci = 10;            % decimation factor for plotting (fs/plot_deci = 40 Hz)
+store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 
 %% ======================================================================
-%  10. CONSTRUCT, BUILD, RUN, PLOT
+%  10. PSD ANALYSIS (pwelch of mean dendritic potential x)
+%  ======================================================================
+%  Single overall PSD of the mean dendritic potential, full-resolution (fs Hz).
+%  Mirrors the old template (SRNN_caller_example_tseries_raster_adapt_psd.m).
+psd_t_start      = 0;     % analysis window start (s); use t > this (drop warmup/transient)
+psd_win_len_s    = 15;    % Hamming window length (s)   [template used 15]
+psd_overlap_frac = 0.75;  % segment overlap fraction    [template used 0.75]
+psd_f            = logspace(log10(0.05), log10(100), 50);  % requested freqs (Hz)
+
+%% ======================================================================
+%  11. CONSTRUCT, BUILD, RUN, PLOT
 %  ======================================================================
 model = SRNNModel2( ...
     'n', n, 'f', f, 'indegree', indegree, ...
@@ -180,7 +191,8 @@ model = SRNNModel2( ...
     'input_config', input_config, 'u_ex_scale', u_ex_scale, ...
     'fs', fs, 'T_range', T_range, 'T_plot', T_plot, ...
     'ode_solver', ode_solver, 'rng_seeds', rng_seeds, ...
-    'lya_method', lya_method, 'plot_deci', plot_deci);
+    'lya_method', lya_method, 'plot_deci', plot_deci, ...
+    'store_full_state', store_full_state);
 
 model.build();
 model.run();
@@ -197,6 +209,35 @@ for k = 1:numel(ax_handles)
         yticks(ax_handles(k), 'auto');
     end
 end
+
+%% ======================================================================
+%  PSD of mean dendritic potential (x)  --  pwelch, full-resolution
+%  ======================================================================
+% Extract full-resolution x (last n columns of S_out) and average over neurons.
+nE = model.n_E; nI = model.n_I;
+len_a = nE*model.n_a_E + nI*model.n_a_I;     % a_E, a_I block lengths
+len_b = nE*model.n_b_E + nI*model.n_b_I;     % b_E, b_I block lengths
+x_cols = (len_a + len_b) + (1:model.n);      % x is the last n state columns
+x_mean = mean(model.S_out(:, x_cols), 2);    % nt x 1, mean dendritic potential
+t_full = model.t_out;
+
+% Post-transient window; remove DC so we get the PSD of fluctuations
+sel   = t_full > psd_t_start;
+x_seg = x_mean(sel) - mean(x_mean(sel));
+
+% Clamp Hamming window to available signal length (guards short signals)
+win_len  = min(round(psd_win_len_s * model.fs), numel(x_seg));
+win      = hamming(win_len);
+noverlap = floor(psd_overlap_frac * win_len);
+
+[pxx, f] = pwelch(x_seg, win, noverlap, psd_f, model.fs);
+
+figure('Name', 'PSD of Mean Dendritic Potential');
+loglog(f, pxx, 'LineWidth', 1.5);
+xlabel('Frequency (Hz)');
+ylabel('Dendritic Potential^2/Hz');
+title('PSD of Mean Dendritic Potential (x)');
+grid on;
 
 %% ======================================================================
 %  LOCAL FUNCTIONS
