@@ -1,2 +1,0 @@
-Figures generated from data in:
-C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_mar_02_26_15_40\fig2_frac_exc_nLevs_5_mar_02_26_16_26
