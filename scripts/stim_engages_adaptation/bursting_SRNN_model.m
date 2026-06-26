@@ -18,13 +18,9 @@ close all; clc;
 % increment both seeds so each execution explores a new network / stimulus
 % realization. clearvars wipes everything EXCEPT rng_seeds, so the value
 % survives from one run to the next (it lives in the base workspace).
-% if exist('rng_seeds', 'var')
-%     rng_seeds = rng_seeds + 1
-% else
-%     rng_seeds = [1 2]
-% end
+% cl
 
-rng_seeds = [19 20]
+rng_seeds = [1 2]
 
 clearvars -except rng_seeds;
 
@@ -50,7 +46,7 @@ alpha = indegree / n;
 F     = 1 / sqrt(n * alpha * (2 - alpha));   % RMT normalization factor
 
 mu_E_tilde    =  3*F;   % normalized E mean      (class default  3*F)
-mu_I_tilde    = -3*F;   % normalized I mean      (class default -4*F)
+mu_I_tilde    = -4*F;   % normalized I mean      (class default -4*F)
 sigma_E_tilde =  1*F;   % normalized E std dev   (class default  1*F)
 sigma_I_tilde =  1*F;   % normalized I std dev   (class default  1*F)
 E_W           =  0;     % common mean offset added to mu_E_tilde & mu_I_tilde (default 0)
@@ -65,12 +61,12 @@ rescale_by_abscissa = false;  % if true, rescale W by 1/abscissa_0 before chaos 
 %  da_{i,k}/dt = (-a_{i,k} + r_i)/tau_k ;  firing rate sees  x - c*sum_k a_k
 n_a_E   = 3;     % # adaptation timescales for E neurons (default 0; set >0 for SFA)
 n_a_I   = 0;     % # adaptation timescales for I neurons (default 0)
-c_E     = 0.5/3;   % adaptation strength for E   (default 0.15/3 ~ 0.05; old bursting = 0.5/3 ~ 0.167)
+c_E     = 0.15/3;   % adaptation strength for E   (default 0.15/3 ~ 0.05; old bursting = 0.5/3 ~ 0.167)
 c_I     = 0.15/3;  % adaptation strength for I   (default 0.15/3 ~ 0.05)
 
 % Adaptation time constants (row vectors). Leave [] to auto-fill with
 % logspace(log10(0.25), log10(10), n_a) inside build_network().
-tau_a_E = logspace(log10(0.3), log10(15), n_a_E);    % old bursting: [0.3 ... 15] s (slower tail)
+tau_a_E = logspace(log10(0.25), log10(10), n_a_E);    % old bursting: [0.3 ... 15] s (slower tail)
 tau_a_I = [];                                        % auto if n_a_I>0
 
 %% ======================================================================
@@ -81,7 +77,7 @@ tau_a_I = [];                                        % auto if n_a_I>0
 n_b_E       = 1;     % enable STD for E (0/1)            (default 0)
 n_b_I       = 0;     % enable STD for I (0/1)            (default 0)
 tau_b_E_rec = 1;     % E recovery time constant (s)      (default 1; old bursting = 1)
-tau_b_E_rel = 1;     % E release  time constant (s)      (default 0.25; old bursting = 1 = tau_STD)
+tau_b_E_rel = 0.25;     % E release  time constant (s)      (default 0.25; old bursting = 1 = tau_STD)
 tau_b_I_rec = 1;     % I recovery time constant (s)      (default 1)
 tau_b_I_rel = 0.25;  % I release  time constant (s)      (default 0.25)
 
@@ -89,16 +85,16 @@ tau_b_I_rel = 0.25;  % I release  time constant (s)      (default 0.25)
 %  5. INTRINSIC DYNAMICS & NONLINEARITY
 %  ======================================================================
 %  dx_i/dt = (-x_i + sum_j w_ij r_j + u_i)/tau_d ;  r_i = b_i * phi(x_i - c*sum_k a_k)
-tau_d = 0.025;   % dendritic time constant (s)   (default 0.1; old bursting = 0.025)
+tau_d = 0.1;   % dendritic time constant (s)   (default 0.1; old bursting = 0.025)
 
 % --- Nonlinearity phi ---------------------------------------------------
 % 'piecewise' : piecewiseSigmoid(x, S_a, S_c)  -- bounded [0,1], parameterized below
 % 'logistic'  : logisticSigmoid(x)             -- bounded [0,1]
 % 'tanh'      : tanhActivation(x)              -- bounded [-1,1]
 % 'relu'      : max(0, x)  -- UNBOUNDED, matches old SRNN model
-nonlinearity = 'relu';
+nonlinearity = 'piecewise';
 S_a = 0.9;       % piecewiseSigmoid slope param a (default 0.9)
-S_c = 0.35;      % piecewiseSigmoid center  param c (default 0.35)
+S_c = 0.5;      % piecewiseSigmoid center  param c (default 0.35); 0.55 puts the lower knee (S_c-0.55) at x=0, mimicking the ReLU threshold
 
 switch lower(nonlinearity)
     case 'piecewise'
@@ -131,11 +127,12 @@ end
 %  profile applies to t in [0, T_range(2)]. The ramp into the first level runs
 %  over the first ramp_dur seconds of the positive window, not the warmup.
 dc_levels = [0.0 0.025 0.05 0.1 0.2 0.0];   % absolute DC per level (all neurons); edit this sweep
-hold_dur  = 90;                       % seconds each level is held
+hold_dur  = 30;                       % seconds each level is held
 % White-noise INTENSITY (fs-invariant): the generator adds noise_intensity*sqrt(fs)*randn
 % per neuron, so the continuous-time noise PSD (~noise_intensity^2) is independent of fs.
 % Effective per-sample std = noise_intensity*sqrt(fs); 0.001*sqrt(400) = 0.02 at fs=400.
 noise_intensity = 0.001;              % white-noise intensity (input units * sqrt(s)); 0 = off
+% noise_intensity = 0;              % white-noise intensity (input units * sqrt(s)); 0 = off
 
 input_config = struct();
 input_config.dc_levels = dc_levels;   % staircase levels
