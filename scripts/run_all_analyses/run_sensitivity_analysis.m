@@ -42,11 +42,14 @@ end
 fprintf('[run_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s\n', run_mode, n_levels, n_reps, func2str(ode_solver_mode));
 note = 'sensitivity';
 
+% LLE histogram y-axis range for the sensitivity heatmaps (plot_sensitivity).
+lle_hist_range = [-1, 1];
+
 % Parameters to sweep: {param_name, [min, max]}
 params_to_sweep = {
-    'n',              [100, 300];
-    'f',              [0.4, 0.6];
-    'level_of_chaos', [0.7, 1.5];
+    'n',              [100, 500];
+    'f',              [0.25, 0.75];
+    'level_of_chaos', [0.5, 2];
 };
 
 %% Run sensitivity analysis for each parameter
@@ -86,7 +89,7 @@ for p_idx = 1:size(params_to_sweep, 1)
     copyfile([mfilename('fullpath') '.m'], psa.output_dir);
 
     % Plot sensitivity heatmaps
-    psa.plot_sensitivity('metric', 'LLE');
+    psa.plot_sensitivity('metric', 'LLE', 'hist_range', lle_hist_range);
     psa.plot_sensitivity('metric', 'mean_rate');
 
     % Save PSA object
