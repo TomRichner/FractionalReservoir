@@ -44,12 +44,12 @@ setup_paths();
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
-    case 'fast',       n_levels = 3;
-    case 'production', n_levels = 5;
+    case 'fast',       n_levels = 3; ode_solver_mode = @ode_rk4;
+    case 'production', n_levels = 5; ode_solver_mode = @ode45;
     otherwise, error('run_param_space_analysis2:badMode', ...
         'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
 end
-fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d\n', run_mode, n_levels);
+fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d, ode_solver=%s\n', run_mode, n_levels, func2str(ode_solver_mode));
 
 psa = ParamSpaceAnalysis2(...
     'n_levels', n_levels, ...   % set by run_mode (fast=3, production=5)
@@ -60,6 +60,7 @@ psa = ParamSpaceAnalysis2(...
 if exist('master_output_dir', 'var')
     psa.output_dir = master_output_dir;
 end
+psa.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
 
 %% Add parameters to the grid
 % All combinations of these parameters will be tested
