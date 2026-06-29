@@ -77,10 +77,17 @@ Preserve this pattern when adding new analysis scripts.
 
 ### Scripts retained beyond the `run_all_analyses` pipeline
 
-The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_paper/`, `VAR_SRNN/`, `python_piecewise/`, `reference_files/`) and the old-API comparison/run scripts. What is kept, besides the four primary entry points:
+The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_paper/`, `VAR_SRNN/`, `python_piecewise/`, `reference_files/`) and the old-API comparison/run scripts, and reorganized `scripts/` into topic subdirectories. Current layout:
 
-- Example/figure scripts that use the current classes: `Sompolinsky_N_1000_g_1p8.m`, `Single_vs_dual_adaptation_example.m`, `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_*.m`, `example_memory_capacity.m`, `looped_memory_capacity.m`, `stim_engages_adaptation/bursting_SRNN_model*.m`, and the `replot_*` figure regenerators.
+- `scripts/setup_paths.m` — shared bootstrap, **stays at the `scripts/` root** (self-locating; every entry point depends on it).
+- `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses, with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside.
+- `scripts/EI_balance/` — fraction-excitatory analyses: `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_load_and_plot.m`.
+- `scripts/memory_capacity/` — `example_memory_capacity.m`, `looped_memory_capacity.m` (Echo State Network experiments).
+- `scripts/stim_engages_adaptation/` — `bursting_SRNN_model*.m`.
+- `scripts/Sompolinsky_N_1000_g_1p8.m`, `scripts/Single_vs_dual_adaptation_example.m`, `scripts/test_*.m` — remaining top-level example/test scripts.
 - `scripts/sine_stim/` and `scripts/paired_pulse/` — kept as references but **currently non-functional**: they still use the old script-based API, and their legacy dependencies were deleted. They must be ported to `SRNNModel2` before use.
+
+**Path convention after the reorg:** scripts no longer assume they sit directly under `scripts/`. Those that call `setup_paths()` derive `project_root = fileparts(fileparts(which('setup_paths')))` (depth-independent); the memory-capacity scripts (which don't call `setup_paths`) walk up from their own location. When adding or moving a script, preserve one of these patterns rather than a fixed-depth `fileparts(mfilename)` chain.
 
 When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnalysis2`.
 

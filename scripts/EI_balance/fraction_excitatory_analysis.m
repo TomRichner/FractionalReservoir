@@ -21,8 +21,9 @@ close all;
 setup_paths();
 
 % Derive project root from script location for portable paths
-script_path = fileparts(mfilename('fullpath'));
-project_root = fileparts(script_path);  % Go up from scripts/ to project root
+% Derive project_root from setup_paths.m (in scripts/) so this tolerates living
+% in a subdirectory such as scripts/EI_balance/.
+project_root = fileparts(fileparts(which('setup_paths')));
 figs_root = fullfile(project_root, 'figs');
 
 %% Configuration

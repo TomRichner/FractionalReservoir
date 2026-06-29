@@ -17,7 +17,9 @@
 clear; clc; close all;
 
 %% Add paths
-addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'src')));
+% This script lives in scripts/memory_capacity/, so the project root (and src/)
+% is two directories up from its folder.
+addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'src')));
 
 %% -------------------- Global experiment settings --------------------
 % Network / dynamics
@@ -55,8 +57,7 @@ n_boot = 2000;              % bootstrap resamples for CI
 n_perm = 10000;             % permutation sign-flip count
 
 % Output directory
-script_dir   = fileparts(mfilename('fullpath'));
-project_root = fileparts(script_dir);
+project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 out_dir = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready');
 if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 

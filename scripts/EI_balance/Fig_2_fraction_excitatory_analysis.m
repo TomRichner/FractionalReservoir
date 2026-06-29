@@ -23,8 +23,9 @@ end
 %% Setup paths
 setup_paths();
 
-script_path = fileparts(mfilename('fullpath'));
-project_root = fileparts(script_path);
+% Derive project_root from setup_paths.m (in scripts/) so this tolerates living
+% in a subdirectory such as scripts/EI_balance/.
+project_root = fileparts(fileparts(which('setup_paths')));
 figs_root = fullfile(project_root, 'figs');
 
 %% Create ParamSpaceAnalysis2 object

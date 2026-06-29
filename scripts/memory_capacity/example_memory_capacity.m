@@ -16,7 +16,9 @@
 clear; clc; close all;
 
 %% Add paths
-addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'src')));
+% This script lives in scripts/memory_capacity/, so the project root (and src/)
+% is two directories up from its folder.
+addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'src')));
 
 %% Common parameters
 n = 300;                    % Number of neurons
@@ -197,8 +199,7 @@ for i = 1:n_cond
 end
 
 % Save results
-script_dir = fileparts(mfilename('fullpath'));
-project_root = fileparts(script_dir);
+project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 output_dir = fullfile(project_root, 'data', 'memory_capacity');
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
