@@ -40,8 +40,8 @@ setup_paths();
 %       e.g., 4 levels x 3 params x 4 conditions = 256 simulations
 
 psa = ParamSpaceAnalysis2(...
-    'n_levels', 5, ...          % Number of levels per parameter
-    'batch_size', 25, ...       % Configs per batch (for checkpointing)
+    'n_levels', 3, ...          %  5, Number of levels per parameter
+    'batch_size', 25, ...       % 25, Configs per batch (for checkpointing)
     'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
     );
