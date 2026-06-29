@@ -22,7 +22,11 @@ function capture_git_provenance(output_dir, repo_root)
         mkdir(output_dir);
     end
 
-    git = sprintf('git -C "%s"', repo_root);
+    % --no-pager is essential: when called via system(), `git log`/`git diff`
+    % would otherwise spawn a pager (less) that blocks waiting for input,
+    % hanging the run. rev-parse/config/status never paginate, which is why
+    % only the log call hung.
+    git = sprintf('git -C "%s" --no-pager', repo_root);
     prov_path = fullfile(output_dir, 'git_provenance.txt');
 
     [s_check, ~] = system([git ' rev-parse --is-inside-work-tree']);
