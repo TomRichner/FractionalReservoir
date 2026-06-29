@@ -30,7 +30,7 @@ There is no standalone test framework; ad-hoc verification scripts are named `sc
 
 ## Architecture
 
-The codebase has converged on **two main classes** that drive everything; many older standalone files exist but are now wrappers, duplicates, or legacy.
+The codebase has converged on **two main classes** that drive everything. Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
 
 ### `src/SRNNModel2.m` (the model)
 
@@ -38,9 +38,9 @@ A `handle` class encapsulating the full SRNN simulation: parameter storage (with
 
 State vector packing is `S = [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]` of length `N_sys_eqs = n_E*n_a_E + n_I*n_a_I + n_E*n_b_E + n_I*n_b_I + n`. The classes assume `n_b_E, n_b_I ∈ {0, 1}`.
 
-Many functions formerly in `src/` have been **internalized as static methods on `SRNNModel2`** (commit `6e2c58f`, 2026-02-27): `compute_Jacobian_fast`, `dynamics_fast`, `generate_external_input`, `compute_lyapunov_exponents_internal`, `benettin_algorithm_internal`, `lyapunov_spectrum_qr_internal`, `decimate_states`, `initialize_state`, `unpack_and_compute_states`, all `plot_*` and colormap helpers, and the activation functions. The standalone `src/` files of the same name still exist for backward compatibility but the class no longer calls them. When editing, **prefer modifying the class method**, not the standalone file. See `docs/refactors/internalize_functions_into_classes.md` for the full mapping.
+Many functions formerly in `src/` have been **internalized as static methods on `SRNNModel2`** (commit `6e2c58f`, 2026-02-27): `compute_Jacobian_fast`, `dynamics_fast`, `generate_external_input`, `compute_lyapunov_exponents_internal`, `benettin_algorithm_internal`, `lyapunov_spectrum_qr_internal`, `decimate_states`, `initialize_state`, `unpack_and_compute_states`, all `plot_*` and colormap helpers, and the activation functions. The standalone `src/` copies that were no longer referenced by any kept script have since been **deleted**; a few standalone helpers remain only because example/figure scripts still call them directly (e.g. `plotting/plot_firing_rate.m`, `algorithms/Jacobian/compute_Jacobian_fast.m`). When editing model behavior, **prefer the class method**, not any remaining standalone file. See `docs/refactors/internalize_functions_into_classes.md` for the original mapping.
 
-`src/SRNNModel.m` is the older single-class predecessor (default `n=100`, `indegree=20`); `SRNNModel2` (default `n=300`, `indegree=100`) is the current model. Treat `SRNNModel.m` as legacy unless explicitly asked.
+The older single-class predecessor `src/SRNNModel.m` (default `n=100`, `indegree=20`) was removed in the cleanup; `SRNNModel2` (default `n=300`, `indegree=100`) is the only model class. Its Echo State Network subclass `src/SRNN_ESN_reservoir.m` adds memory-capacity tooling.
 
 ### `src/ParamSpaceAnalysis2.m` (the analysis driver)
 
@@ -54,7 +54,7 @@ A `handle` class that runs grid sweeps over `SRNNModel2`. Key behaviors not obvi
 - Reps are added as a grid axis (`add_grid_parameter('reps', 1:n_reps)`), not as a separate property.
 - Output directory defaults to `<root>/data/param_space/<folder_prefix>_<note>_<timestamp>/`. `folder_prefix` is overridden to `'1D_sensitivity'` / `'tau_sensitivity'` by the sensitivity scripts.
 
-`src/SensitivityAnalysis.m` is the older 1D-only predecessor; new sensitivity work uses `ParamSpaceAnalysis2` with one grid parameter + `reps`.
+The older 1D-only predecessor `src/SensitivityAnalysis.m` was removed in the cleanup; sensitivity work uses `ParamSpaceAnalysis2` with one grid parameter + `reps`.
 
 ### Master-orchestrator conventions
 
@@ -67,26 +67,24 @@ Preserve this pattern when adding new analysis scripts.
 
 ### `src/` layout
 
-- `algorithms/Lyapunov/`, `algorithms/Jacobian/`, `algorithms/info/` — numerical methods. Note that `compute_Jacobian_fast.m`, `compute_lyapunov_exponents.m`, `benettin_algorithm.m`, `lyapunov_spectrum_qr.m` are also internalized into `SRNNModel2`.
-- `connectivity/` — `create_W_matrix.m`, `create_paired_W_matrix.m`, `RMTMatrix.m` (RMT-based connectivity, still external).
-- `nonlinearities/` — `piecewiseSigmoid`, `logisticSigmoid`, `tanhActivation` and derivatives (also internalized).
-- `generate_stimulus/` — input generators (`generate_external_input`, `generate_AM_pulse_train`, `generate_paired_pulse_input`, `generate_mackey_glass`).
-- `plotting/` — colormaps, line/scatter helpers, time-series panel plots, `param_space_plots/` for post-hoc visualization, `plot_saving/save_some_figs_to_folder_2.m` (used by every script that writes figures).
-- `SRNN_ESN.m`, `SRNN_ESN_reservoir.m`, `SRNN_reservoir.m`, `SRNN_reservoir_DDE.m` — alternative ODE RHS implementations and an Echo State Network variant. The DDE/ESN variants are exploratory.
+- `algorithms/Jacobian/` — `compute_Jacobian_fast.m`, `compute_Jacobian_at_indices.m`, `compute_J_eff.m` (called directly by example scripts; `SRNNModel2` also carries internalized equivalents). The standalone `algorithms/Lyapunov/` files and `algorithms/info/mutual_info_SISO.m` were removed (internalized / unused).
+- `connectivity/` — `RMTMatrix.m` (RMT-based connectivity). The legacy `create_W_matrix.m` / `create_paired_W_matrix.m` were removed.
+- `nonlinearities/` — `piecewiseSigmoid`, `tanhActivation` and their derivatives (also internalized into `SRNNModel2`). `logisticSigmoid` was removed.
+- `plotting/` — colormaps, line/scatter helpers, time-series panel plots, `param_space_plots/` for post-hoc visualization, `plot_saving/save_some_figs_to_folder_2.m` (used by every script that writes figures). Unused plot/colormap duplicates were removed; the standalone `plot_*` files that example/figure scripts call directly remain.
+- `SRNN_ESN_reservoir.m` — Echo State Network subclass of `SRNNModel2` (memory-capacity experiments). The exploratory `SRNN_ESN.m` / `SRNN_reservoir.m` / `SRNN_reservoir_DDE.m` RHS variants were removed.
 
-### Legacy and exploratory code (likely targets for removal in a refactor)
+### Scripts retained beyond the `run_all_analyses` pipeline
 
-- `scripts/old_scripts/` — predecessors of `run_*` scripts, no longer wired in.
-- Single-purpose ad-hoc analyses in `scripts/`: `Sompolinsky_*.m`, `Single_vs_dual_adaptation_example.m`, `SRNN_comparisons.m`, `debug_PP.m`, `looped_memory_capacity.m`, `example_*.m`, `fraction_excitatory_analysis.m`, `Fig_2_*` (the orchestrator's stage 4 is currently commented out), `paired_pulse/`, `sine_stim/`, `review_paper/`, `python_piecewise/`, `VAR_SRNN/`.
-- `reference_files/` — earlier project's source kept as a reference (`Somp_relu_centered_v5d.m`, `compute_dependent_variables.m`, `RMT.m`, …); cited by docs but not on the runtime path of the current pipeline.
-- `src/SensitivityAnalysis.m` — superseded by `ParamSpaceAnalysis2`.
-- `src/SRNNModel.m` — superseded by `SRNNModel2`.
+The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_paper/`, `VAR_SRNN/`, `python_piecewise/`, `reference_files/`) and the old-API comparison/run scripts. What is kept, besides the four primary entry points:
 
-When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnalysis2`. Do not import from `reference_files/` or `old_scripts/` unless explicitly asked.
+- Example/figure scripts that use the current classes: `Sompolinsky_N_1000_g_1p8.m`, `Single_vs_dual_adaptation_example.m`, `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_*.m`, `example_memory_capacity.m`, `looped_memory_capacity.m`, `stim_engages_adaptation/bursting_SRNN_model*.m`, and the `replot_*` figure regenerators.
+- `scripts/sine_stim/` and `scripts/paired_pulse/` — kept as references but **currently non-functional**: they still use the old script-based API, and their legacy dependencies were deleted. They must be ported to `SRNNModel2` before use.
+
+When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnalysis2`.
 
 ## Data conventions
 
-- Output `.mat` files, figures (`.fig`/`.png`/`.pdf`/`.svg`) and the `.venv` are all gitignored — do not commit them.
+- Output `.mat` files, figures (`.fig`/`.png`/`.pdf`/`.svg`) and the `.venv` are all gitignored — do not commit them. The `data/`, `figs/`, and `results_DDE/` output directories are now gitignored wholesale (added in the `refactor` cleanup), so their per-run `.m`/`.txt`/`.csv` contents stay out of git too.
 - Each analysis writes `psa_object.mat` plus per-condition result `.mat` files and copies the launching script into the output dir for reproducibility (via `copyfile([mfilename('fullpath') '.m'], psa.output_dir)`).
 - `data/` already contains historical run dirs (`data/param_space/`, `data/sensitivity/`, `data/sensitivity_tau_timescales_*`, `data/memory_capacity/`); leave these alone unless asked.
 
