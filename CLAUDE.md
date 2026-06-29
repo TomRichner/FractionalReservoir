@@ -19,12 +19,14 @@ Connectivity uses Random Matrix Theory (Harris 2023) tilde-notation. Outputs are
 
 Every entry-point script begins with `setup_paths()` (defined in `scripts/setup_paths.m`), which adds `src/` and `scripts/` recursively to the MATLAB path. Scripts in `scripts/` are intended to be run from the MATLAB cwd at the project root or from the `scripts/` directory.
 
-Primary entry points (current, not legacy):
+Primary entry points (current, not legacy) — the orchestrator and its three sub-analyses live together in `scripts/run_all_analyses/`:
 
-- `scripts/run_param_space_analysis2.m` — multi-dimensional grid sweep across SRNNModel2 parameters
-- `scripts/run_sensitivity_analysis.m` — 1D sweeps (uses `ParamSpaceAnalysis2` with `randomize_order=false` and `reps` as a grid axis)
-- `scripts/run_tau_sensitivity_analysis.m` — vector-parameter sweep over `tau_a_E` / `tau_b_E_rec`
-- `scripts/run_all_analyses.m` — orchestrator that runs the three above into a single dated `data/param_space/run_all_<dt>/` directory
+- `scripts/run_all_analyses/run_param_space_analysis2.m` — multi-dimensional grid sweep across SRNNModel2 parameters
+- `scripts/run_all_analyses/run_sensitivity_analysis.m` — 1D sweeps (uses `ParamSpaceAnalysis2` with `randomize_order=false` and `reps` as a grid axis)
+- `scripts/run_all_analyses/run_tau_sensitivity_analysis.m` — vector-parameter sweep over `tau_a_E` / `tau_b_E_rec`
+- `scripts/run_all_analyses/run_all_analyses.m` — orchestrator that runs the three above into a single dated `data/param_space/run_all_<dt>/` directory
+
+`scripts/setup_paths.m` stays at the `scripts/` root (every entry point depends on it, and it derives the project root from its own location). `run_all_analyses.m` derives `project_root` from `which('setup_paths')`, so it tolerates living in a subdirectory.
 
 There is no standalone test framework; ad-hoc verification scripts are named `scripts/test_*.m` (e.g. `test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_sensitivity_refactor.m`). Run them from the MATLAB editor or via the matlab MCP `run_matlab_file` tool. The matlab MCP server is available — prefer `check_matlab_code` for static analysis and `run_matlab_file` / `evaluate_matlab_code` for execution; the user's MATLAB desktop is the visible UI for any figures.
 
