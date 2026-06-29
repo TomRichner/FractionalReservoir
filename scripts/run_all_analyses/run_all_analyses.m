@@ -43,7 +43,7 @@ master_save_figs = 'save_all_figs';
 %   'production' - full-size sweeps (for real results)
 % Defaults to 'production'. To do a quick run WITHOUT editing any file, set the
 % variable first in the console:   run_mode = 'fast'; run_all_analyses
-if ~exist('run_mode', 'var'); run_mode = 'production'; end
+if ~exist('run_mode', 'var'); run_mode = 'fast'; end
 fprintf('Run mode: %s\n\n', run_mode);
 
 %% 1. Tau Sensitivity Analysis
@@ -57,6 +57,19 @@ fprintf('========================================\n');
 fprintf('[2/4] Running Sensitivity Analysis...\n');
 fprintf('========================================\n');
 run_sensitivity_analysis;
+
+%% 2b. Assemble 1D sensitivity figures into one stacked figure
+% run_sensitivity_analysis saves each swept parameter's LLE figure into its own
+% 1D_sensitivity_* subfolder. replot_sensitivity gathers them into a single
+% replot_sensitivity_<dt>/figures/ folder, then assemble_sensitivity_figure
+% stacks the per-parameter LLE figures into sensitivity_LLE_combined.{fig,png}.
+if ~strcmp(master_save_figs, 'save_no_figs')
+    fprintf('========================================\n');
+    fprintf('Assembling 1D sensitivity figures...\n');
+    fprintf('========================================\n');
+    sens_replot_dir = replot_sensitivity(master_output_dir);
+    assemble_sensitivity_figure(sens_replot_dir, 'LLE');
+end
 
 %% 3. Parameter Space Analysis
 fprintf('========================================\n');
