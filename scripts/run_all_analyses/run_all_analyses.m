@@ -38,6 +38,14 @@ capture_git_provenance(master_output_dir, project_root);
 %   'follow_scripts_save_figs' - Let each script use its own save_figs setting
 master_save_figs = 'save_all_figs';
 
+% Run mode for all three sub-analyses (controls n_levels / n_reps):
+%   'fast'       - few levels/reps; finishes quickly (for testing)
+%   'production' - full-size sweeps (for real results)
+% Defaults to 'production'. To do a quick run WITHOUT editing any file, set the
+% variable first in the console:   run_mode = 'fast'; run_all_analyses
+if ~exist('run_mode', 'var'); run_mode = 'production'; end
+fprintf('Run mode: %s\n\n', run_mode);
+
 %% 1. Tau Sensitivity Analysis
 fprintf('========================================\n');
 fprintf('[1/4] Running Tau Sensitivity Analysis...\n');

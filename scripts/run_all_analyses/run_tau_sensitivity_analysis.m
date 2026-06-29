@@ -31,8 +31,17 @@ end
 setup_paths();
 
 %% Analysis Configuration
-n_levels = 5; % 25
-n_reps = 5; % 50
+% Run mode: 'fast' for quick checks, 'production' for full-size runs.
+% Set run_mode in the base workspace (or via run_all_analyses); defaults to
+% 'production' when this script is run standalone.
+if ~exist('run_mode', 'var'); run_mode = 'production'; end
+switch run_mode
+    case 'fast',       n_levels = 5;  n_reps = 5;
+    case 'production', n_levels = 25; n_reps = 50;
+    otherwise, error('run_tau_sensitivity_analysis:badMode', ...
+        'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
+end
+fprintf('[run_tau_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d\n', run_mode, n_levels, n_reps);
 note = 'tau_timescales';
 
 % Condition: SFA + STD (n_a_E=3, n_b_E=1)

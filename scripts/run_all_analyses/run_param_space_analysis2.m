@@ -39,9 +39,21 @@ setup_paths();
 % NOTE: Total simulations = n_levels^(n_params) * n_conditions
 %       e.g., 4 levels x 3 params x 4 conditions = 256 simulations
 
+% Run mode: 'fast' for quick checks, 'production' for full-size runs.
+% Set run_mode in the base workspace (or via run_all_analyses); defaults to
+% 'production' when this script is run standalone.
+if ~exist('run_mode', 'var'); run_mode = 'production'; end
+switch run_mode
+    case 'fast',       n_levels = 3;
+    case 'production', n_levels = 5;
+    otherwise, error('run_param_space_analysis2:badMode', ...
+        'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
+end
+fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d\n', run_mode, n_levels);
+
 psa = ParamSpaceAnalysis2(...
-    'n_levels', 3, ...          %  5, Number of levels per parameter
-    'batch_size', 25, ...       % 25, Configs per batch (for checkpointing)
+    'n_levels', n_levels, ...   % set by run_mode (fast=3, production=5)
+    'batch_size', 25, ...       % configs per batch (for checkpointing)
     'note', 'test_refactor', ...         % Optional note for folder naming
     'verbose', true ...         % Print progress during execution
     );
