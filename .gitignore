@@ -59,3 +59,8 @@ Thumbs.db
 *.png
 *.pdf
 
+# Output/run directories (regenerable analysis outputs; keep out of git)
+data/
+figs/
+results_DDE/
+
