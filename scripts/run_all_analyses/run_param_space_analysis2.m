@@ -13,11 +13,9 @@
 %
 % See also: ParamSpaceAnalysis2, SRNNModel2, SensitivityAnalysis
 
-if ~exist('master_output_dir', 'var')
-    clear all;
-    clc;
-    close all;
-end
+% No clear/clc/close all on standalone runs, so base-workspace settings such as
+% run_mode and save_figs (set in the console before running) survive into this
+% script. run_all_analyses relies on the same: it never clears the sub-scripts.
 
 %% Figure saving configuration
 if exist('master_save_figs', 'var')
