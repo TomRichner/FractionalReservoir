@@ -2,8 +2,9 @@
 % setup_paths();  % Commented out - called by master script
 
 % Derive project root from script location for portable paths
-script_path = fileparts(mfilename('fullpath'));
-project_root = fileparts(script_path);  % Go up from scripts/ to project root
+% This script lives in scripts/tests/, so the project root is two directories
+% up from its folder. (setup_paths is commented out above; resolve standalone.)
+project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 figs_root = fullfile(project_root, 'figs');
 output_folder_name = ['srnn_comparison_', datestr(now, 'yyyymmdd_HHMM')];
 

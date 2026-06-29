@@ -84,7 +84,7 @@ The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_pape
 - `scripts/EI_balance/` — fraction-excitatory analyses: `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_load_and_plot.m`.
 - `scripts/memory_capacity/` — `example_memory_capacity.m`, `looped_memory_capacity.m` (Echo State Network experiments).
 - `scripts/stim_engages_adaptation/` — `bursting_SRNN_model*.m`.
-- `scripts/Sompolinsky_N_1000_g_1p8.m`, `scripts/Single_vs_dual_adaptation_example.m`, `scripts/test_*.m` — remaining top-level example/test scripts.
+- `scripts/tests/` — verification scripts (`test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_sensitivity_refactor.m`) plus the standalone example/comparison scripts `Sompolinsky_N_1000_g_1p8.m` and `Single_vs_dual_adaptation_example.m`.
 - `scripts/sine_stim/` and `scripts/paired_pulse/` — kept as references but **currently non-functional**: they still use the old script-based API, and their legacy dependencies were deleted. They must be ported to `SRNNModel2` before use.
 
 **Path convention after the reorg:** scripts no longer assume they sit directly under `scripts/`. Those that call `setup_paths()` derive `project_root = fileparts(fileparts(which('setup_paths')))` (depth-independent); the memory-capacity scripts (which don't call `setup_paths`) walk up from their own location. When adding or moving a script, preserve one of these patterns rather than a fixed-depth `fileparts(mfilename)` chain.

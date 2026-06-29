@@ -27,8 +27,9 @@ end
 if ~exist('save_figs', 'var')
     save_figs = false;  % Script default
 end
-script_path = fileparts(mfilename('fullpath'));
-project_root = fileparts(script_path);  % Go up from scripts/ to project root
+% This script lives in scripts/tests/, so the project root is two directories
+% up from its folder.
+project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 figs_root = fullfile(project_root, 'figs');
 output_folder_name = 'Sompolinsky1988';
 
