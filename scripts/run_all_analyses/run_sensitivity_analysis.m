@@ -46,7 +46,7 @@ note = 'sensitivity';
 params_to_sweep = {
     'n',              [100, 300];
     'f',              [0.4, 0.6];
-    'S_c',            [0, 0.6];
+    'level_of_chaos', [0.7, 1.5];
 };
 
 %% Run sensitivity analysis for each parameter
