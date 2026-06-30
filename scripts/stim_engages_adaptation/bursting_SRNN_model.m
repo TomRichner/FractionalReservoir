@@ -164,7 +164,7 @@ ode_solver = @ode_rk4;     % @ode45 (adaptive) | @ode_rk4 (fixed-step, fast with
 %  8. LYAPUNOV / ANALYSIS
 %  ======================================================================
 %  'none' is fastest while tuning; 'benettin' adds LLE; 'qr' = full spectrum.
-lya_method = 'none';       % 'none' | 'benettin' | 'qr'         (default 'benettin')
+lya_method = 'benettin';   % 'none' | 'benettin' | 'qr'         (default 'benettin')
 
 %% ======================================================================
 %  9. PLOTTING
@@ -278,6 +278,54 @@ legend(labels, 'Location', 'southwest');
 grid on;
 
 %% ======================================================================
+%  MEAN LOCAL LLE PER DC LEVEL  (after settling) -- requires lya_method ~= 'none'
+%  ======================================================================
+%  The local Lyapunov exponent (Benettin) is a time-resolved measure of local
+%  stability. Binning it by DC staircase level -- skipping the first psd_settle
+%  seconds after each step so SFA/STD have settled -- gives a finite-time LLE
+%  conditioned on the operating point that DC sets. This tests whether DC drive
+%  moves the network toward or away from the edge of chaos (lambda_1 = 0).
+%
+%  The per-level statistic is the MEAN of the local exponent: the Lyapunov
+%  exponent is by definition a time-average of the local log-expansion rates,
+%  so the mean of local_lya over a window IS the finite-time LLE for that DC.
+%  The std (shown as error bars) is the spread of per-interval rates -- large
+%  spread (e.g. at DC=0, where the near-stationary trajectory makes the Benettin
+%  estimate ill-conditioned) flags an unreliable finite-time estimate that wants
+%  a longer hold, not a different statistic.
+if ~strcmpi(lya_method, 'none')
+    t_lya = model.lya_results.t_lya;
+    ll    = model.lya_results.local_lya;
+    nL    = numel(dc_levels);
+    mean_lle = nan(nL, 1); std_lle = nan(nL, 1);
+    for k = 1:nL
+        % Steady window for level k: skip the first psd_settle s after the step.
+        lo  = (k-1)*hold_dur + psd_settle;
+        hi  = k*hold_dur;
+        sel = t_lya > lo & t_lya <= hi;
+        mean_lle(k) = mean(ll(sel));
+        std_lle(k)  = std(ll(sel));
+    end
+
+    fprintf('\nMean local LLE per DC level (after %g s settle; whole-run LLE = %.4f):\n', ...
+        psd_settle, model.lya_results.LLE);
+    disp(table((1:nL)', dc_levels(:), mean_lle, std_lle, ...
+        'VariableNames', {'level', 'DC', 'mean_localLLE', 'std'}));
+
+    % Plot vs staircase level index (DC repeats, so index preserves time order
+    % and keeps the two DC=0 holds, levels 1 & 6, distinct). DC values on ticks.
+    % confplot draws the mean line with a shaded +/- std band.
+    figure('Name', 'Local LLE vs DC level');
+    confplot(1:nL, mean_lle, std_lle, std_lle, [0 0 0.8; 0.7 0.8 1.0]);
+    yline(0, '--k', 'edge of chaos', 'HandleVisibility', 'off');
+    set(gca, 'XTick', 1:nL, 'XTickLabel', compose('%.3g', dc_levels));
+    xlabel('DC staircase level (input units)');
+    ylabel('mean local \lambda_1  (\pm std, after settle)');
+    title('Largest local Lyapunov exponent vs DC stim level');
+    grid off;
+end
+
+%% ======================================================================
 %  NETWORK GRAPH  (directed connectivity W)
 %  ======================================================================
 %  Circle-layout digraph of the connectivity: E nodes colored, I nodes dark
@@ -306,51 +354,8 @@ if save_figs
     fprintf('Saved figures to %s\n', save_folder);
 end
 
-%% ======================================================================
-%  LOCAL FUNCTIONS
-%  ======================================================================
-function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, rng_seed, input_config)
-    % DC_STAIRCASE_STIMULUS Uniform tonic DC stepped through a sequence of levels,
-    % plus independent per-neuron white noise.
-    %
-    % Each level dc_levels(k) is held for hold_dur seconds, applied identically
-    % to every neuron over [0, T]. The first hold ramps in linearly from 0 over
-    % the first ramp_dur seconds. fs-invariant white noise
-    % (input_config.noise_intensity) is added per neuron on top. Signature
-    % matches the SRNNModel2 generator hook:
-    %   [u_ex, t_ex] = generator(params, T, fs, rng_seed, input_config)
-    dt   = 1 / fs;
-    t_ex = (0:dt:T)';          % nt x 1, matches built-in generator
-    nt   = numel(t_ex);
-
-    dc_levels = input_config.dc_levels;
-    hold_dur  = input_config.hold_dur;
-    ramp_dur  = input_config.ramp_dur;
-    nL        = numel(dc_levels);
-
-    % Staircase: level k over [(k-1)*hold_dur, k*hold_dur)
-    dc_profile = zeros(nt, 1);
-    for k = 1:nL
-        seg = t_ex >= (k-1)*hold_dur & t_ex < k*hold_dur;
-        dc_profile(seg) = dc_levels(k);
-    end
-    dc_profile(t_ex >= nL*hold_dur) = dc_levels(nL);   % final boundary sample
-
-    % Ramp the first hold in linearly: 0 -> dc_levels(1) over the first ramp_dur s
-    ramp_idx = t_ex <= ramp_dur;
-    dc_profile(ramp_idx) = linspace(0, dc_levels(1), nnz(ramp_idx))';
-
-    % Same drive to every neuron: n x nt
-    u_ex = repmat(dc_profile', params.n, 1);
-
-    % Add independent white noise per neuron over [0, T] (probes the network's
-    % filtering). The sqrt(fs) factor makes this an fs-invariant white noise: the
-    % continuous-time PSD ~ noise_intensity^2 is independent of fs (standard
-    % Euler-Maruyama 1/sqrt(dt) scaling). The model's linear interpolant
-    % band-limits it to ~Nyquist (fs/2), flat over our <100 Hz band. Seeded for
-    % reproducibility.
-    if isfield(input_config, 'noise_intensity') && input_config.noise_intensity > 0
-        rng(rng_seed);
-        u_ex = u_ex + input_config.noise_intensity * sqrt(fs) * randn(params.n, numel(t_ex));
-    end
-end
+% NOTE: the DC staircase stimulus generator wired in via
+% input_config.generator = @dc_staircase_stimulus now lives in
+% src/stimulus/dc_staircase_stimulus.m (promoted from a local function here so
+% it is on the path and serializable to parfor workers by the multi-seed
+% analyses). setup_paths() adds it to the path.
