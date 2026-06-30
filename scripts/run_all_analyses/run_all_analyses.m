@@ -5,7 +5,7 @@
 %   1. Tau sensitivity analysis (tau_a and tau_b parameter sweeps)
 %   2. General sensitivity analysis (SFA/STD parameter exploration)
 %   3. Parameter space analysis
-%   4. Fig 2: Fraction excitatory analysis
+%   4. DC Lyapunov analysis (local LLE vs DC stim level, across seeds)
 %
 % Each analysis saves its results to disk automatically.
 
@@ -77,9 +77,25 @@ fprintf('[3/4] Running Parameter Space Analysis...\n');
 fprintf('========================================\n');
 run_param_space_analysis2;
 
-% %% 4. Fig 2: Fraction Excitatory Analysis
+%% 4. DC Lyapunov Analysis
+fprintf('========================================\n');
+fprintf('[4/4] Running DC Lyapunov Analysis...\n');
+fprintf('========================================\n');
+run_dc_lle_analysis;
+
+%% 4b. Replot the DC Lyapunov figure from saved data
+% run_dc_lle_analysis saves dc_lle_results.mat into a dc_lle_nSeeds_* subfolder.
+% replot_dc_lle rebuilds the DC-vs-LLE confplot figure from that .mat alone.
+if ~strcmp(master_save_figs, 'save_no_figs')
+    fprintf('========================================\n');
+    fprintf('Replotting DC Lyapunov figure...\n');
+    fprintf('========================================\n');
+    replot_dc_lle(master_output_dir);
+end
+
+% %% Fig 2: Fraction Excitatory Analysis
 % fprintf('========================================\n');
-% fprintf('[4/4] Running Fig 2 Fraction Excitatory Analysis...\n');
+% fprintf('Running Fig 2 Fraction Excitatory Analysis...\n');
 % fprintf('========================================\n');
 % Fig_2_fraction_excitatory_analysis;
 
