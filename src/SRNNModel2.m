@@ -60,6 +60,7 @@ classdef SRNNModel2 < handle
         tau_b_E_rel = 0.25          % STD release time constant for E neurons (s)
         tau_b_I_rec = 1             % STD recovery time constant for I neurons (s)
         tau_b_I_rel = 0.25          % STD release time constant for I neurons (s)
+        std_zero_floor = false      % If true, rescale synaptic b -> (b-b_min)/(1-b_min) so b*r reaches 0 at r=1
     end
 
     %% Dynamics Properties
@@ -597,6 +598,7 @@ classdef SRNNModel2 < handle
             params.tau_b_E_rel = obj.tau_b_E_rel;
             params.tau_b_I_rec = obj.tau_b_I_rec;
             params.tau_b_I_rel = obj.tau_b_I_rel;
+            params.std_zero_floor = obj.std_zero_floor;
 
             % Dynamics
             params.tau_d = obj.tau_d;
@@ -1113,8 +1115,11 @@ classdef SRNNModel2 < handle
             % Compute firing rates: r = phi(x_eff) (raw rate)
             r_ts = params.activation_function(x_eff_ts);  % n x nt
 
-            % Compute synaptic output: br = b .* r (presynaptically depressed)
-            br_ts = b_ts .* r_ts; % n x nt
+            % Compute synaptic output: br = b .* r (presynaptically depressed).
+            % Apply the optional STD zero-floor here so br matches the drive
+            % used in dynamics_fast; b_ts (the plotted state) stays raw.
+            b_syn_ts = SRNNModel2.apply_std_zero_floor(b_ts, params);
+            br_ts = b_syn_ts .* r_ts; % n x nt
 
             %% Split into E and I components and package into structs
 
@@ -1257,6 +1262,30 @@ classdef SRNNModel2 < handle
             axis equal;
         end
 
+        function b_used = apply_std_zero_floor(b, params)
+            % APPLY_STD_ZERO_FLOOR Rescale synaptic availability so full
+            % depression drives the synaptic output b*r -> 0.
+            %
+            % Maps the dynamic range [b_min, 1] onto [0, 1], where
+            % b_min = tau_rel / (tau_rec + tau_rel) is the asymptote of the b
+            % ODE at r = 1. This is a readout-only transform: the b state and
+            % its ODE are unchanged. At rest (b = 1) b_used = 1, so baseline
+            % behavior is preserved. Accepts b as an n x 1 vector or n x nt
+            % matrix (b_min broadcasts over columns).
+            b_used = b;
+            if ~isfield(params, 'std_zero_floor') || ~params.std_zero_floor
+                return;
+            end
+            if params.n_b_E > 0
+                bmin_E = params.tau_b_E_rel / (params.tau_b_E_rec + params.tau_b_E_rel);
+                b_used(params.E_indices, :) = (b(params.E_indices, :) - bmin_E) / (1 - bmin_E);
+            end
+            if params.n_b_I > 0
+                bmin_I = params.tau_b_I_rel / (params.tau_b_I_rec + params.tau_b_I_rel);
+                b_used(params.I_indices, :) = (b(params.I_indices, :) - bmin_I) / (1 - bmin_I);
+            end
+        end
+
         function dS_dt = dynamics_fast(t, S, params)
             % DYNAMICS_FAST Static method for fast ODE evaluation
             %
@@ -1365,8 +1394,12 @@ classdef SRNNModel2 < handle
 
             r = activation_fn(x_eff);
 
+            % Optional STD zero-floor: rescale b in the synaptic readout only
+            % (the b ODE below still uses the raw b state).
+            b_syn = SRNNModel2.apply_std_zero_floor(b, params);
+
             %% Compute derivatives
-            dx_dt = (-x + W * (b .* r) + u) / tau_d;
+            dx_dt = (-x + W * (b_syn .* r) + u) / tau_d;
 
             da_E_dt = [];
             if n_E > 0 && n_a_E > 0 && ~isempty(a_E)
@@ -2041,6 +2074,24 @@ classdef SRNNModel2 < handle
             phi_prime_x_eff = phi_prime(x_eff);
             r_vec = b .* phi_x_eff;
 
+            % STD zero-floor affects only the synaptic drive W*(b.*r) in dx/dt,
+            % so only the dx/dt (row_x) Jacobian blocks below use b_syn / the
+            % per-population gain g = d(b_used)/db = 1/(1-b_min). The b ODE and
+            % SFA blocks use the raw b state and are unchanged.
+            b_syn = SRNNModel2.apply_std_zero_floor(b, params);
+            g_b_E = 1;
+            g_b_I = 1;
+            if isfield(params, 'std_zero_floor') && params.std_zero_floor
+                if len_b_E > 0
+                    bmin_E = tau_b_E_rel / (tau_b_E_rec + tau_b_E_rel);
+                    g_b_E = 1 / (1 - bmin_E);
+                end
+                if len_b_I > 0
+                    bmin_I = tau_b_I_rel / (tau_b_I_rec + tau_b_I_rel);
+                    g_b_I = 1 / (1 - bmin_I);
+                end
+            end
+
             %% Dimensions and indexing
             N_sys_eqs = len_a_E + len_a_I + len_b_E + len_b_I + n;
 
@@ -2128,30 +2179,30 @@ classdef SRNNModel2 < handle
             %% dx/dt blocks
             if len_a_E > 0
                 replicate_a_E = kron(speye(n_E), ones(1, n_a_E));
-                block = -c_E * W_sparse(:, E_indices) * spdiags(b(E_indices) .* phi_prime_x_eff(E_indices), 0, n_E, n_E);
+                block = -c_E * W_sparse(:, E_indices) * spdiags(b_syn(E_indices) .* phi_prime_x_eff(E_indices), 0, n_E, n_E);
                 J(row_x, col_a_E) = (block * replicate_a_E) / tau_d;
             end
 
             if len_a_I > 0
                 replicate_a_I = kron(speye(n_I), ones(1, n_a_I));
-                block = -c_I * W_sparse(:, I_indices) * spdiags(b(I_indices) .* phi_prime_x_eff(I_indices), 0, n_I, n_I);
+                block = -c_I * W_sparse(:, I_indices) * spdiags(b_syn(I_indices) .* phi_prime_x_eff(I_indices), 0, n_I, n_I);
                 J(row_x, col_a_I) = (block * replicate_a_I) / tau_d;
             end
 
             if len_b_E > 0
                 replicate_b_E = kron(speye(n_E), ones(1, max(1, n_b_E)));
-                block = W_sparse(:, E_indices) * spdiags(phi_x_eff(E_indices), 0, n_E, n_E);
+                block = g_b_E * W_sparse(:, E_indices) * spdiags(phi_x_eff(E_indices), 0, n_E, n_E);
                 J(row_x, col_b_E) = (block * replicate_b_E) / tau_d;
             end
 
             if len_b_I > 0
                 replicate_b_I = kron(speye(n_I), ones(1, max(1, n_b_I)));
-                block = W_sparse(:, I_indices) * spdiags(phi_x_eff(I_indices), 0, n_I, n_I);
+                block = g_b_I * W_sparse(:, I_indices) * spdiags(phi_x_eff(I_indices), 0, n_I, n_I);
                 J(row_x, col_b_I) = (block * replicate_b_I) / tau_d;
             end
 
             diag_term = spdiags(-ones(n,1)/tau_d, 0, n, n);
-            gain_diag = spdiags(b .* phi_prime_x_eff, 0, n, n);
+            gain_diag = spdiags(b_syn .* phi_prime_x_eff, 0, n, n);
             J(row_x, col_x) = diag_term + (W_sparse * gain_diag) / tau_d;
         end
 

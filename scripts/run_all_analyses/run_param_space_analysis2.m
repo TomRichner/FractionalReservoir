@@ -29,6 +29,15 @@ if ~exist('save_figs', 'var')
     save_figs = false;
 end
 
+%% STD zero-floor configuration
+% Honor the master override from run_all_analyses; default off when standalone.
+if exist('master_std_zero_floor', 'var')
+    std_zero_floor = master_std_zero_floor;
+end
+if ~exist('std_zero_floor', 'var')
+    std_zero_floor = false;
+end
+
 %% Setup paths
 setup_paths();
 
@@ -59,6 +68,7 @@ if exist('master_output_dir', 'var')
     psa.output_dir = master_output_dir;
 end
 psa.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
+psa.model_defaults.std_zero_floor = std_zero_floor;
 
 %% Add parameters to the grid
 % All combinations of these parameters will be tested

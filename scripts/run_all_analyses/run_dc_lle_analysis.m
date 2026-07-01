@@ -39,6 +39,15 @@ if ~exist('save_figs', 'var')
     save_figs = false;
 end
 
+%% STD zero-floor configuration
+% Honor the master override from run_all_analyses; default off when standalone.
+if exist('master_std_zero_floor', 'var')
+    std_zero_floor = master_std_zero_floor;
+end
+if ~exist('std_zero_floor', 'var')
+    std_zero_floor = false;
+end
+
 %% Setup paths
 setup_paths();
 
@@ -48,9 +57,10 @@ setup_paths();
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
     case 'fast'
-        n_seeds    = 4;
-        dc_levels  = [0 0.05 0.1 0.2];
+        n_seeds    = 25;
+        dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
         ode_solver = @ode_rk4;
+        % ode_solver = @ode45;
     case 'production'
         n_seeds    = 50;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
@@ -117,13 +127,13 @@ if use_parallel
     parfor s = 1:n_seeds
         seed_results{s} = run_one_seed(s, n, f, indegree, F, phi, phi_deriv, ...
             S_a, S_c, input_config, ode_solver, fs, T_range, ...
-            hold_dur, psd_settle, nL);
+            hold_dur, psd_settle, nL, std_zero_floor);
     end
 else
     for s = 1:n_seeds
         seed_results{s} = run_one_seed(s, n, f, indegree, F, phi, phi_deriv, ...
             S_a, S_c, input_config, ode_solver, fs, T_range, ...
-            hold_dur, psd_settle, nL);
+            hold_dur, psd_settle, nL, std_zero_floor);
     end
 end
 fprintf('[run_dc_lle_analysis] %d seeds finished in %.1f s\n', n_seeds, toc(run_start));
@@ -196,7 +206,7 @@ fprintf('Done! Results saved to: %s\n', output_dir);
 %  LOCAL FUNCTIONS
 %  ======================================================================
 function res = run_one_seed(s, n, f, indegree, F, phi, phi_deriv, S_a, S_c, ...
-        input_config, ode_solver, fs, T_range, hold_dur, psd_settle, nL)
+        input_config, ode_solver, fs, T_range, hold_dur, psd_settle, nL, std_zero_floor)
     % Run one staircase simulation for seed s and return per-level local LLE.
     model = SRNNModel2( ...
         'n', n, 'f', f, 'indegree', indegree, ...
@@ -206,6 +216,7 @@ function res = run_one_seed(s, n, f, indegree, F, phi, phi_deriv, S_a, S_c, ...
         'n_a_E', 3, 'n_a_I', 0, 'c_E', 0.15/3, 'c_I', 0.15/3, ...
         'tau_a_E', logspace(log10(0.25), log10(10), 3), ...
         'n_b_E', 1, 'n_b_I', 0, 'tau_b_E_rec', 1, 'tau_b_E_rel', 0.25, ...
+        'std_zero_floor', std_zero_floor, ...
         'tau_d', 0.1, 'S_a', S_a, 'S_c', S_c, ...
         'activation_function', phi, 'activation_function_derivative', phi_deriv, ...
         'input_config', input_config, 'u_ex_scale', 1.0, ...

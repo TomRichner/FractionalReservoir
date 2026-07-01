@@ -38,6 +38,11 @@ capture_git_provenance(master_output_dir, project_root);
 %   'follow_scripts_save_figs' - Let each script use its own save_figs setting
 master_save_figs = 'save_all_figs';
 
+% Rescale STD so the synaptic output b*r reaches 0 at full depression
+% (see SRNNModel2.std_zero_floor). When set, all four sub-analyses run with
+% the zero-floor; false reproduces the current (pre-floor) behavior.
+master_std_zero_floor = false;
+
 % Run mode for all three sub-analyses (controls n_levels / n_reps):
 %   'fast'       - few levels/reps; finishes quickly (for testing)
 %   'production' - full-size sweeps (for real results)

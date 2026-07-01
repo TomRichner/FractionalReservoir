@@ -11,7 +11,7 @@
 % after it gives the class default. Anything you leave commented falls back to
 % that default. See CLAUDE.md and SRNNModel2.m for the governing equations.
 
-close all; clc;
+% close all; clc;
 
 % --- RNG seeds: persist & advance across successive runs --------------------
 % On the first run, initialize rng_seeds = [1 2]. On every subsequent run,
