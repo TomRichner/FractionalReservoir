@@ -2072,7 +2072,6 @@ classdef SRNNModel2 < handle
 
             phi_x_eff = phi_fun(x_eff);
             phi_prime_x_eff = phi_prime(x_eff);
-            r_vec = b .* phi_x_eff;
 
             % STD zero-floor affects only the synaptic drive W*(b.*r) in dx/dt,
             % so only the dx/dt (row_x) Jacobian blocks below use b_syn / the
@@ -2110,81 +2109,82 @@ classdef SRNNModel2 < handle
             W_sparse = sparse(W);
             J = sparse(N_sys_eqs, N_sys_eqs);
 
-            %% SFA blocks (E)
+            %% SFA blocks (E) — Jacobian of da_{ik}/dt = (r_i - a_{ik})/tau_k,
+            % r_i = phi(x_eff_i), x_eff_i = x_i - c_E*sum_k a_{ik}. Adaptation is
+            % driven by the raw rate r (no b). Timescale-major state ordering:
+            % a_{i,k} lives at index (k-1)*n_E + i.
             if len_a_E > 0
                 tau_inv_E = 1 ./ tau_a_E(:);
-                diag_block_E = kron(speye(n_E), spdiags(-tau_inv_E, 0, n_a_E, n_a_E));
-                gamma_E = c_E * (b(E_indices) .* phi_prime_x_eff(E_indices));
-                row_template_E = sparse(tau_inv_E * ones(1, n_a_E));
-                coupling_block_E = kron(spdiags(-gamma_E, 0, n_E, n_E), row_template_E);
+                gamma_E = c_E * phi_prime_x_eff(E_indices);   % n_E x 1, no b
+                % a -> a: diagonal -1/tau_k plus within-neuron cross-timescale coupling
+                diag_block_E = kron(spdiags(-tau_inv_E, 0, n_a_E, n_a_E), speye(n_E));
+                row_template_E = sparse(tau_inv_E * ones(1, n_a_E));   % (k,k') -> tau_inv_k
+                coupling_block_E = kron(row_template_E, spdiags(-gamma_E, 0, n_E, n_E));
                 J(row_a_E, col_a_E) = diag_block_E + coupling_block_E;
 
-                beta_E = b(E_indices) .* phi_prime_x_eff(E_indices);
-                vals = kron(beta_E, tau_inv_E);
+                % a -> x: (1/tau_k)*phi'_i
+                beta_E = phi_prime_x_eff(E_indices);          % n_E x 1, no b
+                vals = kron(tau_inv_E, beta_E);               % (k-1)*n_E+i -> tau_inv_k*phi'_i
                 rows = (1:len_a_E)';
-                cols = repelem(E_indices(:), n_a_E);
+                cols = repmat(E_indices(:), n_a_E, 1);        % (k-1)*n_E+i -> E_indices(i)
                 J(row_a_E, col_x) = sparse(rows, cols, vals, len_a_E, n);
-
-                if len_b_E > 0
-                    phi_E = phi_x_eff(E_indices);
-                    J(row_a_E, col_b_E) = kron(spdiags(phi_E, 0, n_E, n_E), sparse(tau_inv_E));
-                end
+                % a -> b block is zero: da/dt does not depend on b.
             end
 
-            %% SFA blocks (I)
+            %% SFA blocks (I) — same structure as E (raw-rate drive, ts-major)
             if len_a_I > 0
                 tau_inv_I = 1 ./ tau_a_I(:);
-                diag_block_I = kron(speye(n_I), spdiags(-tau_inv_I, 0, n_a_I, n_a_I));
-                gamma_I = c_I * (b(I_indices) .* phi_prime_x_eff(I_indices));
+                gamma_I = c_I * phi_prime_x_eff(I_indices);   % n_I x 1, no b
+                diag_block_I = kron(spdiags(-tau_inv_I, 0, n_a_I, n_a_I), speye(n_I));
                 row_template_I = sparse(tau_inv_I * ones(1, n_a_I));
-                coupling_block_I = kron(spdiags(-gamma_I, 0, n_I, n_I), row_template_I);
+                coupling_block_I = kron(row_template_I, spdiags(-gamma_I, 0, n_I, n_I));
                 J(row_a_I, col_a_I) = diag_block_I + coupling_block_I;
 
-                beta_I = b(I_indices) .* phi_prime_x_eff(I_indices);
-                vals = kron(beta_I, tau_inv_I);
+                beta_I = phi_prime_x_eff(I_indices);          % n_I x 1, no b
+                vals = kron(tau_inv_I, beta_I);
                 rows = (1:len_a_I)';
-                cols = repelem(I_indices(:), n_a_I);
+                cols = repmat(I_indices(:), n_a_I, 1);
                 J(row_a_I, col_x) = sparse(rows, cols, vals, len_a_I, n);
-
-                if len_b_I > 0
-                    phi_I = phi_x_eff(I_indices);
-                    J(row_a_I, col_b_I) = kron(spdiags(phi_I, 0, n_I, n_I), sparse(tau_inv_I));
-                end
+                % a -> b block is zero.
             end
 
-            %% STD blocks (E)
+            %% STD blocks (E) — Jacobian of db_i/dt = (1-b_i)/tau_rec - b_i*r_i/tau_rel,
+            % r_i = phi(x_eff_i) (raw rate). Depression enters as a single power of b.
             if len_b_E > 0
                 phi_prime_E = phi_prime_x_eff(E_indices);
-                coeff_a_E = (b(E_indices).^2) * c_E .* phi_prime_E / tau_b_E_rel;
+                % b -> a: -b_i/tau_rel * dr_i/da = b_i*c_E*phi'_i/tau_rel (ts-major cols)
+                coeff_a_E = b(E_indices) .* c_E .* phi_prime_E / tau_b_E_rel;
                 if len_a_E > 0
-                    J(row_b_E, col_a_E) = kron(spdiags(coeff_a_E, 0, n_E, n_E), sparse(ones(1, n_a_E)));
+                    J(row_b_E, col_a_E) = kron(sparse(ones(1, n_a_E)), spdiags(coeff_a_E, 0, n_E, n_E));
                 end
-                diag_vals_b_E = -1/tau_b_E_rec - 2 * r_vec(E_indices) / tau_b_E_rel;
+                % b -> b: -1/tau_rec - r_i/tau_rel
+                diag_vals_b_E = -1/tau_b_E_rec - phi_x_eff(E_indices) / tau_b_E_rel;
                 J(row_b_E, col_b_E) = spdiags(diag_vals_b_E, 0, len_b_E, len_b_E);
-                J(row_b_E, col_x) = sparse(1:n_E, E_indices, - (b(E_indices).^2) .* phi_prime_E / tau_b_E_rel, n_E, n);
+                % b -> x: -b_i/tau_rel * phi'_i
+                J(row_b_E, col_x) = sparse(1:n_E, E_indices, - b(E_indices) .* phi_prime_E / tau_b_E_rel, n_E, n);
             end
 
-            %% STD blocks (I)
+            %% STD blocks (I) — same structure as E (raw-rate drive, ts-major)
             if len_b_I > 0
                 phi_prime_I = phi_prime_x_eff(I_indices);
-                coeff_a_I = (b(I_indices).^2) * c_I .* phi_prime_I / tau_b_I_rel;
+                coeff_a_I = b(I_indices) .* c_I .* phi_prime_I / tau_b_I_rel;
                 if len_a_I > 0
-                    J(row_b_I, col_a_I) = kron(spdiags(coeff_a_I, 0, n_I, n_I), sparse(ones(1, n_a_I)));
+                    J(row_b_I, col_a_I) = kron(sparse(ones(1, n_a_I)), spdiags(coeff_a_I, 0, n_I, n_I));
                 end
-                diag_vals_b_I = -1/tau_b_I_rec - 2 * r_vec(I_indices) / tau_b_I_rel;
+                diag_vals_b_I = -1/tau_b_I_rec - phi_x_eff(I_indices) / tau_b_I_rel;
                 J(row_b_I, col_b_I) = spdiags(diag_vals_b_I, 0, len_b_I, len_b_I);
-                J(row_b_I, col_x) = sparse(1:n_I, I_indices, - (b(I_indices).^2) .* phi_prime_I / tau_b_I_rel, n_I, n);
+                J(row_b_I, col_x) = sparse(1:n_I, I_indices, - b(I_indices) .* phi_prime_I / tau_b_I_rel, n_I, n);
             end
 
             %% dx/dt blocks
             if len_a_E > 0
-                replicate_a_E = kron(speye(n_E), ones(1, n_a_E));
+                replicate_a_E = kron(ones(1, n_a_E), speye(n_E));   % ts-major cols
                 block = -c_E * W_sparse(:, E_indices) * spdiags(b_syn(E_indices) .* phi_prime_x_eff(E_indices), 0, n_E, n_E);
                 J(row_x, col_a_E) = (block * replicate_a_E) / tau_d;
             end
 
             if len_a_I > 0
-                replicate_a_I = kron(speye(n_I), ones(1, n_a_I));
+                replicate_a_I = kron(ones(1, n_a_I), speye(n_I));   % ts-major cols
                 block = -c_I * W_sparse(:, I_indices) * spdiags(b_syn(I_indices) .* phi_prime_x_eff(I_indices), 0, n_I, n_I);
                 J(row_x, col_a_I) = (block * replicate_a_I) / tau_d;
             end
