@@ -157,14 +157,16 @@ for curr_ax_idx = 1:n_plots
                     cmap_E = excitatory_colormap(8);
 
                     if p.n_b_I > 0 && ~isempty(b.I)
-                        plot_lines_with_colormap(t_shifted, b.I, cmap_I);
+                        b_I_prod = reshape(prod(b.I, 2), p.n_I, []);   % collapse timescales
+                        plot_lines_with_colormap(t_shifted, b_I_prod, cmap_I);
                     elseif p.n_b_I == 0 && p.n_I > 0
                         ones_I = ones(p.n_I, length(t_shifted));
                         plot_lines_with_colormap(t_shifted, ones_I, cmap_I);
                     end
 
                     if p.n_b_E > 0 && ~isempty(b.E)
-                        plot_lines_with_colormap(t_shifted, b.E, cmap_E);
+                        b_E_prod = reshape(prod(b.E, 2), p.n_E, []);   % collapse timescales
+                        plot_lines_with_colormap(t_shifted, b_E_prod, cmap_E);
                     elseif p.n_b_E == 0 && p.n_E > 0
                         ones_E = ones(p.n_E, length(t_shifted));
                         plot_lines_with_colormap(t_shifted, ones_E, cmap_E);

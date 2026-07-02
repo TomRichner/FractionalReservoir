@@ -82,19 +82,19 @@ function J_eff = compute_J_eff(S, params)
     end
     current_idx = current_idx + len_a_I;
     
-    % Unpack STD states for E neurons (b_E)
+    % Unpack STD states for E neurons (b_E), n_E x n_b_E (timescale-major)
     len_b_E = params.n_E * params.n_b_E;
     if len_b_E > 0
-        b_E = S(current_idx + (1:len_b_E));
+        b_E = reshape(S(current_idx + (1:len_b_E)), params.n_E, params.n_b_E);
     else
         b_E = [];
     end
     current_idx = current_idx + len_b_E;
-    
-    % Unpack STD states for I neurons (b_I)
+
+    % Unpack STD states for I neurons (b_I), n_I x n_b_I (timescale-major)
     len_b_I = params.n_I * params.n_b_I;
     if len_b_I > 0
-        b_I = S(current_idx + (1:len_b_I));
+        b_I = reshape(S(current_idx + (1:len_b_I)), params.n_I, params.n_b_I);
     else
         b_I = [];
     end
@@ -118,13 +118,14 @@ function J_eff = compute_J_eff(S, params)
         x_eff(params.I_indices) = x_eff(params.I_indices) - c_I * sum(a_I, 2);
     end
     
-    %% Construct b vector (defaults to ones, but replace if STD is present)
+    %% Construct b vector (defaults to ones, but replace if STD is present).
+    %  Multi-timescale STD collapses to the product prod_m b_{i,m}.
     b = ones(n, 1);
     if params.n_b_E > 0 && ~isempty(b_E)
-        b(params.E_indices) = b_E;
+        b(params.E_indices) = prod(b_E, 2);
     end
     if params.n_b_I > 0 && ~isempty(b_I)
-        b(params.I_indices) = b_I;
+        b(params.I_indices) = prod(b_I, 2);
     end
     
     %% Compute gain vector g = b .* phi'(x_eff)

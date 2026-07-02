@@ -54,13 +54,13 @@ classdef SRNNModel2 < handle
 
     %% Short-Term Depression (STD) Properties
     properties
-        n_b_E = 0                   % Number of STD timescales for E neurons (0 or 1)
-        n_b_I = 0                   % Number of STD timescales for I neurons (0 or 1)
-        tau_b_E_rec = 1             % STD recovery time constant for E neurons (s)
-        tau_b_E_rel = 0.25          % STD release time constant for E neurons (s)
-        tau_b_I_rec = 1             % STD recovery time constant for I neurons (s)
-        tau_b_I_rel = 0.25          % STD release time constant for I neurons (s)
-        std_zero_floor = false      % If true, rescale synaptic b -> (b-b_min)/(1-b_min) so b*r reaches 0 at r=1
+        n_b_E = 0                   % Number of STD timescales for E neurons
+        n_b_I = 0                   % Number of STD timescales for I neurons
+        tau_b_E_rec = 1             % STD recovery time constants for E neurons (1 x n_b_E vector)
+        tau_b_E_rel = 0.25          % STD release time constant for E neurons (scalar, shared across timescales)
+        tau_b_I_rec = 1             % STD recovery time constants for I neurons (1 x n_b_I vector)
+        tau_b_I_rel = 0.25          % STD release time constant for I neurons (scalar, shared across timescales)
+        std_zero_floor = false      % If true, rescale synaptic prod_m(b_m) -> (P-P_min)/(1-P_min) so (prod_m b_m)*r reaches 0 at r=1
     end
 
     %% Dynamics Properties
@@ -796,6 +796,31 @@ classdef SRNNModel2 < handle
                 error('SRNNModel:InvalidParams', 'tau_a_I must be set when n_a_I > 0');
             end
 
+            % Check STD consistency: tau_b_*_rec must be a 1 x n_b_* vector,
+            % tau_b_*_rel a shared scalar. Coerce recovery constants to row vectors.
+            if obj.n_b_E > 0
+                if numel(obj.tau_b_E_rec) ~= obj.n_b_E
+                    error('SRNNModel:InvalidParams', ...
+                        'tau_b_E_rec must be a 1 x n_b_E vector (n_b_E = %d, numel(tau_b_E_rec) = %d).', ...
+                        obj.n_b_E, numel(obj.tau_b_E_rec));
+                end
+                if ~isscalar(obj.tau_b_E_rel)
+                    error('SRNNModel:InvalidParams', 'tau_b_E_rel must be a scalar (shared release across timescales).');
+                end
+                obj.tau_b_E_rec = reshape(obj.tau_b_E_rec, 1, []);
+            end
+            if obj.n_b_I > 0
+                if numel(obj.tau_b_I_rec) ~= obj.n_b_I
+                    error('SRNNModel:InvalidParams', ...
+                        'tau_b_I_rec must be a 1 x n_b_I vector (n_b_I = %d, numel(tau_b_I_rec) = %d).', ...
+                        obj.n_b_I, numel(obj.tau_b_I_rec));
+                end
+                if ~isscalar(obj.tau_b_I_rel)
+                    error('SRNNModel:InvalidParams', 'tau_b_I_rel must be a scalar (shared release across timescales).');
+                end
+                obj.tau_b_I_rec = reshape(obj.tau_b_I_rec, 1, []);
+            end
+
             % Check T_range
             if obj.T_range(2) <= obj.T_range(1)
                 error('SRNNModel:InvalidParams', 'T_range(2) must be > T_range(1)');
@@ -1058,19 +1083,19 @@ classdef SRNNModel2 < handle
 
             %% Unpack STD variables (b)
 
-            % Unpack b states for E neurons (b_E)
+            % Unpack b states for E neurons (b_E), n_E x n_b_E x nt (timescale-major)
             len_b_E = params.n_E * params.n_b_E;
             if len_b_E > 0
-                b_E_ts = S_out(:, current_idx + (1:len_b_E))';  % n_E x nt
+                b_E_ts = reshape(S_out(:, current_idx + (1:len_b_E))', params.n_E, params.n_b_E, nt);
             else
                 b_E_ts = [];
             end
             current_idx = current_idx + len_b_E;
 
-            % Unpack b states for I neurons (b_I)
+            % Unpack b states for I neurons (b_I), n_I x n_b_I x nt (timescale-major)
             len_b_I = params.n_I * params.n_b_I;
             if len_b_I > 0
-                b_I_ts = S_out(:, current_idx + (1:len_b_I))';  % n_I x nt
+                b_I_ts = reshape(S_out(:, current_idx + (1:len_b_I))', params.n_I, params.n_b_I, nt);
             else
                 b_I_ts = [];
             end
@@ -1103,13 +1128,23 @@ classdef SRNNModel2 < handle
                 x_eff_ts(params.I_indices, :) = x_eff_ts(params.I_indices, :) - params.c_I * sum_a_I;
             end
 
-            % Apply STD effect (b multiplicative factor)
+            % Apply STD effect: the synaptic depression factor is the product
+            % over timescales, prod_m b_{i,m} (collapse the timescale dim like
+            % SFA sums it above, but multiplicatively).
             b_ts = ones(params.n, nt);  % Initialize b = 1 for all neurons (no depression)
             if params.n_b_E > 0 && ~isempty(b_E_ts)
-                b_ts(params.E_indices, :) = b_E_ts;
+                prod_b_E = squeeze(prod(b_E_ts, 2));  % n_E x nt
+                if size(prod_b_E, 1) ~= params.n_E   % Handle case where nt=1
+                    prod_b_E = prod_b_E';
+                end
+                b_ts(params.E_indices, :) = prod_b_E;
             end
             if params.n_b_I > 0 && ~isempty(b_I_ts)
-                b_ts(params.I_indices, :) = b_I_ts;
+                prod_b_I = squeeze(prod(b_I_ts, 2));  % n_I x nt
+                if size(prod_b_I, 1) ~= params.n_I
+                    prod_b_I = prod_b_I';
+                end
+                b_ts(params.I_indices, :) = prod_b_I;
             end
 
             % Compute firing rates: r = phi(x_eff) (raw rate)
@@ -1131,17 +1166,17 @@ classdef SRNNModel2 < handle
             a.E = a_E_ts;  % n_E x n_a_E x nt (or empty)
             a.I = a_I_ts;  % n_I x n_a_I x nt (or empty)
 
-            % b: STD variables
+            % b: STD variables (full per-timescale array, mirroring a)
             if isempty(b_E_ts)
-                b.E = ones(params.n_E, nt);  % Default to no depression
+                b.E = ones(params.n_E, max(1, params.n_b_E), nt);  % Default to no depression
             else
-                b.E = b_E_ts;  % n_E x nt
+                b.E = b_E_ts;  % n_E x n_b_E x nt
             end
 
             if isempty(b_I_ts)
-                b.I = ones(params.n_I, nt);  % Default to no depression
+                b.I = ones(params.n_I, max(1, params.n_b_I), nt);  % Default to no depression
             else
-                b.I = b_I_ts;  % n_I x nt
+                b.I = b_I_ts;  % n_I x n_b_I x nt
             end
 
             % r: firing rates
@@ -1266,23 +1301,25 @@ classdef SRNNModel2 < handle
             % APPLY_STD_ZERO_FLOOR Rescale synaptic availability so full
             % depression drives the synaptic output b*r -> 0.
             %
-            % Maps the dynamic range [b_min, 1] onto [0, 1], where
-            % b_min = tau_rel / (tau_rec + tau_rel) is the asymptote of the b
-            % ODE at r = 1. This is a readout-only transform: the b state and
-            % its ODE are unchanged. At rest (b = 1) b_used = 1, so baseline
+            % Operates on the collapsed per-neuron product P = prod_m b_{i,m}.
+            % Maps the dynamic range [P_min, 1] onto [0, 1], where
+            % P_min = prod_m tau_rel/(tau_rec_m + tau_rel) is the product of the
+            % per-timescale b-ODE asymptotes at r = 1 (a per-population scalar).
+            % This is a readout-only transform: the b state and its ODE are
+            % unchanged. At rest (all b = 1) P = 1 and b_used = 1, so baseline
             % behavior is preserved. Accepts b as an n x 1 vector or n x nt
-            % matrix (b_min broadcasts over columns).
+            % matrix (P_min broadcasts over columns).
             b_used = b;
             if ~isfield(params, 'std_zero_floor') || ~params.std_zero_floor
                 return;
             end
             if params.n_b_E > 0
-                bmin_E = params.tau_b_E_rel / (params.tau_b_E_rec + params.tau_b_E_rel);
-                b_used(params.E_indices, :) = (b(params.E_indices, :) - bmin_E) / (1 - bmin_E);
+                Pmin_E = prod(params.tau_b_E_rel ./ (params.tau_b_E_rec + params.tau_b_E_rel));
+                b_used(params.E_indices, :) = (b(params.E_indices, :) - Pmin_E) / (1 - Pmin_E);
             end
             if params.n_b_I > 0
-                bmin_I = params.tau_b_I_rel / (params.tau_b_I_rec + params.tau_b_I_rel);
-                b_used(params.I_indices, :) = (b(params.I_indices, :) - bmin_I) / (1 - bmin_I);
+                Pmin_I = prod(params.tau_b_I_rel ./ (params.tau_b_I_rec + params.tau_b_I_rel));
+                b_used(params.I_indices, :) = (b(params.I_indices, :) - Pmin_I) / (1 - Pmin_I);
             end
         end
 
@@ -1349,19 +1386,19 @@ classdef SRNNModel2 < handle
             end
             current_idx = current_idx + len_a_I;
 
-            % STD states for E neurons (b_E)
+            % STD states for E neurons (b_E), reshaped to n_E x n_b_E (timescale-major)
             len_b_E = n_E * n_b_E;
             if len_b_E > 0
-                b_E = S(current_idx + (1:len_b_E));
+                b_E = reshape(S(current_idx + (1:len_b_E)), n_E, n_b_E);
             else
                 b_E = [];
             end
             current_idx = current_idx + len_b_E;
 
-            % STD states for I neurons (b_I)
+            % STD states for I neurons (b_I), reshaped to n_I x n_b_I (timescale-major)
             len_b_I = n_I * n_b_I;
             if len_b_I > 0
-                b_I = S(current_idx + (1:len_b_I));
+                b_I = reshape(S(current_idx + (1:len_b_I)), n_I, n_b_I);
             else
                 b_I = [];
             end
@@ -1383,13 +1420,14 @@ classdef SRNNModel2 < handle
                 x_eff(I_indices) = x_eff(I_indices) - c_I * sum(a_I, 2);
             end
 
-            % Apply STD effect
+            % Apply STD effect: the synaptic depression factor is the product
+            % of the per-timescale resources, prod_m b_{i,m} (n_E x 1 / n_I x 1).
             b = ones(n, 1);
             if n_b_E > 0 && ~isempty(b_E)
-                b(E_indices) = b_E;
+                b(E_indices) = prod(b_E, 2);
             end
             if n_b_I > 0 && ~isempty(b_I)
-                b(I_indices) = b_I;
+                b(I_indices) = prod(b_I, 2);
             end
 
             r = activation_fn(x_eff);
@@ -1411,14 +1449,17 @@ classdef SRNNModel2 < handle
                 da_I_dt = (r(I_indices) - a_I) ./ tau_a_I;
             end
 
+            % db_{i,m}/dt: per-timescale recovery (1 x n_b vector) with a shared
+            % release scalar. b_* is n x n_b, tau_b_*_rec is 1 x n_b, r(idx) is
+            % n x 1 and broadcasts across timescale columns (as with da/dt).
             db_E_dt = [];
             if n_E > 0 && n_b_E > 0 && ~isempty(b_E)
-                db_E_dt = (1 - b_E) / tau_b_E_rec - (b_E .* r(E_indices)) / tau_b_E_rel;
+                db_E_dt = (1 - b_E) ./ tau_b_E_rec - (b_E .* r(E_indices)) / tau_b_E_rel;
             end
 
             db_I_dt = [];
             if n_I > 0 && n_b_I > 0 && ~isempty(b_I)
-                db_I_dt = (1 - b_I) / tau_b_I_rec - (b_I .* r(I_indices)) / tau_b_I_rel;
+                db_I_dt = (1 - b_I) ./ tau_b_I_rec - (b_I .* r(I_indices)) / tau_b_I_rel;
             end
 
             %% Pack derivatives
@@ -1985,11 +2026,6 @@ classdef SRNNModel2 < handle
             n_b_E = params.n_b_E;
             n_b_I = params.n_b_I;
 
-            if n_b_E > 1 || n_b_I > 1
-                error('compute_Jacobian_fast:UnsupportedSTDStates', ...
-                      'Fast Jacobian currently supports at most one STD state per neuron.');
-            end
-
             W = params.W;
             tau_d = params.tau_d;
             tau_a_E = params.tau_a_E;
@@ -2038,14 +2074,14 @@ classdef SRNNModel2 < handle
             current_idx = current_idx + len_a_I;
 
             if len_b_E > 0
-                b_E = S(current_idx + (1:len_b_E));
+                b_E = reshape(S(current_idx + (1:len_b_E)), n_E, n_b_E);
             else
                 b_E = [];
             end
             current_idx = current_idx + len_b_E;
 
             if len_b_I > 0
-                b_I = S(current_idx + (1:len_b_I));
+                b_I = reshape(S(current_idx + (1:len_b_I)), n_I, n_b_I);
             else
                 b_I = [];
             end
@@ -2062,32 +2098,38 @@ classdef SRNNModel2 < handle
                 x_eff(I_indices) = x_eff(I_indices) - c_I * sum(a_I, 2);
             end
 
+            % Collapsed per-neuron depression factor P = prod_m b_{i,m}.
             b = ones(n, 1);
+            P_E = [];
+            P_I = [];
             if len_b_E > 0
-                b(E_indices) = b_E;
+                P_E = prod(b_E, 2);        % n_E x 1
+                b(E_indices) = P_E;
             end
             if len_b_I > 0
-                b(I_indices) = b_I;
+                P_I = prod(b_I, 2);        % n_I x 1
+                b(I_indices) = P_I;
             end
 
             phi_x_eff = phi_fun(x_eff);
             phi_prime_x_eff = phi_prime(x_eff);
 
-            % STD zero-floor affects only the synaptic drive W*(b.*r) in dx/dt,
-            % so only the dx/dt (row_x) Jacobian blocks below use b_syn / the
-            % per-population gain g = d(b_used)/db = 1/(1-b_min). The b ODE and
-            % SFA blocks use the raw b state and are unchanged.
+            % STD zero-floor affects only the synaptic drive W*(b_syn.*r) in
+            % dx/dt, so only the dx/dt (row_x) Jacobian blocks below use b_syn /
+            % the per-population gain g = d(P_syn)/dP = 1/(1-P_min), where
+            % P_min = prod_m tau_rel/(tau_rec_m+tau_rel) (a scalar). The b ODE
+            % and SFA blocks use the raw b state and are unchanged.
             b_syn = SRNNModel2.apply_std_zero_floor(b, params);
             g_b_E = 1;
             g_b_I = 1;
             if isfield(params, 'std_zero_floor') && params.std_zero_floor
                 if len_b_E > 0
-                    bmin_E = tau_b_E_rel / (tau_b_E_rec + tau_b_E_rel);
-                    g_b_E = 1 / (1 - bmin_E);
+                    Pmin_E = prod(tau_b_E_rel ./ (tau_b_E_rec + tau_b_E_rel));
+                    g_b_E = 1 / (1 - Pmin_E);
                 end
                 if len_b_I > 0
-                    bmin_I = tau_b_I_rel / (tau_b_I_rec + tau_b_I_rel);
-                    g_b_I = 1 / (1 - bmin_I);
+                    Pmin_I = prod(tau_b_I_rel ./ (tau_b_I_rec + tau_b_I_rel));
+                    g_b_I = 1 / (1 - Pmin_I);
                 end
             end
 
@@ -2148,32 +2190,41 @@ classdef SRNNModel2 < handle
                 % a -> b block is zero.
             end
 
-            %% STD blocks (E) — Jacobian of db_i/dt = (1-b_i)/tau_rec - b_i*r_i/tau_rel,
-            % r_i = phi(x_eff_i) (raw rate). Depression enters as a single power of b.
+            %% STD blocks (E) — Jacobian of db_{i,m}/dt = (1-b_{i,m})/tau_rec_m
+            % - b_{i,m}*r_i/tau_rel, r_i = phi(x_eff_i) (raw rate). Each timescale
+            % is an independent ODE; only the shared rate r_i couples them via a
+            % and x. Timescale-major: b_{i,m} lives at index (m-1)*n_E + i.
             if len_b_E > 0
-                phi_prime_E = phi_prime_x_eff(E_indices);
-                % b -> a: -b_i/tau_rel * dr_i/da = b_i*c_E*phi'_i/tau_rel (ts-major cols)
-                coeff_a_E = b(E_indices) .* c_E .* phi_prime_E / tau_b_E_rel;
+                phi_prime_E = phi_prime_x_eff(E_indices);   % n_E x 1
+                % b -> a: -b_{i,m}/tau_rel * dr_i/da_{ik} = b_{i,m}*c_E*phi'_i/tau_rel.
+                % Same for every SFA timescale k, so replicate across the n_a_E col-blocks.
                 if len_a_E > 0
-                    J(row_b_E, col_a_E) = kron(sparse(ones(1, n_a_E)), spdiags(coeff_a_E, 0, n_E, n_E));
+                    coeff_a_E = b_E .* (c_E .* phi_prime_E / tau_b_E_rel);   % n_E x n_b_E
+                    stack_a_E = sparse(1:len_b_E, repmat((1:n_E)', n_b_E, 1), coeff_a_E(:), len_b_E, n_E);
+                    J(row_b_E, col_a_E) = kron(sparse(ones(1, n_a_E)), stack_a_E);
                 end
-                % b -> b: -1/tau_rec - r_i/tau_rel
-                diag_vals_b_E = -1/tau_b_E_rec - phi_x_eff(E_indices) / tau_b_E_rel;
+                % b -> b: diagonal, -1/tau_rec_m - r_i/tau_rel
+                diag_vals_b_E = kron(-1 ./ tau_b_E_rec(:), ones(n_E, 1)) ...
+                              + repmat(-phi_x_eff(E_indices) / tau_b_E_rel, n_b_E, 1);
                 J(row_b_E, col_b_E) = spdiags(diag_vals_b_E, 0, len_b_E, len_b_E);
-                % b -> x: -b_i/tau_rel * phi'_i
-                J(row_b_E, col_x) = sparse(1:n_E, E_indices, - b(E_indices) .* phi_prime_E / tau_b_E_rel, n_E, n);
+                % b -> x: -b_{i,m}/tau_rel * phi'_i
+                vals_bx_E = -(b_E(:) .* repmat(phi_prime_E, n_b_E, 1)) / tau_b_E_rel;
+                J(row_b_E, col_x) = sparse(1:len_b_E, repmat(E_indices(:), n_b_E, 1), vals_bx_E, len_b_E, n);
             end
 
             %% STD blocks (I) — same structure as E (raw-rate drive, ts-major)
             if len_b_I > 0
                 phi_prime_I = phi_prime_x_eff(I_indices);
-                coeff_a_I = b(I_indices) .* c_I .* phi_prime_I / tau_b_I_rel;
                 if len_a_I > 0
-                    J(row_b_I, col_a_I) = kron(sparse(ones(1, n_a_I)), spdiags(coeff_a_I, 0, n_I, n_I));
+                    coeff_a_I = b_I .* (c_I .* phi_prime_I / tau_b_I_rel);
+                    stack_a_I = sparse(1:len_b_I, repmat((1:n_I)', n_b_I, 1), coeff_a_I(:), len_b_I, n_I);
+                    J(row_b_I, col_a_I) = kron(sparse(ones(1, n_a_I)), stack_a_I);
                 end
-                diag_vals_b_I = -1/tau_b_I_rec - phi_x_eff(I_indices) / tau_b_I_rel;
+                diag_vals_b_I = kron(-1 ./ tau_b_I_rec(:), ones(n_I, 1)) ...
+                              + repmat(-phi_x_eff(I_indices) / tau_b_I_rel, n_b_I, 1);
                 J(row_b_I, col_b_I) = spdiags(diag_vals_b_I, 0, len_b_I, len_b_I);
-                J(row_b_I, col_x) = sparse(1:n_I, I_indices, - b(I_indices) .* phi_prime_I / tau_b_I_rel, n_I, n);
+                vals_bx_I = -(b_I(:) .* repmat(phi_prime_I, n_b_I, 1)) / tau_b_I_rel;
+                J(row_b_I, col_x) = sparse(1:len_b_I, repmat(I_indices(:), n_b_I, 1), vals_bx_I, len_b_I, n);
             end
 
             %% dx/dt blocks
@@ -2189,16 +2240,19 @@ classdef SRNNModel2 < handle
                 J(row_x, col_a_I) = (block * replicate_a_I) / tau_d;
             end
 
+            % x -> b: d(dx_j/dt)/db_{i,m} = (1/tau_d) W_ji r_i g dP_i/db_{i,m},
+            % with P_i = prod_m b_{i,m} so dP_i/db_{i,m} = P_i/b_{i,m}. Column
+            % (m,i) scales W(:,E_i) by r_i*g*(P_i/b_{i,m}) (ts-major cols).
             if len_b_E > 0
-                replicate_b_E = kron(speye(n_E), ones(1, max(1, n_b_E)));
-                block = g_b_E * W_sparse(:, E_indices) * spdiags(phi_x_eff(E_indices), 0, n_E, n_E);
-                J(row_x, col_b_E) = (block * replicate_b_E) / tau_d;
+                coeff_xb_E = (g_b_E * (phi_x_eff(E_indices) .* P_E)) ./ b_E;   % n_E x n_b_E
+                D_E = sparse(repmat((1:n_E)', n_b_E, 1), 1:len_b_E, coeff_xb_E(:), n_E, len_b_E);
+                J(row_x, col_b_E) = (W_sparse(:, E_indices) * D_E) / tau_d;
             end
 
             if len_b_I > 0
-                replicate_b_I = kron(speye(n_I), ones(1, max(1, n_b_I)));
-                block = g_b_I * W_sparse(:, I_indices) * spdiags(phi_x_eff(I_indices), 0, n_I, n_I);
-                J(row_x, col_b_I) = (block * replicate_b_I) / tau_d;
+                coeff_xb_I = (g_b_I * (phi_x_eff(I_indices) .* P_I)) ./ b_I;   % n_I x n_b_I
+                D_I = sparse(repmat((1:n_I)', n_b_I, 1), 1:len_b_I, coeff_xb_I(:), n_I, len_b_I);
+                J(row_x, col_b_I) = (W_sparse(:, I_indices) * D_I) / tau_d;
             end
 
             diag_term = spdiags(-ones(n,1)/tau_d, 0, n, n);
@@ -2452,7 +2506,8 @@ classdef SRNNModel2 < handle
 
             if params.n_b_I > 0 && ~isempty(b.I) && size(b.I, 1) > 0
                 if ~all(b.I(:) == 1)
-                    SRNNModel2.plot_lines_with_colormap(t, b.I, cmap_I);
+                    b_I_prod = reshape(prod(b.I, 2), params.n_I, []);   % collapse timescales
+                    SRNNModel2.plot_lines_with_colormap(t, b_I_prod, cmap_I);
                     has_std = true;
                 end
             end
@@ -2460,7 +2515,8 @@ classdef SRNNModel2 < handle
             if params.n_b_E > 0 && ~isempty(b.E) && size(b.E, 1) > 0
                 if ~all(b.E(:) == 1)
                     if has_std, hold on; end
-                    SRNNModel2.plot_lines_with_colormap(t, b.E, cmap_E);
+                    b_E_prod = reshape(prod(b.E, 2), params.n_E, []);   % collapse timescales
+                    SRNNModel2.plot_lines_with_colormap(t, b_E_prod, cmap_E);
                     has_std = true;
                 end
             end

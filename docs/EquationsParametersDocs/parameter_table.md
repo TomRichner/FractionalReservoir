@@ -5,7 +5,7 @@ This document describes the equations, state variables, derived quantities, and 
 ## System Equations
 
 $$
-\frac{dx_i}{dt} = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, b_j r_{j}}{\tau_d}
+\frac{dx_i}{dt} = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \left(\prod_{m=1}^{M} b_{jm}\right) r_{j}}{\tau_d}
 $$
 
 $$
@@ -17,7 +17,7 @@ $$
 $$
 
 $$
-\frac{db_i}{dt} = \frac{1-b_i}{\tau_{rec}} - \frac{b_i\, r_i}{\tau_{rel}}
+\frac{db_{im}}{dt} = \frac{1-b_{im}}{\tau_{rec_m}} - \frac{b_{im}\, r_i}{\tau_{rel}}, \qquad m = 1, \dots, M
 $$
 
 ---
@@ -34,10 +34,10 @@ $$
 | **State Variables** |||||
 | $x_i$ | Membrane potential | $(-\infty, \infty)$ | arbitrary | Dendritic potential of neuron $i$ |
 | $a_{ik}$ | Adaptation variable | $[0, 1]$ | — | SFA state for neuron $i$, timescale $k$ |
-| $b_i$ | Synaptic resource | $[0, 1]$ | — | STD variable for neuron $i$ (available resources) |
+| $b_{im}$ | Synaptic resource | $[0, 1]$ | — | STD variable for neuron $i$, timescale $m$ (available resources) |
 | **Dependent Variables** |||||
 | $r_i$ | Firing rate | $[0, 1]$ | — | Instantaneous firing rate, $r_i = \phi(\cdot)$ |
-| $b_i r_i$ | Synaptic output | $[0, 1]$ | — | Effective synaptic output with STD |
+| $\left(\prod_m b_{im}\right) r_i$ | Synaptic output | $[0, 1]$ | — | Effective synaptic output with multi-timescale STD |
 | $u_i$ | External input | $[0, \infty)$ | arbitrary | External drive to neuron $i$ |
 | **Connection Weight parameters** |||||
 | $W$ | Connection matrix | — | — | $N \times N$ sparse weight matrix |
@@ -53,8 +53,9 @@ $$
 | **Time Constants** |||||
 | $\tau_d$ | Dendritic time constant | 100 | ms | Membrane integration time constant |
 | $\tau_{a_k}$ | SFA time constants | $[0.1, 1, 10]$ | s | Logspaced, $K=3$ timescales |
-| $\tau_{rec}$ | STD recovery | 1 | s | Synaptic vesicle recovery time constant |
-| $\tau_{rel}$ | STD release | $\frac{1}{2}$ | s | Synaptic vesicle release time constant |
+| $\tau_{rec_m}$ | STD recovery timescales | vector, $M$ timescales | s | Synaptic vesicle recovery time constant, one per STD timescale $m$ |
+| $\tau_{rel}$ | STD release | $\frac{1}{2}$ | s | Synaptic vesicle release time constant, shared across all $M$ STD timescales |
+| $M$ | Number of STD timescales | — | — | Count of STD timescales, $M = n_{b_E}$ (analogous to $K = n_{a_E}$ for SFA) |
 | **Adaptation Strength** |||||
 | $c_E$ | SFA coupling | $\frac{1}{12}$ | — | SFA strength per timescale |
 | **Activation Function** |||||
@@ -156,7 +157,7 @@ $$F = \frac{1}{\sqrt{N\alpha(2-\alpha)}}$$
 
 ## Table 2: Adaptation Conditions
 
-The four conditions are defined by enabling/disabling SFA and STD via the number of timescales ($K = n_{a_E}$ in the equations):
+The four conditions are defined by enabling/disabling SFA and STD via the number of timescales ($K = n_{a_E}$ for SFA, $M = n_{b_E}$ for STD in the equations):
 
 | Condition | $n_{a_E}$ (K) | $n_{a_I}$ | $n_{b_E}$ | $n_{b_I}$ | Description |
 |-----------|---------------|-----------|-----------|-----------|-------------|
@@ -169,9 +170,9 @@ The four conditions are defined by enabling/disabling SFA and STD via the number
 
 - When $n_{a_E} = 0$: No SFA variables $a_{ik}$; the $c_E \sum_k a_{ik}$ term is zero.
 - When $n_{a_E} = 3$: Three SFA timescales with $\tau_{a_k} \in \{0.1, 1, 10\}$ s and coupling $c_E = \frac{1}{12}$.
-- When $n_{b_E} = 0$: No STD variable $b_i$; synaptic output equals $r_i$ (equivalent to $b_i = 1$).
-- When $n_{b_E} = 1$: STD enabled with $\tau_{rec} = 1$ s and $\tau_{rel} = \frac{1}{2}$ s.
+- When $n_{b_E} = 0$: No STD variables $b_{im}$; synaptic output equals $r_i$ (equivalent to $\prod_m b_{im} = 1$).
+- When $n_{b_E} = M \ge 1$: STD enabled with $M$ timescales, each with its own recovery constant $\tau_{rec_m}$ and a shared release constant $\tau_{rel} = \frac{1}{2}$ s; the per-timescale resources enter the recurrent term as the product $\prod_m b_{im}$. The single-timescale case $M = 1$ (with $\tau_{rec} = 1$ s) recovers the original single-$b$ STD.
 
 Inhibitory neurons have no adaptation mechanisms ($n_{a_I} = n_{b_I} = 0$).
 
-> **Implementation note:** When any of $n_{a_E}$, $n_{a_I}$, $n_{b_E}$, or $n_{b_I}$ is set to zero, the corresponding state variables ($a_{ik}$ or $b_i$) are excluded from the system state vector and the Jacobian matrix. This prevents spurious zero eigenvalues that would otherwise arise from including disabled adaptation dynamics.
+> **Implementation note:** When any of $n_{a_E}$, $n_{a_I}$, $n_{b_E}$, or $n_{b_I}$ is set to zero, the corresponding state variables ($a_{ik}$ or $b_{im}$) are excluded from the system state vector and the Jacobian matrix. This prevents spurious zero eigenvalues that would otherwise arise from including disabled adaptation dynamics.

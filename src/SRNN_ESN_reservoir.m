@@ -547,17 +547,19 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             if has_std
                 ax_handles(end+1) = nexttile;
                 has_plotted = false;
-                % Plot I STD first (background)
+                % Plot I STD first (background); collapse timescales via product
                 if ~isempty(b.I) && params.n_b_I > 0
-                    b_I_test = b.I(:, test_indices);
+                    b_I_prod = reshape(prod(b.I, 2), params.n_I, []);   % n_I x nt
+                    b_I_test = b_I_prod(:, test_indices);
                     if ~all(b_I_test(:) == 1)  % Check if actual STD dynamics
                         SRNNModel2.plot_lines_with_colormap(t, b_I_test, cmap_I);
                         has_plotted = true;
                     end
                 end
-                % Plot E STD on top
+                % Plot E STD on top; collapse timescales via product
                 if ~isempty(b.E) && params.n_b_E > 0
-                    b_E_test = b.E(:, test_indices);
+                    b_E_prod = reshape(prod(b.E, 2), params.n_E, []);   % n_E x nt
+                    b_E_test = b_E_prod(:, test_indices);
                     if ~all(b_E_test(:) == 1)  % Check if actual STD dynamics
                         if has_plotted
                             hold on;
