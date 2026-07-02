@@ -41,7 +41,7 @@ master_save_figs = 'save_all_figs';
 % Rescale STD so the synaptic output b*r reaches 0 at full depression
 % (see SRNNModel2.std_zero_floor). When set, all four sub-analyses run with
 % the zero-floor; false reproduces the current (pre-floor) behavior.
-master_std_zero_floor = false;
+master_std_zero_floor = true;
 
 % Run mode for all three sub-analyses (controls n_levels / n_reps):
 %   'fast'       - few levels/reps; finishes quickly (for testing)

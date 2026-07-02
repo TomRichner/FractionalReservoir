@@ -41,7 +41,7 @@ setup_paths();
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
-    case 'fast',       n_levels = 5;  n_reps = 5;  ode_solver_mode = @ode_rk4;
+    case 'fast',       n_levels = 7;  n_reps = 7;  ode_solver_mode = @ode_rk4;
     case 'production', n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
     otherwise, error('run_sensitivity_analysis:badMode', ...
         'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
