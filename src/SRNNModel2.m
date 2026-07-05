@@ -482,7 +482,7 @@ classdef SRNNModel2 < handle
                 ax = subplot(n_rows, n_cols, i);
                 evals = eigenvalues_all{i};
                 time_val = obj.t_out(J_times(i));
-                ax_handles(i) = SRNNModel2.plot_eigenvalues_helper(evals, ax, time_val, global_xlim, global_ylim);
+                ax_handles(i) = SRNNModel2.plot_eigenvalues_helper(evals, ax, time_val, global_xlim, global_ylim, [], 1/obj.tau_d);
                 set(ax_handles(i), 'Color', 'none');
             end
 
@@ -551,6 +551,77 @@ classdef SRNNModel2 < handle
             yl = ylim(ax_handles(2));
             plot(ax_handles(2), [0, 0], yl, 'r--', 'LineWidth', 1.5);
             hold(ax_handles(2), 'off');
+        end
+
+        function [fig_handle, ax_handle] = plot_weight_histogram(obj, bin_edges, show_legend)
+            % PLOT_WEIGHT_HISTOGRAM Histogram of W entries split by E/I presynaptic population
+            %
+            % Overlays the excitatory (columns 1:n_E, red) and inhibitory
+            % (columns n_E+1:end, blue) nonzero-weight distributions, with
+            % population-mean markers below the x-axis. The means are measured
+            % from the plotted (scaled) entries, so they stay correct under
+            % level_of_chaos / E_W / rescale_by_abscissa. Values outside the
+            % bin range are clipped to the first/last bin so large entries
+            % surface as edge spikes rather than vanishing.
+            %
+            % Adapted from RMT.plot_weight_histogram (ConnectivityAdaptation repo).
+            %
+            % Usage:
+            %   model.build();
+            %   model.plot_weight_histogram();
+            %   model.plot_weight_histogram(linspace(-0.2, 0.2, 51));
+            %   model.plot_weight_histogram([], false);   % omit legend
+
+            if ~obj.is_built
+                error('SRNNModel:NotBuilt', 'Model must be built before plotting weights. Call build() first.');
+            end
+            if nargin < 3 || isempty(show_legend), show_legend = true; end
+
+            W_full = full(obj.W);
+            if nargin < 2 || isempty(bin_edges)
+                r = max(abs(W_full(:)));
+                if r == 0, r = 1; end
+                bin_edges = linspace(-r, r, 51);
+            end
+            edge_lo = bin_edges(1);
+            edge_hi = bin_edges(end);
+
+            % Split by presynaptic population (columns), nonzero entries only
+            W_E = W_full(:, 1:obj.n_E);       W_E = W_E(W_E ~= 0);
+            W_I = W_full(:, obj.n_E+1:end);   W_I = W_I(W_I ~= 0);
+
+            fig_handle = figure('Position', [100, 300, 560, 420], 'Color', 'white');
+            ax_handle = gca;
+            hold(ax_handle, 'on');
+            histogram(ax_handle, min(max(W_E, edge_lo), edge_hi), bin_edges, ...
+                'FaceColor', [0.8 0.2 0.2], 'EdgeColor', 'none', 'FaceAlpha', 0.6);
+            histogram(ax_handle, min(max(W_I, edge_lo), edge_hi), bin_edges, ...
+                'FaceColor', [0.2 0.4 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.6);
+
+            if show_legend
+                legend(ax_handle, 'E', 'I', 'Location', 'northeast');
+                legend(ax_handle, 'boxoff');
+            end
+
+            % Population-mean markers just below the x-axis
+            y_bottom = ax_handle.YLim(1);
+            if ~isempty(W_E)
+                text(ax_handle, mean(W_E), y_bottom, '$\mu_E$', 'Interpreter', 'latex', ...
+                    'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', ...
+                    'Color', [0.8 0.2 0.2], 'FontSize', 11, 'Clipping', 'on');
+            end
+            if ~isempty(W_I)
+                text(ax_handle, mean(W_I), y_bottom, '$\mu_I$', 'Interpreter', 'latex', ...
+                    'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', ...
+                    'Color', [0.2 0.4 0.8], 'FontSize', 11, 'Clipping', 'on');
+            end
+            hold(ax_handle, 'off');
+
+            xlabel(ax_handle, 'Weight');
+            ylabel(ax_handle, 'Count');
+            title(ax_handle, 'Synaptic weight distribution (nonzero entries)', 'FontWeight', 'bold');
+            box(ax_handle, 'off');
+            set(ax_handle, 'Color', 'none');
         end
 
         function params = get_params(obj)
@@ -673,10 +744,10 @@ classdef SRNNModel2 < handle
             % F = 1/sqrt(N*alpha*(2-alpha)), see parameter_table.md
             F = obj.default_val;
 
-            if isempty(obj.mu_E_tilde),    obj.mu_E_tilde = 3*F;     end
-            if isempty(obj.mu_I_tilde),    obj.mu_I_tilde = -4*F;    end
-            if isempty(obj.sigma_E_tilde), obj.sigma_E_tilde = F;    end
-            if isempty(obj.sigma_I_tilde), obj.sigma_I_tilde = F;    end
+            if isempty(obj.mu_E_tilde),    obj.mu_E_tilde = 3*F;     end % 3*F
+            if isempty(obj.mu_I_tilde),    obj.mu_I_tilde = -4*F;    end % -4*F
+            if isempty(obj.sigma_E_tilde), obj.sigma_E_tilde = 1*F;    end
+            if isempty(obj.sigma_I_tilde), obj.sigma_I_tilde = 1*F;    end
 
             % Compute tau_a arrays if n_a > 0 but tau_a not set
             if obj.n_a_E > 0 && isempty(obj.tau_a_E)
@@ -898,7 +969,7 @@ classdef SRNNModel2 < handle
             u_plot.I = u_plot.I(:, keep_mask);
             x_plot = obj.trim_struct_data(x_plot, 2, keep_mask);
             r_plot = obj.trim_struct_data(r_plot, 2, keep_mask);
-            b_plot = obj.trim_struct_data(b_plot, 2, keep_mask);
+            b_plot = obj.trim_struct_data(b_plot, 3, keep_mask);  % b.E/b.I are n x n_b x nt (time = dim 3)
             br_plot = obj.trim_struct_data(br_plot, 2, keep_mask);
             a_plot = obj.trim_struct_data(a_plot, 3, keep_mask);
 
@@ -1224,10 +1295,11 @@ classdef SRNNModel2 < handle
             end
         end
 
-        function ax = plot_eigenvalues_helper(eigenvalues, ax, time_value, x_lim, y_lim, circle_params)
+        function ax = plot_eigenvalues_helper(eigenvalues, ax, time_value, x_lim, y_lim, circle_params, scalebar_length)
             % PLOT_EIGENVALUES_HELPER Plot eigenvalue distribution on complex plane
             % Internalized from src/plotting/plot_eigenvalues.m (Option B: 3-tier outlier coloring)
 
+            if nargin < 7, scalebar_length = 1; end
             if nargin < 6, circle_params = []; end
             if nargin < 5, y_lim = []; end
             if nargin < 4, x_lim = []; end
@@ -1290,6 +1362,13 @@ classdef SRNNModel2 < handle
 
             text(1.02*x_lim(2), 0, ' Re($\lambda$)', 'Interpreter', 'latex', 'VerticalAlignment', 'middle');
             text(0, y_lim(2), 'Im($\lambda$)', 'Interpreter', 'latex', 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center');
+
+            % Scale bar in the lower left
+            sb_x = x_lim(1) + 0.05 * diff(x_lim);
+            sb_y = y_lim(1) + 0.05 * diff(y_lim);
+            plot([sb_x, sb_x + scalebar_length], [sb_y, sb_y], 'k-', 'LineWidth', 2);
+            text(sb_x + scalebar_length/2, sb_y, num2str(scalebar_length, '%g'), ...
+                'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom');
 
             xlim(x_lim);
             ylim(y_lim);

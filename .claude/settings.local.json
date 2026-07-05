@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "mcp__matlab__run_matlab_file",
-      "mcp__matlab__evaluate_matlab_code"
-    ]
-  }
-}
