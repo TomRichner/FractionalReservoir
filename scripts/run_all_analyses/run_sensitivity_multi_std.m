@@ -20,24 +20,36 @@ setup_paths();
 %% Configuration
 run_mode = 'fast';                 % few levels/reps for a quick check
 save_figs = true;                 % set true to also write fig/png
+figs_stay_open = true;            % true: leave figures open after the run (rapid iteration)
+use_stimulus = false;             % false: autonomous network (no external input) => intrinsic LLE
 std_zero_floor = true;            % match standalone sensitivity default
-tau_b_E_rec = [0.5, 2, 8];              % two STD recovery timescales (s)
+tau_b_E_rec = [0.5, 2];              % two STD recovery timescales (s)
 n_b_E_multi = numel(tau_b_E_rec);  % => 2
 
 switch run_mode
-    case 'fast',       n_levels = 7;  n_reps = 7;  ode_solver_mode = @ode_rk4;
-    case 'production', n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
+    case 'fast'
+        % Fast iteration: fewer levels/reps, half the sample rate, and a
+        % short time range. fs=200 keeps Benettin's lya_dt/dt guard
+        % satisfied (0.02/0.005 = 4 >= 3). T_range=[0,20] with an explicit
+        % 10 s transient skip => a 10 s LLE window [10,20].
+        n_levels = 7;  n_reps = 3;  ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 20];  n_mode = 200;
+        lya_T_interval_mode = [10, 20];   % skip first 10 s (overrides default 15 s)
+    case 'production'
+        n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
+        fs_mode = 400;  T_range_mode = [0, 50];  n_mode = 300;
+        lya_T_interval_mode = [];         % [] => class default (skip first 15 s)
     otherwise, error('run_sensitivity_multi_std:badMode', ...
         'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
 end
-fprintf('[run_sensitivity_multi_std] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s\n', ...
-    run_mode, n_levels, n_reps, func2str(ode_solver_mode));
+fprintf('[run_sensitivity_multi_std] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s, fs=%d, T_range=[%g %g], n=%d, use_stimulus=%d\n', ...
+    run_mode, n_levels, n_reps, func2str(ode_solver_mode), fs_mode, T_range_mode(1), T_range_mode(2), n_mode, use_stimulus);
 fprintf('[run_sensitivity_multi_std] tau_b_E_rec = [%s], n_b_E = %d\n', ...
     strjoin(compose('%.3g', tau_b_E_rec), ', '), n_b_E_multi);
 note = 'sensitivity_multi_std';
 
 % LLE histogram y-axis range for the sensitivity heatmaps (plot_sensitivity).
-lle_hist_range = [-1, 1];
+lle_hist_range = [-2, 2];
 
 % Adaptation conditions: same four regimes as the default sensitivity run,
 % but the STD conditions use n_b_E = 2 (two timescales) instead of 1.
@@ -78,6 +90,15 @@ for p_idx = 1:size(params_to_sweep, 1)
         );
     psa.folder_prefix = 'sensitivity_new_defaults';
     psa.model_defaults.ode_solver = ode_solver_mode;   % fast=ode_rk4
+    psa.model_defaults.fs = fs_mode;                    % fast=200 (default 400)
+    psa.model_defaults.T_range = T_range_mode;          % fast=[0,30] (default [0,50])
+    psa.model_defaults.n = n_mode;                      % fast=200 (default 300)
+    if ~isempty(lya_T_interval_mode)
+        psa.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
+    end
+    if ~use_stimulus
+        psa.model_defaults.u_ex_scale = 0;              % autonomous: zero external input (no OFF/ON/OFF)
+    end
     psa.model_defaults.std_zero_floor = std_zero_floor;
     psa.model_defaults.tau_b_E_rec = tau_b_E_rec;       % two STD timescales
     psa.model_defaults.c_E = 1/3;
@@ -109,7 +130,9 @@ for p_idx = 1:size(params_to_sweep, 1)
             sprintf('sensitivity_multi_std_%s', param_name), [], {'fig', 'png'});
         fprintf('Figures saved to %s\n', fig_dir);
     end
-    close all;
+    if ~figs_stay_open
+        close all;   % skipped when figs_stay_open=true so results stay on screen
+    end
 end
 
 %% Summary
