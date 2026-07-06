@@ -43,10 +43,12 @@ master_save_figs = 'save_all_figs';
 % the zero-floor; false reproduces the current (pre-floor) behavior.
 master_std_zero_floor = true;
 
-% Run mode for all three sub-analyses (controls n_levels / n_reps):
-%   'fast'       - few levels/reps; finishes quickly (for testing)
-%   'production' - full-size sweeps (for real results)
-% Defaults to 'production'. To do a quick run WITHOUT editing any file, set the
+% Run mode for the sub-analyses (controls n_levels / n_reps, fs, T_range, and
+% the LLE window):
+%   'fast'       - few levels/reps, fs=200, T_range=[0,20]; finishes quickly (testing)
+%   'medium'     - fs=200, T_range=[0,30], 15 levels x 20 reps; ~halfway
+%   'production' - full-size sweeps, fs=400, T_range=[0,50] (for real results)
+% Defaults to 'medium'. To pick another WITHOUT editing this file, set the
 % variable first in the console:   run_mode = 'fast'; run_all_analyses
 if ~exist('run_mode', 'var'); run_mode = 'medium'; end
 fprintf('Run mode: %s\n\n', run_mode);
