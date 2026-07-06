@@ -51,9 +51,10 @@ end
 %% Setup paths
 setup_paths();
 
-%% Run mode: 'fast' for quick checks, 'production' for full-size runs.
-% Set run_mode in the base workspace (or via run_all_analyses); defaults to
-% 'production' when this script is run standalone.
+%% Run mode: 'fast'/'medium'/'production'. Here it sets n_seeds and the solver
+% (the staircase T_range is fixed by dc_levels x hold_dur, so the fs/T_range/LLE
+% tuning used by the PSA sub-analyses does not apply). Set run_mode in the base
+% workspace (or via run_all_analyses); defaults to 'production' when standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
     case 'fast'
@@ -61,13 +62,19 @@ switch run_mode
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
         ode_solver = @ode_rk4;
         % ode_solver = @ode45;
+    case 'medium'
+        % Roughly halfway between fast and production: more seeds, still the
+        % fast fixed-step solver to keep the (expensive) staircase runs quick.
+        n_seeds    = 38;
+        dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
+        ode_solver = @ode_rk4;
     case 'production'
         n_seeds    = 50;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
         ode_solver = @ode45;
     otherwise
         error('run_dc_lle_analysis:badMode', ...
-            'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
+            'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
 end
 nL = numel(dc_levels);
 use_parallel = true;   % set false for serial debugging
