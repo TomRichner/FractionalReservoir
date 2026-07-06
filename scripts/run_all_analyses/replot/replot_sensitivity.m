@@ -16,7 +16,7 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range)
 % No simulations are re-run -- only plotting from saved results.
 
     if nargin < 2 || isempty(lle_hist_range)
-        lle_hist_range = [-1, 1];
+        lle_hist_range = [-2,2];
     end
 
     setup_paths();

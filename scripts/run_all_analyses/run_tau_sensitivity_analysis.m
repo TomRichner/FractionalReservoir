@@ -43,12 +43,28 @@ setup_paths();
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
-    case 'fast',       n_levels = 7;  n_reps = 7;  ode_solver_mode = @ode_rk4;
-    case 'production', n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
+    case 'fast'
+        % Fast iteration: fewer levels/reps, half the sample rate, short time
+        % range. fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3);
+        % T_range=[0,20] with an explicit 10 s LLE window [10,20]. NOTE: this
+        % window is far shorter than the swept tau (up to 60 s), so long-tau
+        % LLE reflects a transient — accepted for fast qualitative iteration.
+        n_levels = 7;  n_reps = 7;  ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
+    case 'medium'
+        % Medium: roughly halfway between fast and production. Fixed-step
+        % ode_rk4 at fs=200, T_range=[0,30] with a 15 s LLE window [15,30].
+        % (Still short vs the swept tau up to 60 s — long-tau LLE is transient.)
+        n_levels = 15; n_reps = 20; ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 30];  lya_T_interval_mode = [15, 30];
+    case 'production'
+        n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
+        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
     otherwise, error('run_tau_sensitivity_analysis:badMode', ...
-        'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
+        'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
 end
-fprintf('[run_tau_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s\n', run_mode, n_levels, n_reps, func2str(ode_solver_mode));
+fprintf('[run_tau_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
+    run_mode, n_levels, n_reps, func2str(ode_solver_mode), fs_mode, T_range_mode(1), T_range_mode(2));
 note = 'tau_timescales';
 
 % Condition: SFA + STD (n_a_E=3, n_b_E=1)
@@ -72,6 +88,11 @@ if exist('master_output_dir', 'var')
 end
 psa_tau_a.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
 psa_tau_a.model_defaults.std_zero_floor = std_zero_floor;
+psa_tau_a.model_defaults.fs = fs_mode;                  % fast=200 (default 400)
+psa_tau_a.model_defaults.T_range = T_range_mode;        % fast=[0,20] (default [0,50])
+if ~isempty(lya_T_interval_mode)
+    psa_tau_a.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
+end
 
 psa_tau_a.set_conditions(condition);
 
@@ -123,6 +144,11 @@ if exist('master_output_dir', 'var')
 end
 psa_tau_b.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
 psa_tau_b.model_defaults.std_zero_floor = std_zero_floor;
+psa_tau_b.model_defaults.fs = fs_mode;                  % fast=200 (default 400)
+psa_tau_b.model_defaults.T_range = T_range_mode;        % fast=[0,20] (default [0,50])
+if ~isempty(lya_T_interval_mode)
+    psa_tau_b.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
+end
 
 psa_tau_b.set_conditions(condition);
 

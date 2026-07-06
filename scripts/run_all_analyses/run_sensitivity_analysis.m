@@ -41,22 +41,35 @@ setup_paths();
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
-    case 'fast',       n_levels = 7;  n_reps = 7;  ode_solver_mode = @ode_rk4;
-    case 'production', n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
+    case 'fast'
+        % Fast iteration: fewer levels/reps, half the sample rate, short time
+        % range. fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3);
+        % T_range=[0,20] with an explicit 10 s LLE window [10,20].
+        n_levels = 5;  n_reps = 4;  ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
+    case 'medium'
+        % Medium: roughly halfway between fast and production. Fixed-step
+        % ode_rk4 at fs=200, T_range=[0,30] with a 15 s LLE window [15,30].
+        n_levels = 15; n_reps = 20; ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 30];  lya_T_interval_mode = [15, 30];
+    case 'production'
+        n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
+        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
     otherwise, error('run_sensitivity_analysis:badMode', ...
-        'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
+        'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
 end
-fprintf('[run_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s\n', run_mode, n_levels, n_reps, func2str(ode_solver_mode));
+fprintf('[run_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
+    run_mode, n_levels, n_reps, func2str(ode_solver_mode), fs_mode, T_range_mode(1), T_range_mode(2));
 note = 'sensitivity';
 
 % LLE histogram y-axis range for the sensitivity heatmaps (plot_sensitivity).
-lle_hist_range = [-1, 1];
+lle_hist_range = [-2, 2];
 
 % Parameters to sweep: {param_name, [min, max]}
 params_to_sweep = {
-    'n',              [100, 500];
+    'n',              [100, 1000];
     'f',              [0.25, 0.75];
-    'level_of_chaos', [0.5, 2];
+    'level_of_chaos', [0.5, 3];
 };
 
 %% Run sensitivity analysis for each parameter
@@ -85,6 +98,11 @@ for p_idx = 1:size(params_to_sweep, 1)
     end
     psa.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
     psa.model_defaults.std_zero_floor = std_zero_floor;
+    psa.model_defaults.fs = fs_mode;                   % fast=200 (default 400)
+    psa.model_defaults.T_range = T_range_mode;         % fast=[0,20] (default [0,50])
+    if ~isempty(lya_T_interval_mode)
+        psa.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
+    end
 
     % Add the swept parameter and reps
     psa.add_grid_parameter(param_name, param_range);

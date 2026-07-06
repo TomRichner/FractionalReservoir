@@ -51,12 +51,27 @@ setup_paths();
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
-    case 'fast',       n_levels = 3; ode_solver_mode = @ode_rk4;
-    case 'production', n_levels = 5; ode_solver_mode = @ode45;
+    case 'fast'
+        % Fast iteration: fewer levels, half the sample rate, short time range.
+        % fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3);
+        % T_range=[0,20] with an explicit 10 s LLE window [10,20].
+        n_levels = 3; ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
+    case 'medium'
+        % Medium: roughly halfway between fast and production. Fixed-step
+        % ode_rk4 at fs=200, T_range=[0,30] with a 15 s LLE window [15,30].
+        % n_levels=4 (this is a multi-dim grid with no reps axis, so 4^n_params
+        % configs) sits between fast (3) and production (5).
+        n_levels = 4; ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 30];  lya_T_interval_mode = [15, 30];
+    case 'production'
+        n_levels = 5; ode_solver_mode = @ode45;
+        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
     otherwise, error('run_param_space_analysis2:badMode', ...
-        'Unknown run_mode ''%s'' (expected ''fast'' or ''production'').', run_mode);
+        'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
 end
-fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d, ode_solver=%s\n', run_mode, n_levels, func2str(ode_solver_mode));
+fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
+    run_mode, n_levels, func2str(ode_solver_mode), fs_mode, T_range_mode(1), T_range_mode(2));
 
 psa = ParamSpaceAnalysis2(...
     'n_levels', n_levels, ...   % set by run_mode (fast=3, production=5)
@@ -69,16 +84,22 @@ if exist('master_output_dir', 'var')
 end
 psa.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
 psa.model_defaults.std_zero_floor = std_zero_floor;
+psa.model_defaults.fs = fs_mode;                   % fast=200 (default 400)
+psa.model_defaults.T_range = T_range_mode;         % fast=[0,20] (default [0,50])
+if ~isempty(lya_T_interval_mode)
+    psa.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
+end
 
 %% Add parameters to the grid
 % All combinations of these parameters will be tested
 % The order in which parameters are added doesn't matter
 
 % Network structure parameters
-
-psa.add_grid_parameter('E_W', [-0.5, 0.5] ./ sqrt(300));  % Mean offset (scaled by 1/sqrt(n))
-psa.add_grid_parameter('f', [0.4, 0.6]);     % fraction of neurons that are E
-psa.add_grid_parameter('c_E', 0.15/3.*[0.5, 2]);             % SFA strength
+% Same swept variables and ranges as run_sensitivity_analysis.m (n, f,
+% level_of_chaos), but here as a joint multi-dimensional grid.
+psa.add_grid_parameter('n',              [100, 1000]);   % network size
+psa.add_grid_parameter('f',              [0.25, 0.75]);  % fraction excitatory
+psa.add_grid_parameter('level_of_chaos', [0.5, 3]);      % W scaling (edge of chaos)
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant
