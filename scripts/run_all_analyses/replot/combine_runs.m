@@ -20,6 +20,13 @@ function combined_dir = combine_runs(run_dirs, out_dir)
 %   - param space    : the whole-grid LLE distribution(plot + pool_with)
 %   - DC LLE         : per-seed level means           (stack + recompute mean/std)
 %
+% Output layout under combined_dir:
+%   combined_manifest.{mat,txt}  which runs were pooled + their settings
+%   figures/                     tau, param-space, DC figures
+%   sensitivity/figures/         per-param 1D sensitivity figures PLUS the stacked
+%                                sensitivity_LLE_combined.{fig,png} (all 1D
+%                                sweeps in one figure, like replot_sensitivity).
+%
 % Safety: runs are pooled only if their configs match (ParamSpaceAnalysis2.
 % same_config / the DC config struct + dc_levels) AND they used DISTINCT seed
 % offsets. Two runs with the same offset would be identical data; that is an
@@ -61,10 +68,26 @@ function combined_dir = combine_runs(run_dirs, out_dir)
     % Load run manifests and verify compatibility. The manifest fingerprints the
     % nonlinearity (activation + S_a/S_c), which same_config cannot see, so this
     % is what guards against pooling e.g. a piecewise run with a logistic one.
-    check_manifests(run_dirs);
+    run_info = check_manifests(run_dirs);
 
-    % --- PSA sweeps: 1D sensitivity and tau (both use plot_sensitivity) ---
-    combine_psa_sweep(run_dirs, '1D_sensitivity_*', fig_dir, 'sensitivity', [-2, 2]);
+    % Record which runs were combined (provenance) into the output dir.
+    write_combined_manifest(out_dir, run_dirs, run_info);
+
+    % --- 1D sensitivity: pool per swept param, then stack into one figure (like
+    % replot_sensitivity + assemble_sensitivity_figure). Uses its OWN subfolder
+    % so the assembly doesn't pick up the tau figures, which share the same
+    % "LLE Sensitivity - ..." figure name. ---
+    sens_dir = fullfile(out_dir, 'sensitivity');
+    combine_psa_sweep(run_dirs, '1D_sensitivity_*', fullfile(sens_dir, 'figures'), 'sensitivity', [-2, 2]);
+    try
+        assemble_sensitivity_figure(sens_dir, 'LLE');
+        assemble_sensitivity_figure(sens_dir, 'mean_rate');
+    catch ME
+        warning('combine_runs:AssembleFailed', ...
+            'Sensitivity assembly skipped: %s', ME.message);
+    end
+
+    % --- tau sensitivity ---
     combine_psa_sweep(run_dirs, 'tau_sensitivity_*', fig_dir, 'tau', [-1.5, 1.5]);
 
     % --- Param space: whole-grid distribution (plot) ---
@@ -73,30 +96,42 @@ function combined_dir = combine_runs(run_dirs, out_dir)
     % --- DC LLE: stack per-seed level means ---
     combine_dc(run_dirs, fig_dir);
 
-    fprintf('Done. Combined figures in:\n  %s\n', fig_dir);
+    fprintf('Done. Combined figures in:\n  %s\n', out_dir);
+    fprintf('  (stacked 1D sensitivity: %s)\n', fullfile(sens_dir, 'figures'));
 end
 
 % ======================================================================
 %  LOCAL FUNCTIONS
 % ======================================================================
-function check_manifests(run_dirs)
-    % Load each run_manifest.mat, print a summary, and require the present
-    % manifests to agree on the nonlinearity fingerprint. Missing manifests
-    % (e.g. runs predating this feature) are warned about, not fatal.
+function info = check_manifests(run_dirs)
+    % Load each run_manifest.mat, print a summary, require the present manifests
+    % to agree on the nonlinearity fingerprint, and RETURN a per-run provenance
+    % struct array (for the combined manifest). Missing manifests (e.g. runs
+    % predating this feature) are warned about, not fatal.
     manifests = {}; present = [];  missing = [];
+    info = struct('dir', {}, 'name', {}, 'has_manifest', {}, 'run_mode', {}, ...
+        'seed_offset', {}, 'activation', {}, 'git_commit_short', {});
     fprintf('Run manifests:\n');
     for i = 1:numel(run_dirs)
+        [~, nm] = fileparts(run_dirs{i});
+        entry = struct('dir', run_dirs{i}, 'name', nm, 'has_manifest', false, ...
+            'run_mode', '', 'seed_offset', NaN, 'activation', '', 'git_commit_short', '');
         mf = fullfile(run_dirs{i}, 'run_manifest.mat');
         if exist(mf, 'file')
             S = load(mf); m = S.run_manifest;
             manifests{end+1} = m; present(end+1) = i; %#ok<AGROW>
+            entry.has_manifest = true;
+            entry.run_mode = getf(m, 'run_mode', '?');
+            entry.seed_offset = getf(m, 'master_seed_offset', NaN);
+            entry.activation = getf(m, 'activation', '');
+            entry.git_commit_short = getf(m, 'git_commit_short', '');
             fprintf('  run %d: run_mode=%s seed_offset=%g activation=%s\n', ...
-                i, getf(m, 'run_mode', '?'), getf(m, 'master_seed_offset', NaN), ...
-                getf(m, 'activation', '<none>'));
+                i, entry.run_mode, entry.seed_offset, getf(m, 'activation', '<none>'));
         else
             missing(end+1) = i; %#ok<AGROW>
             fprintf('  run %d: (no run_manifest.mat)\n', i);
         end
+        info(i) = entry; %#ok<AGROW>
     end
     fprintf('\n');
 
@@ -259,6 +294,35 @@ end
 
 function off = dc_offset(r)
     if isfield(r, 'seed_offset'); off = r.seed_offset; else; off = 0; end
+end
+
+function write_combined_manifest(out_dir, run_dirs, run_info)
+    % Save which runs were pooled + their key settings, so a combined_runs
+    % folder is self-documenting. Writes both a .mat (machine-readable) and a
+    % .txt (human-readable).
+    combined_manifest = struct();
+    combined_manifest.created = char(datetime('now'));
+    combined_manifest.n_runs = numel(run_dirs);
+    combined_manifest.source_runs = run_dirs(:);   % cell of paths
+    combined_manifest.run_info = run_info;          % per-run provenance struct array
+    save(fullfile(out_dir, 'combined_manifest.mat'), 'combined_manifest');
+
+    fid = fopen(fullfile(out_dir, 'combined_manifest.txt'), 'w');
+    if fid < 0; return; end
+    cleanup = onCleanup(@() fclose(fid));
+    fprintf(fid, 'Combined runs created: %s\n', combined_manifest.created);
+    fprintf(fid, 'Number of source runs: %d\n\n', numel(run_dirs));
+    for i = 1:numel(run_info)
+        fprintf(fid, 'run %d: %s\n', i, run_info(i).name);
+        fprintf(fid, '  path: %s\n', run_info(i).dir);
+        if run_info(i).has_manifest
+            fprintf(fid, '  run_mode=%s  seed_offset=%g  git=%s\n', ...
+                run_info(i).run_mode, run_info(i).seed_offset, run_info(i).git_commit_short);
+            fprintf(fid, '  activation=%s\n', run_info(i).activation);
+        else
+            fprintf(fid, '  (no run_manifest.mat -- settings/nonlinearity unverified)\n');
+        end
+    end
 end
 
 function v = getf(s, f, d)

@@ -1,6 +1,6 @@
 %% Example: Memory Capacity Measurement with SRNN_ESN_reservoir
 % This script demonstrates how to use the SRNN_ESN_reservoir class to measure
-% memory capacity under different adaptation conditions (baseline, SFA, SFA+STD).
+% memory capacity under different adaptation conditions (baseline, SFA, STD, SFA+STD).
 %
 % Uses Option A (base config + condition-specific overrides) to avoid
 % duplicating configuration, and Option E (verify_shared_build) to assert
@@ -22,29 +22,36 @@ addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))),
 
 %% Common parameters
 n = 300;                    % Number of neurons
-level_of_chaos = 1.0;       % Moderate chaos level
-rng_seed_net = 42;          % Fixed seed for network reproducibility
+f = 0.6;                    % Fraction excitatory (off perfect E/I balance so no-adaptation isn't favored)
+level_of_chaos = 2.5;         % Higher for the logistic: its mean slope < 1 pushes the edge of chaos to larger level_of_chaos
+rng_seed_net = 42+15;          % Fixed seed for network reproducibility
 rng_seed_stim = 43;         % Fixed seed for stimulus reproducibility
 
 % Sampling frequency
 fs = 200;                     % Sampling frequency (Hz)
 
-% MC protocol parameters (defined in seconds, converted to samples)
-T_wash_sec = 20;              % Washout duration (seconds)
-T_train_sec = 50;            % Training duration (seconds)
-T_test_sec = 50;             % Test duration (seconds)
+% MC protocol parameters (defined in seconds, converted to samples).
+% These are shortened for fast dial-in; increase for final results (in
+% particular T_wash should exceed a few x the slowest tau_a_E for the SFA
+% conditions -- here tau_a_E max = 10 s).
+T_wash_sec = 10;              % Washout duration (s); discarded transient before training
+T_train_sec = 200;           % Training duration (seconds)
+T_test_sec = 90;            % Test duration (seconds)
 
 T_wash = T_wash_sec * fs;     % Washout samples
 T_train = T_train_sec * fs;   % Training samples
 T_test = T_test_sec * fs;     % Test samples
-d_max = 3*fs;                 % Maximum delay
+d_max = 15*fs;                 % Maximum delay
 
 % Input type: 'white' (standard ESN), 'bandlimited' (fair for systems with tau_d),
-%             or 'one_over_f' (1/f^alpha noise, mimics SEEG/EEG power spectrum)
-% Bandlimited uses low-pass filtered noise matching the system bandwidth
-input_type = 'white'; % options: 'white', 'bandlimited', 'one_over_f'
+%             'one_over_f' (1/f^alpha noise), or 'sample_hold' (i.i.d. values held
+%             for ~a few tau_d; MC is then measured in hold units -- fair for a
+%             low-pass reservoir and free of autocorrelation inflation).
+input_type = 'sample_hold'; % options: 'white', 'bandlimited', 'one_over_f', 'sample_hold'
 u_f_cutoff = 5;               % Cutoff frequency for bandlimited input (Hz)
 u_alpha = 1;                  % Spectral exponent for 1/f^alpha noise (1=pink, 2=red/Brownian)
+tau_d = 0.1;                  % Dendritic time constant (s)
+T_hold = 3 * tau_d;           % sample_hold: hold each i.i.d. input value this long (= 3*tau_d)
 
 %% Base ESN configuration (shared across all conditions)
 % All parameters here are identical for every condition. Condition-specific
@@ -53,31 +60,36 @@ u_alpha = 1;                  % Spectral exponent for 1/f^alpha noise (1=pink, 2
 % n_a_E=0 or n_b_E=0 — those parameters are simply ignored by the dynamics.
 base_args = { ...
     'n', n, ...
+    'f', f, ...                    % fraction excitatory (0.6; off perfect balance)
     'fs', fs, ...
     'level_of_chaos', level_of_chaos, ...
+    'ode_solver', @ode_rk4, ...    % fixed-step solver (fast); default is @ode45
     'rng_seeds', [rng_seed_net, rng_seed_stim], ...
-    'tau_d', 0.1, ...              % Dendritic time constant (s)
-    'S_c', 0.4, ...                % Nonlinearity bias (center)
-    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1
+    'tau_d', tau_d, ...            % Dendritic time constant (s)
+    'S_c', 0.35, ...               % Nonlinearity bias (center); matches SRNNModel2 default
+    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1 (unused by the logistic default)
     'n_a_I', 0, ...                % No SFA for I neurons (all conditions)
     'n_b_I', 0, ...                % No STD for I neurons (all conditions)
     'c_E', 0.15/3, ...             % Adaptation strength for E neurons
     'tau_a_E', [0.1, 1.0, 10], ... % Adaptation time constants (s)
     'tau_b_E_rec', 1.0, ...        % STD recovery time constant (s)
     'tau_b_E_rel', 0.25, ...       % STD release time constant (s)
+    'std_zero_floor', true, ...    % rescale STD so (prod b)*r reaches 0 at full depression (matches run_all)
     'input_type', input_type, ...
     'u_f_cutoff', u_f_cutoff, ...
     'u_alpha', u_alpha, ...
+    'T_hold', T_hold, ...          % hold duration for input_type='sample_hold'
     'T_wash', T_wash, ...
     'T_train', T_train, ...
     'T_test', T_test, ...
     'd_max', d_max};
 
 %% Condition-specific overrides (only what differs)
-condition_names = {'Baseline (no adaptation)', 'SFA only', 'SFA + STD'};
+condition_names = {'Baseline (no adaptation)', 'SFA only', 'STD only', 'SFA + STD'};
 condition_args = { ...
     {'n_a_E', 0, 'n_b_E', 0}, ...   % Baseline: no adaptation
     {'n_a_E', 3, 'n_b_E', 0}, ...   % SFA only: 3 adaptation timescales
+    {'n_a_E', 0, 'n_b_E', 1}, ...   % STD only: short-term depression, no SFA
     {'n_a_E', 3, 'n_b_E', 1}, ...   % SFA + STD: adaptation + depression
     };
 n_cond = numel(condition_names);
@@ -120,24 +132,29 @@ for i = 1:n_cond
 end
 
 %% Comparison Plot
-colors = [0.7, 0.7, 0.7;   % Gray for baseline
-    0.3, 0.6, 0.9;   % Blue for SFA
-    0.9, 0.4, 0.3];  % Red for SFA+STD
+colors = [0.7, 0.7, 0.7;   % Gray:  baseline
+    0.3, 0.6, 0.9;   % Blue:  SFA only
+    0.3, 0.7, 0.4;   % Green: STD only
+    0.9, 0.4, 0.3];  % Red:   SFA + STD
 
 figure();
+
+% Delay axis in seconds (works for both sample and hold-unit MC)
+delay_s = results{1}.delay_s;
+nd = numel(delay_s);
 
 % Plot 1: R^2 vs delay for all conditions
 subplot(1, 3, 1);
 hold on;
-bar_data = zeros(d_max, n_cond);
+bar_data = zeros(nd, n_cond);
 for i = 1:n_cond
     bar_data(:, i) = R2{i}(:);
 end
-b = bar(1:d_max, bar_data);
+b = bar(delay_s, bar_data);
 for i = 1:n_cond
     b(i).FaceColor = colors(i, :);
 end
-xlabel('Delay d (samples)');
+xlabel('Delay (s)');
 ylabel('R^2_d');
 title('Memory Capacity by Delay');
 legend(condition_names, 'Location', 'northeast');
@@ -147,11 +164,11 @@ hold off;
 % Plot 2: Cumulative MC
 subplot(1, 3, 2);
 hold on;
-line_styles = {'k-', 'b-', 'r-'};
+line_styles = {'k-', 'b-', 'g-', 'r-'};
 for i = 1:n_cond
-    plot(1:d_max, cumsum(R2{i}), line_styles{i}, 'LineWidth', 2, 'DisplayName', condition_names{i});
+    plot(delay_s, cumsum(R2{i}), line_styles{i}, 'LineWidth', 2, 'DisplayName', condition_names{i});
 end
-xlabel('Delay d (samples)');
+xlabel('Delay (s)');
 ylabel('Cumulative MC');
 title('Cumulative Memory Capacity');
 legend('Location', 'southeast');
@@ -179,12 +196,20 @@ end
 sgtitle('Memory Capacity Analysis: Effect of Spike-Frequency Adaptation and Short-Term Depression');
 
 %% Time Series Plots for Each Condition
-delays_to_plot = [1, 50, 100, 200, 400, 800, 1600, 3200];
+% With sample_hold, predictions are hold-indexed, so delays are hold-delays
+% (small integers). Wrapped in try/catch so a plotting issue can't abort the
+% run before results are saved (plot_esn_timeseries is not yet hold-aware).
+delays_to_plot = [1, 2, 3, 5, 8];
 
 fprintf('\nGenerating time series plots...\n');
 
 for i = 1:n_cond
-    esn{i}.plot_esn_timeseries(delays_to_plot, 'title', condition_names{i});
+    try
+        esn{i}.plot_esn_timeseries(delays_to_plot, 'title', condition_names{i});
+    catch ME
+        warning('example_memory_capacity:PlotSkipped', ...
+            'Time-series plot skipped for %s: %s', condition_names{i}, ME.message);
+    end
 end
 
 fprintf('Time series plots generated.\n');
@@ -206,5 +231,5 @@ if ~exist(output_dir, 'dir')
 end
 
 save_file = fullfile(output_dir, 'memory_capacity_results.mat');
-save(save_file, 'results_all');
+save(save_file, 'results_all','-v7.3');
 fprintf('\nResults saved to memory_capacity_results.mat\n');

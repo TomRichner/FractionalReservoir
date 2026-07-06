@@ -1,17 +1,19 @@
 %% Memory Capacity (MC) experiment — paper-ready, replicated, paired design
-% Compares 3 SRNN conditions:
+% Compares 4 SRNN conditions:
 %   1) Baseline (no adaptation)
 %   2) SFA only
-%   3) SFA + STD
+%   3) STD only
+%   4) SFA + STD
 %
 % Key "fairness" choices:
 %   - Paired trials: same (W, W_in, input u(t)) across conditions within each trial
-%   - Primary input: i.i.d. white noise (prevents inflated MC from autocorrelated inputs)
+%   - Input: sample-and-hold i.i.d. values (fair for a low-pass reservoir; MC is
+%     measured in hold units, i.i.d. at the hold rate -> no autocorrelation inflation)
 %   - Many trials (different seeds) to support statistical inference
 %   - Paper-ready plots (distributions + mean curves w/ CI)
 %
 % Requirements:
-%   - SRNN_ESN_reservoir class must support input_type 'white'
+%   - SRNN_ESN_reservoir class must support input_type 'sample_hold'
 %   - verify_shared_build(esn, differing_props, shared_fields) must exist
 
 clear; clc; close all;
@@ -24,30 +26,37 @@ addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))),
 %% -------------------- Global experiment settings --------------------
 % Network / dynamics
 n = 300;                    % Number of neurons
-level_of_chaos = 1.0;       % Chaos level
+f = 0.6;                    % Fraction excitatory (off perfect E/I balance)
+level_of_chaos = 2.5;       % Higher for the logistic default (mean slope < 1 raises the edge of chaos)
 
 % Sampling
 fs = 200;                   % Hz
 
-% MC protocol (seconds -> samples)
-T_wash_sec  = 20;
-T_train_sec = 50;
-T_test_sec  = 50;
+% MC protocol (seconds -> samples). N_train = T_train_sec/T_hold hold-samples
+% must exceed n features for the readout to be well posed (here ~667 > 300).
+% T_wash=10 s is short vs tau_a_E=10 s (matches the example dial-in); raise it
+% for the final figure if the SFA conditions need more settling.
+T_wash_sec  = 10;
+T_train_sec = 250;
+T_test_sec  = 100;
 
 T_wash  = T_wash_sec  * fs;
 T_train = T_train_sec * fs;
 T_test  = T_test_sec  * fs;
 
-d_max_sec = 3.0;            % seconds
+d_max_sec = 15.0;           % seconds
 d_max = round(d_max_sec * fs);
 
-% Input (PRIMARY: white / i.i.d.)
-input_type = 'white';       % 'white' | 'bandlimited' | 'one_over_f'
+% Input: sample-and-hold i.i.d. -- MC is measured in hold units (fair for a
+% low-pass reservoir, free of autocorrelation inflation). See SRNN_ESN_reservoir.
+input_type = 'sample_hold'; % 'white' | 'bandlimited' | 'one_over_f' | 'sample_hold'
 u_f_cutoff = 5;             % only used if bandlimited
 u_alpha    = 1;             % only used if one_over_f (1=pink, 2=red)
+tau_d      = 0.1;           % Dendritic time constant (s)
+T_hold     = 3 * tau_d;     % sample_hold: hold each i.i.d. value this long (= 3*tau_d)
 
 % Trials / seeds
-n_trials = 50;              % >=30 recommended; 50-100 typical
+n_trials = 50;               % VALIDATION pass (fast); restore to 50-100 for real runs
 seed_net_base  = 1000;      % deterministic seed schedule
 seed_stim_base = 2000;
 
@@ -65,10 +74,11 @@ timestamp = datestr(now, 'yyyymmdd_HHMMSS');
 run_tag = sprintf('MC_%s_%s_trials%d', input_type, timestamp, n_trials);
 
 %% -------------------- Conditions --------------------
-condition_names = {'Baseline', 'SFA', 'SFA+STD'};
+condition_names = {'Baseline', 'SFA', 'STD', 'SFA+STD'};
 condition_args = { ...
     {'n_a_E', 0, 'n_b_E', 0}, ...   % Baseline
     {'n_a_E', 3, 'n_b_E', 0}, ...   % SFA only
+    {'n_a_E', 0, 'n_b_E', 1}, ...   % STD only
     {'n_a_E', 3, 'n_b_E', 1}, ...   % SFA + STD
 };
 n_cond = numel(condition_names);
@@ -77,30 +87,45 @@ n_cond = numel(condition_names);
 % NOTE: rng_seeds will be set per trial: [seed_net, seed_stim]
 base_args_template = { ...
     'n', n, ...
+    'f', f, ...                    % fraction excitatory (off perfect balance)
     'fs', fs, ...
     'level_of_chaos', level_of_chaos, ...
-    'tau_d', 0.1, ...              % Dendritic time constant (s)
-    'S_c', 0.4, ...                % Nonlinearity bias (center)
-    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1
+    'ode_solver', @ode_rk4, ...    % fixed-step solver (fast); default @ode45
+    'tau_d', tau_d, ...            % Dendritic time constant (s)
+    'S_c', 0.35, ...               % Nonlinearity bias (center); matches SRNNModel2 default
+    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1 (unused by the logistic)
     'n_a_I', 0, ...                % no SFA for I neurons (all conditions)
     'n_b_I', 0, ...                % no STD for I neurons (all conditions)
     'c_E', 0.15/3, ...             % adaptation strength for E neurons
     'tau_a_E', [0.1, 1.0, 10], ... % SFA time constants (s)
     'tau_b_E_rec', 1.0, ...        % STD recovery (s)
     'tau_b_E_rel', 0.25, ...       % STD release (s)
+    'std_zero_floor', true, ...    % rescale STD so (prod b)*r reaches 0 at full depression
     'input_type', input_type, ...
     'u_f_cutoff', u_f_cutoff, ...
     'u_alpha', u_alpha, ...
+    'T_hold', T_hold, ...          % hold duration for input_type='sample_hold'
     'T_wash', T_wash, ...
     'T_train', T_train, ...
     'T_test', T_test, ...
     'd_max', d_max ...
 };
 
-%% -------------------- Preallocate logs --------------------
+%% -------------------- Delay grid + preallocate logs --------------------
+% Size the delay grid up front so R2_trials is fully allocated before the parfor
+% (a parfor sliced output cannot be lazily grown). Mirrors the hold-unit
+% decimation in SRNN_ESN_reservoir/run_memory_capacity.
+if strcmpi(input_type, 'sample_hold')
+    hold_len = round(T_hold * fs);
+else
+    hold_len = 1;
+end
+d_max_eff = max(1, floor(d_max / hold_len));
+delay_s   = (1:d_max_eff) * (hold_len / fs);   % delay axis (seconds)
+
 MC_trials  = nan(n_trials, n_cond);
-H_trials   = nan(n_trials, n_cond);          % horizon delay (seconds) at R2>threshold
-R2_trials  = nan(n_trials, n_cond, d_max);   % per-delay R2
+H_trials   = nan(n_trials, n_cond);            % horizon delay (seconds) at R2>threshold
+R2_trials  = nan(n_trials, n_cond, d_max_eff); % per-delay R2
 
 seed_net   = seed_net_base  + (1:n_trials);
 seed_stim  = seed_stim_base + (1:n_trials);
@@ -109,50 +134,57 @@ seed_stim  = seed_stim_base + (1:n_trials);
 store_internal_results = false;
 internal_results = cell(n_trials, n_cond);
 
-%% -------------------- Main loop: paired trials --------------------
+%% -------------------- Main loop: paired trials (parallel) --------------------
+% Trials are independent (each uses its own seed_net(k)/seed_stim(k) and the ESN
+% seeds rng() explicitly at build), so parfor is order-independent and matches
+% the serial result. Degrades to serial if no parallel pool is available.
 fprintf('\n==== Running %d paired trials (%s input) ====\n', n_trials, input_type);
 
-for k = 1:n_trials
-    fprintf('\n--- Trial %d / %d | seeds: net=%d, stim=%d ---\n', ...
+parfor k = 1:n_trials
+    fprintf('--- Trial %d / %d | seeds: net=%d, stim=%d ---\n', ...
         k, n_trials, seed_net(k), seed_stim(k));
 
-    % Per-trial base args includes trial seeds (ensures paired W, W_in, u(t))
+    % Per-trial base args include the trial seeds (ensures paired W, W_in, u(t))
     base_args = [{'rng_seeds', [seed_net(k), seed_stim(k)]}, base_args_template];
 
-    % Build all 3 conditions
+    % Build all conditions (same W/W_in/input; only n_a_E/n_b_E differ)
     esn = cell(1, n_cond);
     for i = 1:n_cond
         esn{i} = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
         esn{i}.build();
     end
 
-    % Verify identical structure + identical input across conditions (fairness check)
+    % Fairness check: identical structure + input across conditions
     verify_shared_build(esn, {'n_a_E','n_b_E'}, {'W','W_in','u_scalar','u_ex','t_ex'});
 
-    % Run MC
+    % Per-trial accumulators (assigned to the sliced outputs once, below)
+    mc_row  = nan(1, n_cond);
+    h_row   = nan(1, n_cond);
+    r2_row  = nan(n_cond, d_max_eff);
+    int_row = cell(1, n_cond);
+
     for i = 1:n_cond
         [mc_i, r2_i, res_i] = esn{i}.run_memory_capacity();
-
-        MC_trials(k,i) = mc_i;
-        r2_i = r2_i(:);
-        if numel(r2_i) ~= d_max
-            error('Trial %d condition %s: expected d_max=%d, got %d', ...
-                k, condition_names{i}, d_max, numel(r2_i));
+        r2_i = r2_i(:)';
+        if numel(r2_i) ~= d_max_eff
+            error('Trial %d condition %s: expected %d delays, got %d', ...
+                k, condition_names{i}, d_max_eff, numel(r2_i));
         end
-        R2_trials(k,i,:) = r2_i;
+        mc_row(i)   = mc_i;
+        r2_row(i,:) = r2_i;
 
-        % horizon (in seconds): max delay with R2 > threshold
+        % horizon (in seconds): largest delay with R2 > threshold
         idx = find(r2_i > R2_threshold_for_horizon, 1, 'last');
-        if isempty(idx)
-            H_trials(k,i) = 0;
-        else
-            H_trials(k,i) = idx / fs;
-        end
+        if isempty(idx); h_row(i) = 0; else; h_row(i) = delay_s(idx); end
 
-        if store_internal_results
-            internal_results{k,i} = res_i;
-        end
+        if store_internal_results; int_row{i} = res_i; end
     end
+
+    % Sliced assignments -- each output written exactly once per trial k
+    MC_trials(k,:)        = mc_row;
+    H_trials(k,:)         = h_row;
+    R2_trials(k,:,:)      = reshape(r2_row, [1, n_cond, d_max_eff]);
+    internal_results(k,:) = int_row;
 end
 
 fprintf('\n==== Done. Computing summary + figures... ====\n');
@@ -171,19 +203,19 @@ H_ci  = bootstrap_mean_ci(H_trials,  n_boot, 0.05);
 % Mean R2(d) and CI across trials
 R2_mean = squeeze(mean(R2_trials, 1, 'omitnan')); % [cond x d]
 R2_ci   = bootstrap_mean_ci_3d(R2_trials, n_boot, 0.05); % struct with lo/hi [cond x d]
-
-% Cumulative MC curves (mean across trials)
-R2_cum_mean = cumsum(R2_mean, 2);
-R2_cum_ci_lo = cumsum(R2_ci.lo, 2);
-R2_cum_ci_hi = cumsum(R2_ci.hi, 2);
+% (Cumulative curves are recomputed inside plot_memory_capacity from these.)
 
 %% -------------------- Paired statistical tests (Total MC) --------------------
 % Pairwise comparisons with sign-flip permutation test + paired effect size
-pairs = [1 2; 1 3; 2 3]; % (Baseline vs SFA), (Baseline vs SFA+STD), (SFA vs SFA+STD)
+% All pairwise comparisons of the 4 conditions (Baseline, SFA, STD, SFA+STD).
+pairs = [1 2; 1 3; 1 4; 2 3; 2 4; 3 4];
 pair_labels = { ...
     'Baseline vs SFA', ...
+    'Baseline vs STD', ...
     'Baseline vs SFA+STD', ...
-    'SFA vs SFA+STD' ...
+    'SFA vs STD', ...
+    'SFA vs SFA+STD', ...
+    'STD vs SFA+STD' ...
 };
 
 stats = struct();
@@ -199,99 +231,10 @@ for p = 1:size(pairs,1)
     stats(p).cohens_dz = d_z;
 end
 
-%% -------------------- Paper-ready figures --------------------
-set(0,'DefaultAxesFontSize',12);
-set(0,'DefaultTextInterpreter','none');
-set(0,'DefaultLegendInterpreter','none');
-
-delay_s = (1:d_max) / fs;
-
-% Colors (simple, print-friendly)
-colors = [0.45 0.45 0.45;   % Baseline
-          0.20 0.50 0.80;   % SFA
-          0.80 0.30 0.25];  % SFA+STD
-
-% Figure 1: Total MC distribution (paired) + mean/CI
-fig1 = figure('Color','w','Position',[100 100 1050 420]);
-tiledlayout(1,2,'Padding','compact','TileSpacing','compact');
-
-% 1A: Paired scatter with lines
-nexttile; hold on; grid on; box on;
-xpos = 1:n_cond;
-for k = 1:n_trials
-    plot(xpos, MC_trials(k,:), '-', 'Color', [0 0 0 0.15], 'LineWidth', 1);
-end
-for i = 1:n_cond
-    scatter(i*ones(n_trials,1), MC_trials(:,i), 20, ...
-        'MarkerFaceColor', colors(i,:), 'MarkerEdgeColor','none', ...
-        'MarkerFaceAlpha',0.65);
-end
-% Mean + 95% CI
-for i = 1:n_cond
-    plot(i, MC_mean(i), 'o', 'MarkerSize', 8, ...
-        'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'k');
-    plot([i i], [MC_ci.lo(i) MC_ci.hi(i)], '-', 'Color', 'k', 'LineWidth', 2);
-end
-xlim([0.5 n_cond+0.5]);
-set(gca,'XTick',xpos,'XTickLabel',condition_names);
-ylabel('Total Memory Capacity (sum R^2)');
-title('Total MC (paired trials)');
-
-% 1B: Horizon distribution (optional but helpful)
-nexttile; hold on; grid on; box on;
-for k = 1:n_trials
-    plot(xpos, H_trials(k,:), '-', 'Color', [0 0 0 0.15], 'LineWidth', 1);
-end
-for i = 1:n_cond
-    scatter(i*ones(n_trials,1), H_trials(:,i), 20, ...
-        'MarkerFaceColor', colors(i,:), 'MarkerEdgeColor','none', ...
-        'MarkerFaceAlpha',0.65);
-end
-for i = 1:n_cond
-    plot(i, H_mean(i), 'o', 'MarkerSize', 8, ...
-        'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'k');
-    plot([i i], [H_ci.lo(i) H_ci.hi(i)], '-', 'Color', 'k', 'LineWidth', 2);
-end
-xlim([0.5 n_cond+0.5]);
-set(gca,'XTick',xpos,'XTickLabel',condition_names);
-ylabel(sprintf('Memory horizon (s), R^2 > %.2f', R2_threshold_for_horizon));
-title('Horizon (paired trials)');
-
-sgtitle(sprintf('Memory Capacity Comparison (%s input, n=%d, trials=%d)', input_type, n, n_trials));
-
-saveas(fig1, fullfile(out_dir, [run_tag '_Fig1_MC_Distributions.png']));
-print(fig1, fullfile(out_dir, [run_tag '_Fig1_MC_Distributions.pdf']), '-dpdf', '-painters');
-
-% Figure 2: R^2(d) mean curve with 95% CI shading
-fig2 = figure('Color','w','Position',[100 100 1050 420]);
-tiledlayout(1,2,'Padding','compact','TileSpacing','compact');
-
-% 2A: R^2(d)
-nexttile; hold on; grid on; box on;
-for i = 1:n_cond
-    shaded_ci(delay_s, R2_ci.lo(i,:), R2_ci.hi(i,:), colors(i,:), 0.18);
-    plot(delay_s, R2_mean(i,:), '-', 'Color', colors(i,:), 'LineWidth', 2);
-end
-xlabel('Delay (s)');
-ylabel('R^2(d)');
-title('Per-delay memory (mean ± 95% CI)');
-legend(condition_names,'Location','northeast');
-
-% 2B: Cumulative MC vs delay
-nexttile; hold on; grid on; box on;
-for i = 1:n_cond
-    shaded_ci(delay_s, R2_cum_ci_lo(i,:), R2_cum_ci_hi(i,:), colors(i,:), 0.18);
-    plot(delay_s, R2_cum_mean(i,:), '-', 'Color', colors(i,:), 'LineWidth', 2);
-end
-xlabel('Delay (s)');
-ylabel('Cumulative MC (sum_{j<=d} R^2(j))');
-title('Cumulative memory (mean ± 95% CI)');
-legend(condition_names,'Location','southeast');
-
-sgtitle(sprintf('Delay Profile of Memory (%s input, n=%d, trials=%d)', input_type, n, n_trials));
-
-saveas(fig2, fullfile(out_dir, [run_tag '_Fig2_R2_Curves.png']));
-print(fig2, fullfile(out_dir, [run_tag '_Fig2_R2_Curves.pdf']), '-dpdf', '-painters');
+%% -------------------- Figures --------------------
+% Plotting is factored into plot_memory_capacity so it can be iterated without
+% recomputing. It is called after the results are saved, below. To re-plot a
+% finished run later:  replot_memory_capacity('<run_tag>_results.mat')
 
 %% -------------------- Save results --------------------
 results_all = struct();
@@ -300,15 +243,28 @@ results_all.timestamp = timestamp;
 
 results_all.settings = struct();
 results_all.settings.n = n;
+results_all.settings.f = f;
 results_all.settings.fs = fs;
 results_all.settings.level_of_chaos = level_of_chaos;
+results_all.settings.S_c = 0.35;
+results_all.settings.std_zero_floor = true;
+results_all.settings.tau_d = tau_d;
 results_all.settings.T_wash = T_wash;
 results_all.settings.T_train = T_train;
 results_all.settings.T_test = T_test;
 results_all.settings.d_max = d_max;
+results_all.settings.d_max_eff = d_max_eff;      % delays actually scored (hold units)
+results_all.settings.delay_s = delay_s;          % delay axis (seconds)
 results_all.settings.input_type = input_type;
+results_all.settings.T_hold = T_hold;
+results_all.settings.hold_len = round(T_hold * fs);
 results_all.settings.u_f_cutoff = u_f_cutoff;
 results_all.settings.u_alpha = u_alpha;
+results_all.settings.ode_solver = 'ode_rk4';
+% Nonlinearity fingerprint from a bare construct (esn is a parfor temporary; no
+% build needed -- the activation is set by the constructor).
+probe_esn = SRNN_ESN_reservoir(base_args_template{:});
+results_all.settings.activation = func2str(probe_esn.activation_function);
 results_all.settings.n_trials = n_trials;
 results_all.settings.R2_threshold_for_horizon = R2_threshold_for_horizon;
 results_all.settings.n_boot = n_boot;
@@ -372,6 +328,9 @@ for p=1:numel(stats)
 end
 fclose(fid);
 
+%% -------------------- Plot (from the saved results struct) --------------------
+plot_memory_capacity(results_all, out_dir);
+
 fprintf('\nSaved:\n  %s\n  %s\n  %s\n  %s\n', mat_file, txt_file, ...
     fullfile(out_dir, [run_tag '_Fig1_MC_Distributions.pdf']), ...
     fullfile(out_dir, [run_tag '_Fig2_R2_Curves.pdf']));
@@ -432,12 +391,4 @@ function dz = paired_cohens_dz(x, y)
     d = x(:) - y(:);
     d = d(~isnan(d));
     dz = mean(d) / std(d, 0);
-end
-
-function shaded_ci(x, lo, hi, rgb, alpha_fill)
-% Draw shaded confidence interval [lo, hi] around x
-    x = x(:)'; lo = lo(:)'; hi = hi(:)';
-    X = [x, fliplr(x)];
-    Y = [hi, fliplr(lo)];
-    fill(X, Y, rgb, 'FaceAlpha', alpha_fill, 'EdgeColor', 'none');
 end

@@ -23,10 +23,11 @@ classdef SRNN_ESN_reservoir < SRNNModel2
         f_in = 0.1              % Fraction of neurons receiving input
         sigma_in = 0.5          % Input weight scaling parameter
         rng_seed_input = 3      % RNG seed for input weight generation
-        input_type = 'one_over_f'    % Input type: 'white', 'bandlimited', or 'one_over_f'
+        input_type = 'one_over_f'    % Input type: 'white', 'bandlimited', 'one_over_f', or 'sample_hold'
         u_f_cutoff = []         % Cutoff frequency for bandlimited input (Hz)
         % If empty, defaults to 1/(2*pi*tau_d)
         u_alpha = 1             % Spectral exponent for 1/f^alpha noise (default=1 for pink noise)
+        T_hold = []             % 'sample_hold' hold duration (s); if empty, defaults to 3*tau_d
         u_scale = 1             % Stimulus amplitude scaling
         u_offset = 0            % Stimulus DC offset
     end
@@ -49,6 +50,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
     properties (SetAccess = protected)
         W_in                    % Input weight vector (n x 1), set during build
         u_scalar                % Scalar input sequence (T_total x 1), set during build
+        hold_len = 1            % Samples per held input value (1 unless input_type='sample_hold')
     end
 
     %% Memory Capacity Results
@@ -72,7 +74,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % Define ESN-specific property names (not in SRNNModel2)
             esn_props = {'f_in', 'sigma_in', 'rng_seed_input', ...
                 'T_wash', 'T_train', 'T_test', 'd_max', 'eta', ...
-                'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset'};
+                'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset', 'T_hold'};
 
             % Parse ESN-specific name-value pairs
             for i = 1:2:length(varargin)
@@ -172,36 +174,66 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % Combine E and I firing rates for training (need n x T matrix)
             R_all = [r_all.E; r_all.I];  % n x T
 
+            %% Step 2b: Sample-and-hold -> decimate to one state per hold so MC is
+            % measured in hold units (canonical i.i.d.-input MC). Other input
+            % types keep sample resolution (hold_len = 1, all locals = obj.*).
+            if obj.hold_len > 1
+                idx = obj.hold_len:obj.hold_len:size(R_all, 2);  % last sample of each hold
+                eff_idx = idx;                      % effective index -> full-res sample
+                R_all = R_all(:, idx);
+                u_scalar = u_scalar(idx);
+                n_wash  = round(obj.T_wash  / obj.hold_len);
+                n_train = round(obj.T_train / obj.hold_len);
+                n_test  = round(obj.T_test  / obj.hold_len);
+                d_max_eff   = max(1, floor(obj.d_max / obj.hold_len));
+                delay_scale = obj.hold_len / obj.fs;   % seconds per hold-delay
+            else
+                eff_idx = 1:size(R_all, 2);         % identity (sample resolution)
+                n_wash = obj.T_wash;  n_train = obj.T_train;  n_test = obj.T_test;
+                d_max_eff = obj.d_max;  delay_scale = 1 / obj.fs;
+            end
+            % Clamp the test window so the requested split fits the sequence.
+            n_avail = numel(u_scalar) - n_wash;
+            if n_train + n_test > n_avail
+                n_test = max(1, n_avail - n_train);
+            end
+
             %% Step 3: Discard washout and split into train/test
-            T_eff = obj.T_train + obj.T_test;
+            T_eff = n_train + n_test;
 
             % Reservoir states after washout
-            R_eff = R_all(:, (obj.T_wash + 1):end);  % n x T_eff
-            u_eff = u_scalar((obj.T_wash + 1):end);  % T_eff x 1
+            R_eff = R_all(:, (n_wash + 1):end);  % n x (>= T_eff)
+            u_eff = u_scalar((n_wash + 1):end);  % (>= T_eff) x 1
 
             % Split into training and test
-            R_train = R_eff(:, 1:obj.T_train)';          % T_train x n
-            R_test = R_eff(:, (obj.T_train + 1):end)';   % T_test x n
-            u_train = u_eff(1:obj.T_train);              % T_train x 1
-            u_test = u_eff((obj.T_train + 1):end);       % T_test x 1
+            R_train = R_eff(:, 1:n_train)';                       % n_train x n
+            R_test  = R_eff(:, (n_train + 1):(n_train + n_test))';% n_test x n
+            u_train = u_eff(1:n_train);                           % n_train x 1
+            u_test  = u_eff((n_train + 1):(n_train + n_test));    % n_test x 1
+
+            % Real times of the (possibly decimated) test samples. predictions
+            % index into 1:n_test, so the delay panels plot against t_pred, not
+            % the full-resolution t_test (which would mis-scale under sample_hold).
+            te_idx = (n_wash + n_train + 1):(n_wash + n_train + n_test);
+            t_pred = t_all(eff_idx(te_idx));                      % n_test x 1
 
             %% Step 4-5: Train readouts and compute R^2 for each delay
             if verbose
-                fprintf('  Training readouts for %d delays...\n', obj.d_max);
+                fprintf('  Training readouts for %d delays...\n', d_max_eff);
             end
 
-            R2_d = zeros(1, obj.d_max);
-            weights_all = zeros(obj.n, obj.d_max);
+            R2_d = zeros(1, d_max_eff);
+            weights_all = zeros(obj.n, d_max_eff);
 
             % Store predictions for selected delays (for plotting)
             predictions = struct();
 
-            for d = 1:obj.d_max
+            for d = 1:d_max_eff
                 % Build delayed targets for training
                 % Target: u(t-d) where t is current time
-                % For training indices (d+1):T_train, target is u(1:(T_train-d))
-                train_indices = (d + 1):obj.T_train;
-                target_indices = 1:(obj.T_train - d);
+                % For training indices (d+1):n_train, target is u(1:(n_train-d))
+                train_indices = (d + 1):n_train;
+                target_indices = 1:(n_train - d);
 
                 if length(train_indices) < 10
                     warning('SRNN_ESN_reservoir:InsufficientData', ...
@@ -217,9 +249,9 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 weights_all(:, d) = w_d;
 
                 % Build delayed targets for test
-                % For test indices (d+1):T_test, target is u_test(1:(T_test-d))
-                test_indices = (d + 1):obj.T_test;
-                test_target_indices = 1:(obj.T_test - d);
+                % For test indices (d+1):n_test, target is u_test(1:(n_test-d))
+                test_indices = (d + 1):n_test;
+                test_target_indices = 1:(n_test - d);
 
                 if length(test_indices) < 10
                     continue;
@@ -255,19 +287,22 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             mc_results = struct();
             mc_results.MC = MC;
             mc_results.R2_d = R2_d;
-            mc_results.d = 1:obj.d_max;
+            mc_results.d = 1:d_max_eff;                 % delay index (holds if sample_hold, else samples)
+            mc_results.hold_len = obj.hold_len;         % samples per held value (1 = sample resolution)
+            mc_results.delay_s = (1:d_max_eff) * delay_scale;  % delay axis in seconds
             mc_results.weights = weights_all;
             mc_results.T_wash = obj.T_wash;
             mc_results.T_train = obj.T_train;
             mc_results.T_test = obj.T_test;
             mc_results.eta = obj.eta;
-            mc_results.u_scalar = u_scalar;
+            mc_results.u_scalar = obj.u_scalar;   % full input (staircase for sample_hold)
             mc_results.predictions = predictions;
 
             % Store time series data for test period (for plotting)
             % Use decimated data following SRNNModel pattern
             test_start_idx = obj.T_wash + obj.T_train + 1;
             mc_results.t_test = t_all(test_start_idx:end);
+            mc_results.t_pred = t_pred;   % time axis matching predictions (hold-aware)
             mc_results.u_test = u_test;
             mc_results.u_ex = obj.u_ex;  % Store actual neural input (n x T)
 
@@ -598,7 +633,13 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                     y_true = obj.mc_results.predictions(d).y_true;
                     y_pred = obj.mc_results.predictions(d).y_pred;
                     t_indices = obj.mc_results.predictions(d).t_indices;
-                    t_delay = t(t_indices);
+                    % Use the prediction-resolution time axis (hold-aware); falls
+                    % back to full-res t_test for older results without t_pred.
+                    if isfield(obj.mc_results, 't_pred')
+                        t_delay = obj.mc_results.t_pred(t_indices);
+                    else
+                        t_delay = t(t_indices);
+                    end
 
                     % Plot true delayed input
                     plot(t_delay, y_true, 'k-', 'LineWidth', 0.8, 'DisplayName', sprintf('u(t-%d)', d));
@@ -669,6 +710,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % 2. Generate scalar input sequence
             T_total = obj.T_wash + obj.T_train + obj.T_test;
             rng(obj.rng_seeds(2));  % Use stimulus seed for reproducibility
+            obj.hold_len = 1;       % reset; only 'sample_hold' overrides this
 
             if strcmpi(obj.input_type, 'bandlimited')
                 % Generate zero-mean white noise for filtering
@@ -723,10 +765,29 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             elseif strcmpi(obj.input_type, 'white')
                 obj.u_scalar = obj.u_offset + obj.u_scale * (rand(T_total, 1) - 0.5);
+                obj.hold_len = 1;
                 fprintf('ESN stimulus: white noise input\n');
+
+            elseif strcmpi(obj.input_type, 'sample_hold')
+                % i.i.d. values held for hold_len samples (staircase). Puts input
+                % energy at frequencies the network can follow and keeps values
+                % i.i.d. at the hold rate (canonical MC in hold units).
+                if isempty(obj.T_hold)
+                    T_hold_eff = 3 * obj.tau_d;
+                else
+                    T_hold_eff = obj.T_hold;
+                end
+                L = max(1, round(T_hold_eff * obj.fs));
+                obj.hold_len = L;
+                n_holds = ceil(T_total / L);
+                held_vals = obj.u_offset + obj.u_scale * (rand(n_holds, 1) - 0.5);
+                u_full = repelem(held_vals, L);
+                obj.u_scalar = u_full(1:T_total);
+                fprintf('ESN stimulus: sample-and-hold input (T_hold = %.3f s, %d samples/hold)\n', ...
+                    T_hold_eff, L);
             else
                 error('SRNN_ESN_reservoir:InvalidInputType', ...
-                    'Unknown input_type ''%s''. Valid options: ''white'', ''bandlimited'', ''one_over_f''', ...
+                    'Unknown input_type ''%s''. Valid options: ''white'', ''bandlimited'', ''one_over_f'', ''sample_hold''', ...
                     obj.input_type);
             end
 
