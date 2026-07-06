@@ -122,6 +122,17 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             %
             % [MC, R2_d, results] = run_memory_capacity()
             % [MC, R2_d, results] = run_memory_capacity('verbose', true)
+            % [MC, R2_d, results] = run_memory_capacity('store_timeseries', false)
+            %
+            % Name-value options:
+            %   'verbose'          - print progress (default true)
+            %   'store_timeseries' - default true. Set FALSE for a lean MC-only run
+            %                        that does NOT keep the full-resolution state
+            %                        time series (x/a/b/r/br, u_ex) or S_out and
+            %                        skips the LLE -- much lower memory for batch /
+            %                        parallel runs. MC and R2_d are identical either
+            %                        way. Do not use with plot_esn_timeseries, which
+            %                        needs the stored states.
             %
             % Outputs:
             %   MC        - Total memory capacity (sum of R^2_d)
@@ -144,9 +155,12 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             % Parse optional arguments
             verbose = true;
+            store_timeseries = true;   % false => lean MC-only path (frees the
+                                       % full-res states/trajectory, skips the LLE)
             for i = 1:2:length(varargin)
-                if strcmpi(varargin{i}, 'verbose')
-                    verbose = varargin{i+1};
+                switch lower(varargin{i})
+                    case 'verbose',          verbose = varargin{i+1};
+                    case 'store_timeseries', store_timeseries = varargin{i+1};
                 end
             end
 
@@ -196,6 +210,14 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             n_avail = numel(u_scalar) - n_wash;
             if n_train + n_test > n_avail
                 n_test = max(1, n_avail - n_train);
+            end
+
+            % Lean path: the full-resolution states and the raw trajectory are no
+            % longer needed once R_all (decimated for sample_hold) is built. Free
+            % them now to keep per-worker memory low in batch/parallel MC runs.
+            if ~store_timeseries
+                x_all = []; a_all = []; b_all = []; r_all = []; br_all = [];
+                obj.S_out = [];
             end
 
             %% Step 3: Discard washout and split into train/test
@@ -297,29 +319,31 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             mc_results.eta = obj.eta;
             mc_results.u_scalar = obj.u_scalar;   % full input (staircase for sample_hold)
             mc_results.predictions = predictions;
-
-            % Store time series data for test period (for plotting)
-            % Use decimated data following SRNNModel pattern
-            test_start_idx = obj.T_wash + obj.T_train + 1;
-            mc_results.t_test = t_all(test_start_idx:end);
             mc_results.t_pred = t_pred;   % time axis matching predictions (hold-aware)
             mc_results.u_test = u_test;
-            mc_results.u_ex = obj.u_ex;  % Store actual neural input (n x T)
 
-            % Store unpacked states for test period
-            mc_results.x = x_all;
-            mc_results.a = a_all;
-            mc_results.b = b_all;
-            mc_results.r = r_all;
-            mc_results.br = br_all;
+            if store_timeseries
+                % Full-resolution state time series + LLE, for plot_esn_timeseries.
+                test_start_idx = obj.T_wash + obj.T_train + 1;
+                mc_results.t_test = t_all(test_start_idx:end);
+                mc_results.u_ex = obj.u_ex;   % actual neural input (n x T)
+                mc_results.x = x_all;
+                mc_results.a = a_all;
+                mc_results.b = b_all;
+                mc_results.r = r_all;
+                mc_results.br = br_all;
 
-            %% Step 7: Compute Lyapunov exponents using parent class method
-            if ~strcmpi(obj.lya_method, 'none')
-                obj.lya_T_interval = [t_all(obj.T_wash + 1), t_all(end)];  % After washout
-                obj.compute_lyapunov();
+                %% Step 7: Compute Lyapunov exponents using parent class method
+                if ~strcmpi(obj.lya_method, 'none')
+                    obj.lya_T_interval = [t_all(obj.T_wash + 1), t_all(end)];  % after washout
+                    obj.compute_lyapunov();
+                end
+                mc_results.lya_results = obj.lya_results;
+            else
+                % Lean path: heavy states/trajectory were freed above; the LLE
+                % needs S_out and is not part of MC, so it is skipped.
+                mc_results.lya_results = [];
             end
-
-            mc_results.lya_results = obj.lya_results;
 
             obj.mc_results = mc_results;
         end

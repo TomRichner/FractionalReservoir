@@ -134,10 +134,27 @@ seed_stim  = seed_stim_base + (1:n_trials);
 store_internal_results = false;
 internal_results = cell(n_trials, n_cond);
 
+%% -------------------- One-time fairness check --------------------
+% verify_shared_build needs all conditions built at once (memory-heavy). The
+% paired invariant (same seeds + only n_a_E/n_b_E differ => identical
+% W/W_in/u_scalar/u_ex/t_ex) is STRUCTURAL, so verify it once on the first seed
+% pair; the trial loop then builds one condition at a time to keep memory low.
+fprintf('\nVerifying shared build (fairness check, trial 1)...\n');
+chk_args = [{'rng_seeds', [seed_net(1), seed_stim(1)]}, base_args_template];
+esn_chk = cell(1, n_cond);
+for i = 1:n_cond
+    esn_chk{i} = SRNN_ESN_reservoir(chk_args{:}, condition_args{i}{:});
+    esn_chk{i}.build();
+end
+verify_shared_build(esn_chk, {'n_a_E','n_b_E'}, {'W','W_in','u_scalar','u_ex','t_ex'});
+clear esn_chk chk_args;
+
 %% -------------------- Main loop: paired trials (parallel) --------------------
 % Trials are independent (each uses its own seed_net(k)/seed_stim(k) and the ESN
 % seeds rng() explicitly at build), so parfor is order-independent and matches
 % the serial result. Degrades to serial if no parallel pool is available.
+% Each condition is built/run/released one at a time, with a lean MC-only run
+% (no stored state time series, no LLE), to keep per-worker memory low.
 fprintf('\n==== Running %d paired trials (%s input) ====\n', n_trials, input_type);
 
 parfor k = 1:n_trials
@@ -147,16 +164,6 @@ parfor k = 1:n_trials
     % Per-trial base args include the trial seeds (ensures paired W, W_in, u(t))
     base_args = [{'rng_seeds', [seed_net(k), seed_stim(k)]}, base_args_template];
 
-    % Build all conditions (same W/W_in/input; only n_a_E/n_b_E differ)
-    esn = cell(1, n_cond);
-    for i = 1:n_cond
-        esn{i} = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
-        esn{i}.build();
-    end
-
-    % Fairness check: identical structure + input across conditions
-    verify_shared_build(esn, {'n_a_E','n_b_E'}, {'W','W_in','u_scalar','u_ex','t_ex'});
-
     % Per-trial accumulators (assigned to the sliced outputs once, below)
     mc_row  = nan(1, n_cond);
     h_row   = nan(1, n_cond);
@@ -164,7 +171,9 @@ parfor k = 1:n_trials
     int_row = cell(1, n_cond);
 
     for i = 1:n_cond
-        [mc_i, r2_i, res_i] = esn{i}.run_memory_capacity();
+        esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
+        esn_i.build();
+        [mc_i, r2_i, res_i] = esn_i.run_memory_capacity('store_timeseries', false, 'verbose', false);
         r2_i = r2_i(:)';
         if numel(r2_i) ~= d_max_eff
             error('Trial %d condition %s: expected %d delays, got %d', ...
@@ -178,6 +187,7 @@ parfor k = 1:n_trials
         if isempty(idx); h_row(i) = 0; else; h_row(i) = delay_s(idx); end
 
         if store_internal_results; int_row{i} = res_i; end
+        esn_i = [];   % release this condition's memory before building the next
     end
 
     % Sliced assignments -- each output written exactly once per trial k
