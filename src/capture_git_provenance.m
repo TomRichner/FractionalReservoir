@@ -1,4 +1,4 @@
-function capture_git_provenance(output_dir, repo_root)
+function info = capture_git_provenance(output_dir, repo_root)
 %CAPTURE_GIT_PROVENANCE Save git state (commit, branch, dirty diff) to output_dir.
 %
 % Writes git_provenance.txt with full commit hash, branch, remote, dirty
@@ -9,6 +9,11 @@ function capture_git_provenance(output_dir, repo_root)
 %
 % Usage:
 %   capture_git_provenance(master_output_dir, project_root)
+%   info = capture_git_provenance(master_output_dir, project_root)
+%
+% Optional output `info` is a struct with fields commit, commit_short, branch,
+% is_dirty (empty strings / false when not a git working tree) so callers can
+% record the git state machine-readably without re-shelling out.
 %
 % If git is not available or repo_root is not a git working tree, a
 % warning is issued and a stub file is written; the caller is not
@@ -17,6 +22,8 @@ function capture_git_provenance(output_dir, repo_root)
     if nargin < 2 || isempty(repo_root)
         repo_root = pwd;
     end
+
+    info = struct('commit', '', 'commit_short', '', 'branch', '', 'is_dirty', false);
 
     if ~isfolder(output_dir)
         mkdir(output_dir);
@@ -50,6 +57,11 @@ function capture_git_provenance(output_dir, repo_root)
     untracked    = run_git(git, 'ls-files --others --exclude-standard');
 
     is_dirty = ~isempty(strtrim(porcelain));
+
+    info.commit = commit;
+    info.commit_short = commit_short;
+    info.branch = branch;
+    info.is_dirty = is_dirty;
 
     fid = fopen(prov_path, 'w');
     cleanup = onCleanup(@() fclose(fid));

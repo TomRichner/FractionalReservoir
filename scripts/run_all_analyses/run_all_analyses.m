@@ -30,7 +30,16 @@ end
 fprintf('Master output directory: %s\n\n', master_output_dir);
 
 % Capture git provenance so the run can be retraced later
-capture_git_provenance(master_output_dir, project_root);
+prov = capture_git_provenance(master_output_dir, project_root);
+
+% Per-run seed offset so repeated runs of the SAME config draw independent
+% networks (poolable via combine_runs). run_index persists across runs within a
+% MATLAB session (this script never clears the workspace), like the rng_seeds
+% block in run_sensitivity_multi_std.m. Stride 1e6 >> any per-run seed span
+% (production max config_idx*100 ~ 125000), so runs never reuse seeds.
+if exist('run_index', 'var'); run_index = run_index + 1; else; run_index = 0; end
+master_seed_offset = run_index * 1e6;
+fprintf('Run index: %d (network_seed_offset = %g)\n\n', run_index, master_seed_offset);
 
 % Control figure saving across all sub-scripts:
 %   'save_all_figs'            - Override all scripts to save figures
@@ -52,6 +61,32 @@ master_std_zero_floor = true;
 % variable first in the console:   run_mode = 'fast'; run_all_analyses
 if ~exist('run_mode', 'var'); run_mode = 'medium'; end
 fprintf('Run mode: %s\n\n', run_mode);
+
+% Machine-readable run manifest for reproducibility + self-documentation, and
+% so combine_runs can (a) confirm pooled runs used DISTINCT seed offsets and
+% (b) verify they used the SAME nonlinearity. We fingerprint the CLASS-DEFAULT
+% activation via a throwaway SRNNModel2 (constructor sets it in set_defaults;
+% no build needed) -- the run_all sub-scripts all use that default and never
+% override activation in model_defaults, so it is not otherwise recorded.
+m0 = SRNNModel2();
+run_manifest = struct( ...
+    'run_mode', run_mode, ...
+    'master_std_zero_floor', master_std_zero_floor, ...
+    'master_save_figs', master_save_figs, ...
+    'master_seed_offset', master_seed_offset, ...
+    'run_index', run_index, ...
+    'activation', func2str(m0.activation_function), ...
+    'activation_derivative', func2str(m0.activation_function_derivative), ...
+    'S_a', m0.S_a, ...
+    'S_c', m0.S_c, ...
+    'git_commit', prov.commit, ...
+    'git_commit_short', prov.commit_short, ...
+    'git_branch', prov.branch, ...
+    'git_dirty', prov.is_dirty, ...
+    'matlab_version', version, ...
+    'timestamp', dt_str);
+save(fullfile(master_output_dir, 'run_manifest.mat'), 'run_manifest');
+clear m0;
 
 %% 1. Tau Sensitivity Analysis
 fprintf('========================================\n');

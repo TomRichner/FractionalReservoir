@@ -32,6 +32,7 @@ classdef ParamSpaceAnalysis2 < handle
         explicit_vectors = struct() % Struct: param_name -> explicit vector (when length > 2)
         vector_param_config = struct() % Struct: param_name -> config for vector params
         randomize_order = true         % Whether to randomize execution order (false for sensitivity)
+        network_seed_offset = 0        % Added to every per-config network seed; set per run (e.g. run_index*1e6) so repeated runs of the same config draw independent networks for pooling
     end
 
     %% Model Default Properties
@@ -337,6 +338,97 @@ classdef ParamSpaceAnalysis2 < handle
             obj.save_summary();
         end
 
+        function [tf, reason] = same_config(obj, other)
+            % SAME_CONFIG Whether another PSA run is poolable with this one.
+            %   [tf, reason] = obj.same_config(other) returns true when the two
+            %   runs sweep the same grid under the same conditions and model
+            %   defaults, so their results can be concatenated for combined
+            %   plotting. The reps-axis LENGTH, randomize_order, and
+            %   network_seed_offset are intentionally ignored (expected to
+            %   differ across runs). `reason` explains the first mismatch found.
+            tf = false; reason = '';
+
+            % Grid parameter names (order-independent set).
+            if ~isequal(sort(obj.grid_params(:)), sort(other.grid_params(:)))
+                reason = sprintf('grid_params differ: {%s} vs {%s}', ...
+                    strjoin(obj.grid_params, ','), strjoin(other.grid_params, ','));
+                return;
+            end
+
+            if ~isequal(obj.n_levels, other.n_levels)
+                reason = sprintf('n_levels differ: %d vs %d', obj.n_levels, other.n_levels);
+                return;
+            end
+
+            % Swept (non-'reps') grid points must match exactly.
+            swept = setdiff(obj.grid_params, {'reps'}, 'stable');
+            for i = 1:numel(swept)
+                p = swept{i};
+                va = obj.param_vectors{strcmp(obj.grid_params, p)};
+                vb = other.param_vectors{strcmp(other.grid_params, p)};
+                if ~isequaln(va, vb)
+                    reason = sprintf('grid points for ''%s'' differ', p);
+                    return;
+                end
+            end
+
+            % Conditions match as a set (compared by full struct content).
+            if numel(obj.conditions) ~= numel(other.conditions)
+                reason = 'number of conditions differ';
+                return;
+            end
+            for i = 1:numel(obj.conditions)
+                ci = obj.conditions{i};
+                found = false;
+                for j = 1:numel(other.conditions)
+                    if isequaln(ci, other.conditions{j}); found = true; break; end
+                end
+                if ~found
+                    reason = sprintf('condition ''%s'' not found in other run', ci.name);
+                    return;
+                end
+            end
+
+            % Integer params / vector configs.
+            if ~isequal(sort(obj.integer_params(:)), sort(other.integer_params(:)))
+                reason = 'integer_params differ'; return;
+            end
+            if ~isequaln(obj.explicit_vectors, other.explicit_vectors)
+                reason = 'explicit_vectors differ'; return;
+            end
+            if ~isequaln(obj.vector_param_config, other.vector_param_config)
+                reason = 'vector_param_config differ'; return;
+            end
+
+            % model_defaults: same fields, values equal (function handles by
+            % their string form). NOTE: func2str does not expose values captured
+            % by an anonymous handle, so two handles differing only in a captured
+            % constant would compare equal -- acceptable here since pooled runs
+            % come from the same script/config.
+            fa = fieldnames(obj.model_defaults);
+            fb = fieldnames(other.model_defaults);
+            if ~isequal(sort(fa), sort(fb))
+                reason = 'model_defaults field sets differ'; return;
+            end
+            for i = 1:numel(fa)
+                k = fa{i};
+                va = obj.model_defaults.(k);
+                vb = other.model_defaults.(k);
+                if isa(va, 'function_handle') || isa(vb, 'function_handle')
+                    if ~(isa(va, 'function_handle') && isa(vb, 'function_handle') ...
+                            && strcmp(func2str(va), func2str(vb)))
+                        reason = sprintf('model_defaults.%s (function handle) differs', k);
+                        return;
+                    end
+                elseif ~isequaln(va, vb)
+                    reason = sprintf('model_defaults.%s differs', k);
+                    return;
+                end
+            end
+
+            tf = true;
+        end
+
         function plot(obj, varargin)
             % PLOT Generate histogram plots of metrics across parameter space
             %
@@ -352,11 +444,15 @@ classdef ParamSpaceAnalysis2 < handle
 
             % Parse arguments
             metric = 'LLE';
+            pool_with = {};   % cell of other PSA objects to pool into the distribution
             for i = 1:2:length(varargin)
                 if strcmpi(varargin{i}, 'metric')
                     metric = varargin{i+1};
+                elseif strcmpi(varargin{i}, 'pool_with')
+                    pool_with = varargin{i+1};
                 end
             end
+            if ~iscell(pool_with); pool_with = {pool_with}; end
 
             % Define histogram bins
             if strcmpi(metric, 'LLE')
@@ -395,20 +491,11 @@ classdef ParamSpaceAnalysis2 < handle
                 cond_name = condition_names{c_idx};
                 ax = subplot(1, num_conditions, c_idx);
 
-                % Extract metric values
-                if isfield(obj.results, cond_name)
-                    results_cell = obj.results.(cond_name);
-                    values = [];
-                    for k = 1:length(results_cell)
-                        res = results_cell{k};
-                        if isstruct(res) && isfield(res, 'success') && res.success
-                            if isfield(res, metric) && ~isnan(res.(metric))
-                                values(end+1) = res.(metric);
-                            end
-                        end
-                    end
-                else
-                    values = [];
+                % Extract metric values across the grid, pooled across runs.
+                values = ParamSpaceAnalysis2.collect_grid_values(obj.results, cond_name, metric);
+                for pp = 1:numel(pool_with)
+                    values = [values, ...
+                        ParamSpaceAnalysis2.collect_grid_values(pool_with{pp}.results, cond_name, metric)]; %#ok<AGROW>
                 end
 
                 % Plot histogram
@@ -486,13 +573,16 @@ classdef ParamSpaceAnalysis2 < handle
             metric = 'LLE';
             hist_range = [];
             n_bins = 35;
+            pool_with = {};   % cell of other PSA objects to pool (more reps)
             for i = 1:2:length(varargin)
                 switch lower(varargin{i})
                     case 'metric', metric = varargin{i+1};
                     case 'hist_range', hist_range = varargin{i+1};
                     case 'n_bins', n_bins = varargin{i+1};
+                    case 'pool_with', pool_with = varargin{i+1};
                 end
             end
+            if ~iscell(pool_with); pool_with = {pool_with}; end
 
             % Default hist_range by metric
             if isempty(hist_range)
@@ -524,9 +614,6 @@ classdef ParamSpaceAnalysis2 < handle
                 {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
                 {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
 
-            % Grid sizes for sub2ind
-            grid_sizes = cellfun(@length, obj.param_vectors);
-
             % Loop over each swept parameter
             for sp_idx = 1:length(swept_params)
                 swept_param = swept_params{sp_idx};
@@ -553,6 +640,12 @@ classdef ParamSpaceAnalysis2 < handle
 
                 n_levels_param = length(x_values);
                 n_reps = length(obj.param_vectors{reps_dim});
+                % Total reps across obj + pooled runs (sets the colour scale).
+                total_reps = n_reps;
+                for pp = 1:numel(pool_with)
+                    rdim_pp = find(strcmp(pool_with{pp}.grid_params, 'reps'));
+                    total_reps = total_reps + length(pool_with{pp}.param_vectors{rdim_pp});
+                end
 
                 % Create figure
                 fig = figure('Name', sprintf('%s Sensitivity - %s', metric, swept_param), ...
@@ -566,41 +659,20 @@ classdef ParamSpaceAnalysis2 < handle
                     histogram_matrix = zeros(num_hist_bins, n_levels_param);
                     median_values = NaN(n_levels_param, 1);
 
-                    if isfield(obj.results, cond_name)
-                        results_cell = obj.results.(cond_name);
+                    for level_idx = 1:n_levels_param
+                        % Rep values for this level, pooled across obj + pool_with.
+                        values_level = ParamSpaceAnalysis2.collect_level_values( ...
+                            obj, swept_param, level_idx, cond_name, metric);
+                        for pp = 1:numel(pool_with)
+                            values_level = [values_level, ...
+                                ParamSpaceAnalysis2.collect_level_values( ...
+                                pool_with{pp}, swept_param, level_idx, cond_name, metric)]; %#ok<AGROW>
+                        end
 
-                        for level_idx = 1:n_levels_param
-                            values_level = [];
-
-                            for rep_idx = 1:n_reps
-                                % Build subscripts for this (level, rep) combination
-                                subs = cell(1, length(obj.grid_params));
-                                for d = 1:length(obj.grid_params)
-                                    if d == param_dim
-                                        subs{d} = level_idx;
-                                    elseif d == reps_dim
-                                        subs{d} = rep_idx;
-                                    else
-                                        subs{d} = 1;
-                                    end
-                                end
-                                linear_idx = sub2ind(grid_sizes, subs{:});
-
-                                if linear_idx <= length(results_cell)
-                                    res = results_cell{linear_idx};
-                                    if isstruct(res) && isfield(res, 'success') && res.success
-                                        if isfield(res, metric) && ~isnan(res.(metric))
-                                            values_level(end+1) = res.(metric); %#ok<AGROW>
-                                        end
-                                    end
-                                end
-                            end
-
-                            if ~isempty(values_level)
-                                [counts, ~] = histcounts(values_level, hist_bins);
-                                histogram_matrix(:, level_idx) = counts;
-                                median_values(level_idx) = median(values_level);
-                            end
+                        if ~isempty(values_level)
+                            [counts, ~] = histcounts(values_level, hist_bins);
+                            histogram_matrix(:, level_idx) = counts;
+                            median_values(level_idx) = median(values_level);
                         end
                     end
 
@@ -622,7 +694,7 @@ classdef ParamSpaceAnalysis2 < handle
                     hold(ax, 'off');
 
                     colormap(ax, flipud(gray));
-                    caxis(ax, [0, n_reps]);
+                    caxis(ax, [0, total_reps]);
                     axis(ax, 'xy');
                     box(ax, 'on');
 
@@ -1432,6 +1504,7 @@ classdef ParamSpaceAnalysis2 < handle
             s.explicit_vectors = obj.explicit_vectors;
             s.vector_param_config = obj.vector_param_config;
             s.randomize_order = obj.randomize_order;
+            s.network_seed_offset = obj.network_seed_offset;
 
             % Model Default Properties (public)
             s.model_defaults = obj.model_defaults;
@@ -1458,6 +1531,50 @@ classdef ParamSpaceAnalysis2 < handle
         end
     end
 
+    %% Static pooling helpers (used by plot / plot_sensitivity)
+    methods (Static, Access = private)
+        function vals = collect_level_values(psa, swept_param, level_idx, cond_name, metric)
+            % Successful metric values across the reps axis for one swept-param
+            % level and one condition. Reused to pool reps within & across runs.
+            vals = [];
+            if ~isfield(psa.results, cond_name); return; end
+            rc = psa.results.(cond_name);
+            gp = psa.grid_params;
+            gsz = cellfun(@length, psa.param_vectors);
+            param_dim = find(strcmp(gp, swept_param));
+            reps_dim = find(strcmp(gp, 'reps'));
+            n_reps = length(psa.param_vectors{reps_dim});
+            for rep_idx = 1:n_reps
+                subs = num2cell(ones(1, numel(gp)));
+                subs{param_dim} = level_idx;
+                subs{reps_dim} = rep_idx;
+                lin = sub2ind(gsz, subs{:});
+                if lin <= numel(rc)
+                    res = rc{lin};
+                    if isstruct(res) && isfield(res, 'success') && res.success ...
+                            && isfield(res, metric) && ~isnan(res.(metric))
+                        vals(end+1) = res.(metric); %#ok<AGROW>
+                    end
+                end
+            end
+        end
+
+        function vals = collect_grid_values(results, cond_name, metric)
+            % All successful metric values across the whole grid for one
+            % condition. Reused to pool the param-space distribution across runs.
+            vals = [];
+            if ~isfield(results, cond_name); return; end
+            rc = results.(cond_name);
+            for k = 1:numel(rc)
+                res = rc{k};
+                if isstruct(res) && isfield(res, 'success') && res.success ...
+                        && isfield(res, metric) && ~isnan(res.(metric))
+                    vals(end+1) = res.(metric); %#ok<AGROW>
+                end
+            end
+        end
+    end
+
     %% Static Methods
     methods (Static)
         function obj = loadobj(s)
@@ -1479,6 +1596,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'explicit_vectors'), obj.explicit_vectors = s.explicit_vectors; end
                 if isfield(s, 'vector_param_config'), obj.vector_param_config = s.vector_param_config; end
                 if isfield(s, 'randomize_order'), obj.randomize_order = s.randomize_order; end
+                if isfield(s, 'network_seed_offset'), obj.network_seed_offset = s.network_seed_offset; end
 
                 % Model Default Properties (public)
                 if isfield(s, 'model_defaults'), obj.model_defaults = s.model_defaults; end
@@ -1759,8 +1877,10 @@ classdef ParamSpaceAnalysis2 < handle
                     config_idx = batch_indices(k);
                     config = obj.all_configs{config_idx};
 
-                    % Same network seed for all conditions of this config
-                    network_seed = config_idx*100;
+                    % Same network seed for all conditions of this config.
+                    % network_seed_offset (0 by default) shifts every seed so
+                    % separate runs of the same config use distinct networks.
+                    network_seed = config_idx*100 + obj.network_seed_offset;
 
                     for c_idx = 1:num_conditions
                         job = struct();

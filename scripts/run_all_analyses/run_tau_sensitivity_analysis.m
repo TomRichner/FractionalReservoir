@@ -86,6 +86,9 @@ psa_tau_a.folder_prefix = 'tau_sensitivity';
 if exist('master_output_dir', 'var')
     psa_tau_a.output_dir = master_output_dir;
 end
+if exist('master_seed_offset', 'var')
+    psa_tau_a.network_seed_offset = master_seed_offset;  % fresh networks per run (pooling)
+end
 psa_tau_a.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
 psa_tau_a.model_defaults.std_zero_floor = std_zero_floor;
 psa_tau_a.model_defaults.fs = fs_mode;                  % fast=200 (default 400)
@@ -141,6 +144,9 @@ psa_tau_b = ParamSpaceAnalysis2(...
 psa_tau_b.folder_prefix = 'tau_sensitivity';
 if exist('master_output_dir', 'var')
     psa_tau_b.output_dir = master_output_dir;
+end
+if exist('master_seed_offset', 'var')
+    psa_tau_b.network_seed_offset = master_seed_offset;  % fresh networks per run (pooling)
 end
 psa_tau_b.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
 psa_tau_b.model_defaults.std_zero_floor = std_zero_floor;

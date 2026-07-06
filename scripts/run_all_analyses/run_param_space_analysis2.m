@@ -82,6 +82,9 @@ psa = ParamSpaceAnalysis2(...
 if exist('master_output_dir', 'var')
     psa.output_dir = master_output_dir;
 end
+if exist('master_seed_offset', 'var')
+    psa.network_seed_offset = master_seed_offset;  % fresh networks per run (pooling)
+end
 psa.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
 psa.model_defaults.std_zero_floor = std_zero_floor;
 psa.model_defaults.fs = fs_mode;                   % fast=200 (default 400)
