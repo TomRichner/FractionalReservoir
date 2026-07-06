@@ -827,9 +827,12 @@ classdef SRNNModel2 < handle
         function set_defaults(obj)
             % SET_DEFAULTS Initialize all properties to default values
 
-            % Set default activation function (piecewiseSigmoid)
-            obj.activation_function = @(x) SRNNModel2.piecewiseSigmoid(x, obj.S_a, obj.S_c);
-            obj.activation_function_derivative = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, obj.S_a, obj.S_c);
+            % Set default activation function (logisticSigmoid, centered at S_c).
+            % Smooth sigmoid with unit slope at its center; S_c biases the resting
+            % operating point onto the lower part of the curve (see logisticSigmoid).
+            % S_a is retained for the piecewise static method but unused here.
+            obj.activation_function = @(x) SRNNModel2.logisticSigmoid(x, obj.S_c);
+            obj.activation_function_derivative = @(x) SRNNModel2.logisticSigmoidDerivative(x, obj.S_c);
 
             % Set default input configuration
             obj.input_config = struct();
@@ -1973,16 +1976,23 @@ classdef SRNNModel2 < handle
             end
         end
 
-        function y = logisticSigmoid(x)
-            % LOGISTICSIGMOID Standard logistic sigmoid activation function.
-            % Internalized from src/nonlinearities/logisticSigmoid.m
-            y = 1 ./ (1 + exp(-4 * x));
+        function y = logisticSigmoid(x, c)
+            % LOGISTICSIGMOID Logistic sigmoid activation with unit slope at its center.
+            %   y = logisticSigmoid(x, c) = 1/(1+exp(-4*(x-c)))
+            %   Range (0,1); y(c)=0.5; slope 1 at x=c (the factor 4 sets that).
+            %   c is an optional center/bias (default 0): c>0 shifts the
+            %   inflection to positive x, so at the resting point (x~0) the
+            %   network sits on the LOWER part of the curve.
+            if nargin < 2, c = 0; end
+            y = 1 ./ (1 + exp(-4 * (x - c)));
         end
 
-        function dy = logisticSigmoidDerivative(x)
-            % LOGISTICSIGMOIDDERIVATIVE First derivative of the logistic sigmoid.
-            % Internalized from src/nonlinearities/logisticSigmoidDerivative.m
-            sigmoid_val = 1 ./ (1 + exp(-4 * x));
+        function dy = logisticSigmoidDerivative(x, c)
+            % LOGISTICSIGMOIDDERIVATIVE First derivative of logisticSigmoid.
+            %   dy = 4*sigma*(1-sigma) with sigma = 1/(1+exp(-4*(x-c))).
+            %   c is an optional center/bias (default 0); dy(c)=1.
+            if nargin < 2, c = 0; end
+            sigmoid_val = 1 ./ (1 + exp(-4 * (x - c)));
             dy = 4 * sigmoid_val .* (1 - sigmoid_val);
         end
 

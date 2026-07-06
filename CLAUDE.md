@@ -71,7 +71,7 @@ Preserve this pattern when adding new analysis scripts.
 
 - `algorithms/Jacobian/` — `compute_Jacobian_fast.m`, `compute_Jacobian_at_indices.m`, `compute_J_eff.m` (called directly by example scripts; `SRNNModel2` also carries internalized equivalents). The standalone `algorithms/Lyapunov/` files and `algorithms/info/mutual_info_SISO.m` were removed (internalized / unused).
 - `connectivity/` — `RMTMatrix.m` (RMT-based connectivity). The legacy `create_W_matrix.m` / `create_paired_W_matrix.m` were removed.
-- `nonlinearities/` — `piecewiseSigmoid`, `tanhActivation` and their derivatives (also internalized into `SRNNModel2`). `logisticSigmoid` was removed.
+- `nonlinearities/` — `piecewiseSigmoid`, `tanhActivation` and their derivatives (also internalized into `SRNNModel2`). The standalone `logisticSigmoid.m` file was removed, but `logisticSigmoid`/`logisticSigmoidDerivative` live as `SRNNModel2` static methods and are now the **default** activation: `logisticSigmoid(x, c) = 1/(1+exp(-4*(x-c)))` (unit slope at center `c = S_c`, range (0,1)), bound in `set_defaults`.
 - `plotting/` — colormaps, line/scatter helpers, time-series panel plots, `param_space_plots/` for post-hoc visualization, `plot_saving/save_some_figs_to_folder_2.m` (used by every script that writes figures). Unused plot/colormap duplicates were removed; the standalone `plot_*` files that example/figure scripts call directly remain.
 - `SRNN_ESN_reservoir.m` — Echo State Network subclass of `SRNNModel2` (memory-capacity experiments). The exploratory `SRNN_ESN.m` / `SRNN_reservoir.m` / `SRNN_reservoir_DDE.m` RHS variants were removed.
 
