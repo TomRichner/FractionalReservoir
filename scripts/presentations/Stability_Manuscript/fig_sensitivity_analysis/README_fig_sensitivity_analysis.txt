@@ -1,7 +1,7 @@
 Stability_Manuscript figure: LLE Sensitivity (combined)
 =======================================================
 
-Generated: 07-Jul-2026 13:22:42
+Generated: 07-Jul-2026 14:41:59
 By script: Fig_sensitivity_analysis.m
 
 HOW IT WAS MADE
@@ -19,9 +19,14 @@ SOURCE RUN
     1D_sensitivity_sensitivity_n_nLevs_15_jul_06_26_22_00
 
 FIGURES PRODUCED (in this folder)
-  Fig_Sensitivity_LLE_figure_1.png
-  Fig_Sensitivity_LLE_figure_1.svg
-  Fig_Sensitivity_LLE_f_1.fig
+  Fig_Sensitivity_LLE.png
+  Fig_Sensitivity_LLE.svg
+  Fig_Sensitivity_LLE.fig
 
   Combined LLE sensitivity: one row per swept parameter
   (f, level_of_chaos, n), one column per adaptation condition.
+  x-axes relabelled: f -> "E:I ratio" (E:I = f:(1-f), ticks
+  1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1); level_of_chaos -> "Synaptic Gain";
+  n -> "Network Size". ylabel lambda_1 -> "Growth Rate"; larger tick fonts.
+  Condition titles kept only on the top row; vertical black dividers
+  separate the 4 condition columns.
