@@ -1,19 +1,16 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_param_space
-Captured at: 07-Jul-2026 15:39:36
+Captured at: 07-Jul-2026 15:52:48
 
-commit:      317a32522883a94c600d0411a008e3ca22f3386d
-commit_short:317a325
+commit:      a446ce7e1b88b96c67d9407039e76cd4dc5f1457
+commit_short:a446ce7
 branch:      refactor
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Stability_Manuscript: commit final LLE sensitivity figure (fig/png/svg)
-last_date:   2026-07-07T15:25:52-05:00
+last_msg:    Stability_Manuscript: add param-space distribution presentation figure script
+last_date:   2026-07-07T15:40:13-05:00
 dirty:       true
 
 --- git status --porcelain ---
-?? scripts/presentations/Stability_Manuscript/fig_param_space/
-
---- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_param_space/Fig_param_space.m
-scripts/presentations/Stability_Manuscript/fig_param_space/README_fig_param_space.txt
-scripts/presentations/Stability_Manuscript/fig_param_space/git_provenance.txt
-scripts/presentations/Stability_Manuscript/fig_param_space/working_changes.patch
+M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_param_space.m
+ M scripts/presentations/Stability_Manuscript/fig_param_space/README_fig_param_space.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space/working_changes.patch
