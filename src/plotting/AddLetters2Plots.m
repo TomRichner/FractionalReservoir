@@ -175,7 +175,14 @@ for ia = 1:length(lAxes)
         otherwise
             error('Location %s is undefined', NV.Location);
     end
-    
+
+    % Keep the annotation within the valid normalized figure range [0, 1].
+    % Negative HShift/VShift on an edge axis (e.g. the leftmost tile of a
+    % compact tiledlayout) can push x or y just outside the range, which
+    % annotation() rejects with "Position values must be between 0 and 1".
+    x = min(max(x, 0), 1);
+    y = min(max(y, 0), 1);
+
     h  = annotation(Parent, 'textbox',...
         [x,  y, 0.0 0.0],...
         'String',Letters{ia},...

@@ -1,59 +1,205 @@
 diff --git a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
-index e060a24..6c19c8f 100644
+index 6c19c8f..cfdf3a4 100644
 --- a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
 +++ b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
-@@ -26,3 +26,54 @@ replot_memory_capacity(mat_file, out_dir);
- % Log the git state alongside the figures so this presentation output can be
- % traced back to an exact commit (+ working-tree diff if dirty).
- capture_git_provenance(out_dir, project_root);
-+
-+%% -------------------- Human-readable description --------------------
-+% Write a plain-text record of how this figure was produced: the source
-+% dataset, the pipeline used, and the names of the figure files generated.
+@@ -9,10 +9,12 @@ this_dir     = fileparts(mfilename('fullpath'));
+ project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
+ 
+ % Make replot_memory_capacity / plot_memory_capacity resolvable regardless of
+-% cwd (replot_memory_capacity in turn adds src/ + its own folder), and src/ so
+-% capture_git_provenance is on the path.
++% cwd (replot_memory_capacity in turn adds src/ + its own folder), src/ so
++% capture_git_provenance is on the path, and this folder so the combined-figure
++% helper (plot_memory_capacity_combined) resolves.
+ addpath(fullfile(project_root, 'scripts', 'memory_capacity'));
+ addpath(fullfile(project_root, 'src'));
++addpath(this_dir);
+ 
+ % Source run to replot.
+ mat_file = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready', ...
+@@ -21,8 +23,18 @@ mat_file = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready', ...
+ % Write the regenerated manuscript figures next to this script.
+ out_dir = this_dir;
+ 
++% Fig1 (total-MC + horizon distributions) and Fig2 (per-delay + cumulative).
+ replot_memory_capacity(mat_file, out_dir);
+ 
++% Load the saved run once (used for the combined figure and the README below).
 +S       = load(mat_file, 'results_all');
 +run_tag = S.results_all.run_tag;
 +cfg     = S.results_all.settings;
 +
-+fig_files = { ...
-+    [run_tag '_Fig1_MC_Distributions.png']; ...
-+    [run_tag '_Fig1_MC_Distributions.pdf']; ...
-+    [run_tag '_Fig2_R2_Curves.png']; ...
-+    [run_tag '_Fig2_R2_Curves.pdf'] };
++% Fig3: paper-ready 1x3 strip assembled from pieces of Fig1/Fig2 --
++% (a) cumulative memory, (b) per-delay memory, (c) horizon paired trials.
++plot_memory_capacity_combined(S.results_all, out_dir);
 +
-+desc_path = fullfile(out_dir, 'README_fig_memory_capacity.txt');
-+fid = fopen(desc_path, 'w');
-+cleanup = onCleanup(@() fclose(fid));
+ % Log the git state alongside the figures so this presentation output can be
+ % traced back to an exact commit (+ working-tree diff if dirty).
+ capture_git_provenance(out_dir, project_root);
+@@ -30,15 +42,13 @@ capture_git_provenance(out_dir, project_root);
+ %% -------------------- Human-readable description --------------------
+ % Write a plain-text record of how this figure was produced: the source
+ % dataset, the pipeline used, and the names of the figure files generated.
+-S       = load(mat_file, 'results_all');
+-run_tag = S.results_all.run_tag;
+-cfg     = S.results_all.settings;
+-
+ fig_files = { ...
+     [run_tag '_Fig1_MC_Distributions.png']; ...
+     [run_tag '_Fig1_MC_Distributions.pdf']; ...
+     [run_tag '_Fig2_R2_Curves.png']; ...
+-    [run_tag '_Fig2_R2_Curves.pdf'] };
++    [run_tag '_Fig2_R2_Curves.pdf']; ...
++    [run_tag '_Fig3_Combined_MC.png']; ...
++    [run_tag '_Fig3_Combined_MC.pdf'] };
+ 
+ desc_path = fullfile(out_dir, 'README_fig_memory_capacity.txt');
+ fid = fopen(desc_path, 'w');
+@@ -74,6 +84,8 @@ for k = 1:numel(fig_files)
+ end
+ fprintf(fid, '\n  Fig1 = paired total-MC + memory-horizon distributions\n');
+ fprintf(fid, '  Fig2 = per-delay R^2(d) and cumulative MC (mean +/- 95%% CI)\n');
++fprintf(fid, '  Fig3 = 1x3 combined panel: (a) cumulative MC, (b) per-delay R^2,\n');
++fprintf(fid, '         (c) horizon paired trials  [paper-ready]\n');
+ 
+ clear cleanup;  % flush + close
+ fprintf('Description written: %s\n', desc_path);
+diff --git a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
+index 7b83d9f..fd20f9a 100644
+--- a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
++++ b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
+@@ -1,7 +1,7 @@
+ Stability_Manuscript figure: Memory Capacity
+ ============================================
+ 
+-Generated: 07-Jul-2026 10:55:24
++Generated: 07-Jul-2026 12:31:25
+ By script: Fig_memory_capacity.m
+ 
+ HOW IT WAS MADE
+@@ -28,6 +28,10 @@ FIGURES PRODUCED (in this folder)
+   MC_sample_hold_20260706_194403_trials50_Fig1_MC_Distributions.pdf
+   MC_sample_hold_20260706_194403_trials50_Fig2_R2_Curves.png
+   MC_sample_hold_20260706_194403_trials50_Fig2_R2_Curves.pdf
++  MC_sample_hold_20260706_194403_trials50_Fig3_Combined_MC.png
++  MC_sample_hold_20260706_194403_trials50_Fig3_Combined_MC.pdf
+ 
+   Fig1 = paired total-MC + memory-horizon distributions
+   Fig2 = per-delay R^2(d) and cumulative MC (mean +/- 95% CI)
++  Fig3 = 1x3 combined panel: (a) cumulative MC, (b) per-delay R^2,
++         (c) horizon paired trials  [paper-ready]
+diff --git a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
+index 65183dc..1c87dd7 100644
+--- a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
++++ b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
+@@ -1,13 +1,21 @@
+ Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity
+-Captured at: 07-Jul-2026 10:55:23
++Captured at: 07-Jul-2026 12:33:59
+ 
+-commit:      d03c72a3703590f7d6c6216ab3575fe0725c1d9f
+-commit_short:d03c72a
++commit:      391cdc1812026e6065a69dd003834bb3a28ccfe8
++commit_short:391cdc1
+ branch:      refactor
+ remote:      git@github.com:TomRichner/FractionalReservoir.git
+-last_msg:    presentations: add Stability_Manuscript memory-capacity replot figure
+-last_date:   2026-07-07T10:51:06-05:00
++last_msg:    stability manuscript memory capacity fig, now with txt log file
++last_date:   2026-07-07T10:57:56-05:00
+ dirty:       true
+ 
+ --- git status --porcelain ---
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
++ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
++ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
++ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
++ M src/plotting/AddLetters2Plots.m
++?? scripts/presentations/Stability_Manuscript/fig_memory_capacity/plot_memory_capacity_combined.m
 +
-+fprintf(fid, 'Stability_Manuscript figure: Memory Capacity\n');
-+fprintf(fid, '============================================\n\n');
-+fprintf(fid, 'Generated: %s\n', char(datetime('now')));
-+fprintf(fid, 'By script: %s.m\n\n', mfilename);
++--- untracked files (not in patch) ---
++scripts/presentations/Stability_Manuscript/fig_memory_capacity/plot_memory_capacity_combined.m
+diff --git a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
+index 2533f14..f0e8e6f 100644
+--- a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
++++ b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
+@@ -1,59 +0,0 @@
+-diff --git a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
+-index e060a24..6c19c8f 100644
+---- a/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
+-+++ b/scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
+-@@ -26,3 +26,54 @@ replot_memory_capacity(mat_file, out_dir);
+- % Log the git state alongside the figures so this presentation output can be
+- % traced back to an exact commit (+ working-tree diff if dirty).
+- capture_git_provenance(out_dir, project_root);
+-+
+-+%% -------------------- Human-readable description --------------------
+-+% Write a plain-text record of how this figure was produced: the source
+-+% dataset, the pipeline used, and the names of the figure files generated.
+-+S       = load(mat_file, 'results_all');
+-+run_tag = S.results_all.run_tag;
+-+cfg     = S.results_all.settings;
+-+
+-+fig_files = { ...
+-+    [run_tag '_Fig1_MC_Distributions.png']; ...
+-+    [run_tag '_Fig1_MC_Distributions.pdf']; ...
+-+    [run_tag '_Fig2_R2_Curves.png']; ...
+-+    [run_tag '_Fig2_R2_Curves.pdf'] };
+-+
+-+desc_path = fullfile(out_dir, 'README_fig_memory_capacity.txt');
+-+fid = fopen(desc_path, 'w');
+-+cleanup = onCleanup(@() fclose(fid));
+-+
+-+fprintf(fid, 'Stability_Manuscript figure: Memory Capacity\n');
+-+fprintf(fid, '============================================\n\n');
+-+fprintf(fid, 'Generated: %s\n', char(datetime('now')));
+-+fprintf(fid, 'By script: %s.m\n\n', mfilename);
+-+
+-+fprintf(fid, 'HOW IT WAS MADE\n');
+-+fprintf(fid, '  This is a presentation replot -- no simulation is re-run. The script\n');
+-+fprintf(fid, '  loads a saved looped_memory_capacity.m results file and calls\n');
+-+fprintf(fid, '  replot_memory_capacity -> plot_memory_capacity to regenerate the\n');
+-+fprintf(fid, '  figures into this folder. See git_provenance.txt for the exact commit.\n\n');
+-+
+-+fprintf(fid, 'SOURCE DATASET\n');
+-+fprintf(fid, '  %s\n', mat_file);
+-+fprintf(fid, '  run_tag: %s\n\n', run_tag);
+-+
+-+fprintf(fid, 'KEY SETTINGS (from the saved run)\n');
+-+fprintf(fid, '  input_type    : %s\n', cfg.input_type);
+-+fprintf(fid, '  n (neurons)   : %d\n', cfg.n);
+-+fprintf(fid, '  fs (Hz)       : %d\n', cfg.fs);
+-+fprintf(fid, '  n_trials      : %d\n', cfg.n_trials);
+-+fprintf(fid, '  level_of_chaos: %g\n', cfg.level_of_chaos);
+-+fprintf(fid, '  T_hold (s)    : %g\n', cfg.T_hold);
+-+fprintf(fid, '  conditions    : %s\n\n', strjoin(S.results_all.conditions, ', '));
+-+
+-+fprintf(fid, 'FIGURES PRODUCED (in this folder)\n');
+-+for k = 1:numel(fig_files)
+-+    fprintf(fid, '  %s\n', fig_files{k});
+-+end
+-+fprintf(fid, '\n  Fig1 = paired total-MC + memory-horizon distributions\n');
+-+fprintf(fid, '  Fig2 = per-delay R^2(d) and cumulative MC (mean +/- 95%% CI)\n');
+-+
+-+clear cleanup;  % flush + close
+-+fprintf('Description written: %s\n', desc_path);
+diff --git a/src/plotting/AddLetters2Plots.m b/src/plotting/AddLetters2Plots.m
+index 7ee5330..12049d1 100755
+--- a/src/plotting/AddLetters2Plots.m
++++ b/src/plotting/AddLetters2Plots.m
+@@ -175,7 +175,14 @@ for ia = 1:length(lAxes)
+         otherwise
+             error('Location %s is undefined', NV.Location);
+     end
+-    
 +
-+fprintf(fid, 'HOW IT WAS MADE\n');
-+fprintf(fid, '  This is a presentation replot -- no simulation is re-run. The script\n');
-+fprintf(fid, '  loads a saved looped_memory_capacity.m results file and calls\n');
-+fprintf(fid, '  replot_memory_capacity -> plot_memory_capacity to regenerate the\n');
-+fprintf(fid, '  figures into this folder. See git_provenance.txt for the exact commit.\n\n');
++    % Keep the annotation within the valid normalized figure range [0, 1].
++    % Negative HShift/VShift on an edge axis (e.g. the leftmost tile of a
++    % compact tiledlayout) can push x or y just outside the range, which
++    % annotation() rejects with "Position values must be between 0 and 1".
++    x = min(max(x, 0), 1);
++    y = min(max(y, 0), 1);
 +
-+fprintf(fid, 'SOURCE DATASET\n');
-+fprintf(fid, '  %s\n', mat_file);
-+fprintf(fid, '  run_tag: %s\n\n', run_tag);
-+
-+fprintf(fid, 'KEY SETTINGS (from the saved run)\n');
-+fprintf(fid, '  input_type    : %s\n', cfg.input_type);
-+fprintf(fid, '  n (neurons)   : %d\n', cfg.n);
-+fprintf(fid, '  fs (Hz)       : %d\n', cfg.fs);
-+fprintf(fid, '  n_trials      : %d\n', cfg.n_trials);
-+fprintf(fid, '  level_of_chaos: %g\n', cfg.level_of_chaos);
-+fprintf(fid, '  T_hold (s)    : %g\n', cfg.T_hold);
-+fprintf(fid, '  conditions    : %s\n\n', strjoin(S.results_all.conditions, ', '));
-+
-+fprintf(fid, 'FIGURES PRODUCED (in this folder)\n');
-+for k = 1:numel(fig_files)
-+    fprintf(fid, '  %s\n', fig_files{k});
-+end
-+fprintf(fid, '\n  Fig1 = paired total-MC + memory-horizon distributions\n');
-+fprintf(fid, '  Fig2 = per-delay R^2(d) and cumulative MC (mean +/- 95%% CI)\n');
-+
-+clear cleanup;  % flush + close
-+fprintf('Description written: %s\n', desc_path);
+     h  = annotation(Parent, 'textbox',...
+         [x,  y, 0.0 0.0],...
+         'String',Letters{ia},...

@@ -9,10 +9,12 @@ this_dir     = fileparts(mfilename('fullpath'));
 project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
 
 % Make replot_memory_capacity / plot_memory_capacity resolvable regardless of
-% cwd (replot_memory_capacity in turn adds src/ + its own folder), and src/ so
-% capture_git_provenance is on the path.
+% cwd (replot_memory_capacity in turn adds src/ + its own folder), src/ so
+% capture_git_provenance is on the path, and this folder so the combined-figure
+% helper (plot_memory_capacity_combined) resolves.
 addpath(fullfile(project_root, 'scripts', 'memory_capacity'));
 addpath(fullfile(project_root, 'src'));
+addpath(this_dir);
 
 % Source run to replot.
 mat_file = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready', ...
@@ -21,7 +23,17 @@ mat_file = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready', ...
 % Write the regenerated manuscript figures next to this script.
 out_dir = this_dir;
 
+% Fig1 (total-MC + horizon distributions) and Fig2 (per-delay + cumulative).
 replot_memory_capacity(mat_file, out_dir);
+
+% Load the saved run once (used for the combined figure and the README below).
+S       = load(mat_file, 'results_all');
+run_tag = S.results_all.run_tag;
+cfg     = S.results_all.settings;
+
+% Fig3: paper-ready 1x3 strip assembled from pieces of Fig1/Fig2 --
+% (a) cumulative memory, (b) per-delay memory, (c) horizon paired trials.
+fig3 = plot_memory_capacity_combined(S.results_all, out_dir);
 
 % Log the git state alongside the figures so this presentation output can be
 % traced back to an exact commit (+ working-tree diff if dirty).
@@ -30,15 +42,18 @@ capture_git_provenance(out_dir, project_root);
 %% -------------------- Human-readable description --------------------
 % Write a plain-text record of how this figure was produced: the source
 % dataset, the pipeline used, and the names of the figure files generated.
-S       = load(mat_file, 'results_all');
-run_tag = S.results_all.run_tag;
-cfg     = S.results_all.settings;
-
+% Fig3 is saved by save_some_figs_to_folder_2, which appends the figure number:
+% <name>_figure_<N>.png/.svg and <name>_f_<N>.fig
+fig3_tag = sprintf('%s_Fig3_Combined_MC', run_tag);
+fig3_num = num2str(fig3.Number);
 fig_files = { ...
     [run_tag '_Fig1_MC_Distributions.png']; ...
     [run_tag '_Fig1_MC_Distributions.pdf']; ...
     [run_tag '_Fig2_R2_Curves.png']; ...
-    [run_tag '_Fig2_R2_Curves.pdf'] };
+    [run_tag '_Fig2_R2_Curves.pdf']; ...
+    [fig3_tag '_figure_' fig3_num '.png']; ...
+    [fig3_tag '_figure_' fig3_num '.svg']; ...
+    [fig3_tag '_f_' fig3_num '.fig'] };
 
 desc_path = fullfile(out_dir, 'README_fig_memory_capacity.txt');
 fid = fopen(desc_path, 'w');
@@ -74,6 +89,8 @@ for k = 1:numel(fig_files)
 end
 fprintf(fid, '\n  Fig1 = paired total-MC + memory-horizon distributions\n');
 fprintf(fid, '  Fig2 = per-delay R^2(d) and cumulative MC (mean +/- 95%% CI)\n');
+fprintf(fid, '  Fig3 = 1x3 combined panel: (a) cumulative MC, (b) per-delay R^2,\n');
+fprintf(fid, '         (c) horizon paired trials  [paper-ready]\n');
 
 clear cleanup;  % flush + close
 fprintf('Description written: %s\n', desc_path);
