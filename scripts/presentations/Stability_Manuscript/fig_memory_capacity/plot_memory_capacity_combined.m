@@ -51,6 +51,7 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
 
     % --- Style + palette (edit here to restyle) ---
     set(0,'DefaultAxesFontSize',14);   % drives tick numbers + x/y labels
+    set(0,'DefaultAxesLineWidth',1.0); % axis lines + tick marks
     set(0,'DefaultTextInterpreter','none');
     set(0,'DefaultLegendInterpreter','none');
 
