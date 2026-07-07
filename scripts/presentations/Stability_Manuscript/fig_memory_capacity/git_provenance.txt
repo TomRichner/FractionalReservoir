@@ -1,0 +1,13 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity
+Captured at: 07-Jul-2026 10:55:23
+
+commit:      d03c72a3703590f7d6c6216ab3575fe0725c1d9f
+commit_short:d03c72a
+branch:      refactor
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    presentations: add Stability_Manuscript memory-capacity replot figure
+last_date:   2026-07-07T10:51:06-05:00
+dirty:       true
+
+--- git status --porcelain ---
+M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
