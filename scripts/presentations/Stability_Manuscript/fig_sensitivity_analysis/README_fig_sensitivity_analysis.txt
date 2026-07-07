@@ -1,7 +1,7 @@
 Stability_Manuscript figure: LLE Sensitivity (combined)
 =======================================================
 
-Generated: 07-Jul-2026 14:41:59
+Generated: 07-Jul-2026 15:24:39
 By script: Fig_sensitivity_analysis.m
 
 HOW IT WAS MADE
@@ -28,5 +28,11 @@ FIGURES PRODUCED (in this folder)
   x-axes relabelled: f -> "E:I ratio" (E:I = f:(1-f), ticks
   1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1); level_of_chaos -> "Synaptic Gain";
   n -> "Network Size". ylabel lambda_1 -> "Growth Rate"; larger tick fonts.
-  Condition titles kept only on the top row; vertical black dividers
-  separate the 4 condition columns.
+  Condition titles kept only on the top row; vertical gray dividers
+  separate the 4 condition columns. imagesc CLim capped at
+  total_reps*0.5 (shared); colormap white -> 90% black so the blue
+  median line stays visible over the darkest cells. Panel letters
+  (a)..(l) added up-and-left of each plot (AddLetters2Plots).
+  Blue median line: alpha 0.35, 25% thinner; green zero line thinner.
+  Titles not bold; axis boxes removed (x/y axes + ticks kept).
+  LLE histograms: range [-1.75, 1.75], 22 bins.

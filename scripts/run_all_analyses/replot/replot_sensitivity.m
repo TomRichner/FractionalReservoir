@@ -1,14 +1,18 @@
-function replot_dir = replot_sensitivity(data_root, lle_hist_range)
+function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins)
 % REPLOT_SENSITIVITY Reload 1D sensitivity PSA objects and regenerate figures.
 %
 %   replot_dir = REPLOT_SENSITIVITY(data_root)
 %   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range)
+%   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range, n_bins)
 %
 % Inputs:
 %   data_root      : path to a run_all_<dt> folder containing 1D_sensitivity_*
 %                    subdirectories produced by run_sensitivity_analysis.m
 %   lle_hist_range : optional 2-element [ymin ymax] for the LLE histogram
 %                    (default [-1, 1]); mean_rate uses its plot_sensitivity default
+%   n_bins         : optional number of LLE histogram bins. When omitted, uses
+%                    plot_sensitivity's default (35); mean_rate always uses the
+%                    default.
 %
 % Output:
 %   replot_dir     : path to the new replot_sensitivity_<dt> folder under data_root
@@ -17,6 +21,9 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range)
 
     if nargin < 2 || isempty(lle_hist_range)
         lle_hist_range = [-2,2];
+    end
+    if nargin < 3
+        n_bins = [];
     end
 
     setup_paths();
@@ -34,6 +41,13 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range)
         mkdir(replot_dir);
     end
     fprintf('Replot output directory:\n  %s\n\n', replot_dir);
+
+    % LLE plot_sensitivity args (constant across params); include n_bins only
+    % when the caller provided it, else plot_sensitivity uses its default.
+    lle_args = {'metric', 'LLE', 'hist_range', lle_hist_range};
+    if ~isempty(n_bins)
+        lle_args = [lle_args, {'n_bins', n_bins}];
+    end
 
     for k = 1:length(sens_listing)
         src_dir = fullfile(sens_listing(k).folder, sens_listing(k).name);
@@ -59,7 +73,7 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range)
 
         psa.output_dir = replot_dir;
 
-        psa.plot_sensitivity('metric', 'LLE', 'hist_range', lle_hist_range);
+        psa.plot_sensitivity(lle_args{:});
         psa.plot_sensitivity('metric', 'mean_rate');
 
         fig_dir = fullfile(replot_dir, 'figures');
