@@ -1,0 +1,20 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_EI_param_space
+Captured at: 07-Jul-2026 16:15:45
+
+commit:      d3a58324cbeaa1394661208fcd818832343cda21
+commit_short:d3a5832
+branch:      refactor
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Stability_Manuscript: combined param-space figure + final figs
+last_date:   2026-07-07T15:56:57-05:00
+dirty:       true
+
+--- git status --porcelain ---
+M src/plotting/param_space_plots/load_and_make_unit_histograms.m
+?? scripts/presentations/Stability_Manuscript/fig_EI_param_space/
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_param_space.m
+scripts/presentations/Stability_Manuscript/fig_EI_param_space/README_fig_EI_param_space.txt
+scripts/presentations/Stability_Manuscript/fig_EI_param_space/git_provenance.txt
+scripts/presentations/Stability_Manuscript/fig_EI_param_space/working_changes.patch

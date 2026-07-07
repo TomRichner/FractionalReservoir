@@ -1,0 +1,21 @@
+diff --git a/src/plotting/param_space_plots/load_and_make_unit_histograms.m b/src/plotting/param_space_plots/load_and_make_unit_histograms.m
+index 0b11062..b9b433b 100644
+--- a/src/plotting/param_space_plots/load_and_make_unit_histograms.m
++++ b/src/plotting/param_space_plots/load_and_make_unit_histograms.m
+@@ -31,6 +31,7 @@ arguments
+     results_dir (1,:) char
+     options.NormalizeMode (1,:) char {mustBeMember(options.NormalizeMode, {'count', 'probability'})} = 'count'
+     options.Metrics (1,:) cell = {'lle', 'r'}
++    options.LLERange (1,2) double = [-2.3, 1.5]   % LLE histogram range (bin edges)
+ end
+ 
+ normalize_mode = options.NormalizeMode;
+@@ -80,7 +81,7 @@ condition_titles = containers.Map(...
+ %% Build metric configuration based on options
+ % Map short names to internal metric names and display properties
+ metric_config = struct();
+-metric_config.lle = struct('field', 'LLE', 'label', '\lambda_1', 'range', [-2.3, 1.5], 'inf_both', true);
++metric_config.lle = struct('field', 'LLE', 'label', '\lambda_1', 'range', options.LLERange, 'inf_both', true);
+ metric_config.r = struct('field', 'mean_rate', 'label', 'Mean Firing Rate', 'range', [0, 1], 'inf_both', false);
+ metric_config.br = struct('field', 'mean_synaptic_output', 'label', 'Mean Synaptic Output', 'range', [0, 1], 'inf_both', false);
+ 
