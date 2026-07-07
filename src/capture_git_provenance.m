@@ -82,14 +82,18 @@ function info = capture_git_provenance(output_dir, repo_root)
     end
     clear cleanup;  % flush
 
+    patch_path = fullfile(output_dir, 'working_changes.patch');
     if is_dirty
-        patch_path = fullfile(output_dir, 'working_changes.patch');
         cmd = sprintf('%s diff HEAD > "%s"', git, patch_path);
         [s_diff, ~] = system(cmd);
         if s_diff ~= 0
             warning('capture_git_provenance:DiffFailed', ...
                 'git diff HEAD failed (status %d); patch not saved.', s_diff);
         end
+    elseif isfile(patch_path)
+        % Clean tree: remove any stale patch left by a previous dirty run so the
+        % provenance folder never keeps an out-of-date working_changes.patch.
+        delete(patch_path);
     end
 
     fprintf('Git provenance saved: %s @ %s%s\n', branch, commit_short, ...
