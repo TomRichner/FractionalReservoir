@@ -34,7 +34,7 @@ for i=fig_vec
         saveas(i, fullfile(save_folder, [save_name '_f_' num2str(i)]), 'fig');
     end
     if any(strcmpi(fig_type,'png'))
-        exportgraphics(figure(i), fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']), 'Resolution', 300)
+        exportgraphics(figure(i), fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']), 'Resolution', 600)
     end
     if any(strcmpi(fig_type,'svg'))
         set(gcf, 'Renderer', 'painters');
