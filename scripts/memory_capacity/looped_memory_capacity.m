@@ -37,7 +37,7 @@ fs = 200;                   % Hz
 % T_wash=10 s is short vs tau_a_E=10 s (matches the example dial-in); raise it
 % for the final figure if the SFA conditions need more settling.
 T_wash_sec  = 10;
-T_train_sec = 250;
+T_train_sec = 300;
 T_test_sec  = 100;
 
 T_wash  = T_wash_sec  * fs;
@@ -96,7 +96,7 @@ base_args_template = { ...
     'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1 (unused by the logistic)
     'n_a_I', 0, ...                % no SFA for I neurons (all conditions)
     'n_b_I', 0, ...                % no STD for I neurons (all conditions)
-    'c_E', 0.15/3, ...             % adaptation strength for E neurons
+    'c_E', 0.5/3, ...              % adaptation strength for E neurons (raised to strengthen SFA)
     'tau_a_E', [0.1, 1.0, 10], ... % SFA time constants (s)
     'tau_b_E_rec', 1.0, ...        % STD recovery (s)
     'tau_b_E_rel', 0.25, ...       % STD release (s)

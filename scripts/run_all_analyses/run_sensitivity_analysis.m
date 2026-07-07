@@ -32,6 +32,15 @@ if ~exist('std_zero_floor', 'var')
     std_zero_floor = false;
 end
 
+%% SFA strength (c_E) configuration
+% Honor the master override from run_all_analyses; default to the class default.
+if exist('master_c_E', 'var')
+    c_E = master_c_E;
+end
+if ~exist('c_E', 'var')
+    c_E = 0.15/3;   % SRNNModel2 default
+end
+
 %% Setup paths
 setup_paths();
 
@@ -48,10 +57,10 @@ switch run_mode
         n_levels = 5;  n_reps = 4;  ode_solver_mode = @ode_rk4;
         fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
     case 'medium'
-        % Medium: roughly halfway between fast and production. Fixed-step
-        % ode_rk4 at fs=200, T_range=[0,30] with a 15 s LLE window [15,30].
-        n_levels = 15; n_reps = 20; ode_solver_mode = @ode_rk4;
-        fs_mode = 200;  T_range_mode = [0, 30];  lya_T_interval_mode = [15, 30];
+        % Medium: roughly halfway between fast and production. ode45 at fs=400,
+        % T_range=[0,30] with a 15 s LLE window [15,30], 15 levels x 50 reps.
+        n_levels = 15; n_reps = 50; ode_solver_mode = @ode45;
+        fs_mode = 400;  T_range_mode = [0, 30];  lya_T_interval_mode = [15, 30];
     case 'production'
         n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
         fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
@@ -101,6 +110,7 @@ for p_idx = 1:size(params_to_sweep, 1)
     end
     psa.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
     psa.model_defaults.std_zero_floor = std_zero_floor;
+    psa.model_defaults.c_E = c_E;                      % SFA strength (run_all: 0.5/3)
     psa.model_defaults.fs = fs_mode;                   % fast=200 (default 400)
     psa.model_defaults.T_range = T_range_mode;         % fast=[0,20] (default [0,50])
     if ~isempty(lya_T_interval_mode)

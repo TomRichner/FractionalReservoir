@@ -2,8 +2,8 @@
 % Master script to run all analysis pipelines in sequence
 %
 % This script executes the following analyses in order:
-%   1. Tau sensitivity analysis (tau_a and tau_b parameter sweeps)
-%   2. General sensitivity analysis (SFA/STD parameter exploration)
+%   1. General sensitivity analysis (SFA/STD parameter exploration)
+%   2. Tau sensitivity analysis (tau_a and tau_b parameter sweeps)
 %   3. Parameter space analysis
 %   4. DC Lyapunov analysis (local LLE vs DC stim level, across seeds)
 %
@@ -52,10 +52,16 @@ master_save_figs = 'save_all_figs';
 % the zero-floor; false reproduces the current (pre-floor) behavior.
 master_std_zero_floor = true;
 
+% SFA strength (c_E) for E neurons across the sub-analyses. Raised from the
+% SRNNModel2 default (0.15/3) to 0.5/3 to make spike-frequency adaptation
+% stronger (matches the dialed-in memory-capacity run). Honored by the tau /
+% sensitivity / param-space sub-scripts; run_dc_lle_analysis keeps its own c_E.
+master_c_E = 0.5/3;
+
 % Run mode for the sub-analyses (controls n_levels / n_reps, fs, T_range, and
 % the LLE window):
 %   'fast'       - few levels/reps, fs=200, T_range=[0,20]; finishes quickly (testing)
-%   'medium'     - fs=200, T_range=[0,30], 15 levels x 20 reps; ~halfway
+%   'medium'     - ode45, fs=400, 15 levels x 50 reps, T_range=[0,30] (tau: [0,50]); ~halfway
 %   'production' - full-size sweeps, fs=400, T_range=[0,50] (for real results)
 % Defaults to 'medium'. To pick another WITHOUT editing this file, set the
 % variable first in the console:   run_mode = 'fast'; run_all_analyses
@@ -72,6 +78,7 @@ m0 = SRNNModel2();
 run_manifest = struct( ...
     'run_mode', run_mode, ...
     'master_std_zero_floor', master_std_zero_floor, ...
+    'master_c_E', master_c_E, ...
     'master_save_figs', master_save_figs, ...
     'master_seed_offset', master_seed_offset, ...
     'run_index', run_index, ...
@@ -88,19 +95,13 @@ run_manifest = struct( ...
 save(fullfile(master_output_dir, 'run_manifest.mat'), 'run_manifest');
 clear m0;
 
-%% 1. Tau Sensitivity Analysis
+%% 1. General Sensitivity Analysis
 fprintf('========================================\n');
-fprintf('[1/4] Running Tau Sensitivity Analysis...\n');
-fprintf('========================================\n');
-run_tau_sensitivity_analysis;
-
-%% 2. General Sensitivity Analysis
-fprintf('========================================\n');
-fprintf('[2/4] Running Sensitivity Analysis...\n');
+fprintf('[1/4] Running Sensitivity Analysis...\n');
 fprintf('========================================\n');
 run_sensitivity_analysis;
 
-%% 2b. Assemble 1D sensitivity figures into one stacked figure
+%% 1b. Assemble 1D sensitivity figures into one stacked figure
 % run_sensitivity_analysis saves each swept parameter's LLE figure into its own
 % 1D_sensitivity_* subfolder. replot_sensitivity gathers them into a single
 % replot_sensitivity_<dt>/figures/ folder, then assemble_sensitivity_figure
@@ -112,6 +113,12 @@ if ~strcmp(master_save_figs, 'save_no_figs')
     sens_replot_dir = replot_sensitivity(master_output_dir);
     assemble_sensitivity_figure(sens_replot_dir, 'LLE');
 end
+
+%% 2. Tau Sensitivity Analysis
+fprintf('========================================\n');
+fprintf('[2/4] Running Tau Sensitivity Analysis...\n');
+fprintf('========================================\n');
+run_tau_sensitivity_analysis;
 
 %% 3. Parameter Space Analysis
 fprintf('========================================\n');
