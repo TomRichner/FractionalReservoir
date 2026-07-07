@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Parameter-space distributions (combined)
 ====================================================================
 
-Generated: 07-Jul-2026 15:52:48
+Generated: 07-Jul-2026 15:56:10
 By script: Fig_param_space.m
 
 HOW IT WAS MADE
@@ -12,9 +12,10 @@ HOW IT WAS MADE
     row 1 = LLE (growth-rate) distributions (green dashed zero line)
     row 2 = mean firing-rate distributions
     columns = No Adaptation, SFA, STD, SFA+STD
-  Cleanups: condition titles only on the top row (not bold), vertical gray
-  column dividers, fonts matched to the MC/sensitivity figures, y-axes
-  linked within each row. See git_provenance.txt for the exact commit.
+  Cleanups: LLE row xlabel "LLE (lambda_1)" -> "Growth Rate"; condition
+  titles only on the top row (not bold); vertical gray column dividers;
+  fonts matched to the MC/sensitivity figures; y-axes linked within each
+  row. See git_provenance.txt for the exact commit.
 
 SOURCE RUN
   C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_jul_06_26_22_00

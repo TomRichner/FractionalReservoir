@@ -75,11 +75,12 @@ for r = 1:nRows
     for c = 1:nCols
         ax = cax(r, c);
         set(ax, 'FontSize', tick_fs);
-        set(ax.XLabel, 'FontSize', label_fs);
         set(ax.YLabel, 'FontSize', label_fs);
         if r == 1
+            xlabel(ax, 'Growth Rate', 'FontSize', label_fs);   % LLE (lambda_1) -> Growth Rate
             set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);  % titles, not bold
         else
+            set(ax.XLabel, 'FontSize', label_fs);   % keep 'Mean Firing Rate'
             title(ax, '');   % condition titles only on the top row
         end
     end
@@ -150,9 +151,10 @@ fprintf(fid, '  the per-condition histogram axes into a single 2x4 figure:\n');
 fprintf(fid, '    row 1 = LLE (growth-rate) distributions (green dashed zero line)\n');
 fprintf(fid, '    row 2 = mean firing-rate distributions\n');
 fprintf(fid, '    columns = No Adaptation, SFA, STD, SFA+STD\n');
-fprintf(fid, '  Cleanups: condition titles only on the top row (not bold), vertical gray\n');
-fprintf(fid, '  column dividers, fonts matched to the MC/sensitivity figures, y-axes\n');
-fprintf(fid, '  linked within each row. See git_provenance.txt for the exact commit.\n\n');
+fprintf(fid, '  Cleanups: LLE row xlabel "LLE (lambda_1)" -> "Growth Rate"; condition\n');
+fprintf(fid, '  titles only on the top row (not bold); vertical gray column dividers;\n');
+fprintf(fid, '  fonts matched to the MC/sensitivity figures; y-axes linked within each\n');
+fprintf(fid, '  row. See git_provenance.txt for the exact commit.\n\n');
 
 fprintf(fid, 'SOURCE RUN\n');
 fprintf(fid, '  %s\n', data_root);
