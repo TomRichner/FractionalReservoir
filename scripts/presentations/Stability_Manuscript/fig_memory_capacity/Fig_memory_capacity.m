@@ -44,7 +44,7 @@ capture_git_provenance(out_dir, project_root);
 % dataset, the pipeline used, and the names of the figure files generated.
 % Fig3 is saved by save_some_figs_to_folder_2, which appends the figure number:
 % <name>_figure_<N>.png/.svg and <name>_f_<N>.fig
-fig3_tag = sprintf('%s_Fig3_Combined_MC', run_tag);
+fig3_tag = 'Fig_Memory_Capacity';
 fig3_num = num2str(fig3.Number);
 fig_files = { ...
     [run_tag '_Fig1_MC_Distributions.png']; ...

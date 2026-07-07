@@ -16,8 +16,9 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
 %
 % Inputs:
 %   results_all : struct saved by looped_memory_capacity.m.
-%   out_dir     : optional. If non-empty, save <run_tag>_Fig3_Combined_MC.{png,pdf}
-%                 there. If omitted, the figure is only displayed.
+%   out_dir     : optional. If non-empty, save Fig_Memory_Capacity.{png,svg,fig}
+%                 there (via save_some_figs_to_folder_2, which appends the figure
+%                 number). If omitted, the figure is only displayed.
 
     if nargin < 2; out_dir = ''; end
 
@@ -44,10 +45,7 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     R2_cum_ci_hi = cumsum(R2_ci.hi, 2);
 
     cfg = results_all.settings;
-    delay_s    = cfg.delay_s;
-    input_type = cfg.input_type;
-    n          = cfg.n;
-    run_tag    = results_all.run_tag;
+    delay_s = cfg.delay_s;
 
     % --- Style + palette (edit here to restyle) ---
     set(0,'DefaultAxesFontSize',14);   % drives tick numbers + x/y labels
@@ -98,8 +96,12 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
 
     % (c) Horizon distribution (paired trials)
     nexttile; hold on; grid off; box off;
+    % Faint paired-trial lines. Use a solid light-gray RGB rather than an
+    % alpha'd color ([0 0 0 0.15]): the 4th (alpha) element is an undocumented
+    % runtime-only transparency that is NOT saved in .fig files, so a saved/
+    % reopened figure would otherwise show these as opaque black.
     for k = 1:n_trials
-        plot(xpos, H_trials(k,:), '-', 'Color', [0 0 0 0.15], 'LineWidth', 1);
+        plot(xpos, H_trials(k,:), '-', 'Color', [0.7 0.7 0.7], 'LineWidth', 0.75);
     end
     for i = 1:n_cond
         scatter(i*ones(n_trials,1), H_trials(:,i), 20, ...
@@ -122,7 +124,7 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     % number explicitly so the open Fig1/Fig2 (from replot_memory_capacity) are
     % not also re-saved here.
     if ~isempty(out_dir)
-        save_some_figs_to_folder_2(out_dir, [run_tag '_Fig3_Combined_MC'], ...
+        save_some_figs_to_folder_2(out_dir, 'Fig_Memory_Capacity', ...
             fig3.Number, {'png', 'svg', 'fig'});
         fprintf('Combined figure saved to:\n  %s\n', out_dir);
     end
