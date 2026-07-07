@@ -1,18 +1,11 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity
-Captured at: 07-Jul-2026 13:01:47
+Captured at: 07-Jul-2026 13:03:40
 
-commit:      d4d75c873a6a54c95deb28b41f4bd59118fe9c71
-commit_short:d4d75c8
+commit:      c074548c750c372c2f4cc37d60ed541d0d0ae27f
+commit_short:c074548
 branch:      refactor
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Fig3 combined MC: set axes LineWidth to 1.0
-last_date:   2026-07-07T12:53:22-05:00
-dirty:       true
+last_msg:    updated fig saving
+last_date:   2026-07-07T13:03:22-05:00
+dirty:       false
 
---- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/plot_memory_capacity_combined.m
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
- M src/plotting/plot_saving/save_some_figs_to_folder_2.m
