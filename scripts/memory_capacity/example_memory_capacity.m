@@ -35,7 +35,7 @@ fs = 200;                     % Sampling frequency (Hz)
 % particular T_wash should exceed a few x the slowest tau_a_E for the SFA
 % conditions -- here tau_a_E max = 10 s).
 T_wash_sec = 10;              % Washout duration (s); discarded transient before training
-T_train_sec = 200;           % Training duration (seconds)
+T_train_sec = 90;           % Training duration (seconds)
 T_test_sec = 90;            % Test duration (seconds)
 
 T_wash = T_wash_sec * fs;     % Washout samples

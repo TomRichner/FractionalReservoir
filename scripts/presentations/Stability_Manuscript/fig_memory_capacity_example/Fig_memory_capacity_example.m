@@ -1,20 +1,22 @@
-%% Plot half of the Stability_Manuscript example memory-capacity figure.
+%% Plot the Stability_Manuscript example memory-capacity figure.
 % Loads mc_example_data.mat (written by compute_memory_capacity_example.m) and
-% renders the figures -- no simulation is re-run, so the look can be iterated
-% quickly. Run compute_memory_capacity_example.m first.
+% renders a single manuscript figure -- no simulation is re-run, so the look can
+% be iterated quickly. Run compute_memory_capacity_example.m first.
 %
-% Produces:
-%   Fig 1 -- 1x3 comparison: R^2 by delay, cumulative MC, total-MC bars.
-%   Fig 2 -- per-condition reconstruction: the test input and, for a few delays,
-%            the target u(t-d) vs the readout y_d(t). Built from the saved
-%            mc_results structs (predictions/t_pred/R2_d), a clean struct-based
-%            stand-in for the diagnostic plot_esn_timeseries method.
+% Layout (styled to match fig_memory_capacity/Fig_memory_capacity.m):
+%   (a) Cumulative Memory Capacity vs delay (0-10 s), all 4 conditions.
+%   (b) Per-delay R^2 vs delay (0-10 s), all 4 conditione t a few delays -- target
+%   u(t-d) vs the trained readout -- each panel titled with the delay in seconds
+%   and its R^2. Built from the saved mc_results (predictions/t_pred/R2_d).
 
 clear; clc; close all;
 
 % Assumes setup_paths.m has already been run (src/ + scripts/ on the MATLAB path).
-% this_dir is only used to locate mc_example_data.mat next to this script.
+% this_dir locates mc_example_data.mat and is where the final figure is saved.
 this_dir = fileparts(mfilename('fullpath'));
+% scripts/presentations/Stability_Manuscript/fig_memory_capacity_example -> root is 4 up
+project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
+out_dir = this_dir;   % write the final figure next to this script
 
 %% Load precomputed results
 data_file = fullfile(this_dir, 'mc_example_data.mat');
@@ -22,101 +24,167 @@ assert(isfile(data_file), ...
     'Missing %s -- run compute_memory_capacity_example.m first.', data_file);
 S = load(data_file);
 results         = S.results;
-MC              = S.MC;
 R2              = S.R2;
 delay_s         = S.delay_s;
 condition_names = S.condition_names;
 n_cond          = numel(condition_names);
 
-%% Plotting parameters (edit here to restyle)
-colors = [0.7, 0.7, 0.7;   % Gray:  baseline
-          0.3, 0.6, 0.9;   % Blue:  SFA only
-          0.3, 0.7, 0.4;   % Green: STD only
-          0.9, 0.4, 0.3];  % Red:   SFA + STD
-delays_to_plot = [1, 2, 3, 5, 8];   % hold-delays to show in the reconstruction
+%% Style + palette (matched to Fig_memory_capacity.m / plot_memory_capacity_combined.m)
+set(0,'DefaultAxesFontSize',14);    % tick numbers + x/y labels
+set(0,'DefaultAxesLineWidth',1.0);  % axis lines + tick marks
+set(0,'DefaultTextInterpreter','none');
+set(0,'DefaultLegendInterpreter','none');
 
-%% ==================== Fig 1: MC comparison (1x3) ====================
-figure('Color', 'w', 'Position', [100 100 1200 380]);
-nd = numel(delay_s);
-
-% Plot 1: R^2 vs delay for all conditions
-subplot(1, 3, 1); hold on;
-bar_data = zeros(nd, n_cond);
-for i = 1:n_cond
-    bar_data(:, i) = R2{i}(:);
+% Okabe-Ito colorblind-safe palette (same as the combined MC figure):
+%   Baseline black, SFA orange, STD sky blue, SFA+STD reddish purple.
+colors = [0.000 0.000 0.000;
+          0.902 0.624 0.000;
+          0.337 0.706 0.914;
+          0.800 0.475 0.655];
+if size(colors,1) < n_cond
+    colors = lines(n_cond);
 end
-b = bar(delay_s, bar_data);
-for i = 1:n_cond
-    b(i).FaceColor = colors(i, :);
+
+% Short condition labels for the legend (match the combined figure).
+if n_cond == 4
+    display_names = {'Baseline', 'SFA', 'STD', 'SFA+STD'};
+else
+    display_names = condition_names;
 end
-xlabel('Delay (s)'); ylabel('R^2_d');
-title('Memory Capacity by Delay');
-legend(condition_names, 'Location', 'northeast');
-grid on; hold off;
 
-% Plot 2: Cumulative MC
-subplot(1, 3, 2); hold on;
-line_styles = {'k-', 'b-', 'g-', 'r-'};
+xmax_s       = 10;              % (a)/(b) delay-axis limit (s)
+recon_cond   = 4;               % reconstruct the SFA+STD condition
+recon_delays = [2, 4, 8, 16];   % hold-delay indices to show (labeled in seconds)
+recon_ylim   = [-0.6, 0.6];     % shared y-limits across all reconstruction panels
+line_w       = 2;               % (a)/(b) curve width (matches the reference figure)
+
+%% ==================== Combined figure ====================
+% 6x2 tiled grid: (a)/(b) span the top two rows; each reconstruction spans a
+% full-width row below. Explicit tile indices keep the spans unambiguous.
+fig = figure('Color', 'w', 'Position', [100 100 1000 1050]);
+tiledlayout(6, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+
+% (a) Cumulative MC vs delay
+ax_a = nexttile(1, [2 1]); hold on; grid off; box off;
 for i = 1:n_cond
-    plot(delay_s, cumsum(R2{i}), line_styles{i}, 'LineWidth', 2, 'DisplayName', condition_names{i});
+    plot(delay_s, cumsum(R2{i}), '-', 'Color', colors(i, :), 'LineWidth', line_w);
 end
-xlabel('Delay (s)'); ylabel('Cumulative MC');
-title('Cumulative Memory Capacity');
-legend('Location', 'southeast');
-grid on; hold off;
+xlim([0 xmax_s]);
+xlabel('Delay (s)'); ylabel('Cumulative Memory Capacity');
+hold off;
 
-% Plot 3: Bar chart of total MC
-subplot(1, 3, 3);
-b = bar(1:n_cond, MC);
-b.FaceColor = 'flat';
+% (b) Per-delay R^2 vs delay -- carries the one legend for the figure
+ax_b = nexttile(2, [2 1]); hold on; grid off; box off;
 for i = 1:n_cond
-    b.CData(i, :) = colors(i, :);
+    plot(delay_s, R2{i}, '-', 'Color', colors(i, :), 'LineWidth', line_w);
 end
-set(gca, 'XTickLabel', condition_names);
-ylabel('Total Memory Capacity');
-title('Total MC Comparison');
-grid on;
-for i = 1:n_cond
-    text(i, MC(i) + 0.5, sprintf('%.1f', MC(i)), ...
-        'HorizontalAlignment', 'center', 'FontWeight', 'bold');
+xlim([0 xmax_s]);
+xlabel('Delay (s)'); ylabel('$R^2$', 'Interpreter', 'latex');
+legend(display_names, 'Location', 'northeast');
+hold off;
+
+% Reconstruction rows (SFA+STD): target u(t-d) vs trained readout, delay in s.
+% The x-axis (time) is hidden on every row -- a 15 s scale bar on the bottom row
+% conveys the timescale instead.
+mcr        = results{recon_cond};
+tile_ids   = [5, 7, 9, 11];   % top-left tile of each full-width reconstruction row
+nR         = numel(recon_delays);
+scalebar_s = 15;              % length of the reconstruction scale bar (s)
+recon_ax   = gobjects(1, nR);
+for k = 1:nR
+    d = recon_delays(k);
+    p = mcr.predictions(d);
+    t_delay = mcr.t_pred(p.t_indices);
+
+    recon_ax(k) = nexttile(tile_ids(k), [1 2]); hold on; grid off; box off;
+    plot(t_delay, p.y_true, 'k-', 'LineWidth', 0.9);
+    plot(t_delay, p.y_pred, '-', 'Color', colors(recon_cond, :), 'LineWidth', 1.4);
+    ylim(recon_ylim);
+    ylabel('u(t-d)');
+    title(sprintf('delay = %.1f seconds,  R^2 = %.2f', delay_s(d), mcr.R2_d(d)), ...
+        'FontWeight', 'normal', 'Interpreter', 'tex');
+    % Hide the x-axis entirely (no ticks, no black axis line).
+    set(gca, 'XColor', 'none');
+    if k == 1
+        lgd = legend({'target', 'readout'}, 'Location', 'northeast', 'FontSize', 10);
+        lgd.Position(2) = lgd.Position(2) + 0.03;   % nudge the legend higher
+    end
+    if k == nR
+        % 15 s scale bar in the lower-right corner.
+        xl = get(gca, 'XLim');
+        x2 = xl(2) - 0.03 * diff(xl);
+        x1 = x2 - scalebar_s;
+        yb = recon_ylim(1) + 0.05 * diff(recon_ylim);
+        plot([x1 x2], [yb yb], 'k-', 'LineWidth', 2.5);
+        text((x1 + x2) / 2, yb, sprintf('%d s', scalebar_s), ...
+            'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+            'FontSize', 12);
+    end
+    hold off;
 end
-sgtitle('Memory Capacity Analysis: Effect of Spike-Frequency Adaptation and Short-Term Depression');
 
-%% ============ Fig 2: per-condition reconstruction (from struct) ============
-% For each condition: the test input on top, then target u(t-d) vs readout
-% y_d(t) for each delay -- rebuilt from the saved mc_results (no object needed).
-for i = 1:n_cond
-    mcr = results{i};
-    d_avail = delays_to_plot(delays_to_plot <= numel(mcr.predictions));
-    nD = numel(d_avail);
+% Panel letters: (a)/(b) on the analysis panels and (c) on the first
+% reconstruction row, same style as the reference figure. The remaining
+% reconstruction rows are self-labeled by their delay/R^2 titles.
+AddLetters2Plots({ax_a, ax_b, recon_ax(1)}, {'(a)', '(b)', '(c)'}, ...
+    'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.06, 'VShift', -0.04);
 
-    figure('Color', 'w', 'Position', [120 120 720 130*(nD+1)]);
-    tiledlayout(nD + 1, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+%% ==================== Save the figure ====================
+% Stable names (png/svg/fig), matching the other Stability_Manuscript scripts.
+save_fig_stable(fig, out_dir, 'Fig_MC_Example');
 
-    % Input being remembered
-    nexttile;
-    plot(mcr.t_pred, mcr.u_test, 'k-', 'LineWidth', 1);
-    ylabel('u(t)'); title('Test input'); grid on;
-    set(gca, 'XTickLabel', []);
+% Log the git state alongside the figure.
+capture_git_provenance(out_dir, project_root);
 
-    % Delay reconstructions
-    for k = 1:nD
-        d = d_avail(k);
-        p = mcr.predictions(d);
-        t_delay = mcr.t_pred(p.t_indices);
-        nexttile; hold on;
-        plot(t_delay, p.y_true, 'k-', 'LineWidth', 0.9);
-        plot(t_delay, p.y_pred, '-', 'Color', colors(i, :), 'LineWidth', 1.4);
-        hold off; grid on;
-        ylabel(sprintf('u(t-%d)', d));
-        title(sprintf('Delay d = %d:  R^2 = %.3f', d, mcr.R2_d(d)), 'FontWeight', 'normal');
-        if k < nD; set(gca, 'XTickLabel', []); end
-        if k == 1
-            legend({'target', 'readout'}, 'Location', 'northeast', 'FontSize', 8);
+%% -------------------- Human-readable description --------------------
+desc_path = fullfile(out_dir, 'README_fig_memory_capacity_example.txt');
+fid = fopen(desc_path, 'w');
+cleanup = onCleanup(@() fclose(fid));
+
+fprintf(fid, 'Stability_Manuscript figure: Example memory capacity\n');
+fprintf(fid, '====================================================\n\n');
+fprintf(fid, 'Generated: %s\n', char(datetime('now')));
+fprintf(fid, 'By script: %s.m\n\n', mfilename);
+
+fprintf(fid, 'HOW IT WAS MADE\n');
+fprintf(fid, '  Two-step, no re-simulation at plot time: compute_memory_capacity_example.m\n');
+fprintf(fid, '  runs the memory-capacity protocol for the 4 adaptation conditions and saves\n');
+fprintf(fid, '  the per-condition mc_results structs to mc_example_data.mat (gitignored).\n');
+fprintf(fid, '  This script loads that file and renders the figure, so the look can be\n');
+fprintf(fid, '  iterated without re-running the sim. See git_provenance.txt for the commit.\n\n');
+
+fprintf(fid, 'MODEL SETTINGS\n');
+fprintf(fid, '  Match looped_memory_capacity.m (c_E = 0.5/3, sample_hold input, n = 300,\n');
+fprintf(fid, '  f = 0.6, level_of_chaos = 2.5). See compute_memory_capacity_example.m.\n\n');
+
+fprintf(fid, 'FIGURE PRODUCED (in this folder)\n');
+fprintf(fid, '  Fig_MC_Example.png / .svg / .fig\n');
+fprintf(fid, '    (a) Cumulative Memory Capacity vs delay (0-%d s), all 4 conditions.\n', xmax_s);
+fprintf(fid, '    (b) Per-delay R^2 vs delay (0-%d s), all 4 conditions (legend).\n', xmax_s);
+fprintf(fid, '    Below: SFA+STD input reconstruction (target vs readout) for hold-delays\n');
+fprintf(fid, '    %s (delay indices), each titled with the delay in seconds and R^2;\n', mat2str(recon_delays));
+fprintf(fid, '    all reconstruction panels share y-limits [%g, %g].\n', recon_ylim(1), recon_ylim(2));
+
+clear cleanup;  % flush + close
+fprintf('Description written: %s\n', desc_path);
+
+fprintf('Rendered + saved the example memory-capacity figure.\n');
+
+%% ==================== Local helpers ====================
+function save_fig_stable(fig, out_dir, base)
+% Save fig as <base>.{png,svg,fig} with a stable name: clear any prior <base>*
+% outputs, save via save_some_figs_to_folder_2 (which suffixes the figure
+% number), then rename to the fixed names.
+    old = dir(fullfile(out_dir, [base '*']));
+    for a = 1:numel(old)
+        fp = fullfile(old(a).folder, old(a).name);
+        if ~old(a).isdir && (endsWith(fp, '.png') || endsWith(fp, '.svg') || endsWith(fp, '.fig'))
+            delete(fp);
         end
     end
-    xlabel('Time (s)');
-    sgtitle(sprintf('Memory reconstruction -- %s', condition_names{i}));
+    save_some_figs_to_folder_2(out_dir, base, fig.Number, {'png', 'svg', 'fig'});
+    num = num2str(fig.Number);
+    movefile(fullfile(out_dir, [base '_figure_' num '.png']), fullfile(out_dir, [base '.png']));
+    movefile(fullfile(out_dir, [base '_figure_' num '.svg']), fullfile(out_dir, [base '.svg']));
+    movefile(fullfile(out_dir, [base '_f_' num '.fig']),      fullfile(out_dir, [base '.fig']));
 end
-
-fprintf('Rendered MC comparison + %d reconstruction figures.\n', n_cond);

@@ -1,0 +1,23 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity_example
+Captured at: 08-Jul-2026 11:56:03
+
+commit:      44aa4bbe4859afde57851f55babc593cde5c87e1
+commit_short:44aa4bb
+branch:      refactor
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Stability_Manuscript: add reservoir diagram (HTML/SVG/PDF)
+last_date:   2026-07-08T11:45:50-05:00
+dirty:       true
+
+--- git status --porcelain ---
+M scripts/memory_capacity/example_memory_capacity.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_memory_capacity_example.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/compute_memory_capacity_example.m
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/README_fig_memory_capacity_example.txt
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/git_provenance.txt
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/working_changes.patch
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/README_fig_memory_capacity_example.txt
+scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/git_provenance.txt
+scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/working_changes.patch

@@ -16,18 +16,18 @@ this_dir = fileparts(mfilename('fullpath'));
 n = 300;                    % Number of neurons
 f = 0.6;                    % Fraction excitatory (off perfect E/I balance so no-adaptation isn't favored)
 level_of_chaos = 2.5;         % Higher for the logistic: its mean slope < 1 pushes the edge of chaos to larger level_of_chaos
-rng_seed_net = 42+15;          % Fixed seed for network reproducibility
-rng_seed_stim = 43;         % Fixed seed for stimulus reproducibility
+rng_seed_net = 1;          % Fixed seed for network reproducibility
+rng_seed_stim = 2;         % Fixed seed for stimulus reproducibility
 
 % Sampling frequency
-fs = 200;                     % Sampling frequency (Hz)
+fs = 400;                     % Sampling frequency (Hz)
 
 % MC protocol parameters (defined in seconds, converted to samples).
 % These are shortened for fast dial-in; increase for final results (in
 % particular T_wash should exceed a few x the slowest tau_a_E for the SFA
 % conditions -- here tau_a_E max = 10 s).
 T_wash_sec = 10;              % Washout duration (s); discarded transient before training
-T_train_sec = 300;           % Training duration (seconds); matches looped_memory_capacity
+T_train_sec = 500;           % Training duration (seconds); matches looped_memory_capacity
 T_test_sec = 100;            % Test duration (seconds); matches looped_memory_capacity
 
 T_wash = T_wash_sec * fs;     % Washout samples
