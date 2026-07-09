@@ -79,6 +79,7 @@ classdef SRNNModel2 < handle
         T_plot                      % Plotting time interval (defaults to T_range)
         ode_solver = @ode45         % ODE solver function handle
         ode_opts                    % ODE solver options struct
+        x0_std = 0.1                % Std dev of the random initial dendritic state x0 (0 = deterministic x0=0)
     end
 
     %% Input Configuration Properties
@@ -675,6 +676,7 @@ classdef SRNNModel2 < handle
             params.tau_d = obj.tau_d;
             params.activation_function = obj.activation_function;
             params.activation_function_derivative = obj.activation_function_derivative;
+            params.x0_std = obj.x0_std;
 
             % Connection matrix (if built)
             if ~isempty(obj.W)
@@ -1108,8 +1110,9 @@ classdef SRNNModel2 < handle
                 b0_I = ones(params.n_I * params.n_b_I, 1);
             end
 
-            % Initialize dendritic states (small random values)
-            x0 = 0.1 .* randn(params.n, 1);
+            % Initialize dendritic states (small random values, or 0 if x0_std=0)
+            x0_std = SRNNModel2.safe_get_param(params, 'x0_std', 0.1);
+            x0 = x0_std .* randn(params.n, 1);
 
             % Pack state vector: [a_E; a_I; b_E; b_I; x]
             S0 = [a0_E; a0_I; b0_E; b0_I; x0];
