@@ -19,7 +19,9 @@ function C = load_campagnola_matrices()
 %                    ml_depression_amount, ml_depression_tau, ml_release_prob,
 %                    ml_n_release_sites, ml_mini_amplitude
 %     Kinetics     : latency, psc_rise_time, psc_decay_tau
-%     SFA (4x1)    : sfa_adaptation_index, sfa_adaptation_index_n  (by postsynaptic type)
+%     Intrinsic (4x1, by cell type; SI units): sfa_adaptation_index (SFA),
+%                    isi_adapt_ratio, tau [s], fi_slope [Hz/A], rheobase [A],
+%                    input_resistance [Ohm]  (each with a matching _n)
 %     types        : {'pyr','pvalb','sst','vip'}  (row/col order)
 %
 %   Reads the committed CSVs under src/connectivity/campagnola/ (the version-
@@ -65,8 +67,15 @@ function C = load_campagnola_matrices()
         C.([m '_n'])   = read4([m '__n']);
     end
 
-    % SFA: per-type adaptation_index (columns: type, adaptation_index, n).
-    sfa_file = fullfile(this_dir, 'campagnola', 'sfa_adaptation_index.csv');
-    C.sfa_adaptation_index   = readmatrix(sfa_file, 'Range', 'B2:B5');   % 4x1
-    C.sfa_adaptation_index_n = readmatrix(sfa_file, 'Range', 'C2:C5');   % 4x1
+    % Intrinsic per-type (single-cell) properties, incl. SFA. Each is 4x1 by type,
+    % with a matching _n. SI units: tau [s], rheobase [A], input_resistance [Ohm],
+    % fi_slope [Hz/A]; adaptation_index / isi_adapt_ratio dimensionless.
+    T = readtable(fullfile(this_dir, 'campagnola', 'intrinsic_per_type.csv'), ...
+        'VariableNamingRule', 'preserve');
+    C.sfa_adaptation_index   = T.adaptation_index;          % 4x1 (historical field name)
+    C.sfa_adaptation_index_n = T.adaptation_index_n;
+    for p = {'isi_adapt_ratio', 'tau', 'fi_slope', 'rheobase', 'input_resistance'}
+        C.(p{1})        = T.(p{1});
+        C.([p{1} '_n']) = T.([p{1} '_n']);
+    end
 end

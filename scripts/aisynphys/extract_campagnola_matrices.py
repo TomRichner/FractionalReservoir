@@ -78,6 +78,18 @@ METRICS = OrderedDict([
     ('psc_decay_tau',          'synapse.psc_decay_tau'),
 ])
 
+# per-type intrinsic (single-cell) properties -> dataframe column, from the per-cell
+# query. Stored in SI units as in the DB: tau [s], rheobase [A], input_resistance [Ohm],
+# fi_slope [Hz/A], adaptation_index / isi_adapt_ratio [dimensionless].
+INTRINSIC = OrderedDict([
+    ('adaptation_index',  'intrinsic.adaptation_index'),
+    ('isi_adapt_ratio',   'intrinsic.isi_adapt_ratio'),
+    ('tau',               'intrinsic.tau'),
+    ('fi_slope',          'intrinsic.fi_slope'),
+    ('rheobase',          'intrinsic.rheobase'),
+    ('input_resistance',  'intrinsic.input_resistance'),
+])
+
 
 def _empty_4x4():
     return pd.DataFrame(np.full((4, 4), np.nan), index=ORDER, columns=ORDER)
@@ -155,28 +167,33 @@ def extract(db, outdir):
                                       value=med.loc[pre, post], n=cnt.loc[pre, post]))
 
     # ------------------------------------------------------------------ #
-    # 3. SFA: per-type adaptation_index (per-cell, de-duplicated)
+    # 3. Intrinsic per-type properties (per-cell, de-duplicated) incl. SFA
     # ------------------------------------------------------------------ #
-    print("== SFA (intrinsic.adaptation_index) ==", flush=True)
+    print("== intrinsic per-type properties ==", flush=True)
     cells = (db.query(db.Cell, db.Intrinsic)
                .join(db.Intrinsic, db.Intrinsic.cell_id == db.Cell.id)).dataframe()
-    # restrict to mouse via species on the slice/experiment if available; the coarse-matrix
-    # cre_type labels are mouse-specific, so classification below already excludes human.
-    cell_cls = classify_cell_dataframe(CELL_CLASSES, cells, prefix='')  # matches 'cell.*' columns
+    # The coarse-matrix cre_type labels are mouse-specific, so classification below
+    # already excludes human. adaptation_index/tau/etc. are postsynaptic-cell properties.
     cells = cells.copy()
-    cells['subclass'] = cell_cls
-    sfa_rows = []
-    sfa_med = np.full(4, np.nan); sfa_n = np.full(4, np.nan)
-    for i, t in enumerate(ORDER):
-        vals = cells.loc[cells['subclass'] == t, 'intrinsic.adaptation_index'].dropna()
-        n = int(vals.shape[0])
-        med = float(vals.median()) if n >= MIN_N else np.nan
-        sfa_med[i] = med; sfa_n[i] = n
-        sfa_rows.append(dict(type=t, adaptation_index=med, n=n))
-    pd.DataFrame(sfa_rows).to_csv(os.path.join(outdir, 'sfa_adaptation_index.csv'), index=False)
-    mat_out['sfa_adaptation_index'] = sfa_med.reshape(-1, 1)
-    mat_out['sfa_adaptation_index_n'] = sfa_n.reshape(-1, 1)
-    print("  SFA per type:", {r['type']: (round(r['adaptation_index'], 4) if r['adaptation_index'] == r['adaptation_index'] else None, r['n']) for r in sfa_rows}, flush=True)
+    cells['subclass'] = classify_cell_dataframe(CELL_CLASSES, cells, prefix='')  # 'cell.*' cols
+    intr_table = OrderedDict([('type', ORDER)])
+    for key, col in INTRINSIC.items():
+        med = np.full(4, np.nan); cnt = np.full(4, np.nan)
+        for i, t in enumerate(ORDER):
+            if col in cells.columns:
+                vals = cells.loc[cells['subclass'] == t, col].dropna()
+            else:
+                vals = pd.Series([], dtype=float)
+            n = int(vals.shape[0]); cnt[i] = n
+            med[i] = float(vals.median()) if n >= MIN_N else np.nan
+        intr_table[key] = med
+        intr_table[key + '_n'] = cnt
+        # keep adaptation_index under its historical 'sfa_adaptation_index' .mat field
+        field = 'sfa_adaptation_index' if key == 'adaptation_index' else key
+        mat_out[field] = med.reshape(-1, 1)
+        mat_out[field + '_n'] = cnt.reshape(-1, 1)
+    pd.DataFrame(intr_table).to_csv(os.path.join(outdir, 'intrinsic_per_type.csv'), index=False)
+    print(pd.DataFrame(intr_table).to_string(index=False), flush=True)
 
     # ------------------------------------------------------------------ #
     # 4. Write long-form + .mat
