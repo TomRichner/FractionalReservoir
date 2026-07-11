@@ -1,0 +1,611 @@
+classdef SRNNModelCellTypes < SRNNModelBase
+    % SRNNMODELCELLTYPES  Cell-type-resolved rate reservoir (Pyr/Pvalb/Sst/Vip).
+    %
+    % A concrete SRNNModelBase subclass (sibling of SRNNModel2) that models K cell
+    % types with a PER-NEURON type-index representation and PER-EDGE (pre-type x
+    % post-type) short-term plasticity, parameterized from the Allen/Campagnola 2022
+    % matrices (via load_campagnola_matrices).
+    %
+    % Mechanisms:
+    %   - SFA  (a): per neuron, intrinsic firing adaptation. State a is n x n_a.
+    %               x_eff = x - c .* sum(a,2);  da/dt = (r - a)./tau_a.
+    %   - STD  (b): per (presynaptic neuron j, post-type T). State b is n x K (n_b=1).
+    %               db/dt = (1-b)./tau_rec - (b.*r)./tau_rel.   (driven by r_j)
+    %   - STF  (u): per (presynaptic neuron j, post-type T). State u is n x K (n_u=1).
+    %               du/dt = (U0-u)./tau_f + f_amount.*(1-u).*r.  (NEW; driven by r_j)
+    % Synaptic efficacy of j -> post-type T is eff(j,T) = (u(j,T)/U0(j,T)) * b(j,T),
+    % so STF-off (u=U0) reduces to pure STD and rest (u=U0,b=1) gives eff=1.
+    %
+    % The recurrent drive is post-type structured: neuron i (type T_i) receives
+    %   drive_i = sum_j W_ij * eff(j,T_i) * r_j.
+    % Using the full (pre,post) data-matrix element param(type(j),T) automatically
+    % realizes the paper's alignment rules (excitatory dynamics vary with post-type,
+    % inhibitory mostly with pre-type).
+    %
+    % State layout  S = [a(:); b(:); u(:); x(:)]   (x last), with
+    %   a -> (n, n_a),  b -> (n, K),  u -> (n, K),  x -> (n,1).
+    %   N_sys_eqs = n*n_a + n*K*n_b + n*K*n_u + n.
+    %
+    % Scope of the scaffold: SFA supports multiple timescales (n_a>=0); STD/STF are
+    % single-timescale (n_b,n_u in {0,1}). The optional STD zero-floor is not applied.
+    %
+    % Lifecycle:  model = SRNNModelCellTypes(...); model.build(); model.run(); model.plot();
+    %
+    % See also: SRNNModelBase, SRNNModel2, load_campagnola_matrices
+
+    %% Cell-type configuration
+    properties
+        type_names = {'pyr', 'pvalb', 'sst', 'vip'}   % K types; type 1 is excitatory (Pyr)
+        type_fractions = [0.80, 0.08, 0.07, 0.05]     % fraction of neurons per type (renormalized)
+        use_campagnola_data = true                    % parameterize from load_campagnola_matrices
+    end
+
+    %% Mechanism configuration
+    properties
+        n_a = 1                  % # SFA timescales (0 disables SFA)
+        n_b = 1                  % # STD timescales (0 or 1)
+        n_u = 1                  % # STF timescales (0 or 1)
+        tau_a = 1.0              % SFA time constant(s), 1 x n_a (s)
+        c_gain = 0.7             % maps per-type adaptation_index -> SFA strength c
+        w_cv = 1.0               % per-edge weight heterogeneity (std / |mean|)
+        tau_b_rel_ref = 0.5      % reference STD release tau (s); scaled down by depression amount
+    end
+
+    %% Per-type parameter tables (K x K unless noted; filled at build if empty)
+    properties
+        conn_prob      % K x K  connection probability (pre -> post)
+        psp_amp        % K x K  signed synaptic weight (pre -> post)
+        dep_tau        % K x K  STD recovery tau (s)
+        dep_amount     % K x K  STD depression amount [0,1)
+        rel_prob       % K x K  baseline release probability U0
+        fac_tau        % K x K  STF facilitation tau (s)
+        fac_amount     % K x K  STF facilitation increment
+        adapt_index    % K x 1  per-type adaptation index (SFA strength source)
+    end
+
+    %% Computed (set at build)
+    properties (SetAccess = protected)
+        type_of        % n x 1  integer type label per neuron
+        is_exc         % n x 1  logical, true for excitatory (Pyr) neurons
+        n_types        % number of cell types (K)
+    end
+
+    %% Constructor
+    methods
+        function obj = SRNNModelCellTypes(varargin)
+            % Forwards to the shared base constructor (defaults + name-value parse).
+            obj@SRNNModelBase(varargin{:});
+        end
+    end
+
+    %% Subclass hooks
+    methods (Access = protected)
+        function set_defaults(obj)
+            % SET_DEFAULTS Activation, input_config, and plotting defaults.
+            obj.activation_function            = @(x) SRNNModelBase.logisticSigmoid(x, obj.S_c);
+            obj.activation_function_derivative = @(x) SRNNModelBase.logisticSigmoidDerivative(x, obj.S_c);
+
+            % Cell-typed W uses signed psp_amplitude weights (tiny, O(1e-4)), so
+            % normalize the spectral abscissa by default: level_of_chaos then sets
+            % the edge-of-chaos scale directly (overridable via name-value).
+            obj.rescale_by_abscissa = true;
+
+            obj.input_config = struct();
+            obj.input_config.n_steps        = 3;
+            obj.input_config.amp            = 0.5;
+            obj.input_config.step_density   = 0.15;   % fraction of neurons driven per step
+            obj.input_config.no_stim_pattern = false(1, 3);
+            obj.input_config.no_stim_pattern(1:2:end) = true;
+            obj.input_config.intrinsic_drive = [];
+            obj.input_config.positive_only   = false;
+
+            obj.T_plot = [];
+        end
+
+        function build_network(obj)
+            % BUILD_NETWORK Assign types, gather per-type parameters, build block W.
+            rng(obj.rng_seeds(1));
+            obj.n_types = numel(obj.type_names);
+            obj.assign_types();
+            obj.load_parameter_tables();          % fills the K x K tables (data or defaults)
+
+            n = obj.n; K = obj.n_types; t = obj.type_of;
+
+            % Block-structured signed connectivity. Column j (presynaptic) carries the
+            % sign of its pre-type; each (pre,post) block has its own p and weight.
+            W = zeros(n, n);
+            for tp = 1:K                          % presynaptic type (columns)
+                cols = find(t == tp);
+                for ts = 1:K                      % postsynaptic type (rows)
+                    rows = find(t == ts);
+                    if isempty(rows) || isempty(cols), continue; end
+                    p  = min(max(obj.conn_prob(tp, ts), 0), 1);
+                    mu = obj.psp_amp(tp, ts);
+                    sig = obj.w_cv * abs(mu);
+                    m = numel(rows); q = numel(cols);
+                    blk = (mu + sig * randn(m, q)) .* (rand(m, q) < p);
+                    W(rows, cols) = blk;
+                end
+            end
+
+            % Scale W (same edge-of-chaos convention as SRNNModel2).
+            if obj.rescale_by_abscissa
+                abscissa_0 = max(real(eig(W)));
+                if abscissa_0 <= 0, abscissa_0 = max(abs(eig(W))); end
+                if abscissa_0 == 0, abscissa_0 = 1; end
+                obj.W = obj.level_of_chaos * (1 / abscissa_0) * W;
+            else
+                obj.W = obj.level_of_chaos * W;
+            end
+
+            W_eigs = eig(obj.W);
+            fprintf('CellTypes W: n=%d, K=%d, spectral radius=%.3f, abscissa=%.3f\n', ...
+                n, K, max(abs(W_eigs)), max(real(W_eigs)));
+        end
+
+        function build_stimulus(obj)
+            % BUILD_STIMULUS Sparse step external input, interpolant, and S0.
+            dt = 1 / obj.fs;
+            T  = obj.T_range(2);
+            t_stim = (0:dt:T)';
+            nt = numel(t_stim);
+
+            rng(obj.rng_seeds(2));
+            ic = obj.input_config;
+            n = obj.n;
+            step_period = fix(T / ic.n_steps);
+            step_len = round(step_period * obj.fs);
+            if ic.positive_only
+                steps = ic.amp * abs(randn(n, ic.n_steps));
+            else
+                steps = ic.amp * randn(n, ic.n_steps);
+            end
+            mask = rand(n, ic.n_steps) < ic.step_density;
+            steps = steps .* mask;
+            steps(:, ic.no_stim_pattern) = 0;
+
+            u_stim = zeros(n, nt);
+            for s = 1:ic.n_steps
+                a0 = (s - 1) * step_len + 1;
+                b0 = min(s * step_len, nt);
+                if a0 > nt, break; end
+                u_stim(:, a0:b0) = repmat(steps(:, s), 1, b0 - a0 + 1);
+            end
+            if ~isempty(ic.intrinsic_drive)
+                u_stim = u_stim + ic.intrinsic_drive;
+            end
+
+            % Prepend zeros for a negative settling window (as SRNNModel2 does).
+            if obj.T_range(1) < 0
+                t_pre = (obj.T_range(1):dt:-dt)';
+                obj.t_ex = [t_pre; t_stim];
+                obj.u_ex = [zeros(n, numel(t_pre)), u_stim];
+            else
+                keep = t_stim >= obj.T_range(1);
+                obj.t_ex = t_stim(keep);
+                obj.u_ex = u_stim(:, keep);
+            end
+            obj.u_ex = obj.u_ex * obj.u_ex_scale;
+
+            obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'linear', 'none');
+            obj.S0 = obj.initialize_state(obj.get_params());
+            fprintf('CellTypes stimulus: %d time points, %d neurons\n', numel(obj.t_ex), n);
+        end
+
+        function validate(obj)
+            % VALIDATE Parameter-consistency checks.
+            if obj.n < obj.n_types
+                error('SRNNModelCellTypes:TooFewNeurons', 'n (%d) must be >= K (%d).', obj.n, obj.n_types);
+            end
+            if ~ismember(obj.n_b, [0 1]) || ~ismember(obj.n_u, [0 1])
+                error('SRNNModelCellTypes:BadTimescales', 'n_b and n_u must be 0 or 1 (single-timescale STD/STF).');
+            end
+            if obj.n_a < 0
+                error('SRNNModelCellTypes:BadTimescales', 'n_a must be >= 0.');
+            end
+            if obj.T_range(2) <= obj.T_range(1)
+                error('SRNNModelCellTypes:BadT', 'T_range(2) must be > T_range(1).');
+            end
+        end
+
+        function dS_dt = eval_dynamics(~, t, S, params)
+            dS_dt = SRNNModelCellTypes.dynamics_fast_ct(t, S, params);
+        end
+
+        function J = eval_jacobian(~, S, params)
+            J = SRNNModelCellTypes.compute_Jacobian_fast_ct(S, params);
+        end
+
+        function decimate_and_unpack(obj)
+            % DECIMATE_AND_UNPACK Decimate the trajectory and store plot_data.
+            params = obj.cached_params;
+            [t_plot, S_plot, plot_idx] = obj.decimate_states(obj.t_out, obj.S_out, obj.plot_deci);
+            st = SRNNModelCellTypes.unpack_states_ct(S_plot, params);   % fields x,a,b,u,r,br (n x nt)
+
+            Tp = obj.T_plot; if isempty(Tp), Tp = obj.T_range; end
+            keep = t_plot >= Tp(1) & t_plot <= Tp(2);
+
+            pd = struct();
+            pd.t       = t_plot(keep);
+            pd.u_ext   = obj.u_ex(:, plot_idx); pd.u_ext = pd.u_ext(:, keep);
+            pd.x       = st.x(:, keep);
+            pd.r       = st.r(:, keep);
+            pd.br      = st.br(:, keep);
+            pd.b       = st.b(:, :, keep);          % n x K x nt (per post-type)
+            pd.u       = st.u(:, :, keep);          % n x K x nt
+            if ~isempty(st.a), pd.a = st.a(:, :, keep); else, pd.a = []; end
+            pd.type_of = obj.type_of;
+            pd.type_names = obj.type_names;
+            obj.plot_data = pd;
+        end
+
+        function S0 = initialize_state(~, params)
+            % INITIALIZE_STATE  a=0, b=1 (no depression), u=U0 (facilitation at rest), x random.
+            n = params.n; K = params.K;
+            a0 = zeros(n * params.n_a, 1);
+            if params.n_b > 0, b0 = ones(n * K, 1); else, b0 = []; end
+            if params.n_u > 0, u0 = params.U0_mat(:); else, u0 = []; end
+            x0 = params.x0_std .* randn(n, 1);
+            S0 = [a0; b0; u0; x0];
+        end
+    end
+
+    %% Public
+    methods
+        function params = get_params(obj)
+            % GET_PARAMS Pack everything the kernels / base machinery read.
+            params = struct();
+            params.n = obj.n;
+            params.K = obj.n_types;
+            params.n_a = obj.n_a; params.n_b = obj.n_b; params.n_u = obj.n_u;
+            params.N_sys_eqs = obj.n * obj.n_a + obj.n * obj.n_types * obj.n_b + ...
+                               obj.n * obj.n_types * obj.n_u + obj.n;
+            params.tau_d = obj.tau_d;
+            params.activation_function = obj.activation_function;
+            params.activation_function_derivative = obj.activation_function_derivative;
+            params.x0_std = obj.x0_std;
+            params.rng_seeds = obj.rng_seeds;
+            params.type_of = obj.type_of;
+            params.is_exc = obj.is_exc;
+
+            % SFA (per neuron)
+            ta = obj.tau_a;
+            if obj.n_a > 0
+                if isscalar(ta), ta = repmat(ta, 1, obj.n_a); end
+                ta = reshape(ta, 1, obj.n_a);
+            end
+            params.tau_a = ta;
+            if ~isempty(obj.adapt_index) && ~isempty(obj.type_of)
+                params.c_vec = obj.c_gain * obj.adapt_index(obj.type_of);   % n x 1
+            else
+                params.c_vec = zeros(obj.n, 1);
+            end
+
+            % STD / STF per (neuron j, post-type T): gather K x K -> n x K by pre-type row.
+            if ~isempty(obj.type_of)
+                t = obj.type_of;
+                params.tau_b_rec_mat = obj.dep_tau(t, :);
+                params.tau_b_rel_mat = max(obj.tau_b_rel_ref * (1 - min(max(obj.dep_amount(t, :), 0), 0.95)), 0.05);
+                params.U0_mat        = min(max(obj.rel_prob(t, :), 0.05), 0.95);
+                params.tau_f_mat     = obj.fac_tau(t, :);
+                params.f_amount_mat  = max(obj.fac_amount(t, :), 0);
+            end
+
+            if ~isempty(obj.W), params.W = obj.W; end
+        end
+
+        function [fig, ax] = plot(obj)
+            % PLOT Minimal per-type time-series view (mean firing rate + input per type).
+            if ~obj.has_run || isempty(obj.plot_data)
+                error('SRNNModelCellTypes:NotRun', 'Run the model before plotting.');
+            end
+            pd = obj.plot_data; K = obj.n_types; t = pd.t;
+            cmap = lines(K);
+            fig = figure('Color', 'w', 'Name', 'SRNNModelCellTypes');
+            ax = gobjects(2, 1);
+            ax(1) = subplot(2, 1, 1); hold(ax(1), 'on');
+            for T = 1:K
+                sel = pd.type_of == T;
+                plot(ax(1), t, mean(pd.r(sel, :), 1), 'Color', cmap(T, :), 'LineWidth', 1.5);
+            end
+            legend(ax(1), obj.type_names, 'Location', 'eastoutside');
+            ylabel(ax(1), 'mean firing rate'); title(ax(1), 'Per-type firing rate');
+            box(ax(1), 'off');
+            ax(2) = subplot(2, 1, 2); hold(ax(2), 'on');
+            for T = 1:K
+                sel = pd.type_of == T;
+                plot(ax(2), t, mean(pd.x(sel, :), 1), 'Color', cmap(T, :), 'LineWidth', 1.0);
+            end
+            ylabel(ax(2), 'mean dendritic x'); xlabel(ax(2), 'time (s)');
+            title(ax(2), 'Per-type dendritic state'); box(ax(2), 'off');
+        end
+    end
+
+    %% Private helpers
+    methods (Access = protected)
+        function assign_types(obj)
+            % ASSIGN_TYPES Contiguous per-type blocks from type_fractions (each >= 1 neuron).
+            K = obj.n_types; n = obj.n;
+            fr = obj.type_fractions(:)'; fr = fr / sum(fr);
+            cnt = max(round(fr * n), 1);
+            % fix rounding so sum == n
+            while sum(cnt) > n, [~, i] = max(cnt); cnt(i) = cnt(i) - 1; end
+            while sum(cnt) < n, [~, i] = max(fr);  cnt(i) = cnt(i) + 1; fr(i) = -inf; end
+            t = zeros(n, 1); pos = 0;
+            for k = 1:K
+                t(pos + (1:cnt(k))) = k; pos = pos + cnt(k);
+            end
+            obj.type_of = t;
+            obj.is_exc = (t == 1);
+        end
+
+        function load_parameter_tables(obj)
+            % LOAD_PARAMETER_TABLES Fill the K x K tables from Campagnola data or defaults.
+            K = obj.n_types;
+            haveData = false;
+            if obj.use_campagnola_data && exist('load_campagnola_matrices', 'file') == 2
+                try
+                    C = load_campagnola_matrices();
+                    haveData = true;
+                catch ME
+                    warning('SRNNModelCellTypes:NoData', 'load_campagnola_matrices failed (%s); using defaults.', ME.message);
+                end
+            end
+
+            if haveData
+                cp   = C.conn_prob_adj;
+                psp  = C.psp_amplitude;
+                dtau = C.ml_depression_tau;
+                damt = C.ml_depression_amount;
+                relp = C.ml_release_prob;
+                ftau = C.ml_facilitation_tau;
+                famt = C.ml_facilitation_amount;
+                adix = C.sfa_adaptation_index(:);
+                % NaN fallbacks (under-sampled elements, e.g. Vip->Pyr)
+                cp   = obj.fillnan(cp, 0.05);
+                psp  = obj.fill_psp_nan(psp);
+                dtau = min(max(obj.fillnan(dtau, 1.0), 0.05), 5);
+                damt = min(max(obj.fillnan(damt, 0.3), 0), 0.95);
+                relp = min(max(obj.fillnan(relp, 0.2), 0.05), 0.95);
+                ftau = min(max(obj.fillnan(ftau, 1.0), 0.05), 5);
+                famt = max(obj.fillnan(famt, 0.2), 0);
+                adix = obj.fillnan(adix, 0.03);
+            else
+                % Synthetic defaults so the class runs stand-alone. Pyr (row 1) excitatory (+).
+                cp   = 0.1 * ones(K) + diag(-0.05 * ones(K, 1));
+                psp  = -3e-4 * ones(K); psp(1, :) = 3e-4;
+                dtau = 1.0 * ones(K);
+                damt = 0.3 * ones(K);
+                relp = 0.2 * ones(K);
+                ftau = 1.0 * ones(K);
+                famt = 0.2 * ones(K);
+                adix = 0.03 * ones(K, 1);
+            end
+
+            if isempty(obj.conn_prob),   obj.conn_prob   = cp;   end
+            if isempty(obj.psp_amp),     obj.psp_amp     = psp;  end
+            if isempty(obj.dep_tau),     obj.dep_tau     = dtau; end
+            if isempty(obj.dep_amount),  obj.dep_amount  = damt; end
+            if isempty(obj.rel_prob),    obj.rel_prob    = relp; end
+            if isempty(obj.fac_tau),     obj.fac_tau     = ftau; end
+            if isempty(obj.fac_amount),  obj.fac_amount  = famt; end
+            if isempty(obj.adapt_index), obj.adapt_index = adix(:); end
+        end
+
+        function M = fill_psp_nan(~, M)
+            % Fill NaN synaptic weights with a signed default (pre-type = row sign).
+            mag = median(abs(M(~isnan(M))), 'omitnan'); if isempty(mag) || mag == 0, mag = 3e-4; end
+            for r = 1:size(M, 1)
+                sgn = 1; if r > 1, sgn = -1; end   % row 1 (pyr) excitatory (+), others (-)
+                col = isnan(M(r, :));
+                M(r, col) = sgn * mag;
+            end
+        end
+    end
+
+    methods (Static)
+        function M = fillnan(M, val)
+            M(isnan(M)) = val;
+        end
+
+        function dS_dt = dynamics_fast_ct(t, S, params)
+            % DYNAMICS_FAST_CT Per-neuron RHS with post-type-structured synaptic drive.
+            u_ext = params.u_interpolant(t)';           % n x 1
+            n = params.n; K = params.K;
+            n_a = params.n_a; n_b = params.n_b; n_u = params.n_u;
+            W = params.W; tau_d = params.tau_d; phi = params.activation_function;
+            type_of = params.type_of;
+
+            % --- unpack ---
+            idx = 0;
+            len_a = n * n_a;
+            if len_a > 0, a = reshape(S(idx + (1:len_a)), n, n_a); else, a = []; end
+            idx = idx + len_a;
+            len_b = n * K * n_b;
+            if len_b > 0, b = reshape(S(idx + (1:len_b)), n, K); else, b = []; end
+            idx = idx + len_b;
+            len_u = n * K * n_u;
+            if len_u > 0, uu = reshape(S(idx + (1:len_u)), n, K); else, uu = []; end
+            idx = idx + len_u;
+            x = S(idx + (1:n));
+
+            % --- rates ---
+            x_eff = x;
+            if len_a > 0, x_eff = x_eff - params.c_vec .* sum(a, 2); end
+            r = phi(x_eff);                              % n x 1
+
+            % --- per-edge synaptic gains (n x K) ---
+            if len_b > 0, b_mat = b; else, b_mat = ones(n, K); end
+            if len_u > 0, u_gain = uu ./ params.U0_mat; else, u_gain = ones(n, K); end
+            eff = u_gain .* b_mat;                        % n x K
+
+            % --- post-type-structured recurrent drive ---
+            drive = zeros(n, 1);
+            for T = 1:K
+                dr = W * (eff(:, T) .* r);
+                sel = (type_of == T);
+                drive(sel) = dr(sel);
+            end
+            dx = (-x + drive + u_ext) / tau_d;
+
+            % --- state ODEs ---
+            if len_a > 0, da = (r - a) ./ params.tau_a; else, da = []; end
+            if len_b > 0
+                db = (1 - b_mat) ./ params.tau_b_rec_mat - (b_mat .* r) ./ params.tau_b_rel_mat;
+            else
+                db = [];
+            end
+            if len_u > 0
+                du = (params.U0_mat - uu) ./ params.tau_f_mat + params.f_amount_mat .* (1 - uu) .* r;
+            else
+                du = [];
+            end
+
+            dS_dt = [da(:); db(:); du(:); dx];
+        end
+
+        function J = compute_Jacobian_fast_ct(S, params)
+            % COMPUTE_JACOBIAN_FAST_CT Analytic Jacobian for dynamics_fast_ct.
+            n = params.n; K = params.K;
+            n_a = params.n_a; n_b = params.n_b; n_u = params.n_u;
+            W = sparse(params.W); tau_d = params.tau_d;
+            type_of = params.type_of;
+            phi = params.activation_function; phip = params.activation_function_derivative;
+
+            len_a = n * n_a; len_b = n * K * n_b; len_u = n * K * n_u;
+            N = len_a + len_b + len_u + n;
+
+            % --- unpack ---
+            idx = 0;
+            if len_a > 0, a = reshape(S(idx + (1:len_a)), n, n_a); else, a = []; end
+            idx = idx + len_a;
+            if len_b > 0, b_mat = reshape(S(idx + (1:len_b)), n, K); else, b_mat = ones(n, K); end
+            idx = idx + len_b;
+            if len_u > 0, uu = reshape(S(idx + (1:len_u)), n, K); else, uu = []; end
+            idx = idx + len_u;
+            x = S(idx + (1:n));
+
+            x_eff = x;
+            if len_a > 0, x_eff = x_eff - params.c_vec .* sum(a, 2); end
+            r = phi(x_eff);                       % n x 1
+            pr = phip(x_eff);                     % n x 1  (phi')
+            c = params.c_vec;                     % n x 1
+
+            if len_u > 0, u_gain = uu ./ params.U0_mat; else, u_gain = ones(n, K); end
+            eff = u_gain .* b_mat;                % n x K
+
+            % --- row/col index blocks ---
+            row_a = 1:len_a;
+            row_b = len_a + (1:len_b);
+            row_u = len_a + len_b + (1:len_u);
+            row_x = len_a + len_b + len_u + (1:n);
+
+            J = sparse(N, N);
+
+            % ---------- SFA rows ----------
+            if len_a > 0
+                tau_inv = 1 ./ params.tau_a(:);                     % n_a x 1
+                gamma = c .* pr;                                    % n x 1
+                diag_block = kron(spdiags(-tau_inv, 0, n_a, n_a), speye(n));
+                coupling = kron(sparse(tau_inv * ones(1, n_a)), spdiags(-gamma, 0, n, n));
+                J(row_a, row_a) = diag_block + coupling;            % da/da
+                vals = kron(tau_inv, pr);                          % da/dx
+                J(row_a, row_x) = sparse((1:len_a)', repmat((1:n)', n_a, 1), vals, len_a, n);
+            end
+
+            % ---------- STD rows (per (i,T)) ----------
+            if len_b > 0
+                trec = params.tau_b_rec_mat; trel = params.tau_b_rel_mat;   % n x K
+                rrep = repmat(r, K, 1); prrep = repmat(pr, K, 1); crep = repmat(c .* pr, K, 1);
+                diag_b = -1 ./ trec(:) - rrep ./ trel(:);
+                J(row_b, row_b) = spdiags(diag_b, 0, len_b, len_b);         % db/db
+                vals_bx = -(b_mat(:) ./ trel(:)) .* prrep;                 % db/dx
+                J(row_b, row_x) = sparse((1:len_b)', repmat((1:n)', K, 1), vals_bx, len_b, n);
+                if len_a > 0                                                % db/da
+                    coeff_ba = (b_mat(:) ./ trel(:)) .* crep;
+                    stack = sparse((1:len_b)', repmat((1:n)', K, 1), coeff_ba, len_b, n);
+                    J(row_b, row_a) = kron(sparse(ones(1, n_a)), stack);
+                end
+            end
+
+            % ---------- STF rows (per (i,T)) ----------
+            if len_u > 0
+                tf = params.tau_f_mat; fa = params.f_amount_mat;           % n x K
+                rrep = repmat(r, K, 1); prrep = repmat(pr, K, 1); crep = repmat(c .* pr, K, 1);
+                diag_u = -1 ./ tf(:) - fa(:) .* rrep;
+                J(row_u, row_u) = spdiags(diag_u, 0, len_u, len_u);        % du/du
+                vals_ux = (fa(:) .* (1 - uu(:))) .* prrep;                 % du/dx
+                J(row_u, row_x) = sparse((1:len_u)', repmat((1:n)', K, 1), vals_ux, len_u, n);
+                if len_a > 0                                                % du/da
+                    coeff_ua = -(fa(:) .* (1 - uu(:))) .* crep;
+                    stack = sparse((1:len_u)', repmat((1:n)', K, 1), coeff_ua, len_u, n);
+                    J(row_u, row_a) = kron(sparse(ones(1, n_a)), stack);
+                end
+            end
+
+            % ---------- dx rows (post-type partitioned) ----------
+            Jxx = -speye(n) / tau_d;
+            Jxa = sparse(n, len_a);
+            Jxb = sparse(n, len_b);
+            Jxu = sparse(n, len_u);
+            for T = 1:K
+                rows = find(type_of == T);
+                if isempty(rows), continue; end
+                gcol = eff(:, T) .* pr;                          % n x 1  (dx/dx column scale)
+                Jxx(rows, :) = Jxx(rows, :) + (W(rows, :) .* gcol') / tau_d;
+                if len_a > 0
+                    acol = (-c .* pr .* eff(:, T));              % n x 1
+                    blk = (W(rows, :) .* acol') / tau_d;         % m x n
+                    Jxa(rows, :) = repmat(blk, 1, n_a);
+                end
+                if len_b > 0
+                    bcol = r .* u_gain(:, T);                    % dx/db_{:,T}
+                    Jxb(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* bcol') / tau_d;
+                end
+                if len_u > 0
+                    ucol = r .* (b_mat(:, T) ./ params.U0_mat(:, T));   % dx/du_{:,T}
+                    Jxu(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* ucol') / tau_d;
+                end
+            end
+            J(row_x, row_x) = Jxx;
+            if len_a > 0, J(row_x, row_a) = Jxa; end
+            if len_b > 0, J(row_x, row_b) = Jxb; end
+            if len_u > 0, J(row_x, row_u) = Jxu; end
+        end
+
+        function st = unpack_states_ct(S_out, params)
+            % UNPACK_STATES_CT Reconstruct x,a,b,u,r,br as n x (K x) nt arrays.
+            nt = size(S_out, 1);
+            n = params.n; K = params.K;
+            n_a = params.n_a; n_b = params.n_b; n_u = params.n_u;
+            idx = 0;
+            len_a = n * n_a;
+            if len_a > 0, a = reshape(S_out(:, idx + (1:len_a))', n, n_a, nt); else, a = []; end
+            idx = idx + len_a;
+            len_b = n * K * n_b;
+            if len_b > 0, b = reshape(S_out(:, idx + (1:len_b))', n, K, nt); else, b = ones(n, K, nt); end
+            idx = idx + len_b;
+            len_u = n * K * n_u;
+            if len_u > 0, uu = reshape(S_out(:, idx + (1:len_u))', n, K, nt); else, uu = ones(n, K, nt); end
+            idx = idx + len_u;
+            x = S_out(:, idx + (1:n))';                          % n x nt
+
+            x_eff = x;
+            if len_a > 0
+                sa = reshape(sum(a, 2), n, nt);
+                x_eff = x_eff - params.c_vec .* sa;
+            end
+            r = params.activation_function(x_eff);               % n x nt
+            % synaptic output magnitude proxy: efficacy to each post-type times r
+            if len_u > 0
+                ug = uu ./ params.U0_mat;                        % n x K x nt
+            else
+                ug = ones(n, K, nt);
+            end
+            eff = ug .* b;                                       % n x K x nt
+            br = reshape(mean(eff, 2), n, nt) .* r;              % mean efficacy over post-types * r
+
+            st = struct('x', x, 'a', a, 'b', b, 'u', uu, 'r', r, 'br', br);
+        end
+    end
+end
