@@ -11,10 +11,12 @@ classdef SRNNModelCellTypes < SRNNModelBase
     %               x_eff = x - c .* sum(a,2);  da/dt = (r - a)./tau_a.
     %   - STD  (b): per (presynaptic neuron j, post-type T). State b is n x K (n_b=1).
     %               db/dt = (1-b)./tau_rec - (b.*r)./tau_rel.   (driven by r_j)
-    %   - STF  (u): per (presynaptic neuron j, post-type T). State u is n x K (n_u=1).
-    %               du/dt = (U0-u)./tau_f + f_amount.*(1-u).*r.  (NEW; driven by r_j)
-    % Synaptic efficacy of j -> post-type T is eff(j,T) = (u(j,T)/U0(j,T)) * b(j,T),
-    % so STF-off (u=U0) reduces to pure STD and rest (u=U0,b=1) gives eff=1.
+    %   - STF  (p): per (presynaptic neuron j, post-type T). State p is n x K (n_u=1).
+    %               p is a dynamic release probability (Tsodyks-Markram u, renamed to p
+    %               because u denotes the external input here).
+    %               dp/dt = (p0-p)./tau_f + f_amount.*(1-p).*r.  (NEW; driven by r_j)
+    % Synaptic efficacy of j -> post-type T is eff(j,T) = (p(j,T)/p0(j,T)) * b(j,T),
+    % so STF-off (p=p0) reduces to pure STD and rest (p=p0,b=1) gives eff=1.
     %
     % The recurrent drive is post-type structured: neuron i (type T_i) receives
     %   drive_i = sum_j W_ij * eff(j,T_i) * r_j.
@@ -22,8 +24,8 @@ classdef SRNNModelCellTypes < SRNNModelBase
     % realizes the paper's alignment rules (excitatory dynamics vary with post-type,
     % inhibitory mostly with pre-type).
     %
-    % State layout  S = [a(:); b(:); u(:); x(:)]   (x last), with
-    %   a -> (n, n_a),  b -> (n, K),  u -> (n, K),  x -> (n,1).
+    % State layout  S = [a(:); b(:); p(:); x(:)]   (x last), with
+    %   a -> (n, n_a),  b -> (n, K),  p -> (n, K),  x -> (n,1).
     %   N_sys_eqs = n*n_a + n*K*n_b + n*K*n_u + n.
     %
     % Scope of the scaffold: SFA supports multiple timescales (n_a>=0); STD/STF are
@@ -57,7 +59,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
         psp_amp        % K x K  signed synaptic weight (pre -> post)
         dep_tau        % K x K  STD recovery tau (s)
         dep_amount     % K x K  STD depression amount [0,1)
-        rel_prob       % K x K  baseline release probability U0
+        rel_prob       % K x K  baseline release probability p0 (STF rest value)
         fac_tau        % K x K  STF facilitation tau (s)
         fac_amount     % K x K  STF facilitation increment
         adapt_index    % K x 1  per-type adaptation index (SFA strength source)
@@ -232,7 +234,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             pd.r       = st.r(:, keep);
             pd.br      = st.br(:, keep);
             pd.b       = st.b(:, :, keep);          % n x K x nt (per post-type)
-            pd.u       = st.u(:, :, keep);          % n x K x nt
+            pd.p       = st.p(:, :, keep);          % n x K x nt  (STF release-prob state)
             if ~isempty(st.a), pd.a = st.a(:, :, keep); else, pd.a = []; end
             pd.type_of = obj.type_of;
             pd.type_names = obj.type_names;
@@ -240,11 +242,11 @@ classdef SRNNModelCellTypes < SRNNModelBase
         end
 
         function S0 = initialize_state(~, params)
-            % INITIALIZE_STATE  a=0, b=1 (no depression), u=U0 (facilitation at rest), x random.
+            % INITIALIZE_STATE  a=0, b=1 (no depression), p=p0 (facilitation at rest), x random.
             n = params.n; K = params.K;
             a0 = zeros(n * params.n_a, 1);
             if params.n_b > 0, b0 = ones(n * K, 1); else, b0 = []; end
-            if params.n_u > 0, u0 = params.U0_mat(:); else, u0 = []; end
+            if params.n_u > 0, u0 = params.p0_mat(:); else, u0 = []; end
             x0 = params.x0_std .* randn(n, 1);
             S0 = [a0; b0; u0; x0];
         end
@@ -286,7 +288,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 t = obj.type_of;
                 params.tau_b_rec_mat = obj.dep_tau(t, :);
                 params.tau_b_rel_mat = max(obj.tau_b_rel_ref * (1 - min(max(obj.dep_amount(t, :), 0), 0.95)), 0.05);
-                params.U0_mat        = min(max(obj.rel_prob(t, :), 0.05), 0.95);
+                params.p0_mat        = min(max(obj.rel_prob(t, :), 0.05), 0.95);
                 params.tau_f_mat     = obj.fac_tau(t, :);
                 params.f_amount_mat  = max(obj.fac_amount(t, :), 0);
             end
@@ -425,7 +427,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if len_b > 0, b = reshape(S(idx + (1:len_b)), n, K); else, b = []; end
             idx = idx + len_b;
             len_u = n * K * n_u;
-            if len_u > 0, uu = reshape(S(idx + (1:len_u)), n, K); else, uu = []; end
+            if len_u > 0, p = reshape(S(idx + (1:len_u)), n, K); else, p = []; end
             idx = idx + len_u;
             x = S(idx + (1:n));
 
@@ -436,8 +438,8 @@ classdef SRNNModelCellTypes < SRNNModelBase
 
             % --- per-edge synaptic gains (n x K) ---
             if len_b > 0, b_mat = b; else, b_mat = ones(n, K); end
-            if len_u > 0, u_gain = uu ./ params.U0_mat; else, u_gain = ones(n, K); end
-            eff = u_gain .* b_mat;                        % n x K
+            if len_u > 0, p_gain = p ./ params.p0_mat; else, p_gain = ones(n, K); end
+            eff = p_gain .* b_mat;                        % n x K
 
             % --- post-type-structured recurrent drive ---
             drive = zeros(n, 1);
@@ -456,12 +458,12 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 db = [];
             end
             if len_u > 0
-                du = (params.U0_mat - uu) ./ params.tau_f_mat + params.f_amount_mat .* (1 - uu) .* r;
+                dp = (params.p0_mat - p) ./ params.tau_f_mat + params.f_amount_mat .* (1 - p) .* r;
             else
-                du = [];
+                dp = [];
             end
 
-            dS_dt = [da(:); db(:); du(:); dx];
+            dS_dt = [da(:); db(:); dp(:); dx];
         end
 
         function J = compute_Jacobian_fast_ct(S, params)
@@ -481,7 +483,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             idx = idx + len_a;
             if len_b > 0, b_mat = reshape(S(idx + (1:len_b)), n, K); else, b_mat = ones(n, K); end
             idx = idx + len_b;
-            if len_u > 0, uu = reshape(S(idx + (1:len_u)), n, K); else, uu = []; end
+            if len_u > 0, p = reshape(S(idx + (1:len_u)), n, K); else, p = []; end
             idx = idx + len_u;
             x = S(idx + (1:n));
 
@@ -491,8 +493,8 @@ classdef SRNNModelCellTypes < SRNNModelBase
             pr = phip(x_eff);                     % n x 1  (phi')
             c = params.c_vec;                     % n x 1
 
-            if len_u > 0, u_gain = uu ./ params.U0_mat; else, u_gain = ones(n, K); end
-            eff = u_gain .* b_mat;                % n x K
+            if len_u > 0, p_gain = p ./ params.p0_mat; else, p_gain = ones(n, K); end
+            eff = p_gain .* b_mat;                % n x K
 
             % --- row/col index blocks ---
             row_a = 1:len_a;
@@ -533,11 +535,11 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 tf = params.tau_f_mat; fa = params.f_amount_mat;           % n x K
                 rrep = repmat(r, K, 1); prrep = repmat(pr, K, 1); crep = repmat(c .* pr, K, 1);
                 diag_u = -1 ./ tf(:) - fa(:) .* rrep;
-                J(row_u, row_u) = spdiags(diag_u, 0, len_u, len_u);        % du/du
-                vals_ux = (fa(:) .* (1 - uu(:))) .* prrep;                 % du/dx
+                J(row_u, row_u) = spdiags(diag_u, 0, len_u, len_u);        % dp/dp
+                vals_ux = (fa(:) .* (1 - p(:))) .* prrep;                 % dp/dx
                 J(row_u, row_x) = sparse((1:len_u)', repmat((1:n)', K, 1), vals_ux, len_u, n);
-                if len_a > 0                                                % du/da
-                    coeff_ua = -(fa(:) .* (1 - uu(:))) .* crep;
+                if len_a > 0                                                % dp/da
+                    coeff_ua = -(fa(:) .* (1 - p(:))) .* crep;
                     stack = sparse((1:len_u)', repmat((1:n)', K, 1), coeff_ua, len_u, n);
                     J(row_u, row_a) = kron(sparse(ones(1, n_a)), stack);
                 end
@@ -559,12 +561,12 @@ classdef SRNNModelCellTypes < SRNNModelBase
                     Jxa(rows, :) = repmat(blk, 1, n_a);
                 end
                 if len_b > 0
-                    bcol = r .* u_gain(:, T);                    % dx/db_{:,T}
+                    bcol = r .* p_gain(:, T);                    % dx/db_{:,T}
                     Jxb(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* bcol') / tau_d;
                 end
                 if len_u > 0
-                    ucol = r .* (b_mat(:, T) ./ params.U0_mat(:, T));   % dx/du_{:,T}
-                    Jxu(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* ucol') / tau_d;
+                    pcol = r .* (b_mat(:, T) ./ params.p0_mat(:, T));   % dx/dp_{:,T}
+                    Jxu(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* pcol') / tau_d;
                 end
             end
             J(row_x, row_x) = Jxx;
@@ -586,7 +588,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if len_b > 0, b = reshape(S_out(:, idx + (1:len_b))', n, K, nt); else, b = ones(n, K, nt); end
             idx = idx + len_b;
             len_u = n * K * n_u;
-            if len_u > 0, uu = reshape(S_out(:, idx + (1:len_u))', n, K, nt); else, uu = ones(n, K, nt); end
+            if len_u > 0, p = reshape(S_out(:, idx + (1:len_u))', n, K, nt); else, p = ones(n, K, nt); end
             idx = idx + len_u;
             x = S_out(:, idx + (1:n))';                          % n x nt
 
@@ -598,14 +600,14 @@ classdef SRNNModelCellTypes < SRNNModelBase
             r = params.activation_function(x_eff);               % n x nt
             % synaptic output magnitude proxy: efficacy to each post-type times r
             if len_u > 0
-                ug = uu ./ params.U0_mat;                        % n x K x nt
+                ug = p ./ params.p0_mat;                        % n x K x nt
             else
                 ug = ones(n, K, nt);
             end
             eff = ug .* b;                                       % n x K x nt
             br = reshape(mean(eff, 2), n, nt) .* r;              % mean efficacy over post-types * r
 
-            st = struct('x', x, 'a', a, 'b', b, 'u', uu, 'r', r, 'br', br);
+            st = struct('x', x, 'a', a, 'b', b, 'p', p, 'r', r, 'br', br);
         end
     end
 end
