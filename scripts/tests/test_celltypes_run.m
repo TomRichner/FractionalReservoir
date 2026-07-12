@@ -26,15 +26,15 @@ haveLLE = isfield(model.lya_results, 'LLE') && isfinite(model.lya_results.LLE);
 report(sprintf('Benettin LLE finite (%.4f)', model.lya_results.LLE), haveLLE);
 ok = ok && haveLLE;
 
-%% 2. STF/STD sanity: under activity, b depresses (<1) and u facilitates (>U0)
+%% 2. STF/STD sanity: under activity, b depresses (<1) and p facilitates (>p0)
 p = model.cached_params;
 b_end = pd.b(:, :, end);       % n x K
-u_end = pd.u(:, :, end);       % n x K
+p_end = pd.p(:, :, end);       % n x K
 b_dep = mean(b_end(:)) < 1 - 1e-3;
-u_fac = mean(u_end(:)) > mean(p.U0_mat(:)) + 1e-3;
+p_fac = mean(p_end(:)) > mean(p.p0_mat(:)) + 1e-3;
 report(sprintf('STD depresses (mean b_end=%.3f < 1)', mean(b_end(:))), b_dep);
-report(sprintf('STF facilitates (mean u_end=%.3f > mean U0=%.3f)', mean(u_end(:)), mean(p.U0_mat(:))), u_fac);
-ok = ok && b_dep && u_fac;
+report(sprintf('STF facilitates (mean p_end=%.3f > mean p0=%.3f)', mean(p_end(:)), mean(p.p0_mat(:))), p_fac);
+ok = ok && b_dep && p_fac;
 
 %% 3. Plot smoke test
 try

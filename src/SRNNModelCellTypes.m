@@ -10,11 +10,11 @@ classdef SRNNModelCellTypes < SRNNModelBase
     %   - SFA  (a): per neuron, intrinsic firing adaptation. State a is n x n_a.
     %               x_eff = x - c .* sum(a,2);  da/dt = (r - a)./tau_a.
     %   - STD  (b): per (presynaptic neuron j, post-type T). State b is n x K (n_b=1).
-    %               db/dt = (1-b)./tau_rec - (b.*r)./tau_rel.   (driven by r_j)
+    %               db/dt = (1-b)./tau_rec - (p.*b.*r)./tau_rel.  (driven by r_j; depletion coupled to p)
     %   - STF  (p): per (presynaptic neuron j, post-type T). State p is n x K (n_u=1).
     %               p is a dynamic release probability (Tsodyks-Markram u, renamed to p
     %               because u denotes the external input here).
-    %               dp/dt = (p0-p)./tau_f + f_amount.*(1-p).*r.  (NEW; driven by r_j)
+    %               dp/dt = (p0-p)./tau_f + kappa.*(1-p).*r.  (NEW; driven by r_j)
     % Synaptic efficacy of j -> post-type T is eff(j,T) = (p(j,T)/p0(j,T)) * b(j,T),
     % so STF-off (p=p0) reduces to pure STD and rest (p=p0,b=1) gives eff=1.
     %
@@ -61,7 +61,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
         dep_amount     % K x K  STD depression amount [0,1)
         rel_prob       % K x K  baseline release probability p0 (STF rest value)
         fac_tau        % K x K  STF facilitation tau (s)
-        fac_amount     % K x K  STF facilitation increment
+        kappa          % K x K  STF facilitation rate kappa (from ml_facilitation_amount)
         adapt_index    % K x 1  per-type adaptation index (SFA strength source)
     end
 
@@ -290,7 +290,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 params.tau_b_rel_mat = max(obj.tau_b_rel_ref * (1 - min(max(obj.dep_amount(t, :), 0), 0.95)), 0.05);
                 params.p0_mat        = min(max(obj.rel_prob(t, :), 0.05), 0.95);
                 params.tau_f_mat     = obj.fac_tau(t, :);
-                params.f_amount_mat  = max(obj.fac_amount(t, :), 0);
+                params.kappa_mat     = max(obj.kappa(t, :), 0);
             end
 
             if ~isempty(obj.W), params.W = obj.W; end
@@ -390,7 +390,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if isempty(obj.dep_amount),  obj.dep_amount  = damt; end
             if isempty(obj.rel_prob),    obj.rel_prob    = relp; end
             if isempty(obj.fac_tau),     obj.fac_tau     = ftau; end
-            if isempty(obj.fac_amount),  obj.fac_amount  = famt; end
+            if isempty(obj.kappa),       obj.kappa       = famt; end
             if isempty(obj.adapt_index), obj.adapt_index = adix(:); end
         end
 
@@ -440,6 +440,8 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if len_b > 0, b_mat = b; else, b_mat = ones(n, K); end
             if len_u > 0, p_gain = p ./ params.p0_mat; else, p_gain = ones(n, K); end
             eff = p_gain .* b_mat;                        % n x K
+            % effective release prob for STD depletion: state p if STF on, else frozen p0
+            if len_u > 0, p_eff = p; else, p_eff = params.p0_mat; end   % n x K
 
             % --- post-type-structured recurrent drive ---
             drive = zeros(n, 1);
@@ -453,12 +455,12 @@ classdef SRNNModelCellTypes < SRNNModelBase
             % --- state ODEs ---
             if len_a > 0, da = (r - a) ./ params.tau_a; else, da = []; end
             if len_b > 0
-                db = (1 - b_mat) ./ params.tau_b_rec_mat - (b_mat .* r) ./ params.tau_b_rel_mat;
+                db = (1 - b_mat) ./ params.tau_b_rec_mat - (p_eff .* b_mat .* r) ./ params.tau_b_rel_mat;
             else
                 db = [];
             end
             if len_u > 0
-                dp = (params.p0_mat - p) ./ params.tau_f_mat + params.f_amount_mat .* (1 - p) .* r;
+                dp = (params.p0_mat - p) ./ params.tau_f_mat + params.kappa_mat .* (1 - p) .* r;
             else
                 dp = [];
             end
@@ -495,6 +497,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
 
             if len_u > 0, p_gain = p ./ params.p0_mat; else, p_gain = ones(n, K); end
             eff = p_gain .* b_mat;                % n x K
+            if len_u > 0, p_eff = p; else, p_eff = params.p0_mat; end   % STD depletion release prob
 
             % --- row/col index blocks ---
             row_a = 1:len_a;
@@ -519,27 +522,31 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if len_b > 0
                 trec = params.tau_b_rec_mat; trel = params.tau_b_rel_mat;   % n x K
                 rrep = repmat(r, K, 1); prrep = repmat(pr, K, 1); crep = repmat(c .* pr, K, 1);
-                diag_b = -1 ./ trec(:) - rrep ./ trel(:);
+                diag_b = -1 ./ trec(:) - (p_eff(:) .* rrep) ./ trel(:);
                 J(row_b, row_b) = spdiags(diag_b, 0, len_b, len_b);         % db/db
-                vals_bx = -(b_mat(:) ./ trel(:)) .* prrep;                 % db/dx
+                vals_bx = -(p_eff(:) .* b_mat(:) ./ trel(:)) .* prrep;      % db/dx
                 J(row_b, row_x) = sparse((1:len_b)', repmat((1:n)', K, 1), vals_bx, len_b, n);
                 if len_a > 0                                                % db/da
-                    coeff_ba = (b_mat(:) ./ trel(:)) .* crep;
+                    coeff_ba = (p_eff(:) .* b_mat(:) ./ trel(:)) .* crep;
                     stack = sparse((1:len_b)', repmat((1:n)', K, 1), coeff_ba, len_b, n);
                     J(row_b, row_a) = kron(sparse(ones(1, n_a)), stack);
+                end
+                if len_u > 0                                                % db/dp (depletion coupling)
+                    diag_bp = -(b_mat(:) .* rrep) ./ trel(:);
+                    J(row_b, row_u) = spdiags(diag_bp, 0, len_b, len_u);
                 end
             end
 
             % ---------- STF rows (per (i,T)) ----------
             if len_u > 0
-                tf = params.tau_f_mat; fa = params.f_amount_mat;           % n x K
+                tf = params.tau_f_mat; kappa = params.kappa_mat;           % n x K
                 rrep = repmat(r, K, 1); prrep = repmat(pr, K, 1); crep = repmat(c .* pr, K, 1);
-                diag_u = -1 ./ tf(:) - fa(:) .* rrep;
+                diag_u = -1 ./ tf(:) - kappa(:) .* rrep;
                 J(row_u, row_u) = spdiags(diag_u, 0, len_u, len_u);        % dp/dp
-                vals_ux = (fa(:) .* (1 - p(:))) .* prrep;                 % dp/dx
+                vals_ux = (kappa(:) .* (1 - p(:))) .* prrep;              % dp/dx
                 J(row_u, row_x) = sparse((1:len_u)', repmat((1:n)', K, 1), vals_ux, len_u, n);
                 if len_a > 0                                                % dp/da
-                    coeff_ua = -(fa(:) .* (1 - p(:))) .* crep;
+                    coeff_ua = -(kappa(:) .* (1 - p(:))) .* crep;
                     stack = sparse((1:len_u)', repmat((1:n)', K, 1), coeff_ua, len_u, n);
                     J(row_u, row_a) = kron(sparse(ones(1, n_a)), stack);
                 end
