@@ -78,4 +78,19 @@ function C = load_campagnola_matrices()
         C.(p{1})        = T.(p{1});
         C.([p{1} '_n']) = T.([p{1} '_n']);
     end
+
+    % SFA time constant fit from the raw long-square sweeps (fit_sfa_tau.py), 4x1 [s]
+    % aligned to C.types. Missing file -> NaN (the model falls back to its scalar tau_a).
+    C.sfa_tau = nan(numel(C.types), 1);
+    tau_file = fullfile(this_dir, 'campagnola', 'sfa_tau_per_type.csv');
+    if isfile(tau_file)
+        Tt = readtable(tau_file, 'VariableNamingRule', 'preserve');
+        for i = 1:numel(C.types)
+            row = strcmpi(Tt.type, C.types{i});
+            if any(row), C.sfa_tau(i) = Tt.tau_a_median_s(find(row, 1)); end
+        end
+    else
+        warning('load_campagnola_matrices:noSfaTau', ...
+            'sfa_tau_per_type.csv not found; C.sfa_tau = NaN (model uses scalar tau_a).');
+    end
 end
