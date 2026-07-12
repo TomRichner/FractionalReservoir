@@ -24,7 +24,7 @@ setup_paths();
 this_dir = fileparts(mfilename('fullpath'));
 
 %% Shared step stimulus and model settings (mirror the SFA/STD reference)
-step_amp = 0.8;        % external drive during the step (mid-range, avoids saturating r)
+step_amp = 0.5;        % external drive during the step (mid-range, avoids saturating r)
 t_on     = 5;          % step onset (s)
 t_off    = 15;         % step offset (s); long enough for slow SFA/STF to develop
 T_range  = [-10, 20];  % simulate before/after the step
@@ -43,8 +43,8 @@ base.K     = 1;
 base.W     = 0;                 % no recurrence
 base.tau_d = 0.1;               % dendritic time constant (base default)
 base.type_of = 1;
-base.activation_function            = @(x) SRNNModelBase.piecewiseSigmoid(x, 1.0, 0.35);
-base.activation_function_derivative = @(x) SRNNModelBase.piecewiseSigmoidDerivative(x, 1.0, 0.35);
+base.activation_function            = @(x) SRNNModelBase.piecewiseSigmoid(x, 1.0, 0.5);
+base.activation_function_derivative = @(x) SRNNModelBase.piecewiseSigmoidDerivative(x, 1.0, 0.5);
 base.u_interpolant = u_interpolant;
 
 % Illustrative mechanism values (exaggerated for a clear, readable demo).
