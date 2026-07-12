@@ -66,3 +66,4 @@ data/
 figs/
 results_DDE/
 
+__pycache__/
