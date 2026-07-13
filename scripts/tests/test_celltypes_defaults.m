@@ -12,7 +12,11 @@ close all; clear; clc;
 setup_paths();
 
 %% Create model: 50 neurons, all 4 cell types from Campagnola data
-model = SRNNModelCellTypes('n', 50, 'lya_method', 'benettin');
+% Piecewise (hard) sigmoid nonlinearity, S_a=0.9 (shape), S_c=0.35 (center).
+model = SRNNModelCellTypes('n', 300, 'lya_method', 'benettin', ...
+    'S_a', 0.9, 'S_c', 0.35, ...
+    'activation_function', @(x) SRNNModelBase.piecewiseSigmoid(x, 0.9, 0.35), ...
+    'activation_function_derivative', @(x) SRNNModelBase.piecewiseSigmoidDerivative(x, 0.9, 0.35));
 
 %% Build, run, and plot
 model.build();
@@ -21,8 +25,9 @@ model.build();
 fprintf('\nPer-type SFA loaded from Campagnola data:\n');
 for T = 1:model.n_types
     j = find(model.type_of == T, 1);
-    fprintf('  %-6s adaptation_index=%.4f  adapting=%d  tau_a=%.3f s\n', ...
-        model.type_names{T}, model.adapt_index(T), ismember(j, model.ad_idx), model.tau_a_type(T));
+    fprintf('  %-6s adaptation_index=%.4f  adapting=%d  tau_a=%.3f s  tau_d=%.4f s\n', ...
+        model.type_names{T}, model.adapt_index(T), ismember(j, model.ad_idx), ...
+        model.tau_a_type(T), model.tau_d_type(T));
 end
 
 model.run();

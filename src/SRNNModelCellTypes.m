@@ -65,6 +65,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
         kappa          % K x K  STF facilitation rate kappa (from ml_facilitation_amount)
         adapt_index    % K x 1  per-type adaptation index (SFA strength source)
         tau_a_type     % K x 1  per-type fitted SFA tau (s); NaN entries fall back to tau_a
+        tau_d_type     % K x 1  per-type membrane tau (s) from Campagnola C.tau; settable override
     end
 
     %% Computed (set at build)
@@ -277,7 +278,12 @@ classdef SRNNModelCellTypes < SRNNModelBase
             params.n_ad = obj.n_ad; params.ad_idx = obj.ad_idx; params.adapting = obj.adapting;
             params.N_sys_eqs = obj.n_ad * obj.n_a + obj.n * obj.n_types * obj.n_b + ...
                                obj.n * obj.n_types * obj.n_u + obj.n;
-            params.tau_d = obj.tau_d;
+            % Dendritic time constant, PER NEURON (n x 1): each neuron uses its type's membrane tau.
+            if ~isempty(obj.tau_d_type) && ~isempty(obj.type_of)
+                params.tau_d = obj.tau_d_type(obj.type_of);      % n x 1
+            else
+                params.tau_d = repmat(obj.tau_d, obj.n, 1);      % scalar fallback (data disabled)
+            end
             params.activation_function = obj.activation_function;
             params.activation_function_derivative = obj.activation_function_derivative;
             params.x0_std = obj.x0_std;
@@ -421,6 +427,13 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 famt = max(obj.fillnan(famt, 0.2), 0);
                 adix = obj.fillnan(adix, 0.03);
                 if isfield(C, 'sfa_tau'), stau = C.sfa_tau(:); else, stau = nan(K, 1); end
+                % Per-type membrane tau (dendritic tau_d). Data is REQUIRED here.
+                if ~isfield(C, 'tau') || any(~isfinite(C.tau(:))) || any(C.tau(:) <= 0)
+                    error('SRNNModelCellTypes:NoMembraneTau', ...
+                        ['Campagnola per-type membrane tau (C.tau) is missing or invalid; ', ...
+                         'cannot set per-type tau_d. Set use_campagnola_data=false to run without data.']);
+                end
+                mtau = C.tau(:);
             else
                 % Synthetic defaults so the class runs stand-alone. Pyr (row 1) excitatory (+).
                 cp   = 0.1 * ones(K) + diag(-0.05 * ones(K, 1));
@@ -432,6 +445,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 famt = 0.2 * ones(K);
                 adix = 0.03 * ones(K, 1);
                 stau = nan(K, 1);
+                mtau = [];   % no data -> tau_d_type stays empty; get_params uses scalar tau_d
             end
 
             % Per-type SFA tau: fitted value where available, else the scalar tau_a fallback.
@@ -447,6 +461,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if isempty(obj.kappa),       obj.kappa       = famt; end
             if isempty(obj.adapt_index), obj.adapt_index = adix(:); end
             if isempty(obj.tau_a_type),  obj.tau_a_type  = stau(:); end
+            if isempty(obj.tau_d_type),  obj.tau_d_type  = mtau(:); end
         end
 
         function M = fill_psp_nan(~, M)
@@ -537,7 +552,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 sel = (type_of == T);
                 drive(sel) = dr(sel);
             end
-            dx = (-x + drive + u_ext) / tau_d;
+            dx = (-x + drive + u_ext) ./ tau_d;
 
             % --- state ODEs ---  (da only for adapting neurons; per-neuron tau)
             if len_a > 0, da = (r(ad_idx) - a_ad) ./ params.tau_a(ad_idx, :); else, da = []; end
@@ -660,7 +675,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             end
 
             % ---------- dx rows (post-type partitioned) ----------
-            Jxx = -speye(n) / tau_d;
+            Jxx = -spdiags(1 ./ tau_d(:), 0, n, n);   % tau_d is n x 1 (per-neuron membrane tau)
             Jxa = sparse(n, len_a);
             Jxb = sparse(n, len_b);
             Jxu = sparse(n, len_u);
@@ -668,19 +683,19 @@ classdef SRNNModelCellTypes < SRNNModelBase
                 rows = find(type_of == T);
                 if isempty(rows), continue; end
                 gcol = eff(:, T) .* pr;                          % n x 1  (dx/dx column scale)
-                Jxx(rows, :) = Jxx(rows, :) + (W(rows, :) .* gcol') / tau_d;
+                Jxx(rows, :) = Jxx(rows, :) + (W(rows, :) .* gcol') ./ tau_d(rows);
                 if len_a > 0
                     acol = (-c .* pr .* eff(:, T));              % n x 1
-                    blk = (W(rows, :) .* acol') / tau_d;         % m x n
+                    blk = (W(rows, :) .* acol') ./ tau_d(rows);  % m x n
                     Jxa(rows, :) = repmat(blk, 1, n_a);
                 end
                 if len_b > 0
                     bcol = r .* p_gain(:, T);                    % dx/db_{:,T}
-                    Jxb(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* bcol') / tau_d;
+                    Jxb(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* bcol') ./ tau_d(rows);
                 end
                 if len_u > 0
                     pcol = r .* (b_mat(:, T) ./ params.p0_mat(:, T));   % dx/dp_{:,T}
-                    Jxu(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* pcol') / tau_d;
+                    Jxu(rows, (T - 1) * n + (1:n)) = (W(rows, :) .* pcol') ./ tau_d(rows);
                 end
             end
             J(row_x, row_x) = Jxx;
