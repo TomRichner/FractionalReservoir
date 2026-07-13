@@ -955,10 +955,16 @@ classdef SRNNModelBase < handle
     % Internalized from src/nonlinearities/ to make SRNNModel2 standalone.
 
     methods (Static)
-        function y = piecewiseSigmoid(x, a, c)
+        function y = piecewiseSigmoid(x, a, c, r_max)
             % PIECEWISESIGMOID A piecewise linear/quadratic sigmoid activation function.
             % Internalized from src/nonlinearities/piecewiseSigmoid.m
+            %
+            % Optional scalar r_max (default 1) raises the saturation ceiling from 1
+            % to r_max by lengthening the unit-slope linear band; the threshold and
+            % bottom soft shoulder are unchanged, so the low output region is
+            % identical to the r_max=1 form. See also piecewiseSigmoidDerivative.
 
+            if nargin < 4 || isempty(r_max), r_max = 1; end
             if a < 0 || a > 1
                 error('Parameter "a" must be between 0 and 1.');
             end
@@ -966,14 +972,14 @@ classdef SRNNModelBase < handle
 
             if a == 0.5
                 y_linear = (x - c) + 0.5;
-                y = min(max(y_linear, 0), 1);
+                y = min(max(y_linear, 0), r_max);
             else
                 y = zeros(size(x));
                 k = 0.5 / (1 - 2*a);
                 x1 = c + a - 1;
                 x2 = c - a;
-                x3 = c + a;
-                x4 = c + 1 - a;
+                x3 = c + r_max - 1 + a;
+                x4 = c + r_max - a;
 
                 mask_left_quad = (x >= x1) & (x < x2);
                 mask_linear = (x >= x2) & (x <= x3);
@@ -987,18 +993,20 @@ classdef SRNNModelBase < handle
                     y(mask_linear) = (x(mask_linear) - c) + 0.5;
                 end
                 if any(mask_right_quad, 'all')
-                    y(mask_right_quad) = 1 - k * (x(mask_right_quad) - x4).^2;
+                    y(mask_right_quad) = r_max - k * (x(mask_right_quad) - x4).^2;
                 end
                 if any(mask_right_sat, 'all')
-                    y(mask_right_sat) = 1;
+                    y(mask_right_sat) = r_max;
                 end
             end
         end
 
-        function dy = piecewiseSigmoidDerivative(x, a, c)
+        function dy = piecewiseSigmoidDerivative(x, a, c, r_max)
             % PIECEWISESIGMOIDDERIVATIVE First derivative of the piecewise sigmoid.
             % Internalized from src/nonlinearities/piecewiseSigmoidDerivative.m
+            % Optional scalar r_max (default 1) matches piecewiseSigmoid's ceiling.
 
+            if nargin < 4 || isempty(r_max), r_max = 1; end
             if a < 0 || a > 1
                 error('Parameter "a" must be between 0 and 1.');
             end
@@ -1007,15 +1015,15 @@ classdef SRNNModelBase < handle
 
             if a == 0.5
                 breakpoint1 = c - 0.5;
-                breakpoint2 = c + 0.5;
+                breakpoint2 = c + r_max - 0.5;
                 mask_linear = (x >= breakpoint1) & (x <= breakpoint2);
                 dy(mask_linear) = 1;
             else
                 k = 0.5 / (1 - 2*a);
                 x1 = c + a - 1;
                 x2 = c - a;
-                x3 = c + a;
-                x4 = c + 1 - a;
+                x3 = c + r_max - 1 + a;
+                x4 = c + r_max - a;
 
                 mask_left_quad = (x >= x1) & (x < x2);
                 mask_linear = (x >= x2) & (x <= x3);

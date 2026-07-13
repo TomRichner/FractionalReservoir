@@ -9,12 +9,13 @@
 close all; clear; clc;
 
 %% Create model: 50 neurons, all 4 cell types from Campagnola data
-% Piecewise (hard) sigmoid nonlinearity, S_a=0.9 (shape), S_c=0.35 (center).
+% Piecewise sigmoid nonlinearity, S_a=0.9 (shape), S_c=0.35 (center), r_max=100
+% (firing-rate ceiling; unit slope over the [0, r_max] linear band).
 model = SRNNModelCellTypes('fs',500, ...
     'n', 50, 'lya_method', 'benettin', ...
     'S_a', 0.9, 'S_c', 0.35, ...
-    'activation_function', @(x) SRNNModelBase.piecewiseSigmoid(x, 0.9, 0.35), ...
-    'activation_function_derivative', @(x) SRNNModelBase.piecewiseSigmoidDerivative(x, 0.9, 0.35));
+    'activation_function', @(x) SRNNModelBase.piecewiseSigmoid(x, 0.9, 0.35, 100), ...
+    'activation_function_derivative', @(x) SRNNModelBase.piecewiseSigmoidDerivative(x, 0.9, 0.35, 100));
 
 %% Build, run, and plot
 model.build();
