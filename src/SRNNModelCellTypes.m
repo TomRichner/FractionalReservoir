@@ -312,29 +312,62 @@ classdef SRNNModelCellTypes < SRNNModelBase
         end
 
         function [fig, ax] = plot(obj)
-            % PLOT Minimal per-type time-series view (mean firing rate + input per type).
+            % PLOT Stacked per-type time series (all colored by cell type): external
+            % stimulus, dendritic x, firing rate r, synaptic output, SFA, STD, STF, and
+            % the local Lyapunov exponent. Each panel shows every neuron's trace (faint,
+            % in its type's color) plus a bold per-type mean; panels for a mechanism are
+            % included only when it is enabled.
             if ~obj.has_run || isempty(obj.plot_data)
                 error('SRNNModelCellTypes:NotRun', 'Run the model before plotting.');
             end
-            pd = obj.plot_data; K = obj.n_types; t = pd.t;
-            cmap = lines(K);
+            pd = obj.plot_data; t = pd.t; ntype = pd.type_of;
+            n = size(pd.x, 1);
+            cmap = SRNNModelCellTypes.type_colors(obj.n_types);
+
+            % Panel list: {ylabel, data (n x nt)}; mechanism panels reduced to per-neuron.
+            panels = {'stim', pd.u_ext; 'dendrite', pd.x; 'firing rate', pd.r; ...
+                      'synaptic output', pd.br};
+            if obj.n_a > 0 && isfield(pd, 'a') && ~isempty(pd.a)
+                panels(end+1, :) = {'SFA', reshape(sum(pd.a, 2), n, [])};          % sum over timescales
+            end
+            if obj.n_b > 0
+                panels(end+1, :) = {'STD', reshape(mean(pd.b, 2), n, [])};         % mean over post-types
+            end
+            if obj.n_u > 0
+                panels(end+1, :) = {'STF', reshape(mean(pd.p, 2), n, [])};         % mean over post-types
+            end
+            has_lya = ~strcmpi(obj.lya_method, 'none') && ~isempty(obj.lya_results);
+            n_plots = size(panels, 1) + double(has_lya);
+
             fig = figure('Color', 'w', 'Name', 'SRNNModelCellTypes');
-            ax = gobjects(2, 1);
-            ax(1) = subplot(2, 1, 1); hold(ax(1), 'on');
-            for T = 1:K
-                sel = pd.type_of == T;
-                plot(ax(1), t, mean(pd.r(sel, :), 1), 'Color', cmap(T, :), 'LineWidth', 1.5);
+            tl = tiledlayout(fig, n_plots, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+            ax = gobjects(n_plots, 1);
+
+            for k = 1:size(panels, 1)
+                ax(k) = nexttile(tl); hold(ax(k), 'on');
+                h = SRNNModelCellTypes.plot_type_traces(ax(k), t, panels{k, 2}, ntype, cmap);
+                ylabel(ax(k), panels{k, 1}); box(ax(k), 'off');
+                if k == 1
+                    idx = find(isgraphics(h));
+                    lg = legend(h(idx), obj.type_names(idx)); lg.Layout.Tile = 'east';
+                end
+                if k < n_plots, set(ax(k), 'XTickLabel', []); end
             end
-            legend(ax(1), obj.type_names, 'Location', 'eastoutside');
-            ylabel(ax(1), 'mean firing rate'); title(ax(1), 'Per-type firing rate');
-            box(ax(1), 'off');
-            ax(2) = subplot(2, 1, 2); hold(ax(2), 'on');
-            for T = 1:K
-                sel = pd.type_of == T;
-                plot(ax(2), t, mean(pd.x(sel, :), 1), 'Color', cmap(T, :), 'LineWidth', 1.0);
+
+            if has_lya
+                ax(end) = nexttile(tl); hold(ax(end), 'on');
+                if strcmpi(obj.lya_method, 'benettin')
+                    SRNNModelBase.plot_lyapunov(obj.lya_results, obj.lya_method, {'local', 'EOC', 'value'});
+                else
+                    SRNNModelBase.plot_lyapunov(obj.lya_results, obj.lya_method);
+                end
+                box(ax(end), 'off');
             end
-            ylabel(ax(2), 'mean dendritic x'); xlabel(ax(2), 'time (s)');
-            title(ax(2), 'Per-type dendritic state'); box(ax(2), 'off');
+
+            linkaxes(ax, 'x');
+            Tp = obj.T_plot; if isempty(Tp), Tp = [t(1), t(end)]; end
+            xlim(ax(end), Tp);
+            xlabel(ax(end), 'time (s)');
         end
     end
 
@@ -430,6 +463,32 @@ classdef SRNNModelCellTypes < SRNNModelBase
     methods (Static)
         function M = fillnan(M, val)
             M(isnan(M)) = val;
+        end
+
+        function c = type_colors(K)
+            % TYPE_COLORS Fixed cell-type palette (Pyr/Pvalb/Sst/Vip), matching the
+            % project's other figures; falls back to lines() for K > 4.
+            base = [0.1216 0.4667 0.7059;   % pyr   #1f77b4
+                    0.8392 0.1529 0.1569;   % pvalb #d62728
+                    0.1725 0.6275 0.1725;   % sst   #2ca02c
+                    0.5804 0.4039 0.7412];  % vip   #9467bd
+            if nargin < 1 || isempty(K), K = 4; end
+            if K <= 4, c = base(1:K, :); else, c = lines(K); end
+        end
+
+        function h = plot_type_traces(ax, t, Y, type_of, cmap)
+            % PLOT_TYPE_TRACES Plot every neuron's trace (Y is n x nt) faint in its cell
+            % type's color, plus a bold per-type mean. Returns the K mean-line handles
+            % (gobjects placeholder for absent types) for building a legend.
+            K = size(cmap, 1);
+            h = gobjects(K, 1);
+            for T = 1:K
+                sel = (type_of == T);
+                if ~any(sel), continue; end
+                col = cmap(T, :);
+                plot(ax, t, Y(sel, :)', 'Color', [col 0.25], 'LineWidth', 0.5);   % all traces, faint
+                h(T) = plot(ax, t, mean(Y(sel, :), 1), 'Color', col, 'LineWidth', 2);  % per-type mean
+            end
         end
 
         function dS_dt = dynamics_fast_ct(t, S, params)
