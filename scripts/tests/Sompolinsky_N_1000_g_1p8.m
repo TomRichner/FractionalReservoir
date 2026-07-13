@@ -71,7 +71,7 @@ model.activation_function = @tanhActivation;
 model.activation_function_derivative = @tanhActivationDerivative;
 
 % Simulation settings
-model.T_range = [-15, 350];           % 50 seconds simulation
+model.T_range = [-15, 50];           % 50 seconds simulation
 model.fs = 200;                    % 400 Hz sampling
 model.rng_seeds = [42, 1];         % Reproducible seeds
 
