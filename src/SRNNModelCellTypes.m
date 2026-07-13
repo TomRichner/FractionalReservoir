@@ -50,7 +50,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
         tau_a = 1.0              % fallback SFA time constant(s), 1 x n_a (s), if no per-type fit
         c_gain = 0.7             % maps per-type adaptation_index -> SFA strength c
         w_cv = 1.0               % per-edge weight heterogeneity (std / |mean|)
-        tau_b_rel_ref = 0.5      % reference STD release tau (s); scaled down by depression amount
+        tau_b_rel_ref = 1        % STD release tau_rel (s); 1 = proper Tsodyks-Markram (r in Hz), U=p0
         sfa_min_index = 0.01     % a type with adaptation_index below this is non-adapting (n_a=0)
     end
 
@@ -308,7 +308,11 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if ~isempty(obj.type_of)
                 t = obj.type_of;
                 params.tau_b_rec_mat = obj.dep_tau(t, :);
-                params.tau_b_rel_mat = max(obj.tau_b_rel_ref * (1 - min(max(obj.dep_amount(t, :), 0), 0.95)), 0.05);
+                % Proper Tsodyks-Markram depletion with r in Hz: tau_rel = 1 s (units
+                % constant, not a free knob), so utilization U = p0 and the depression
+                % ratio is U*r*tau_rec. (Was a 0.5*(1-dep_amount) heuristic; dep_amount
+                % is still loaded, reserved for a future utilization calibration.)
+                params.tau_b_rel_mat = obj.tau_b_rel_ref * ones(size(params.tau_b_rec_mat));
                 params.p0_mat        = min(max(obj.rel_prob(t, :), 0.05), 0.95);
                 params.tau_f_mat     = obj.fac_tau(t, :);
                 params.kappa_mat     = max(obj.kappa(t, :), 0);
