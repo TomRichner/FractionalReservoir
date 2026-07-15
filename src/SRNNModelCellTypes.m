@@ -379,10 +379,279 @@ classdef SRNNModelCellTypes < SRNNModelBase
             xlim(ax(end), Tp);
             xlabel(ax(end), 'time (s)');
         end
+
+        function [fig, ax] = plot_by_celltype(obj, varargin)
+            % PLOT_BY_CELLTYPE Same per-type time series as plot(), but laid out as a
+            % grid: one COLUMN of subplots per PRE-synaptic cell type and one ROW per
+            % state variable (stim, dendrite, firing rate, synaptic output, SFA, STD, STF).
+            %   - Per-NEURON variables (stim, dendrite, firing rate, synaptic output, SFA)
+            %     show each pre-type's neurons plus a bold per-type mean. The trace colors
+            %     depend on 'colormode' (name-value, default 'lines'):
+            %       'lines' : each neuron gets a distinct color (lines palette) so
+            %                 individual traces are easy to follow (no mean overlay).
+            %       'type'  : every neuron in a type shares that type's color (faint),
+            %                 with a bold per-type mean in the type color.
+            %   - The synaptic-resource variables STD and STF are per (pre->post) SYNAPSE:
+            %     within each pre-type column they are drawn as one line PER POST-TYPE,
+            %     colored by post-type, so a full STD/STF row is the K x K pre-by-post
+            %     matrix of synaptic resources. (Unaffected by 'colormode'.)
+            % Y-axes are shared across columns within each row; x-axes are linked across
+            % the whole grid. The network-level Lyapunov panel is replicated at the bottom
+            % of every column (redundant, for row alignment).
+            p = inputParser;
+            addParameter(p, 'colormode', 'lines', @(s) any(strcmpi(s, {'lines', 'type'})));
+            parse(p, varargin{:});
+            colormode = p.Results.colormode;
+            if ~obj.has_run || isempty(obj.plot_data)
+                error('SRNNModelCellTypes:NotRun', 'Run the model before plotting.');
+            end
+            pd = obj.plot_data; t = pd.t; ntype = pd.type_of;
+            n = size(pd.x, 1);
+            cmap = SRNNModelCellTypes.type_colors(obj.n_types);
+
+            % Panel list. kind='neuron' -> data is n x nt, colored by the column's pre-type.
+            % kind='synapse' -> data is n x K x nt, drawn per post-type (colored by post-type).
+            panels = struct('label', {}, 'data', {}, 'kind', {});
+            panels(end+1) = struct('label', 'stim',            'data', pd.u_ext, 'kind', 'neuron');
+            panels(end+1) = struct('label', 'dendrite',        'data', pd.x,     'kind', 'neuron');
+            panels(end+1) = struct('label', 'firing rate',     'data', pd.r,     'kind', 'neuron');
+            panels(end+1) = struct('label', 'synaptic output', 'data', pd.br,    'kind', 'neuron');
+            if obj.n_a > 0 && isfield(pd, 'a') && ~isempty(pd.a)
+                panels(end+1) = struct('label', 'SFA', 'data', reshape(sum(pd.a, 2), n, []), 'kind', 'neuron');  % sum over timescales
+            end
+            if obj.n_b > 0
+                panels(end+1) = struct('label', 'STD', 'data', pd.b, 'kind', 'synapse');   % n x K x nt (per post-type)
+            end
+            if obj.n_u > 0
+                panels(end+1) = struct('label', 'STF', 'data', pd.p, 'kind', 'synapse');   % n x K x nt (per post-type)
+            end
+            has_lya = ~strcmpi(obj.lya_method, 'none') && ~isempty(obj.lya_results);
+            n_panel = numel(panels);
+            n_rows  = n_panel + double(has_lya);
+            n_cols  = obj.n_types;
+
+            fig = figure('Color', 'w', 'Name', 'SRNNModelCellTypes by cell type');
+            tl = tiledlayout(fig, n_rows, n_cols, 'TileSpacing', 'compact', 'Padding', 'compact');
+            ax = gobjects(n_rows, n_cols);
+            syn_legend_done = false;
+
+            for k = 1:n_panel
+                P = panels(k);
+                for T = 1:n_cols
+                    a = nexttile(tl); hold(a, 'on'); ax(k, T) = a;
+                    sel = (ntype == T);
+                    if strcmp(P.kind, 'neuron')
+                        if any(sel)
+                            col = cmap(T, :);
+                            Ysel = P.data(sel, :);
+                            if strcmpi(colormode, 'lines')
+                                set(a, 'ColorOrder', lines(max(size(Ysel, 1), 1)), 'ColorOrderIndex', 1);
+                                plot(a, t, Ysel', 'LineWidth', 0.5);                              % per-neuron distinct colors
+                            else   % 'type'
+                                plot(a, t, Ysel', 'Color', [col 0.25], 'LineWidth', 0.5);         % all traces, faint
+                                plot(a, t, mean(Ysel, 1), 'Color', col, 'LineWidth', 2);          % per-type mean
+                            end
+                        end
+                    else   % 'synapse': one line per post-type q for pre-type T synapses
+                        hq = gobjects(n_cols, 1);
+                        if any(sel)
+                            for q = 1:n_cols
+                                Yq = reshape(P.data(:, q, :), n, []);   % n x nt for post-type q
+                                colq = cmap(q, :);
+                                plot(a, t, Yq(sel, :)', 'Color', [colq 0.15], 'LineWidth', 0.5);   % per-synapse, faint
+                                hq(q) = plot(a, t, mean(Yq(sel, :), 1), 'Color', colq, 'LineWidth', 2);  % pre T -> post q mean
+                            end
+                        end
+                        if ~syn_legend_done && any(isgraphics(hq))
+                            idx = find(isgraphics(hq));
+                            lg = legend(a, hq(idx), obj.type_names(idx), 'Location', 'best');
+                            title(lg, 'post-type'); syn_legend_done = true;
+                        end
+                    end
+                    box(a, 'off');
+                    if k == 1, title(a, obj.type_names{T}); end
+                    if T == 1, ylabel(a, P.label); end
+                    if k < n_rows, set(a, 'XTickLabel', []); end
+                end
+                linkaxes(ax(k, :), 'y');   % share y-scale across cell types within this row
+            end
+
+            if has_lya
+                for T = 1:n_cols
+                    a = nexttile(tl); hold(a, 'on'); ax(n_rows, T) = a;
+                    if strcmpi(obj.lya_method, 'benettin')
+                        SRNNModelBase.plot_lyapunov(obj.lya_results, obj.lya_method, {'local', 'EOC', 'value'});
+                    else
+                        SRNNModelBase.plot_lyapunov(obj.lya_results, obj.lya_method);
+                    end
+                    box(a, 'off');
+                    if T ~= 1, ylabel(a, ''); end
+                end
+            end
+
+            linkaxes(ax(isgraphics(ax)), 'x');
+            Tp = obj.T_plot; if isempty(Tp), Tp = [t(1), t(end)]; end
+            xlim(ax(n_rows, 1), Tp);
+            for T = 1:n_cols
+                if isgraphics(ax(n_rows, T)), xlabel(ax(n_rows, T), 'time (s)'); end
+            end
+        end
+
+        function [fig, fig_legend, ax] = plot_W_bytype(obj, varargin)
+            % PLOT_W_BYTYPE Truecolor image of the realized weight matrix W with a
+            % distinct white->color gradient PER PRESYNAPTIC cell type, so the cell-type
+            % block structure is directly visible.
+            %
+            % Because the model is Dale-consistent (every neuron's outgoing weights share
+            % one sign, fixed by its presynaptic type), magnitude -> intensity plus type
+            % -> hue fully encodes W without a diverging (signed) colormap. A single axes
+            % supports only one colormap, so instead of imagesc this pre-renders an
+            % n x n x 3 truecolor image and shows it with one image() call. Color encodes
+            % the PRESYNAPTIC type only; sign is implicit in the type identity.
+            %
+            % W is displayed transposed so rows = PREsynaptic, cols = POSTsynaptic (obj.W
+            % is stored post x pre), matching the Campagnola 4x4 heatmap convention.
+            % Magnitude normalization is GLOBAL (max |W|). Optional gamma brightens weak
+            % entries; default is linear.
+            %
+            %   [fig, fig_legend, ax] = obj.plot_W_bytype('gamma', 1)
+            %
+            % Dale-specific: assumes uniform sign per presynaptic type. Do not use on a
+            % model whose presynaptic population has mixed-sign outputs.
+            p = inputParser;
+            addParameter(p, 'gamma', 1, @(x) isnumeric(x) && isscalar(x) && x > 0);
+            parse(p, varargin{:});
+            gam = p.Results.gamma;
+
+            if isempty(obj.W)
+                error('SRNNModelCellTypes:NotBuilt', 'Build the model before plotting W.');
+            end
+            Wd = full(obj.W)';                 % rows = pre, cols = post
+            n  = size(Wd, 1);
+            K  = obj.n_types;
+            cmap = SRNNModelCellTypes.type_colors(K);
+            tof  = obj.type_of;                % pre-type of each row
+
+            % Global magnitude -> normalized intensity g in [0,1] (0 -> white).
+            scale = max(abs(Wd(:))); if scale == 0, scale = 1; end
+            g = min(abs(Wd) / scale, 1) .^ gam;
+
+            % Truecolor RGB: white at g=0, full pre-type color at g=1 (channel = 1-(1-c)g).
+            RGB = ones(n, n, 3);
+            for T = 1:K
+                rows = (tof == T); if ~any(rows), continue; end
+                cT = cmap(T, :); gT = g(rows, :);
+                for ch = 1:3
+                    RGB(rows, :, ch) = 1 - (1 - cT(ch)) * gT;
+                end
+            end
+
+            % Contiguous per-type block edges + centers (for boundaries and labels).
+            cnt     = histcounts(tof, 1:K+1);
+            edges   = cumsum(cnt(:))';
+            starts  = [0, edges(1:end-1)];
+            centers = starts + cnt(:)' / 2 + 0.5;
+            present = cnt > 0;
+
+            % --- Main figure ---
+            fig = figure('Color', 'w', 'Name', 'SRNNModelCellTypes W (by pre-type)');
+            ax  = axes(fig); hold(ax, 'on');
+            image(ax, RGB); axis(ax, 'image'); set(ax, 'YDir', 'reverse');
+            for e = edges(1:end-1)
+                xline(ax, e + 0.5, 'Color', [0.6 0.6 0.6], 'LineWidth', 0.5);
+                yline(ax, e + 0.5, 'Color', [0.6 0.6 0.6], 'LineWidth', 0.5);
+            end
+            xlim(ax, [0.5, n + 0.5]); ylim(ax, [0.5, n + 0.5]);
+            set(ax, 'XTick', centers(present), 'XTickLabel', obj.type_names(present), ...
+                    'YTick', centers(present), 'YTickLabel', obj.type_names(present), ...
+                    'TickLength', [0 0], 'Box', 'on', 'Layer', 'top');
+            xlabel(ax, 'postsynaptic'); ylabel(ax, 'presynaptic');
+            title(ax, sprintf('W by pre-type (|w|_{max} = %.3g)', scale));
+
+            % --- Legend figure: one white->color ramp per type vs weight magnitude ---
+            fig_legend = figure('Color', 'w', 'Name', 'W by pre-type - legend');
+            tl = tiledlayout(fig_legend, K, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+            gg = linspace(0, 1, 256);
+            for T = 1:K
+                aL = nexttile(tl); cT = cmap(T, :);
+                ramp = ones(1, 256, 3);
+                for ch = 1:3, ramp(1, :, ch) = 1 - (1 - cT(ch)) * gg; end
+                image(aL, 'XData', [0 1], 'YData', [0 1], 'CData', ramp);
+                ylim(aL, [0 1]); xlim(aL, [0 1]);
+                set(aL, 'YTick', [], 'Box', 'on');
+                ylabel(aL, obj.type_names{T}, 'Color', cT, 'FontWeight', 'bold', ...
+                       'Rotation', 0, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
+                if T < K, set(aL, 'XTickLabel', []); end
+                % Magnitude ticks: color position g maps to magnitude scale*g.^(1/gamma).
+                gt = [0 0.25 0.5 0.75 1];
+                set(aL, 'XTick', gt, 'XTickLabel', arrayfun(@(x) sprintf('%.2g', scale * x.^(1/gam)), gt, 'UniformOutput', false));
+            end
+            xlabel(tl, 'weight magnitude |w|');
+            title(tl, 'pre-type color scales');
+        end
+
+        function [fig_handle, ax_handles] = plot_W_spectrum(obj)
+            % PLOT_W_SPECTRUM Eigenvalue spectra of -I+W and the LTI Jacobian.
+            %
+            % 2-panel figure:
+            %   Left:  eig(-I + W)                (unscaled Jacobian block)
+            %   Right: eig((-I + W)./tau_d)       (LTI Jacobian; per-neuron tau_d)
+            % A red dashed line at Re = 0 marks the stability boundary (the network
+            % is unstable/edge-of-chaos when the spectral abscissa reaches 0, i.e. the
+            % abscissa of W reaches 1 == level_of_chaos).
+            %
+            % No reference circle is drawn: unlike SRNNModel2, this multi-cell-type W has
+            % no analytic RMT spectral radius to predict (W is rescaled by its own
+            % spectral abscissa), so only the empirical eigenvalues are shown.
+            %
+            % Note: this is the static-W spectrum (adaptation/synaptic states linearized
+            % out); use plot_eigenvalues(J_times_sec) for the full realized Jacobian.
+            if isempty(obj.W)
+                error('SRNNModelCellTypes:NotBuilt', 'Build the model before plotting the spectrum.');
+            end
+
+            n = obj.n;
+            % Per-neuron membrane tau (same mapping as get_params).
+            if ~isempty(obj.tau_d_type) && ~isempty(obj.type_of)
+                tau_d = obj.tau_d_type(obj.type_of);
+            else
+                tau_d = repmat(obj.tau_d, n, 1);
+            end
+
+            J_unscaled    = -eye(n) + full(obj.W);
+            eigs_unscaled = eig(J_unscaled);
+            eigs_J        = eig(J_unscaled ./ tau_d(:));   % row i scaled by 1/tau_d(i)
+
+            fig_handle = figure('Color', 'w', 'Position', [100, 300, 900, 400], ...
+                'Name', 'SRNNModelCellTypes W spectrum');
+            ax_handles = gobjects(2, 1);
+
+            ax_handles(1) = subplot(1, 2, 1);
+            obj.scatter_spectrum(ax_handles(1), eigs_unscaled);
+            title(ax_handles(1), '-I + W eigenvalues', 'FontWeight', 'bold');
+
+            ax_handles(2) = subplot(1, 2, 2);
+            obj.scatter_spectrum(ax_handles(2), eigs_J);
+            title(ax_handles(2), '(-I + W)/\tau_d eigenvalues', 'FontWeight', 'bold');
+        end
     end
 
     %% Private helpers
     methods (Access = protected)
+        function scatter_spectrum(~, ax, eigs)
+            % SCATTER_SPECTRUM Complex-plane scatter of eigenvalues with origin axes and a
+            % red dashed stability line at Re = 0. No reference circle (no analytic RMT
+            % radius for the multi-cell-type W).
+            plot(ax, real(eigs), imag(eigs), 'ko', 'MarkerSize', 4, 'LineWidth', 0.5);
+            hold(ax, 'on');
+            xl = xlim(ax); yl = ylim(ax);
+            plot(ax, xl, [0 0], 'k-', 'LineWidth', 0.5);          % Re axis
+            plot(ax, [0 0], yl, 'k-', 'LineWidth', 0.5);          % Im axis
+            plot(ax, [0 0], yl, 'r--', 'LineWidth', 1.5);         % stability boundary Re = 0
+            xlabel(ax, 'Re(\lambda)'); ylabel(ax, 'Im(\lambda)');
+            grid(ax, 'on'); axis(ax, 'equal'); hold(ax, 'off');
+        end
+
         function assign_types(obj)
             % ASSIGN_TYPES Contiguous per-type blocks from type_fractions (each >= 1 neuron).
             K = obj.n_types; n = obj.n;
