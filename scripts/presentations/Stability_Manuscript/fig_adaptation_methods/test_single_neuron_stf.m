@@ -173,11 +173,19 @@ function params = build_params(base, n_a, n_b, n_u, vals)
 % BUILD_PARAMS Assemble the dynamics_fast_ct params struct for one condition
 % (n=1, K=1). Only the active-mechanism fields matter, but all are filled.
 params = base;
-params.n_a = n_a; params.n_b = n_b; params.n_u = n_u;
-params.N_sys_eqs = params.n * n_a + params.n * params.K * n_b + ...
+params.n_b = n_b; params.n_u = n_u;
+% Ragged SFA layout (single neuron, single type; DC state ordering [a; b; p; x]).
+if n_a > 0
+    params.sfa = struct('type', 1, 'idx', 1, 'count', 1, 'n_a', n_a, ...
+                        'tau', vals.tau_a(:)', 'c', vals.c, 'off', 0, 'len', params.n * n_a);
+else
+    params.sfa = struct('type', {}, 'idx', {}, 'count', {}, 'n_a', {}, 'tau', {}, 'c', {}, 'off', {}, 'len', {});
+end
+params.sfa_len = params.n * n_a;
+params.n_a = n_a;                          % per-type count (n=1, single type)
+params.N_sys_eqs = params.sfa_len + params.n * params.K * n_b + ...
                    params.n * params.K * n_u + params.n;
-params.tau_a = vals.tau_a;                 % 1 x n_a (scalar broadcasts)
-params.c_vec = vals.c * ones(params.n, 1); % n x 1
+params.c_vec = vals.c * ones(params.n, 1); % n x 1 (legacy Jacobian only)
 params.tau_b_rec_mat = vals.tau_b_rec * ones(params.n, params.K);
 params.tau_b_rel_mat = vals.tau_b_rel * ones(params.n, params.K);
 params.p0_mat        = vals.p0     * ones(params.n, params.K);

@@ -1,4 +1,4 @@
-% Fig_example_cellTypeNet.m - Example cell-typed reservoir for the STF presentation
+ % Fig_example_cellTypeNet.m - Example cell-typed reservoir for the STF presentation
 %
 % Presentation-figure version of test_celltypes_defaults.m. Builds one
 % SRNNModelCellTypes network with SFA + STD + STF on, parameterized from the
@@ -19,7 +19,7 @@ this_dir = fileparts(mfilename('fullpath'));
 %% Cell-type fractions: 50% Pyr, inhibitory rescaled to keep relative proportions
 % default: [0.80 0.08 0.07 0.05] (pyr pvalb sst vip); inhibitory sums to 0.20.
 % Target pyr = 0.50 -> inhibitory must sum to 0.50; rescale inh by 0.50/0.20 = 2.5.
-frac_E = 0.95;
+frac_E = 0.8;
 inh_default   = [0.08, 0.07, 0.05];                 % pvalb, sst, vip (default)
 inh_rescaled  = inh_default * ((1-frac_E) / sum(inh_default));
 cell_frac    = [frac_E, inh_rescaled]               % -> [0.50 0.20 0.175 0.125]

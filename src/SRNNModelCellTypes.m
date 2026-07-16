@@ -44,11 +44,16 @@ classdef SRNNModelCellTypes < SRNNModelBase
 
     %% Mechanism configuration
     properties
-        n_a = 1                  % # SFA timescales for ADAPTING types (0 disables SFA everywhere)
+        n_a = []                 % per-type SFA timescale count (K-vector, 0-3). Empty -> 1 per
+                                 % adapting type (adapt_index>=sfa_min_index); a scalar is broadcast
+                                 % to all adapting types; a length-K vector sets each type explicitly
+        tau_a_cell = {}          % optional explicit per-type SFA tau vectors (s); tau_a_cell{T}
+                                 % length must equal the resolved n_a(T) when provided
+        tau_a_range = [0.05, 2]  % logspace range (s) for SFA taus when n_a(T)>1 and no tau_a_cell{T}
         n_b = 1                  % # STD timescales (0 or 1)
         n_u = 1                  % # STF timescales (0 or 1)
         tau_a = 1.0              % fallback SFA time constant(s), 1 x n_a (s), if no per-type fit
-        c_gain = 0.7             % maps per-type adaptation_index -> SFA strength c
+        c_gain = 0.7             % maps per-type adaptation_index -> SFA total strength c (DC-split by n_a)
         w_cv = 1.0               % per-edge weight heterogeneity (std / |mean|)
         tau_b_rel_ref = 1        % STD release tau_rel (s); 1 = proper Tsodyks-Markram (r in Hz), U=p0
         sfa_min_index = 0.01     % a type with adaptation_index below this is non-adapting (n_a=0)
@@ -75,7 +80,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
         n_types        % number of cell types (K)
         adapting       % n x 1  logical, true for neurons of adapting types (carry SFA state)
         ad_idx         % n_ad x 1  global indices of adapting neurons
-        n_ad           % number of adapting neurons (SFA state is n_ad x n_a)
+        n_ad           % number of adapting neurons
     end
 
     %% Constructor
@@ -117,11 +122,18 @@ classdef SRNNModelCellTypes < SRNNModelBase
             obj.assign_types();
             obj.load_parameter_tables();          % fills the K x K tables (data or defaults)
 
-            % Per-type SFA: a type is adapting iff its adaptation_index >= sfa_min_index (and
-            % SFA is enabled globally, n_a>0). Only adapting neurons carry SFA state (n_a=0 for
-            % the rest, e.g. fast-spiking Pvalb) -> the "adapting-neuron subset" ragged layout.
-            type_adapts = (obj.adapt_index(:) >= obj.sfa_min_index);
-            obj.adapting = (obj.n_a > 0) & type_adapts(obj.type_of);
+            % Per-type SFA timescale counts (ragged; resolved from n_a). Only types with count>0
+            % carry SFA state (no orphan pools).
+            na_eff = obj.resolved_n_a();
+            for T = 1:obj.n_types   % tau_a_cell length consistency (when provided)
+                if numel(obj.tau_a_cell) >= T && ~isempty(obj.tau_a_cell{T}) && ...
+                        numel(obj.tau_a_cell{T}) ~= na_eff(T)
+                    error('SRNNModelCellTypes:BadTauCell', ...
+                        'tau_a_cell{%d} has %d taus but resolved n_a(%d)=%d.', ...
+                        T, numel(obj.tau_a_cell{T}), T, na_eff(T));
+                end
+            end
+            obj.adapting = ismember(obj.type_of, find(na_eff > 0));
             obj.ad_idx = find(obj.adapting);
             obj.n_ad = numel(obj.ad_idx);
 
@@ -216,8 +228,19 @@ classdef SRNNModelCellTypes < SRNNModelBase
             if ~ismember(obj.n_b, [0 1]) || ~ismember(obj.n_u, [0 1])
                 error('SRNNModelCellTypes:BadTimescales', 'n_b and n_u must be 0 or 1 (single-timescale STD/STF).');
             end
-            if obj.n_a < 0
-                error('SRNNModelCellTypes:BadTimescales', 'n_a must be >= 0.');
+            if ~isempty(obj.n_a)
+                if ~isscalar(obj.n_a) && numel(obj.n_a) ~= obj.n_types
+                    error('SRNNModelCellTypes:BadNa', 'n_a must be a scalar or a length-K=%d vector.', obj.n_types);
+                end
+                if any(obj.n_a(:) < 0) || any(mod(obj.n_a(:), 1) ~= 0)
+                    error('SRNNModelCellTypes:BadNa', 'n_a must be non-negative integer(s).');
+                end
+                if any(obj.n_a(:) > 3)
+                    warning('SRNNModelCellTypes:NaLarge', 'n_a entries > 3 are outside the intended 0-3 range.');
+                end
+            end
+            if numel(obj.tau_a_range) ~= 2 || any(obj.tau_a_range <= 0) || obj.tau_a_range(2) <= obj.tau_a_range(1)
+                error('SRNNModelCellTypes:BadTauRange', 'tau_a_range must be [lo hi] positive and ascending.');
             end
             if obj.T_range(2) <= obj.T_range(1)
                 error('SRNNModelCellTypes:BadT', 'T_range(2) must be > T_range(1).');
@@ -229,6 +252,13 @@ classdef SRNNModelCellTypes < SRNNModelBase
         end
 
         function J = eval_jacobian(~, S, params)
+            % Analytic Jacobian is implemented only for single-timescale SFA. Multi-timescale
+            % ragged SFA (any n_a>1) is deferred (Benettin does not need the Jacobian).
+            if any(params.n_a > 1)
+                error('SRNNModelCellTypes:JacobianDeferredMultiSFA', ...
+                    ['Analytic Jacobian not implemented for multi-timescale ragged SFA ', ...
+                     '(n_a>1). Use lya_method=''benettin'' for stability.']);
+            end
             J = SRNNModelCellTypes.compute_Jacobian_fast_ct(S, params);
         end
 
@@ -258,7 +288,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
         function S0 = initialize_state(~, params)
             % INITIALIZE_STATE  a=0, b=1 (no depression), p=p0 (facilitation at rest), x random.
             n = params.n; K = params.K;
-            a0 = zeros(params.n_ad * params.n_a, 1);       % SFA state only for adapting neurons
+            a0 = zeros(params.sfa_len, 1);                 % ragged SFA state (per-type blocks)
             if params.n_b > 0, b0 = ones(n * K, 1); else, b0 = []; end
             if params.n_u > 0, u0 = params.p0_mat(:); else, u0 = []; end
             x0 = params.x0_std .* randn(n, 1);
@@ -273,10 +303,28 @@ classdef SRNNModelCellTypes < SRNNModelBase
             params = struct();
             params.n = obj.n;
             params.K = obj.n_types;
-            params.n_a = obj.n_a; params.n_b = obj.n_b; params.n_u = obj.n_u;
-            % SFA state is ragged: only the n_ad adapting neurons carry a (n_ad x n_a).
+            params.n_b = obj.n_b; params.n_u = obj.n_u;
+            % --- Ragged per-type SFA layout (contiguous blocks; DC-split c; no orphan pools) ---
+            na_eff = obj.resolved_n_a();
+            sfa = struct('type', {}, 'idx', {}, 'count', {}, 'n_a', {}, 'tau', {}, 'c', {}, 'off', {}, 'len', {});
+            off = 0;
+            for T = 1:obj.n_types
+                naT = na_eff(T);
+                if naT <= 0, continue; end
+                idxT = find(obj.type_of == T);
+                if isempty(idxT), continue; end
+                s = struct('type', T, 'idx', idxT, 'count', numel(idxT), 'n_a', naT, ...
+                           'tau', obj.resolve_tau_a(T, naT), ...                  % 1 x naT distinct taus
+                           'c', obj.c_gain * obj.adapt_index(T) / naT, ...        % DC-split total c
+                           'off', off, 'len', numel(idxT) * naT);
+                off = off + s.len;
+                sfa(end + 1) = s; %#ok<AGROW>
+            end
+            params.sfa = sfa; params.sfa_len = off;
+            params.n_a = na_eff;                       % resolved per-type vector (guard reads this)
+            % SFA state is ragged: only adapting neurons carry a.
             params.n_ad = obj.n_ad; params.ad_idx = obj.ad_idx; params.adapting = obj.adapting;
-            params.N_sys_eqs = obj.n_ad * obj.n_a + obj.n * obj.n_types * obj.n_b + ...
+            params.N_sys_eqs = params.sfa_len + obj.n * obj.n_types * obj.n_b + ...
                                obj.n * obj.n_types * obj.n_u + obj.n;
             % Dendritic time constant, PER NEURON (n x 1): each neuron uses its type's membrane tau.
             if ~isempty(obj.tau_d_type) && ~isempty(obj.type_of)
@@ -291,12 +339,16 @@ classdef SRNNModelCellTypes < SRNNModelBase
             params.type_of = obj.type_of;
             params.is_exc = obj.is_exc;
 
-            % SFA time constant, PER NEURON (n x n_a): each neuron uses its type's fitted tau.
-            if obj.n_a > 0 && ~isempty(obj.type_of) && ~isempty(obj.tau_a_type)
-                params.tau_a = repmat(obj.tau_a_type(obj.type_of), 1, obj.n_a);   % n x n_a
+            % Legacy per-neuron tau_a (n x na_max) and c_vec (n x 1) -- consumed ONLY by the
+            % analytic Jacobian, which is guarded to the single-timescale case (max n_a <= 1),
+            % where c is unsplit (n_a=1) and equals the DC-split c. The ragged dynamics use
+            % params.sfa instead.
+            na_max = max([0; na_eff]);
+            if na_max == 1 && ~isempty(obj.type_of) && ~isempty(obj.tau_a_type)
+                params.tau_a = obj.tau_a_type(obj.type_of);                % n x 1
+                params.tau_a = params.tau_a(:);
             else
-                ta = obj.tau_a; if isscalar(ta), ta = repmat(ta, 1, max(obj.n_a, 1)); end
-                params.tau_a = repmat(reshape(ta, 1, []), obj.n, 1);              % n x n_a fallback
+                params.tau_a = zeros(obj.n, na_max);                       % n x 0 (no SFA) or unused (guarded)
             end
             if ~isempty(obj.adapt_index) && ~isempty(obj.type_of)
                 params.c_vec = obj.c_gain * obj.adapt_index(obj.type_of);   % n x 1
@@ -337,7 +389,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             % Panel list: {ylabel, data (n x nt)}; mechanism panels reduced to per-neuron.
             panels = {'stim', pd.u_ext; 'dendrite', pd.x; 'firing rate', pd.r; ...
                       'synaptic output', pd.br};
-            if obj.n_a > 0 && isfield(pd, 'a') && ~isempty(pd.a)
+            if isfield(pd, 'a') && ~isempty(pd.a)
                 panels(end+1, :) = {'SFA', reshape(sum(pd.a, 2), n, [])};          % sum over timescales
             end
             if obj.n_b > 0
@@ -416,7 +468,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
             panels(end+1) = struct('label', 'dendrite',        'data', pd.x,     'kind', 'neuron');
             panels(end+1) = struct('label', 'firing rate',     'data', pd.r,     'kind', 'neuron');
             panels(end+1) = struct('label', 'synaptic output', 'data', pd.br,    'kind', 'neuron');
-            if obj.n_a > 0 && isfield(pd, 'a') && ~isempty(pd.a)
+            if isfield(pd, 'a') && ~isempty(pd.a)
                 panels(end+1) = struct('label', 'SFA', 'data', reshape(sum(pd.a, 2), n, []), 'kind', 'neuron');  % sum over timescales
             end
             if obj.n_b > 0
@@ -652,6 +704,40 @@ classdef SRNNModelCellTypes < SRNNModelBase
             grid(ax, 'on'); axis(ax, 'equal'); hold(ax, 'off');
         end
 
+        function na = resolved_n_a(obj)
+            % RESOLVED_N_A Per-type SFA timescale counts (K x 1) from the public n_a knob:
+            % empty -> 1 per adapting type (adapt_index>=sfa_min_index); scalar -> broadcast
+            % (adapt-gated); length-K vector -> used verbatim.
+            type_adapts = (obj.adapt_index(:) >= obj.sfa_min_index);
+            if isempty(obj.n_a)
+                na = double(type_adapts);
+            elseif isscalar(obj.n_a)
+                na = obj.n_a * double(type_adapts);
+            else
+                na = obj.n_a(:);
+            end
+            na = max(round(na), 0);
+        end
+
+        function tau = resolve_tau_a(obj, T, na)
+            % RESOLVE_TAU_A Per-type SFA tau vector (1 x na): explicit tau_a_cell{T} if given;
+            % else single fitted tau_a_type(T) for count<=1; else logspaced over tau_a_range.
+            % (Mirrors SRNNModelHHEI.resolve_tau_a.)
+            if numel(obj.tau_a_cell) >= T && ~isempty(obj.tau_a_cell{T})
+                tau = obj.tau_a_cell{T}(:)';
+            elseif na <= 1
+                ta = obj.tau_a_type(T);
+                if isempty(ta) || isnan(ta)
+                    ts = obj.tau_a; if ~isscalar(ts), ts = ts(1); end
+                    ta = ts;
+                end
+                tau = ta;
+            else
+                tau = logspace(log10(obj.tau_a_range(1)), log10(obj.tau_a_range(2)), na);
+            end
+            tau = tau(:)';
+        end
+
         function assign_types(obj)
             % ASSIGN_TYPES Contiguous per-type blocks from type_fractions (each >= 1 neuron).
             K = obj.n_types; n = obj.n;
@@ -783,21 +869,22 @@ classdef SRNNModelCellTypes < SRNNModelBase
             % DYNAMICS_FAST_CT Per-neuron RHS with post-type-structured synaptic drive.
             u_ext = params.u_interpolant(t)';           % n x 1
             n = params.n; K = params.K;
-            n_a = params.n_a; n_b = params.n_b; n_u = params.n_u;
+            n_b = params.n_b; n_u = params.n_u;
             W = params.W; tau_d = params.tau_d; phi = params.activation_function;
             type_of = params.type_of;
-            n_ad = params.n_ad; ad_idx = params.ad_idx;
+            sfa = params.sfa;
 
-            % --- unpack ---  (SFA state is ragged: only adapting neurons carry a)
+            % --- unpack SFA (ragged per-type blocks) + accumulate intrinsic drive ---
             idx = 0;
-            len_a = n_ad * n_a;
-            if len_a > 0
-                a_ad = reshape(S(idx + (1:len_a)), n_ad, n_a);
-                a = zeros(n, n_a); a(ad_idx, :) = a_ad;    % scatter to full for x_eff
-            else
-                a_ad = []; a = [];
+            sfa_drive = zeros(n, 1);
+            a_blocks = cell(numel(sfa), 1);
+            for si = 1:numel(sfa)
+                bl = sfa(si);
+                a_block = reshape(S(bl.off + (1:bl.len)), bl.count, bl.n_a);
+                a_blocks{si} = a_block;
+                sfa_drive(bl.idx) = sfa_drive(bl.idx) + bl.c .* sum(a_block, 2);   % DC-split c
             end
-            idx = idx + len_a;
+            idx = idx + params.sfa_len;
             len_b = n * K * n_b;
             if len_b > 0, b = reshape(S(idx + (1:len_b)), n, K); else, b = []; end
             idx = idx + len_b;
@@ -806,9 +893,8 @@ classdef SRNNModelCellTypes < SRNNModelBase
             idx = idx + len_u;
             x = S(idx + (1:n));
 
-            % --- rates ---
-            x_eff = x;
-            if len_a > 0, x_eff = x_eff - params.c_vec .* sum(a, 2); end
+            % --- rates (intrinsic SFA subtracted; zero where no SFA) ---
+            x_eff = x - sfa_drive;
             r = phi(x_eff);                              % n x 1
 
             % --- per-edge synaptic gains (n x K) ---
@@ -827,8 +913,18 @@ classdef SRNNModelCellTypes < SRNNModelBase
             end
             dx = (-x + drive + u_ext) ./ tau_d;
 
-            % --- state ODEs ---  (da only for adapting neurons; per-neuron tau)
-            if len_a > 0, da = (r(ad_idx) - a_ad) ./ params.tau_a(ad_idx, :); else, da = []; end
+            % --- state ODEs --- (SFA: per-block leaky integrator toward r; ragged, distinct taus)
+            if isempty(sfa)
+                da = [];
+            else
+                da_parts = cell(numel(sfa), 1);
+                for si = 1:numel(sfa)
+                    bl = sfa(si);
+                    da_block = (r(bl.idx) - a_blocks{si}) ./ bl.tau;   % count x n_a (tau row-broadcast)
+                    da_parts{si} = da_block(:);
+                end
+                da = cat(1, da_parts{:});
+            end
             if len_b > 0
                 db = (1 - b_mat) ./ params.tau_b_rec_mat - (p_eff .* b_mat .* r) ./ params.tau_b_rel_mat;
             else
@@ -846,7 +942,7 @@ classdef SRNNModelCellTypes < SRNNModelBase
         function J = compute_Jacobian_fast_ct(S, params)
             % COMPUTE_JACOBIAN_FAST_CT Analytic Jacobian for dynamics_fast_ct.
             n = params.n; K = params.K;
-            n_a = params.n_a; n_b = params.n_b; n_u = params.n_u;
+            n_a = max([0; params.n_a(:)]); n_b = params.n_b; n_u = params.n_u;   % scalar (guarded to <=1)
             W = sparse(params.W); tau_d = params.tau_d;
             type_of = params.type_of;
             phi = params.activation_function; phip = params.activation_function_derivative;
@@ -990,17 +1086,20 @@ classdef SRNNModelCellTypes < SRNNModelBase
             % UNPACK_STATES_CT Reconstruct x,a,b,u,r,br as n x (K x) nt arrays.
             nt = size(S_out, 1);
             n = params.n; K = params.K;
-            n_a = params.n_a; n_b = params.n_b; n_u = params.n_u;
+            n_b = params.n_b; n_u = params.n_u;
+            sfa = params.sfa; n_a_max = max([0; params.n_a(:)]);
             idx = 0;
-            n_ad = params.n_ad; ad_idx = params.ad_idx;
-            len_a = n_ad * n_a;                        % ragged SFA state length (guard below)
-            if len_a > 0
-                a_ad = reshape(S_out(:, idx + (1:len_a))', n_ad, n_a, nt);
-                a = zeros(n, n_a, nt); a(ad_idx, :, :) = a_ad;   % scatter to full for plotting
+            if params.sfa_len > 0
+                a = zeros(n, n_a_max, nt);             % scatter ragged blocks into first n_a(T) cols
+                for si = 1:numel(sfa)
+                    bl = sfa(si);
+                    a_block = reshape(S_out(:, bl.off + (1:bl.len))', bl.count, bl.n_a, nt);
+                    a(bl.idx, 1:bl.n_a, :) = a_block;
+                end
             else
                 a = [];
             end
-            idx = idx + len_a;
+            idx = idx + params.sfa_len;
             len_b = n * K * n_b;
             if len_b > 0, b = reshape(S_out(:, idx + (1:len_b))', n, K, nt); else, b = ones(n, K, nt); end
             idx = idx + len_b;
@@ -1010,9 +1109,12 @@ classdef SRNNModelCellTypes < SRNNModelBase
             x = S_out(:, idx + (1:n))';                          % n x nt
 
             x_eff = x;
-            if len_a > 0
-                sa = reshape(sum(a, 2), n, nt);
-                x_eff = x_eff - params.c_vec .* sa;
+            if params.sfa_len > 0
+                for si = 1:numel(sfa)                            % DC-split c per block
+                    bl = sfa(si);
+                    sa = reshape(sum(a(bl.idx, 1:bl.n_a, :), 2), bl.count, nt);
+                    x_eff(bl.idx, :) = x_eff(bl.idx, :) - bl.c .* sa;
+                end
             end
             r = params.activation_function(x_eff);               % n x nt
             % synaptic output magnitude proxy: efficacy to each post-type times r
