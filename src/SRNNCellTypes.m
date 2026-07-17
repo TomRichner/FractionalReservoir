@@ -571,28 +571,47 @@ classdef SRNNCellTypes < handle
             panel = 0;
 
             panel = panel + 1; ax_handles(panel) = nexttile;
-            SRNNCellTypes.plot_named_series(p.t, p.u, obj.cell_type_names, 'External input');
+            SRNNCellTypes.plot_named_series( ...
+                p.t, p.u, obj.cell_type_names, 'External input', true);
             panel = panel + 1; ax_handles(panel) = nexttile;
-            SRNNCellTypes.plot_named_series(p.t, p.x, obj.cell_type_names, 'Dendritic state');
+            SRNNCellTypes.plot_named_series( ...
+                p.t, p.x, obj.cell_type_names, 'Dendritic state', false);
             panel = panel + 1; ax_handles(panel) = nexttile;
-            SRNNCellTypes.plot_named_series(p.t, p.r, obj.cell_type_names, 'Firing rate');
+            SRNNCellTypes.plot_named_series( ...
+                p.t, p.r, obj.cell_type_names, 'Firing rate', false);
             panel = panel + 1; ax_handles(panel) = nexttile;
-            SRNNCellTypes.plot_named_series(p.t, p.br, obj.cell_type_names, 'Synaptic output');
+            SRNNCellTypes.plot_named_series( ...
+                p.t, p.br, obj.cell_type_names, 'Synaptic output', false);
             if has_a
                 panel = panel + 1; ax_handles(panel) = nexttile;
                 a_collapsed = SRNNCellTypes.collapse_named(p.a, obj.cell_type_names, 'sum');
-                SRNNCellTypes.plot_named_series(p.t, a_collapsed, obj.cell_type_names, 'SFA (sum)');
+                SRNNCellTypes.plot_named_series( ...
+                    p.t, a_collapsed, obj.cell_type_names, 'SFA (sum)', false);
             end
             if has_b
                 panel = panel + 1; ax_handles(panel) = nexttile;
                 b_collapsed = SRNNCellTypes.collapse_named(p.b, obj.cell_type_names, 'prod');
-                SRNNCellTypes.plot_named_series(p.t, b_collapsed, obj.cell_type_names, 'STD (product)');
+                SRNNCellTypes.plot_named_series( ...
+                    p.t, b_collapsed, obj.cell_type_names, 'STD (product)', false);
             end
             if has_lya
                 panel = panel + 1; ax_handles(panel) = nexttile;
                 if isfield(obj.lya_results, 'local_lya')
-                    plot(obj.lya_results.t_lya, obj.lya_results.local_lya, 'k');
-                    ylabel('Local LLE');
+                    plot(obj.lya_results.t_lya, obj.lya_results.local_lya, ...
+                        'Color', lines(1));
+                    hold on;
+                    yline(0, '--k');
+                    ylabel('\lambda_1');
+                    xlim(range);
+                    if isfield(obj.lya_results, 'LLE')
+                        y_limits = ylim;
+                        text(range(2), y_limits(1) + 0.05 * diff(y_limits), ...
+                            ['$\lambda_1 = ' sprintf('%.2f', obj.lya_results.LLE) '$'], ...
+                            'HorizontalAlignment', 'right', ...
+                            'VerticalAlignment', 'bottom', ...
+                            'Interpreter', 'latex');
+                    end
+                    hold off;
                 elseif isfield(obj.lya_results, 'local_LE_spectrum_t')
                     plot(obj.lya_results.t_lya, obj.lya_results.local_LE_spectrum_t);
                     ylabel('Local LE');
@@ -601,6 +620,121 @@ classdef SRNNCellTypes < handle
             linkaxes(ax_handles, 'x');
             xlim(ax_handles(end), range);
             xlabel(ax_handles(end), 'Time (s)');
+        end
+
+        function [fig_handle, ax_handles] = plot_celltypes(obj, varargin)
+            %PLOT_CELLTYPES Plot each cell type in a separate subplot column.
+            %
+            % Rows match plot(): external input, dendritic state, firing rate,
+            % synaptic output, optional SFA and STD, and optional Lyapunov
+            % output. The network-level Lyapunov trace is repeated in every
+            % cell-type column to preserve the aligned grid.
+            %
+            % Usage:
+            %   model.plot_celltypes()
+            %   model.plot_celltypes('T_plot', [10 40])
+
+            if ~obj.has_run || isempty(obj.plot_data)
+                error('SRNNCellTypes:NotRun', ...
+                    'Run the model with store_decimated_state=true before plotting.');
+            end
+
+            range = obj.T_plot;
+            for k = 1:2:numel(varargin)
+                if strcmpi(varargin{k}, 'T_plot'), range = varargin{k + 1}; end
+            end
+            if isempty(range), range = obj.T_range; end
+
+            p = obj.plot_data;
+            has_a = any(obj.n_a > 0);
+            has_b = any(obj.n_b > 0);
+            has_lya = ~strcmpi(obj.lya_method, 'none') && ~isempty(obj.lya_results);
+
+            series = {p.u, p.x, p.r, p.br};
+            row_labels = {'External input', 'Dendritic state', ...
+                'Firing rate', 'Synaptic output'};
+            empty_labels = {'', '', '', ''};
+            if has_a
+                series{end + 1} = SRNNCellTypes.collapse_named( ...
+                    p.a, obj.cell_type_names, 'sum');
+                row_labels{end + 1} = 'SFA (sum)';
+                empty_labels{end + 1} = 'No SFA';
+            end
+            if has_b
+                series{end + 1} = SRNNCellTypes.collapse_named( ...
+                    p.b, obj.cell_type_names, 'prod');
+                row_labels{end + 1} = 'STD (product)';
+                empty_labels{end + 1} = 'No STD';
+            end
+
+            n_series_rows = numel(series);
+            n_rows = n_series_rows + has_lya;
+            C = obj.n_cellTypes;
+            colors = lines(C);
+            fig_handle = figure('Name', 'SRNNCellTypes by cell type');
+            layout = tiledlayout(fig_handle, n_rows, C, ...
+                'TileSpacing', 'compact', 'Padding', 'compact');
+            ax_handles = gobjects(n_rows, C);
+
+            for row = 1:n_series_rows
+                for q = 1:C
+                    tile_index = (row - 1) * C + q;
+                    ax = nexttile(layout, tile_index);
+                    ax_handles(row, q) = ax;
+                    name = obj.cell_type_names{q};
+                    values = series{row}.(name);
+
+                    % Inactive STD is stored as a constant-one readout. Show
+                    % it as disabled here rather than drawing redundant lines.
+                    if has_b && row == n_series_rows && obj.n_b(q) == 0
+                        values = [];
+                    end
+
+                    if isempty(values)
+                        text(ax, 0.5, 0.5, empty_labels{row}, ...
+                            'Units', 'normalized', ...
+                            'HorizontalAlignment', 'center', ...
+                            'VerticalAlignment', 'middle', ...
+                            'Color', [0.4 0.4 0.4]);
+                    else
+                        SRNNCellTypes.plot_celltype_lines( ...
+                            ax, p.t, values, colors(q, :));
+                    end
+                    if row == 1
+                        title(ax, name, 'Interpreter', 'none');
+                    end
+                    if q == 1
+                        ylabel(ax, row_labels{row});
+                    end
+                    if row < n_rows
+                        set(ax, 'XTickLabel', []);
+                    end
+                end
+            end
+
+            if has_lya
+                row = n_rows;
+                for q = 1:C
+                    tile_index = (row - 1) * C + q;
+                    ax = nexttile(layout, tile_index);
+                    ax_handles(row, q) = ax;
+                    if isfield(obj.lya_results, 'local_lya')
+                        plot(ax, obj.lya_results.t_lya, ...
+                            obj.lya_results.local_lya, 'k');
+                        if q == 1, ylabel(ax, 'Local LLE'); end
+                    elseif isfield(obj.lya_results, 'local_LE_spectrum_t')
+                        plot(ax, obj.lya_results.t_lya, ...
+                            obj.lya_results.local_LE_spectrum_t);
+                        if q == 1, ylabel(ax, 'Local LE'); end
+                    end
+                end
+            end
+
+            linkaxes(ax_handles(:), 'x');
+            xlim(ax_handles(1, 1), range);
+            for q = 1:C
+                xlabel(ax_handles(end, q), 'Time (s)');
+            end
         end
 
         function [fig_handle, ax_handles] = plot_eigenvalues(obj, times_sec)
@@ -986,24 +1120,44 @@ classdef SRNNCellTypes < handle
             end
         end
 
-        function plot_named_series(t, data, names, label)
+        function plot_named_series(t, data, names, label, show_legend)
+            if nargin < 5, show_legend = true; end
             colors = lines(numel(names));
             hold on;
             handles = gobjects(0); labels = {};
             for q = 1:numel(names)
                 values = data.(names{q});
                 if isempty(values), continue; end
-                n_show = min(8, size(values, 1));
-                rows = unique(round(linspace(1, size(values, 1), n_show)));
-                light = 0.45 .* colors(q, :) + 0.55;
-                plot(t, values(rows, :)', 'Color', light, 'HandleVisibility', 'off');
+                SRNNCellTypes.plot_celltype_lines( ...
+                    gca, t, values, colors(q, :));
                 handles(end + 1) = plot(nan, nan, '-', 'Color', colors(q, :), ...
                     'LineWidth', 1.5); %#ok<AGROW>
                 labels{end + 1} = names{q}; %#ok<AGROW>
             end
             hold off;
             ylabel(label);
-            if ~isempty(handles), legend(handles, labels, 'Location', 'best'); end
+            if show_legend && ~isempty(handles)
+                legend(handles, labels, 'Location', 'best');
+            end
+        end
+
+        function line_handles = plot_celltype_lines(ax, t, values, type_color)
+            %PLOT_CELLTYPE_LINES Blend cell-type and neuron-specific colors.
+            %
+            % The cell type supplies the dominant color while lines() adds a
+            % repeatable accent for each neuron. This keeps populations easy
+            % to identify while making overlapping neurons distinguishable.
+            n_neurons = size(values, 1);
+            neuron_accents = lines(n_neurons);
+            neuron_colors = 0.5 .* repmat(type_color, n_neurons, 1) ...
+                + 0.5 .* neuron_accents;
+
+            line_handles = plot(ax, t, values');
+            for neuron = 1:numel(line_handles)
+                set(line_handles(neuron), ...
+                    'Color', neuron_colors(neuron, :), ...
+                    'HandleVisibility', 'off');
+            end
         end
 
         function y = piecewiseSigmoid(x, a, c)
