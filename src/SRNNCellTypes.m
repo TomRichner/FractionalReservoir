@@ -2,11 +2,13 @@ classdef SRNNCellTypes < handle
     %SRNNCELLTYPES Stable recurrent nonlinear network with arbitrary cell types.
     %
     % Cell-type-specific parameters are ordered according to cell_type_names.
-    % Numeric vectors hold one scalar per type; tau_a and tau_b_rec are cell
-    % arrays because their per-type vectors may have different lengths.
+    % Numeric vectors hold one scalar per type; tau_a, tau_b_rec, and
+    % tau_g_dec are cell arrays because their per-type vectors may have
+    % different lengths.
     %
     % State ordering is timescale-major within each type:
-    %   S = [a{1}(:); ...; a{C}(:); b{1}(:); ...; b{C}(:); x(:)]
+    %   S = [a{1}(:); ...; a{C}(:); b{1}(:); ...; b{C}(:); ...
+    %        g{1}(:); ...; g{C}(:); x(:)]
     %
     % Example:
     %   model = SRNNCellTypes( ...
@@ -30,7 +32,7 @@ classdef SRNNCellTypes < handle
         rescale_by_abscissa = false
     end
 
-    %% Per-type SFA and STD
+    %% Per-type SFA, STD, and STF
     properties
         n_a
         tau_a
@@ -39,6 +41,10 @@ classdef SRNNCellTypes < handle
         tau_b_rec
         tau_b_rel
         std_zero_floor = false
+        n_g
+        tau_g_dec
+        tau_g_fac
+        G
     end
 
     %% Shared dynamics and simulation settings
@@ -155,10 +161,11 @@ classdef SRNNCellTypes < handle
         end
 
         function value = get.N_sys_eqs(obj)
-            if isempty(obj.n_a) || isempty(obj.n_b)
+            if isempty(obj.n_a) || isempty(obj.n_b) || isempty(obj.n_g)
                 value = obj.n;
             else
-                value = obj.n + sum(obj.n_per_type .* (obj.n_a + obj.n_b));
+                value = obj.n + sum(obj.n_per_type .* ...
+                    (obj.n_a + obj.n_b + obj.n_g));
             end
         end
 
@@ -278,13 +285,17 @@ classdef SRNNCellTypes < handle
             params.tau_b_rec = obj.tau_b_rec;
             params.tau_b_rel = obj.tau_b_rel;
             params.std_zero_floor = obj.std_zero_floor;
+            params.n_g = obj.n_g;
+            params.tau_g_dec = obj.tau_g_dec;
+            params.tau_g_fac = obj.tau_g_fac;
+            params.G = obj.G;
             params.tau_d = obj.tau_d;
             params.activation_function = obj.activation_function;
             params.activation_function_derivative = obj.activation_function_derivative;
             params.x0_std = obj.x0_std;
             params.N_sys_eqs = obj.N_sys_eqs;
             params.state_layout = SRNNCellTypes.make_state_layout( ...
-                obj.n, obj.n_per_type, obj.n_a, obj.n_b);
+                obj.n, obj.n_per_type, obj.n_a, obj.n_b, obj.n_g);
             params.rng_seeds = obj.rng_seeds;
             if ~isempty(obj.W)
                 params.W = obj.W;
@@ -346,17 +357,25 @@ classdef SRNNCellTypes < handle
             obj.sigma_tilde = reshape(obj.sigma_tilde, 1, []);
             if isempty(obj.n_a), obj.n_a = zeros(1, C); end
             if isempty(obj.n_b), obj.n_b = zeros(1, C); end
+            if isempty(obj.n_g), obj.n_g = zeros(1, C); end
             if isempty(obj.c), obj.c = repmat(0.15 / 3, 1, C); end
             if isempty(obj.tau_b_rel), obj.tau_b_rel = repmat(0.25, 1, C); end
+            if isempty(obj.tau_g_fac), obj.tau_g_fac = repmat(0.25, 1, C); end
+            if isempty(obj.G), obj.G = repmat(2, 1, C); end
             obj.n_a = reshape(obj.n_a, 1, []);
             obj.n_b = reshape(obj.n_b, 1, []);
+            obj.n_g = reshape(obj.n_g, 1, []);
             obj.c = reshape(obj.c, 1, []);
             obj.tau_b_rel = reshape(obj.tau_b_rel, 1, []);
+            obj.tau_g_fac = reshape(obj.tau_g_fac, 1, []);
+            obj.G = reshape(obj.G, 1, []);
 
             if isempty(obj.tau_a), obj.tau_a = cell(1, C); end
             if isempty(obj.tau_b_rec), obj.tau_b_rec = cell(1, C); end
+            if isempty(obj.tau_g_dec), obj.tau_g_dec = cell(1, C); end
             if iscell(obj.tau_a), obj.tau_a = reshape(obj.tau_a, 1, []); end
             if iscell(obj.tau_b_rec), obj.tau_b_rec = reshape(obj.tau_b_rec, 1, []); end
+            if iscell(obj.tau_g_dec), obj.tau_g_dec = reshape(obj.tau_g_dec, 1, []); end
             if iscell(obj.tau_a) && numel(obj.tau_a) == C
                 for q = 1:C
                     if obj.n_a(q) > 0 && isempty(obj.tau_a{q})
@@ -372,6 +391,15 @@ classdef SRNNCellTypes < handle
                         obj.tau_b_rec{q} = 1;
                     elseif ~isempty(obj.tau_b_rec{q})
                         obj.tau_b_rec{q} = reshape(obj.tau_b_rec{q}, 1, []);
+                    end
+                end
+            end
+            if iscell(obj.tau_g_dec) && numel(obj.tau_g_dec) == C
+                for q = 1:C
+                    if obj.n_g(q) == 1 && isempty(obj.tau_g_dec{q})
+                        obj.tau_g_dec{q} = 1;
+                    elseif ~isempty(obj.tau_g_dec{q})
+                        obj.tau_g_dec{q} = reshape(obj.tau_g_dec{q}, 1, []);
                     end
                 end
             end
@@ -417,7 +445,8 @@ classdef SRNNCellTypes < handle
                     'mu_tilde and sigma_tilde must have one valid value per type.');
             end
 
-            vector_fields = {'n_a', 'n_b', 'c', 'tau_b_rel'};
+            vector_fields = {'n_a', 'n_b', 'n_g', 'c', 'tau_b_rel', ...
+                'tau_g_fac', 'G'};
             for k = 1:numel(vector_fields)
                 name = vector_fields{k};
                 if ~isnumeric(obj.(name)) || numel(obj.(name)) ~= C || ...
@@ -427,18 +456,23 @@ classdef SRNNCellTypes < handle
                 end
             end
             if any(obj.n_a < 0 | obj.n_a ~= round(obj.n_a)) || ...
-                    any(obj.n_b < 0 | obj.n_b ~= round(obj.n_b))
+                    any(obj.n_b < 0 | obj.n_b ~= round(obj.n_b)) || ...
+                    any(obj.n_g < 0 | obj.n_g ~= round(obj.n_g))
                 error('SRNNCellTypes:InvalidParams', ...
-                    'n_a and n_b must contain nonnegative integers.');
+                    'n_a, n_b, and n_g must contain nonnegative integers.');
             end
-            if any(obj.c < 0) || any(obj.tau_b_rel <= 0)
+            if any(obj.c < 0) || any(obj.tau_b_rel <= 0) || ...
+                    any(obj.tau_g_fac <= 0) || any(obj.G < 1)
                 error('SRNNCellTypes:InvalidParams', ...
-                    'c must be nonnegative and tau_b_rel must be positive.');
+                    ['c must be nonnegative, tau_b_rel and tau_g_fac must ' ...
+                    'be positive, and G must be at least one.']);
             end
             if ~iscell(obj.tau_a) || numel(obj.tau_a) ~= C || ...
-                    ~iscell(obj.tau_b_rec) || numel(obj.tau_b_rec) ~= C
+                    ~iscell(obj.tau_b_rec) || numel(obj.tau_b_rec) ~= C || ...
+                    ~iscell(obj.tau_g_dec) || numel(obj.tau_g_dec) ~= C
                 error('SRNNCellTypes:InvalidParams', ...
-                    'tau_a and tau_b_rec must be 1-by-n_cellTypes cell arrays.');
+                    ['tau_a, tau_b_rec, and tau_g_dec must be ' ...
+                    '1-by-n_cellTypes cell arrays.']);
             end
             for q = 1:C
                 if numel(obj.tau_a{q}) ~= obj.n_a(q) || ...
@@ -450,6 +484,11 @@ classdef SRNNCellTypes < handle
                         any(~isfinite(obj.tau_b_rec{q})) || any(obj.tau_b_rec{q} <= 0)
                     error('SRNNCellTypes:InvalidParams', ...
                         'tau_b_rec{%d} must contain n_b(%d) positive values.', q, q);
+                end
+                if numel(obj.tau_g_dec{q}) ~= obj.n_g(q) || ...
+                        any(~isfinite(obj.tau_g_dec{q})) || any(obj.tau_g_dec{q} <= 0)
+                    error('SRNNCellTypes:InvalidParams', ...
+                        'tau_g_dec{%d} must contain n_g(%d) positive values.', q, q);
                 end
             end
             if obj.T_range(2) <= obj.T_range(1) || obj.fs <= 0 || obj.tau_d <= 0
@@ -529,7 +568,7 @@ classdef SRNNCellTypes < handle
             sample_indices = 1:obj.plot_deci:numel(obj.t_out);
             t_plot = obj.t_out(sample_indices);
             S_plot = obj.S_out(sample_indices, :);
-            [x, a, b, r, br] = SRNNCellTypes.unpack_and_compute_states( ...
+            [x, a, b, r, br, g] = SRNNCellTypes.unpack_and_compute_states( ...
                 S_plot, obj.cached_params);
             u = SRNNCellTypes.split_by_type( ...
                 obj.u_ex(:, sample_indices), obj.cached_params, 1);
@@ -543,6 +582,7 @@ classdef SRNNCellTypes < handle
                 'r', SRNNCellTypes.trim_named(r, 2, keep), ...
                 'a', SRNNCellTypes.trim_named(a, 3, keep), ...
                 'b', SRNNCellTypes.trim_named(b, 3, keep), ...
+                'g', SRNNCellTypes.trim_named(g, 3, keep), ...
                 'br', SRNNCellTypes.trim_named(br, 2, keep));
         end
     end
@@ -563,8 +603,9 @@ classdef SRNNCellTypes < handle
             p = obj.plot_data;
             has_a = any(obj.n_a > 0);
             has_b = any(obj.n_b > 0);
+            has_g = any(obj.n_g > 0);
             has_lya = ~strcmpi(obj.lya_method, 'none') && ~isempty(obj.lya_results);
-            n_panels = 4 + has_a + has_b + has_lya;
+            n_panels = 4 + has_a + has_b + has_g + has_lya;
             fig_handle = figure('Name', 'SRNNCellTypes time series');
             tiledlayout(n_panels, 1);
             ax_handles = gobjects(n_panels, 1);
@@ -593,6 +634,12 @@ classdef SRNNCellTypes < handle
                 b_collapsed = SRNNCellTypes.collapse_named(p.b, obj.cell_type_names, 'prod');
                 SRNNCellTypes.plot_named_series( ...
                     p.t, b_collapsed, obj.cell_type_names, 'STD (product)', false);
+            end
+            if has_g
+                panel = panel + 1; ax_handles(panel) = nexttile;
+                g_collapsed = SRNNCellTypes.collapse_named(p.g, obj.cell_type_names, 'prod');
+                SRNNCellTypes.plot_named_series( ...
+                    p.t, g_collapsed, obj.cell_type_names, 'STF (product)', false);
             end
             if has_lya
                 panel = panel + 1; ax_handles(panel) = nexttile;
@@ -626,7 +673,7 @@ classdef SRNNCellTypes < handle
             %PLOT_CELLTYPES Plot each cell type in a separate subplot column.
             %
             % Rows match plot(): external input, dendritic state, firing rate,
-            % synaptic output, optional SFA and STD, and optional Lyapunov
+            % synaptic output, optional SFA, STD, and STF, and optional Lyapunov
             % output. The network-level Lyapunov trace is repeated in every
             % cell-type column to preserve the aligned grid.
             %
@@ -648,12 +695,15 @@ classdef SRNNCellTypes < handle
             p = obj.plot_data;
             has_a = any(obj.n_a > 0);
             has_b = any(obj.n_b > 0);
+            has_g = any(obj.n_g > 0);
             has_lya = ~strcmpi(obj.lya_method, 'none') && ~isempty(obj.lya_results);
 
             series = {p.u, p.x, p.r, p.br};
             row_labels = {'External input', 'Dendritic state', ...
                 'Firing rate', 'Synaptic output'};
             empty_labels = {'', '', '', ''};
+            b_row = [];
+            g_row = [];
             if has_a
                 series{end + 1} = SRNNCellTypes.collapse_named( ...
                     p.a, obj.cell_type_names, 'sum');
@@ -663,8 +713,16 @@ classdef SRNNCellTypes < handle
             if has_b
                 series{end + 1} = SRNNCellTypes.collapse_named( ...
                     p.b, obj.cell_type_names, 'prod');
+                b_row = numel(series);
                 row_labels{end + 1} = 'STD (product)';
                 empty_labels{end + 1} = 'No STD';
+            end
+            if has_g
+                series{end + 1} = SRNNCellTypes.collapse_named( ...
+                    p.g, obj.cell_type_names, 'prod');
+                g_row = numel(series);
+                row_labels{end + 1} = 'STF (product)';
+                empty_labels{end + 1} = 'No STF';
             end
 
             n_series_rows = numel(series);
@@ -684,9 +742,11 @@ classdef SRNNCellTypes < handle
                     name = obj.cell_type_names{q};
                     values = series{row}.(name);
 
-                    % Inactive STD is stored as a constant-one readout. Show
-                    % it as disabled here rather than drawing redundant lines.
-                    if has_b && row == n_series_rows && obj.n_b(q) == 0
+                    % Inactive synaptic mechanisms are stored as constant-one
+                    % readouts. Show them as disabled instead of plotting them.
+                    inactive_b = ~isempty(b_row) && row == b_row && obj.n_b(q) == 0;
+                    inactive_g = ~isempty(g_row) && row == g_row && obj.n_g(q) == 0;
+                    if inactive_b || inactive_g
                         values = [];
                     end
 
@@ -804,9 +864,11 @@ classdef SRNNCellTypes < handle
 
     %% State layout, dynamics, and Jacobian
     methods (Static)
-        function layout = make_state_layout(n, counts, n_a, n_b)
+        function layout = make_state_layout(n, counts, n_a, n_b, n_g)
+            if nargin < 5, n_g = zeros(size(counts)); end
             C = numel(counts);
-            layout = struct('a', {cell(1, C)}, 'b', {cell(1, C)}, 'x', []);
+            layout = struct('a', {cell(1, C)}, 'b', {cell(1, C)}, ...
+                'g', {cell(1, C)}, 'x', []);
             cursor = 0;
             for q = 1:C
                 len = counts(q) * n_a(q);
@@ -818,16 +880,23 @@ classdef SRNNCellTypes < handle
                 layout.b{q} = cursor + (1:len);
                 cursor = cursor + len;
             end
+            for q = 1:C
+                len = counts(q) * n_g(q);
+                layout.g{q} = cursor + (1:len);
+                cursor = cursor + len;
+            end
             layout.x = cursor + (1:n);
             layout.N = cursor + n;
         end
 
         function S0 = initialize_state(params)
-            parts = cell(1, 2 * params.n_cellTypes + 1);
+            parts = cell(1, 3 * params.n_cellTypes + 1);
             for q = 1:params.n_cellTypes
                 parts{q} = zeros(params.n_per_type(q) * params.n_a(q), 1);
                 parts{params.n_cellTypes + q} = ...
                     ones(params.n_per_type(q) * params.n_b(q), 1);
+                parts{2 * params.n_cellTypes + q} = ...
+                    ones(params.n_per_type(q) * params.n_g(q), 1);
             end
             parts{end} = params.x0_std .* randn(params.n, 1);
             S0 = vertcat(parts{:});
@@ -878,10 +947,11 @@ classdef SRNNCellTypes < handle
             u = params.u_interpolant(t)';
             C = params.n_cellTypes;
             layout = params.state_layout;
-            a = cell(1, C); b_state = cell(1, C);
+            a = cell(1, C); b_state = cell(1, C); g_state = cell(1, C);
             x = S(layout.x);
             x_eff = x;
             depression = ones(params.n, 1);
+            facilitation = ones(params.n, 1);
 
             for q = 1:C
                 idx = params.type_indices{q};
@@ -898,11 +968,17 @@ classdef SRNNCellTypes < handle
                 else
                     b_state{q} = ones(nq, 0);
                 end
+                if params.n_g(q) > 0
+                    g_state{q} = reshape(S(layout.g{q}), nq, params.n_g(q));
+                    facilitation(idx) = prod(g_state{q}, 2);
+                else
+                    g_state{q} = ones(nq, 0);
+                end
             end
 
             rate = params.activation_function(x_eff);
             depression_syn = SRNNCellTypes.apply_std_zero_floor(depression, params);
-            derivatives = cell(1, 2 * C + 1);
+            derivatives = cell(1, 3 * C + 1);
             for q = 1:C
                 idx = params.type_indices{q};
                 if params.n_a(q) > 0
@@ -916,10 +992,19 @@ classdef SRNNCellTypes < handle
                 else
                     derivatives{C + q} = [];
                 end
+                if params.n_g(q) > 0
+                    derivatives{2 * C + q} = ...
+                        (1 - g_state{q}) ./ params.tau_g_dec{q} ...
+                        + ((params.G(q) - g_state{q}) .* rate(idx)) ...
+                        ./ params.tau_g_fac(q);
+                else
+                    derivatives{2 * C + q} = [];
+                end
             end
-            derivatives{end} = (-x + params.W * (depression_syn .* rate) + u) ...
+            derivatives{end} = (-x + params.W * ...
+                (facilitation .* depression_syn .* rate) + u) ...
                 ./ params.tau_d;
-            for k = 1:2*C
+            for k = 1:3*C
                 derivatives{k} = derivatives{k}(:);
             end
             dS = vertcat(derivatives{:});
@@ -941,11 +1026,12 @@ classdef SRNNCellTypes < handle
             C = params.n_cellTypes;
             layout = params.state_layout;
             n = params.n;
-            a = cell(1, C); b_state = cell(1, C);
-            P = cell(1, C);
+            a = cell(1, C); b_state = cell(1, C); g_state = cell(1, C);
+            P = cell(1, C); Q = cell(1, C);
             x = S(layout.x);
             x_eff = x;
             depression = ones(n, 1);
+            facilitation = ones(n, 1);
 
             for q = 1:C
                 idx = params.type_indices{q}; nq = params.n_per_type(q);
@@ -962,18 +1048,26 @@ classdef SRNNCellTypes < handle
                 else
                     b_state{q} = ones(nq, 0); P{q} = ones(nq, 1);
                 end
+                if params.n_g(q) > 0
+                    g_state{q} = reshape(S(layout.g{q}), nq, params.n_g(q));
+                    Q{q} = prod(g_state{q}, 2);
+                    facilitation(idx) = Q{q};
+                else
+                    g_state{q} = ones(nq, 0); Q{q} = ones(nq, 1);
+                end
             end
 
             rate = params.activation_function(x_eff);
             rate_prime = params.activation_function_derivative(x_eff);
             depression_syn = SRNNCellTypes.apply_std_zero_floor(depression, params);
+            synaptic_modulation = facilitation .* depression_syn;
             J = sparse(layout.N, layout.N);
             row_x = layout.x;
 
             for q = 1:C
                 idx = params.type_indices{q}; nq = params.n_per_type(q);
-                na = params.n_a(q); nb = params.n_b(q);
-                row_a = layout.a{q}; row_b = layout.b{q};
+                na = params.n_a(q); nb = params.n_b(q); ng = params.n_g(q);
+                row_a = layout.a{q}; row_b = layout.b{q}; row_g = layout.g{q};
 
                 if na > 0
                     tau_inv = 1 ./ params.tau_a{q}(:);
@@ -1004,10 +1098,27 @@ classdef SRNNCellTypes < handle
                         repmat(idx(:), nb, 1), vals, numel(row_b), n);
                 end
 
+                if ng > 0
+                    if na > 0
+                        coeff = -(params.G(q) - g_state{q}) .* ...
+                            (params.c(q) .* rate_prime(idx) ./ params.tau_g_fac(q));
+                        stack = sparse(1:numel(row_g), repmat((1:nq)', ng, 1), ...
+                            coeff(:), numel(row_g), nq);
+                        J(row_g, row_a) = kron(sparse(ones(1, na)), stack);
+                    end
+                    diagonal = kron(-1 ./ params.tau_g_dec{q}(:), ones(nq, 1)) ...
+                        + repmat(-rate(idx) ./ params.tau_g_fac(q), ng, 1);
+                    J(row_g, row_g) = spdiags(diagonal, 0, numel(row_g), numel(row_g));
+                    vals = ((params.G(q) - g_state{q}(:)) .* ...
+                        repmat(rate_prime(idx), ng, 1)) ./ params.tau_g_fac(q);
+                    J(row_g, row_x) = sparse(1:numel(row_g), ...
+                        repmat(idx(:), ng, 1), vals, numel(row_g), n);
+                end
+
                 if na > 0
                     replicate = kron(ones(1, na), speye(nq));
                     block = -params.c(q) .* params.W(:, idx) * spdiags( ...
-                        depression_syn(idx) .* rate_prime(idx), 0, nq, nq);
+                        synaptic_modulation(idx) .* rate_prime(idx), 0, nq, nq);
                     J(row_x, row_a) = (block * replicate) ./ params.tau_d;
                 end
                 if nb > 0
@@ -1026,15 +1137,30 @@ classdef SRNNCellTypes < handle
                             (params.tau_b_rec{q} + params.tau_b_rel(q)));
                         gain = 1 / (1 - p_min);
                     end
-                    coeff = gain .* rate(idx) .* product_derivative;
+                    coeff = gain .* facilitation(idx) .* rate(idx) .* product_derivative;
                     D = sparse(repmat((1:nq)', nb, 1), 1:numel(row_b), ...
                         coeff(:), nq, numel(row_b));
                     J(row_x, row_b) = (params.W(:, idx) * D) ./ params.tau_d;
                 end
+                if ng > 0
+                    product_derivative = zeros(nq, ng);
+                    for k = 1:ng
+                        other = [1:k-1, k+1:ng];
+                        if isempty(other)
+                            product_derivative(:, k) = 1;
+                        else
+                            product_derivative(:, k) = prod(g_state{q}(:, other), 2);
+                        end
+                    end
+                    coeff = depression_syn(idx) .* rate(idx) .* product_derivative;
+                    D = sparse(repmat((1:nq)', ng, 1), 1:numel(row_g), ...
+                        coeff(:), nq, numel(row_g));
+                    J(row_x, row_g) = (params.W(:, idx) * D) ./ params.tau_d;
+                end
             end
 
             J(row_x, row_x) = spdiags(-ones(n, 1) ./ params.tau_d, 0, n, n) ...
-                + params.W * spdiags(depression_syn .* rate_prime, 0, n, n) ...
+                + params.W * spdiags(synaptic_modulation .* rate_prime, 0, n, n) ...
                 ./ params.tau_d;
         end
 
@@ -1049,14 +1175,15 @@ classdef SRNNCellTypes < handle
 
     %% State conversion and plotting helpers
     methods (Static)
-        function [x_named, a_named, b_named, r_named, br_named] = ...
+        function [x_named, a_named, b_named, r_named, br_named, g_named] = ...
                 unpack_and_compute_states(S_out, params)
             nt = size(S_out, 1);
             layout = params.state_layout;
             x_all = S_out(:, layout.x)';
             x_eff = x_all;
             depression = ones(params.n, nt);
-            a_named = struct(); b_named = struct();
+            facilitation = ones(params.n, nt);
+            a_named = struct(); b_named = struct(); g_named = struct();
 
             for q = 1:params.n_cellTypes
                 name = params.cell_type_names{q};
@@ -1077,9 +1204,17 @@ classdef SRNNCellTypes < handle
                 else
                     b_named.(name) = ones(nq, 1, nt);
                 end
+                if params.n_g(q) > 0
+                    gq = reshape(S_out(:, layout.g{q})', nq, params.n_g(q), nt);
+                    facilitation(idx, :) = reshape(prod(gq, 2), nq, nt);
+                    g_named.(name) = gq;
+                else
+                    g_named.(name) = ones(nq, 1, nt);
+                end
             end
             rate = params.activation_function(x_eff);
-            br = SRNNCellTypes.apply_std_zero_floor(depression, params) .* rate;
+            br = facilitation .* ...
+                SRNNCellTypes.apply_std_zero_floor(depression, params) .* rate;
             x_named = SRNNCellTypes.split_by_type(x_all, params, 1);
             r_named = SRNNCellTypes.split_by_type(rate, params, 1);
             br_named = SRNNCellTypes.split_by_type(br, params, 1);

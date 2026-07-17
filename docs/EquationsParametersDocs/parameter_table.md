@@ -5,7 +5,7 @@ This document describes the equations, state variables, derived quantities, and 
 ## System Equations
 
 $$
-\frac{dx_i}{dt} = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \left(\prod_{m=1}^{M} b_{jm}\right) r_{j}}{\tau_d}
+\frac{dx_i}{dt} = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \left(\prod_{n=1}^{n_f} g_{jn}\right)\left(\prod_{m=1}^{M} b_{jm}\right) r_{j}}{\tau_d}
 $$
 
 $$
@@ -13,11 +13,15 @@ r_i = \phi\left( x_i - a_{0_i} - c \sum_{k=1}^{K} a_{ik} \right)
 $$
 
 $$
-\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}
+\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K
 $$
 
 $$
 \frac{db_{im}}{dt} = \frac{1-b_{im}}{\tau_{rec_m}} - \frac{b_{im}\, r_i}{\tau_{rel}}, \qquad m = 1, \dots, M
+$$
+
+$$
+\frac{dg_{in}}{dt} = \frac{1-g_{in}}{\tau_{dec_n}} + \frac{(G - g_{in})\, r_i}{\tau_{fac}}, \qquad n = 1, \dots, n_f
 $$
 
 ---
@@ -26,6 +30,7 @@ $$
 - **SRNN**: Stable Recurrent Nonlinear Network
 - **SFA**: Spike frequency adaptation
 - **STD**: Short-term synaptic depression
+- **STF**: Short-term synaptic facilitation
 
 ## Table 1: Model Parameters
 
