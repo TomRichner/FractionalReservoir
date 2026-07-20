@@ -80,7 +80,27 @@ set(groot, 'DefaultFigureVisible', 'off');
 visibility_cleanup = onCleanup(@() set(groot, ...
     'DefaultFigureVisible', old_visibility));
 [figure_handle, ~] = model.plot(); close(figure_handle);
-[figure_handle, ~] = model.plot_celltypes(); close(figure_handle);
+[figure_handle, celltype_axes] = model.plot_celltypes();
+synaptic_PV_lines = findall(celltype_axes(4, 1), ...
+    'Type', 'line', 'Tag', 'PostType_PV');
+std_E_lines = findall(celltype_axes(6, 1), ...
+    'Type', 'line', 'Tag', 'PostType_E');
+std_SST_lines = findall(celltype_axes(6, 1), ...
+    'Type', 'line', 'Tag', 'PostType_SST');
+stf_PV_lines = findall(celltype_axes(7, 1), ...
+    'Type', 'line', 'Tag', 'PostType_PV');
+assert(numel(synaptic_PV_lines) == model.n_per_type(1));
+assert(numel(std_E_lines) == model.n_per_type(1));
+assert(numel(std_SST_lines) == model.n_per_type(1));
+assert(numel(stf_PV_lines) == model.n_per_type(1));
+std_E_colors = vertcat(std_E_lines.Color);
+assert(size(unique(round(std_E_colors, 8), 'rows'), 1) > 1);
+post_colors = lines(model.n_cellTypes);
+expected_E_colors = 0.5 .* repmat(post_colors(1, :), ...
+    model.n_per_type(1), 1) + 0.5 .* lines(model.n_per_type(1));
+assert(max(abs(sortrows(std_E_colors) - sortrows(expected_E_colors)), ...
+    [], 'all') < 1e-12);
+close(figure_handle);
 
 %% Uniform routes reproduce SRNNCellTypes recurrent dynamics
 [old_model, pair_model] = make_parity_models();

@@ -787,7 +787,7 @@ classdef SRNNCellTypePairs < handle
                 row = row + 1;
                 ax = nexttile(layout, (row - 1) * C + q);
                 ax_handles(row, q) = ax;
-                SRNNCellTypePairs.plot_target_routes( ...
+                SRNNCellTypePairs.plot_postsynaptic_route_lines( ...
                     ax, p.t, p.synaptic_output.(name), obj.cell_type_names);
                 if q == 1, ylabel(ax, 'Synaptic output'); end
                 if has_a
@@ -807,7 +807,7 @@ classdef SRNNCellTypePairs < handle
                     row = row + 1;
                     ax = nexttile(layout, (row - 1) * C + q);
                     ax_handles(row, q) = ax;
-                    SRNNCellTypePairs.plot_target_routes( ...
+                    SRNNCellTypePairs.plot_postsynaptic_route_lines( ...
                         ax, p.t, b_collapsed.(name), obj.cell_type_names);
                     if q == 1, ylabel(ax, 'STD (product)'); end
                 end
@@ -815,7 +815,7 @@ classdef SRNNCellTypePairs < handle
                     row = row + 1;
                     ax = nexttile(layout, (row - 1) * C + q);
                     ax_handles(row, q) = ax;
-                    SRNNCellTypePairs.plot_target_routes( ...
+                    SRNNCellTypePairs.plot_postsynaptic_route_lines( ...
                         ax, p.t, g_collapsed.(name), obj.cell_type_names);
                     if q == 1, ylabel(ax, 'STF (product)'); end
                 end
@@ -1528,7 +1528,8 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
-        function plot_target_routes(ax, t, routes, post_names)
+        function plot_postsynaptic_route_lines(ax, t, routes, post_names)
+            % Plot every presynaptic-neuron trace, colored by target type.
             colors = lines(numel(post_names));
             handles = gobjects(0); labels = {};
             hold(ax, 'on');
@@ -1536,8 +1537,11 @@ classdef SRNNCellTypePairs < handle
                 name = post_names{post};
                 values = routes.(name);
                 if isempty(values), continue; end
-                handles(end + 1) = plot(ax, t, mean(values, 1), ...
-                    'Color', colors(post, :)); %#ok<AGROW>
+                route_lines = SRNNCellTypePairs.plot_celltype_lines( ...
+                    ax, t, values, colors(post, :));
+                set(route_lines, 'Tag', ['PostType_' name]);
+                handles(end + 1) = plot(ax, nan, nan, '-', ...
+                    'Color', colors(post, :), 'LineWidth', 1.5); %#ok<AGROW>
                 labels{end + 1} = name; %#ok<AGROW>
             end
             hold(ax, 'off');
