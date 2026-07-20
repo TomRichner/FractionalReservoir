@@ -40,10 +40,7 @@ if ~exist('save_figs', 'var')
 end
 
 %% STD zero-floor configuration
-% Honor the master override from run_all_analyses; default off when standalone.
-if exist('master_std_zero_floor', 'var')
-    std_zero_floor = master_std_zero_floor;
-end
+% Matches the SRNNModel2 default (off) unless set in the base workspace.
 if ~exist('std_zero_floor', 'var')
     std_zero_floor = false;
 end
@@ -127,10 +124,9 @@ fprintf('[run_dc_lle_analysis] output_dir = %s\n', output_dir);
 
 %% Run the seed sweep (parfor over seeds)
 seed_results = cell(n_seeds, 1);
-% Per-run seed offset (from run_all_analyses; 0 when standalone) so repeated runs
-% draw independent networks that combine_runs can pool. `seeds` records the
-% actual RNG seeds used (offset + 1:n_seeds).
-if exist('master_seed_offset', 'var'); seed_offset = master_seed_offset; else; seed_offset = 0; end
+% Deterministic network seeds (offset 0) so every run draws the same networks.
+% `seeds` records the actual RNG seeds used (offset + 1:n_seeds).
+seed_offset = 0;
 seeds = seed_offset + (1:n_seeds);
 
 run_start = tic;

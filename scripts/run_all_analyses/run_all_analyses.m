@@ -32,31 +32,11 @@ fprintf('Master output directory: %s\n\n', master_output_dir);
 % Capture git provenance so the run can be retraced later
 prov = capture_git_provenance(master_output_dir, project_root);
 
-% Per-run seed offset so repeated runs of the SAME config draw independent
-% networks (poolable via combine_runs). run_index persists across runs within a
-% MATLAB session (this script never clears the workspace), like the rng_seeds
-% block in run_sensitivity_multi_std.m. Stride 1e6 >> any per-run seed span
-% (production max config_idx*100 ~ 125000), so runs never reuse seeds.
-if exist('run_index', 'var'); run_index = run_index + 1; else; run_index = 0; end
-master_seed_offset = run_index * 1e6;
-fprintf('Run index: %d (network_seed_offset = %g)\n\n', run_index, master_seed_offset);
-
 % Control figure saving across all sub-scripts:
 %   'save_all_figs'            - Override all scripts to save figures
 %   'save_no_figs'             - Override all scripts to NOT save figures
 %   'follow_scripts_save_figs' - Let each script use its own save_figs setting
 master_save_figs = 'save_all_figs';
-
-% Rescale STD so the synaptic output b*r reaches 0 at full depression
-% (see SRNNModel2.std_zero_floor). When set, all four sub-analyses run with
-% the zero-floor; false reproduces the current (pre-floor) behavior.
-master_std_zero_floor = true;
-
-% SFA strength (c_E) for E neurons across the sub-analyses. Raised from the
-% SRNNModel2 default (0.15/3) to 0.5/3 to make spike-frequency adaptation
-% stronger (matches the dialed-in memory-capacity run). Honored by the tau /
-% sensitivity / param-space sub-scripts; run_dc_lle_analysis keeps its own c_E.
-master_c_E = 0.5/3;
 
 % Run mode for the sub-analyses (controls n_levels / n_reps, fs, T_range, and
 % the LLE window):
@@ -69,19 +49,15 @@ if ~exist('run_mode', 'var'); run_mode = 'medium'; end
 fprintf('Run mode: %s\n\n', run_mode);
 
 % Machine-readable run manifest for reproducibility + self-documentation, and
-% so combine_runs can (a) confirm pooled runs used DISTINCT seed offsets and
-% (b) verify they used the SAME nonlinearity. We fingerprint the CLASS-DEFAULT
-% activation via a throwaway SRNNModel2 (constructor sets it in set_defaults;
-% no build needed) -- the run_all sub-scripts all use that default and never
-% override activation in model_defaults, so it is not otherwise recorded.
+% so combine_runs can verify pooled runs used the SAME nonlinearity. We
+% fingerprint the CLASS-DEFAULT activation via a throwaway SRNNModel2
+% (constructor sets it in set_defaults; no build needed) -- the run_all
+% sub-scripts all use that default and never override model parameters in
+% model_defaults, so it is not otherwise recorded.
 m0 = SRNNModel2();
 run_manifest = struct( ...
     'run_mode', run_mode, ...
-    'master_std_zero_floor', master_std_zero_floor, ...
-    'master_c_E', master_c_E, ...
     'master_save_figs', master_save_figs, ...
-    'master_seed_offset', master_seed_offset, ...
-    'run_index', run_index, ...
     'activation', func2str(m0.activation_function), ...
     'activation_derivative', func2str(m0.activation_function_derivative), ...
     'S_a', m0.S_a, ...

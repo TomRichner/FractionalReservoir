@@ -25,24 +25,6 @@ if ~exist('save_figs', 'var')
     save_figs = false;
 end
 
-%% STD zero-floor configuration
-% Honor the master override from run_all_analyses; default off when standalone.
-if exist('master_std_zero_floor', 'var')
-    std_zero_floor = master_std_zero_floor;
-end
-if ~exist('std_zero_floor', 'var')
-    std_zero_floor = false;
-end
-
-%% SFA strength (c_E) configuration
-% Honor the master override from run_all_analyses; default to the class default.
-if exist('master_c_E', 'var')
-    c_E = master_c_E;
-end
-if ~exist('c_E', 'var')
-    c_E = 0.15/3;   % SRNNModel2 default
-end
-
 %% Setup paths
 setup_paths();
 
@@ -96,12 +78,7 @@ psa_tau_a.folder_prefix = 'tau_sensitivity';
 if exist('master_output_dir', 'var')
     psa_tau_a.output_dir = master_output_dir;
 end
-if exist('master_seed_offset', 'var')
-    psa_tau_a.network_seed_offset = master_seed_offset;  % fresh networks per run (pooling)
-end
 psa_tau_a.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
-psa_tau_a.model_defaults.std_zero_floor = std_zero_floor;
-psa_tau_a.model_defaults.c_E = c_E;                     % SFA strength (run_all: 0.5/3)
 psa_tau_a.model_defaults.fs = fs_mode;                  % fast=200 (default 400)
 psa_tau_a.model_defaults.T_range = T_range_mode;        % fast=[0,20] (default [0,50])
 if ~isempty(lya_T_interval_mode)
@@ -156,12 +133,7 @@ psa_tau_b.folder_prefix = 'tau_sensitivity';
 if exist('master_output_dir', 'var')
     psa_tau_b.output_dir = master_output_dir;
 end
-if exist('master_seed_offset', 'var')
-    psa_tau_b.network_seed_offset = master_seed_offset;  % fresh networks per run (pooling)
-end
 psa_tau_b.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
-psa_tau_b.model_defaults.std_zero_floor = std_zero_floor;
-psa_tau_b.model_defaults.c_E = c_E;                     % SFA strength (run_all: 0.5/3)
 psa_tau_b.model_defaults.fs = fs_mode;                  % fast=200 (default 400)
 psa_tau_b.model_defaults.T_range = T_range_mode;        % fast=[0,20] (default [0,50])
 if ~isempty(lya_T_interval_mode)

@@ -69,7 +69,7 @@ classdef SRNNModel2 < handle
         activation_function         % Activation function handle
         activation_function_derivative  % Derivative of activation function
         S_a = 0.9                   % Activation function parameter a
-        S_c = 0.35                  % Activation function parameter c (center)
+        S_c = 0.4                   % Activation function parameter c (center)
     end
 
     %% Simulation Settings Properties
@@ -829,12 +829,13 @@ classdef SRNNModel2 < handle
         function set_defaults(obj)
             % SET_DEFAULTS Initialize all properties to default values
 
-            % Set default activation function (logisticSigmoid, centered at S_c).
-            % Smooth sigmoid with unit slope at its center; S_c biases the resting
-            % operating point onto the lower part of the curve (see logisticSigmoid).
-            % S_a is retained for the piecewise static method but unused here.
-            obj.activation_function = @(x) SRNNModel2.logisticSigmoid(x, obj.S_c);
-            obj.activation_function_derivative = @(x) SRNNModel2.logisticSigmoidDerivative(x, obj.S_c);
+            % Set default activation function (piecewiseSigmoid, parameters S_a, S_c).
+            % Piecewise sigmoid with unit slope at its center; S_a controls the width
+            % of the linear region and S_c is the center (see piecewiseSigmoid).
+            % The logisticSigmoid / tanhActivation static methods remain available as
+            % alternative activations but are not the default.
+            obj.activation_function = @(x) SRNNModel2.piecewiseSigmoid(x, obj.S_a, obj.S_c);
+            obj.activation_function_derivative = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, obj.S_a, obj.S_c);
 
             % Set default input configuration
             obj.input_config = struct();
