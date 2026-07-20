@@ -11,7 +11,7 @@ addpath(fileparts(fileparts(mfilename('fullpath'))));
 setup_paths();
 
 %% Match SRNNModel2 connectivity defaults
-n = 300;
+n = 400;
 indegree = 100;
 alpha = indegree / n;
 F = 1 / sqrt(n * alpha * (2 - alpha));
