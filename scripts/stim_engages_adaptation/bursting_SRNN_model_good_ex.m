@@ -181,7 +181,7 @@ store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 % Figure saving: when true, save all open figures (time-series + PSD) to data/
 % via save_some_figs_to_folder_2 (writes .fig/.png/.pdf). Each run goes to a
 % timestamped subfolder so nothing is overwritten.
-save_figs  = true;        % set true to save figures for sharing
+save_figs  = false;        % set true to save figures for sharing
 save_types = {'fig', 'png', 'svg', 'pdf'};   % formats; pdf bundles all figs into one _report.pdf
 
 %% ======================================================================
@@ -281,64 +281,12 @@ legend(labels, 'Location', 'southwest');
 grid on;
 
 %% ======================================================================
-%  SHORT STAIRCASE FOR THE PAPER  (3 DC levels, 10 s holds)
+%  SAVE FIGURES  (time-series + PSD) -> data/<timestamped subfolder>
 %  ======================================================================
-%  The staircase above is long and busy -- great for the per-level PSD, too
-%  cluttered for a figure. Re-run the SAME network/adaptation/nonlinearity with
-%  a compact 3-level staircase so the time-series reads cleanly in a paper.
-%  Only dc_levels, hold_dur and the derived T_range change; everything else is
-%  inherited from the parameters set at the top of this script.
-dc_levels_short = [0.0 0.05 0.2];   % compact staircase for the paper figure
-hold_dur_short  = 20;               % seconds each level is held
-
-input_config_short = input_config;                 % inherit noise, generator, etc.
-input_config_short.dc_levels = dc_levels_short;
-input_config_short.hold_dur  = hold_dur_short;
-
-T_range_short = [-0, numel(dc_levels_short)*hold_dur_short];
-
-model_short = SRNNModel2( ...
-    'n', n, 'f', f, 'indegree', indegree, ...
-    'mu_E_tilde', mu_E_tilde, 'mu_I_tilde', mu_I_tilde, ...
-    'sigma_E_tilde', sigma_E_tilde, 'sigma_I_tilde', sigma_I_tilde, ...
-    'E_W', E_W, 'zrs_mode', zrs_mode, ...
-    'level_of_chaos', level_of_chaos, 'rescale_by_abscissa', rescale_by_abscissa, ...
-    'n_a_E', n_a_E, 'n_a_I', n_a_I, 'c_E', c_E, 'c_I', c_I, ...
-    'tau_a_E', tau_a_E, 'tau_a_I', tau_a_I, ...
-    'n_b_E', n_b_E, 'n_b_I', n_b_I, ...
-    'tau_b_E_rec', tau_b_E_rec, 'tau_b_E_rel', tau_b_E_rel, ...
-    'tau_b_I_rec', tau_b_I_rec, 'tau_b_I_rel', tau_b_I_rel, ...
-    'tau_d', tau_d, 'S_a', S_a, 'S_c', S_c, ...
-    'activation_function', phi, 'activation_function_derivative', phi_deriv, ...
-    'input_config', input_config_short, 'u_ex_scale', u_ex_scale, ...
-    'fs', fs, 'T_range', T_range_short, 'T_plot', T_plot, ...
-    'ode_solver', ode_solver, 'rng_seeds', rng_seeds, ...
-    'lya_method', lya_method, 'plot_deci', plot_deci, ...
-    'store_full_state', store_full_state);
-
-model_short.build();
-model_short.run();
-[fig_handle_short, ax_handles_short] = model_short.plot();
-set(fig_handle_short, 'Name', 'Short staircase (paper figure)');
-
-% Un-cap the firing-rate & synaptic-output panels (same ReLU fix as above).
-for k = 1:numel(ax_handles_short)
-    ylab = get(get(ax_handles_short(k), 'YLabel'), 'String');
-    if any(strcmp(ylab, {'firing rate', 'synaptic output'}))
-        ylim(ax_handles_short(k), 'auto');
-        yticks(ax_handles_short(k), 'auto');
-    end
-end
-
-%% ======================================================================
-%  SAVE FIGURES  (time-series + PSD) -> this script's own directory
-%  ======================================================================
-% Save alongside the script (scripts/stim_engages_adaptation) rather than into
-% the gitignored data/ tree, so the PNGs can be committed with the manuscript.
-% The seed-tagged name overwrites on a same-seed re-run instead of piling up
-% timestamped folders.
 if save_figs
-    save_folder = fileparts(mfilename('fullpath'));   % scripts/stim_engages_adaptation
+    project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));  % .../FractionalResevoir
+    stamp       = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+    save_folder = fullfile(project_root, 'data', ['bursting_SRNN_model_' stamp]);
     save_name   = sprintf('bursting_seed%d_%d', rng_seeds(1), rng_seeds(2));
     % fig_vec = [] -> save every open figure (close all at top guarantees these
     % are just the time-series and PSD figures from this run).

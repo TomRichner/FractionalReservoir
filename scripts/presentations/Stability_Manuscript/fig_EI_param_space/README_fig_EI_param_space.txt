@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Parameter-space distributions (E:I colored)
 =======================================================================
 
-Generated: 07-Jul-2026 16:15:45
+Generated: 21-Jul-2026 15:42:27
 By script: Fig_EI_param_space.m
 
 HOW IT WAS MADE
@@ -13,8 +13,10 @@ HOW IT WAS MADE
     row 1 = LLE ("Growth Rate", green dashed zero line)
     row 2 = mean firing rate
     columns = No Adaptation, SFA, STD, SFA+STD
-  Cleanups: condition titles only on the top row (not bold); vertical gray
-  column dividers; panel letters (a)..(h); fonts matched to the MC/sensitivity
+  Cleanups: condition titles raised into column-header position above the top
+  row (not bold, enlarged to match the sensitivity figure); extra row spacing;
+  y-ticks reduced (row 1: 0, 0.5; row 2: 0, 0.25); vertical gray column
+  dividers; panel letters (a)..(h); fonts matched to the MC/sensitivity
   figures; y-axes linked within each row. A separate colorbar figure encodes f
   as an E:I ratio
   (ticks 1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1). See git_provenance.txt.

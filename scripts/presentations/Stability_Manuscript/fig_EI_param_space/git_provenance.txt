@@ -1,20 +1,23 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_EI_param_space
-Captured at: 07-Jul-2026 16:15:45
+Captured at: 21-Jul-2026 15:42:27
 
-commit:      d3a58324cbeaa1394661208fcd818832343cda21
-commit_short:d3a5832
-branch:      refactor
+commit:      2141f5941d8cde4b36a44c0370388b61cf41ca48
+commit_short:2141f59
+branch:      celltypes-v2
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Stability_Manuscript: combined param-space figure + final figs
-last_date:   2026-07-07T15:56:57-05:00
+last_msg:    sensitivty fig cleaned up
+last_date:   2026-07-21T15:12:09-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M src/plotting/param_space_plots/load_and_make_unit_histograms.m
-?? scripts/presentations/Stability_Manuscript/fig_EI_param_space/
-
---- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_param_space.m
-scripts/presentations/Stability_Manuscript/fig_EI_param_space/README_fig_EI_param_space.txt
-scripts/presentations/Stability_Manuscript/fig_EI_param_space/git_provenance.txt
-scripts/presentations/Stability_Manuscript/fig_EI_param_space/working_changes.patch
+M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_Colorbar.fig
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_Colorbar.png
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_Colorbar.svg
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.fig
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.png
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.svg
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_param_space.m
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/README_fig_EI_param_space.txt
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/working_changes.patch
+ M scripts/stim_engages_adaptation/bursting_SRNN_model_good_ex.m

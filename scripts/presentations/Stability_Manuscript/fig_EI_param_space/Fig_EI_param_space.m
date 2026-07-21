@@ -68,9 +68,14 @@ close(mr_fig);
 %    on the top row (not bold), y-axes linked within each row.
 tick_fs  = 14;    % tick numbers -- matches MC/sensitivity figures
 label_fs = 15.4;  % axis labels  -- matches MC/sensitivity figures
-title_fs  = 14;
+title_fs  = 20;   % condition titles -- matches sensitivity figure (column headers)
 axes_lw   = 1.0;  % x/y axis line width (default 0.5)
 letter_fs = 18;   % panel letters -- matches MC/sensitivity figures
+row_shrink   = 0.85; % shrink each row's height to open the gap between rows
+top_headroom = 0.06; % shift the row stack down (normalized) to clear room above the top row for column headers
+title_y      = 1.22; % condition-title height above the top-row axes (normalized), reads as a column header
+lle_yticks   = [0, 0.5];   % row 1 (Growth Rate) y ticks
+rate_yticks  = [0, 0.3];  % row 2 (mean firing rate) y ticks
 for r = 1:nRows
     for c = 1:nCols
         ax = cax(r, c);
@@ -80,12 +85,35 @@ for r = 1:nRows
             xlabel(ax, 'Growth Rate', 'FontSize', label_fs);   % lambda_1 -> Growth Rate
             set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);  % titles, not bold
             set(findobj(ax, 'Type', 'constantline'), 'Color', [0 0.7 0]);  % zero line -> green
+            set(ax, 'YTick', lle_yticks);    % just 0 and 0.5
         else
             set(ax.XLabel, 'FontSize', label_fs);   % keep 'Mean Firing Rate'
             title(ax, '');   % condition titles only on the top row
+            set(ax, 'YTick', rate_yticks);   % just 0 and 0.25
         end
     end
     linkaxes(cax(r, :), 'y');   % shared probability axis within each row
+end
+
+% --- Open more space between the two rows + lift condition titles ---------
+% Shrink each axis's height and slide the stack down: the top-fixed shrink
+% widens the inter-row gap while the shift frees room above the top row. Then
+% raise the condition titles into column-header position so they clearly label
+% the whole column -- matching Fig_sensitivity_analysis.m.
+for r = 1:nRows
+    for c = 1:nCols
+        ax = cax(r, c);
+        p  = get(ax, 'Position');            % [left bottom width height]
+        new_h = p(4) * row_shrink;
+        set(ax, 'Position', [p(1), p(2) + (p(4) - new_h) - top_headroom, p(3), new_h]);
+    end
+end
+for c = 1:nCols
+    t = get(cax(1, c), 'Title');
+    if ~isempty(get(t, 'String'))
+        set(t, 'Units', 'normalized', 'Position', [0.5, title_y, 0], ...
+            'VerticalAlignment', 'bottom', 'FontSize', title_fs);
+    end
 end
 
 % 5) Vertical gray dividers between the 4 condition columns (span both rows).
@@ -151,8 +179,10 @@ fprintf(fid, '  probability-normalized. Those axes are copied into a single 2x4 
 fprintf(fid, '    row 1 = LLE ("Growth Rate", green dashed zero line)\n');
 fprintf(fid, '    row 2 = mean firing rate\n');
 fprintf(fid, '    columns = No Adaptation, SFA, STD, SFA+STD\n');
-fprintf(fid, '  Cleanups: condition titles only on the top row (not bold); vertical gray\n');
-fprintf(fid, '  column dividers; panel letters (a)..(h); fonts matched to the MC/sensitivity\n');
+fprintf(fid, '  Cleanups: condition titles raised into column-header position above the top\n');
+fprintf(fid, '  row (not bold, enlarged to match the sensitivity figure); extra row spacing;\n');
+fprintf(fid, '  y-ticks reduced (row 1: 0, 0.5; row 2: 0, 0.25); vertical gray column\n');
+fprintf(fid, '  dividers; panel letters (a)..(h); fonts matched to the MC/sensitivity\n');
 fprintf(fid, '  figures; y-axes linked within each row. A separate colorbar figure encodes f\n');
 fprintf(fid, '  as an E:I ratio\n');
 fprintf(fid, '  (ticks 1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1). See git_provenance.txt.\n\n');
@@ -172,26 +202,26 @@ fprintf('Description written: %s\n', desc_path);
 %% ==================== Local helpers ====================
 function ax_sorted = sort_axes_left_to_right(fig)
 % Return a figure's axes ordered left-to-right by their x-position.
-    ax = findobj(fig, 'Type', 'axes');
-    p = cell2mat(get(ax, 'Position'));
-    [~, order] = sort(p(:, 1));
-    ax_sorted = ax(order);
+ax = findobj(fig, 'Type', 'axes');
+p = cell2mat(get(ax, 'Position'));
+[~, order] = sort(p(:, 1));
+ax_sorted = ax(order);
 end
 
 function save_fig_stable(fig, out_dir, base)
 % Save fig as <base>.{png,svg,fig} with a stable name: clear any prior <base>*
 % outputs, save via save_some_figs_to_folder_2 (which suffixes the figure
 % number), then rename to the fixed names.
-    old = dir(fullfile(out_dir, [base '*']));
-    for a = 1:numel(old)
-        fp = fullfile(old(a).folder, old(a).name);
-        if ~old(a).isdir && (endsWith(fp, '.png') || endsWith(fp, '.svg') || endsWith(fp, '.fig'))
-            delete(fp);
-        end
+old = dir(fullfile(out_dir, [base '*']));
+for a = 1:numel(old)
+    fp = fullfile(old(a).folder, old(a).name);
+    if ~old(a).isdir && (endsWith(fp, '.png') || endsWith(fp, '.svg') || endsWith(fp, '.fig'))
+        delete(fp);
     end
-    save_some_figs_to_folder_2(out_dir, base, fig.Number, {'png', 'svg', 'fig'});
-    num = num2str(fig.Number);
-    movefile(fullfile(out_dir, [base '_figure_' num '.png']), fullfile(out_dir, [base '.png']));
-    movefile(fullfile(out_dir, [base '_figure_' num '.svg']), fullfile(out_dir, [base '.svg']));
-    movefile(fullfile(out_dir, [base '_f_' num '.fig']),      fullfile(out_dir, [base '.fig']));
+end
+save_some_figs_to_folder_2(out_dir, base, fig.Number, {'png', 'svg', 'fig'});
+num = num2str(fig.Number);
+movefile(fullfile(out_dir, [base '_figure_' num '.png']), fullfile(out_dir, [base '.png']));
+movefile(fullfile(out_dir, [base '_figure_' num '.svg']), fullfile(out_dir, [base '.svg']));
+movefile(fullfile(out_dir, [base '_f_' num '.fig']),      fullfile(out_dir, [base '.fig']));
 end
