@@ -1,11 +1,25 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity
-Captured at: 07-Jul-2026 13:03:40
+Captured at: 21-Jul-2026 16:16:46
 
-commit:      c074548c750c372c2f4cc37d60ed541d0d0ae27f
-commit_short:c074548
-branch:      refactor
+commit:      add78d64e40b919c3023e06023726cf740ea84c6
+commit_short:add78d6
+branch:      celltypes-v2
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    updated fig saving
-last_date:   2026-07-07T13:03:22-05:00
-dirty:       false
+last_msg:    param space figure cleanup 2
+last_date:   2026-07-21T16:00:29-05:00
+dirty:       true
 
+--- git status --porcelain ---
+M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_f_3.fig
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.png
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.svg
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
+ D scripts/presentations/Stability_Manuscript/fig_memory_capacity/MC_sample_hold_20260706_194403_trials50_Fig1_MC_Distributions.png
+ D scripts/presentations/Stability_Manuscript/fig_memory_capacity/MC_sample_hold_20260706_194403_trials50_Fig2_R2_Curves.png
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/plot_memory_capacity_combined.m
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch

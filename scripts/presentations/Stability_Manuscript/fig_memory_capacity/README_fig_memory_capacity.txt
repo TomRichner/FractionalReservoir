@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Memory Capacity
 ============================================
 
-Generated: 07-Jul-2026 13:03:41
+Generated: 21-Jul-2026 16:16:47
 By script: Fig_memory_capacity.m
 
 HOW IT WAS MADE
@@ -24,15 +24,12 @@ KEY SETTINGS (from the saved run)
   conditions    : Baseline, SFA, STD, SFA+STD
 
 FIGURES PRODUCED (in this folder)
-  MC_sample_hold_20260706_194403_trials50_Fig1_MC_Distributions.png
-  MC_sample_hold_20260706_194403_trials50_Fig1_MC_Distributions.pdf
-  MC_sample_hold_20260706_194403_trials50_Fig2_R2_Curves.png
-  MC_sample_hold_20260706_194403_trials50_Fig2_R2_Curves.pdf
   Fig_Memory_Capacity_figure_3.png
   Fig_Memory_Capacity_figure_3.svg
   Fig_Memory_Capacity_f_3.fig
 
-  Fig1 = paired total-MC + memory-horizon distributions
-  Fig2 = per-delay R^2(d) and cumulative MC (mean +/- 95% CI)
+  Only the final combined figure is saved. Fig1 (paired total-MC +
+  memory-horizon distributions) and Fig2 (per-delay R^2(d) and cumulative
+  MC) are shown for reference during the replot but not written to disk.
   Fig3 = 1x3 combined panel: (a) cumulative MC, (b) per-delay R^2,
          (c) horizon paired trials  [paper-ready]

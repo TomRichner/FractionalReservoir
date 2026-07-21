@@ -67,14 +67,14 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     xpos = 1:n_cond;
 
     % ================= Figure 3: combined 1x3 strip =================
-    fig3 = figure('Color','w','Position',[100 100 1350 380]);
+    fig3 = figure('Color','w','Position',[100 82 1089 398]);
     tl = tiledlayout(1,3,'Padding','compact','TileSpacing','loose');
     % Leave headroom above the tiles (so the panel letters sit above the axes
     % without clipping) and a margin below (so the x tick labels aren't cut off).
     tl.OuterPosition = [0 0.06 1 0.86];
 
     % (a) Cumulative MC vs delay
-    nexttile; hold on; grid off; box off;
+    ax_a = nexttile; hold on; grid off; box off;
     for i = 1:n_cond
         shaded_ci(delay_s, R2_cum_ci_lo(i,:), R2_cum_ci_hi(i,:), colors(i,:), 0.12);
         plot(delay_s, R2_cum_mean(i,:), '-', 'Color', colors(i,:), 'LineWidth', 2);
@@ -82,9 +82,10 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     xlim([0 10]);
     xlabel('Delay (s)');
     ylabel('Cumulative Memory Capacity');
+    set(ax_a, 'XTick', [0 5 10], 'YTick', [0 4 8]);
 
     % (b) Per-delay R^2(d) -- carries the one legend for the figure
-    nexttile; hold on; grid off; box off;
+    ax_b = nexttile; hold on; grid off; box off;
     for i = 1:n_cond
         shaded_ci(delay_s, R2_ci.lo(i,:), R2_ci.hi(i,:), colors(i,:), 0.12);
         plot(delay_s, R2_mean(i,:), '-', 'Color', colors(i,:), 'LineWidth', 2);
@@ -92,10 +93,11 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     xlim([0 10]);
     xlabel('Delay (s)');
     ylabel('$R^2$', 'Interpreter', 'latex');
-    legend(condition_names, 'Location', 'northeast');
+    set(ax_b, 'XTick', [0 5 10], 'YTick', [0 0.5 1]);
+    legend(condition_names, 'Location', 'northeast', 'Box', 'off');
 
     % (c) Horizon distribution (paired trials)
-    nexttile; hold on; grid off; box off;
+    ax_c = nexttile; hold on; grid off; box off;
     % Faint paired-trial lines. Use a solid light-gray RGB rather than an
     % alpha'd color ([0 0 0 0.15]): the 4th (alpha) element is an undocumented
     % runtime-only transparency that is NOT saved in .fig files, so a saved/
@@ -110,6 +112,7 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     end
     xlim([0.5 n_cond+0.5]);
     set(gca,'XTick',xpos,'XTickLabel',condition_names);
+    set(ax_c, 'YTick', [0 3 6]);
     ylabel('Memory Horizon (s)');
 
     % Panel letters (a)/(b)/(c) just above-left of each tile, outside the axes

@@ -4,6 +4,9 @@
 % paper_ready) into this presentation folder using the existing plotting
 % pipeline. No simulation is re-run -- edit mat_file to point at a different run.
 
+close all
+clear
+
 this_dir     = fileparts(mfilename('fullpath'));
 % scripts/presentations/Stability_Manuscript/fig_memory_capacity -> root is 4 levels up
 project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
@@ -23,8 +26,11 @@ mat_file = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready', ...
 % Write the regenerated manuscript figures next to this script.
 out_dir = this_dir;
 
-% Fig1 (total-MC + horizon distributions) and Fig2 (per-delay + cumulative).
-replot_memory_capacity(mat_file, out_dir);
+% Fig1 (total-MC + horizon distributions) and Fig2 (per-delay + cumulative) are
+% shown for reference but NOT saved -- only the final combined Fig3 is written.
+% Pass '' so replot_memory_capacity displays without saving (plot_memory_capacity
+% guards its save on ~isempty(out_dir)).
+replot_memory_capacity(mat_file, '');
 
 % Load the saved run once (used for the combined figure and the README below).
 S       = load(mat_file, 'results_all');
@@ -47,10 +53,6 @@ capture_git_provenance(out_dir, project_root);
 fig3_tag = 'Fig_Memory_Capacity';
 fig3_num = num2str(fig3.Number);
 fig_files = { ...
-    [run_tag '_Fig1_MC_Distributions.png']; ...
-    [run_tag '_Fig1_MC_Distributions.pdf']; ...
-    [run_tag '_Fig2_R2_Curves.png']; ...
-    [run_tag '_Fig2_R2_Curves.pdf']; ...
     [fig3_tag '_figure_' fig3_num '.png']; ...
     [fig3_tag '_figure_' fig3_num '.svg']; ...
     [fig3_tag '_f_' fig3_num '.fig'] };
@@ -87,8 +89,9 @@ fprintf(fid, 'FIGURES PRODUCED (in this folder)\n');
 for k = 1:numel(fig_files)
     fprintf(fid, '  %s\n', fig_files{k});
 end
-fprintf(fid, '\n  Fig1 = paired total-MC + memory-horizon distributions\n');
-fprintf(fid, '  Fig2 = per-delay R^2(d) and cumulative MC (mean +/- 95%% CI)\n');
+fprintf(fid, '\n  Only the final combined figure is saved. Fig1 (paired total-MC +\n');
+fprintf(fid, '  memory-horizon distributions) and Fig2 (per-delay R^2(d) and cumulative\n');
+fprintf(fid, '  MC) are shown for reference during the replot but not written to disk.\n');
 fprintf(fid, '  Fig3 = 1x3 combined panel: (a) cumulative MC, (b) per-delay R^2,\n');
 fprintf(fid, '         (c) horizon paired trials  [paper-ready]\n');
 
