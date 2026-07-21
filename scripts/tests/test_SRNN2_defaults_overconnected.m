@@ -5,11 +5,13 @@
 
 close all; clear; clc;
 
+rng_seeds = [1 3] + 4;
+
 % Add paths
 setup_paths();
 
 %% Create model
-model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.5);
+model = SRNNModel2('tau_d',0.1,'rng_seeds',rng_seeds,'tau_b_E_rel',0.25,'std_zero_floor',false,'c_E', 0.15/3,'S_c', 0.35,'n_a_E', 3, 'n_b_E',1, 'tau_a_E', logspace(log10(0.25), log10(10), 3),  'tau_b_E_rec', [2], 'f', 0.5, 'level_of_chaos', 10, 'T_range', [0 30]);
 
 %% Build, run, and plot
 model.build();

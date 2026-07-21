@@ -36,18 +36,18 @@ switch run_mode
         % Fast iteration: fewer levels/reps, half the sample rate, short time
         % range. fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3);
         % T_range=[0,20] with an explicit 10 s LLE window [10,20].
-        n_levels = 5;  n_reps = 4;  ode_solver_mode = @ode_rk4;
-        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
+        n_levels = 4;  n_reps = 3;  ode_solver_mode = @ode_rk4;
+        fs_mode = 200;  T_range_mode = [0, 10];  lya_T_interval_mode = [5, 10];
     case 'medium'
         % Medium: roughly halfway between fast and production. ode45 at fs=400,
         % T_range=[0,30] with a 15 s LLE window [15,30], 15 levels x 50 reps.
-        n_levels = 15; n_reps = 50; ode_solver_mode = @ode45;
-        fs_mode = 400;  T_range_mode = [0, 30];  lya_T_interval_mode = [15, 30];
+        n_levels = 11; n_reps = 15; ode_solver_mode = @ode_rk4;
+        fs_mode = 400;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
     case 'production'
         n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
-        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
+        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [20 50];
     otherwise, error('run_sensitivity_analysis:badMode', ...
-        'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
+            'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
 end
 fprintf('[run_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
     run_mode, n_levels, n_reps, func2str(ode_solver_mode), fs_mode, T_range_mode(1), T_range_mode(2));
@@ -59,9 +59,13 @@ lle_hist_range = [-2, 2];
 % Parameters to sweep: {param_name, [min, max]}
 params_to_sweep = {
     'n',              [100, 1000];
-    'f',              [0.25, 0.75];
-    'level_of_chaos', [0.5, 3];
-};
+    'f',              [0.2, 0.8];
+    'level_of_chaos', [0.25, 4];
+    };
+
+% params_to_sweep = {
+%     'level_of_chaos', [0.5, 2];
+% };
 
 %% Run sensitivity analysis for each parameter
 all_output_dirs = {};
@@ -69,12 +73,12 @@ all_output_dirs = {};
 for p_idx = 1:size(params_to_sweep, 1)
     param_name = params_to_sweep{p_idx, 1};
     param_range = params_to_sweep{p_idx, 2};
-
+    
     fprintf('\n========================================\n');
     fprintf('=== Sensitivity: %s [%.3g, %.3g] (%d/%d) ===\n', ...
         param_name, param_range(1), param_range(2), p_idx, size(params_to_sweep, 1));
     fprintf('========================================\n');
-
+    
     % Create PSA for this parameter
     psa = ParamSpaceAnalysis2(...
         'n_levels', n_levels, ...
@@ -93,26 +97,41 @@ for p_idx = 1:size(params_to_sweep, 1)
     if ~isempty(lya_T_interval_mode)
         psa.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
     end
-
+    
+    % --- STD with two recovery timescales ---------------------------------
+    % Give the STD conditions n_b_E = 2 (two E depression timescales, product
+    % of the two b columns) with a 1x2 recovery-time-constant vector; the
+    % release constant tau_b_E_rel stays scalar/shared. n_b_E must come from
+    % the condition (ParamSpaceAnalysis2 ignores it in model_defaults), while
+    % tau_b_E_rec flows through model_defaults. STD is on E neurons only.
+    psa.set_conditions({ ...
+        struct('name', 'no_adaptation', 'n_a_E', 0, 'n_b_E', 0), ...
+        struct('name', 'sfa_only',      'n_a_E', 3, 'n_b_E', 0), ...
+        struct('name', 'std_only',      'n_a_E', 0, 'n_b_E', 2), ...
+        struct('name', 'sfa_and_std',   'n_a_E', 3, 'n_b_E', 2) ...
+        });
+    psa.model_defaults.tau_b_E_rec = [0.5, 5];   % two E recovery timescales (s)
+    % ----------------------------------------------------------------------
+    
     % Add the swept parameter and reps
     psa.add_grid_parameter(param_name, param_range);
     psa.add_grid_parameter('reps', 1:n_reps);
-
+    
     % Run
     psa.run();
-
+    
     % Copy this script for reproducibility
     copyfile([mfilename('fullpath') '.m'], psa.output_dir);
-
+    
     % Plot sensitivity heatmaps
     psa.plot_sensitivity('metric', 'LLE', 'hist_range', lle_hist_range);
     psa.plot_sensitivity('metric', 'mean_rate');
-
+    
     % Save PSA object
     save(fullfile(psa.output_dir, 'psa_object.mat'), 'psa');
-
+    
     all_output_dirs{end+1} = psa.output_dir; %#ok<SAGROW>
-
+    
     % Save figures in additional formats
     if save_figs
         fig_dir = fullfile(psa.output_dir, 'figures');

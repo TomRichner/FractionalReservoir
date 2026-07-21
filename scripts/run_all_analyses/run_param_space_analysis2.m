@@ -53,8 +53,8 @@ switch run_mode
         % T_range=[0,30] with a 15 s LLE window [15,30].
         % n_levels=4 (this is a multi-dim grid with no reps axis, so 4^n_params
         % configs) sits between fast (3) and production (5).
-        n_levels = 4; ode_solver_mode = @ode45;
-        fs_mode = 400;  T_range_mode = [0, 30];  lya_T_interval_mode = [15, 30];
+        n_levels = 4; ode_solver_mode = @ode_rk4;
+        fs_mode = 400;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
     case 'production'
         n_levels = 5; ode_solver_mode = @ode45;
         fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];

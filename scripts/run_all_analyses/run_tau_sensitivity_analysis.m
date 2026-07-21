@@ -47,7 +47,7 @@ switch run_mode
         % 15 levels x 50 reps. T_range=[0,50] with the auto LLE window
         % ([] -> [15,50]) so the analysis window is longer relative to the swept
         % tau (up to 60 s) than the [15,30] used by the other medium sub-scripts.
-        n_levels = 15; n_reps = 50; ode_solver_mode = @ode45;
+        n_levels = 11; n_reps = 25; ode_solver_mode = @ode45;
         fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
     case 'production'
         n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
@@ -117,6 +117,8 @@ if save_figs
 end
 close all;
 
+% NOTE: tau_b_E_rec sweep skipped — section 2 is commented out below.
+%{
 %% 2. tau_b_E_rec sweep — scalar parameter
 fprintf('\n========================================\n');
 fprintf('=== Tau Sensitivity: tau_b_E_rec [5, 60] ===\n');
@@ -160,10 +162,12 @@ if save_figs
     fprintf('Figures saved to %s\n', fig_dir);
 end
 close all;
+%}
+% end of skipped tau_b_E_rec sweep
 
 %% Summary
 fprintf('\n========================================\n');
 fprintf('=== Tau Sensitivity Analysis Complete ===\n');
 fprintf('tau_a_E results: %s\n', psa_tau_a.output_dir);
-fprintf('tau_b_E_rec results: %s\n', psa_tau_b.output_dir);
+% fprintf('tau_b_E_rec results: %s\n', psa_tau_b.output_dir);  % skipped
 fprintf('========================================\n');
