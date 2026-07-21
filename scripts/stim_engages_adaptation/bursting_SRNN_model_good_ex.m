@@ -130,7 +130,7 @@ end
 %  NOTE: SRNNModel2 forces u = 0 during the negative warmup (t < 0), so this
 %  profile applies to t in [0, T_range(2)]. The ramp into the first level runs
 %  over the first ramp_dur seconds of the positive window, not the warmup.
-dc_levels = [0.0 0.025 0.05 0.1 0.2 0.0];   % absolute DC per level (all neurons); edit this sweep
+dc_levels = [0.0 0.025 0.05 0.1 0.2];   % absolute DC per level (all neurons); edit this sweep
 hold_dur  = 90;                       % seconds each level is held
 % White-noise INTENSITY (fs-invariant): the generator adds noise_intensity*sqrt(fs)*randn
 % per neuron, so the continuous-time noise PSD (~noise_intensity^2) is independent of fs.
@@ -181,7 +181,7 @@ store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 % Figure saving: when true, save all open figures (time-series + PSD) to data/
 % via save_some_figs_to_folder_2 (writes .fig/.png/.pdf). Each run goes to a
 % timestamped subfolder so nothing is overwritten.
-save_figs  = false;        % set true to save figures for sharing
+save_figs  = trueor;        % set true to save figures for sharing
 save_types = {'fig', 'png', 'pdf'};   % formats; pdf bundles all figs into one _report.pdf
 
 %% ======================================================================
@@ -259,15 +259,15 @@ for k = 1:nL
     lo  = (k-1)*hold_dur + psd_settle;
     hi  = k*hold_dur;
     sel = t_full > lo & t_full <= hi;
-
+    
     % Remove DC so we get the PSD of fluctuations
     x_seg = x_mean(sel) - mean(x_mean(sel));
-
+    
     % Clamp Hamming window to available signal length (guards short windows)
     win_len  = min(round(psd_win_len_s * model.fs), numel(x_seg));
     win      = hamming(win_len);
     noverlap = floor(psd_overlap_frac * win_len);
-
+    
     [pxx, fpx] = pwelch(x_seg, win, noverlap, psd_f, model.fs);
     plot(fpx, pxx, 'LineWidth', 1.5, 'Color', cmap(k, :));
     labels{k} = sprintf('DC = %.3g', dc_levels(k));
@@ -279,6 +279,56 @@ ylabel('Dendritic Potential^2/Hz');
 title(sprintf('PSD of Mean Dendritic Potential (x) vs DC level  (noise intensity = %.3g)', noise_intensity));
 legend(labels, 'Location', 'southwest');
 grid on;
+
+%% ======================================================================
+%  SHORT STAIRCASE FOR THE PAPER  (3 DC levels, 10 s holds)
+%  ======================================================================
+%  The staircase above is long and busy -- great for the per-level PSD, too
+%  cluttered for a figure. Re-run the SAME network/adaptation/nonlinearity with
+%  a compact 3-level staircase so the time-series reads cleanly in a paper.
+%  Only dc_levels, hold_dur and the derived T_range change; everything else is
+%  inherited from the parameters set at the top of this script.
+dc_levels_short = [0.0 0.05 0.2];   % compact staircase for the paper figure
+hold_dur_short  = 20;               % seconds each level is held
+
+input_config_short = input_config;                 % inherit noise, generator, etc.
+input_config_short.dc_levels = dc_levels_short;
+input_config_short.hold_dur  = hold_dur_short;
+
+T_range_short = [-0, numel(dc_levels_short)*hold_dur_short];
+
+model_short = SRNNModel2( ...
+    'n', n, 'f', f, 'indegree', indegree, ...
+    'mu_E_tilde', mu_E_tilde, 'mu_I_tilde', mu_I_tilde, ...
+    'sigma_E_tilde', sigma_E_tilde, 'sigma_I_tilde', sigma_I_tilde, ...
+    'E_W', E_W, 'zrs_mode', zrs_mode, ...
+    'level_of_chaos', level_of_chaos, 'rescale_by_abscissa', rescale_by_abscissa, ...
+    'n_a_E', n_a_E, 'n_a_I', n_a_I, 'c_E', c_E, 'c_I', c_I, ...
+    'tau_a_E', tau_a_E, 'tau_a_I', tau_a_I, ...
+    'n_b_E', n_b_E, 'n_b_I', n_b_I, ...
+    'tau_b_E_rec', tau_b_E_rec, 'tau_b_E_rel', tau_b_E_rel, ...
+    'tau_b_I_rec', tau_b_I_rec, 'tau_b_I_rel', tau_b_I_rel, ...
+    'tau_d', tau_d, 'S_a', S_a, 'S_c', S_c, ...
+    'activation_function', phi, 'activation_function_derivative', phi_deriv, ...
+    'input_config', input_config_short, 'u_ex_scale', u_ex_scale, ...
+    'fs', fs, 'T_range', T_range_short, 'T_plot', T_plot, ...
+    'ode_solver', ode_solver, 'rng_seeds', rng_seeds, ...
+    'lya_method', lya_method, 'plot_deci', plot_deci, ...
+    'store_full_state', store_full_state);
+
+model_short.build();
+model_short.run();
+[fig_handle_short, ax_handles_short] = model_short.plot();
+set(fig_handle_short, 'Name', 'Short staircase (paper figure)');
+
+% Un-cap the firing-rate & synaptic-output panels (same ReLU fix as above).
+for k = 1:numel(ax_handles_short)
+    ylab = get(get(ax_handles_short(k), 'YLabel'), 'String');
+    if any(strcmp(ylab, {'firing rate', 'synaptic output'}))
+        ylim(ax_handles_short(k), 'auto');
+        yticks(ax_handles_short(k), 'auto');
+    end
+end
 
 %% ======================================================================
 %  SAVE FIGURES  (time-series + PSD) -> data/<timestamped subfolder>
@@ -298,72 +348,72 @@ end
 %  LOCAL FUNCTIONS
 %  ======================================================================
 function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, rng_seed, input_config)
-    % DC_STAIRCASE_STIMULUS Uniform tonic DC stepped through a sequence of levels,
-    % plus independent per-neuron white noise.
-    %
-    % Each level dc_levels(k) is held for hold_dur seconds, applied identically
-    % to every neuron over [0, T]. The first hold ramps in linearly from 0 over
-    % the first ramp_dur seconds. fs-invariant white noise
-    % (input_config.noise_intensity) is added per neuron on top. Signature
-    % matches the SRNNModel2 generator hook:
-    %   [u_ex, t_ex] = generator(params, T, fs, rng_seed, input_config)
-    dt   = 1 / fs;
-    t_ex = (0:dt:T)';          % nt x 1, matches built-in generator
-    nt   = numel(t_ex);
+% DC_STAIRCASE_STIMULUS Uniform tonic DC stepped through a sequence of levels,
+% plus independent per-neuron white noise.
+%
+% Each level dc_levels(k) is held for hold_dur seconds, applied identically
+% to every neuron over [0, T]. The first hold ramps in linearly from 0 over
+% the first ramp_dur seconds. fs-invariant white noise
+% (input_config.noise_intensity) is added per neuron on top. Signature
+% matches the SRNNModel2 generator hook:
+%   [u_ex, t_ex] = generator(params, T, fs, rng_seed, input_config)
+dt   = 1 / fs;
+t_ex = (0:dt:T)';          % nt x 1, matches built-in generator
+nt   = numel(t_ex);
 
-    dc_levels = input_config.dc_levels;
-    hold_dur  = input_config.hold_dur;
-    ramp_dur  = input_config.ramp_dur;
-    nL        = numel(dc_levels);
+dc_levels = input_config.dc_levels;
+hold_dur  = input_config.hold_dur;
+ramp_dur  = input_config.ramp_dur;
+nL        = numel(dc_levels);
 
-    % Staircase: level k over [(k-1)*hold_dur, k*hold_dur)
-    dc_profile = zeros(nt, 1);
-    for k = 1:nL
-        seg = t_ex >= (k-1)*hold_dur & t_ex < k*hold_dur;
-        dc_profile(seg) = dc_levels(k);
-    end
-    dc_profile(t_ex >= nL*hold_dur) = dc_levels(nL);   % final boundary sample
+% Staircase: level k over [(k-1)*hold_dur, k*hold_dur)
+dc_profile = zeros(nt, 1);
+for k = 1:nL
+    seg = t_ex >= (k-1)*hold_dur & t_ex < k*hold_dur;
+    dc_profile(seg) = dc_levels(k);
+end
+dc_profile(t_ex >= nL*hold_dur) = dc_levels(nL);   % final boundary sample
 
-    % Ramp the first hold in linearly: 0 -> dc_levels(1) over the first ramp_dur s
-    ramp_idx = t_ex <= ramp_dur;
-    dc_profile(ramp_idx) = linspace(0, dc_levels(1), nnz(ramp_idx))';
+% Ramp the first hold in linearly: 0 -> dc_levels(1) over the first ramp_dur s
+ramp_idx = t_ex <= ramp_dur;
+dc_profile(ramp_idx) = linspace(0, dc_levels(1), nnz(ramp_idx))';
 
-    % Same drive to every neuron: n x nt
-    u_ex = repmat(dc_profile', params.n, 1);
+% Same drive to every neuron: n x nt
+u_ex = repmat(dc_profile', params.n, 1);
 
-    % Add independent white noise per neuron over [0, T] (probes the network's
-    % filtering). The sqrt(fs) factor makes this an fs-invariant white noise: the
-    % continuous-time PSD ~ noise_intensity^2 is independent of fs (standard
-    % Euler-Maruyama 1/sqrt(dt) scaling). The model's linear interpolant
-    % band-limits it to ~Nyquist (fs/2), flat over our <100 Hz band. Seeded for
-    % reproducibility.
-    if isfield(input_config, 'noise_intensity') && input_config.noise_intensity > 0
-        rng(rng_seed);
-        u_ex = u_ex + input_config.noise_intensity * sqrt(fs) * randn(params.n, numel(t_ex));
-    end
+% Add independent white noise per neuron over [0, T] (probes the network's
+% filtering). The sqrt(fs) factor makes this an fs-invariant white noise: the
+% continuous-time PSD ~ noise_intensity^2 is independent of fs (standard
+% Euler-Maruyama 1/sqrt(dt) scaling). The model's linear interpolant
+% band-limits it to ~Nyquist (fs/2), flat over our <100 Hz band. Seeded for
+% reproducibility.
+if isfield(input_config, 'noise_intensity') && input_config.noise_intensity > 0
+    rng(rng_seed);
+    u_ex = u_ex + input_config.noise_intensity * sqrt(fs) * randn(params.n, numel(t_ex));
+end
 end
 
 function [t, Y] = ode_rk4(odefun, tspan, y0, ~)
-    % ODE_RK4 Fixed-step classic RK4, matching the @ode45 call signature used by
-    % SRNNModel2: solver(rhs, t_ex, S0, opts). Steps at the native spacing of the
-    % supplied time vector tspan (uniform fs grid) and returns the solution at
-    % exactly those times, so the class's output-time check passes. opts ignored.
-    %
-    % Much faster than adaptive ode45 when the forcing is noisy (no step-size
-    % control thrashing). rhs is evaluated 4x per step.
-    t  = tspan(:);
-    nt = numel(t);
-    y  = y0(:);
-    Y  = zeros(nt, numel(y));
-    Y(1, :) = y.';
-    for k = 1:nt-1
-        h  = t(k+1) - t(k);
-        tk = t(k);
-        k1 = odefun(tk,       y);
-        k2 = odefun(tk + h/2, y + (h/2)*k1);
-        k3 = odefun(tk + h/2, y + (h/2)*k2);
-        k4 = odefun(tk + h,   y + h*k3);
-        y  = y + (h/6)*(k1 + 2*k2 + 2*k3 + k4);
-        Y(k+1, :) = y.';
-    end
+% ODE_RK4 Fixed-step classic RK4, matching the @ode45 call signature used by
+% SRNNModel2: solver(rhs, t_ex, S0, opts). Steps at the native spacing of the
+% supplied time vector tspan (uniform fs grid) and returns the solution at
+% exactly those times, so the class's output-time check passes. opts ignored.
+%
+% Much faster than adaptive ode45 when the forcing is noisy (no step-size
+% control thrashing). rhs is evaluated 4x per step.
+t  = tspan(:);
+nt = numel(t);
+y  = y0(:);
+Y  = zeros(nt, numel(y));
+Y(1, :) = y.';
+for k = 1:nt-1
+    h  = t(k+1) - t(k);
+    tk = t(k);
+    k1 = odefun(tk,       y);
+    k2 = odefun(tk + h/2, y + (h/2)*k1);
+    k3 = odefun(tk + h/2, y + (h/2)*k2);
+    k4 = odefun(tk + h,   y + h*k3);
+    y  = y + (h/6)*(k1 + 2*k2 + 2*k3 + k4);
+    Y(k+1, :) = y.';
+end
 end

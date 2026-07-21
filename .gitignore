@@ -61,6 +61,9 @@ Thumbs.db
 *.png
 *.pdf
 
+# Keep manuscript figure PNGs (override the global *.png ignore above)
+!scripts/presentations/Stability_Manuscript/**/*.png
+
 # Output/run directories (regenerable analysis outputs; keep out of git)
 data/
 figs/
