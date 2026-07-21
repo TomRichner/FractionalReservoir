@@ -63,6 +63,7 @@ Thumbs.db
 
 # Keep manuscript figure PNGs (override the global *.png ignore above)
 !scripts/presentations/Stability_Manuscript/**/*.png
+!scripts/stim_engages_adaptation/**/*.png
 
 # Output/run directories (regenerable analysis outputs; keep out of git)
 data/

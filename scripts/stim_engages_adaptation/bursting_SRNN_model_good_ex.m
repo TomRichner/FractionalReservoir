@@ -181,8 +181,8 @@ store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 % Figure saving: when true, save all open figures (time-series + PSD) to data/
 % via save_some_figs_to_folder_2 (writes .fig/.png/.pdf). Each run goes to a
 % timestamped subfolder so nothing is overwritten.
-save_figs  = trueor;        % set true to save figures for sharing
-save_types = {'fig', 'png', 'pdf'};   % formats; pdf bundles all figs into one _report.pdf
+save_figs  = true;        % set true to save figures for sharing
+save_types = {'fig', 'png', 'svg', 'pdf'};   % formats; pdf bundles all figs into one _report.pdf
 
 %% ======================================================================
 %  10. PSD ANALYSIS (pwelch of mean dendritic potential x, per DC level)
@@ -331,12 +331,14 @@ for k = 1:numel(ax_handles_short)
 end
 
 %% ======================================================================
-%  SAVE FIGURES  (time-series + PSD) -> data/<timestamped subfolder>
+%  SAVE FIGURES  (time-series + PSD) -> this script's own directory
 %  ======================================================================
+% Save alongside the script (scripts/stim_engages_adaptation) rather than into
+% the gitignored data/ tree, so the PNGs can be committed with the manuscript.
+% The seed-tagged name overwrites on a same-seed re-run instead of piling up
+% timestamped folders.
 if save_figs
-    project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));  % .../FractionalResevoir
-    stamp       = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
-    save_folder = fullfile(project_root, 'data', ['bursting_SRNN_model_' stamp]);
+    save_folder = fileparts(mfilename('fullpath'));   % scripts/stim_engages_adaptation
     save_name   = sprintf('bursting_seed%d_%d', rng_seeds(1), rng_seeds(2));
     % fig_vec = [] -> save every open figure (close all at top guarantees these
     % are just the time-series and PSD figures from this run).
