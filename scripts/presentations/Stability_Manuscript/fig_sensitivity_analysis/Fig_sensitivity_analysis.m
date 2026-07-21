@@ -38,6 +38,13 @@ assemble_sensitivity_figure(replot_dir, 'LLE');
 combined_fig_path = fullfile(replot_dir, 'figures', 'sensitivity_LLE_combined.fig');
 cf = openfig(combined_fig_path, 'visible');
 
+% --- Reshape the whole figure ---------------------------------------------
+% Make it ~15% narrower and ~15% taller so the imagesc panels are less wide
+% (the added row spacing / raised headers had stretched their aspect ratio).
+% Axes use normalized positions, so they follow the new figure proportions.
+fig_pos = get(cf, 'Position');            % [left bottom width height]
+set(cf, 'Position', [fig_pos(1), fig_pos(2), fig_pos(3) * 0.85, fig_pos(4) * 1.05]);
+
 % --- Clean up axis labels + fonts -----------------------------------------
 % Enlarge tick numbers, relabel the ylabel (lambda_1 -> "Growth Rate", present
 % only on the leftmost column), relabel each row's x-axis, and keep the
@@ -51,7 +58,11 @@ ei_ticks  = [0.25, 1/3, 0.4, 0.5, 0.6, 2/3, 0.75];
 ei_labels = {'1:3', '1:2', '2:3', '1:1', '3:2', '2:1', '3:1'};
 tick_fs   = 14;    % tick numbers -- matches MC figure DefaultAxesFontSize
 label_fs  = 15.4;  % axis labels -- matches MC figure (14 * 1.1 label multiplier)
+title_fs  = 20;    % condition titles (no adaptation, sfa only, ...) -- enlarged
 letter_fs = 18;    % panel letters -- matches MC figure
+row_shrink = 0.85; % shrink each row's height to open gaps between rows
+top_headroom = 0.06; % shift the row stack down (normalized) to clear room above the top row for column headers
+title_y   = 1.22;  % condition-title height above the top-row axes (normalized), reads as a column header
 clim_frac = 0.4;  % darken imagesc: cap CLim at total_reps*clim_frac (shared scale)
 % Colormap ramps white (0 counts) -> 90% black (max), not pure black, so the
 % blue median line stays visible over the darkest cells.
@@ -63,16 +74,16 @@ ax_all = findobj(cf, 'Type', 'axes');
 for a = 1:numel(ax_all)
     ax = ax_all(a);
     set(ax, 'FontSize', tick_fs);         % enlarge x & y tick numbers
-    set(get(ax, 'Title'), 'FontWeight', 'normal');   % condition titles not bold
+    set(get(ax, 'Title'), 'FontWeight', 'normal', 'FontSize', title_fs);  % condition titles, not bold, enlarged
     box(ax, 'off');                       % drop the rectangle; keep x/y axes+ticks
     colormap(ax, dark_cmap);              % white -> 90% black (blue line stays visible)
-
+    
     % Darken the histogram density: the panels are drawn with CLim = [0,
     % total_reps]; lower the ceiling so typical bin counts use more of the
     % dark range (kept shared across panels so they stay comparable).
     cl = get(ax, 'CLim');
     set(ax, 'CLim', [0, cl(2) * clim_frac]);
-
+    
     % Blue median line: more transparent + 25% thinner. (imagesc is Type
     % 'image', the zero line is 'constantline', so 'line' is the median.)
     ml = findobj(ax, 'Type', 'line');
@@ -84,13 +95,13 @@ for a = 1:numel(ax_all)
     end
     % Green dashed zero line: thinner.
     set(findobj(ax, 'Type', 'constantline'), 'LineWidth', zeroline_lw);
-
+    
     % ylabel (present only on the leftmost column): lambda_1 -> "Growth Rate"
     yl = get(ax, 'YLabel');
     if ~isempty(get(yl, 'String'))
         set(yl, 'String', 'Growth Rate', 'Interpreter', 'none', 'FontSize', label_fs);
     end
-
+    
     xmax = max(xlim(ax));
     if xmax <= 1                          % f row -> E:I ratio
         xlabel(ax, 'E:I ratio', 'FontSize', label_fs);
@@ -100,7 +111,33 @@ for a = 1:numel(ax_all)
         title(ax, '');                    % condition titles only on the top row
     else                                  % n row -> Network Size
         xlabel(ax, 'Network Size', 'FontSize', label_fs);
+        set(ax, 'XTick', [100, 500, 1000]);   % fewer network-size ticks
         title(ax, '');                    % condition titles only on the top row
+    end
+end
+
+% --- Open more vertical space between rows --------------------------------
+% Shrink each axis's height (widening the gaps below each row) and slide the
+% whole stack down by top_headroom, freeing space above the top row so the
+% condition titles can float well above it as column headers. Done before the
+% divider/letter code so those pick up the new positions.
+for a = 1:numel(ax_all)
+    ax = ax_all(a);
+    p  = get(ax, 'Position');             % [left bottom width height]
+    new_h = p(4) * row_shrink;
+    set(ax, 'Position', [p(1), p(2) + (p(4) - new_h) - top_headroom, p(3), new_h]);
+end
+
+% --- Lift the condition titles into column-header position ----------------
+% Only the top-row axes still carry a title string (the loop above cleared the
+% lower rows). Raise each well above its axes and enlarge it so it clearly
+% labels the whole column, not just the first row.
+for a = 1:numel(ax_all)
+    ax = ax_all(a);
+    t  = get(ax, 'Title');
+    if ~isempty(get(t, 'String'))
+        set(t, 'Units', 'normalized', 'Position', [0.5, title_y, 0], ...
+            'VerticalAlignment', 'bottom', 'FontSize', title_fs);
     end
 end
 

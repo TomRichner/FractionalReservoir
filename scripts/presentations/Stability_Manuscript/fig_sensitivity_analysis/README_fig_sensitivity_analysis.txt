@@ -1,7 +1,7 @@
 Stability_Manuscript figure: LLE Sensitivity (combined)
 =======================================================
 
-Generated: 07-Jul-2026 15:24:39
+Generated: 21-Jul-2026 15:10:02
 By script: Fig_sensitivity_analysis.m
 
 HOW IT WAS MADE

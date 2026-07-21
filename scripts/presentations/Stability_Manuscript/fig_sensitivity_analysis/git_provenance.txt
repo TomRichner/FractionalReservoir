@@ -1,17 +1,19 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sensitivity_analysis
-Captured at: 07-Jul-2026 15:24:39
+Captured at: 21-Jul-2026 15:10:01
 
-commit:      ceba5c2544e1e8b0550500aa7f80baeed7df7ce8
-commit_short:ceba5c2
-branch:      refactor
+commit:      b47d89b33dffc5d4566b5faf0eaac89e7b11555c
+commit_short:b47d89b
+branch:      celltypes-v2
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    sensitivity figure
-last_date:   2026-07-07T14:42:22-05:00
+last_msg:    stim dc figs
+last_date:   2026-07-21T13:09:50-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_analysis.m
+M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_Sensitivity_LLE.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_Sensitivity_LLE.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_Sensitivity_LLE.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_analysis.m
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/README_fig_sensitivity_analysis.txt
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/git_provenance.txt
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/working_changes.patch
- M scripts/run_all_analyses/replot/replot_sensitivity.m
