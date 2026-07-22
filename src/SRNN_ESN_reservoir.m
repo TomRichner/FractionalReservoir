@@ -157,10 +157,13 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             verbose = true;
             store_timeseries = true;   % false => lean MC-only path (frees the
                                        % full-res states/trajectory, skips the LLE)
+            readout_signal = 'rate';   % 'rate' => read out r = phi(x_eff); 'synaptic'
+                                       % => read out br = b.*r (STD-depressed output)
             for i = 1:2:length(varargin)
                 switch lower(varargin{i})
                     case 'verbose',          verbose = varargin{i+1};
                     case 'store_timeseries', store_timeseries = varargin{i+1};
+                    case 'readout_signal',   readout_signal = varargin{i+1};
                 end
             end
 
@@ -185,8 +188,21 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % Unpack states using standard utility
             [x_all, a_all, b_all, r_all, br_all] = obj.unpack_and_compute_states(obj.S_out, obj.cached_params);
 
-            % Combine E and I firing rates for training (need n x T matrix)
-            R_all = [r_all.E; r_all.I];  % n x T
+            % Combine E and I readout signals for training (need n x T matrix).
+            % 'rate'     => firing rate r = phi(x_eff) (adaptation baked into x_eff,
+            %               but STD depression NOT included).
+            % 'synaptic' => br = b.*r, the STD-depressed presynaptic output (exposes
+            %               the STD state b to the linear readout). For conditions
+            %               without STD (n_b_E=0), br == r, so those are unchanged.
+            switch lower(readout_signal)
+                case 'rate'
+                    R_all = [r_all.E; r_all.I];   % n x T
+                case 'synaptic'
+                    R_all = [br_all.E; br_all.I]; % n x T
+                otherwise
+                    error('SRNN_ESN_reservoir:BadReadoutSignal', ...
+                        'readout_signal must be ''rate'' or ''synaptic'' (got ''%s'').', readout_signal);
+            end
 
             %% Step 2b: Sample-and-hold -> decimate to one state per hold so MC is
             % measured in hold units (canonical i.i.d.-input MC). Other input

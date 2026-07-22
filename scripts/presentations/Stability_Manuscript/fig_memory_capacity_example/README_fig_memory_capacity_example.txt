@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Example memory capacity
 ====================================================
 
-Generated: 08-Jul-2026 11:56:03
+Generated: 21-Jul-2026 17:34:38
 By script: Fig_memory_capacity_example.m
 
 HOW IT WAS MADE
@@ -20,5 +20,5 @@ FIGURE PRODUCED (in this folder)
     (a) Cumulative Memory Capacity vs delay (0-10 s), all 4 conditions.
     (b) Per-delay R^2 vs delay (0-10 s), all 4 conditions (legend).
     Below: SFA+STD input reconstruction (target vs readout) for hold-delays
-    [2 4 8 16] (delay indices), each titled with the delay in seconds and R^2;
+    [1 2 4 8] (delay indices), each titled with the delay in seconds and R^2;
     all reconstruction panels share y-limits [-0.6, 0.6].

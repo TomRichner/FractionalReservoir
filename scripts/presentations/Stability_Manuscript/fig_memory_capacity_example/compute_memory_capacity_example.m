@@ -13,22 +13,22 @@ clear; clc; close all;
 this_dir = fileparts(mfilename('fullpath'));
 
 %% Common parameters
-n = 300;                    % Number of neurons
-f = 0.6;                    % Fraction excitatory (off perfect E/I balance so no-adaptation isn't favored)
-level_of_chaos = 2.5;         % Higher for the logistic: its mean slope < 1 pushes the edge of chaos to larger level_of_chaos
-rng_seed_net = 1;          % Fixed seed for network reproducibility
-rng_seed_stim = 2;         % Fixed seed for stimulus reproducibility
+n = 300;                    % Number of neurons (matches SRNNModel2 default)
+f = 0.6;                    % Fraction excitatory (matches looped_memory_capacity.m)
+level_of_chaos = 2.0;       % Above the edge of chaos (matches looped_memory_capacity.m)
+rng_seed_net = 3;          % Fixed seed for network reproducibility
+rng_seed_stim = 4;         % Fixed seed for stimulus reproducibility
 
 % Sampling frequency
-fs = 400;                     % Sampling frequency (Hz)
+fs = 200;                     % Sampling frequency (Hz)
 
 % MC protocol parameters (defined in seconds, converted to samples).
 % These are shortened for fast dial-in; increase for final results (in
 % particular T_wash should exceed a few x the slowest tau_a_E for the SFA
 % conditions -- here tau_a_E max = 10 s).
 T_wash_sec = 10;              % Washout duration (s); discarded transient before training
-T_train_sec = 500;           % Training duration (seconds); matches looped_memory_capacity
-T_test_sec = 100;            % Test duration (seconds); matches looped_memory_capacity
+T_train_sec = 600;           % Training duration (seconds); matches looped_memory_capacity
+T_test_sec = 150;            % Test duration (seconds); matches looped_memory_capacity
 
 T_wash = T_wash_sec * fs;     % Washout samples
 T_train = T_train_sec * fs;   % Training samples
@@ -43,28 +43,31 @@ input_type = 'sample_hold'; % options: 'white', 'bandlimited', 'one_over_f', 'sa
 u_f_cutoff = 5;               % Cutoff frequency for bandlimited input (Hz)
 u_alpha = 1;                  % Spectral exponent for 1/f^alpha noise (1=pink, 2=red/Brownian)
 tau_d = 0.1;                  % Dendritic time constant (s)
-T_hold = 3 * tau_d;           % sample_hold: hold each i.i.d. input value this long (= 3*tau_d)
+T_hold = 0.3;                 % sample_hold: hold each i.i.d. input value this long (s); sets the MC delay increment (matches looped_memory_capacity.m)
+
+% Readout signal for the MC regression: 'synaptic' reads out br = b.*r (exposes
+% the STD state to the linear readout); matches looped_memory_capacity.m.
+readout_signal = 'synaptic';  % 'rate' | 'synaptic'
 
 %% Base ESN configuration (shared across all conditions)
 % All parameters here are identical for every condition. Condition-specific
 % overrides (n_a_E, n_b_E) are applied below via the condition_args cell array.
 base_args = { ...
     'n', n, ...
-    'f', f, ...                    % fraction excitatory (0.6; off perfect balance)
+    'f', f, ...                    % fraction excitatory (matches SRNNModel2 default)
     'fs', fs, ...
     'level_of_chaos', level_of_chaos, ...
-    'ode_solver', @ode_rk4, ...    % fixed-step solver (fast); default is @ode45
+    'ode_solver', @ode_rk4, ...    % fixed-step solver (fast); SRNNModel2 default is @ode45
     'rng_seeds', [rng_seed_net, rng_seed_stim], ...
-    'tau_d', tau_d, ...            % Dendritic time constant (s)
-    'S_c', 0.35, ...               % Nonlinearity bias (center); matches SRNNModel2 default
-    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1 (unused by the logistic default)
-    'n_a_I', 0, ...                % No SFA for I neurons (all conditions)
-    'n_b_I', 0, ...                % No STD for I neurons (all conditions)
-    'c_E', 0.5/3, ...              % Adaptation strength for E neurons (matches looped_memory_capacity)
-    'tau_a_E', [0.1, 1.0, 10], ... % Adaptation time constants (s)
-    'tau_b_E_rec', 1.0, ...        % STD recovery time constant (s)
-    'tau_b_E_rel', 0.25, ...       % STD release time constant (s)
-    'std_zero_floor', true, ...    % rescale STD so (prod b)*r reaches 0 at full depression (matches run_all)
+    'tau_d', tau_d, ...            % Dendritic time constant (s; matches SRNNModel2 default)
+    'S_c', 0.35, ...               % Nonlinearity bias (center); matches looped_memory_capacity.m
+    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1 (matches SRNNModel2 default; unused by the logistic)
+    'n_a_I', 0, ...                % No SFA for I neurons (all conditions; matches SRNNModel2 default)
+    'n_b_I', 0, ...                % No STD for I neurons (all conditions; matches SRNNModel2 default)
+    'c_E', 0.5/3, ...              % Adaptation strength for E neurons (matches looped_memory_capacity.m)
+    'tau_b_E_rec', 1.0, ...        % STD recovery time constant (s; matches SRNNModel2 default)
+    'tau_b_E_rel', 0.25, ...       % STD release time constant (s; matches SRNNModel2 default)
+    'std_zero_floor', false, ...   % matches SRNNModel2 default (no zero-floor rescale)
     'input_type', input_type, ...
     'u_f_cutoff', u_f_cutoff, ...
     'u_alpha', u_alpha, ...
@@ -98,7 +101,7 @@ end
 % Asserts that W, W_in, u_scalar, u_ex, t_ex are identical across conditions,
 % all public config properties match, and n_a_E/n_b_E/tau_a_E actually differ.
 SRNN_ESN_reservoir.verify_shared_build(esn, ...
-    {'n_a_E', 'n_b_E'}, ...
+    {'n_a_E', 'n_b_E', 'tau_a_E'}, ...   % tau_a_E now uses the SRNNModel2 default (auto-filled per n_a_E), so it legitimately differs across conditions
     {'W', 'W_in', 'u_scalar', 'u_ex', 't_ex'});
 
 %% Run all conditions
@@ -109,7 +112,7 @@ for i = 1:n_cond
     fprintf('\n==============================\n');
     fprintf('CONDITION %d: %s\n', i, condition_names{i});
     fprintf('==============================\n');
-    [MC(i), R2{i}, results{i}] = esn{i}.run_memory_capacity();
+    [MC(i), R2{i}, results{i}] = esn{i}.run_memory_capacity('readout_signal', readout_signal);
 end
 
 %% Summary
@@ -122,13 +125,26 @@ for i = 1:n_cond
 end
 
 %% Save results for the plotting script
-% Saves the per-condition mc_results structs (which carry input, predictions,
-% targets, and full state time series) plus the summary + config, so
-% Fig_memory_capacity_example.m can re-render without re-simulating. The ESN
-% objects themselves are NOT saved (S_out alone is ~GB; mc_results has all the
-% plotting data). File is gitignored.
+% Keep ONLY what Fig_memory_capacity_example.m needs: the per-delay R^2 and the
+% reconstruction traces (predictions). The full mc_results also carries the
+% complete state time series (u_ex, x, r, b, br -- each [n x n_samples], ~0.6 GB
+% per condition); those are NOT used by the figure, so we strip them to keep the
+% .mat small (a few MB instead of ~9 GB). File is gitignored.
 delay_s = results{1}.delay_s;   % delay axis in seconds (shared across conditions)
+plot_fields = {'predictions', 't_pred', 'R2_d', 'd', 'delay_s', 'hold_len', 'MC'};
+results = cellfun(@(r) keep_fields(r, plot_fields), results, 'UniformOutput', false);
+
 save_file = fullfile(this_dir, 'mc_example_data.mat');
 save(save_file, 'results', 'MC', 'R2', 'delay_s', 'condition_names', ...
-    'base_args', 'condition_args', '-v7.3');
+    'base_args', 'condition_args');
 fprintf('\nSaved: %s\n', save_file);
+
+function out = keep_fields(s, fields)
+% Return a struct with only the named fields of s that actually exist.
+    out = struct();
+    for i = 1:numel(fields)
+        if isfield(s, fields{i})
+            out.(fields{i}) = s.(fields{i});
+        end
+    end
+end

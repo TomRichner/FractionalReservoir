@@ -25,20 +25,20 @@ addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))),
 
 %% -------------------- Global experiment settings --------------------
 % Network / dynamics
-n = 300;                    % Number of neurons
-f = 0.6;                    % Fraction excitatory (off perfect E/I balance)
-level_of_chaos = 2.5;       % Higher for the logistic default (mean slope < 1 raises the edge of chaos)
+n = 300;                    % Number of neurons (matches SRNNModel2 default)
+f = 0.6;                    % Fraction excitatory (matches SRNNModel2 default)
+level_of_chaos = 2.0;       % Above the edge of chaos (logistic mean slope < 1 raises it); SRNNModel2 default is 1.0
 
 % Sampling
-fs = 200;                   % Hz
+fs = 200;                   % Hz (matches SRNNModel2 default)
 
 % MC protocol (seconds -> samples). N_train = T_train_sec/T_hold hold-samples
 % must exceed n features for the readout to be well posed (here ~667 > 300).
 % T_wash=10 s is short vs tau_a_E=10 s (matches the example dial-in); raise it
 % for the final figure if the SFA conditions need more settling.
 T_wash_sec  = 10;
-T_train_sec = 300;
-T_test_sec  = 100;
+T_train_sec = 600;
+T_test_sec  = 150;
 
 T_wash  = T_wash_sec  * fs;
 T_train = T_train_sec * fs;
@@ -53,12 +53,17 @@ input_type = 'sample_hold'; % 'white' | 'bandlimited' | 'one_over_f' | 'sample_h
 u_f_cutoff = 5;             % only used if bandlimited
 u_alpha    = 1;             % only used if one_over_f (1=pink, 2=red)
 tau_d      = 0.1;           % Dendritic time constant (s)
-T_hold     = 3 * tau_d;     % sample_hold: hold each i.i.d. value this long (= 3*tau_d)
+T_hold     = 0.3;           % sample_hold: hold each i.i.d. value this long (s); sets the MC delay increment (matches compute_memory_capacity_example.m)
+
+% Readout signal for the MC regression: 'rate' reads out r = phi(x_eff) (STD's b
+% NOT exposed); 'synaptic' reads out br = b.*r (exposes the STD state to the
+% linear readout; unchanged for the no-STD conditions since br == r there).
+readout_signal = 'synaptic'; % 'rate' | 'synaptic'
 
 % Trials / seeds
-n_trials = 50;               % VALIDATION pass (fast); restore to 50-100 for real runs
-seed_net_base  = 1000;      % deterministic seed schedule
-seed_stim_base = 2000;
+n_trials = 10;     % 10 for fast, 50 for production   % VALIDATION pass (fast); restore to 50-100 for real runs
+seed_net_base  = 3000;      % deterministic seed schedule
+seed_stim_base = 4000;
 
 % Analysis knobs
 R2_threshold_for_horizon = 0.10;
@@ -80,27 +85,26 @@ condition_args = { ...
     {'n_a_E', 3, 'n_b_E', 0}, ...   % SFA only
     {'n_a_E', 0, 'n_b_E', 1}, ...   % STD only
     {'n_a_E', 3, 'n_b_E', 1}, ...   % SFA + STD
-};
+    };
 n_cond = numel(condition_names);
 
 %% -------------------- Shared base config template --------------------
 % NOTE: rng_seeds will be set per trial: [seed_net, seed_stim]
 base_args_template = { ...
     'n', n, ...
-    'f', f, ...                    % fraction excitatory (off perfect balance)
+    'f', f, ...                    % fraction excitatory (matches SRNNModel2 default)
     'fs', fs, ...
     'level_of_chaos', level_of_chaos, ...
-    'ode_solver', @ode_rk4, ...    % fixed-step solver (fast); default @ode45
-    'tau_d', tau_d, ...            % Dendritic time constant (s)
-    'S_c', 0.35, ...               % Nonlinearity bias (center); matches SRNNModel2 default
-    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1 (unused by the logistic)
-    'n_a_I', 0, ...                % no SFA for I neurons (all conditions)
-    'n_b_I', 0, ...                % no STD for I neurons (all conditions)
-    'c_E', 0.5/3, ...              % adaptation strength for E neurons (raised to strengthen SFA)
-    'tau_a_E', [0.1, 1.0, 10], ... % SFA time constants (s)
-    'tau_b_E_rec', 1.0, ...        % STD recovery (s)
-    'tau_b_E_rel', 0.25, ...       % STD release (s)
-    'std_zero_floor', true, ...    % rescale STD so (prod b)*r reaches 0 at full depression
+    'ode_solver', @ode_rk4, ...    % fixed-step solver (fast); SRNNModel2 default is @ode45
+    'tau_d', tau_d, ...            % Dendritic time constant (s; matches SRNNModel2 default)
+    'S_c', 0.35, ...                % Nonlinearity bias (center); matches SRNNModel2 default
+    'S_a', 0.9, ...                % Fraction of nonlinearity with slope 1 (matches SRNNModel2 default; unused by the logistic)
+    'n_a_I', 0, ...                % no SFA for I neurons (all conditions; matches SRNNModel2 default)
+    'n_b_I', 0, ...                % no STD for I neurons (all conditions; matches SRNNModel2 default)
+    'c_E', 0.5/3, ...             % adaptation strength for E neurons (matches SRNNModel2 default)
+    'tau_b_E_rec', 1.0, ...        % STD recovery (s; matches SRNNModel2 default)
+    'tau_b_E_rel', 0.25, ...       % STD release (s; matches SRNNModel2 default)
+    'std_zero_floor', false, ...   % matches SRNNModel2 default (no zero-floor rescale)
     'input_type', input_type, ...
     'u_f_cutoff', u_f_cutoff, ...
     'u_alpha', u_alpha, ...
@@ -109,7 +113,7 @@ base_args_template = { ...
     'T_train', T_train, ...
     'T_test', T_test, ...
     'd_max', d_max ...
-};
+    };
 
 %% -------------------- Delay grid + preallocate logs --------------------
 % Size the delay grid up front so R2_trials is fully allocated before the parfor
@@ -146,7 +150,8 @@ for i = 1:n_cond
     esn_chk{i} = SRNN_ESN_reservoir(chk_args{:}, condition_args{i}{:});
     esn_chk{i}.build();
 end
-verify_shared_build(esn_chk, {'n_a_E','n_b_E'}, {'W','W_in','u_scalar','u_ex','t_ex'});
+% tau_a_E now uses the SRNNModel2 default (auto-filled per n_a_E), so it legitimately differs across conditions.
+verify_shared_build(esn_chk, {'n_a_E','n_b_E','tau_a_E'}, {'W','W_in','u_scalar','u_ex','t_ex'});
 clear esn_chk chk_args;
 
 %% -------------------- Main loop: paired trials (parallel) --------------------
@@ -160,20 +165,21 @@ fprintf('\n==== Running %d paired trials (%s input) ====\n', n_trials, input_typ
 parfor k = 1:n_trials
     fprintf('--- Trial %d / %d | seeds: net=%d, stim=%d ---\n', ...
         k, n_trials, seed_net(k), seed_stim(k));
-
+    
     % Per-trial base args include the trial seeds (ensures paired W, W_in, u(t))
     base_args = [{'rng_seeds', [seed_net(k), seed_stim(k)]}, base_args_template];
-
+    
     % Per-trial accumulators (assigned to the sliced outputs once, below)
     mc_row  = nan(1, n_cond);
     h_row   = nan(1, n_cond);
     r2_row  = nan(n_cond, d_max_eff);
     int_row = cell(1, n_cond);
-
+    
     for i = 1:n_cond
         esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
         esn_i.build();
-        [mc_i, r2_i, res_i] = esn_i.run_memory_capacity('store_timeseries', false, 'verbose', false);
+        [mc_i, r2_i, res_i] = esn_i.run_memory_capacity('store_timeseries', false, 'verbose', false, ...
+            'readout_signal', readout_signal);
         r2_i = r2_i(:)';
         if numel(r2_i) ~= d_max_eff
             error('Trial %d condition %s: expected %d delays, got %d', ...
@@ -181,15 +187,15 @@ parfor k = 1:n_trials
         end
         mc_row(i)   = mc_i;
         r2_row(i,:) = r2_i;
-
+        
         % horizon (in seconds): largest delay with R2 > threshold
         idx = find(r2_i > R2_threshold_for_horizon, 1, 'last');
         if isempty(idx); h_row(i) = 0; else; h_row(i) = delay_s(idx); end
-
+        
         if store_internal_results; int_row{i} = res_i; end
         esn_i = [];   % release this condition's memory before building the next
     end
-
+    
     % Sliced assignments -- each output written exactly once per trial k
     MC_trials(k,:)        = mc_row;
     H_trials(k,:)         = h_row;
@@ -226,7 +232,7 @@ pair_labels = { ...
     'SFA vs STD', ...
     'SFA vs SFA+STD', ...
     'STD vs SFA+STD' ...
-};
+    };
 
 stats = struct();
 for p = 1:size(pairs,1)
@@ -350,55 +356,55 @@ fprintf('\nSaved:\n  %s\n  %s\n  %s\n  %s\n', mat_file, txt_file, ...
 function ci = bootstrap_mean_ci(X, n_boot, alpha)
 % X: [N x C]
 % Returns ci.lo, ci.hi for each column (mean CI)
-    if nargin < 3; alpha = 0.05; end
-    [N, C] = size(X);
-    boot_means = nan(n_boot, C);
-    for b = 1:n_boot
-        idx = randi(N, N, 1);
-        boot_means(b,:) = mean(X(idx,:), 1, 'omitnan');
-    end
-    ci.lo = quantile(boot_means, alpha/2, 1);
-    ci.hi = quantile(boot_means, 1-alpha/2, 1);
+if nargin < 3; alpha = 0.05; end
+[N, C] = size(X);
+boot_means = nan(n_boot, C);
+for b = 1:n_boot
+    idx = randi(N, N, 1);
+    boot_means(b,:) = mean(X(idx,:), 1, 'omitnan');
+end
+ci.lo = quantile(boot_means, alpha/2, 1);
+ci.hi = quantile(boot_means, 1-alpha/2, 1);
 end
 
 function ci = bootstrap_mean_ci_3d(R2_trials, n_boot, alpha)
 % R2_trials: [N x C x D]
 % Returns ci.lo and ci.hi as [C x D] for mean across N
-    if nargin < 3; alpha = 0.05; end
-    [N, C, D] = size(R2_trials);
-    boot_means = nan(n_boot, C, D);
-    for b = 1:n_boot
-        idx = randi(N, N, 1);
-        boot_means(b,:,:) = squeeze(mean(R2_trials(idx,:,:), 1, 'omitnan')); % [C x D]
-    end
-    ci.lo = squeeze(quantile(boot_means, alpha/2, 1));     % [C x D]
-    ci.hi = squeeze(quantile(boot_means, 1-alpha/2, 1));   % [C x D]
+if nargin < 3; alpha = 0.05; end
+[N, C, D] = size(R2_trials);
+boot_means = nan(n_boot, C, D);
+for b = 1:n_boot
+    idx = randi(N, N, 1);
+    boot_means(b,:,:) = squeeze(mean(R2_trials(idx,:,:), 1, 'omitnan')); % [C x D]
+end
+ci.lo = squeeze(quantile(boot_means, alpha/2, 1));     % [C x D]
+ci.hi = squeeze(quantile(boot_means, 1-alpha/2, 1));   % [C x D]
 end
 
 function [pval, mean_diff] = paired_signflip_permutation_pvalue(x, y, n_perm)
 % Robust paired permutation test via sign flips on differences.
 % H0: mean(x-y) = 0
-    x = x(:); y = y(:);
-    d = x - y;
-    d = d(~isnan(d));
-    mean_diff = mean(d);
-    N = numel(d);
-    if N == 0
-        pval = NaN; return;
-    end
-    % Permute by random sign flips
-    perm_stats = zeros(n_perm,1);
-    for r = 1:n_perm
-        s = 2*(rand(N,1) > 0.5) - 1; % +/-1
-        perm_stats(r) = mean(s .* d);
-    end
-    % two-sided p-value
-    pval = mean(abs(perm_stats) >= abs(mean_diff));
+x = x(:); y = y(:);
+d = x - y;
+d = d(~isnan(d));
+mean_diff = mean(d);
+N = numel(d);
+if N == 0
+    pval = NaN; return;
+end
+% Permute by random sign flips
+perm_stats = zeros(n_perm,1);
+for r = 1:n_perm
+    s = 2*(rand(N,1) > 0.5) - 1; % +/-1
+    perm_stats(r) = mean(s .* d);
+end
+% two-sided p-value
+pval = mean(abs(perm_stats) >= abs(mean_diff));
 end
 
 function dz = paired_cohens_dz(x, y)
 % Cohen's dz for paired designs: mean(diff)/std(diff)
-    d = x(:) - y(:);
-    d = d(~isnan(d));
-    dz = mean(d) / std(d, 0);
+d = x(:) - y(:);
+d = d(~isnan(d));
+dz = mean(d) / std(d, 0);
 end

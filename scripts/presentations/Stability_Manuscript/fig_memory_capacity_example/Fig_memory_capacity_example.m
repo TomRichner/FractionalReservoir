@@ -54,15 +54,18 @@ end
 
 xmax_s       = 10;              % (a)/(b) delay-axis limit (s)
 recon_cond   = 4;               % reconstruct the SFA+STD condition
-recon_delays = [2, 4, 8, 16];   % hold-delay indices to show (labeled in seconds)
+recon_delays = [1, 5, 10, 15];  % hold-delay indices to show (labeled in seconds): 0.3, 1.5, 3.0, 4.5 s at T_hold=0.3
 recon_ylim   = [-0.6, 0.6];     % shared y-limits across all reconstruction panels
 line_w       = 2;               % (a)/(b) curve width (matches the reference figure)
 
 %% ==================== Combined figure ====================
 % 6x2 tiled grid: (a)/(b) span the top two rows; each reconstruction spans a
 % full-width row below. Explicit tile indices keep the spans unambiguous.
-fig = figure('Color', 'w', 'Position', [100 100 1000 1050]);
-tiledlayout(6, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+fig = figure('Color', 'w', 'Position', [100 100 750 788]);   % 75% of the previous 1000x1050
+tl = tiledlayout(6, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+% Leave headroom above the tiles so the (a)/(b) panel letters can sit clearly
+% above the axes (and their y-labels) without clipping at the figure top.
+tl.OuterPosition = [0 0 1 0.95];
 
 % (a) Cumulative MC vs delay
 ax_a = nexttile(1, [2 1]); hold on; grid off; box off;
@@ -71,6 +74,7 @@ for i = 1:n_cond
 end
 xlim([0 xmax_s]);
 xlabel('Delay (s)'); ylabel('Cumulative Memory Capacity');
+set(ax_a, 'XTick', [0 5 10], 'YTick', [0 4 8]);   % match plot_memory_capacity_combined.m
 hold off;
 
 % (b) Per-delay R^2 vs delay -- carries the one legend for the figure
@@ -80,7 +84,8 @@ for i = 1:n_cond
 end
 xlim([0 xmax_s]);
 xlabel('Delay (s)'); ylabel('$R^2$', 'Interpreter', 'latex');
-legend(display_names, 'Location', 'northeast');
+set(ax_b, 'XTick', [0 5 10], 'YTick', [0 0.5 1]);   % match plot_memory_capacity_combined.m
+legend(display_names, 'Location', 'northeast', 'Box', 'off');
 hold off;
 
 % Reconstruction rows (SFA+STD): target u(t-d) vs trained readout, delay in s.
@@ -100,15 +105,10 @@ for k = 1:nR
     plot(t_delay, p.y_true, 'k-', 'LineWidth', 0.9);
     plot(t_delay, p.y_pred, '-', 'Color', colors(recon_cond, :), 'LineWidth', 1.4);
     ylim(recon_ylim);
-    ylabel('u(t-d)');
     title(sprintf('delay = %.1f seconds,  R^2 = %.2f', delay_s(d), mcr.R2_d(d)), ...
         'FontWeight', 'normal', 'Interpreter', 'tex');
     % Hide the x-axis entirely (no ticks, no black axis line).
     set(gca, 'XColor', 'none');
-    if k == 1
-        lgd = legend({'target', 'readout'}, 'Location', 'northeast', 'FontSize', 10);
-        lgd.Position(2) = lgd.Position(2) + 0.03;   % nudge the legend higher
-    end
     if k == nR
         % 15 s scale bar in the lower-right corner.
         xl = get(gca, 'XLim');
@@ -126,8 +126,10 @@ end
 % Panel letters: (a)/(b) on the analysis panels and (c) on the first
 % reconstruction row, same style as the reference figure. The remaining
 % reconstruction rows are self-labeled by their delay/R^2 titles.
+% Per-axis VShift: push (a)/(b) further up into the headroom (clearing their
+% y-labels); keep (c) where it is.
 AddLetters2Plots({ax_a, ax_b, recon_ax(1)}, {'(a)', '(b)', '(c)'}, ...
-    'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.06, 'VShift', -0.04);
+    'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.06, 'VShift', [-0.075 -0.075 -0.04]);
 
 %% ==================== Save the figure ====================
 % Stable names (png/svg/fig), matching the other Stability_Manuscript scripts.

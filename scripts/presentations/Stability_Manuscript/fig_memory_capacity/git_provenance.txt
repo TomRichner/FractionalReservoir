@@ -1,25 +1,29 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity
-Captured at: 21-Jul-2026 16:16:46
+Captured at: 22-Jul-2026 13:30:22
 
-commit:      add78d64e40b919c3023e06023726cf740ea84c6
-commit_short:add78d6
+commit:      218f0e05b3c8f453421a68f59317cc8b567db54f
+commit_short:218f0e0
 branch:      celltypes-v2
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    param space figure cleanup 2
-last_date:   2026-07-21T16:00:29-05:00
+last_msg:    memory capacity fiure cleanup
+last_date:   2026-07-21T16:17:10-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_f_3.fig
+M scripts/memory_capacity/looped_memory_capacity.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_f_3.fig
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.png
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.svg
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
- D scripts/presentations/Stability_Manuscript/fig_memory_capacity/MC_sample_hold_20260706_194403_trials50_Fig1_MC_Distributions.png
- D scripts/presentations/Stability_Manuscript/fig_memory_capacity/MC_sample_hold_20260706_194403_trials50_Fig2_R2_Curves.png
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/plot_memory_capacity_combined.m
-?? scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.fig
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.png
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.svg
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_memory_capacity_example.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/README_fig_memory_capacity_example.txt
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/compute_memory_capacity_example.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/git_provenance.txt
+ M src/SRNN_ESN_reservoir.m
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/working_changes.patch
 
 --- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
+scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/working_changes.patch
