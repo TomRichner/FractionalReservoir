@@ -16,7 +16,8 @@ function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, rng_seed, input_con
 % Optional:
 %   noise_intensity - fs-invariant white-noise intensity (0 or absent = off)
 %
-% Promoted from a local function in scripts/stim_engages_adaptation/
+% Promoted from a local function in scripts/presentations/Stability_Manuscript/
+% fig_stim_engages_adaptation/
 % bursting_SRNN_model.m so it lives on the path (added by setup_paths) and can
 % be serialized to parfor workers by the multi-seed analyses.
     dt   = 1 / fs;

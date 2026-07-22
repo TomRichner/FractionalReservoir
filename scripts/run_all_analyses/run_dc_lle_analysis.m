@@ -6,7 +6,8 @@
 %
 % For each of n_seeds network/stimulus seeds we run ONE simulation in which a
 % uniform DC is stepped through a staircase of levels (the same setup as
-% scripts/stim_engages_adaptation/bursting_SRNN_model.m, single SFA+STD regime),
+% scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/
+% bursting_SRNN_model_good_ex.m, single SFA+STD regime),
 % compute the local LLE timeseries with Benettin's method, and bin it by DC
 % level -- skipping the first psd_settle seconds after each step so SFA/STD have
 % settled. Aggregating the per-level mean LLE ACROSS seeds gives a mean +/- std
@@ -79,7 +80,8 @@ fprintf('[run_dc_lle_analysis] run_mode=%s, n_seeds=%d, nL=%d, ode_solver=%s\n',
     run_mode, n_seeds, nL, func2str(ode_solver));
 
 %% Network / model configuration (single SFA+STD "bursting" regime)
-% Mirrors scripts/stim_engages_adaptation/bursting_SRNN_model.m.
+% Mirrors scripts/presentations/Stability_Manuscript/
+% fig_stim_engages_adaptation/bursting_SRNN_model_good_ex.m.
 n        = 50;      % total neurons
 f        = 0.5;     % fraction excitatory
 indegree = 4;       % expected in-degree

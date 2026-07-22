@@ -181,8 +181,8 @@ store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 % Figure saving: when true, save all open figures (time-series + PSD) to data/
 % via save_some_figs_to_folder_2 (writes .fig/.png/.pdf). Each run goes to a
 % timestamped subfolder so nothing is overwritten.
-save_figs  = false;        % set true to save figures for sharing
-save_types = {'fig', 'png', 'svg', 'pdf'};   % formats; pdf bundles all figs into one _report.pdf
+save_figs  = true;        % set true to save figures for sharing
+save_types = {'png'};   % formats; pdf bundles all figs into one _report.pdf
 
 %% ======================================================================
 %  10. PSD ANALYSIS (pwelch of mean dendritic potential x, per DC level)
@@ -250,7 +250,8 @@ t_full = model.t_out;
 
 % One PSD per DC staircase level, overlaid on a log-log axis.
 nL = numel(dc_levels);
-figure('Name', 'PSD of Mean Dendritic Potential vs DC level');
+figure('Name', 'PSD of Mean Dendritic Potential vs DC level', ...
+    'Position', [20   297   505   418]);
 hold on;
 cmap = parula(nL+1);
 labels = cell(nL, 1);
@@ -279,18 +280,66 @@ label_fs = 15.4;
 legend_fs = 12.6;
 set(psd_ax, 'XScale', 'log', 'YScale', 'log', 'FontSize', tick_fs);
 xlabel(psd_ax, 'Frequency (Hz)', 'FontSize', label_fs);
-ylabel(psd_ax, 'Dendritic Potential^2/Hz', 'FontSize', label_fs);
+ylabel(psd_ax, 'PSD $x^2$/Hz', 'Interpreter', 'latex', ...
+    'FontSize', label_fs);
 legend(psd_ax, labels, 'Location', 'northeast', 'Box', 'off', ...
     'FontSize', legend_fs);
 grid(psd_ax, 'off');
 
 %% ======================================================================
-%  SAVE FIGURES  (time-series + PSD) -> data/<timestamped subfolder>
+%  SHORT STAIRCASE FOR THE PAPER  (3 DC levels, 20 s holds)
+%  ======================================================================
+% The staircase above is long and busy -- useful for the per-level PSD, but
+% too cluttered for a manuscript time-series figure. Re-run the same network
+% configuration with a compact three-level staircase. Only the DC levels,
+% hold duration, and derived simulation range change.
+dc_levels_short = [0.0 0.05 0.2];
+hold_dur_short  = 20;
+
+input_config_short = input_config;
+input_config_short.dc_levels = dc_levels_short;
+input_config_short.hold_dur  = hold_dur_short;
+
+T_range_short = [0, numel(dc_levels_short) * hold_dur_short];
+
+model_short = SRNNModel2( ...
+    'n', n, 'f', f, 'indegree', indegree, ...
+    'mu_E_tilde', mu_E_tilde, 'mu_I_tilde', mu_I_tilde, ...
+    'sigma_E_tilde', sigma_E_tilde, 'sigma_I_tilde', sigma_I_tilde, ...
+    'E_W', E_W, 'zrs_mode', zrs_mode, ...
+    'level_of_chaos', level_of_chaos, 'rescale_by_abscissa', rescale_by_abscissa, ...
+    'n_a_E', n_a_E, 'n_a_I', n_a_I, 'c_E', c_E, 'c_I', c_I, ...
+    'tau_a_E', tau_a_E, 'tau_a_I', tau_a_I, ...
+    'n_b_E', n_b_E, 'n_b_I', n_b_I, ...
+    'tau_b_E_rec', tau_b_E_rec, 'tau_b_E_rel', tau_b_E_rel, ...
+    'tau_b_I_rec', tau_b_I_rec, 'tau_b_I_rel', tau_b_I_rel, ...
+    'tau_d', tau_d, 'S_a', S_a, 'S_c', S_c, ...
+    'activation_function', phi, 'activation_function_derivative', phi_deriv, ...
+    'input_config', input_config_short, 'u_ex_scale', u_ex_scale, ...
+    'fs', fs, 'T_range', T_range_short, 'T_plot', T_plot, ...
+    'ode_solver', ode_solver, 'rng_seeds', rng_seeds, ...
+    'lya_method', lya_method, 'plot_deci', plot_deci, ...
+    'store_full_state', store_full_state);
+
+model_short.build();
+model_short.run();
+[fig_handle_short, ax_handles_short] = model_short.plot();
+set(fig_handle_short, 'Name', 'Short staircase (paper figure)');
+
+% Un-cap the firing-rate and synaptic-output panels for the ReLU output.
+for k = 1:numel(ax_handles_short)
+    ylab = get(get(ax_handles_short(k), 'YLabel'), 'String');
+    if any(strcmp(ylab, {'firing rate', 'synaptic output'}))
+        ylim(ax_handles_short(k), 'auto');
+        yticks(ax_handles_short(k), 'auto');
+    end
+end
+
+%% ======================================================================
+%  SAVE FIGURES  (time-series + PSD) -> this manuscript figure folder
 %  ======================================================================
 if save_figs
-    project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));  % .../FractionalResevoir
-    stamp       = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
-    save_folder = fullfile(project_root, 'data', ['bursting_SRNN_model_' stamp]);
+    save_folder = fileparts(mfilename('fullpath'));
     save_name   = sprintf('bursting_seed%d_%d', rng_seeds(1), rng_seeds(2));
     % fig_vec = [] -> save every open figure (close all at top guarantees these
     % are just the time-series and PSD figures from this run).
