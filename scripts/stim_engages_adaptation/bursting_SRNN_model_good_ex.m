@@ -273,12 +273,16 @@ for k = 1:nL
     labels{k} = sprintf('DC = %.3g', dc_levels(k));
 end
 hold off;
-set(gca, 'XScale', 'log', 'YScale', 'log');
-xlabel('Frequency (Hz)');
-ylabel('Dendritic Potential^2/Hz');
-title(sprintf('PSD of Mean Dendritic Potential (x) vs DC level  (noise intensity = %.3g)', noise_intensity));
-legend(labels, 'Location', 'southwest');
-grid on;
+psd_ax = gca;
+tick_fs = 14;
+label_fs = 15.4;
+legend_fs = 12.6;
+set(psd_ax, 'XScale', 'log', 'YScale', 'log', 'FontSize', tick_fs);
+xlabel(psd_ax, 'Frequency (Hz)', 'FontSize', label_fs);
+ylabel(psd_ax, 'Dendritic Potential^2/Hz', 'FontSize', label_fs);
+legend(psd_ax, labels, 'Location', 'northeast', 'Box', 'off', ...
+    'FontSize', legend_fs);
+grid(psd_ax, 'off');
 
 %% ======================================================================
 %  SAVE FIGURES  (time-series + PSD) -> data/<timestamped subfolder>
@@ -340,30 +344,5 @@ u_ex = repmat(dc_profile', params.n, 1);
 if isfield(input_config, 'noise_intensity') && input_config.noise_intensity > 0
     rng(rng_seed);
     u_ex = u_ex + input_config.noise_intensity * sqrt(fs) * randn(params.n, numel(t_ex));
-end
-end
-
-function [t, Y] = ode_rk4(odefun, tspan, y0, ~)
-% ODE_RK4 Fixed-step classic RK4, matching the @ode45 call signature used by
-% SRNNModel2: solver(rhs, t_ex, S0, opts). Steps at the native spacing of the
-% supplied time vector tspan (uniform fs grid) and returns the solution at
-% exactly those times, so the class's output-time check passes. opts ignored.
-%
-% Much faster than adaptive ode45 when the forcing is noisy (no step-size
-% control thrashing). rhs is evaluated 4x per step.
-t  = tspan(:);
-nt = numel(t);
-y  = y0(:);
-Y  = zeros(nt, numel(y));
-Y(1, :) = y.';
-for k = 1:nt-1
-    h  = t(k+1) - t(k);
-    tk = t(k);
-    k1 = odefun(tk,       y);
-    k2 = odefun(tk + h/2, y + (h/2)*k1);
-    k3 = odefun(tk + h/2, y + (h/2)*k2);
-    k4 = odefun(tk + h,   y + h*k3);
-    y  = y + (h/6)*(k1 + 2*k2 + 2*k3 + k4);
-    Y(k+1, :) = y.';
 end
 end

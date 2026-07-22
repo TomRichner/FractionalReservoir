@@ -52,84 +52,121 @@ else
     display_names = condition_names;
 end
 
-xmax_s       = 10;              % (a)/(b) delay-axis limit (s)
+xmax_s       = 7.5;             % (a)/(b) delay-axis limit (s)
 recon_cond   = 4;               % reconstruct the SFA+STD condition
 recon_delays = [1, 5, 10, 15];  % hold-delay indices to show (labeled in seconds): 0.3, 1.5, 3.0, 4.5 s at T_hold=0.3
 recon_ylim   = [-0.6, 0.6];     % shared y-limits across all reconstruction panels
 line_w       = 2;               % (a)/(b) curve width (matches the reference figure)
 
 %% ==================== Combined figure ====================
-% 6x2 tiled grid: (a)/(b) span the top two rows; each reconstruction spans a
-% full-width row below. Explicit tile indices keep the spans unambiguous.
-fig = figure('Color', 'w', 'Position', [100 100 750 788]);   % 75% of the previous 1000x1050
-tl = tiledlayout(6, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+% 24x2 tiled grid (fine rows so the gap below (a)/(b) is tunable): (a)/(b) span
+% the top 8 rows; row 9 is left empty as a spacer; the reconstruction block
+% (nested layout) fills rows 10-24. Explicit tile indices keep the spans clear.
+fig = figure('Color', 'w', 'Position', [100 237 603 652]);   % compact size (hand-tuned)
+tl = tiledlayout(24, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
 % Leave headroom above the tiles so the (a)/(b) panel letters can sit clearly
-% above the axes (and their y-labels) without clipping at the figure top.
-tl.OuterPosition = [0 0 1 0.95];
+% above the axes (and their y-labels) without clipping at the figure top. The
+% reduced width leaves room at the right for the (c) amplitude scale-bar label.
+tl.OuterPosition = [0 0 0.90 0.95];
 
 % (a) Cumulative MC vs delay
-ax_a = nexttile(1, [2 1]); hold on; grid off; box off;
+ax_a = nexttile(1, [8 1]); hold on; grid off; box off;
 for i = 1:n_cond
     plot(delay_s, cumsum(R2{i}), '-', 'Color', colors(i, :), 'LineWidth', line_w);
 end
-xlim([0 xmax_s]);
-xlabel('Delay (s)'); ylabel('Cumulative Memory Capacity');
-set(ax_a, 'XTick', [0 5 10], 'YTick', [0 4 8]);   % match plot_memory_capacity_combined.m
+xlim([0 xmax_s]); ylim([0 11]);
+xlabel('Delay (s)', 'FontSize', 15.4); ylabel({'Cumulative', 'Memory Capacity'}, 'FontSize', 15.4);
+set(ax_a, 'XTick', [0 2.5 5], 'YTick', [0 5 10]);   % match plot_memory_capacity_combined.m
 hold off;
 
 % (b) Per-delay R^2 vs delay -- carries the one legend for the figure
-ax_b = nexttile(2, [2 1]); hold on; grid off; box off;
+ax_b = nexttile(2, [8 1]); hold on; grid off; box off;
 for i = 1:n_cond
     plot(delay_s, R2{i}, '-', 'Color', colors(i, :), 'LineWidth', line_w);
 end
-xlim([0 xmax_s]);
-xlabel('Delay (s)'); ylabel('$R^2$', 'Interpreter', 'latex');
-set(ax_b, 'XTick', [0 5 10], 'YTick', [0 0.5 1]);   % match plot_memory_capacity_combined.m
-legend(display_names, 'Location', 'northeast', 'Box', 'off');
+xlim([0 xmax_s]); ylim([0 1.005]);
+xlabel('Delay (s)', 'FontSize', 15.4); ylabel('$R^2$', 'Interpreter', 'latex', 'FontSize', 15.4);
+set(ax_b, 'XTick', [0 2.5 5], 'YTick', [0 0.5 1]);   % match plot_memory_capacity_combined.m
+lgd = legend(display_names, 'Location', 'northeast', 'Box', 'off');
+% Nudge the legend further up and to the right (into the corner headroom).
+lgd.Units = 'normalized';
+lp = lgd.Position;
+lgd.Position = [lp(1) + 0.02, lp(2) + 0.03, lp(3), lp(4)];
 hold off;
 
 % Reconstruction rows (SFA+STD): target u(t-d) vs trained readout, delay in s.
 % The x-axis (time) is hidden on every row -- a 15 s scale bar on the bottom row
 % conveys the timescale instead.
 mcr        = results{recon_cond};
-tile_ids   = [5, 7, 9, 11];   % top-left tile of each full-width reconstruction row
 nR         = numel(recon_delays);
-scalebar_s = 15;              % length of the reconstruction scale bar (s)
+scalebar_s  = 15;             % length of the horizontal time scale bar (s)
+scalebar_au = 1;              % length of the vertical amplitude scale bar (A.U.)
+recon_win   = 60;             % time span shown in each reconstruction panel (s)
 recon_ax   = gobjects(1, nR);
+
+% Nested tiledlayout for the (c) rows so their vertical spacing can be tightened
+% independently of (a)/(b). It occupies grid rows 10-24 of the outer 24x2 layout
+% (row 9 above it is the empty spacer that opens the gap below (a)/(b)); 'tight'
+% spacing packs the four panels closer than the outer 'compact' while still
+% leaving room for each panel's title.
+tl_c = tiledlayout(tl, nR, 1, 'TileSpacing', 'tight', 'Padding', 'none');
+tl_c.Layout.Tile     = 19;       % top-left tile of the (c) block (row 10, col 1)
+tl_c.Layout.TileSpan = [15 2];   % span rows 10-24 x 2 cols
 for k = 1:nR
     d = recon_delays(k);
     p = mcr.predictions(d);
     t_delay = mcr.t_pred(p.t_indices);
 
-    recon_ax(k) = nexttile(tile_ids(k), [1 2]); hold on; grid off; box off;
+    recon_ax(k) = nexttile(tl_c); hold on; grid off; box off;
     plot(t_delay, p.y_true, 'k-', 'LineWidth', 0.9);
     plot(t_delay, p.y_pred, '-', 'Color', colors(recon_cond, :), 'LineWidth', 1.4);
     ylim(recon_ylim);
+    % Show only the first recon_win seconds of the test window.
+    xlim([t_delay(1), t_delay(1) + recon_win]);
     title(sprintf('delay = %.1f seconds,  R^2 = %.2f', delay_s(d), mcr.R2_d(d)), ...
         'FontWeight', 'normal', 'Interpreter', 'tex');
-    % Hide the x-axis entirely (no ticks, no black axis line).
-    set(gca, 'XColor', 'none');
+    % Hide both axes entirely (no ticks, no black axis lines) -- the scale bars
+    % convey time (x) and amplitude (y) instead.
+    set(gca, 'XColor', 'none', 'YColor', 'none');
     if k == nR
-        % 15 s scale bar in the lower-right corner.
+        % L-shaped scale bar in the lower-right corner: a horizontal 15 s time bar
+        % and a vertical 1 A.U. amplitude bar meeting at a right angle. Clipping is
+        % off so the bars/labels can sit beneath and right of the axis limits.
         xl = get(gca, 'XLim');
-        x2 = xl(2) - 0.03 * diff(xl);
-        x1 = x2 - scalebar_s;
-        yb = recon_ylim(1) + 0.05 * diff(recon_ylim);
-        plot([x1 x2], [yb yb], 'k-', 'LineWidth', 2.5);
-        text((x1 + x2) / 2, yb, sprintf('%d s', scalebar_s), ...
-            'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
-            'FontSize', 12);
+        xc = xl(2) + 0.02 * diff(xl);                    % corner x (just right of the data)
+        x1 = xc - scalebar_s;                            % left end of the time bar
+        yb = recon_ylim(1) - 0.18 * diff(recon_ylim);    % corner y (below the trace)
+        ya = yb + scalebar_au;                           % top of the amplitude bar
+
+        % Horizontal time bar + vertical amplitude bar, sharing the corner (xc, yb).
+        plot([x1 xc], [yb yb], 'k-', 'LineWidth', 2.5, 'Clipping', 'off');
+        plot([xc xc], [yb ya], 'k-', 'LineWidth', 2.5, 'Clipping', 'off');
+
+        % Time label centered below the horizontal bar.
+        text((x1 + xc) / 2, yb - 0.06 * diff(recon_ylim), sprintf('%d s', scalebar_s), ...
+            'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', ...
+            'FontSize', 12, 'Clipping', 'off');
+        % Amplitude label just right of the vertical bar, rotated -90 deg.
+        text(xc + 0.03 * diff(xl), (yb + ya) / 2, sprintf('%g AU', scalebar_au), ...
+            'Rotation', 90, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+            'FontSize', 12, 'Clipping', 'off');
     end
     hold off;
 end
 
-% Panel letters: (a)/(b) on the analysis panels and (c) on the first
-% reconstruction row, same style as the reference figure. The remaining
-% reconstruction rows are self-labeled by their delay/R^2 titles.
-% Per-axis VShift: push (a)/(b) further up into the headroom (clearing their
-% y-labels); keep (c) where it is.
-AddLetters2Plots({ax_a, ax_b, recon_ax(1)}, {'(a)', '(b)', '(c)'}, ...
-    'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.06, 'VShift', [-0.075 -0.075 -0.04]);
+% Panel letters: (a)/(b) on the analysis panels via AddLetters2Plots. The
+% remaining reconstruction rows are self-labeled by their delay/R^2 titles.
+% Per-axis VShift: a modest upward nudge for (a)/(b) -- the two-line y-label on
+% (a) frees up space, so the letters can sit lower than before.
+AddLetters2Plots({ax_a, ax_b}, {'(a)', '(b)'}, ...
+    'FontSize', 18, 'FontWeight', 'normal', 'HShift', -0.06, 'VShift', [-0.02 -0.02]);
+
+% (c) is lettered manually: recon_ax(1) lives in the nested tiledlayout, whose
+% reported position confuses AddLetters2Plots (it lands up by (a)). Place it in
+% axis-normalized coordinates at the panel's top-left corner instead.
+text(recon_ax(1), -0.025, 1.16, '(c)', 'Units', 'normalized', ...
+    'FontSize', 18, 'FontWeight', 'normal', 'HorizontalAlignment', 'center', ...
+    'VerticalAlignment', 'bottom', 'Clipping', 'off');
 
 %% ==================== Save the figure ====================
 % Stable names (png/svg/fig), matching the other Stability_Manuscript scripts.

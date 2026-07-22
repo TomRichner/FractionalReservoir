@@ -1,24 +1,25 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity_example
-Captured at: 21-Jul-2026 17:34:38
+Captured at: 22-Jul-2026 14:40:09
 
-commit:      218f0e05b3c8f453421a68f59317cc8b567db54f
-commit_short:218f0e0
+commit:      27fa2134791685c138a3a1a582db07a201a82b44
+commit_short:27fa213
 branch:      celltypes-v2
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    memory capacity fiure cleanup
-last_date:   2026-07-21T16:17:10-05:00
+last_msg:    memory capacity figure re-runs
+last_date:   2026-07-22T13:44:36-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/memory_capacity/looped_memory_capacity.m
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.fig
+M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.fig
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.png
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.svg
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_memory_capacity_example.m
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/README_fig_memory_capacity_example.txt
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/compute_memory_capacity_example.m
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/git_provenance.txt
-?? scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/working_changes.patch
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/working_changes.patch
+D  scripts/stim_engages_adaptation/bursting_SRNN_model.m
+ M scripts/stim_engages_adaptation/bursting_SRNN_model_good_ex.m
+?? FractionalReservoir.code-workspace
 
 --- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/working_changes.patch
+FractionalReservoir.code-workspace
