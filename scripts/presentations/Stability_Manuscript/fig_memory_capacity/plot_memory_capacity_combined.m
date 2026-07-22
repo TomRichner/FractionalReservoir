@@ -79,10 +79,10 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
         shaded_ci(delay_s, R2_cum_ci_lo(i,:), R2_cum_ci_hi(i,:), colors(i,:), 0.12);
         plot(delay_s, R2_cum_mean(i,:), '-', 'Color', colors(i,:), 'LineWidth', 2);
     end
-    xlim([0 10]);
-    xlabel('Delay (s)');
-    ylabel('Cumulative Memory Capacity');
-    set(ax_a, 'XTick', [0 5 10], 'YTick', [0 4 8]);
+    xlim([0 7.5]); ylim([0 10.9]);
+    xlabel('Delay (s)', 'FontSize', 15.4);
+    ylabel({'Cumulative', 'Memory Capacity'}, 'FontSize', 15.4);
+    set(ax_a, 'XTick', [0 2.5 5], 'YTick', [0 5 10]);
 
     % (b) Per-delay R^2(d) -- carries the one legend for the figure
     ax_b = nexttile; hold on; grid off; box off;
@@ -90,10 +90,10 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
         shaded_ci(delay_s, R2_ci.lo(i,:), R2_ci.hi(i,:), colors(i,:), 0.12);
         plot(delay_s, R2_mean(i,:), '-', 'Color', colors(i,:), 'LineWidth', 2);
     end
-    xlim([0 10]);
-    xlabel('Delay (s)');
-    ylabel('$R^2$', 'Interpreter', 'latex');
-    set(ax_b, 'XTick', [0 5 10], 'YTick', [0 0.5 1]);
+    xlim([0 7.5]);
+    xlabel('Delay (s)', 'FontSize', 15.4);
+    ylabel('$R^2$', 'Interpreter', 'latex', 'FontSize', 15.4);
+    set(ax_b, 'XTick', [0 2.5 5], 'YTick', [0 0.5 1]);
     legend(condition_names, 'Location', 'northeast', 'Box', 'off');
 
     % (c) Horizon distribution (paired trials)
@@ -113,7 +113,7 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     xlim([0.5 n_cond+0.5]);
     set(gca,'XTick',xpos,'XTickLabel',condition_names);
     set(ax_c, 'YTick', [0 3 6]);
-    ylabel('Memory Horizon (s)');
+    ylabel('Memory Horizon (s)', 'FontSize', 15.4);
 
     % Panel letters (a)/(b)/(c) just above-left of each tile, outside the axes
     % (negative shifts push the label outside the plotting area). Uniform shift
