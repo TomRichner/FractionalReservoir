@@ -21,7 +21,7 @@ addpath(this_dir);
 
 % Source run to replot.
 mat_file = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready', ...
-    'MC_sample_hold_20260722_123819_trials10_results.mat');
+    'MC_sample_hold_20260722_154245_trials30_results.mat');
 
 % Write the regenerated manuscript figures next to this script.
 out_dir = this_dir;

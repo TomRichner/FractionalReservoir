@@ -61,7 +61,7 @@ T_hold     = 0.3;           % sample_hold: hold each i.i.d. value this long (s);
 readout_signal = 'synaptic'; % 'rate' | 'synaptic'
 
 % Trials / seeds
-n_trials = 10;     % 10 for fast, 50 for production   % VALIDATION pass (fast); restore to 50-100 for real runs
+n_trials = 30;     % 10 for fast, 50 for production   % VALIDATION pass (fast); restore to 50-100 for real runs
 seed_net_base  = 3000;      % deterministic seed schedule
 seed_stim_base = 4000;
 

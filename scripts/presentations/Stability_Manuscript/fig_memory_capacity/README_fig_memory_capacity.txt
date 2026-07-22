@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Memory Capacity
 ============================================
 
-Generated: 22-Jul-2026 14:47:19
+Generated: 22-Jul-2026 16:31:28
 By script: Fig_memory_capacity.m
 
 HOW IT WAS MADE
@@ -11,14 +11,14 @@ HOW IT WAS MADE
   figures into this folder. See git_provenance.txt for the exact commit.
 
 SOURCE DATASET
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\memory_capacity\paper_ready\MC_sample_hold_20260722_123819_trials10_results.mat
-  run_tag: MC_sample_hold_20260722_123819_trials10
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\memory_capacity\paper_ready\MC_sample_hold_20260722_154245_trials30_results.mat
+  run_tag: MC_sample_hold_20260722_154245_trials30
 
 KEY SETTINGS (from the saved run)
   input_type    : sample_hold
   n (neurons)   : 300
   fs (Hz)       : 200
-  n_trials      : 10
+  n_trials      : 30
   level_of_chaos: 2
   T_hold (s)    : 0.3
   conditions    : Baseline, SFA, STD, SFA+STD

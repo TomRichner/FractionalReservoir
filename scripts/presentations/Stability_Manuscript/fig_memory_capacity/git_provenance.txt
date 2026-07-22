@@ -1,19 +1,17 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity
-Captured at: 22-Jul-2026 14:47:19
+Captured at: 22-Jul-2026 16:31:28
 
-commit:      7a4d1feabcfd760c85f2153b824aecb2c08217cf
-commit_short:7a4d1fe
+commit:      83680c3c6f710dc52b570b748cb89dc069682356
+commit_short:83680c3
 branch:      celltypes-v2
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    memory capacity example figure looks great.
-last_date:   2026-07-22T14:41:01-05:00
+last_msg:    bursting figs cleand up
+last_date:   2026-07-22T15:34:23-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_f_3.fig
+M scripts/memory_capacity/looped_memory_capacity.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_f_3.fig
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.png
  M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.svg
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/plot_memory_capacity_combined.m
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/working_changes.patch
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
