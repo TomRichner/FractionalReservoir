@@ -197,7 +197,7 @@ save_types = {'png'};   % formats; pdf bundles all figs into one _report.pdf
 psd_settle       = 15;    % seconds to skip after each DC step before the PSD window
 psd_win_len_s    = 10;    % Hamming window length (s)   [template used 15]
 psd_overlap_frac = 0.5;  % segment overlap fraction    [template used 0.75]
-psd_f            = logspace(log10(0.3), log10(80), 100);  % requested freqs (Hz)
+psd_f            = logspace(log10(0.3), log10(100), 100);  % requested freqs (Hz)
 
 %% ======================================================================
 %  11. CONSTRUCT, BUILD, RUN, PLOT
@@ -284,6 +284,7 @@ psd_ax = gca;
 tick_fs = 14;
 label_fs = 15.4;
 legend_fs = 12.6;
+xlim([0.2 90])
 set(psd_ax, 'XScale', 'log', 'YScale', 'log', 'FontSize', tick_fs);
 xlim(psd_ax, [0.2 90]);
 xlabel(psd_ax, 'Frequency (Hz)', 'FontSize', label_fs);
