@@ -197,7 +197,7 @@ save_types = {'png'};   % formats; pdf bundles all figs into one _report.pdf
 psd_settle       = 15;    % seconds to skip after each DC step before the PSD window
 psd_win_len_s    = 10;    % Hamming window length (s)   [template used 15]
 psd_overlap_frac = 0.5;  % segment overlap fraction    [template used 0.75]
-psd_f            = logspace(log10(0.1), log10(100), 100);  % requested freqs (Hz)
+psd_f            = logspace(log10(0.3), log10(80), 100);  % requested freqs (Hz)
 
 %% ======================================================================
 %  11. CONSTRUCT, BUILD, RUN, PLOT
@@ -254,8 +254,14 @@ figure('Name', 'PSD of Mean Dendritic Potential vs DC level', ...
     'Position', [20   297   505   418]);
 hold on;
 cmap = parula(nL+1);
-labels = cell(nL, 1);
-for k = 1:nL
+% Only show a subset of DC levels (here DC = 0 and DC = 0.2), but keep the
+% parula(nL+1) colors indexed by the original level number so the traces
+% match the full-staircase color scheme.
+psd_show_levels = [1 5];
+psd_show_labels = {'no-stim', 'stim'};   % legend text for each shown level
+labels = cell(numel(psd_show_levels), 1);
+for ii = 1:numel(psd_show_levels)
+    k = psd_show_levels(ii);
     % Steady window for level k: skip the first psd_settle s after the step.
     lo  = (k-1)*hold_dur + psd_settle;
     hi  = k*hold_dur;
@@ -271,7 +277,7 @@ for k = 1:nL
     
     [pxx, fpx] = pwelch(x_seg, win, noverlap, psd_f, model.fs);
     plot(fpx, pxx, 'LineWidth', 1.5, 'Color', cmap(k, :));
-    labels{k} = sprintf('DC = %.3g', dc_levels(k));
+    labels{ii} = psd_show_labels{ii};
 end
 hold off;
 psd_ax = gca;
@@ -279,6 +285,7 @@ tick_fs = 14;
 label_fs = 15.4;
 legend_fs = 12.6;
 set(psd_ax, 'XScale', 'log', 'YScale', 'log', 'FontSize', tick_fs);
+xlim(psd_ax, [0.2 90]);
 xlabel(psd_ax, 'Frequency (Hz)', 'FontSize', label_fs);
 ylabel(psd_ax, 'PSD $x^2$/Hz', 'Interpreter', 'latex', ...
     'FontSize', label_fs);
