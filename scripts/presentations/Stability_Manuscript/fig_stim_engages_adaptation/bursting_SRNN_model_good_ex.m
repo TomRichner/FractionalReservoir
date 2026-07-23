@@ -272,7 +272,7 @@ for ii = 1:numel(psd_show_levels)
     
     % Clamp Hamming window to available signal length (guards short windows)
     win_len  = min(round(psd_win_len_s * model.fs), numel(x_seg));
-    win      = hamming(win_len);
+    win      = hann(win_len);
     noverlap = floor(psd_overlap_frac * win_len);
     
     [pxx, fpx] = pwelch(x_seg, win, noverlap, psd_f, model.fs);
