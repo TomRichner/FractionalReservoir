@@ -65,6 +65,10 @@ Thumbs.db
 !scripts/presentations/Stability_Manuscript/**/*.png
 !scripts/stim_engages_adaptation/**/*.png
 
+# Keep presentation figure vector/source files (override *.svg and *.fig above)
+!scripts/presentations/**/*.svg
+!scripts/presentations/**/*.fig
+
 # Output/run directories (regenerable analysis outputs; keep out of git)
 data/
 figs/

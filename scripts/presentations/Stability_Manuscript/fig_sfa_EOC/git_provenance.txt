@@ -1,0 +1,20 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sfa_EOC
+Captured at: 27-Jul-2026 14:06:04
+
+commit:      f93a0ae85a55c5ac6f6c4072a176d9afacf6a0af
+commit_short:f93a0ae
+branch:      celltypes-v2
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Merge remote-tracking branch 'origin/celltypes-v2' into celltypes-v2
+last_date:   2026-07-27T12:29:08-05:00
+dirty:       true
+
+--- git status --porcelain ---
+?? scripts/presentations/Stability_Manuscript/fig_sfa_EOC/
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_sfa_EOC/Fig_SFA_EOC.png
+scripts/presentations/Stability_Manuscript/fig_sfa_EOC/Fig_sfa_EOC.m
+scripts/presentations/Stability_Manuscript/fig_sfa_EOC/README_fig_sfa_EOC.txt
+scripts/presentations/Stability_Manuscript/fig_sfa_EOC/git_provenance.txt
+scripts/presentations/Stability_Manuscript/fig_sfa_EOC/working_changes.patch
