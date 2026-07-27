@@ -61,13 +61,14 @@ Thumbs.db
 *.png
 *.pdf
 
-# Keep manuscript figure PNGs (override the global *.png ignore above)
-!scripts/presentations/Stability_Manuscript/**/*.png
+# Keep presentation/manuscript figure PNGs (override the global *.png ignore above)
+!scripts/presentations/**/*.png
 !scripts/stim_engages_adaptation/**/*.png
 
-# Keep presentation figure vector/source files (override *.svg and *.fig above)
-!scripts/presentations/**/*.svg
-!scripts/presentations/**/*.fig
+# Keep vector/source figure files for the manuscript only (override *.svg/*.fig);
+# other presentations dirs stay PNG-only.
+!scripts/presentations/Stability_Manuscript/**/*.svg
+!scripts/presentations/Stability_Manuscript/**/*.fig
 
 # Output/run directories (regenerable analysis outputs; keep out of git)
 figs/
