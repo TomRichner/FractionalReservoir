@@ -489,7 +489,144 @@ classdef SRNNModel2 < handle
             
             linkaxes(ax_handles, 'xy');
         end
-        
+
+        function [evals_all, evals_by_time] = eigenvalue_time_series(obj, J_times_sec, varargin)
+            % EIGENVALUE_TIME_SERIES Jacobian eigenvalues sampled through a run
+            %
+            % Samples the instantaneous Jacobian at the requested times and
+            % returns every eigenvalue seen. Because the network is nonlinear,
+            % the Jacobian (and thus its eigenvalues) changes as the state
+            % evolves; pooling the eigenvalues over many sampled times reveals
+            % how much time they spend in each region of the complex plane.
+            %
+            % Requires store_full_state = true (so obj.S_out is available).
+            %
+            % The Jacobian build + eig at each sampled time are independent, so
+            % they run under parfor by default (Parallel Computing Toolbox). The
+            % state rows are sliced out first, so workers receive only the
+            % n_times x N samples, not the full S_out trajectory.
+            %
+            % Usage:
+            %   evals = model.eigenvalue_time_series(linspace(0, 20, 150));
+            %   evals = model.eigenvalue_time_series(t, 'use_parallel', false);
+            %
+            % Name-value options:
+            %   'use_parallel' - use parfor when a pool is available (default true)
+            %
+            % Outputs:
+            %   evals_all     - column vector of ALL eigenvalues (all times pooled)
+            %   evals_by_time - cell array, one entry per sampled time index
+
+            p = inputParser;
+            p.addParameter('use_parallel', true);
+            p.parse(varargin{:});
+            use_parallel = p.Results.use_parallel;
+
+            if isempty(obj.S_out)
+                error('SRNNModel:NoStateData', 'State data required. Set store_full_state=true.');
+            end
+
+            params = obj.cached_params;
+
+            % Convert times to state-row indices (same mapping as plot_eigenvalues)
+            J_times = round((J_times_sec - obj.t_out(1)) * obj.fs) + 1;
+            J_times = unique(max(1, min(J_times, size(obj.S_out, 1))));
+
+            % Slice the needed state rows up front so parfor ships only these
+            % (n_times x N) rows to the workers, not the full S_out trajectory.
+            S_sel = obj.S_out(J_times, :);
+            n_times = size(S_sel, 1);
+            evals_by_time = cell(n_times, 1);
+
+            fprintf('Computing Jacobian eigenvalues at %d time points\n', n_times);
+
+            % Fuse Jacobian build + eig per time point (avoids the large
+            % N x N x n_times J_array). Independent across i -> parfor.
+            run_parallel = use_parallel && canUseParallelPool;
+            if use_parallel && ~canUseParallelPool
+                warning('SRNNModel:NoParallelPool', ...
+                    'Parallel pool not available. Falling back to sequential execution.');
+            end
+
+            if run_parallel
+                parfor i = 1:n_times
+                    J = full(SRNNModel2.compute_Jacobian_fast(S_sel(i, :)', params));
+                    evals_by_time{i} = eig(J);
+                end
+            else
+                for i = 1:n_times
+                    J = full(SRNNModel2.compute_Jacobian_fast(S_sel(i, :)', params));
+                    evals_by_time{i} = eig(J);
+                end
+            end
+            evals_all = vertcat(evals_by_time{:});
+        end
+
+        function [fig_handle, ax_handle] = plot_eigenvalue_heatmap(obj, J_times_sec, varargin)
+            % PLOT_EIGENVALUE_HEATMAP Occupancy heatmap of Jacobian eigenvalues
+            %
+            % Samples the Jacobian at J_times_sec (seconds), pools the
+            % eigenvalues, and renders a Gaussian-smoothed 2-D density over the
+            % complex plane. The stability line at Re = 0 is overlaid so the
+            % time spent in the locally-unstable half-plane (Re > 0) is visible.
+            %
+            % Usage:
+            %   model.plot_eigenvalue_heatmap(linspace(0, 20, 150));
+            %   model.plot_eigenvalue_heatmap(t, 'grid_res', 300, 'use_log', false);
+            %
+            % Name-value options:
+            %   'grid_res'   - number of bins per axis (default 200)
+            %   'sigma_bins' - Gaussian smoothing width in bins (default 1.5)
+            %   're_lim'     - [min max] real-axis limits (default from data)
+            %   'im_lim'     - [min max] imag-axis limits (default from data)
+            %   'use_log'    - log10(1+density) color scale (default true)
+            %   'use_parallel' - parallelize the eig loop (default true)
+
+            p = inputParser;
+            p.addParameter('grid_res', 200);
+            p.addParameter('sigma_bins', 1.5);
+            p.addParameter('re_lim', []);
+            p.addParameter('im_lim', []);
+            p.addParameter('use_log', true);
+            p.addParameter('use_parallel', true);
+            p.parse(varargin{:});
+            opt = p.Results;
+
+            evals = obj.eigenvalue_time_series(J_times_sec, 'use_parallel', opt.use_parallel);
+
+            % Axis limits: from data (with ~10% pad) unless overridden
+            re = real(evals); im = imag(evals);
+            re_lim = opt.re_lim; im_lim = opt.im_lim;
+            if isempty(re_lim)
+                re_lim = [min(re), max(re)] + [-0.1, 0.1] * max(range(re), eps);
+            end
+            if isempty(im_lim)
+                im_lim = [min(im), max(im)] + [-0.1, 0.1] * max(range(im), eps);
+            end
+
+            re_edges = linspace(re_lim(1), re_lim(2), opt.grid_res + 1);
+            im_edges = linspace(im_lim(1), im_lim(2), opt.grid_res + 1);
+
+            D = SRNNModel2.compute_eigenvalue_density(evals, re_edges, im_edges, opt.sigma_bins);
+
+            if opt.use_log
+                clim = [0, max(log10(1 + D(:)))];
+            else
+                clim = [0, max(D(:))];
+            end
+            if clim(2) <= clim(1), clim(2) = clim(1) + 1; end
+
+            fig_handle = figure('Position', [1312, 526, 560, 460]);
+            ax_handle = axes(fig_handle);
+            SRNNModel2.plot_eigenvalue_heatmap_helper(ax_handle, D, re_edges, im_edges, clim, opt.use_log);
+            cb = colorbar(ax_handle);
+            if opt.use_log
+                cb.Label.String = 'log_{10}(1 + density)';
+            else
+                cb.Label.String = 'density';
+            end
+        end
+
         function [fig_handle, ax_handles] = plot_W_spectrum(obj)
             % PLOT_W_SPECTRUM Plot eigenvalue spectra of -I+W and the LTI Jacobian
             %
@@ -1383,7 +1520,7 @@ classdef SRNNModel2 < handle
             hold off;
             axis equal;
         end
-        
+
         function b_used = apply_std_zero_floor(b, params)
             % APPLY_STD_ZERO_FLOOR Rescale synaptic availability so full
             % depression drives the synaptic output b*r -> 0.
@@ -1903,6 +2040,85 @@ classdef SRNNModel2 < handle
     % Internalized from src/nonlinearities/ to make SRNNModel2 standalone.
     
     methods (Static)
+        function D = compute_eigenvalue_density(eigenvalues, re_edges, im_edges, sigma_bins)
+            % COMPUTE_EIGENVALUE_DENSITY 2-D Gaussian-smoothed eigenvalue density
+            %
+            % Bins the (real, imag) eigenvalue coordinates onto the grid defined
+            % by re_edges x im_edges, then smooths with a small Gaussian kernel.
+            % conv2 is used (not imgaussfilt) to avoid an Image Processing
+            % Toolbox dependency.
+            %
+            % Inputs:
+            %   eigenvalues - vector of (complex) eigenvalues
+            %   re_edges    - bin edges along the real axis (1 x nRe+1)
+            %   im_edges    - bin edges along the imag axis (1 x nIm+1)
+            %   sigma_bins  - Gaussian smoothing width in bins (default 1.5)
+            %
+            % Output:
+            %   D - smoothed density matrix, size (numel(re_edges)-1) x (numel(im_edges)-1)
+            %       rows index the real axis, columns index the imaginary axis.
+
+            if nargin < 4 || isempty(sigma_bins), sigma_bins = 1.5; end
+
+            H = histcounts2(real(eigenvalues(:)), imag(eigenvalues(:)), re_edges, im_edges);
+
+            if sigma_bins > 0
+                % Build a normalized separable Gaussian kernel (+/- 3 sigma).
+                half = max(1, ceil(3 * sigma_bins));
+                gv = exp(-((-half:half).^2) / (2 * sigma_bins^2));
+                gv = gv / sum(gv);
+                K = gv(:) * gv(:)';          % 2-D isotropic Gaussian
+                D = conv2(H, K, 'same');
+            else
+                D = H;
+            end
+        end
+
+        function ax = plot_eigenvalue_heatmap_helper(ax, D, re_edges, im_edges, clim, use_log)
+            % PLOT_EIGENVALUE_HEATMAP_HELPER Render one eigenvalue-density panel
+            %
+            % Draws the smoothed density D as an image on the complex plane and
+            % overlays the Re = 0 stability line. Pass a shared clim across
+            % multiple panels for directly-comparable color scaling.
+            %
+            % Inputs:
+            %   ax        - target axes
+            %   D         - density matrix from compute_eigenvalue_density
+            %   re_edges  - real-axis bin edges
+            %   im_edges  - imag-axis bin edges
+            %   clim      - [lo hi] color limits (shared across panels)
+            %   use_log   - if true, display log10(1 + D) (default true)
+
+            if nargin < 6 || isempty(use_log), use_log = true; end
+
+            re_centers = (re_edges(1:end-1) + re_edges(2:end)) / 2;
+            im_centers = (im_edges(1:end-1) + im_edges(2:end)) / 2;
+
+            if use_log
+                plot_val = log10(1 + D);
+            else
+                plot_val = D;
+            end
+
+            % D is (Re x Im); imagesc expects rows=y(Im), cols=x(Re) -> transpose
+            imagesc(ax, re_centers, im_centers, plot_val');
+            axis(ax, 'xy');
+            axis(ax, 'image');
+            colormap(ax, parula);
+            if nargin >= 5 && ~isempty(clim)
+                caxis(ax, clim);
+            end
+
+            % Stability line at Re = 0
+            hold(ax, 'on');
+            yl = [im_centers(1), im_centers(end)];
+            plot(ax, [0, 0], yl, 'w--', 'LineWidth', 1.25);
+            hold(ax, 'off');
+
+            xlabel(ax, 'Re(\lambda)');
+            ylabel(ax, 'Im(\lambda)');
+        end
+
         function y = piecewiseSigmoid(x, a, c)
             % PIECEWISESIGMOID A piecewise linear/quadratic sigmoid activation function.
             % Internalized from src/nonlinearities/piecewiseSigmoid.m
