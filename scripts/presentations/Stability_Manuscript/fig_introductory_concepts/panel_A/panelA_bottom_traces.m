@@ -160,7 +160,7 @@ text(ax(1), mean([x_start, x_end]), y_bar - 0.03*wy, sprintf('%d s', bar_len), .
 hold(ax(1), 'off');
 
 %% Save (fig, png, svg via repo helper)
-save_some_figs_to_folder_2(this_dir, 'panelA_bottom_traces', fig.Number, {'fig', 'png', 'svg'});
+save_some_figs_to_folder_2(fullfile(this_dir, 'statetraces'), 'panelA_bottom_traces', fig.Number, {'fig', 'png', 'svg'});
 
 %% Eigenspectrum of the Jacobian at x = 0:  J = (-I + gamma*W)/tau_d
 % (tanh'(0) = 1, so the linearization uses W directly; gamma is already in W.)
@@ -224,7 +224,7 @@ end
 % (a), (b), (c) letters omitted for the eigenspectrum panels
 drawnow;
 
-save_some_figs_to_folder_2(this_dir, 'panelA_eigenspectrum', fig2.Number, {'fig', 'png', 'svg'});
+save_some_figs_to_folder_2(fullfile(this_dir, 'eigenspectra'), 'panelA_eigenspectrum', fig2.Number, {'fig', 'png', 'svg'});
 
 %% Local helper
 function out = ternary(cond, a, b)
