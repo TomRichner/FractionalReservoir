@@ -141,14 +141,11 @@ for k = 1:n_cases
     if k == 1
         ylabel('x (AU)');
     end
-    % Annotation: gamma and largest Lyapunov exponent
-    title(sprintf('\\gamma = %.2f   \\lambda_{max} = %+.3f', ...
-        results(k).gamma, results(k).LLE), 'FontWeight', 'normal');
 end
 
 linkaxes(ax, 'xy');       % shared x and y scale across the three panels
 xlim(ax(1), T_plot);
-set(ax(1), 'YTick', [-3, 0, 3]);
+set(ax, 'YTick', [-3, 0, 3]);
 
 % 10 s time scale bar in the lower-right of the 1st subplot
 bar_len = 10;                        % seconds
@@ -224,10 +221,7 @@ for k = 1:n_cases
     hold off;
 end
 
-% (a), (b), (c) letters
-letters = arrayfun(@(c) sprintf('(%s)', c), 'a':'z', 'UniformOutput', false);
-AddLetters2Plots(num2cell(axe), letters(1:n_cases), ...
-    'FontSize', 18, 'FontWeight', 'normal', 'HShift', +0.01, 'VShift', +0.01);
+% (a), (b), (c) letters omitted for the eigenspectrum panels
 drawnow;
 
 save_some_figs_to_folder_2(this_dir, 'panelA_eigenspectrum', fig2.Number, {'fig', 'png', 'svg'});
