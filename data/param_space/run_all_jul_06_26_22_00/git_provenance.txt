@@ -1,0 +1,11 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_jul_06_26_22_00
+Captured at: 06-Jul-2026 22:00:10
+
+commit:      2f0b802fc963406a16882d109bcce1ea0854970d
+commit_short:2f0b802
+branch:      refactor
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    run_all: c_E=0.5/3, heavier medium mode, sensitivity before tau
+last_date:   2026-07-06T21:59:09-05:00
+dirty:       false
+

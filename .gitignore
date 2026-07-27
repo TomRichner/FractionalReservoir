@@ -70,7 +70,16 @@ Thumbs.db
 !scripts/presentations/**/*.fig
 
 # Output/run directories (regenerable analysis outputs; keep out of git)
-data/
 figs/
 results_DDE/
+
+# Ignore data/ contents, but BACK UP the run_all_jul_06_26_22_00 source data
+# that many manuscript figures depend on. Parents are re-included stepwise
+# (git won't descend into a fully-ignored dir); the final /** re-includes every
+# file, overriding the *.mat/*.png/*.fig/*.svg/*.pdf rules above for this run.
+data/*
+!data/param_space/
+data/param_space/*
+!data/param_space/run_all_jul_06_26_22_00/
+!data/param_space/run_all_jul_06_26_22_00/**
 
