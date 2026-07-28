@@ -1,0 +1,22 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_FI_curve
+Captured at: 28-Jul-2026 12:48:22
+
+commit:      46cc534651b70363bdc3391d7fe5bab8850e33fb
+commit_short:46cc534
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    panelA_bottom_traces: save figs into statetraces/ and eigenspectra/ subfolders
+last_date:   2026-07-27T15:13:33-05:00
+dirty:       true
+
+--- git status --porcelain ---
+?? scripts/presentations/Stability_Manuscript/fig_FI_curve/
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
+scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.m
+scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.png
+scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.svg
+scripts/presentations/Stability_Manuscript/fig_FI_curve/README_fig_FI_curve.txt
+scripts/presentations/Stability_Manuscript/fig_FI_curve/git_provenance.txt
+scripts/presentations/Stability_Manuscript/fig_FI_curve/working_changes.patch
