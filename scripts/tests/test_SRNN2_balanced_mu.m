@@ -13,12 +13,18 @@ close all; clear; clc;
 setup_paths();
 
 %% Create model
-model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.5);
+model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.667,'T_range',[0 60],'S_c',0,'rng_seeds',[1 2],'lya_method','none','c_E',0.5/3);
 
 % Override the E/I population means (must be set before build())
 F = model.default_val;
-model.mu_E_tilde =  3 * F;
-model.mu_I_tilde = -3 * F;
+model.mu_E_tilde =  10 * F;
+model.mu_I_tilde = -20 * F;
+
+% stim steps
+n_steps = 3;
+model.input_config.n_steps = n_steps;
+model.input_config.no_stim_pattern = true(1, n_steps);        % start all silent
+model.input_config.no_stim_pattern(2:2:end) = false;      % drive blocks 2, 4
 
 %% Build, run, and plot
 model.build();
