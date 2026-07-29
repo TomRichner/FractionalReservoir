@@ -9,9 +9,6 @@ close all
 clc;
 fprintf('=== Testing ParamSpaceAnalysis saveobj/loadobj ===\n\n');
 
-%% Setup paths
-setup_paths();
-
 %% Create and configure PSA with fast parameters
 fprintf('Creating ParamSpaceAnalysis object...\n');
 psa = ParamSpaceAnalysis(...

@@ -27,8 +27,6 @@
 % pair-specific connection probabilities and strengths.
 
 close all; clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 %% Network scale and presynaptic weight signs
 n = 400;

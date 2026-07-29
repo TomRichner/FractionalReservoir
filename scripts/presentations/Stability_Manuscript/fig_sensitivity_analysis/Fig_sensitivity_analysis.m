@@ -13,8 +13,7 @@ project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
 
 % Resolve the replot pipeline (scripts/run_all_analyses/replot) + src helpers
 % (save_some_figs_to_folder_2, capture_git_provenance).
-addpath(genpath(fullfile(project_root, 'scripts')));
-addpath(genpath(fullfile(project_root, 'src')));
+setup_paths();
 
 % Source run (a run_all_<dt> folder with 1D_sensitivity_* subdirs).
 data_root = fullfile(project_root, 'data', 'param_space', 'run_all_jul_06_26_22_00');

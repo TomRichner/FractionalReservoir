@@ -1,8 +1,6 @@
 % test_RMTCellTypes.m - Verify arbitrary-cell-type RMT connectivity.
 
 clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 %% Largest-remainder allocation and deterministic population columns
 rng(11);

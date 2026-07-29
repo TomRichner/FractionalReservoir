@@ -20,8 +20,7 @@ this_dir     = fileparts(mfilename('fullpath'));
 % .../Stability_Manuscript/fig_FI_curve -> project root is 4 up
 project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
 
-addpath(genpath(fullfile(project_root, 'scripts')));
-addpath(genpath(fullfile(project_root, 'src')));
+setup_paths();
 
 %% ---- Parameters -----------------------------------------------------------
 S_c = 0.4;                                     % activation center (class default)

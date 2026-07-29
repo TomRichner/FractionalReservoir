@@ -17,7 +17,9 @@ Connectivity uses Random Matrix Theory (Harris 2023) tilde-notation. Outputs are
 
 ## Running things
 
-Every entry-point script begins with `setup_paths()` (defined in `scripts/setup_paths.m`), which adds `src/` and `scripts/` recursively to the MATLAB path. Scripts in `scripts/` are intended to be run from the MATLAB cwd at the project root or from the `scripts/` directory.
+Path setup is a **once-per-session** action: run `setup_paths` with the MATLAB cwd at the project root (the function lives at `setup_paths.m` in the repo root, so it resolves with no prior `addpath`). It adds `src/` and `scripts/` recursively and is idempotent. After that, any script in the repo runs from any cwd.
+
+Entry-point scripts (the `run_all_analyses` pipeline, the `Fig_*` presentation scripts, the runnable memory-capacity scripts) still call `setup_paths()` on their first line so they can be launched cold. Smaller scripts — everything in `scripts/tests/`, examples — assume the session is already bootstrapped and contain **no path code at all**. Do not reintroduce per-script `addpath`/`genpath` bootstrap lines.
 
 Primary entry points (current, not legacy) — the orchestrator and its three sub-analyses live together in `scripts/run_all_analyses/`:
 
@@ -26,7 +28,7 @@ Primary entry points (current, not legacy) — the orchestrator and its three su
 - `scripts/run_all_analyses/run_tau_sensitivity_analysis.m` — vector-parameter sweep over `tau_a_E` / `tau_b_E_rec`
 - `scripts/run_all_analyses/run_all_analyses.m` — orchestrator that runs the three above into a single dated `data/param_space/run_all_<dt>/` directory
 
-`scripts/setup_paths.m` stays at the `scripts/` root (every entry point depends on it, and it derives the project root from its own location). `run_all_analyses.m` derives `project_root` from `which('setup_paths')`, so it tolerates living in a subdirectory.
+`setup_paths.m` lives at the **repo root** and derives everything from its own location. It deliberately enumerates `src/` and `scripts/` rather than `genpath`-ing the root: `data/`, `figs/` and `docs/` must stay off the path, and `data/param_space/run_all_*/` holds copies of the launcher scripts that would otherwise shadow the originals. It never calls `savepath`. `run_all_analyses.m` and friends derive `project_root = fileparts(which('setup_paths'))`, so they tolerate living in a subdirectory.
 
 There is no standalone test framework; ad-hoc verification scripts are named `scripts/test_*.m` (e.g. `test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_sensitivity_refactor.m`). Run them from the MATLAB editor or via the matlab MCP `run_matlab_file` tool. The matlab MCP server is available — prefer `check_matlab_code` for static analysis and `run_matlab_file` / `evaluate_matlab_code` for execution; the user's MATLAB desktop is the visible UI for any figures.
 
@@ -79,7 +81,7 @@ Preserve this pattern when adding new analysis scripts.
 
 The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_paper/`, `VAR_SRNN/`, `python_piecewise/`, `reference_files/`) and the old-API comparison/run scripts, and reorganized `scripts/` into topic subdirectories. Current layout:
 
-- `scripts/setup_paths.m` — shared bootstrap, **stays at the `scripts/` root** (self-locating; every entry point depends on it).
+- `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
 - `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses, with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside.
 - `scripts/EI_balance/` — fraction-excitatory analyses: `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_load_and_plot.m`.
 - `scripts/memory_capacity/` — `example_memory_capacity.m`, `looped_memory_capacity.m` (Echo State Network experiments).
@@ -88,7 +90,7 @@ The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_pape
 - `scripts/tests/` — verification scripts (`test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_sensitivity_refactor.m`) plus the standalone example/comparison scripts `Sompolinsky_N_1000_g_1p8.m` and `Single_vs_dual_adaptation_example.m`.
 - `scripts/sine_stim/` and `scripts/paired_pulse/` — kept as references but **currently non-functional**: they still use the old script-based API, and their legacy dependencies were deleted. They must be ported to `SRNNModel2` before use.
 
-**Path convention after the reorg:** scripts no longer assume they sit directly under `scripts/`. Those that call `setup_paths()` derive `project_root = fileparts(fileparts(which('setup_paths')))` (depth-independent); the memory-capacity scripts (which don't call `setup_paths`) walk up from their own location. When adding or moving a script, preserve one of these patterns rather than a fixed-depth `fileparts(mfilename)` chain.
+**Path convention:** scripts do not assume they sit at any particular depth under `scripts/`. Derive the project root as `project_root = fileparts(which('setup_paths'))` (depth-independent) rather than with a fixed-depth `fileparts(mfilename)` chain. Scripts that need their *own* folder (to locate a sibling data file or write a figure next to themselves) still use `this_dir = fileparts(mfilename('fullpath'))` — that is a data path, not a path bootstrap, and is fine to keep.
 
 When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnalysis2`.
 

@@ -6,10 +6,6 @@
 
 close all; clear; clc;
 
-% Add repository paths even when this file is launched directly.
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
-
 %% Match SRNNModel2 connectivity defaults
 n = 400;
 indegree = 100;

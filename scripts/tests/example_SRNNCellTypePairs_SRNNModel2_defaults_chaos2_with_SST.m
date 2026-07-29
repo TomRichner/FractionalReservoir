@@ -7,8 +7,6 @@
 % SFA. All other settings match the two-population baseline.
 
 close all; clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 %% Match the baseline network scale
 n = 300;

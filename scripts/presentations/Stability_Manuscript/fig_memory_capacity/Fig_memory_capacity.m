@@ -11,13 +11,9 @@ this_dir     = fileparts(mfilename('fullpath'));
 % scripts/presentations/Stability_Manuscript/fig_memory_capacity -> root is 4 levels up
 project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
 
-% Make replot_memory_capacity / plot_memory_capacity resolvable regardless of
-% cwd (replot_memory_capacity in turn adds src/ + its own folder), src/ so
-% capture_git_provenance is on the path, and this folder so the combined-figure
-% helper (plot_memory_capacity_combined) resolves.
-addpath(fullfile(project_root, 'scripts', 'memory_capacity'));
-addpath(fullfile(project_root, 'src'));
-addpath(this_dir);
+% Resolve replot_memory_capacity / plot_memory_capacity, capture_git_provenance,
+% and the combined-figure helper (plot_memory_capacity_combined, this folder).
+setup_paths();
 
 % Source run to replot.
 mat_file = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready', ...

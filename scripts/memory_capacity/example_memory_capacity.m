@@ -16,9 +16,7 @@
 clear; clc; close all;
 
 %% Add paths
-% This script lives in scripts/memory_capacity/, so the project root (and src/)
-% is two directories up from its folder.
-addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'src')));
+setup_paths();
 
 %% Common parameters
 n = 300;                    % Number of neurons

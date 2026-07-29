@@ -4,8 +4,6 @@
 % mechanism assigned to different presynaptic-to-postsynaptic routes.
 
 close all; clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 n = 300;
 indegree = 100;

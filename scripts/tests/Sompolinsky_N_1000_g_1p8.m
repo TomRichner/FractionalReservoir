@@ -13,7 +13,6 @@
 % Reference: Sompolinsky, H., Crisanti, A. & Sommers, H. J. Chaos in Random Neural Networks. Phys. Rev. Lett. 61, 259–262 (1988).
 
 %% Setup
-setup_paths;
 
 % Figure saving configuration
 % Check for master override from run_all_figures.m

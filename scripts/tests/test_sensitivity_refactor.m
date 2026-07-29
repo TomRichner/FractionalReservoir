@@ -2,8 +2,6 @@
 % Quick verification that the refactored sensitivity analysis works
 % Uses 3 levels and 3 reps for fast execution
 
-setup_paths();
-
 %% Test 1: Scalar parameter sensitivity (level_of_chaos)
 fprintf('\n=== Test 1: Scalar param (level_of_chaos) ===\n');
 psa1 = ParamSpaceAnalysis2(...

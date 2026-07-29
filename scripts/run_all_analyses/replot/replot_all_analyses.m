@@ -19,9 +19,9 @@ fprintf('Start time: %s\n\n', datetime('now'));
 tic;
 
 %% Configuration -- point this at the run_all_<dt> folder you want to replot
-% Derive project_root from setup_paths.m (in scripts/) so this tolerates living
+% Derive project_root from setup_paths.m (at the repo root) so this tolerates living
 % in a subdirectory such as scripts/run_all_analyses/replot/.
-project_root = fileparts(fileparts(which('setup_paths')));
+project_root = fileparts(which('setup_paths'));
 data_root    = fullfile(project_root, 'data', 'param_space', ...
     'run_all_mar_02_26_17_12');
 

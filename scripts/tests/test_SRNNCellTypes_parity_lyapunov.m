@@ -1,8 +1,6 @@
 % test_SRNNCellTypes_parity_lyapunov.m - E/I parity and Lyapunov smoke test.
 
 clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 %% Two-type dynamics match SRNNModel2 for deterministic full connectivity
 shared = {'n', 6, 'indegree', 6, 'f', 0.5, ...

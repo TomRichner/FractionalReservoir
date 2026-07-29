@@ -1,8 +1,6 @@
 % test_SRNNCellTypes.m - Verify generalized cell types, dynamics, and Jacobian.
 
 clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 rng(0);
 
 model = make_three_type_model();

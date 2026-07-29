@@ -14,8 +14,7 @@ function [fig1, fig2] = replot_memory_capacity(mat_file, out_dir)
 %              folder). Pass '' to display only, without saving.
 
     % Make plot_memory_capacity resolvable regardless of cwd.
-    addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'src')));
-    addpath(fileparts(mfilename('fullpath')));
+    setup_paths();
 
     if ~isfile(mat_file)
         error('replot_memory_capacity:NotFound', 'File not found:\n  %s', mat_file);

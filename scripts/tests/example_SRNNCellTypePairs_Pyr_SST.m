@@ -6,8 +6,6 @@
 % synapses are weakly depressing, and both cell types have SFA.
 
 close all; clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 %% Matched network scale and baseline E/I weights
 n = 400;

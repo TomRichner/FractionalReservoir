@@ -17,11 +17,9 @@
 
 clear; clc; close all;
 
-%% Paths: add scripts/ so combine_runs (and setup_paths) resolve.
-% This file lives in scripts/run_all_analyses/replot/, so the project root is
-% four directories up.
-project_root = fileparts(fileparts(fileparts(fileparts(mfilename('fullpath')))));
-addpath(genpath(fullfile(project_root, 'scripts')));
+%% Paths
+setup_paths();
+project_root = fileparts(which('setup_paths'));
 
 data_root = fullfile(project_root, 'data', 'param_space');
 run_dirs = { ...

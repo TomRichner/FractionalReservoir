@@ -3,16 +3,22 @@
 > [!NOTE]
 > **Post-internalization state (2026-02-27).** Many standalone functions documented below have been internalized as static methods on `SRNNModel2` (commit `6e2c58f`) and `SRNN_ESN_reservoir` (commit `49945cb`). The original `src/` files still exist for backward compatibility, but the classes now call their own static methods. See [internalize_functions_into_classes.md](file:///Users/tom/Desktop/local_code/FractionalReservoir/docs/refactors/internalize_functions_into_classes.md) for the complete mapping.
 
-## scripts/setup_paths.m
+## setup_paths.m
 
 ### Purpose
-`setup_paths.m` lives in the `scripts/` directory and is the one-stop helper for adding the sibling `src/`
-tree to the MATLAB path. Call `scripts/setup_paths` (or `setup_paths` from the same directory) before running any script that needs the shared `src` utilities so they can resolve without hardcoded `addpath` calls.
+`setup_paths.m` lives at the repository root and is the one-stop helper for adding the `src/` and
+`scripts/` trees to the MATLAB path. Call `setup_paths` once per MATLAB session (with the cwd at the
+repository root in a fresh session, where it resolves without any `addpath`); after that every script
+runs from any cwd without hardcoded path logic of its own.
 
 ### Behavior
-- locates the repository root relative to `scripts/`
+- locates the repository root as its own folder
 - ensures `<root>/src/` exists and errors otherwise
-- adds `src/` (recursively) to the MATLAB path, so downstream scripts can rely on the `src` functions without having to replicate the path-setup logic
+- adds `src/` and `scripts/` (recursively) plus the root itself; deliberately does **not** `genpath` the
+  root, keeping `data/`, `figs/` and `docs/` off the path
+- idempotent, and never calls `savepath`
+- optionally returns the project root: `project_root = setup_paths();` (also recoverable as
+  `fileparts(which('setup_paths'))`)
 
 ## SRNN_reservoir.m
 

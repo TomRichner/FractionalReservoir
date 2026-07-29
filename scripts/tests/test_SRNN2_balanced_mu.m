@@ -9,9 +9,6 @@
 
 close all; clear; clc;
 
-% Add paths
-setup_paths();
-
 %% Create model
 model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.667,'T_range',[0 60],'S_c',0,'rng_seeds',[1 2],'lya_method','none','c_E',0.5/3);
 

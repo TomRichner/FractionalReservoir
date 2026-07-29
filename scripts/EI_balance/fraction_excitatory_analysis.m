@@ -21,9 +21,9 @@ close all;
 setup_paths();
 
 % Derive project root from script location for portable paths
-% Derive project_root from setup_paths.m (in scripts/) so this tolerates living
+% Derive project_root from setup_paths.m (at the repo root) so this tolerates living
 % in a subdirectory such as scripts/EI_balance/.
-project_root = fileparts(fileparts(which('setup_paths')));
+project_root = fileparts(which('setup_paths'));
 figs_root = fullfile(project_root, 'figs');
 
 %% Configuration

@@ -9,8 +9,6 @@
 % logistic activation.
 
 close all; clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 %% Match the SRNNModel2 network defaults
 n = 300;

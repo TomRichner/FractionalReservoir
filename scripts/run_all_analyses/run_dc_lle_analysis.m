@@ -113,7 +113,7 @@ input_config.intrinsic_drive = [];                      % required by the class
 input_config.generator       = @dc_staircase_stimulus;
 
 %% Output directory
-project_root = fileparts(fileparts(which('setup_paths')));
+project_root = fileparts(which('setup_paths'));
 dt_str = lower(datestr(now, 'mmm_dd_yy_HH_MM')); %#ok<TNOW1,DATST>
 if exist('master_output_dir', 'var')
     base_dir = master_output_dir;

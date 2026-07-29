@@ -1,8 +1,6 @@
 % example_SRNNCellTypes.m - Three-cell-type SRNN example.
 
 close all; clear; clc;
-addpath(fileparts(fileparts(mfilename('fullpath'))));
-setup_paths();
 
 n = 60;
 indegree = 20;

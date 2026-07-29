@@ -16,8 +16,7 @@ project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
 
 % Resolve src helpers (load_and_make_unit_histograms, unit_histogram_patch,
 % blue_gray_red_colormap, save_some_figs_to_folder_2, capture_git_provenance).
-addpath(genpath(fullfile(project_root, 'scripts')));
-addpath(genpath(fullfile(project_root, 'src')));
+setup_paths();
 
 % Source run + its param_space_* subdir (the colored builder takes the subdir).
 data_root = fullfile(project_root, 'data', 'param_space', 'run_all_jul_06_26_22_00');

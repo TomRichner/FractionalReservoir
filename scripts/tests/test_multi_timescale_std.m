@@ -11,7 +11,6 @@
 % Uses SRNN2TestAccess (a test-only subclass) to reach the protected RHS.
 
 close all; clear; clc;
-setup_paths();
 
 rng(0);
 tol = 1e-6;         % max abs Jacobian error tolerance

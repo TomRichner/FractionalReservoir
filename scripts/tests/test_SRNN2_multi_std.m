@@ -7,8 +7,6 @@
 
 close all; clearvars -except rng_seeds; clc;
 
-% Add paths
-setup_paths();
 
 
 if exist('rng_seeds', 'var')

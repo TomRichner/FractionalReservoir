@@ -23,10 +23,9 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     if nargin < 2; out_dir = ''; end
 
     % Ensure AddLetters2Plots (src/plotting) is resolvable even if this function
-    % is called standalone. Project root is 4 folders up from this file.
+    % is called standalone.
     if exist('AddLetters2Plots', 'file') ~= 2
-        project_root = fileparts(fileparts(fileparts(fileparts(fileparts(mfilename('fullpath'))))));
-        addpath(genpath(fullfile(project_root, 'src')));
+        setup_paths();
     end
 
     % --- Unpack (no recompute; everything is already in results_all) ---

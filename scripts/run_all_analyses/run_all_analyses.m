@@ -17,10 +17,10 @@ fprintf('Start time: %s\n\n', datetime('now'));
 tic;
 
 % Create shared output directory for this run.
-% Derive project_root from setup_paths.m (which lives in scripts/) rather than
+% Derive project_root from setup_paths.m (which lives at the repo root) rather than
 % from this file's own location, so run_all_analyses.m can live in any
 % subdirectory of scripts/ without breaking the output paths.
-project_root = fileparts(fileparts(which('setup_paths')));
+project_root = fileparts(which('setup_paths'));
 dt_str = lower(datestr(now, 'mmm_dd_yy_HH_MM')); %#ok<TNOW1,DATST>
 master_output_dir = fullfile(project_root, 'data', 'param_space', ...
     sprintf('run_all_%s', dt_str));

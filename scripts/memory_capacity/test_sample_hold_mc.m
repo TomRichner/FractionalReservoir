@@ -14,9 +14,6 @@
 
 clear; clc; close all;
 
-%% Add paths (project root is two directories up from scripts/memory_capacity/)
-addpath(genpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'src')));
-
 n_fail = 0;
 
 %% ---- Test 1: sample_hold input + hold-unit MC ----

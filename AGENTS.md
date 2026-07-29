@@ -11,16 +11,16 @@ Prefer the current class methods over similarly named standalone helpers. Treat 
 There is no compilation step. Run commands from the repository root:
 
 ```sh
-matlab -batch "addpath('scripts'); setup_paths; run('scripts/tests/test_SRNN2_defaults.m')"
-matlab -batch "addpath('scripts'); setup_paths; run_mode='fast'; run('scripts/run_all_analyses/run_all_analyses.m')"
+matlab -batch "setup_paths; run('scripts/tests/test_SRNN2_defaults.m')"
+matlab -batch "setup_paths; run_mode='fast'; run('scripts/run_all_analyses/run_all_analyses.m')"
 matlab -batch "checkcode('src/SRNNModel2.m')"
 ```
 
-The first runs a model smoke test, the second exercises the analysis pipeline with reduced settings, and the third performs MATLAB static analysis. `setup_paths()` recursively adds `src/` and `scripts/`; call it at the start of new entry-point scripts. Production sweeps can be expensive and require the Parallel Computing Toolbox.
+The first runs a model smoke test, the second exercises the analysis pipeline with reduced settings, and the third performs MATLAB static analysis. `setup_paths.m` lives at the repository root, so it resolves from a cold session once the cwd is the root; it recursively adds `src/` and `scripts/` and is idempotent. Call it **once per session**, plus at the start of new entry-point scripts so they can be launched cold. Small test and example scripts assume the session is already bootstrapped and carry no path code. Production sweeps can be expensive and require the Parallel Computing Toolbox.
 
 ## Coding Style & Naming Conventions
 
-Follow existing MATLAB style: four-space indentation, one primary class or function per file, `%%` section headers, and concise `%` comments explaining scientific assumptions. Use `UpperCamelCase` for classes, `snake_case` for functions and scripts, and descriptive variable names such as `master_output_dir`. Construct paths with `fullfile` and derive the project root through `which('setup_paths')`, not fixed directory-depth assumptions.
+Follow existing MATLAB style: four-space indentation, one primary class or function per file, `%%` section headers, and concise `%` comments explaining scientific assumptions. Use `UpperCamelCase` for classes, `snake_case` for functions and scripts, and descriptive variable names such as `master_output_dir`. Construct paths with `fullfile` and derive the project root as `fileparts(which('setup_paths'))`, not through fixed directory-depth assumptions.
 
 ## Testing Guidelines
 

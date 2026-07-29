@@ -8,18 +8,18 @@ This document explains how to run the current scripts in the FractionalReservoir
 
 ## Prerequisites
 
-Before running any script, you **must** call [setup_paths.m](../../scripts/setup_paths.m) to add the `src/` directory to the MATLAB path:
+Once per MATLAB session, with the cwd at the repository root, call [setup_paths.m](../../setup_paths.m):
 
 ```matlab
 setup_paths();
 ```
 
 This function:
-- Locates the repository root relative to the `scripts/` directory
-- Adds `src/` (and all subdirectories) to the MATLAB path
+- Locates the repository root as its own folder
+- Adds `src/` and `scripts/` (and all subdirectories) to the MATLAB path
 - Errors if the `src/` directory is not found
 
-> **Note:** Each script calls `setup_paths()` (or `addpath(genpath(...))`) automatically at the start, so you only need to call it manually if running individual functions interactively.
+> **Note:** Entry-point scripts call `setup_paths()` themselves, so they can be launched cold. Smaller test and example scripts carry no path code and assume the session has already been bootstrapped.
 
 ---
 

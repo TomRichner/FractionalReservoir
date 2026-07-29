@@ -16,8 +16,7 @@ this_dir     = fileparts(mfilename('fullpath'));
 project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
 
 % Resolve save_some_figs_to_folder_2, capture_git_provenance, ParamSpaceAnalysis2.
-addpath(genpath(fullfile(project_root, 'scripts')));
-addpath(genpath(fullfile(project_root, 'src')));
+setup_paths();
 
 % Source run + the specific tau_a_E_max sensitivity subfolder (SFA+STD only).
 data_root = fullfile(project_root, 'data', 'param_space', 'run_all_jul_06_26_22_00');

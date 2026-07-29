@@ -20,9 +20,6 @@
 
 close all; clear; clc;
 
-% Add paths
-setup_paths();
-
 %% Shared configuration
 % Same rng_seeds (default [1 2]) => identical W, stimulus, and fiducial
 % trajectory for both models; only the Lyapunov computation differs.

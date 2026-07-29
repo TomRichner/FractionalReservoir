@@ -33,7 +33,7 @@ if ~exist('target_rep', 'var');            target_rep = 1;                    en
 if ~exist('sim_T_range', 'var');           sim_T_range = [0, 60];             end  % override the swept window
 if ~exist('sim_c_E', 'var');               sim_c_E = 1/3;                     end  % override SFA strength
 
-project_root = fileparts(fileparts(which('setup_paths')));
+project_root = fileparts(which('setup_paths'));
 
 %% ---- Locate and load the PSA object ----
 if isempty(psa_dir)
