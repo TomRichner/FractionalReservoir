@@ -8,15 +8,23 @@ Prefer the current class methods over similarly named standalone helpers. Treat 
 
 ## Build, Test, and Development Commands
 
-There is no compilation step. Run commands from the repository root:
+There is no compilation step. **Never invoke MATLAB from the shell — `matlab -batch` and any other CLI invocation are off-limits.** All MATLAB work goes through the matlab MCP server, which drives the user's running MATLAB desktop (figures appear there, which is the point):
 
-```sh
-matlab -batch "setup_paths; run('scripts/tests/test_SRNN2_defaults.m')"
-matlab -batch "setup_paths; run_mode='fast'; run('scripts/run_all_analyses/run_all_analyses.m')"
-matlab -batch "checkcode('src/SRNNModel2.m')"
+- `check_matlab_code` — static analysis of a `.m` file (replaces `checkcode`)
+- `evaluate_matlab_code` — inline commands, e.g. bootstrapping the session
+- `run_matlab_file` / `run_matlab_test_file` — run a script or test; the working folder is set to the script's own location
+
+Typical session:
+
+```matlab
+setup_paths                                    % once, cwd at the repository root
+run('scripts/tests/test_SRNN2_defaults.m')     % model smoke test
+run_mode = 'fast'; run('scripts/run_all_analyses/run_all_analyses.m')   % pipeline, reduced settings
 ```
 
-The first runs a model smoke test, the second exercises the analysis pipeline with reduced settings, and the third performs MATLAB static analysis. `setup_paths.m` lives at the repository root, so it resolves from a cold session once the cwd is the root; it recursively adds `src/` and `scripts/` and is idempotent. Call it **once per session**, plus at the start of new entry-point scripts so they can be launched cold. Small test and example scripts assume the session is already bootstrapped and carry no path code. Production sweeps can be expensive and require the Parallel Computing Toolbox.
+`setup_paths.m` lives at the repository root, so it resolves from a cold session once the cwd is the root; it recursively adds `src/` and `scripts/` and is idempotent. Call it **once per session**, plus at the start of new entry-point scripts so they can be launched cold. Small test and example scripts assume the session is already bootstrapped and carry no path code. Production sweeps can be expensive and require the Parallel Computing Toolbox.
+
+Because the MCP session is the user's live desktop, treat its state as shared: don't `clear`/`close all` beyond what a script already does, and if a check needs a pristine path (`restoredefaultpath`), restore the previous path afterwards.
 
 ## Coding Style & Naming Conventions
 
