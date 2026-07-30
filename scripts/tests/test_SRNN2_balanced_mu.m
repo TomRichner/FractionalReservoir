@@ -10,7 +10,8 @@
 close all; clear; clc;
 
 %% Create model
-model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.667,'T_range',[0 60],'S_c',0,'rng_seeds',[1 2],'lya_method','none','c_E',0.5/3);
+model = SRNNModel2('tau_a_E',logspace(log10(0.25), log10(10), 3),'n_a_E', 3, 'n_b_E', 1, 'f', 2/3,'indegree',100,'T_range',[0 100],'S_c',0,'rng_seeds',[2 3],'lya_method','none','c_E',0.5/3);
+% model = SRNNModel2('tau_a_E',logspace(log10(0.25), log10(10), 3),'n_a_E', 3, 'n_b_E', 0, 'f', 2/3,'indegree',100,'T_range',[0 100],'S_c',0,'rng_seeds',[2 3],'lya_method','none','c_E',0.5/3);
 
 % Override the E/I population means (must be set before build())
 F = model.default_val;
