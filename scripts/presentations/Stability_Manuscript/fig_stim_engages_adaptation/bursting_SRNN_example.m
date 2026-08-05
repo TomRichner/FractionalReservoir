@@ -79,7 +79,7 @@ tau_a_I = [];                                        % auto if n_a_I>0
 n_b_E       = 1;     % enable STD for E (0/1)            (default 0)
 n_b_I       = 0;     % enable STD for I (0/1)            (default 0)
 tau_b_E_rec = 1;     % E recovery time constant (s)      (default 1; old bursting = 1)
-tau_b_E_rel = 1;     % E release  time constant (s)      (default 0.25; old bursting = 1 = tau_STD)
+tau_b_E_rel = 0.25;     % E release  time constant (s)      (default 0.25; old bursting = 1 = tau_STD)
 tau_b_I_rec = 1;     % I recovery time constant (s)      (default 1)
 tau_b_I_rel = 0.25;  % I release  time constant (s)      (default 0.25)
 
@@ -102,7 +102,7 @@ S_a = 0.9;       % piecewiseSigmoid slope param a (default 0.9)
 % For the logistic it sets the operating point: phi(S_c)=0.5 with unit slope there, so
 % the resting rate at x=0 is 1/(1+exp(4*S_c)) -- 0.48 -> ~0.13, 0.35 -> ~0.20, 1.0 -> ~0.02.
 % Larger S_c => lower baseline firing and lower gain near rest.
-S_c = 0.45;      % activation center param c (default 0.35)
+S_c = 0.5;      % activation center param c (default 0.35)
 
 switch lower(nonlinearity)
     case 'piecewise'
