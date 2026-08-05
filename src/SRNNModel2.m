@@ -1341,24 +1341,44 @@ classdef SRNNModel2 < handle
             % Pack state vector: [a_E; a_I; b_E; b_I; x]
             S0 = [a0_E; a0_I; b0_E; b0_I; x0];
         end
-        
-        function [x, a, b, r, br] = unpack_and_compute_states(~, S_out, params, a_zeros_b_ones)
+    end
+
+    methods (Static)
+        function [x, a, b, r, br] = unpack_and_compute_states(S_out, params, a_zeros_b_ones)
             % UNPACK_AND_COMPUTE_STATES Unpack state vector and compute dependent variables
             %
             % Unpacks the state trajectory S_out into individual state variables,
             % splits them into excitatory and inhibitory components, and computes
             % the firing rate r and synaptic output br.
             %
+            % Public static: this is a pure function of (S_out, params) and touches
+            % no object state, so analysis scripts can call it directly rather than
+            % re-deriving the state layout themselves. Matches the convention already
+            % used by SRNNCellTypes / SRNNCellTypePairs. Because MATLAB does not pass
+            % the object when a static method is dot-called on an instance, existing
+            % obj.unpack_and_compute_states(S, params) call sites work unchanged.
+            %
             % Inputs:
-            %   S_out          - State trajectory (nt x N_sys_eqs) or column vector
-            %   params         - Struct containing network parameters
-            %   a_zeros_b_ones - (Optional) If true, returns a as zeros and b as ones
-            
+            %   S_out          - State trajectory (nt x N_sys_eqs)
+            %   params         - Struct containing network parameters (see get_params)
+            %   a_zeros_b_ones - (Optional, INTERNAL) If true, returns a as zeros and
+            %                    b as ones, and returns x/r/br as plain n x nt arrays
+            %                    instead of E/I structs. Used by the Jacobian path.
+
             % Handle optional parameter
-            if nargin < 4
+            if nargin < 3
                 a_zeros_b_ones = false;
             end
-            
+
+            % Guard against a params struct that does not describe this S_out.
+            % Without this, a mismatched pair unpacks silently into wrong numbers.
+            if size(S_out, 2) ~= params.N_sys_eqs
+                error('SRNNModel2:unpack_and_compute_states:StateSizeMismatch', ...
+                    ['S_out has %d columns but params.N_sys_eqs = %d. ' ...
+                     'S_out must be nt x N_sys_eqs (time in rows).'], ...
+                    size(S_out, 2), params.N_sys_eqs);
+            end
+
             nt = size(S_out, 1);
             current_idx = 0;
             
