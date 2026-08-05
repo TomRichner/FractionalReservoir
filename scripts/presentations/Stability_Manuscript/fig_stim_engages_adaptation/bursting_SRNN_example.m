@@ -145,8 +145,8 @@ end
 %  NOTE: SRNNModel2 forces u = 0 during the negative warmup (t < 0), so this
 %  profile applies to t in [0, T_range(2)]. The ramp into the first level runs
 %  over the first ramp_dur seconds of the positive window, not the warmup.
-dc_levels = [0.0 0.1 0.4];   % absolute DC per level (all neurons); edit this sweep
-hold_dur  = 40; % 45                      % seconds each level is held
+dc_levels = [0.0 0.4];   % absolute DC per level (all neurons); edit this sweep
+hold_dur  = 50; % 45                      % seconds each level is held
 % White-noise INTENSITY (fs-invariant): the generator adds noise_intensity*sqrt(fs)*randn
 % per neuron, so the continuous-time noise PSD (~noise_intensity^2) is independent of fs.
 % Effective per-sample std = noise_intensity*sqrt(fs); 0.001*sqrt(400) = 0.02 at fs=400.
@@ -196,7 +196,7 @@ store_full_state = true;   % keep full-res S_out (needed for the PSD of x)
 % Figure saving: when true, save all open figures (time-series + PSD) to data/
 % via save_some_figs_to_folder_2 (writes .fig/.png/.pdf). Each run goes to a
 % timestamped subfolder so nothing is overwritten.
-save_figs  = false;        % set true to save figures for sharing
+save_figs  = true;        % set true to save figures for sharing
 save_types = {'png'};   % formats; pdf bundles all figs into one _report.pdf
 
 %% ======================================================================
@@ -298,19 +298,23 @@ nL = numel(dc_levels);
 figure('Name', 'PSD of Mean Dendritic Potential vs DC level', ...
     'Position', [20   297   505   418]);
 hold on;
-cmap = parula(nL+1);
+
 % Only show a subset of DC levels (the first = no stim, and the last = the
 % strongest stim), but keep the parula(nL+1) colors indexed by the original
 % level number so the traces match the full-staircase color scheme.
 % Derived from dc_levels so editing the staircase can't ask for a level that
 % was never simulated (a stale index yields an empty window and a pwelch error).
-% psd_show_levels = [1 nL];
-psd_show_levels = [1:nL];
-% psd_show_labels = {'no-stim', 'stim'};   % legend text for each shown level
+cmap1 = parula(5+1);
+cmap = [cmap1(1,:); cmap1(5,:)];
+psd_show_levels = [1 nL];
+psd_show_labels = {'no-stim', 'stim'};   % legend text for each shown level
 % Label each shown trace by its DC level, so the legend stays in sync with
 % whatever staircase / subset of levels is being plotted.
-psd_show_labels = arrayfun(@(v) sprintf('DC = %g', v), ...
-    dc_levels(psd_show_levels), 'UniformOutput', false);
+% cmap = parula(nL+1);
+% psd_show_levels = [1:nL];
+% psd_show_labels = arrayfun(@(v) sprintf('DC = %g', v), ...
+%     dc_levels(psd_show_levels), 'UniformOutput', false);
+
 labels = cell(numel(psd_show_levels), 1);
 for ii = 1:numel(psd_show_levels)
     k = psd_show_levels(ii);
