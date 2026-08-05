@@ -20,17 +20,6 @@
 
 close all; clc;
 
-% --- RNG seeds: persist & advance across successive runs --------------------
-% On the first run, initialize rng_seeds = [1 2]. On every subsequent run,
-% increment both seeds so each execution explores a new network / stimulus
-% realization. clearvars wipes everything EXCEPT rng_seeds, so the value
-% survives from one run to the next (it lives in the base workspace).
-% if exist('rng_seeds', 'var')
-%     rng_seeds = rng_seeds + 1
-% else
-%     rng_seeds = [1 2]
-% end
-
 % rng_seeds = [19 20]
 rng_seeds = [42 42];
 
@@ -211,8 +200,8 @@ save_types = {'png'};   % formats; pdf bundles all figs into one _report.pdf
 %  hold_dur (and psd_win_len_s) for finer low-frequency resolution (~1/win).
 psd_settle       = 15;    % seconds to skip after each DC step before the PSD window
 psd_win_len_s    = 10;    % Hamming window length (s)   [template used 15]
-psd_overlap_frac = 0.75;  % segment overlap fraction    [template used 0.75]
-psd_f            = logspace(log10(0.3), log10(100), 150);  % requested freqs (Hz)
+psd_overlap_frac = 0.5;  % segment overlap fraction    [template used 0.75]
+psd_f            = logspace(log10(0.3), log10(100), 100);  % requested freqs (Hz)
 
 %% ======================================================================
 %  11. POPULATION SYNCHRONY  (chi^2, Golomb-Rinzel), per DC level
