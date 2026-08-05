@@ -68,7 +68,7 @@ c_I     = 0.15/3;  % adaptation strength for I   (default 0.15/3 ~ 0.05)
 
 % Adaptation time constants (row vectors). Leave [] to auto-fill with
 % logspace(log10(0.25), log10(10), n_a) inside build_network().
-tau_a_E = logspace(log10(0.3), log10(15), n_a_E);    % old bursting: [0.3 ... 15] s (slower tail)
+tau_a_E = logspace(log10(0.25), log10(10), n_a_E);    % old bursting: [0.3 ... 15] s (slower tail)
 tau_a_I = [];                                        % auto if n_a_I>0
 
 %% ======================================================================
