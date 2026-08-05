@@ -996,6 +996,16 @@ classdef SRNNModel2 < handle
                     cls, cinfo.n_scc, 100*cinfo.largest_scc_frac, ...
                     cinfo.n_sources, cinfo.n_sinks, cinfo.p_strong_est_nominal, ...
                     obj.n, obj.indegree);
+
+                % SCC sizes, descending. Truncated so a large network with many
+                % singleton components does not flood the command window.
+                n_show  = min(20, numel(cinfo.scc_sizes));
+                scc_str = mat2str(cinfo.scc_sizes(1:n_show));
+                if numel(cinfo.scc_sizes) > n_show
+                    scc_str = sprintf('%s ... (%d more)', scc_str, ...
+                        numel(cinfo.scc_sizes) - n_show);
+                end
+                fprintf('  SCC sizes: %s\n', scc_str);
             end
         end
         

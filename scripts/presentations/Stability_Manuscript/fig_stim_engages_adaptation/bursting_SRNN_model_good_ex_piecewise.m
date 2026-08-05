@@ -31,8 +31,8 @@ close all; clc;
 %     rng_seeds = [1 2]
 % end
 
-rng_seeds = [19 20]
-% rng_seeds = [0 1]+3;
+% rng_seeds = [19 20]
+rng_seeds = [0 1]+7;
 
 clearvars -except rng_seeds;
 
@@ -43,8 +43,8 @@ setup_paths();
 %  1. NETWORK ARCHITECTURE
 %  ======================================================================
 n          = 50;      % total number of neurons              (default 300; old bursting net = 10)
-f          = 0.5;     % fraction excitatory, n_E = round(f*n) (default 0.5; old EI = 0.7)
-indegree   = 4;       % expected in-degree -> alpha = indegree/n (default 100; old mean degree ~4)
+f          = 0.7;     % fraction excitatory, n_E = round(f*n) (default 0.5; old EI = 0.7)
+indegree   = 10;       % expected in-degree -> alpha = indegree/n (default 100; old mean degree ~4)
 check_connectivity = true;
 
 %% ======================================================================
@@ -59,7 +59,7 @@ alpha = indegree / n;
 F     = 1 / sqrt(n * alpha * (2 - alpha));   % RMT normalization factor
 
 mu_E_tilde    =  3*F;   % normalized E mean      (class default  3*F)
-mu_I_tilde    = -4*F;   % normalized I mean      (class default -4*F)
+mu_I_tilde    = -2*F;   % normalized I mean      (class default -4*F)
 sigma_E_tilde =  1*F;   % normalized E std dev   (class default  1*F)
 sigma_I_tilde =  1*F;   % normalized I std dev   (class default  1*F)
 E_W           =  0;     % common mean offset added to mu_E_tilde & mu_I_tilde (default 0)
@@ -98,7 +98,7 @@ tau_b_I_rel = 0.25;  % I release  time constant (s)      (default 0.25)
 %  5. INTRINSIC DYNAMICS & NONLINEARITY
 %  ======================================================================
 %  dx_i/dt = (-x_i + sum_j w_ij r_j + u_i)/tau_d ;  r_i = b_i * phi(x_i - c*sum_k a_k)
-tau_d = 0.025;   % dendritic time constant (s)   (default 0.1; old bursting = 0.025)
+tau_d = 0.1;   % dendritic time constant (s)   (default 0.1; old bursting = 0.025)
 
 % --- Nonlinearity phi ---------------------------------------------------
 % 'piecewise' : piecewiseSigmoid(x, S_a, S_c)  -- bounded [0,1], parameterized below
@@ -113,7 +113,7 @@ S_a = 0.9;       % piecewiseSigmoid slope param a (default 0.9)
 % For the logistic it sets the operating point: phi(S_c)=0.5 with unit slope there, so
 % the resting rate at x=0 is 1/(1+exp(4*S_c)) -- 0.48 -> ~0.13, 0.35 -> ~0.20, 1.0 -> ~0.02.
 % Larger S_c => lower baseline firing and lower gain near rest.
-S_c = 0.45;      % activation center param c (default 0.35)
+S_c = 0.4;      % activation center param c (default 0.35)
 
 switch lower(nonlinearity)
     case 'piecewise'
@@ -145,8 +145,8 @@ end
 %  NOTE: SRNNModel2 forces u = 0 during the negative warmup (t < 0), so this
 %  profile applies to t in [0, T_range(2)]. The ramp into the first level runs
 %  over the first ramp_dur seconds of the positive window, not the warmup.
-dc_levels = [0.0 0.025 0.05 0.5];   % absolute DC per level (all neurons); edit this sweep
-hold_dur  = 20; % 45                      % seconds each level is held
+dc_levels = [0.0 0.125 0.25 0.5];   % absolute DC per level (all neurons); edit this sweep
+hold_dur  = 40; % 45                      % seconds each level is held
 % White-noise INTENSITY (fs-invariant): the generator adds noise_intensity*sqrt(fs)*randn
 % per neuron, so the continuous-time noise PSD (~noise_intensity^2) is independent of fs.
 % Effective per-sample std = noise_intensity*sqrt(fs); 0.001*sqrt(400) = 0.02 at fs=400.
@@ -155,7 +155,7 @@ noise_intensity = 0.001;     % 0.001         % white-noise intensity (input unit
 input_config = struct();
 input_config.dc_levels = dc_levels;   % staircase levels
 input_config.hold_dur  = hold_dur;    % seconds per level
-input_config.ramp_dur  = 10;          % ramp 0 -> dc_levels(1) over first ramp_dur s
+input_config.ramp_dur  = 0;          % ramp 0 -> dc_levels(1) over first ramp_dur s
 input_config.noise_intensity = noise_intensity;  % fs-invariant noise intensity (to the generator)
 input_config.intrinsic_drive = [];    % unused by this generator; required by the class
 input_config.generator = @dc_staircase_stimulus;  % custom generator (see bottom of file)
@@ -211,8 +211,8 @@ save_types = {'png'};   % formats; pdf bundles all figs into one _report.pdf
 %  hold_dur (and psd_win_len_s) for finer low-frequency resolution (~1/win).
 psd_settle       = 15;    % seconds to skip after each DC step before the PSD window
 psd_win_len_s    = 10;    % Hamming window length (s)   [template used 15]
-psd_overlap_frac = 0.5;  % segment overlap fraction    [template used 0.75]
-psd_f            = logspace(log10(0.3), log10(100), 100);  % requested freqs (Hz)
+psd_overlap_frac = 0.75;  % segment overlap fraction    [template used 0.75]
+psd_f            = logspace(log10(0.3), log10(100), 150);  % requested freqs (Hz)
 
 %% ======================================================================
 %  11. CONSTRUCT, BUILD, RUN, PLOT
