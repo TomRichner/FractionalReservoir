@@ -215,7 +215,46 @@ psd_overlap_frac = 0.75;  % segment overlap fraction    [template used 0.75]
 psd_f            = logspace(log10(0.3), log10(100), 150);  % requested freqs (Hz)
 
 %% ======================================================================
-%  11. CONSTRUCT, BUILD, RUN, PLOT
+%  11. POPULATION SYNCHRONY  (chi^2, Golomb-Rinzel), per DC level
+%  ======================================================================
+%  For a population matrix M (n_neurons x nt) over a settled window, with
+%  population mean R(t) = mean_i M(i,t):
+%
+%      chi2 = var_t(R) / mean_i( var_t(M_i) )
+%
+%  i.e. the variance of the average divided by the average of the variances.
+%  The only difference between numerator and denominator is WHEN you average
+%  across neurons -- before or after taking the variance over time.
+%
+%    chi2 = 1   -> every neuron follows the same trace; averaging across
+%                  neurons cancels nothing (perfect synchrony).
+%    chi2 = 1/N -> neurons fluctuate independently; averaging N independent
+%                  signals shrinks variance by 1/N (perfect asynchrony).
+%
+%  chi2 IS the mean pairwise correlation plus a 1/N floor:
+%      chi2 = 1/N + (1 - 1/N)*rho_bar   =>   rho_bar = (chi2 - 1/N)/(1 - 1/N)
+%  so rho_bar is the floor-corrected, N-independent form. Both are reported.
+%
+%  Computed on the E population only: with f = 0.7 and adaptation on E alone
+%  (n_a_E = 3, n_a_I = 0), E and I cells do structurally different things and
+%  blending them muddies the measure.
+%
+%  Computed on BOTH x (dendritic potential) and r (firing rate). x is primary:
+%  in the burst regime r clips at phi's ceiling of 1, and saturation distorts
+%  variance. x is unbounded and shows the burst cleanly.
+%
+%  Computed BOTH raw and with a per-neuron linear detrend. tau_a_E reaches 15 s,
+%  so the network can still be drifting inside a hold; that drift is shared
+%  across neurons (common-mode) and spuriously inflates chi2 in the suppressed
+%  regime. Comparing the two lines shows how big that confound is. NOTE this is
+%  an affine trend removal, NOT a bandpass -- no filtering is applied here.
+chi2_settle    = 10;      % seconds to skip after each DC step (separate from psd_settle)
+chi2_var_floor = 1e-24;   % denominator guard; below this chi2 -> NaN instead of 0/0
+                          % (matters only if noise_intensity = 0, where a suppressed
+                          %  fixed point has genuinely zero variance)
+
+%% ======================================================================
+%  12. CONSTRUCT, BUILD, RUN, PLOT
 %  ======================================================================
 model = SRNNModel2( ...
     'n', n, 'f', f, 'indegree', indegree, 'check_connectivity',check_connectivity, ...
@@ -306,6 +345,94 @@ legend(psd_ax, labels, 'Location', 'northeast', 'Box', 'off', ...
     'FontSize', legend_fs);
 grid(psd_ax, 'off');
 
+%% ======================================================================
+%  POPULATION SYNCHRONY chi^2 vs DC level
+%  ======================================================================
+% See Section 11 for the definition and the reasoning behind the four variants.
+% Unpack the full-resolution state once. unpack_and_compute_states returns
+% x/r as structs with .E (n_E x nt) and .I (n_I x nt) -- neurons in ROWS, time
+% in COLUMNS -- so variance over time is var(M,0,2) and the population mean is
+% mean(M,1).
+[x_st, ~, ~, r_st, ~] = SRNNModel2.unpack_and_compute_states(model.S_out, model.get_params());
+xE = x_st.E;    % n_E x nt, dendritic potential
+rE = r_st.E;    % n_E x nt, firing rate
+
+chi2_x    = nan(nL, 1);  rho_x    = nan(nL, 1);
+chi2_xd   = nan(nL, 1);  rho_xd   = nan(nL, 1);
+chi2_r    = nan(nL, 1);  rho_r    = nan(nL, 1);
+chi2_rd   = nan(nL, 1);  rho_rd   = nan(nL, 1);
+varR_x    = nan(nL, 1);  meanvar_x = nan(nL, 1);
+mean_rate = nan(nL, 1);
+
+for k = 1:nL
+    % Steady window for level k: skip the first chi2_settle s after the step.
+    lo  = (k-1)*hold_dur + chi2_settle;
+    hi  = k*hold_dur;
+    sel = t_full > lo & t_full <= hi;
+
+    xk = xE(:, sel);
+    rk = rE(:, sel);
+    % Per-neuron linear detrend (detrend works column-wise -> transpose).
+    xkd = detrend(xk', 'linear')';
+    rkd = detrend(rk', 'linear')';
+
+    [chi2_x(k),  rho_x(k),  varR_x(k), meanvar_x(k)] = population_chi2(xk,  chi2_var_floor);
+    [chi2_xd(k), rho_xd(k), ~, ~]                    = population_chi2(xkd, chi2_var_floor);
+    [chi2_r(k),  rho_r(k),  ~, ~]                    = population_chi2(rk,  chi2_var_floor);
+    [chi2_rd(k), rho_rd(k), ~, ~]                    = population_chi2(rkd, chi2_var_floor);
+
+    % Mean E firing rate: distinguishes suppression-to-quiescence from
+    % suppression-by-saturation (both read as "no bursts", very different states).
+    mean_rate(k) = mean(rk(:));
+end
+
+chi2_floor = 1 / model.n_E;   % asynchronous floor for the E population
+
+% --- Figure: chi^2 vs DC, plus the numerator/denominator that produce it ----
+figure('Name', 'Population synchrony (chi^2) vs DC level', ...
+    'Position', [540 297 505 560]);
+
+ax_chi = subplot(2, 1, 1);
+hold(ax_chi, 'on');
+plot(ax_chi, dc_levels, chi2_x,  '-o', 'LineWidth', 1.8, 'MarkerSize', 7);
+plot(ax_chi, dc_levels, chi2_xd, '--o', 'LineWidth', 1.5, 'MarkerSize', 6);
+plot(ax_chi, dc_levels, chi2_r,  '-s', 'LineWidth', 1.8, 'MarkerSize', 7);
+plot(ax_chi, dc_levels, chi2_rd, '--s', 'LineWidth', 1.5, 'MarkerSize', 6);
+yline(ax_chi, chi2_floor, ':k', 'LineWidth', 1.5);
+hold(ax_chi, 'off');
+ylim(ax_chi, [0 1]);
+set(ax_chi, 'FontSize', tick_fs);
+xlabel(ax_chi, 'DC level', 'FontSize', label_fs);
+ylabel(ax_chi, '$\chi^2$', 'Interpreter', 'latex', 'FontSize', label_fs);
+legend(ax_chi, {'x (raw)', 'x (detrended)', 'r (raw)', 'r (detrended)', ...
+    sprintf('async floor 1/n_E = %.3f', chi2_floor)}, ...
+    'Location', 'best', 'Box', 'off', 'FontSize', legend_fs);
+grid(ax_chi, 'off');
+
+ax_var = subplot(2, 1, 2);
+hold(ax_var, 'on');
+plot(ax_var, dc_levels, varR_x,    '-o', 'LineWidth', 1.8, 'MarkerSize', 7);
+plot(ax_var, dc_levels, meanvar_x, '-s', 'LineWidth', 1.8, 'MarkerSize', 7);
+hold(ax_var, 'off');
+set(ax_var, 'YScale', 'log', 'FontSize', tick_fs);
+xlabel(ax_var, 'DC level', 'FontSize', label_fs);
+ylabel(ax_var, 'variance (x)', 'FontSize', label_fs);
+legend(ax_var, {'var_t(R) [numerator]', '\langle var_t(x_i) \rangle_i [denominator]'}, ...
+    'Location', 'best', 'Box', 'off', 'FontSize', legend_fs);
+grid(ax_var, 'off');
+
+% --- Console table ---------------------------------------------------------
+fprintf('\nPopulation synchrony (E cells, n_E = %d, window = last %g s of each %g s hold)\n', ...
+    model.n_E, hold_dur - chi2_settle, hold_dur);
+fprintf('%8s %10s %12s %10s %10s %12s %12s %10s\n', ...
+    'DC', 'chi2_x', 'chi2_x_dtr', 'chi2_r', 'rho_x', 'var(R)', 'meanvar', 'mean_r');
+for k = 1:nL
+    fprintf('%8.4g %10.4f %12.4f %10.4f %10.4f %12.3e %12.3e %10.4f\n', ...
+        dc_levels(k), chi2_x(k), chi2_xd(k), chi2_r(k), rho_x(k), ...
+        varR_x(k), meanvar_x(k), mean_rate(k));
+end
+fprintf('\n');
+
 % %% ======================================================================
 % %  SHORT STAIRCASE FOR THE PAPER  (3 DC levels, 20 s holds)
 % %  ======================================================================
@@ -361,6 +488,39 @@ end
 %% ======================================================================
 %  LOCAL FUNCTIONS
 %  ======================================================================
+function [chi2, rho, varR, meanvar] = population_chi2(M, var_floor)
+    % POPULATION_CHI2 Golomb-Rinzel population synchrony measure.
+    %
+    %   chi2 = var_t( mean_i M ) / mean_i( var_t(M_i) )
+    %
+    % Variance of the population average over the average of the per-neuron
+    % variances. Equals 1 for perfectly synchronous neurons (averaging cancels
+    % nothing) and 1/N for independent neurons (averaging N independent signals
+    % shrinks variance by 1/N).
+    %
+    % Inputs:
+    %   M         - n_neurons x nt population matrix (neurons in ROWS)
+    %   var_floor - if the denominator falls below this, return NaN rather than
+    %               a meaningless 0/0 (a noiseless fixed point has zero variance)
+    %
+    % Outputs:
+    %   chi2    - synchrony measure, in [1/N, 1]
+    %   rho     - floor-corrected form (chi2 - 1/N)/(1 - 1/N), the mean pairwise
+    %             correlation; independent of N, so comparable across net sizes
+    %   varR    - numerator,   var_t(mean_i M)
+    %   meanvar - denominator, mean_i var_t(M_i)
+    N       = size(M, 1);
+    varR    = var(mean(M, 1), 0, 2);
+    meanvar = mean(var(M, 0, 2));
+
+    if meanvar < var_floor
+        chi2 = NaN;
+    else
+        chi2 = varR / meanvar;
+    end
+    rho = (chi2 - 1/N) / (1 - 1/N);
+end
+
 function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, rng_seed, input_config)
     % DC_STAIRCASE_STIMULUS Uniform tonic DC stepped through a sequence of levels,
     % plus independent per-neuron white noise.
