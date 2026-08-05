@@ -40,6 +40,7 @@ classdef SRNNModel2 < handle
         
         level_of_chaos = 1.0        % Scaling factor for W
         rescale_by_abscissa = false % Whether to apply 1/abscissa_0 scaling
+        check_connectivity = false  % If true, build_network reports the digraph connectivity class of W
     end
     
     %% Spike-Frequency Adaptation (SFA) Properties
@@ -762,6 +763,67 @@ classdef SRNNModel2 < handle
             set(ax_handle, 'Color', 'none');
         end
         
+        function [cls, info] = checkConnectivityClass(obj, varargin)
+            % CHECKCONNECTIVITYCLASS Digraph connectivity class of the network W
+            %
+            % Classifies the directed graph defined by the nonzero entries of W
+            % as one of 'strong', 'unilateral', 'weak', or 'disconnected'. Call
+            % after build() (or after build_network has assigned W).
+            %
+            % Usage:
+            %   model.checkConnectivityClass()          % prints a summary
+            %   cls = model.checkConnectivityClass()
+            %   [cls, info] = model.checkConnectivityClass('Tolerance', 1e-12)
+            %
+            % Name-value options are passed through to the static
+            % SRNNModel2.connectivity_class; see that method for the full list
+            % of info fields.
+            %
+            % In addition to the fields set by connectivity_class, info carries
+            % the *nominal* (configured) quantities, so the realized draw can be
+            % compared against what the parameters predict:
+            %   indegree_nominal, alpha_nominal, p_strong_est_nominal,
+            %   expected_sources_sinks_nominal
+            %
+            % This is a purely structural check: it ignores weight magnitude and
+            % sign. A strongly connected W whose only path between two halves
+            % runs through a 1e-6 weight is functionally disconnected. Use
+            % 'Tolerance' to screen out negligible weights.
+            %
+            % See also: connectivity_class, strong_connectivity_probability
+
+            if isempty(obj.W)
+                error('SRNNModel2:NotBuilt', ...
+                    ['W is empty. Call build() (or build_network) before ' ...
+                     'checkConnectivityClass. To classify an arbitrary matrix, ' ...
+                     'use the static SRNNModel2.connectivity_class(A).']);
+            end
+
+            [cls, info] = SRNNModel2.connectivity_class(obj.W, varargin{:});
+
+            % Nominal (configured) counterparts to the realized values above.
+            info.indegree_nominal = obj.indegree;
+            info.alpha_nominal    = obj.alpha;
+            [info.p_strong_est_nominal, info.expected_sources_sinks_nominal] = ...
+                SRNNModel2.strong_connectivity_probability(obj.n, obj.indegree);
+
+            if nargout == 0
+                fprintf(['Connectivity class: %s  (n = %d, indegree = %g, ' ...
+                         'alpha = %.4f)\n'], cls, obj.n, obj.indegree, obj.alpha);
+                fprintf(['  %d SCC(s), largest spans %d/%d nodes (%.1f%%); ' ...
+                         '%d weak component(s)\n'], ...
+                    info.n_scc, info.scc_sizes(1), obj.n, ...
+                    100*info.largest_scc_frac, info.n_weak_comp);
+                fprintf(['  %d node(s) with zero in-degree, %d with zero ' ...
+                         'out-degree; realized mean in-degree = %.2f\n'], ...
+                    info.n_sources, info.n_sinks, info.mean_indegree);
+                fprintf(['  P(strongly connected) ~ %.3f for these settings ' ...
+                         '(expected %.2f source/sink nodes)\n'], ...
+                    info.p_strong_est_nominal, info.expected_sources_sinks_nominal);
+                clear cls;   % suppress ans display
+            end
+        end
+
         function params = get_params(obj)
             % GET_PARAMS Return params struct for compatibility with existing functions
             %
@@ -922,6 +984,19 @@ classdef SRNNModel2 < handle
             W_eigs_scaled = eig(obj.W);
             fprintf('W matrix created: spectral radius = %.3f, abscissa = %.3f, theoretical R = %.3f\n', ...
                 max(abs(W_eigs_scaled)), max(real(W_eigs_scaled)), obj.R);
+
+            % Optional structural check. Relevant at low indegree, where the
+            % network can fail to be strongly connected -- usually because a
+            % neuron or two ends up a pure source or sink.
+            if obj.check_connectivity
+                [cls, cinfo] = obj.checkConnectivityClass();
+                fprintf(['W connectivity: %s (%d SCC, largest %.0f%% of nodes; ' ...
+                         '%d source / %d sink; P(strong) ~ %.2f for n = %d, ' ...
+                         'indegree = %g)\n'], ...
+                    cls, cinfo.n_scc, 100*cinfo.largest_scc_frac, ...
+                    cinfo.n_sources, cinfo.n_sinks, cinfo.p_strong_est_nominal, ...
+                    obj.n, obj.indegree);
+            end
         end
         
         function build_stimulus(obj)
@@ -2035,10 +2110,217 @@ classdef SRNNModel2 < handle
     end
     
     %% ====================================================================
+    %              CONNECTIVITY STRUCTURE (graph diagnostics)
+    % =====================================================================
+    % Structural checks on W. Pure functions of a matrix; the instance-level
+    % entry point is checkConnectivityClass.
+
+    methods (Static)
+        function [cls, info] = connectivity_class(A, varargin)
+            % CONNECTIVITY_CLASS Classify the digraph defined by a matrix
+            %
+            % [cls, info] = SRNNModel2.connectivity_class(A, ...)
+            %
+            % Returns one of, in order of decreasing strength:
+            %   'strong'       - every node reaches every other node
+            %   'unilateral'   - for every pair (i,j) there is a path i->j OR j->i
+            %   'weak'         - the underlying undirected graph is connected
+            %   'disconnected' - none of the above
+            % The classes nest (strong subset unilateral subset weak), so the
+            % strongest applicable label is returned.
+            %
+            % Name-value options:
+            %   'Tolerance' (0)    - entries with abs(A) <= Tolerance are treated
+            %                        as absent edges. Useful for screening out
+            %                        weights too small to matter dynamically.
+            %   'Transpose' (true) - interpret A(i,j) as an edge j->i, which is
+            %                        this model's convention (dx_i/dt includes
+            %                        sum_j w_ij r_j). MATLAB's digraph(A) reads
+            %                        A(i,j) as i->j, so the adjacency is
+            %                        transposed before the graph is built. All
+            %                        four classes are invariant under edge
+            %                        reversal, so cls is unaffected, but the
+            %                        per-node source/sink diagnostics are not.
+            %
+            % Self-loops are removed before analysis: they never affect the
+            % connectivity class, and RMTMatrix's sparsity mask includes the
+            % diagonal, so they would otherwise inflate the degree counts.
+            %
+            % info fields (realized structure):
+            %   class, is_strong, is_unilateral, is_weakly_connected
+            %   n_scc, scc_sizes (descending), largest_scc_frac, scc_bins
+            %   n_weak_comp, weak_bins
+            %   in_degree, out_degree      (1 x n, self-loops excluded)
+            %   zero_indegree, zero_outdegree (index vectors)
+            %   n_sources, n_sinks, n_selfloops, n_edges
+            %   mean_indegree, alpha_hat   (realized density over n*(n-1) slots)
+            %   p_strong_est, expected_sources_sinks
+            %       Erdos-Renyi estimate evaluated at the REALIZED density; see
+            %       strong_connectivity_probability.
+            %
+            % largest_scc_frac is usually the field of interest: it separates
+            % "one big SCC plus a couple of dangling source/sink neurons" from a
+            % genuinely fractured reservoir.
+            %
+            % See also: checkConnectivityClass, strong_connectivity_probability
+
+            p = inputParser;
+            p.FunctionName = 'SRNNModel2.connectivity_class';
+            addRequired(p, 'A', @(x) isnumeric(x) || islogical(x));
+            addParameter(p, 'Tolerance', 0, @(x) isnumeric(x) && isscalar(x) && x >= 0);
+            addParameter(p, 'Transpose', true, @(x) islogical(x) || isnumeric(x));
+            parse(p, A, varargin{:});
+            tol       = p.Results.Tolerance;
+            do_transp = logical(p.Results.Transpose);
+
+            if ndims(A) ~= 2 || size(A, 1) ~= size(A, 2) %#ok<ISMAT>
+                error('SRNNModel2:connectivity_class:NotSquare', ...
+                    'A must be a square matrix; got %s.', mat2str(size(A)));
+            end
+            n = size(A, 1);
+            if n == 0
+                error('SRNNModel2:connectivity_class:Empty', 'A must be non-empty.');
+            end
+
+            % Structural adjacency, oriented so that Adj(i,j) means i -> j.
+            Adj = abs(full(A)) > tol;
+            if do_transp
+                Adj = Adj.';
+            end
+            n_selfloops = nnz(diag(Adj));
+            Adj(1:n+1:end) = false;      % self-loops do not affect the class
+
+            G = digraph(Adj);
+
+            scc_bins  = conncomp(G, 'Type', 'strong');
+            weak_bins = conncomp(G, 'Type', 'weak');
+            n_scc       = max(scc_bins);
+            n_weak_comp = max(weak_bins);
+
+            is_strong = (n_scc == 1);
+            is_weak   = (n_weak_comp == 1);
+
+            % Unilateral <=> the condensation DAG has a Hamiltonian path
+            % <=> its topological order is unique <=> consecutive nodes in any
+            % topological order are joined by an edge. O(V+E). A disconnected
+            % condensation fails this automatically, so no special-casing.
+            if is_strong
+                is_unilateral = true;
+            else
+                Gc  = condensation(G);
+                ord = toposort(Gc);
+                is_unilateral = true;
+                for k = 1:(numnodes(Gc) - 1)
+                    if findedge(Gc, ord(k), ord(k+1)) == 0
+                        is_unilateral = false;
+                        break;
+                    end
+                end
+            end
+
+            if is_strong
+                cls = 'strong';
+            elseif is_unilateral
+                cls = 'unilateral';
+            elseif is_weak
+                cls = 'weak';
+            else
+                cls = 'disconnected';
+            end
+
+            if nargout < 2
+                return;
+            end
+
+            in_deg  = full(sum(Adj, 1));    % Adj(i,j) = i->j, so column sums are in-degrees
+            out_deg = full(sum(Adj, 2)).';
+
+            scc_sizes = sort(accumarray(scc_bins(:), 1), 'descend').';
+
+            info = struct();
+            info.class               = cls;
+            info.is_strong           = is_strong;
+            info.is_unilateral       = is_unilateral;
+            info.is_weakly_connected = is_weak;
+
+            info.n_scc            = n_scc;
+            info.scc_sizes        = scc_sizes;
+            info.largest_scc_frac = scc_sizes(1) / n;
+            info.scc_bins         = scc_bins;
+            info.n_weak_comp      = n_weak_comp;
+            info.weak_bins        = weak_bins;
+
+            info.in_degree      = in_deg;
+            info.out_degree     = out_deg;
+            info.zero_indegree  = find(in_deg  == 0);
+            info.zero_outdegree = find(out_deg == 0);
+            info.n_sources      = numel(info.zero_indegree);
+            info.n_sinks        = numel(info.zero_outdegree);
+            info.n_selfloops    = n_selfloops;
+            info.n_edges        = nnz(Adj);
+
+            info.mean_indegree = info.n_edges / n;
+            if n > 1
+                info.alpha_hat = info.n_edges / (n * (n - 1));
+            else
+                info.alpha_hat = 0;
+            end
+
+            [info.p_strong_est, info.expected_sources_sinks] = ...
+                SRNNModel2.strong_connectivity_probability(n, info.alpha_hat * n);
+        end
+
+        function [p_strong, expected_sources_sinks] = strong_connectivity_probability(n, indegree)
+            % STRONG_CONNECTIVITY_PROBABILITY P(strongly connected) for D(n,p)
+            %
+            % [p, lambda] = SRNNModel2.strong_connectivity_probability(n, indegree)
+            %
+            % Estimates the probability that an Erdos-Renyi directed random
+            % graph on n nodes with expected in-degree `indegree` (edge
+            % probability alpha = indegree/n, as built by RMTMatrix) is strongly
+            % connected, and returns lambda = the expected number of nodes with
+            % zero in-degree or zero out-degree.
+            %
+            % At the densities used here the dominant obstruction to strong
+            % connectivity is a single node of in- or out-degree zero, not a
+            % large structural split (Palasti: P(strong) -> exp(-2c) when
+            % n*(1-p)^(n-1) -> c). This estimate accounts only for that
+            % obstruction and treats the 2n zero-degree events as independent,
+            % so it is an APPROXIMATION, not a bound: ignoring larger splits
+            % biases it high, while the independence assumption (those events
+            % are in fact negatively correlated) biases it low. Empirically the
+            % two roughly cancel -- at n = 50, indegree = 4 it returns 0.184
+            % against a Monte-Carlo value of ~0.21 (see
+            % scripts/tests/test_connectivity_class.m). Treat it as good to a
+            % few percent in the alpha ~ log(n)/n regime, and as a rough guide
+            % below it.
+            %
+            % Example (the fig_stim_engages_adaptation bursting network):
+            %   [p, lam] = SRNNModel2.strong_connectivity_probability(50, 4)
+            %   -> p ~ 0.18, lam ~ 1.68
+            % i.e. only about one draw in five is strongly connected, and one to
+            % two neurons are expected to be pure sources or sinks. Mean degree
+            % log(n) ~ 3.9 is the connectivity threshold, so indegree = 4 sits
+            % right on it.
+            %
+            % See also: connectivity_class, checkConnectivityClass
+
+            alpha = indegree / n;
+            alpha = min(max(alpha, 0), 1);
+
+            % P(a given node has in-degree 0), excluding the self-loop slot.
+            p_zero = (1 - alpha)^(n - 1);
+
+            expected_sources_sinks = 2 * n * p_zero;
+            p_strong = (1 - p_zero)^(2 * n);
+        end
+    end
+
+    %% ====================================================================
     %              INTERNALIZED ACTIVATION FUNCTIONS
     % =====================================================================
     % Internalized from src/nonlinearities/ to make SRNNModel2 standalone.
-    
+
     methods (Static)
         function D = compute_eigenvalue_density(eigenvalues, re_edges, im_edges, sigma_bins)
             % COMPUTE_EIGENVALUE_DENSITY 2-D Gaussian-smoothed eigenvalue density
