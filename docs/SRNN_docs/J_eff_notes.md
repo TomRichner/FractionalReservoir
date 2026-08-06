@@ -13,21 +13,22 @@ We consider a network of N neurons (indices i,j = 1,…,N) with the following eq
 
 The membrane / rate state variable x_i evolves as
 
-    \dot{x}_i = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, r_j}{\tau_d},
+    \dot{x}_i = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, b_j r_j}{\tau_d},
 
 where
 
 - τ_d is the (global) decay time constant,
 - u_i is an external input (ignored when computing the Jacobian),
 - w_{ij} is the (structural) weight from neuron j to neuron i,
-- r_j is the firing rate of neuron j.
+- r_j is the firing rate of neuron j, before depression is applied,
+- b_j r_j is the synaptic output of neuron j — the quantity the recurrent sum sees.
 
 1.2 Nonlinearity and adaptation
 -------------------------------
 
 The firing rate r_i is given by
 
-    r_i = b_i\,\phi\!\left(
+    r_i = \phi\!\left(
         x_i - a_{0_i}
         - c \sum_{k=1}^{K} a_{ik}
     \right),
@@ -35,7 +36,8 @@ The firing rate r_i is given by
 where
 
 - φ(·) is a static nonlinearity (e.g., sigmoid),
-- b_i is a synaptic depression / gain factor,
+- b_i is a synaptic depression / gain factor, applied *outside* φ to form the
+  synaptic output b_i r_i; it does not enter r_i itself,
 - a_{0_i} is an offset parameter (e.g., preferred input or threshold shift),
 - c is an adaptation gain,
 - a_{ik} are adaptation state variables for neuron i and component k = 1,…,K.
@@ -55,33 +57,34 @@ Let
 - W = (w_{ij}) ∈ R^{N×N},
 - 1 be the N-vector of ones.
 
-The recurrent input term can be written as
+Let s = b ⊙ r denote the vector of synaptic outputs, s_i = b_i r_i. The recurrent
+input term can be written as
 
-    \left(\sum_{j=1}^{N} w_{ij} r_j\right)_i
-    = (W r)_i.
+    \left(\sum_{j=1}^{N} w_{ij} b_j r_j\right)_i
+    = (W s)_i.
 
-To make it explicit that r_j scales the columns of W, we can also write
+To make it explicit that s_j scales the columns of W, we can also write
 
-    W r = W \mathrm{diag}(r)\, 1,
+    W s = W \mathrm{diag}(s)\, 1,
 
 since
 
-    \left(W\,\mathrm{diag}(r)\,1\right)_i
-    = \sum_{j} w_{ij} r_j.
+    \left(W\,\mathrm{diag}(s)\,1\right)_i
+    = \sum_{j} w_{ij} b_j r_j.
 
 Thus, the x-dynamics in vector form is
 
     \dot{x}
-    = \frac{-x + u + W r}{\tau_d}
-    = \frac{-x + u + W\,\mathrm{diag}(r)\,1}{\tau_d}.
+    = \frac{-x + u + W s}{\tau_d}
+    = \frac{-x + u + W\,\mathrm{diag}(s)\,1}{\tau_d}.
 
 ------------------------------------------------------------
-3. Jacobian of r with respect to x
+3. Jacobian of the synaptic output s = b ⊙ r with respect to x
 ------------------------------------------------------------
 
 We treat a_{ik} and b_i as constants. For each neuron i,
 
-    r_i
+    s_i = b_i r_i
     = b_i\,\phi\!\left(
         x_i - a_{0_i}
         - c \sum_{k=1}^{K} a_{ik}
@@ -94,11 +97,12 @@ Define the constant
 
 Then
 
-    r_i = b_i\,\phi\!\left(x_i - \mathrm{const}_i\right).
+    r_i = \phi\!\left(x_i - \mathrm{const}_i\right).
 
-The partial derivative of r_i with respect to x_j is
+What the recurrent sum sees is the synaptic output b_i r_i, so it is that product
+whose derivative is required. Holding b constant,
 
-    \frac{\partial r_i}{\partial x_j}
+    \frac{\partial (b_i r_i)}{\partial x_j}
     = b_i\,\phi'\!\left(x_i - \mathrm{const}_i\right)\,\delta_{ij},
 
 where δ_{ij} is the Kronecker delta.

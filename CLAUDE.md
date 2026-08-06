@@ -7,11 +7,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD). The dynamics implemented are:
 
 ```
-dx_i/dt    = (-x_i + Σ_j w_ij r_j + u_i) / τ_d
-r_i        = b_i · φ(x_i - c · Σ_k a_{i,k})
+dx_i/dt    = (-x_i + Σ_j w_ij · b_j r_j + u_i) / τ_d
+r_i        = φ(x_i - c · Σ_k a_{i,k})
 da_{i,k}/dt = (-a_{i,k} + r_i) / τ_k
 db_i/dt    = (1 - b_i)/τ_rec - (b_i · r_i)/τ_rel
 ```
+
+Note the placement of `b`. The rate `r_i` is the **pre-depression** output of the
+nonlinearity; depression enters as the product `b_j r_j` in the recurrent sum, i.e.
+presynaptically and multiplicatively. Consequently SFA and STD are both driven by
+the raw rate `r_i`, not by `b_i r_i`. This is not cosmetic: the alternative framing
+`r_i = b_i·φ(...)` would make SFA integrate `b_i r_i`, make the STD ODE depend on
+`b_i² r_i`, and put a factor of `b` into the `a→x` and `a→a` Jacobian blocks. The
+code (`dynamics_fast`, `compute_Jacobian_fast`) implements the form above.
 
 Connectivity uses Random Matrix Theory (Harris 2023) tilde-notation. Outputs are largest Lyapunov exponent (LLE), full Lyapunov spectrum (QR method), firing rate statistics, and parameter-sweep histograms.
 

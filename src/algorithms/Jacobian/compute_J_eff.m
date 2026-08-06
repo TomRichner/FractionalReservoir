@@ -12,7 +12,9 @@ function J_eff = compute_J_eff(S, params)
 %
 %   Based on the derivation in J_eff_notes.md:
 %     J_eff(x,a,b) = (1/tau_d) * (-I + W * G)
-%   where
+%   where G is the derivative of the SYNAPTIC OUTPUT b_i*r_i with respect to
+%   x_i, holding a and b fixed. Since r_i = phi(x_i - c*sum_k(a_{ik})) is the
+%   pre-depression rate and b multiplies it outside the nonlinearity,
 %     G = diag(b_i * phi'(x_i - c * sum_k(a_{ik})))
 %
 % Inputs:

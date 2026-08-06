@@ -35,9 +35,9 @@ function [dS_dt] = SRNN_reservoir(t, S, t_ex, u_ex, params)
 The function implements the following system of differential equations:
 
 ```
-dx_i/dt = (-x_i + Σ_j w_ij * r_j + u_i) / τ_d
+dx_i/dt = (-x_i + Σ_j w_ij * b_j * r_j + u_i) / τ_d
 
-r_i = b_i * φ(x_i - c * Σ_k a_{i,k})
+r_i = φ(x_i - c * Σ_k a_{i,k})
 
 da_{i,k}/dt = (-a_{i,k} + r_i) / τ_k
 
@@ -46,9 +46,11 @@ db_i/dt = (1 - b_i) / τ_rec - (b_i * r_i) / τ_rel
 
 Where:
 - `x_i`: Dendritic state of neuron i
-- `r_i`: Firing rate of neuron i
-- `a_{i,k}`: k-th adaptation variable for neuron i
-- `b_i`: Short-term depression variable for neuron i (0 < b_i ≤ 1)
+- `r_i`: Firing rate of neuron i, **before** depression is applied
+- `b_i * r_i`: Synaptic output of neuron i — the quantity that enters the recurrent sum
+- `a_{i,k}`: k-th adaptation variable for neuron i (driven by `r_i`, not `b_i r_i`)
+- `b_i`: Short-term depression variable for neuron i (0 < b_i ≤ 1), acting
+  presynaptically and multiplicatively
 - `φ`: Nonlinear activation function (e.g., sigmoid, tanh)
 - `c`: Adaptation scaling factor (c_E for E neurons, c_I for I neurons)
 - `w_ij`: Connection weight from neuron j to neuron i

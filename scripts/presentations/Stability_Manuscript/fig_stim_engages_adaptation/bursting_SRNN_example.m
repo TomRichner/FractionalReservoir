@@ -86,7 +86,9 @@ tau_b_I_rel = 0.25;  % I release  time constant (s)      (default 0.25)
 %% ======================================================================
 %  5. INTRINSIC DYNAMICS & NONLINEARITY
 %  ======================================================================
-%  dx_i/dt = (-x_i + sum_j w_ij r_j + u_i)/tau_d ;  r_i = b_i * phi(x_i - c*sum_k a_k)
+%  dx_i/dt = (-x_i + sum_j w_ij b_j r_j + u_i)/tau_d ;  r_i = phi(x_i - c*sum_k a_k)
+%  (b multiplies r OUTSIDE phi: r is the pre-depression rate, b_j*r_j is the
+%   synaptic output. SFA and STD are both driven by the raw rate r.)
 tau_d = 0.1;   % dendritic time constant (s)   (default 0.1; old bursting = 0.025)
 
 % --- Nonlinearity phi ---------------------------------------------------

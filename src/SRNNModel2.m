@@ -1659,10 +1659,15 @@ classdef SRNNModel2 < handle
             % as a struct. The interpolant must be in params.u_interpolant.
             %
             % Implements:
-            %   dx_i/dt = (-x_i + sum_j(w_ij * r_j) + u_i) / tau_d
-            %   r_i = b_i * phi(x_i - c * sum_k(a_i,k))
+            %   dx_i/dt = (-x_i + sum_j(w_ij * b_j * r_j) + u_i) / tau_d
+            %   r_i = phi(x_i - c * sum_k(a_i,k))
             %   da_i,k/dt = (-a_i,k + r_i) / tau_k
             %   db_i/dt = (1 - b_i) / tau_rec - (b_i * r_i) / tau_rel
+            %
+            % Note the placement of b: r_i is the PRE-depression rate, and
+            % depression enters as the product b_j*r_j in the recurrent sum
+            % (presynaptic, multiplicative). Both SFA and STD are therefore
+            % driven by the raw rate r_i, not by b_i*r_i.
             %
             % State organization: S = [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]
             
