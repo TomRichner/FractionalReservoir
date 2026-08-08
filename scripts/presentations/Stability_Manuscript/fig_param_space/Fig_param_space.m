@@ -76,7 +76,9 @@ for r = 1:nRows
         set(ax, 'FontSize', tick_fs);
         set(ax.YLabel, 'FontSize', label_fs);
         if r == 1
-            xlabel(ax, 'Growth Rate', 'FontSize', label_fs);   % LLE (lambda_1) -> Growth Rate
+            % LLE is the x-axis here (row 1 is a distribution). 'tex' so the
+            % symbol renders rather than printing the literal \lambda_1.
+            xlabel(ax, '\lambda_1', 'Interpreter', 'tex', 'FontSize', label_fs);
             set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);  % titles, not bold
         else
             set(ax.XLabel, 'FontSize', label_fs);   % keep 'Mean Firing Rate'
@@ -147,10 +149,10 @@ fprintf(fid, '  Presentation replot -- no simulation is re-run. The script reloa
 fprintf(fid, '  saved param-space PSA object from a run_all_<dt> run, calls\n');
 fprintf(fid, '  replot_param_space_analysis (psa.plot for LLE + mean_rate), then copies\n');
 fprintf(fid, '  the per-condition histogram axes into a single 2x4 figure:\n');
-fprintf(fid, '    row 1 = LLE (growth-rate) distributions (green dashed zero line)\n');
+fprintf(fid, '    row 1 = LLE distributions (green dashed zero line)\n');
 fprintf(fid, '    row 2 = mean firing-rate distributions\n');
 fprintf(fid, '    columns = No Adaptation, SFA, STD, SFA+STD\n');
-fprintf(fid, '  Cleanups: LLE row xlabel "LLE (lambda_1)" -> "Growth Rate"; condition\n');
+fprintf(fid, '  Cleanups: LLE row xlabel "LLE (lambda_1)" -> \\lambda_1; condition\n');
 fprintf(fid, '  titles only on the top row (not bold); vertical gray column dividers;\n');
 fprintf(fid, '  fonts matched to the MC/sensitivity figures; y-axes linked within each\n');
 fprintf(fid, '  row. See git_provenance.txt for the exact commit.\n\n');

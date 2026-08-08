@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Parameter-space distributions (combined)
 ====================================================================
 
-Generated: 07-Jul-2026 15:56:10
+Generated: 08-Aug-2026 18:06:36
 By script: Fig_param_space.m
 
 HOW IT WAS MADE
@@ -9,10 +9,10 @@ HOW IT WAS MADE
   saved param-space PSA object from a run_all_<dt> run, calls
   replot_param_space_analysis (psa.plot for LLE + mean_rate), then copies
   the per-condition histogram axes into a single 2x4 figure:
-    row 1 = LLE (growth-rate) distributions (green dashed zero line)
+    row 1 = LLE distributions (green dashed zero line)
     row 2 = mean firing-rate distributions
     columns = No Adaptation, SFA, STD, SFA+STD
-  Cleanups: LLE row xlabel "LLE (lambda_1)" -> "Growth Rate"; condition
+  Cleanups: LLE row xlabel "LLE (lambda_1)" -> \lambda_1; condition
   titles only on the top row (not bold); vertical gray column dividers;
   fonts matched to the MC/sensitivity figures; y-axes linked within each
   row. See git_provenance.txt for the exact commit.

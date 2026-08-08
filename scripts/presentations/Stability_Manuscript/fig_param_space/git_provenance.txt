@@ -1,16 +1,16 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_param_space
-Captured at: 07-Jul-2026 15:56:10
+Captured at: 08-Aug-2026 18:06:36
 
-commit:      53801c81c212eff205165d6b914efb0da274e988
-commit_short:53801c8
-branch:      refactor
+commit:      b8d0140f47408a5c1c032c74620ebd4cacdfb05e
+commit_short:b8d0140
+branch:      main
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    param space fig
-last_date:   2026-07-07T15:53:25-05:00
+last_msg:    Fig_sensitivity_analysis.m now makes a mean_rate figure,  and the LLE figures are now labeled lambda_1 instead of growthrate, generated new figs
+last_date:   2026-08-08T18:03:54-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_param_space.m
- M scripts/presentations/Stability_Manuscript/fig_param_space/README_fig_param_space.txt
- M scripts/presentations/Stability_Manuscript/fig_param_space/git_provenance.txt
- D scripts/presentations/Stability_Manuscript/fig_param_space/working_changes.patch
+M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_ParamSpace.fig
+ M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_ParamSpace.png
+ M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_ParamSpace.svg
+ M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_param_space.m
