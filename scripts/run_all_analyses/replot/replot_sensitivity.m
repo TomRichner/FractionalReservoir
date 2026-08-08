@@ -1,18 +1,26 @@
-function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins)
+function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate_n_bins)
 % REPLOT_SENSITIVITY Reload 1D sensitivity PSA objects and regenerate figures.
 %
 %   replot_dir = REPLOT_SENSITIVITY(data_root)
 %   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range)
 %   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range, n_bins)
+%   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range, n_bins, rate_n_bins)
 %
 % Inputs:
 %   data_root      : path to a run_all_<dt> folder containing 1D_sensitivity_*
 %                    subdirectories produced by run_sensitivity_analysis.m
 %   lle_hist_range : optional 2-element [ymin ymax] for the LLE histogram
-%                    (default [-1, 1]); mean_rate uses its plot_sensitivity default
+%                    (default [-1, 1]); mean_rate uses its plot_sensitivity
+%                    default range of [0, 1]
 %   n_bins         : optional number of LLE histogram bins. When omitted, uses
-%                    plot_sensitivity's default (35); mean_rate always uses the
-%                    default.
+%                    plot_sensitivity's default (35).
+%   rate_n_bins    : optional number of mean_rate histogram bins. When omitted,
+%                    uses plot_sensitivity's default (35). Pass the same value
+%                    as n_bins to give both metrics the same vertical
+%                    resolution.
+%
+% Note: n_bins counts linspace EDGES, so the plotted image has n_bins+1 rows
+% (n_bins-1 interior bins plus the two -inf/+inf overflow bins).
 %
 % Output:
 %   replot_dir     : path to the new replot_sensitivity_<dt> folder under data_root
@@ -24,6 +32,9 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins)
     end
     if nargin < 3
         n_bins = [];
+    end
+    if nargin < 4
+        rate_n_bins = [];
     end
 
     setup_paths();
@@ -42,11 +53,16 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins)
     end
     fprintf('Replot output directory:\n  %s\n\n', replot_dir);
 
-    % LLE plot_sensitivity args (constant across params); include n_bins only
-    % when the caller provided it, else plot_sensitivity uses its default.
+    % Per-metric plot_sensitivity args (constant across params); include n_bins
+    % only when the caller provided it, else plot_sensitivity uses its default.
     lle_args = {'metric', 'LLE', 'hist_range', lle_hist_range};
     if ~isempty(n_bins)
         lle_args = [lle_args, {'n_bins', n_bins}];
+    end
+
+    rate_args = {'metric', 'mean_rate'};
+    if ~isempty(rate_n_bins)
+        rate_args = [rate_args, {'n_bins', rate_n_bins}];
     end
 
     for k = 1:length(sens_listing)
@@ -74,7 +90,7 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins)
         psa.output_dir = replot_dir;
 
         psa.plot_sensitivity(lle_args{:});
-        psa.plot_sensitivity('metric', 'mean_rate');
+        psa.plot_sensitivity(rate_args{:});
 
         fig_dir = fullfile(replot_dir, 'figures');
         save_some_figs_to_folder_2(fig_dir, ...
