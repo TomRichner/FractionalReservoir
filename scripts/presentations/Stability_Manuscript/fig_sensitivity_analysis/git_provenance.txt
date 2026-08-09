@@ -1,28 +1,24 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sensitivity_analysis
-Captured at: 08-Aug-2026 14:45:08
+Captured at: 08-Aug-2026 19:30:32
 
-commit:      85e2fd2164fd2fbb275f0c5620bbd1df15f39fec
-commit_short:85e2fd2
+commit:      c6cf66aa6df67effc7be7419ea7227d244ef1df7
+commit_short:c6cf66a
 branch:      main
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    fixed tau_b_E_rel to be default
-last_date:   2026-08-05T17:43:15-05:00
+last_msg:    paramspace figure is now \lambda_1 not Growth Rate
+last_date:   2026-08-08T19:27:31-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_Sensitivity_LLE.fig
+M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_ParamSpace.fig
+ M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_ParamSpace.png
+ M scripts/presentations/Stability_Manuscript/fig_param_space/Fig_ParamSpace.svg
+ M scripts/presentations/Stability_Manuscript/fig_param_space/README_fig_param_space.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space/working_changes.patch
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_Sensitivity_LLE.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_Sensitivity_LLE.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_Sensitivity_LLE.svg
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_analysis.m
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/README_fig_sensitivity_analysis.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/working_changes.patch
- M scripts/run_all_analyses/replot/replot_sensitivity.m
-?? scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.fig
-?? scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.png
-?? scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.svg
-
---- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.fig
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.png
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis/Fig_sensitivity_mean_rate.svg
