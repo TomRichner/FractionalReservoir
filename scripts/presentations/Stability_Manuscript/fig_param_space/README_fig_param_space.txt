@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Parameter-space distributions (combined)
 ====================================================================
 
-Generated: 08-Aug-2026 19:29:34
+Generated: 08-Aug-2026 19:40:30
 By script: Fig_param_space.m
 
 HOW IT WAS MADE
@@ -15,7 +15,8 @@ HOW IT WAS MADE
   Cleanups: LLE row xlabel "LLE (lambda_1)" -> \lambda_1; condition
   titles only on the top row (not bold); vertical gray column dividers;
   fonts matched to the MC/sensitivity figures; y-axes linked within each
-  row. See git_provenance.txt for the exact commit.
+  row, with probability ticks at 0/0.4/0.8 (LLE row) and 0/0.2/0.4
+  (rate row). See git_provenance.txt for the exact commit.
 
 SOURCE RUN
   C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_jul_06_26_22_00

@@ -70,6 +70,10 @@ close(mr_fig);
 tick_fs  = 14;    % tick numbers -- matches MC/sensitivity figures
 label_fs = 15.4;  % axis labels  -- matches MC/sensitivity figures
 title_fs = 14;
+% Probability y ticks, one entry per row. The two rows span different ranges
+% (the LLE distributions peak near 0.8, the rate distributions near 0.4), so
+% each gets its own sparse set rather than MATLAB's automatic ticks.
+prob_yticks = {[0, 0.4, 0.8], [0, 0.2, 0.4]};
 for r = 1:nRows
     for c = 1:nCols
         ax = cax(r, c);
@@ -86,6 +90,8 @@ for r = 1:nRows
         end
     end
     linkaxes(cax(r, :), 'y');   % shared probability axis within each row
+    % After linkaxes, so the shared limits don't regenerate automatic ticks.
+    set(cax(r, :), 'YTick', prob_yticks{r});
 end
 
 % 5) Vertical gray dividers between the 4 condition columns (span both rows).
@@ -155,7 +161,8 @@ fprintf(fid, '    columns = No Adaptation, SFA, STD, SFA+STD\n');
 fprintf(fid, '  Cleanups: LLE row xlabel "LLE (lambda_1)" -> \\lambda_1; condition\n');
 fprintf(fid, '  titles only on the top row (not bold); vertical gray column dividers;\n');
 fprintf(fid, '  fonts matched to the MC/sensitivity figures; y-axes linked within each\n');
-fprintf(fid, '  row. See git_provenance.txt for the exact commit.\n\n');
+fprintf(fid, '  row, with probability ticks at 0/0.4/0.8 (LLE row) and 0/0.2/0.4\n');
+fprintf(fid, '  (rate row). See git_provenance.txt for the exact commit.\n\n');
 
 fprintf(fid, 'SOURCE RUN\n');
 fprintf(fid, '  %s\n', data_root);

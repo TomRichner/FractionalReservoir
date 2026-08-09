@@ -44,8 +44,9 @@ replot_dir = replot_sensitivity(data_root, lle_range, n_bins, n_bins);
 %   f              -> "E:I ratio"     (E:I = f:(1-f)), ratio tick labels
 %   level_of_chaos -> "Synaptic Gain" (g; edge of chaos ~1)
 %   n              -> "Network Size"
-ei_ticks  = [0.25, 1/3, 0.4, 0.5, 0.6, 2/3, 0.75];
-ei_labels = {'1:3', '1:2', '2:3', '1:1', '3:2', '2:1', '3:1'};
+% 1:2 (f = 1/3) and 2:1 (f = 2/3) are dropped -- 7 ratio labels crowd the axis.
+ei_ticks  = [0.25, 0.4, 0.5, 0.6, 0.75];
+ei_labels = {'1:3', '2:3', '1:1', '3:2', '3:1'};
 tick_fs   = 14;    % tick numbers -- matches MC figure DefaultAxesFontSize
 label_fs  = 15.4;  % axis labels -- matches MC figure (14 * 1.1 label multiplier)
 title_fs  = 20;    % condition titles (no adaptation, sfa only, ...) -- enlarged
@@ -70,12 +71,15 @@ zeroline_lw  = 2;      % green dashed zero line width (plot_sensitivity uses 4)
 % clim_frac darkens imagesc: CLim is capped at total_reps*clim_frac (shared
 % across panels of a metric so they stay comparable). Tuned per metric because
 % the two use different bin counts/ranges, so counts concentrate differently.
+% yticks: [] leaves the automatic ticks alone. mean_rate is pinned to just the
+% 0 and 1 endpoints -- the intermediate 0.5 adds clutter without information.
 metric_specs = struct( ...
     'name',      {'LLE',                 'mean_rate'}, ...
     'ylabel',    {'\lambda_1',           'Mean Firing Rate'}, ...
     'fig_tag',   {'Fig_Sensitivity_LLE', 'Fig_sensitivity_mean_rate'}, ...
     'zero_line', {true,                  false}, ...
-    'clim_frac', {0.4,                   0.4});
+    'clim_frac', {0.4,                   0.4}, ...
+    'yticks',    {[],                    [0, 1]});
 
 for mi = 1:numel(metric_specs)
     spec = metric_specs(mi);
@@ -132,6 +136,10 @@ for mi = 1:numel(metric_specs)
         yl = get(ax, 'YLabel');
         if ~isempty(get(yl, 'String'))
             set(yl, 'String', spec.ylabel, 'Interpreter', 'tex', 'FontSize', label_fs);
+        end
+
+        if ~isempty(spec.yticks)              % metric-specific y ticks
+            set(ax, 'YTick', spec.yticks);
         end
 
         xmax = max(xlim(ax));
@@ -282,7 +290,7 @@ end
 fprintf(fid, '\nSHARED LAYOUT (both figures)\n');
 fprintf(fid, '  One row per swept parameter (f, level_of_chaos, n), one column per\n');
 fprintf(fid, '  adaptation condition. x-axes relabelled: f -> "E:I ratio"\n');
-fprintf(fid, '  (E:I = f:(1-f), ticks 1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1);\n');
+fprintf(fid, '  (E:I = f:(1-f), ticks 1:3, 2:3, 1:1, 3:2, 3:1);\n');
 fprintf(fid, '  level_of_chaos -> "Synaptic Gain"; n -> "Network Size". Larger tick\n');
 fprintf(fid, '  fonts. Condition titles kept only on the top row; vertical gray\n');
 fprintf(fid, '  dividers separate the 4 condition columns. imagesc CLim capped at\n');
@@ -305,9 +313,9 @@ fprintf(fid, '                             the range).\n');
 fprintf(fid, '  Fig_sensitivity_mean_rate: ylabel "Mean Firing Rate"; histogram range\n');
 fprintf(fid, '                             [0, 1] (plot_sensitivity default; nothing can\n');
 fprintf(fid, '                             fall outside it, so the overflow bins are\n');
-fprintf(fid, '                             always empty); zero line removed -- at y=0 it\n');
-fprintf(fid, '                             lands on the bottom axis and carries no\n');
-fprintf(fid, '                             meaning for a rate.\n');
+fprintf(fid, '                             always empty); y ticks at 0 and 1 only; zero\n');
+fprintf(fid, '                             line removed -- at y=0 it lands on the bottom\n');
+fprintf(fid, '                             axis and carries no meaning for a rate.\n');
 
 clear cleanup;  % flush + close
 fprintf('Description written: %s\n', desc_path);

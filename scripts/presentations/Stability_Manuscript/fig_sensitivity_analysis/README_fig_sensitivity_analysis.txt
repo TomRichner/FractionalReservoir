@@ -1,7 +1,7 @@
 Stability_Manuscript figures: LLE + mean firing rate Sensitivity (combined)
 ==========================================================================
 
-Generated: 08-Aug-2026 19:30:32
+Generated: 08-Aug-2026 19:40:13
 By script: Fig_sensitivity_analysis.m
 
 HOW THEY WERE MADE
@@ -30,7 +30,7 @@ FIGURES PRODUCED (in this folder)
 SHARED LAYOUT (both figures)
   One row per swept parameter (f, level_of_chaos, n), one column per
   adaptation condition. x-axes relabelled: f -> "E:I ratio"
-  (E:I = f:(1-f), ticks 1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1);
+  (E:I = f:(1-f), ticks 1:3, 2:3, 1:1, 3:2, 3:1);
   level_of_chaos -> "Synaptic Gain"; n -> "Network Size". Larger tick
   fonts. Condition titles kept only on the top row; vertical gray
   dividers separate the 4 condition columns. imagesc CLim capped at
@@ -54,6 +54,6 @@ PER-FIGURE DIFFERENCES
   Fig_sensitivity_mean_rate: ylabel "Mean Firing Rate"; histogram range
                              [0, 1] (plot_sensitivity default; nothing can
                              fall outside it, so the overflow bins are
-                             always empty); zero line removed -- at y=0 it
-                             lands on the bottom axis and carries no
-                             meaning for a rate.
+                             always empty); y ticks at 0 and 1 only; zero
+                             line removed -- at y=0 it lands on the bottom
+                             axis and carries no meaning for a rate.
