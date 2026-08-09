@@ -43,12 +43,12 @@ switch run_mode
         n_levels = 7;  n_reps = 7;  ode_solver_mode = @ode_rk4;
         fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
     case 'medium'
-        % Medium: roughly halfway between fast and production. ode45 at fs=400,
-        % 15 levels x 50 reps. T_range=[0,50] with the auto LLE window
+        % Medium: roughly halfway between fast and production. ode45 at fs=200,
+        % 11 levels x 25 reps. T_range=[0,50] with the auto LLE window
         % ([] -> [15,50]) so the analysis window is longer relative to the swept
-        % tau (up to 60 s) than the [15,30] used by the other medium sub-scripts.
+        % tau (up to 60 s) than the [10,20] used by the other medium sub-scripts.
         n_levels = 11; n_reps = 25; ode_solver_mode = @ode45;
-        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
+        fs_mode = 200;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
     case 'production'
         n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
         fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];

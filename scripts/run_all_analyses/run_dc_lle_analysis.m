@@ -59,25 +59,29 @@ switch run_mode
         n_seeds    = 25;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
         ode_solver = @ode_rk4;
+        fs_mode    = 400;
         % ode_solver = @ode45;
     case 'medium'
         % Roughly halfway between fast and production: more seeds, still the
         % fast fixed-step solver to keep the (expensive) staircase runs quick.
+        % fs=200 matches the other medium sub-analyses.
         n_seeds    = 38;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
         ode_solver = @ode_rk4;
+        fs_mode    = 200;
     case 'production'
         n_seeds    = 50;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
         ode_solver = @ode45;
+        fs_mode    = 400;
     otherwise
         error('run_dc_lle_analysis:badMode', ...
             'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
 end
 nL = numel(dc_levels);
 use_parallel = true;   % set false for serial debugging
-fprintf('[run_dc_lle_analysis] run_mode=%s, n_seeds=%d, nL=%d, ode_solver=%s\n', ...
-    run_mode, n_seeds, nL, func2str(ode_solver));
+fprintf('[run_dc_lle_analysis] run_mode=%s, n_seeds=%d, nL=%d, ode_solver=%s, fs=%d\n', ...
+    run_mode, n_seeds, nL, func2str(ode_solver), fs_mode);
 
 %% Network / model configuration (single SFA+STD "bursting" regime)
 % Mirrors scripts/presentations/Stability_Manuscript/
@@ -100,7 +104,7 @@ hold_dur        = 30;      % seconds each DC level is held
 ramp_dur        = 10;      % ramp 0 -> dc_levels(1) over the first ramp_dur s
 noise_intensity = 0.001;   % fs-invariant white-noise intensity
 psd_settle      = 15;      % seconds skipped after each step before the LLE window
-fs              = 400;
+fs              = fs_mode;  % set by run_mode (medium=200, else 400)
 T_range         = [0, nL * hold_dur];
 
 % Custom DC staircase generator (shared, on the path via setup_paths)

@@ -39,10 +39,11 @@ switch run_mode
         n_levels = 4;  n_reps = 3;  ode_solver_mode = @ode_rk4;
         fs_mode = 200;  T_range_mode = [0, 10];  lya_T_interval_mode = [5, 10];
     case 'medium'
-        % Medium: roughly halfway between fast and production. ode45 at fs=400,
-        % T_range=[0,30] with a 15 s LLE window [15,30], 15 levels x 50 reps.
+        % Medium: roughly halfway between fast and production. ode_rk4 at
+        % fs=200, T_range=[0,20] with a 10 s LLE window [10,20], 11 levels x
+        % 15 reps. fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3).
         n_levels = 11; n_reps = 15; ode_solver_mode = @ode_rk4;
-        fs_mode = 400;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
+        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
     case 'production'
         n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
         fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [20 50];

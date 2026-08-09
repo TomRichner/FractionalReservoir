@@ -27,7 +27,7 @@ classdef SRNNModel2 < handle
     %% Network Architecture Properties
     properties
         n = 300                     % Total number of neurons
-        f = 0.5                     % Fraction of excitatory neurons
+        f = 2/3                     % Fraction of excitatory neurons (E:I = 2:1)
         indegree = 100              % Expected in-degree
         
         % RMT tilde-notation parameters (Harris 2023)
@@ -49,8 +49,8 @@ classdef SRNNModel2 < handle
         n_a_I = 0                   % Number of adaptation timescales for I neurons
         tau_a_E                     % Adaptation time constants for E neurons (1 x n_a_E)
         tau_a_I                     % Adaptation time constants for I neurons (1 x n_a_I)
-        c_E = 0.15/3                 % Adaptation scaling for E neurons
-        c_I = 0.15/3                  % Adaptation scaling for I neurons
+        c_E = 1/3                   % Adaptation scaling for E neurons
+        c_I = 1/3                   % Adaptation scaling for I neurons
     end
     
     %% Short-Term Depression (STD) Properties
@@ -66,11 +66,11 @@ classdef SRNNModel2 < handle
     
     %% Dynamics Properties
     properties
-        tau_d = 0.1                 % Dendritic time constant (s)
+        tau_d = 1                   % Dendritic time constant (s)
         activation_function         % Activation function handle
         activation_function_derivative  % Derivative of activation function
         S_a = 0.9                   % Activation function parameter a
-        S_c = 0.4                   % Activation function parameter c (center)
+        S_c = 0.0                   % Activation function parameter c (center)
     end
     
     %% Simulation Settings Properties
@@ -945,8 +945,14 @@ classdef SRNNModel2 < handle
             % F = 1/sqrt(N*alpha*(2-alpha)), see parameter_table.md
             F = obj.default_val;
             
+            % mu_I_tilde = -6*F is the E/I mean-balanced value at the default
+            % f = 2/3 (f*3F + (1-f)*mu_I_tilde = 0): with half as many I neurons
+            % as E, per-synapse inhibition is doubled to compensate. It is a
+            % FIXED multiple of F, so the f sweeps in run_sensitivity_analysis
+            % (0.2-0.8) and run_param_space_analysis2 (0.25-0.75) move away from
+            % exact balance -- intended, since f is the swept variable there.
             if isempty(obj.mu_E_tilde),    obj.mu_E_tilde = 3*F;     end % 3*F
-            if isempty(obj.mu_I_tilde),    obj.mu_I_tilde = -4*F;    end % -4*F
+            if isempty(obj.mu_I_tilde),    obj.mu_I_tilde = -6*F;    end % -6*F
             if isempty(obj.sigma_E_tilde), obj.sigma_E_tilde = 1*F;    end
             if isempty(obj.sigma_I_tilde), obj.sigma_I_tilde = 1*F;    end
             
@@ -1051,14 +1057,17 @@ classdef SRNNModel2 < handle
         function set_defaults(obj)
             % SET_DEFAULTS Initialize all properties to default values
             
-            % Set default activation function (logisticSigmoid, centered at S_c).
-            % Smooth sigmoid with unit slope at its center; gives more robust
-            % near-edge-of-chaos stability than the piecewise variant. S_a is
-            % retained for the piecewise static method but unused here. The
-            % piecewiseSigmoid / tanhActivation static methods remain available
-            % as alternative activations but are not the default.
-            obj.activation_function = @(x) SRNNModel2.logisticSigmoid(x, obj.S_c);
-            obj.activation_function_derivative = @(x) SRNNModel2.logisticSigmoidDerivative(x, obj.S_c);
+            % Set default activation function: piecewiseSigmoid(x, S_a, S_c) with
+            % S_a = 0.9 and S_c = 0 (piecewise linear/quadratic, range [0,1],
+            % phi(S_c) = 0.5). Centering at 0 puts the resting point (x ~ 0) in
+            % the middle of the linear region rather than on the lower tail.
+            % NOTE: these handles capture the PROPERTY-BLOCK values of S_a/S_c,
+            % because set_defaults runs before the constructor's name-value
+            % parsing -- a caller passing 'S_c' must rebuild the handles itself.
+            % The logisticSigmoid / tanhActivation static methods remain
+            % available as alternative activations but are not the default.
+            obj.activation_function = @(x) SRNNModel2.piecewiseSigmoid(x, obj.S_a, obj.S_c);
+            obj.activation_function_derivative = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, obj.S_a, obj.S_c);
             
             % Set default input configuration
             obj.input_config = struct();
