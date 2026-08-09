@@ -4,7 +4,7 @@ clc
 % Fig_sfa_EOC.m
 % Stability_Manuscript presentation figure: SFA edge-of-chaos.
 % Replots the tau_a-sensitivity LLE panel -- how the largest Lyapunov exponent
-% (growth rate) approaches 0 (edge of chaos) as the maximum SFA adaptation
+% (lambda_1) approaches 0 (edge of chaos) as the maximum SFA adaptation
 % timescale tau_a grows. No simulation is re-run: it reloads the saved
 % tau_a_E_max PSA object and restyles the single-condition (SFA+STD) panel,
 % matching the presentation treatment in fig_sensitivity_analysis.
@@ -24,7 +24,7 @@ tau_dir   = fullfile(data_root, ...
     'tau_sensitivity_tau_timescales_tau_a_E_max_nLevs_15_jul_07_26_08_49');
 out_dir   = this_dir;   % write the final figure next to this script
 
-% LLE (growth-rate) y-axis range -- matches the original tau_a run.
+% LLE y-axis range -- matches the original tau_a run.
 lle_range = [-0.3, 0.1];
 
 % Start clean: plot_sensitivity operates on the current session's figures.
@@ -73,14 +73,17 @@ end
 % Green dashed zero line: thinner.
 set(findobj(ax, 'Type', 'constantline'), 'LineWidth', zeroline_lw);
 
-% Labels: lambda_1 -> "Growth Rate"; x -> "max \tau_a (s)"; drop the title.
-ylabel(ax, 'Growth Rate', 'Interpreter', 'none', 'FontSize', label_fs);
+% Labels: keep lambda_1; x -> "max \tau_a (s)"; drop the title. latex here (not
+% tex) so the symbol matches the latex xlabel below.
+ylabel(ax, '$\lambda_1$', 'Interpreter', 'latex', 'FontSize', label_fs);
 xlabel(ax, 'max $\tau_a$ (s)', 'Interpreter', 'latex', 'FontSize', label_fs);
 title(ax, '');
 
 % Fewer y-ticks + a tighter view around the data.
 ylim(ax, [-0.25, 0.05]);
 yticks(ax, -0.2:0.1:0.1);
+
+set(gcf,'Position',[457   637   264   252])
 
 % --- Save ONLY the cleaned panel, with a STABLE name -----------------------
 % save_some_figs_to_folder_2 suffixes filenames with the (run-dependent) figure
@@ -132,12 +135,13 @@ fprintf(fid, '  Fig_SFA_EOC.png\n');
 fprintf(fid, '  Fig_SFA_EOC.svg\n');
 fprintf(fid, '  Fig_SFA_EOC.fig\n\n');
 
-fprintf(fid, '  Single panel: largest Lyapunov exponent (growth rate) vs the maximum\n');
+fprintf(fid, '  Single panel: largest Lyapunov exponent (lambda_1) vs the maximum\n');
 fprintf(fid, '  SFA adaptation timescale tau_a (the last, largest of 3 log-spaced\n');
-fprintf(fid, '  tau_a_E elements, swept 5..60 s). As tau_a grows the growth rate rises\n');
+fprintf(fid, '  tau_a_E elements, swept 5..60 s). As tau_a grows lambda_1 rises\n');
 fprintf(fid, '  toward 0 (the green dashed edge-of-chaos line) but stays negative.\n');
-fprintf(fid, '  x-axis relabelled tau_a_E(last) -> "max \\tau_a (s)"; ylabel\n');
-fprintf(fid, '  lambda_1 -> "Growth Rate"; condition title ("SFA + STD") removed.\n');
+fprintf(fid, '  x-axis relabelled tau_a_E(last) -> "max \\tau_a (s)"; ylabel kept as\n');
+fprintf(fid, '  \\lambda_1 (latex, matching the xlabel); condition title ("SFA + STD")\n');
+fprintf(fid, '  removed.\n');
 fprintf(fid, '  imagesc CLim capped at total_reps*%.2g; colormap white -> 90%% black so\n', clim_frac);
 fprintf(fid, '  the blue median line stays visible. Blue median: alpha %.2g, width %d;\n', median_alpha, median_lw);
 fprintf(fid, '  green zero line width %d; axis box removed. LLE range [%.2g, %.2g].\n', ...

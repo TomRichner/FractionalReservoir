@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA Edge of Chaos (tau_a sensitivity)
 =================================================================
 
-Generated: 27-Jul-2026 14:06:04
+Generated: 08-Aug-2026 21:39:02
 By script: Fig_sfa_EOC.m
 
 HOW IT WAS MADE
@@ -21,12 +21,13 @@ FIGURES PRODUCED (in this folder)
   Fig_SFA_EOC.svg
   Fig_SFA_EOC.fig
 
-  Single panel: largest Lyapunov exponent (growth rate) vs the maximum
+  Single panel: largest Lyapunov exponent (lambda_1) vs the maximum
   SFA adaptation timescale tau_a (the last, largest of 3 log-spaced
-  tau_a_E elements, swept 5..60 s). As tau_a grows the growth rate rises
+  tau_a_E elements, swept 5..60 s). As tau_a grows lambda_1 rises
   toward 0 (the green dashed edge-of-chaos line) but stays negative.
-  x-axis relabelled tau_a_E(last) -> "max \tau_a (s)"; ylabel
-  lambda_1 -> "Growth Rate"; condition title ("SFA + STD") removed.
+  x-axis relabelled tau_a_E(last) -> "max \tau_a (s)"; ylabel kept as
+  \lambda_1 (latex, matching the xlabel); condition title ("SFA + STD")
+  removed.
   imagesc CLim capped at total_reps*0.4; colormap white -> 90% black so
   the blue median line stays visible. Blue median: alpha 0.35, width 3;
   green zero line width 2; axis box removed. LLE range [-0.3, 0.1].
