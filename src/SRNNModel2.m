@@ -49,8 +49,8 @@ classdef SRNNModel2 < handle
         n_a_I = 0                   % Number of adaptation timescales for I neurons
         tau_a_E                     % Adaptation time constants for E neurons (1 x n_a_E)
         tau_a_I                     % Adaptation time constants for I neurons (1 x n_a_I)
-        c_E = 0.15/3                 % Adaptation scaling for E neurons
-        c_I = 0.15/3                  % Adaptation scaling for I neurons
+        c_E = 0.5/3                 % Adaptation scaling for E neurons
+        c_I = 0.5/3                  % Adaptation scaling for I neurons
     end
     
     %% Short-Term Depression (STD) Properties
@@ -61,7 +61,7 @@ classdef SRNNModel2 < handle
         tau_b_E_rel = 0.25          % STD release time constant for E neurons (scalar, shared across timescales)
         tau_b_I_rec = 1             % STD recovery time constants for I neurons (1 x n_b_I vector)
         tau_b_I_rel = 0.25          % STD release time constant for I neurons (scalar, shared across timescales)
-        std_zero_floor = false      % If true, rescale synaptic prod_m(b_m) -> (P-P_min)/(1-P_min) so (prod_m b_m)*r reaches 0 at r=1
+        std_zero_floor = true      % If true, rescale synaptic prod_m(b_m) -> (P-P_min)/(1-P_min) so (prod_m b_m)*r reaches 0 at r=1
     end
     
     %% Dynamics Properties
@@ -70,7 +70,7 @@ classdef SRNNModel2 < handle
         activation_function         % Activation function handle
         activation_function_derivative  % Derivative of activation function
         S_a = 0.9                   % Activation function parameter a
-        S_c = 0.4                   % Activation function parameter c (center)
+        S_c = 0.35                   % Activation function parameter c (center)
     end
     
     %% Simulation Settings Properties
@@ -1051,14 +1051,19 @@ classdef SRNNModel2 < handle
         function set_defaults(obj)
             % SET_DEFAULTS Initialize all properties to default values
             
-            % Set default activation function (logisticSigmoid, centered at S_c).
-            % Smooth sigmoid with unit slope at its center; gives more robust
-            % near-edge-of-chaos stability than the piecewise variant. S_a is
-            % retained for the piecewise static method but unused here. The
-            % piecewiseSigmoid / tanhActivation static methods remain available
-            % as alternative activations but are not the default.
-            obj.activation_function = @(x) SRNNModel2.logisticSigmoid(x, obj.S_c);
-            obj.activation_function_derivative = @(x) SRNNModel2.logisticSigmoidDerivative(x, obj.S_c);
+            % Set default activation function (piecewiseSigmoid, centered at S_c).
+            % Slope is exactly 1 across the linear band [S_c - S_a/2, S_c + S_a/2],
+            % with a quadratic taper to saturation at S_c +/- (1 - S_a/2); range
+            % [0, 1] and r = 1 is attained exactly (unlike the logistic, which only
+            % asymptotes). The higher mean gain gives a more chaotic network than
+            % logisticSigmoid at the same level_of_chaos. logisticSigmoid /
+            % tanhActivation remain available as alternative activations but are
+            % not the default; the logistic bindings are kept commented below so
+            % the two can be swapped in place.
+            % obj.activation_function = @(x) SRNNModel2.logisticSigmoid(x, obj.S_c);
+            % obj.activation_function_derivative = @(x) SRNNModel2.logisticSigmoidDerivative(x, obj.S_c);
+            obj.activation_function = @(x) SRNNModel2.piecewiseSigmoid(x, obj.S_a, obj.S_c);
+            obj.activation_function_derivative = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, obj.S_a, obj.S_c);
             
             % Set default input configuration
             obj.input_config = struct();

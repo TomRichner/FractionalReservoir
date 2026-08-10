@@ -34,15 +34,17 @@ if ~exist('run_mode', 'var'); run_mode = 'production'; end
 switch run_mode
     case 'fast'
         % Fast iteration: fewer levels/reps, half the sample rate, short time
-        % range. fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3);
-        % T_range=[0,20] with an explicit 10 s LLE window [10,20].
+        % range. ode_rk4 at fs=200, T_range=[0,10] with an explicit 5 s LLE
+        % window [5,10].
         n_levels = 4;  n_reps = 3;  ode_solver_mode = @ode_rk4;
         fs_mode = 200;  T_range_mode = [0, 10];  lya_T_interval_mode = [5, 10];
     case 'medium'
-        % Medium: roughly halfway between fast and production. ode45 at fs=400,
-        % T_range=[0,30] with a 15 s LLE window [15,30], 15 levels x 50 reps.
+        % Medium: roughly halfway between fast and production. ode_rk4 at
+        % fs=200, T_range=[0,20] with a 10 s LLE window [10,20], 11 levels x
+        % 15 reps. fs=200 gives dt=0.005, so benettin's lya_dt=0.1 clears the
+        % lya_dt/dt >= 3 guard with room to spare (ratio 20).
         n_levels = 11; n_reps = 15; ode_solver_mode = @ode_rk4;
-        fs_mode = 400;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
+        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
     case 'production'
         n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
         fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [20 50];
@@ -98,19 +100,16 @@ for p_idx = 1:size(params_to_sweep, 1)
         psa.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
     end
     
-    % --- STD with two recovery timescales ---------------------------------
-    % Give the STD conditions n_b_E = 2 (two E depression timescales, product
-    % of the two b columns) with a 1x2 recovery-time-constant vector; the
-    % release constant tau_b_E_rel stays scalar/shared. n_b_E must come from
-    % the condition (ParamSpaceAnalysis2 ignores it in model_defaults), while
-    % tau_b_E_rec flows through model_defaults. STD is on E neurons only.
+    % --- STD with one recovery timescale ----------------------------------
+    % n_b_E must come from the condition (ParamSpaceAnalysis2 ignores it in
+    % model_defaults). tau_b_E_rec / tau_b_E_rel are left at the class defaults
+    % (1 s / 0.25 s), matching the pre-multi-timescale runs. STD is on E only.
     psa.set_conditions({ ...
         struct('name', 'no_adaptation', 'n_a_E', 0, 'n_b_E', 0), ...
         struct('name', 'sfa_only',      'n_a_E', 3, 'n_b_E', 0), ...
-        struct('name', 'std_only',      'n_a_E', 0, 'n_b_E', 2), ...
-        struct('name', 'sfa_and_std',   'n_a_E', 3, 'n_b_E', 2) ...
+        struct('name', 'std_only',      'n_a_E', 0, 'n_b_E', 1), ...
+        struct('name', 'sfa_and_std',   'n_a_E', 3, 'n_b_E', 1) ...
         });
-    psa.model_defaults.tau_b_E_rec = [0.5, 5];   % two E recovery timescales (s)
     % ----------------------------------------------------------------------
     
     % Add the swept parameter and reps
