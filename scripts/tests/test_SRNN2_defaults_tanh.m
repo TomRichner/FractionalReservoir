@@ -8,6 +8,10 @@ close all; clear; clc;
 %% Create model
 model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.5, 'level_of_chaos',1.5);
 
+%% Use tanh activation instead of the default piecewise sigmoid
+model.activation_function = @SRNNModel2.tanhActivation;
+model.activation_function_derivative = @SRNNModel2.tanhActivationDerivative;
+
 %% Build, run, and plot
 model.build();
 model.run();
