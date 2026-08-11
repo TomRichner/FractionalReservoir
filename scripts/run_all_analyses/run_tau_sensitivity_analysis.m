@@ -33,30 +33,21 @@ setup_paths();
 % Set run_mode in the base workspace (or via run_all_analyses); defaults to
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
-switch run_mode
-    case 'fast'
-        % Fast iteration: fewer levels/reps, half the sample rate, short time
-        % range. fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3);
-        % T_range=[0,20] with an explicit 10 s LLE window [10,20]. NOTE: this
-        % window is far shorter than the swept tau (up to 60 s), so long-tau
-        % LLE reflects a transient — accepted for fast qualitative iteration.
-        n_levels = 7;  n_reps = 7;  ode_solver_mode = @ode_rk4;
-        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
-    case 'medium'
-        % Medium: roughly halfway between fast and production. ode45 at fs=400,
-        % 15 levels x 50 reps. T_range=[0,50] with the auto LLE window
-        % ([] -> [15,50]) so the analysis window is longer relative to the swept
-        % tau (up to 60 s) than the [15,30] used by the other medium sub-scripts.
-        n_levels = 11; n_reps = 25; ode_solver_mode = @ode45;
-        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
-    case 'production'
-        n_levels = 25; n_reps = 50; ode_solver_mode = @ode45;
-        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
-    otherwise, error('run_tau_sensitivity_analysis:badMode', ...
-        'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
-end
+cfg = analysis_run_config('tau_sensitivity', run_mode);
+n_levels = cfg.n_levels;
+n_reps = cfg.n_reps;
 fprintf('[run_tau_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
-    run_mode, n_levels, n_reps, func2str(ode_solver_mode), fs_mode, T_range_mode(1), T_range_mode(2));
+    run_mode, n_levels, n_reps, func2str(cfg.model.ode_solver), cfg.model.fs, ...
+    cfg.model.T_range(1), cfg.model.T_range(2));
+
+% Which network to simulate. run_all_analyses sets master_model_overrides from
+% srnn_param_preset; standalone runs get the class defaults.
+if exist('master_model_overrides', 'var')
+    preset_defaults = master_model_overrides;
+else
+    preset_defaults = srnn_param_preset('default');
+end
+
 note = 'tau_timescales';
 
 % Condition: SFA + STD (n_a_E=3, n_b_E=1)
@@ -78,12 +69,9 @@ psa_tau_a.folder_prefix = 'tau_sensitivity';
 if exist('master_output_dir', 'var')
     psa_tau_a.output_dir = master_output_dir;
 end
-psa_tau_a.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
-psa_tau_a.model_defaults.fs = fs_mode;                  % fast=200 (default 400)
-psa_tau_a.model_defaults.T_range = T_range_mode;        % fast=[0,20] (default [0,50])
-if ~isempty(lya_T_interval_mode)
-    psa_tau_a.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
-end
+% Parameter preset first, run_mode timings second, so run_mode keeps final say
+% over ode_solver / fs / T_range / lya_T_interval.
+psa_tau_a.model_defaults = merge_struct(preset_defaults, cfg.model);
 
 psa_tau_a.set_conditions(condition);
 
@@ -135,12 +123,7 @@ psa_tau_b.folder_prefix = 'tau_sensitivity';
 if exist('master_output_dir', 'var')
     psa_tau_b.output_dir = master_output_dir;
 end
-psa_tau_b.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
-psa_tau_b.model_defaults.fs = fs_mode;                  % fast=200 (default 400)
-psa_tau_b.model_defaults.T_range = T_range_mode;        % fast=[0,20] (default [0,50])
-if ~isempty(lya_T_interval_mode)
-    psa_tau_b.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
-end
+psa_tau_b.model_defaults = merge_struct(preset_defaults, cfg.model);
 
 psa_tau_b.set_conditions(condition);
 

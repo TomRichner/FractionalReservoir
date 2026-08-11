@@ -41,28 +41,19 @@ setup_paths();
 % Set run_mode in the base workspace (or via run_all_analyses); defaults to
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
-switch run_mode
-    case 'fast'
-        % Fast iteration: fewer levels, half the sample rate, short time range.
-        % fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3);
-        % T_range=[0,20] with an explicit 10 s LLE window [10,20].
-        n_levels = 3; ode_solver_mode = @ode_rk4;
-        fs_mode = 200;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
-    case 'medium'
-        % Medium: roughly halfway between fast and production. ode45 at fs=400,
-        % T_range=[0,30] with a 15 s LLE window [15,30].
-        % n_levels=4 (this is a multi-dim grid with no reps axis, so 4^n_params
-        % configs) sits between fast (3) and production (5).
-        n_levels = 4; ode_solver_mode = @ode_rk4;
-        fs_mode = 400;  T_range_mode = [0, 20];  lya_T_interval_mode = [10, 20];
-    case 'production'
-        n_levels = 5; ode_solver_mode = @ode45;
-        fs_mode = 400;  T_range_mode = [0, 50];  lya_T_interval_mode = [];
-    otherwise, error('run_param_space_analysis2:badMode', ...
-        'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
-end
+cfg = analysis_run_config('param_space', run_mode);
+n_levels = cfg.n_levels;
 fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
-    run_mode, n_levels, func2str(ode_solver_mode), fs_mode, T_range_mode(1), T_range_mode(2));
+    run_mode, n_levels, func2str(cfg.model.ode_solver), cfg.model.fs, ...
+    cfg.model.T_range(1), cfg.model.T_range(2));
+
+% Which network to simulate. run_all_analyses sets master_model_overrides from
+% srnn_param_preset; standalone runs get the class defaults.
+if exist('master_model_overrides', 'var')
+    preset_defaults = master_model_overrides;
+else
+    preset_defaults = srnn_param_preset('default');
+end
 
 psa = ParamSpaceAnalysis2(...
     'n_levels', n_levels, ...   % set by run_mode (fast=3, production=5)
@@ -73,12 +64,9 @@ psa = ParamSpaceAnalysis2(...
 if exist('master_output_dir', 'var')
     psa.output_dir = master_output_dir;
 end
-psa.model_defaults.ode_solver = ode_solver_mode;  % fast=ode_rk4, production=ode45
-psa.model_defaults.fs = fs_mode;                   % fast=200 (default 400)
-psa.model_defaults.T_range = T_range_mode;         % fast=[0,20] (default [0,50])
-if ~isempty(lya_T_interval_mode)
-    psa.model_defaults.lya_T_interval = lya_T_interval_mode;  % fast: LLE window [10,20]
-end
+% Parameter preset first, run_mode timings second, so run_mode keeps final say
+% over ode_solver / fs / T_range / lya_T_interval.
+psa.model_defaults = merge_struct(preset_defaults, cfg.model);
 
 %% Add parameters to the grid
 % All combinations of these parameters will be tested

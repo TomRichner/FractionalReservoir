@@ -61,7 +61,9 @@ The older single-class predecessor `src/SRNNModel.m` (default `n=100`, `indegree
 A `handle` class that runs grid sweeps over `SRNNModel2`. Key behaviors not obvious from individual files:
 
 - Configure with `add_grid_parameter(name, [min, max])`, `add_vector_parameter(...)`, `set_conditions(...)`, and `model_defaults` struct entries.
-- `model_defaults` is validated at the top of `run()` by `validate_model_defaults()`: unknown names (typos), `Dependent` properties (`alpha`, `R`, `n_E`) and non-public ones (`W`) are a hard **error** listing every problem at once; names shadowed by a grid axis or a condition field only **warn** (those win at run time — see `run_single_job`). This runs before the output directory is created, so a rejected config leaves no empty dated folder.
+- `model_defaults` is validated at the top of `run()` by `validate_model_defaults()`: unknown names (typos), `Dependent` properties (`alpha`, `R`, `n_E`) and non-public ones (`W`) are a hard **error** listing every problem at once. A name a **condition sets** only **warns** (it can never take effect). A name shadowed by a **grid axis** is silent — that is normal with parameter presets, which carry a value for every axis while each sweep varies a different subset; `run()` just reports it once under `verbose`. This runs before the output directory is created, so a rejected config leaves no empty dated folder.
+- The condition fields `n_a_E` / `n_a_I` / `n_b_E` / `n_b_I` may **never** be grid axes — `add_grid_parameter`, `add_vector_parameter` and `run()` all reject them. Grid parameters are applied *after* condition parameters and the constructor is last-write-wins, so a gridded `n_a_E` would silently override every condition and collapse the four adaptation regimes into one. Vary adaptation with `set_conditions()` instead.
+- Only the condition fields a condition **actually sets** are treated as condition-owned. The default conditions set `n_a_E`/`n_b_E` but not `n_a_I`/`n_b_I`, so `model_defaults.n_a_I` takes effect normally. (Before this was fixed it was silently dropped and the model ran at the class default.)
 - To read a parameter back off a result, use `psa.effective_param(res, name)` rather than reaching into `res.config` / `model_defaults`. It applies the same precedence `run_single_job` uses (grid → condition → `resolved_defaults` → `model_defaults` → `SRNNModel2` class default) and handles vector parameters, where `res.config` holds a level *index* rather than the value. Pass `res = []` for run-wide parameters. `ParamSpaceAnalysis2.class_default(name)` gives the bare class default. Never hand-copy a class default as a plotting fallback.
 - `run()` freezes the full effective parameter set into `resolved_defaults` (saved in both `psa_object.mat` and `param_space_summary.mat`), so a run directory describes itself. `same_config` compares that — runs predating the field are refused unless called with `'allow_legacy', true`. Grid axes and condition fields are excluded from it, as are the RMT `mu_*_tilde` defaults, which depend on the grid point and are filled in `build()`.
 - Histogram plots colour by `f` by default; pass `'color_by', <param>` (`'ColorBy'` in the standalone `load_and_*` plotters) to colour by whatever was actually swept.
@@ -73,6 +75,15 @@ A `handle` class that runs grid sweeps over `SRNNModel2`. Key behaviors not obvi
 - Output directory defaults to `<root>/data/param_space/<folder_prefix>_<note>_<timestamp>/`. `folder_prefix` is overridden to `'1D_sensitivity'` / `'tau_sensitivity'` by the sensitivity scripts.
 
 The older 1D-only predecessor `src/SensitivityAnalysis.m` was removed in the cleanup; sensitivity work uses `ParamSpaceAnalysis2` with one grid parameter + `reps`.
+
+### Parameter presets vs. run modes
+
+Two orthogonal knobs, deliberately kept apart:
+
+- **`src/srnn_param_preset.m`** — *which network*. `srnn_param_preset(name)` returns a struct of `SRNNModel2` overrides (the name is only a lookup key; the struct is what reaches the model). Assign it to `psa.model_defaults` and layer tweaks on with plain field assignment. Presets carry physics **including** swept axes like `n`/`f`/`level_of_chaos` — a grid axis overrides the preset for the sweep that varies it, while sweeps holding that axis fixed use the preset's value. They must **not** carry `n_levels`/`n_reps` (not model properties), the run_mode timing knobs, or condition fields.
+- **`scripts/run_all_analyses/analysis_run_config.m`** — *how much compute*. `analysis_run_config(analysis, run_mode)` returns `n_levels`, `n_reps`, and a `cfg.model` struct of timing settings (`ode_solver`, `fs`, `T_range`, and `lya_T_interval` only when it should be set).
+
+Sub-scripts combine them with `merge_struct(preset_defaults, cfg.model)` — **preset first**, so `run_mode` keeps final say over its own knobs, and so a whole-struct assignment cannot clobber them. `run_all_analyses.m` picks the preset in one line (`preset_name`) and records it in `run_manifest`.
 
 ### Master-orchestrator conventions
 
@@ -96,7 +107,7 @@ Preserve this pattern when adding new analysis scripts.
 The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_paper/`, `VAR_SRNN/`, `python_piecewise/`, `reference_files/`) and the old-API comparison/run scripts, and reorganized `scripts/` into topic subdirectories. Current layout:
 
 - `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
-- `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses, with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside.
+- `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses, with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside. Also `analysis_run_config.m`, the single per-script table of `run_mode` settings that replaced the duplicated `switch run_mode` blocks.
 - `scripts/EI_balance/` — fraction-excitatory analyses: `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_load_and_plot.m`.
 - `scripts/memory_capacity/` — `example_memory_capacity.m`, `looped_memory_capacity.m` (Echo State Network experiments).
 - `scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/` —

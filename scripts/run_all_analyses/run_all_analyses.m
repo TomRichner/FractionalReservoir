@@ -48,6 +48,15 @@ master_save_figs = 'save_all_figs';
 if ~exist('run_mode', 'var'); run_mode = 'medium'; end
 fprintf('Run mode: %s\n\n', run_mode);
 
+% Which network to simulate, as opposed to how much compute to spend on it
+% (that is run_mode). Edit this ONE line to run the whole pipeline on a
+% different SRNNModel2 parameter set; see src/srnn_param_preset.m for the
+% available names and for what may and may not go in a preset.
+if ~exist('preset_name', 'var'); preset_name = 'default'; end
+master_model_overrides = srnn_param_preset(preset_name);
+fprintf('Parameter preset: %s (%d override(s))\n\n', ...
+    preset_name, numel(fieldnames(master_model_overrides)));
+
 % Machine-readable run manifest for reproducibility + self-documentation, and
 % so combine_runs can verify pooled runs used the SAME nonlinearity. We
 % fingerprint the CLASS-DEFAULT activation via a throwaway SRNNModel2
@@ -62,6 +71,7 @@ fprintf('Run mode: %s\n\n', run_mode);
 m0 = SRNNModel2();
 run_manifest = struct( ...
     'run_mode', run_mode, ...
+    'preset_name', preset_name, ...
     'master_save_figs', master_save_figs, ...
     'activation', func2str(m0.activation_function), ...
     'activation_derivative', func2str(m0.activation_function_derivative), ...

@@ -43,19 +43,45 @@ psa.model_defaults.W = eye(3);
 [threw, err] = capture_error(@() psa.validate_model_defaults());
 all_passed = check('accumulates into one error', threw && contains(err.message, '3 field(s)')) && all_passed;
 
-%% 5. Grid-shadowed field -> warning, not error
+%% 5. Grid-shadowed field -> silent. A parameter preset carries a value for
+%    every axis and each sweep varies a different subset, so this is expected.
 psa = make_psa();  % grid parameter is 'f'
 psa.model_defaults.f = 0.6;
 [threw, ~, warn_id] = capture_error(@() psa.validate_model_defaults());
-all_passed = check('grid-shadowed f warns, does not error', ...
-    ~threw && strcmp(warn_id, 'ParamSpaceAnalysis2:GridParamShadowed')) && all_passed;
+all_passed = check('grid-shadowed f is silent', ~threw && isempty(warn_id)) && all_passed;
 
-%% 6. Condition-shadowed field -> warning, not error
+%% 6. Condition-SET field -> warning (it can never take effect)
 psa = make_psa();
 psa.model_defaults.n_a_E = 3;
 [threw, ~, warn_id] = capture_error(@() psa.validate_model_defaults());
-all_passed = check('condition-shadowed n_a_E warns, does not error', ...
+all_passed = check('condition-set n_a_E warns, does not error', ...
     ~threw && strcmp(warn_id, 'ParamSpaceAnalysis2:ConditionParamShadowed')) && all_passed;
+
+%% 6b. A condition field NO condition sets is not shadowed -- it takes effect.
+%     The default conditions set n_a_E / n_b_E only.
+psa = make_psa();
+psa.model_defaults.n_a_I = 2;
+[threw, ~, warn_id] = capture_error(@() psa.validate_model_defaults());
+all_passed = check('n_a_I does not warn (no condition sets it)', ...
+    ~threw && isempty(warn_id)) && all_passed;
+
+%% 6c. Condition fields may never be swept
+psa = make_psa();
+[threw, err] = capture_error(@() psa.add_grid_parameter('n_a_E', [0, 3]));
+all_passed = check('add_grid_parameter(''n_a_E'') errors', threw && ...
+    strcmp(err.identifier, 'ParamSpaceAnalysis2:ConditionFieldAsGridParam')) && all_passed;
+
+psa = make_psa();
+[threw, err] = capture_error(@() psa.add_vector_parameter('n_b_E', ...
+    'fixed_value', 1, 'vary_range', [1, 2], 'n_elements', 2));
+all_passed = check('add_vector_parameter(''n_b_E'') errors', threw && ...
+    strcmp(err.identifier, 'ParamSpaceAnalysis2:ConditionFieldAsGridParam')) && all_passed;
+
+psa = make_psa();
+psa.grid_params{end+1} = 'n_b_I';   % bypass the setter
+[threw, err] = capture_error(@() psa.run());
+all_passed = check('run() catches a condition field assigned into grid_params', ...
+    threw && strcmp(err.identifier, 'ParamSpaceAnalysis2:ConditionFieldAsGridParam')) && all_passed;
 
 %% 7. Clean defaults -> passes silently (no error, no warning)
 psa = make_psa();

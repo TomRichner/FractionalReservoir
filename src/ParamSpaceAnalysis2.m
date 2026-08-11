@@ -115,6 +115,8 @@ classdef ParamSpaceAnalysis2 < handle
                     'param_range must be a numeric array with at least 2 elements');
             end
 
+            ParamSpaceAnalysis2.reject_condition_field(param_name);
+
             % Add to grid_params if not already present
             if ~ismember(param_name, obj.grid_params)
                 obj.grid_params{end+1} = param_name;
@@ -208,6 +210,8 @@ classdef ParamSpaceAnalysis2 < handle
                 error('ParamSpaceAnalysis2:InvalidInput', 'vary_range(2) must be >= vary_range(1)');
             end
 
+            ParamSpaceAnalysis2.reject_condition_field(param_name);
+
             % Store config
             vpc = struct();
             vpc.vary_element = p.Results.vary_element;
@@ -261,9 +265,11 @@ classdef ParamSpaceAnalysis2 < handle
             % settable. All such problems are accumulated into a SINGLE error so a
             % bad override struct can be fixed in one pass.
             %
-            % Warns on names that are valid properties but are overridden per job
-            % by the grid or the condition -- run_single_job skips those, so the
-            % default is silently ignored.
+            % Warns only on names a CONDITION sets, which can therefore never take
+            % effect in any run. Names shadowed by a grid axis are NOT warned
+            % about: a parameter preset legitimately carries values for axes that
+            % some sweeps vary and others hold fixed, so that case is expected and
+            % is merely reported by run() (see report_shadowed_defaults).
             %
             % This matters because SRNNModel2's constructor only WARNS on an
             % unknown name, and a warning raised inside a parfor worker is easily
@@ -275,22 +281,18 @@ classdef ParamSpaceAnalysis2 < handle
             if isempty(fields); return; end
 
             info = ParamSpaceAnalysis2.srnn_property_info();
-            condition_fields = setdiff( ...
-                ParamSpaceAnalysis2.per_job_param_names({}), obj.grid_params);
+            condition_fields = obj.condition_set_fields();
             problems = {};
 
             for i = 1:numel(fields)
                 name = fields{i};
                 if ismember(name, info.settable)
-                    % Valid property -- warn only if something else wins at run time.
-                    if ismember(name, obj.grid_params)
-                        warning('ParamSpaceAnalysis2:GridParamShadowed', ...
-                            ['model_defaults.%s is also a grid parameter; the grid ' ...
-                            'value wins and the default is ignored.'], name);
-                    elseif ismember(name, condition_fields)
+                    % Valid property. A grid axis overriding it is expected; only a
+                    % condition-set name can never take effect anywhere.
+                    if ismember(name, condition_fields) && ~ismember(name, obj.grid_params)
                         warning('ParamSpaceAnalysis2:ConditionParamShadowed', ...
-                            ['model_defaults.%s is set per condition; the condition ' ...
-                            'value wins and the default is ignored.'], name);
+                            ['model_defaults.%s is set by every condition; the condition ' ...
+                            'value wins and the default can never take effect.'], name);
                     end
                 elseif ismember(name, info.dependent)
                     problems{end+1} = sprintf(['  ''%s'' is a Dependent (computed) property ' ...
@@ -333,7 +335,8 @@ classdef ParamSpaceAnalysis2 < handle
             % scalar. F itself is reconstructed per grid point from n/indegree
             % (or pinned, when F_tracks_network is false -- also recorded here).
 
-            excluded = ParamSpaceAnalysis2.per_job_param_names(obj.grid_params);
+            excluded = ParamSpaceAnalysis2.per_job_param_names( ...
+                obj.grid_params, obj.condition_set_fields());
 
             model_args = {};
             default_fields = fieldnames(obj.model_defaults);
@@ -353,6 +356,37 @@ classdef ParamSpaceAnalysis2 < handle
                     obj.resolved_defaults.(pname) = m.(pname);
                 end
             end
+        end
+
+        function report_shadowed_defaults(obj)
+            % REPORT_SHADOWED_DEFAULTS Note which model_defaults the grid supersedes
+            %
+            % Informational only, and not a warning: a parameter preset carries a
+            % value for every axis, and each sweep varies a different subset, so
+            % this situation is normal. Printing it once keeps the fact visible
+            % without the alarm fatigue a per-field warning would cause.
+            if ~obj.verbose; return; end
+            shadowed = intersect(fieldnames(obj.model_defaults), obj.grid_params);
+            if ~isempty(shadowed)
+                shadowed = sort(shadowed);
+                fprintf('[psa] model_defaults superseded by grid axes: %s\n', ...
+                    strjoin(shadowed(:)', ', '));
+            end
+        end
+
+        function names = condition_set_fields(obj)
+            % CONDITION_SET_FIELDS Condition fields at least one condition sets.
+            %
+            % Only these are genuinely supplied per job. The default conditions
+            % set n_a_E and n_b_E but never n_a_I / n_b_I, so treating all four as
+            % condition-owned would silently drop a model_defaults value for the
+            % inhibitory ones (which is exactly the bug this replaces).
+            names = {};
+            owned = ParamSpaceAnalysis2.condition_field_names();
+            for c_idx = 1:numel(obj.conditions)
+                names = union(names, intersect(owned, fieldnames(obj.conditions{c_idx})));
+            end
+            names = names(:)';
         end
 
         function val = effective_param(obj, res, name)
@@ -438,9 +472,23 @@ classdef ParamSpaceAnalysis2 < handle
                     'No conditions defined.');
             end
 
+            % Reject a grid axis that the conditions own. Checked here as well as
+            % in add_grid_parameter/add_vector_parameter because grid_params is
+            % publicly settable and could be assigned directly or restored from an
+            % older saved object.
+            owned = intersect(obj.grid_params, ParamSpaceAnalysis2.condition_field_names());
+            if ~isempty(owned)
+                error('ParamSpaceAnalysis2:ConditionFieldAsGridParam', ...
+                    ['%s cannot be a grid parameter: the adaptation conditions set ' ...
+                    'it per job, and a grid value would silently override every ' ...
+                    'condition. Vary it with set_conditions() instead.'], ...
+                    strjoin(owned, ', '));
+            end
+
             % Reject unusable model_defaults BEFORE the output directory is
             % created, so a rejected config leaves no empty dated folder behind.
             obj.validate_model_defaults();
+            obj.report_shadowed_defaults();
 
             % Create timestamped output directory
             obj.analysis_start_time = datetime('now');
@@ -1745,14 +1793,38 @@ classdef ParamSpaceAnalysis2 < handle
     end
 
     methods (Static, Access = private)
-        function names = per_job_param_names(grid_params)
+        function names = per_job_param_names(grid_params, condition_fields)
             % PER_JOB_PARAM_NAMES Parameters that vary per job, not per run
             %
-            % The grid axes plus the condition fields. run_single_job sets these
-            % from the job rather than from model_defaults, so a run-wide default
-            % for any of them is ignored (see validate_model_defaults) and they
-            % are excluded from resolved_defaults.
-            names = [grid_params(:)', {'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I'}];
+            % The grid axes plus the condition fields THAT SOME CONDITION ACTUALLY
+            % SETS. run_single_job supplies these from the job rather than from
+            % model_defaults, so a run-wide default for any of them is ignored and
+            % they are excluded from resolved_defaults.
+            %
+            % Passing the conditions' real field set rather than the static
+            % {n_a_E, n_a_I, n_b_E, n_b_I} matters: the default conditions set only
+            % n_a_E and n_b_E, so model_defaults.n_a_I DOES take effect and must
+            % not be skipped or excluded.
+            names = [grid_params(:)', condition_fields(:)'];
+        end
+
+        function reject_condition_field(param_name)
+            % REJECT_CONDITION_FIELD Error if a name the conditions own is swept.
+            if ismember(char(param_name), ParamSpaceAnalysis2.condition_field_names())
+                error('ParamSpaceAnalysis2:ConditionFieldAsGridParam', ...
+                    ['''%s'' cannot be a grid parameter: the adaptation conditions ' ...
+                    'set it per job, and a grid value would silently override every ' ...
+                    'condition. Vary it with set_conditions() instead.'], char(param_name));
+            end
+        end
+
+        function names = condition_field_names()
+            % CONDITION_FIELD_NAMES Names the conditions mechanism owns.
+            % These may never be used as grid axes -- run_single_job appends grid
+            % parameters AFTER condition parameters and the SRNNModel2 constructor
+            % is last-write-wins, so a gridded n_a_E would silently override every
+            % condition and collapse the adaptation regimes into one.
+            names = {'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I'};
         end
 
         function [tf, reason] = compare_param_structs(a, b, label)
@@ -1954,12 +2026,16 @@ classdef ParamSpaceAnalysis2 < handle
                 % Build model arguments
                 model_args = {'rng_seeds', [job.network_seed, job.network_seed + 1]};
 
-                % Add condition parameters when present
-                condition_fields = {'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I'};
+                % Add condition parameters when present, and record WHICH ones this
+                % condition actually supplied -- only those may be skipped from
+                % model_defaults below.
+                condition_fields = ParamSpaceAnalysis2.condition_field_names();
+                supplied_by_condition = {};
                 for cf_idx = 1:length(condition_fields)
                     field_name = condition_fields{cf_idx};
                     if isfield(job.condition, field_name)
                         model_args = [model_args, {field_name, job.condition.(field_name)}]; %#ok<AGROW>
+                        supplied_by_condition{end+1} = field_name; %#ok<AGROW>
                     end
                 end
 
@@ -1975,13 +2051,16 @@ classdef ParamSpaceAnalysis2 < handle
                     end
                 end
 
-                % Add model defaults (don't override grid params or condition params)
+                % Add model defaults, skipping only names already supplied above.
+                % Skipping by the condition's ACTUAL fields (not the static four)
+                % is what lets model_defaults.n_a_I take effect when no condition
+                % sets it -- previously it was dropped here and never supplied,
+                % so the model silently ran at the class default.
                 default_fields = fieldnames(model_defaults_local);
                 for d_idx = 1:length(default_fields)
                     fname = default_fields{d_idx};
                     if ~ismember(fname, grid_params_local) && ...
-                            ~strcmp(fname, 'n_a_E') && ~strcmp(fname, 'n_a_I') && ...
-                            ~strcmp(fname, 'n_b_E') && ~strcmp(fname, 'n_b_I')
+                            ~ismember(fname, supplied_by_condition)
                         model_args = [model_args, {fname, model_defaults_local.(fname)}]; %#ok<AGROW>
                     end
                 end
