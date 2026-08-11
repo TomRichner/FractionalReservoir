@@ -60,12 +60,14 @@ for k = 1:n_cases
     model.indegree = N;                 % fully connected, alpha = 1
     model.tau_d    = tau_d;             % dendritic time constant (matches reference)
 
-    % Purely random Gaussian weights: zero mean, std 1/sqrt(N), no E/I structure
-    model.mu_E_tilde    = 0;
-    model.mu_I_tilde    = 0;
-    model.sigma_E_tilde = 1/sqrt(N);
-    model.sigma_I_tilde = 1/sqrt(N);
-    model.E_W           = 0;
+    % Purely random Gaussian weights: zero mean, std 1/sqrt(N), no E/I structure.
+    % With alpha = 1 (fully connected) F = 1/sqrt(N*1*(2-1)) = 1/sqrt(N), so a
+    % relative std of 1 is exactly the 1/sqrt(N) this panel wants.
+    model.mu_E_tilde_relative    = 0;
+    model.mu_I_tilde_relative    = 0;
+    model.sigma_E_tilde_relative = 1;
+    model.sigma_I_tilde_relative = 1;
+    model.E_W_relative           = 0;
     model.zrs_mode      = 'none';
     model.rescale_by_abscissa = false;
     model.level_of_chaos      = gamma;  % scales W by gamma -> R = gamma

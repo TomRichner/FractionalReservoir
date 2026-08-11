@@ -13,10 +13,9 @@ close all; clear; clc;
 model = SRNNModel2('tau_a_E',logspace(log10(0.25), log10(10), 3),'n_a_E', 3, 'n_b_E', 1, 'f', 2/3,'indegree',100,'T_range',[0 100],'S_c',0,'rng_seeds',[2 3],'lya_method','none','c_E',0.5/3);
 % model = SRNNModel2('tau_a_E',logspace(log10(0.25), log10(10), 3),'n_a_E', 3, 'n_b_E', 0, 'f', 2/3,'indegree',100,'T_range',[0 100],'S_c',0,'rng_seeds',[2 3],'lya_method','none','c_E',0.5/3);
 
-% Override the E/I population means (must be set before build())
-F = model.default_val;
-model.mu_E_tilde =  10 * F;
-model.mu_I_tilde = -20 * F;
+% Override the E/I population means, in multiples of F = default_val
+model.mu_E_tilde_relative =  10;
+model.mu_I_tilde_relative = -20;
 
 % stim steps
 n_steps = 3;

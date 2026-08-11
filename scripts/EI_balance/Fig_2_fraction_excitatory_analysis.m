@@ -31,8 +31,6 @@ figs_root = fullfile(project_root, 'figs');
 %% Create ParamSpaceAnalysis2 object
 N = 300;
 indegree = 100;
-alpha = indegree / N;
-default_tilde_val = 1 / sqrt(N * alpha * (2 - alpha));
 
 psa = ParamSpaceAnalysis2(...
     'n_levels', 5, ...
@@ -57,12 +55,12 @@ psa.model_defaults.indegree = indegree;
 psa.model_defaults.T_range = [-15, 45];
 psa.model_defaults.tau_d = 0.1;
 
-% RMT tilde-parameters (Harris 2023)
-psa.model_defaults.mu_E_tilde = 3.5 * default_tilde_val;
-psa.model_defaults.mu_I_tilde = -3.5 * default_tilde_val;
-psa.model_defaults.sigma_E_tilde = default_tilde_val;
-psa.model_defaults.sigma_I_tilde = default_tilde_val;
-psa.model_defaults.E_W = -0.5 / sqrt(N * alpha * (2 - alpha));
+% RMT tilde-parameters (Harris 2023), in multiples of F = default_val
+psa.model_defaults.mu_E_tilde_relative = 3.5;
+psa.model_defaults.mu_I_tilde_relative = -3.5;
+psa.model_defaults.sigma_E_tilde_relative = 1;
+psa.model_defaults.sigma_I_tilde_relative = 1;
+psa.model_defaults.E_W_relative = -0.5;
 psa.model_defaults.zrs_mode = 'none';
 psa.model_defaults.level_of_chaos = 1.0;
 psa.model_defaults.rescale_by_abscissa = false;

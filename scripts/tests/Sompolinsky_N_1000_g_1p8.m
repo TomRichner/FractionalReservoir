@@ -46,14 +46,15 @@ model.f = 1;                       % All excitatory (E/I doesn't matter for Hopf
 model.indegree = N;                % Fully connected (alpha = 1)
 model.tau_d = 1;                 % Dendritic time constant (100 ms)
 
-% RMT parameters for zero-mean, 1/sqrt(N) std Gaussian weights
-% With alpha = 1 (full connectivity), the sparse parameters become dense ones
-% Set mu_tilde = 0 and sigma_tilde = 1/sqrt(N) for both E and I
-model.mu_E_tilde = 0;              % Zero mean excitatory
-model.mu_I_tilde = 0;              % Zero mean inhibitory
-model.sigma_E_tilde = 1/sqrt(N);   % Std = 1/sqrt(N)
-model.sigma_I_tilde = 1/sqrt(N);   % Std = 1/sqrt(N)
-model.E_W = 0;                     % No mean offset
+% RMT parameters for zero-mean, 1/sqrt(N) std Gaussian weights, given in
+% multiples of F = default_val. With alpha = 1 (full connectivity),
+% F = 1/sqrt(N*1*(2-1)) = 1/sqrt(N), so sigma_tilde_relative = 1 is exactly the
+% 1/sqrt(N) std this demo wants.
+model.mu_E_tilde_relative = 0;      % Zero mean excitatory
+model.mu_I_tilde_relative = 0;      % Zero mean inhibitory
+model.sigma_E_tilde_relative = 1;   % Std = 1*F = 1/sqrt(N)
+model.sigma_I_tilde_relative = 1;   % Std = 1*F = 1/sqrt(N)
+model.E_W_relative = 0;             % No mean offset
 
 model.level_of_chaos = gamma;      % This scales W by gamma
 model.rescale_by_abscissa = false;

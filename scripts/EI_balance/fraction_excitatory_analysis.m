@@ -48,11 +48,8 @@ psa = ParamSpaceAnalysis2(...
 % Network structure parameters
 N = 300;
 indegree = 100;
-alpha = indegree / N;
 
-default_tilde_val = 1 / sqrt(N * alpha * (2 - alpha));
-
-% psa.add_grid_parameter('E_W', [-2 2] .* default_tilde_val);  % Mean offset (scaled by 1/sqrt(n))
+% psa.add_grid_parameter('E_W_relative', [-2 2]);  % Mean offset, in multiples of F
 psa.add_grid_parameter('f', [0.4, 0.6]);     % fraction of neurons that are E
 
 % Repetition index (creates unique network seeds per parameter combo)
@@ -74,12 +71,12 @@ psa.model_defaults.indegree = indegree;            % Sparse connectivity
 psa.model_defaults.T_range = [-15, 45];       % Simulation time range
 psa.model_defaults.tau_d = 0.1;               % Dendritic time constant
 
-% RMT tilde-parameters (Harris 2023)
-psa.model_defaults.mu_E_tilde = 3.5 * default_tilde_val;
-psa.model_defaults.mu_I_tilde = -3.5 * default_tilde_val;
-psa.model_defaults.sigma_E_tilde = default_tilde_val;
-psa.model_defaults.sigma_I_tilde = default_tilde_val;
-psa.model_defaults.E_W = -0.5 / sqrt(N * alpha * (2 - alpha));
+% RMT tilde-parameters (Harris 2023), in multiples of F = default_val
+psa.model_defaults.mu_E_tilde_relative = 3.5;
+psa.model_defaults.mu_I_tilde_relative = -3.5;
+psa.model_defaults.sigma_E_tilde_relative = 1;
+psa.model_defaults.sigma_I_tilde_relative = 1;
+psa.model_defaults.E_W_relative = -0.5;
 % psa.model_defaults.zrs_mode = 'Partial_SZRS';
 psa.model_defaults.zrs_mode = 'none';
 psa.model_defaults.level_of_chaos = 1.0;      % Edge of chaos

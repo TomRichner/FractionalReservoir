@@ -69,12 +69,11 @@ model1.c_E = 0.25/3;
 % RMT tilde-notation parameters (Harris 2023)
 % F = 1/sqrt(N*alpha*(2-alpha)), the scaling factor yielding R=1 when
 % all tilde parameters are equal (see parameter_table.md)
-F = model1.default_val;
-model1.mu_E_tilde = 3.5*F;
-model1.mu_I_tilde = -3.5*F;
-model1.sigma_E_tilde = F;
-model1.sigma_I_tilde = F;
-model1.E_W = -0.5 * F;
+model1.mu_E_tilde_relative = 3.5;
+model1.mu_I_tilde_relative = -3.5;
+model1.sigma_E_tilde_relative = 1;
+model1.sigma_I_tilde_relative = 1;
+model1.E_W_relative = -0.5;
 model1.zrs_mode = 'none';
 
 model1.level_of_chaos = level_of_chaos;
@@ -154,12 +153,11 @@ model2.f = 0.50;
 model2.tau_d = 0.1;
 model2.c_E = 0.25/3;
 
-F = model2.default_val;
-model2.mu_E_tilde = 3.5*F;
-model2.mu_I_tilde = -3.5*F;
-model2.sigma_E_tilde = F;
-model2.sigma_I_tilde = F;
-model2.E_W = -0.5 * F;
+model2.mu_E_tilde_relative = 3.5;
+model2.mu_I_tilde_relative = -3.5;
+model2.sigma_E_tilde_relative = 1;
+model2.sigma_I_tilde_relative = 1;
+model2.E_W_relative = -0.5;
 model2.zrs_mode = 'none';
 
 model2.level_of_chaos = level_of_chaos;

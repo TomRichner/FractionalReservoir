@@ -13,11 +13,11 @@ model = SRNNModel2('n',300,'indegree',100,'check_connectivity',true,'level_of_ch
     'ode_solver', @ode_rk4, 'fs', 200);
 
 %% E:I ratio of 2:1 (f=2/3), with per-synapse inhibition doubled to compensate
-% F = 1/sqrt(n*alpha*(2-alpha)) is the RMT normalization factor (Harris 2023);
-% it depends only on n and alpha, so it is unchanged by f.
-F = model.default_val;
-model.mu_E_tilde =  3*F;   % default
-model.mu_I_tilde = -6*F;   % default is -4*F; doubled since there are half as many I neurons
+% The _relative properties are in multiples of the RMT normalization factor
+% F = 1/sqrt(n*alpha*(2-alpha)) (Harris 2023), which depends only on n and
+% alpha, so it is unchanged by f.
+model.mu_E_tilde_relative =  3;   % default
+model.mu_I_tilde_relative = -6;   % default is -4; doubled since there are half as many I neurons
 
 %% Use the piecewise sigmoid instead of the default logistic sigmoid
 model.activation_function            = @(x) SRNNModel2.piecewiseSigmoid(x, model.S_a, model.S_c);

@@ -30,13 +30,27 @@ classdef SRNNModel2 < handle
         f = 0.5                     % Fraction of excitatory neurons
         indegree = 100              % Expected in-degree
         
-        % RMT tilde-notation parameters (Harris 2023)
-        mu_E_tilde                  % Normalized excitatory mean (default: 1/(alpha*sqrt(n)))
-        mu_I_tilde                  % Normalized inhibitory mean (default: -1/(alpha*sqrt(n)))
-        sigma_E_tilde               % Normalized excitatory std dev (default: 1/(alpha*sqrt(n)))
-        sigma_I_tilde               % Normalized inhibitory std dev (default: 1/(alpha*sqrt(n)))
-        E_W = 0                     % Mean offset: added to both mu_E_tilde and mu_I_tilde
+        % RMT tilde-notation parameters (Harris 2023), expressed as multiples of
+        % the normalization factor F = default_val. The absolute mu_*_tilde /
+        % sigma_*_tilde / E_W are Dependent properties computed from these; see
+        % the Dependent block below. Storing the multiplier rather than the
+        % product is what lets these be swept (F depends on n and indegree) and
+        % frozen into a run's recorded parameter set.
+        mu_E_tilde_relative    =  3     % Normalized excitatory mean, in multiples of F
+        mu_I_tilde_relative    = -4     % Normalized inhibitory mean, in multiples of F
+        sigma_E_tilde_relative =  1     % Normalized excitatory std dev, in multiples of F
+        sigma_I_tilde_relative =  1     % Normalized inhibitory std dev, in multiples of F
+        E_W_relative           =  0     % Mean offset (multiples of F): added to both mu tildes
         zrs_mode = 'none'           % ZRS mode: 'none', 'ZRS', 'SZRS', 'Partial_SZRS'
+
+        % Which network F is computed for. When true (default), F follows the
+        % CURRENT n and indegree, which makes the theoretical spectral radius R
+        % exactly independent of n. When false, F is pinned to the reference
+        % network below, so sweeping n or indegree leaves the weight
+        % distribution fixed and lets R vary with network size. See default_val.
+        F_tracks_network = true     % F follows the current n/indegree
+        F_ref_n          = 300      % Reference network size for F when F_tracks_network is false
+        F_ref_indegree   = 100      % Reference in-degree for F when F_tracks_network is false
         
         level_of_chaos = 1.0        % Scaling factor for W
         rescale_by_abscissa = false % Whether to apply 1/abscissa_0 scaling
@@ -112,6 +126,11 @@ classdef SRNNModel2 < handle
     properties (Dependent)
         alpha               % Sparsity = indegree/n
         default_val         % Normalization factor F = 1/sqrt(N*alpha*(2-alpha)) (Harris 2023)
+        mu_E_tilde          % Normalized excitatory mean    = mu_E_tilde_relative    * F
+        mu_I_tilde          % Normalized inhibitory mean    = mu_I_tilde_relative    * F
+        sigma_E_tilde       % Normalized excitatory std dev = sigma_E_tilde_relative * F
+        sigma_I_tilde       % Normalized inhibitory std dev = sigma_I_tilde_relative * F
+        E_W                 % Mean offset added to both mu tildes = E_W_relative * F
         mu_se               % Sparse excitatory mean
         mu_si               % Sparse inhibitory mean
         sigma_se            % Sparse excitatory std dev
@@ -159,12 +178,30 @@ classdef SRNNModel2 < handle
             % Set default values
             obj.set_defaults();
             
+            % The RMT tildes became Dependent (computed from the _relative
+            % multipliers), so setting them here would raise MATLAB's generic
+            % read-only error. Name the replacement instead -- isprop() is true
+            % for Dependent properties, so this must be checked first.
+            renamed = struct( ...
+                'mu_E_tilde',    'mu_E_tilde_relative', ...
+                'mu_I_tilde',    'mu_I_tilde_relative', ...
+                'sigma_E_tilde', 'sigma_E_tilde_relative', ...
+                'sigma_I_tilde', 'sigma_I_tilde_relative', ...
+                'E_W',           'E_W_relative');
+
             % Parse name-value pairs
             for i = 1:2:length(varargin)
-                if isprop(obj, varargin{i})
-                    obj.(varargin{i}) = varargin{i+1};
+                name = varargin{i};
+                if ischar(name) && isfield(renamed, name)
+                    error('SRNNModel:RenamedProperty', ...
+                        ['''%s'' is now a computed (Dependent) property. Set ''%s'' ' ...
+                        'instead, which holds the value in multiples of ' ...
+                        'F = default_val -- e.g. ''%s'', 3 replaces ''%s'', 3*F.'], ...
+                        name, renamed.(name), renamed.(name), name);
+                elseif isprop(obj, name)
+                    obj.(name) = varargin{i+1};
                 else
-                    warning('SRNNModel:UnknownProperty', 'Unknown property: %s', varargin{i});
+                    warning('SRNNModel:UnknownProperty', 'Unknown property: %s', name);
                 end
             end
             
@@ -185,41 +222,68 @@ classdef SRNNModel2 < handle
             % DEFAULT_VAL Normalization factor F = 1/sqrt(N*alpha*(2-alpha))
             % Scaling factor which yields R=1 when all tilde parameters are equal.
             % See parameter_table.md for derivation (Harris 2023).
-            val = 1 / sqrt(obj.n * obj.alpha * (2 - obj.alpha));
+            %
+            % F_tracks_network = true (default) computes F from the CURRENT n and
+            % indegree. Because the n*alpha in R cancels against this F, the
+            % theoretical spectral radius R is then exactly independent of n --
+            % that is the point of the normalization.
+            %
+            % F_tracks_network = false pins F to the reference network
+            % (F_ref_n, F_ref_indegree), so a sweep over n or indegree leaves the
+            % weight distribution fixed and lets R vary with network size.
+            %
+            % NOTE: freezing F does NOT freeze the network. build() passes the
+            % REAL obj.alpha to RMTMatrix, so sparsity and connectivity still
+            % track the current n/indegree; only the scale of the weight
+            % distribution is pinned.
+            if obj.F_tracks_network
+                n_F = obj.n;
+                alpha_F = obj.alpha;
+            else
+                n_F = obj.F_ref_n;
+                alpha_F = obj.F_ref_indegree / obj.F_ref_n;
+            end
+            val = 1 / sqrt(n_F * alpha_F * (2 - alpha_F));
+        end
+
+        function val = get.mu_E_tilde(obj)
+            val = SRNNModel2.scale_tilde(obj.mu_E_tilde_relative, obj.default_val);
+        end
+
+        function val = get.mu_I_tilde(obj)
+            val = SRNNModel2.scale_tilde(obj.mu_I_tilde_relative, obj.default_val);
+        end
+
+        function val = get.sigma_E_tilde(obj)
+            val = SRNNModel2.scale_tilde(obj.sigma_E_tilde_relative, obj.default_val);
+        end
+
+        function val = get.sigma_I_tilde(obj)
+            val = SRNNModel2.scale_tilde(obj.sigma_I_tilde_relative, obj.default_val);
+        end
+
+        function val = get.E_W(obj)
+            val = SRNNModel2.scale_tilde(obj.E_W_relative, obj.default_val);
         end
         
+        % The tilde properties are now always defined (they are computed from the
+        % _relative multipliers), so these no longer need an isempty -> NaN guard.
         function val = get.mu_se(obj)
-            if isempty(obj.mu_E_tilde)
-                val = NaN;
-            else
-                val = obj.alpha * (obj.mu_E_tilde + obj.E_W);
-            end
+            val = obj.alpha * (obj.mu_E_tilde + obj.E_W);
         end
-        
+
         function val = get.mu_si(obj)
-            if isempty(obj.mu_I_tilde)
-                val = NaN;
-            else
-                val = obj.alpha * (obj.mu_I_tilde + obj.E_W);
-            end
+            val = obj.alpha * (obj.mu_I_tilde + obj.E_W);
         end
-        
+
         function val = get.sigma_se(obj)
-            if isempty(obj.sigma_E_tilde) || isempty(obj.mu_E_tilde)
-                val = NaN;
-            else
-                mu_eff = obj.mu_E_tilde + obj.E_W;
-                val = sqrt(obj.alpha * (1 - obj.alpha) * mu_eff^2 + obj.alpha * obj.sigma_E_tilde^2);
-            end
+            mu_eff = obj.mu_E_tilde + obj.E_W;
+            val = sqrt(obj.alpha * (1 - obj.alpha) * mu_eff^2 + obj.alpha * obj.sigma_E_tilde^2);
         end
-        
+
         function val = get.sigma_si(obj)
-            if isempty(obj.sigma_I_tilde) || isempty(obj.mu_I_tilde)
-                val = NaN;
-            else
-                mu_eff = obj.mu_I_tilde + obj.E_W;
-                val = sqrt(obj.alpha * (1 - obj.alpha) * mu_eff^2 + obj.alpha * obj.sigma_I_tilde^2);
-            end
+            mu_eff = obj.mu_I_tilde + obj.E_W;
+            val = sqrt(obj.alpha * (1 - obj.alpha) * mu_eff^2 + obj.alpha * obj.sigma_I_tilde^2);
         end
         
         function val = get.R(obj)
@@ -941,15 +1005,28 @@ classdef SRNNModel2 < handle
             % Set RNG seed for network generation
             rng(obj.rng_seeds(1));
             
-            % Compute RMT tilde defaults if not set
-            % F = 1/sqrt(N*alpha*(2-alpha)), see parameter_table.md
-            F = obj.default_val;
-            
-            if isempty(obj.mu_E_tilde),    obj.mu_E_tilde = 3*F;     end % 3*F
-            if isempty(obj.mu_I_tilde),    obj.mu_I_tilde = -4*F;    end % -4*F
-            if isempty(obj.sigma_E_tilde), obj.sigma_E_tilde = 1*F;    end
-            if isempty(obj.sigma_I_tilde), obj.sigma_I_tilde = 1*F;    end
-            
+            % The RMT tildes need no default-filling here: they are Dependent on
+            % the _relative multipliers and F, so they are always defined and are
+            % recomputed whenever n or indegree changes. (The old version filled
+            % them in place only when empty, which meant a rebuild after changing
+            % n silently kept the F from the previous n.)
+
+            % Validate the reference network used when F_tracks_network is false.
+            % This is a pairwise constraint, so it cannot live in a set method.
+            if ~obj.F_tracks_network
+                if ~isscalar(obj.F_ref_n) || ~isscalar(obj.F_ref_indegree) || ...
+                        obj.F_ref_n <= 0 || obj.F_ref_indegree <= 0
+                    error('SRNNModel:InvalidParams', ...
+                        'F_ref_n and F_ref_indegree must be positive scalars.');
+                end
+                if obj.F_ref_indegree > obj.F_ref_n
+                    error('SRNNModel:InvalidParams', ...
+                        ['F_ref_indegree (%g) must not exceed F_ref_n (%g); the ' ...
+                        'reference in-degree cannot be larger than the reference network.'], ...
+                        obj.F_ref_indegree, obj.F_ref_n);
+                end
+            end
+
             % Compute tau_a arrays if n_a > 0 but tau_a not set
             if obj.n_a_E > 0 && isempty(obj.tau_a_E)
                 obj.tau_a_E = logspace(log10(0.25), log10(10), obj.n_a_E);
@@ -2909,6 +2986,19 @@ classdef SRNNModel2 < handle
     end
     
     methods (Static, Access = private)
+        function val = scale_tilde(relative, F)
+            % SCALE_TILDE relative * F, keeping an exact zero at zero.
+            % A disconnected model (indegree = 0, e.g. the single-neuron scripts)
+            % has alpha = 0, so F = 1/sqrt(0) = Inf and a plain 0*F would be NaN,
+            % which would then poison W and the dynamics. A zero multiplier means
+            % "this term is absent" regardless of the normalization.
+            if relative == 0
+                val = 0;
+            else
+                val = relative * F;
+            end
+        end
+
         function value = safe_get_param(params, field, default_value)
             % SAFE_GET_PARAM Helper to get a field from params with a default.
             if isfield(params, field)

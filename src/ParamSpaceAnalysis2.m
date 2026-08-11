@@ -295,7 +295,8 @@ classdef ParamSpaceAnalysis2 < handle
                 elseif ismember(name, info.dependent)
                     problems{end+1} = sprintf(['  ''%s'' is a Dependent (computed) property ' ...
                         'of SRNNModel2 and cannot be set; set the properties it is ' ...
-                        'derived from instead.'], name); %#ok<AGROW>
+                        'derived from instead.%s'], ...
+                        name, ParamSpaceAnalysis2.suggest_property(name, info.settable)); %#ok<AGROW>
                 elseif ismember(name, info.nonpublic)
                     problems{end+1} = sprintf(['  ''%s'' is not publicly settable on ' ...
                         'SRNNModel2 (it is computed during build/run).'], name); %#ok<AGROW>
@@ -325,10 +326,12 @@ classdef ParamSpaceAnalysis2 < handle
             % set_defaults side effects are captured too -- the activation
             % handles, input_config, and plot_deci computed from fs/plot_freq.
             %
-            % NOTE: the RMT parameters left empty here (mu_E_tilde and friends)
-            % are filled in build() as multiples of F = 1/sqrt(n*alpha*(2-alpha)),
-            % which depends on n and indegree and therefore on the grid point.
-            % They are deliberately NOT frozen.
+            % The RMT parameters freeze cleanly now that they are stored as
+            % _relative multipliers of F: mu_E_tilde and friends are Dependent,
+            % so they drop out of srnn_property_info().settable automatically,
+            % and mu_E_tilde_relative and friends are captured like any other
+            % scalar. F itself is reconstructed per grid point from n/indegree
+            % (or pinned, when F_tracks_network is false -- also recorded here).
 
             excluded = ParamSpaceAnalysis2.per_job_param_names(obj.grid_params);
 
