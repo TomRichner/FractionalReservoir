@@ -16,13 +16,10 @@ this_dir = fileparts(mfilename('fullpath'));
 %% Piecewise sigmoid activation (class-default S_a, S_c)
 S_a = 0.9;   % piecewiseSigmoid slope param (class default)
 S_c = 0.4;   % piecewiseSigmoid center param (class default)
-phi       = @(x) SRNNModel2.piecewiseSigmoid(x, S_a, S_c);
-phi_deriv = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, S_a, S_c);
 
 %% Create model
 model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.5, ...
-    'S_a', S_a, 'S_c', S_c, ...
-    'activation_function', phi, 'activation_function_derivative', phi_deriv);
+    'activation', 'piecewise', 'S_a', S_a, 'S_c', S_c);
 
 %% Build, run, and plot
 model.build();

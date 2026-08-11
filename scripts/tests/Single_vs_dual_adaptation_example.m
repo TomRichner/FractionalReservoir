@@ -93,10 +93,9 @@ model1.tau_b_E_rel = 0.5;
 % Activation function
 S_a = 0.9;
 S_c = 0.40;
+model1.activation = 'piecewise';
 model1.S_a = S_a;
 model1.S_c = S_c;
-model1.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
-model1.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
 % Simulation settings
 model1.T_range = time_config.T_range;
@@ -174,10 +173,9 @@ model2.tau_b_E_rel = 0.5;
 
 S_a = 0.9;
 S_c = 0.40;
+model2.activation = 'piecewise';
 model2.S_a = S_a;
 model2.S_c = S_c;
-model2.activation_function = @(x) piecewiseSigmoid(x, S_a, S_c);
-model2.activation_function_derivative = @(x) piecewiseSigmoidDerivative(x, S_a, S_c);
 
 model2.T_range = time_config.T_range;
 model2.T_plot = time_config.T_plot;

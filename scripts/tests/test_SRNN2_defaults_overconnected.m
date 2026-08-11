@@ -19,9 +19,10 @@ model = SRNNModel2('n',300,'indegree',100,'check_connectivity',true,'level_of_ch
 model.mu_E_tilde_relative =  3;   % default
 model.mu_I_tilde_relative = -6;   % default is -4; doubled since there are half as many I neurons
 
-%% Use the piecewise sigmoid instead of the default logistic sigmoid
-model.activation_function            = @(x) SRNNModel2.piecewiseSigmoid(x, model.S_a, model.S_c);
-model.activation_function_derivative = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, model.S_a, model.S_c);
+%% Use the piecewise sigmoid instead of the default logistic sigmoid.
+% The handles follow from this and the model's own S_a / S_c, so they cannot
+% disagree with the values above.
+model.activation = 'piecewise';
 
 %% Build, run, and plot
 model.build();

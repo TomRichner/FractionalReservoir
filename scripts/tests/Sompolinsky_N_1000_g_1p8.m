@@ -67,8 +67,7 @@ model.n_b_E = 0;
 model.n_b_I = 0;
 
 % Use tanh activation function
-model.activation_function = @tanhActivation;
-model.activation_function_derivative = @tanhActivationDerivative;
+model.activation = 'tanh';   % tanh takes no parameters; S_a / S_c are unused
 
 % Simulation settings
 model.T_range = [-15, 350];           % 50 seconds simulation

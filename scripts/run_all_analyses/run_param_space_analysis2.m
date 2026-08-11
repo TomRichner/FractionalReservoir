@@ -98,8 +98,7 @@ psa.add_grid_parameter('level_of_chaos', [0.5, 3]);      % W scaling (edge of ch
 % psa.model_defaults.u_ex_scale = 1.5;          % External input scaling
 % psa.model_defaults.lya_method = 'benettin';   % Lyapunov computation method
 % psa.model_defaults.level_of_chaos = 1.0;
-% psa.model_defaults.activation_function = @logisticSigmoid;
-% psa.model_defaults.activation_function_derivative = @logisticSigmoidDerivative;
+% psa.model_defaults.activation = 'logistic';   % or 'piecewise' / 'tanh'
 % psa.store_local_lya = true;                   % Store decimated local LLE time series
 % psa.store_local_lya_dt = 0.01;                 % Time resolution for local_lya (seconds)
 

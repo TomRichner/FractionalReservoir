@@ -57,17 +57,16 @@ master_model_overrides = srnn_param_preset(preset_name);
 fprintf('Parameter preset: %s (%d override(s))\n\n', ...
     preset_name, numel(fieldnames(master_model_overrides)));
 
-% Machine-readable run manifest for reproducibility + self-documentation, and
-% so combine_runs can verify pooled runs used the SAME nonlinearity. We
-% fingerprint the CLASS-DEFAULT activation via a throwaway SRNNModel2
-% (constructor sets it in set_defaults; no build needed).
+% Machine-readable run manifest for reproducibility + self-documentation. The
+% activation fields fingerprint the CLASS-DEFAULT nonlinearity via a throwaway
+% SRNNModel2 (no build needed).
 %
-% NOTE: each PSA now also freezes its FULL effective parameter set into
-% psa.resolved_defaults (saved in psa_object.mat and param_space_summary.mat),
-% which records the activation actually used even when a sub-script overrides
-% model parameters. same_config compares that directly, so these manifest
-% fields are redundant for pooling; they are kept for continuity with runs
-% made before resolved_defaults existed.
+% NOTE: these fields are now redundant. Each PSA freezes its FULL effective
+% parameter set into psa.resolved_defaults (saved in psa_object.mat and
+% param_space_summary.mat), and since the nonlinearity is named data
+% (`activation` + S_a/S_c) rather than a function handle, same_config compares
+% it EXACTLY -- no func2str fingerprinting needed. The manifest fields are kept
+% only for continuity with runs made before resolved_defaults existed.
 m0 = SRNNModel2();
 run_manifest = struct( ...
     'run_mode', run_mode, ...

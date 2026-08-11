@@ -77,8 +77,7 @@ for k = 1:n_cases
     model.n_b_E = 0; model.n_b_I = 0;
 
     % tanh activation
-    model.activation_function            = @SRNNModel2.tanhActivation;
-    model.activation_function_derivative = @SRNNModel2.tanhActivationDerivative;
+    model.activation = 'tanh';   % tanh takes no parameters; S_a / S_c are unused
 
     % Simulation settings
     model.T_range   = T_range;

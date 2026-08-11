@@ -81,10 +81,28 @@ classdef SRNNModel2 < handle
     %% Dynamics Properties
     properties
         tau_d = 0.1                 % Dendritic time constant (s)
-        activation_function         % Activation function handle
-        activation_function_derivative  % Derivative of activation function
-        S_a = 0.9                   % Activation function parameter a
-        S_c = 0.4                   % Activation function parameter c (center)
+
+        % The nonlinearity is chosen by NAME and parameterised by S_a / S_c; the
+        % activation_function / activation_function_derivative handles are
+        % Dependent and rebuilt from these (see the Dependent block below).
+        % Storing the choice as data rather than as a handle is what keeps S_a
+        % and S_c from silently disagreeing with the function actually in use,
+        % and lets a parameter preset express the nonlinearity without handles.
+        %
+        % 'logistic'  - logisticSigmoid(x, S_c); smooth, unit slope at centre.
+        %               The default: more robust near-edge-of-chaos stability
+        %               than the piecewise variant. Ignores S_a.
+        % 'piecewise' - piecewiseSigmoid(x, S_a, S_c); piecewise linear/quadratic.
+        % 'tanh'      - tanhActivation(x); ignores both S_a and S_c.
+        activation = 'logistic'     % 'logistic' | 'piecewise' | 'tanh'
+        S_a = 0.9                   % Activation function parameter a (piecewise only)
+        S_c = 0.4                   % Activation function parameter c, the centre (piecewise, logistic)
+
+        % Escape hatch for a nonlinearity that is not one of the named three:
+        % a 1x2 cell {fn, dfn} of function handles. When non-empty it overrides
+        % `activation`. Leave empty for the normal case, which keeps the
+        % recorded parameter set free of function handles.
+        activation_custom = {}
     end
     
     %% Simulation Settings Properties
@@ -131,6 +149,8 @@ classdef SRNNModel2 < handle
         sigma_E_tilde       % Normalized excitatory std dev = sigma_E_tilde_relative * F
         sigma_I_tilde       % Normalized inhibitory std dev = sigma_I_tilde_relative * F
         E_W                 % Mean offset added to both mu tildes = E_W_relative * F
+        activation_function            % Nonlinearity handle, built from activation + S_a/S_c
+        activation_function_derivative % Its derivative, built the same way
         mu_se               % Sparse excitatory mean
         mu_si               % Sparse inhibitory mean
         sigma_se            % Sparse excitatory std dev
@@ -178,26 +198,33 @@ classdef SRNNModel2 < handle
             % Set default values
             obj.set_defaults();
             
-            % The RMT tildes became Dependent (computed from the _relative
-            % multipliers), so setting them here would raise MATLAB's generic
-            % read-only error. Name the replacement instead -- isprop() is true
-            % for Dependent properties, so this must be checked first.
+            % These properties became Dependent (computed from the settable ones
+            % named here), so assigning them would raise MATLAB's generic
+            % read-only error. Name the replacement and how to use it instead --
+            % isprop() is true for Dependent properties, so check this first.
             renamed = struct( ...
-                'mu_E_tilde',    'mu_E_tilde_relative', ...
-                'mu_I_tilde',    'mu_I_tilde_relative', ...
-                'sigma_E_tilde', 'sigma_E_tilde_relative', ...
-                'sigma_I_tilde', 'sigma_I_tilde_relative', ...
-                'E_W',           'E_W_relative');
+                'mu_E_tilde', struct('set', 'mu_E_tilde_relative', ...
+                    'hint', 'which holds the value in multiples of F = default_val (''mu_E_tilde_relative'', 3 replaces ''mu_E_tilde'', 3*F)'), ...
+                'mu_I_tilde', struct('set', 'mu_I_tilde_relative', ...
+                    'hint', 'which holds the value in multiples of F = default_val'), ...
+                'sigma_E_tilde', struct('set', 'sigma_E_tilde_relative', ...
+                    'hint', 'which holds the value in multiples of F = default_val'), ...
+                'sigma_I_tilde', struct('set', 'sigma_I_tilde_relative', ...
+                    'hint', 'which holds the value in multiples of F = default_val'), ...
+                'E_W', struct('set', 'E_W_relative', ...
+                    'hint', 'which holds the value in multiples of F = default_val'), ...
+                'activation_function', struct('set', 'activation', ...
+                    'hint', 'one of ''logistic'', ''piecewise'', ''tanh'', parameterised by S_a/S_c (or set activation_custom for a bespoke nonlinearity)'), ...
+                'activation_function_derivative', struct('set', 'activation', ...
+                    'hint', 'the derivative follows the same choice; there is no separate setting'));
 
             % Parse name-value pairs
             for i = 1:2:length(varargin)
                 name = varargin{i};
                 if ischar(name) && isfield(renamed, name)
                     error('SRNNModel:RenamedProperty', ...
-                        ['''%s'' is now a computed (Dependent) property. Set ''%s'' ' ...
-                        'instead, which holds the value in multiples of ' ...
-                        'F = default_val -- e.g. ''%s'', 3 replaces ''%s'', 3*F.'], ...
-                        name, renamed.(name), renamed.(name), name);
+                        '''%s'' is now a computed (Dependent) property. Set ''%s'' instead, %s.', ...
+                        name, renamed.(name).set, renamed.(name).hint);
                 elseif isprop(obj, name)
                     obj.(name) = varargin{i+1};
                 else
@@ -264,6 +291,14 @@ classdef SRNNModel2 < handle
 
         function val = get.E_W(obj)
             val = SRNNModel2.scale_tilde(obj.E_W_relative, obj.default_val);
+        end
+
+        function val = get.activation_function(obj)
+            val = obj.build_activation(1);
+        end
+
+        function val = get.activation_function_derivative(obj)
+            val = obj.build_activation(2);
         end
         
         % The tilde properties are now always defined (they are computed from the
@@ -1011,6 +1046,17 @@ classdef SRNNModel2 < handle
             % them in place only when empty, which meant a rebuild after changing
             % n silently kept the F from the previous n.)
 
+            % Validate the activation choice up front, so a typo fails here
+            % rather than at the first phi() evaluation deep inside the solver.
+            if ~isempty(obj.activation_custom)
+                SRNNModel2.check_activation_custom(obj.activation_custom);
+            elseif ~ismember(obj.activation, SRNNModel2.activation_names())
+                error('SRNNModel:InvalidParams', ...
+                    'Unknown activation ''%s''. Valid: %s.', ...
+                    char(string(obj.activation)), ...
+                    strjoin(SRNNModel2.activation_names(), ', '));
+            end
+
             % Validate the reference network used when F_tracks_network is false.
             % This is a pairwise constraint, so it cannot live in a set method.
             if ~obj.F_tracks_network
@@ -1125,18 +1171,61 @@ classdef SRNNModel2 < handle
     
     %% Private Methods
     methods (Access = protected)
+        function h = build_activation(obj, which_one)
+            % BUILD_ACTIVATION Handle for the chosen nonlinearity (1=fn, 2=derivative)
+            %
+            % Parameters are captured BY VALUE, not by capturing obj: the handle
+            % is rebuilt on every property access so it can never be stale, and
+            % capturing the model would drag the whole object into anything that
+            % saves the handle (a saved obj-capturing handle costs ~3x as much,
+            % and would embed an SRNNModel2 in every recorded parameter set).
+            %
+            % Each nonlinearity binds only the parameters it actually takes, so
+            % S_a is genuinely unused by 'logistic' and both are unused by
+            % 'tanh' -- which was already true, just implicit, when these were
+            % hand-built handles.
+            if ~isempty(obj.activation_custom)
+                SRNNModel2.check_activation_custom(obj.activation_custom);
+                h = obj.activation_custom{which_one};
+                return;
+            end
+
+            a = obj.S_a;
+            c = obj.S_c;
+            switch obj.activation
+                case 'logistic'
+                    if which_one == 1
+                        h = @(x) SRNNModel2.logisticSigmoid(x, c);
+                    else
+                        h = @(x) SRNNModel2.logisticSigmoidDerivative(x, c);
+                    end
+                case 'piecewise'
+                    if which_one == 1
+                        h = @(x) SRNNModel2.piecewiseSigmoid(x, a, c);
+                    else
+                        h = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, a, c);
+                    end
+                case 'tanh'
+                    if which_one == 1
+                        h = @SRNNModel2.tanhActivation;
+                    else
+                        h = @SRNNModel2.tanhActivationDerivative;
+                    end
+                otherwise
+                    error('SRNNModel:InvalidParams', ...
+                        ['Unknown activation ''%s''. Valid: %s. (Set activation_custom ' ...
+                        'for a nonlinearity outside this set.)'], ...
+                        char(string(obj.activation)), ...
+                        strjoin(SRNNModel2.activation_names(), ', '));
+            end
+        end
+
         function set_defaults(obj)
             % SET_DEFAULTS Initialize all properties to default values
             
-            % Set default activation function (logisticSigmoid, centered at S_c).
-            % Smooth sigmoid with unit slope at its center; gives more robust
-            % near-edge-of-chaos stability than the piecewise variant. S_a is
-            % retained for the piecewise static method but unused here. The
-            % piecewiseSigmoid / tanhActivation static methods remain available
-            % as alternative activations but are not the default.
-            obj.activation_function = @(x) SRNNModel2.logisticSigmoid(x, obj.S_c);
-            obj.activation_function_derivative = @(x) SRNNModel2.logisticSigmoidDerivative(x, obj.S_c);
-            
+            % The activation needs no setup here: `activation` defaults to
+            % 'logistic' as a plain property, and the handles are Dependent.
+
             % Set default input configuration
             obj.input_config = struct();
             obj.input_config.n_steps = 3;
@@ -2986,6 +3075,22 @@ classdef SRNNModel2 < handle
     end
     
     methods (Static, Access = private)
+        function names = activation_names()
+            % ACTIVATION_NAMES The valid values of the `activation` property.
+            names = {'logistic', 'piecewise', 'tanh'};
+        end
+
+        function check_activation_custom(c)
+            % CHECK_ACTIVATION_CUSTOM Validate the escape-hatch {fn, dfn} pair.
+            ok = iscell(c) && numel(c) == 2 && ...
+                all(cellfun(@(h) isa(h, 'function_handle'), c));
+            if ~ok
+                error('SRNNModel:InvalidParams', ...
+                    ['activation_custom must be a 1x2 cell of function handles, ' ...
+                    '{phi, phi_derivative}, or empty to use the named `activation`.']);
+            end
+        end
+
         function val = scale_tilde(relative, F)
             % SCALE_TILDE relative * F, keeping an exact zero at zero.
             % A disconnected model (indegree = 0, e.g. the single-neuron scripts)

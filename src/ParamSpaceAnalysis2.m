@@ -1876,7 +1876,14 @@ classdef ParamSpaceAnalysis2 < handle
             %   nonpublic - not publicly settable (protected/private)
             %
             % Cached in a persistent: the class definition does not change at
-            % runtime and metaclass introspection is comparatively slow.
+            % runtime and metaclass introspection is comparatively slow (this is
+            % called once per result by effective_param, so plotting loops hit it
+            % thousands of times).
+            %
+            % DEVELOPMENT NOTE: because it is cached, adding or renaming an
+            % SRNNModel2 property mid-session leaves this list stale, and the new
+            % name is then reported as "not a property of SRNNModel2". Run
+            % `clear classes` after editing the classdef.
             persistent cached
             if isempty(cached)
                 mc = ?SRNNModel2;

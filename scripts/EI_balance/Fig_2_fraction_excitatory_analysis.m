@@ -74,10 +74,9 @@ psa.model_defaults.tau_b_E_rel = 0.5;
 % Activation function (use SRNNModel2 static methods)
 S_a = 0.9;
 S_c = 0.40;
+psa.model_defaults.activation = 'piecewise';
 psa.model_defaults.S_a = S_a;
 psa.model_defaults.S_c = S_c;
-psa.model_defaults.activation_function = @(x) SRNNModel2.piecewiseSigmoid(x, S_a, S_c);
-psa.model_defaults.activation_function_derivative = @(x) SRNNModel2.piecewiseSigmoidDerivative(x, S_a, S_c);
 
 % Input configuration
 psa.model_defaults.u_ex_scale = 1.0;
