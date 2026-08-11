@@ -42,6 +42,12 @@ There is no standalone test framework; ad-hoc verification scripts are named `sc
 
 **Always run MATLAB through the matlab MCP server — never `matlab -batch` or any other shell invocation.** Use `check_matlab_code` for static analysis and `run_matlab_file` / `evaluate_matlab_code` for execution. The MCP server drives the user's running MATLAB desktop, which is the visible UI for any figures; a `-batch` process would be headless, would not share that session, and is not how this project is meant to be driven. Since the session is shared and live, leave it as you found it: restore the path if a check calls `restoredefaultpath`, and don't clear the workspace beyond what the script itself does.
 
+**Gotcha: after editing a `classdef`, run `clear classes`.** `ParamSpaceAnalysis2.srnn_property_info` caches `SRNNModel2`'s property list in a `persistent` (it is called once per result by `effective_param`, so plotting loops hit it thousands of times; uncached it costs ~0.7 ms a call, which is seconds per figure on a production-size sweep). MATLAB does **not** invalidate that cache when a classdef changes on disk, so adding or renaming an `SRNNModel2` property mid-session makes the new name report as
+
+> `'activation' is not a property of SRNNModel2. Did you mean one of: activation_function, ...`
+
+which reads like a bug in the calling code rather than a stale cache. `clear ParamSpaceAnalysis2` and `clear functions` do **not** clear it — only `clear classes` does. That is a deliberate exception to "don't clear the workspace" above: it wipes the user's base workspace, so say so when you use it in their live session. MATLAB needs `clear classes` after a classdef edit anyway whenever live instances exist.
+
 ## Architecture
 
 The codebase has converged on **two main classes** that drive everything. Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
