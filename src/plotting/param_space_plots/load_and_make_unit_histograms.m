@@ -20,6 +20,7 @@ function [psa, fig_handles] = load_and_make_unit_histograms(results_dir, options
 %   NormalizeMode - 'count' (default) or 'probability'
 %   Metrics       - Cell array of metrics to plot: 'lle', 'r', 'br'
 %                   (default: {'lle', 'r'})
+%   ColorBy       - SRNNModel2 parameter to colour points by (default: 'f')
 %
 % Output:
 %   psa         - The loaded ParamSpaceAnalysis object
@@ -32,10 +33,12 @@ arguments
     options.NormalizeMode (1,:) char {mustBeMember(options.NormalizeMode, {'count', 'probability'})} = 'count'
     options.Metrics (1,:) cell = {'lle', 'r'}
     options.LLERange (1,2) double = [-2.3, 1.5]   % LLE histogram range (bin edges)
+    options.ColorBy (1,:) char = 'f'
 end
 
 normalize_mode = options.NormalizeMode;
 metrics_to_plot = lower(options.Metrics);
+color_by = options.ColorBy;
 
 if ~exist(results_dir, 'dir')
     error('load_and_make_unit_histograms:NotFound', ...
@@ -127,7 +130,7 @@ for m_idx = 1:length(metrics)
     metric_edges{m_idx} = edges;
 end
 
-% First pass: collect all f values across all conditions for global normalization
+% First pass: collect all colour-parameter values for global normalization
 all_f_combined = [];
 for c_idx = 1:num_conditions
     cond_name = condition_names{c_idx};
@@ -136,21 +139,18 @@ for c_idx = 1:num_conditions
         for k = 1:length(results_cell)
             res = results_cell{k};
             if isstruct(res) && isfield(res, 'success') && res.success
-                if isfield(res, 'config') && isfield(res.config, 'f')
-                    all_f_combined(end+1) = res.config.f;
-                elseif isfield(psa.model_defaults, 'f')
-                    all_f_combined(end+1) = psa.model_defaults.f;
-                end
+                all_f_combined(end+1) = psa.effective_param(res, color_by);
             end
         end
     end
 end
 
-% Compute global f limits
-if ~isempty(all_f_combined)
+% Compute global colour limits. A constant colour parameter would give a
+% degenerate CLim, so fall back to the unit range as if none were found.
+if ~isempty(all_f_combined) && max(all_f_combined) > min(all_f_combined)
     f_min = min(all_f_combined);
     f_max = max(all_f_combined);
-    has_f_variation = (f_max > f_min);
+    has_f_variation = true;
 else
     f_min = 0;
     f_max = 1;
@@ -158,7 +158,7 @@ else
 end
 
 if has_f_variation
-    fprintf('Coloring by f value: [%.3f, %.3f]\n', f_min, f_max);
+    fprintf('Coloring by %s value: [%.3f, %.3f]\n', color_by, f_min, f_max);
 end
 
 % Get colormap (same as beeswarm)
@@ -193,15 +193,7 @@ for m_idx = 1:length(metrics)
                 if isstruct(res) && isfield(res, 'success') && res.success
                     if isfield(res, metric) && ~isnan(res.(metric))
                         values(end+1) = res.(metric);
-
-                        % Get f value
-                        if isfield(res, 'config') && isfield(res.config, 'f')
-                            f_values(end+1) = res.config.f;
-                        elseif isfield(psa.model_defaults, 'f')
-                            f_values(end+1) = psa.model_defaults.f;
-                        else
-                            f_values(end+1) = 0.5;  % Default
-                        end
+                        f_values(end+1) = psa.effective_param(res, color_by);
                     end
                 end
             end

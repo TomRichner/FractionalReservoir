@@ -62,6 +62,7 @@ classdef ParamSpaceAnalysis2 < handle
         shuffled_indices            % Randomized/sequential order for execution
         num_combinations            % Total number of grid points
         vector_param_lookup = struct() % Struct: param_name -> cell array of pre-generated vectors
+        resolved_defaults = struct()   % Every SRNNModel2 parameter as actually used (set by run); empty for runs predating this field
     end
 
     %% Constructor
@@ -252,6 +253,168 @@ classdef ParamSpaceAnalysis2 < handle
             end
         end
 
+        function validate_model_defaults(obj)
+            % VALIDATE_MODEL_DEFAULTS Check model_defaults against SRNNModel2's properties
+            %
+            % Errors on names that can never take effect: unknown properties
+            % (typos), Dependent properties, and properties that are not publicly
+            % settable. All such problems are accumulated into a SINGLE error so a
+            % bad override struct can be fixed in one pass.
+            %
+            % Warns on names that are valid properties but are overridden per job
+            % by the grid or the condition -- run_single_job skips those, so the
+            % default is silently ignored.
+            %
+            % This matters because SRNNModel2's constructor only WARNS on an
+            % unknown name, and a warning raised inside a parfor worker is easily
+            % lost; setting a Dependent or protected property throws mid-sweep.
+            % Called automatically at the top of run(); call it directly to check a
+            % configuration before committing to a long sweep.
+
+            fields = fieldnames(obj.model_defaults);
+            if isempty(fields); return; end
+
+            info = ParamSpaceAnalysis2.srnn_property_info();
+            condition_fields = setdiff( ...
+                ParamSpaceAnalysis2.per_job_param_names({}), obj.grid_params);
+            problems = {};
+
+            for i = 1:numel(fields)
+                name = fields{i};
+                if ismember(name, info.settable)
+                    % Valid property -- warn only if something else wins at run time.
+                    if ismember(name, obj.grid_params)
+                        warning('ParamSpaceAnalysis2:GridParamShadowed', ...
+                            ['model_defaults.%s is also a grid parameter; the grid ' ...
+                            'value wins and the default is ignored.'], name);
+                    elseif ismember(name, condition_fields)
+                        warning('ParamSpaceAnalysis2:ConditionParamShadowed', ...
+                            ['model_defaults.%s is set per condition; the condition ' ...
+                            'value wins and the default is ignored.'], name);
+                    end
+                elseif ismember(name, info.dependent)
+                    problems{end+1} = sprintf(['  ''%s'' is a Dependent (computed) property ' ...
+                        'of SRNNModel2 and cannot be set; set the properties it is ' ...
+                        'derived from instead.'], name); %#ok<AGROW>
+                elseif ismember(name, info.nonpublic)
+                    problems{end+1} = sprintf(['  ''%s'' is not publicly settable on ' ...
+                        'SRNNModel2 (it is computed during build/run).'], name); %#ok<AGROW>
+                else
+                    problems{end+1} = sprintf('  ''%s'' is not a property of SRNNModel2.%s', ...
+                        name, ParamSpaceAnalysis2.suggest_property(name, info.settable)); %#ok<AGROW>
+                end
+            end
+
+            if ~isempty(problems)
+                error('ParamSpaceAnalysis2:InvalidModelDefaults', ...
+                    'model_defaults contains %d field(s) that cannot take effect:\n%s', ...
+                    numel(problems), strjoin(problems, '\n'));
+            end
+        end
+
+        function resolve_model_defaults(obj)
+            % RESOLVE_MODEL_DEFAULTS Freeze this run's full SRNNModel2 parameter set
+            %
+            % Records every publicly settable SRNNModel2 property as it will
+            % actually be used, so a saved run describes itself and readers do
+            % not have to re-derive run_single_job's precedence. Grid parameters
+            % and condition fields are excluded: those vary per job and are
+            % already recorded per result.
+            %
+            % Built by CONSTRUCTING a model rather than merging structs, so the
+            % set_defaults side effects are captured too -- the activation
+            % handles, input_config, and plot_deci computed from fs/plot_freq.
+            %
+            % NOTE: the RMT parameters left empty here (mu_E_tilde and friends)
+            % are filled in build() as multiples of F = 1/sqrt(n*alpha*(2-alpha)),
+            % which depends on n and indegree and therefore on the grid point.
+            % They are deliberately NOT frozen.
+
+            excluded = ParamSpaceAnalysis2.per_job_param_names(obj.grid_params);
+
+            model_args = {};
+            default_fields = fieldnames(obj.model_defaults);
+            for i = 1:numel(default_fields)
+                fname = default_fields{i};
+                if ~ismember(fname, excluded)
+                    model_args = [model_args, {fname, obj.model_defaults.(fname)}]; %#ok<AGROW>
+                end
+            end
+
+            m = SRNNModel2(model_args{:});
+            info = ParamSpaceAnalysis2.srnn_property_info();
+            obj.resolved_defaults = struct();
+            for i = 1:numel(info.settable)
+                pname = info.settable{i};
+                if ~ismember(pname, excluded)
+                    obj.resolved_defaults.(pname) = m.(pname);
+                end
+            end
+        end
+
+        function val = effective_param(obj, res, name)
+            % EFFECTIVE_PARAM Value a parameter actually had for one result
+            %
+            % Resolves NAME with the same precedence run_single_job uses to build
+            % the model, so readers never have to reimplement it:
+            %   1. vector grid parameter -- res.config holds the level INDEX, not
+            %      the value, so it is resolved through vector_param_lookup
+            %   2. scalar grid parameter -- res.config
+            %   3. condition field (n_a_E / n_b_E / ...), via res.condition_name
+            %   4. obj.resolved_defaults, the set frozen at run time
+            %   5. obj.model_defaults, then the SRNNModel2 class default -- the
+            %      fallback for objects loaded from runs predating (4)
+            %
+            % Pass RES = [] for a parameter with no per-result value, to resolve
+            % straight from model_defaults / the class default.
+            %
+            % Usage:
+            %   f = psa.effective_param(res, 'f');
+            %   T = psa.effective_param([], 'T_range');
+
+            info = ParamSpaceAnalysis2.srnn_property_info();
+            if ~ismember(name, info.settable)
+                error('ParamSpaceAnalysis2:UnknownModelParam', ...
+                    '''%s'' is not a settable property of SRNNModel2.%s', ...
+                    name, ParamSpaceAnalysis2.suggest_property(name, info.settable));
+            end
+
+            % 1-2. Per-config grid value
+            if isstruct(res) && isfield(res, 'config') && isfield(res.config, name)
+                if isfield(obj.vector_param_lookup, name)
+                    val = obj.vector_param_lookup.(name){res.config.(name)};
+                else
+                    val = res.config.(name);
+                end
+                return;
+            end
+
+            % 3. Per-condition value
+            if isstruct(res) && isfield(res, 'condition_name')
+                for c_idx = 1:numel(obj.conditions)
+                    cond = obj.conditions{c_idx};
+                    if strcmp(cond.name, res.condition_name)
+                        if isfield(cond, name)
+                            val = cond.(name);
+                            return;
+                        end
+                        break;
+                    end
+                end
+            end
+
+            % 4-5. Run-wide default: prefer the set frozen at run time, which
+            % already folds in the class defaults. The model_defaults path is
+            % the fallback for runs saved before resolved_defaults existed.
+            if isfield(obj.resolved_defaults, name)
+                val = obj.resolved_defaults.(name);
+            elseif isfield(obj.model_defaults, name)
+                val = obj.model_defaults.(name);
+            else
+                val = ParamSpaceAnalysis2.class_default(name);
+            end
+        end
+
         function run(obj)
             % RUN Execute the full parameter space analysis
             %
@@ -272,6 +435,10 @@ classdef ParamSpaceAnalysis2 < handle
                     'No conditions defined.');
             end
 
+            % Reject unusable model_defaults BEFORE the output directory is
+            % created, so a rejected config leaves no empty dated folder behind.
+            obj.validate_model_defaults();
+
             % Create timestamped output directory
             obj.analysis_start_time = datetime('now');
             dt_str = lower(datestr(obj.analysis_start_time, 'mmm_dd_yy_HH_MM'));
@@ -291,6 +458,10 @@ classdef ParamSpaceAnalysis2 < handle
 
             % Generate parameter grid
             obj.generate_grid();
+
+            % Freeze the full parameter set this run will actually use, so the
+            % saved run describes itself without a reader re-deriving it.
+            obj.resolve_model_defaults();
 
             % Print summary
             fprintf('\n========================================\n');
@@ -338,15 +509,34 @@ classdef ParamSpaceAnalysis2 < handle
             obj.save_summary();
         end
 
-        function [tf, reason] = same_config(obj, other)
+        function [tf, reason] = same_config(obj, other, varargin)
             % SAME_CONFIG Whether another PSA run is poolable with this one.
             %   [tf, reason] = obj.same_config(other) returns true when the two
             %   runs sweep the same grid under the same conditions and model
-            %   defaults, so their results can be concatenated for combined
+            %   parameters, so their results can be concatenated for combined
             %   plotting. The reps-axis LENGTH, randomize_order, and
             %   network_seed_offset are intentionally ignored (expected to
             %   differ across runs). `reason` explains the first mismatch found.
+            %
+            %   Model parameters are compared through resolved_defaults -- the
+            %   FULL parameter set each run froze at run time -- so two runs with
+            %   identical explicit overrides but different SRNNModel2 class
+            %   defaults (say, across a commit that changed the default
+            %   activation) are correctly refused.
+            %
+            %   Name-value:
+            %     'allow_legacy' - (default false) when a run predates
+            %                      resolved_defaults, fall back to comparing
+            %                      model_defaults instead of refusing. Weaker:
+            %                      it cannot see class defaults.
             tf = false; reason = '';
+
+            allow_legacy = false;
+            for i = 1:2:numel(varargin)
+                switch lower(varargin{i})
+                    case 'allow_legacy', allow_legacy = varargin{i+1};
+                end
+            end
 
             % Grid parameter names (order-independent set).
             if ~isequal(sort(obj.grid_params(:)), sort(other.grid_params(:)))
@@ -400,30 +590,29 @@ classdef ParamSpaceAnalysis2 < handle
                 reason = 'vector_param_config differ'; return;
             end
 
-            % model_defaults: same fields, values equal (function handles by
-            % their string form). NOTE: func2str does not expose values captured
-            % by an anonymous handle, so two handles differing only in a captured
-            % constant would compare equal -- acceptable here since pooled runs
-            % come from the same script/config.
-            fa = fieldnames(obj.model_defaults);
-            fb = fieldnames(other.model_defaults);
-            if ~isequal(sort(fa), sort(fb))
-                reason = 'model_defaults field sets differ'; return;
-            end
-            for i = 1:numel(fa)
-                k = fa{i};
-                va = obj.model_defaults.(k);
-                vb = other.model_defaults.(k);
-                if isa(va, 'function_handle') || isa(vb, 'function_handle')
-                    if ~(isa(va, 'function_handle') && isa(vb, 'function_handle') ...
-                            && strcmp(func2str(va), func2str(vb)))
-                        reason = sprintf('model_defaults.%s (function handle) differs', k);
-                        return;
-                    end
-                elseif ~isequaln(va, vb)
-                    reason = sprintf('model_defaults.%s differs', k);
-                    return;
+            % Model parameters: prefer the resolved set frozen at run time.
+            has_this = ~isempty(fieldnames(obj.resolved_defaults));
+            has_other = ~isempty(fieldnames(other.resolved_defaults));
+            if has_this && has_other
+                [ok, reason] = ParamSpaceAnalysis2.compare_param_structs( ...
+                    obj.resolved_defaults, other.resolved_defaults, 'resolved_defaults');
+                if ~ok; return; end
+            elseif allow_legacy
+                [ok, reason] = ParamSpaceAnalysis2.compare_param_structs( ...
+                    obj.model_defaults, other.model_defaults, 'model_defaults');
+                if ~ok; return; end
+            else
+                if ~has_this && ~has_other
+                    which_side = 'both runs predate';
+                elseif ~has_this
+                    which_side = 'this run predates';
+                else
+                    which_side = 'the other run predates';
                 end
+                reason = sprintf(['%s resolved_defaults, so model parameters cannot ' ...
+                    'be compared exactly; pass ''allow_legacy'', true to fall back ' ...
+                    'to comparing model_defaults'], which_side);
+                return;
             end
 
             tf = true;
@@ -740,6 +929,7 @@ classdef ParamSpaceAnalysis2 < handle
             % Name-value args:
             %   Metrics       - Cell array: 'lle', 'r', 'br' (default {'lle','r'})
             %   NormalizeMode - 'count' (default) or 'probability'
+            %   color_by      - SRNNModel2 parameter to colour by (default 'f')
 
             if ~obj.has_run && isempty(fieldnames(obj.results))
                 error('ParamSpaceAnalysis2:NotRun', ...
@@ -749,10 +939,12 @@ classdef ParamSpaceAnalysis2 < handle
             % Parse name-value args
             normalize_mode = 'count';
             metrics_to_plot = {'lle', 'r'};
+            color_by = 'f';
             for i = 1:2:length(varargin)
                 switch lower(varargin{i})
                     case 'normalizemode', normalize_mode = varargin{i+1};
                     case 'metrics', metrics_to_plot = lower(varargin{i+1});
+                    case 'color_by', color_by = varargin{i+1};
                 end
             end
 
@@ -808,7 +1000,7 @@ classdef ParamSpaceAnalysis2 < handle
                 metric_edges{m_idx} = edges;
             end
 
-            % Collect all f values for global normalization
+            % Collect all colour-parameter values for global normalization
             all_f_combined = [];
             for c_idx = 1:num_conditions
                 cond_name = condition_names{c_idx};
@@ -817,26 +1009,24 @@ classdef ParamSpaceAnalysis2 < handle
                     for k = 1:length(results_cell)
                         res = results_cell{k};
                         if isstruct(res) && isfield(res, 'success') && res.success
-                            if isfield(res, 'config') && isfield(res.config, 'f')
-                                all_f_combined(end+1) = res.config.f; %#ok<AGROW>
-                            elseif isfield(obj.model_defaults, 'f')
-                                all_f_combined(end+1) = obj.model_defaults.f; %#ok<AGROW>
-                            end
+                            all_f_combined(end+1) = obj.effective_param(res, color_by); %#ok<AGROW>
                         end
                     end
                 end
             end
 
-            if ~isempty(all_f_combined)
+            % A constant colour parameter would give a degenerate CLim, so fall
+            % back to the unit range as if no values had been found at all.
+            if ~isempty(all_f_combined) && max(all_f_combined) > min(all_f_combined)
                 f_min = min(all_f_combined);
                 f_max = max(all_f_combined);
-                has_f_variation = (f_max > f_min);
+                has_f_variation = true;
             else
                 f_min = 0; f_max = 1; has_f_variation = false;
             end
 
             if has_f_variation
-                fprintf('Coloring by f value: [%.3f, %.3f]\n', f_min, f_max);
+                fprintf('Coloring by %s value: [%.3f, %.3f]\n', color_by, f_min, f_max);
             end
 
             cmap_f = blue_gray_red_colormap(256);
@@ -866,13 +1056,7 @@ classdef ParamSpaceAnalysis2 < handle
                             if isstruct(res) && isfield(res, 'success') && res.success
                                 if isfield(res, metric) && ~isnan(res.(metric))
                                     values(end+1) = res.(metric); %#ok<AGROW>
-                                    if isfield(res, 'config') && isfield(res.config, 'f')
-                                        f_values(end+1) = res.config.f; %#ok<AGROW>
-                                    elseif isfield(obj.model_defaults, 'f')
-                                        f_values(end+1) = obj.model_defaults.f; %#ok<AGROW>
-                                    else
-                                        f_values(end+1) = 0.5; %#ok<AGROW>
-                                    end
+                                    f_values(end+1) = obj.effective_param(res, color_by); %#ok<AGROW>
                                 end
                             end
                         end
@@ -951,6 +1135,11 @@ classdef ParamSpaceAnalysis2 < handle
             %   psa.plot_lle_by_stim_period()
             %   psa.plot_lle_by_stim_period('transient_skip', 3)
             %   [fig, p] = psa.plot_lle_by_stim_period('periods_to_plot', [0 1 1])
+            %
+            % Name-value args:
+            %   transient_skip  - Seconds to skip at the start of each step
+            %   periods_to_plot - Logical mask over the steps to show
+            %   color_by        - SRNNModel2 parameter to colour by (default 'f')
 
             if ~obj.has_run && isempty(fieldnames(obj.results))
                 error('ParamSpaceAnalysis2:NotRun', ...
@@ -960,10 +1149,12 @@ classdef ParamSpaceAnalysis2 < handle
             % Parse args
             transient_skip = 0;
             periods_to_plot_arg = [];
+            color_by = 'f';
             for i = 1:2:length(varargin)
                 switch lower(varargin{i})
                     case 'transient_skip', transient_skip = varargin{i+1};
                     case 'periods_to_plot', periods_to_plot_arg = logical(varargin{i+1});
+                    case 'color_by', color_by = varargin{i+1};
                 end
             end
 
@@ -989,21 +1180,13 @@ classdef ParamSpaceAnalysis2 < handle
                     'Results do not contain local_lya. Re-run with store_local_lya = true.');
             end
 
-            % Step configuration
-            if isfield(obj.model_defaults, 'input_config')
-                n_steps = obj.model_defaults.input_config.n_steps;
-                no_stim_pattern = obj.model_defaults.input_config.no_stim_pattern;
-            else
-                n_steps = 3;
-                no_stim_pattern = false(1, 3);
-                no_stim_pattern(1:2:end) = true;
-            end
+            % Step configuration (run-wide, so no per-result context is needed)
+            stim_config = obj.effective_param([], 'input_config');
+            n_steps = stim_config.n_steps;
+            no_stim_pattern = stim_config.no_stim_pattern;
 
-            if isfield(obj.model_defaults, 'T_range')
-                T_stim = obj.model_defaults.T_range(2);
-            else
-                T_stim = 50;
-            end
+            T_stim_range = obj.effective_param([], 'T_range');
+            T_stim = T_stim_range(2);
             step_period = T_stim / n_steps;
 
             num_conditions = length(cond_names);
@@ -1042,11 +1225,7 @@ classdef ParamSpaceAnalysis2 < handle
                     t_lya = res.t_lya;
                     local_lya = res.local_lya;
 
-                    if isfield(res, 'config') && isfield(res.config, 'f')
-                        f_values(sim_idx) = res.config.f;
-                    elseif isfield(obj.model_defaults, 'f')
-                        f_values(sim_idx) = obj.model_defaults.f;
-                    end
+                    f_values(sim_idx) = obj.effective_param(res, color_by);
 
                     valid_mask = t_lya >= 0;
                     t_lya = t_lya(valid_mask);
@@ -1073,10 +1252,12 @@ classdef ParamSpaceAnalysis2 < handle
             end
             all_f_combined = all_f_combined(~isnan(all_f_combined));
 
-            if ~isempty(all_f_combined)
+            % A constant colour parameter would give a degenerate CLim, so fall
+            % back to the unit range as if no values had been found at all.
+            if ~isempty(all_f_combined) && max(all_f_combined) > min(all_f_combined)
                 f_min = min(all_f_combined);
                 f_max = max(all_f_combined);
-                has_f_variation = (f_max > f_min);
+                has_f_variation = true;
             else
                 f_min = 0; f_max = 1; has_f_variation = false;
             end
@@ -1310,6 +1491,12 @@ classdef ParamSpaceAnalysis2 < handle
                     obj.param_ranges = loaded.summary_data.param_ranges;
                     obj.n_levels = loaded.summary_data.n_levels;
                     obj.conditions = loaded.summary_data.conditions;
+                    if isfield(loaded.summary_data, 'model_defaults')
+                        obj.model_defaults = loaded.summary_data.model_defaults;
+                    end
+                    if isfield(loaded.summary_data, 'resolved_defaults')
+                        obj.resolved_defaults = loaded.summary_data.resolved_defaults;
+                    end
                 end
             end
 
@@ -1380,6 +1567,9 @@ classdef ParamSpaceAnalysis2 < handle
                         end
                         if isfield(loaded.summary_data, 'model_defaults')
                             obj.model_defaults = loaded.summary_data.model_defaults;
+                        end
+                        if isfield(loaded.summary_data, 'resolved_defaults')
+                            obj.resolved_defaults = loaded.summary_data.resolved_defaults;
                         end
                     end
                 else
@@ -1528,6 +1718,127 @@ classdef ParamSpaceAnalysis2 < handle
             s.shuffled_indices = obj.shuffled_indices;
             s.num_combinations = obj.num_combinations;
             s.vector_param_lookup = obj.vector_param_lookup;
+            s.resolved_defaults = obj.resolved_defaults;
+        end
+    end
+
+    %% Model-default introspection helpers
+    methods (Static)
+        function val = class_default(name)
+            % CLASS_DEFAULT Value SRNNModel2 gives NAME when nothing overrides it
+            %
+            % Backed by a cached throwaway model: the constructor runs
+            % set_defaults (which binds the activation handles and input_config,
+            % and computes plot_deci), so no build() is needed. The cached object
+            % is never mutated. Using this instead of a hand-copied literal is
+            % what keeps plotting fallbacks from drifting when a class default
+            % changes.
+            persistent m0
+            if isempty(m0) || ~isvalid(m0)
+                m0 = SRNNModel2();
+            end
+            val = m0.(name);
+        end
+    end
+
+    methods (Static, Access = private)
+        function names = per_job_param_names(grid_params)
+            % PER_JOB_PARAM_NAMES Parameters that vary per job, not per run
+            %
+            % The grid axes plus the condition fields. run_single_job sets these
+            % from the job rather than from model_defaults, so a run-wide default
+            % for any of them is ignored (see validate_model_defaults) and they
+            % are excluded from resolved_defaults.
+            names = [grid_params(:)', {'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I'}];
+        end
+
+        function [tf, reason] = compare_param_structs(a, b, label)
+            % COMPARE_PARAM_STRUCTS Field-by-field equality of two parameter structs
+            %
+            % Ignores properties that do not affect the dynamics (storage and
+            % plotting options, per-job seeds), so pooling is not refused over a
+            % different plot_freq. Function handles compare by their string form.
+            % NOTE: func2str does not expose values captured by an anonymous
+            % handle, so two handles differing only in a captured constant compare
+            % equal -- acceptable here since pooled runs come from the same
+            % script/config.
+            ignore = {'rng_seeds', 'reps', 'store_full_state', ...
+                'store_decimated_state', 'plot_deci', 'plot_freq', ...
+                'T_plot', 'check_connectivity'};
+
+            tf = false;
+            fa = setdiff(fieldnames(a), ignore);
+            fb = setdiff(fieldnames(b), ignore);
+            if ~isequal(fa, fb)
+                reason = sprintf('%s field sets differ', label);
+                return;
+            end
+            for i = 1:numel(fa)
+                k = fa{i};
+                va = a.(k);
+                vb = b.(k);
+                if isa(va, 'function_handle') || isa(vb, 'function_handle')
+                    if ~(isa(va, 'function_handle') && isa(vb, 'function_handle') ...
+                            && strcmp(func2str(va), func2str(vb)))
+                        reason = sprintf('%s.%s (function handle) differs', label, k);
+                        return;
+                    end
+                elseif ~isequaln(va, vb)
+                    reason = sprintf('%s.%s differs', label, k);
+                    return;
+                end
+            end
+            tf = true;
+            reason = '';
+        end
+
+        function info = srnn_property_info()
+            % SRNN_PROPERTY_INFO Classify SRNNModel2's properties for validation
+            %
+            % Returns a struct with cell-array fields:
+            %   settable  - publicly settable (what model_defaults may contain)
+            %   dependent - Dependent with no set method (computed, read-only)
+            %   nonpublic - not publicly settable (protected/private)
+            %
+            % Cached in a persistent: the class definition does not change at
+            % runtime and metaclass introspection is comparatively slow.
+            persistent cached
+            if isempty(cached)
+                mc = ?SRNNModel2;
+                props = mc.PropertyList;
+                names = {props.Name};
+                is_dependent = [props.Dependent];
+                has_setter = ~cellfun(@isempty, {props.SetMethod});
+                % SetAccess is 'public'/'protected'/'private', or a cell array of
+                % meta.class for SetAccess = ?SomeClass -- the ischar guard treats
+                % the latter as non-public, which is what we want here.
+                is_public = cellfun(@(a) ischar(a) && strcmp(a, 'public'), {props.SetAccess});
+
+                cached = struct();
+                cached.settable  = names(is_public & (~is_dependent | has_setter));
+                cached.dependent = names(is_dependent & ~has_setter);
+                cached.nonpublic = names(~is_public & ~is_dependent);
+            end
+            info = cached;
+        end
+
+        function s = suggest_property(name, candidates)
+            % SUGGEST_PROPERTY Trailing " Did you mean ...?" text for a bad name.
+            % Case-insensitive exact match first (catches tau_D -> tau_d), then
+            % prefix/substring matches. Returns '' when nothing is close.
+            hit = candidates(strcmpi(candidates, name));
+            if isempty(hit)
+                hit = candidates(startsWith(candidates, name, 'IgnoreCase', true) | ...
+                    contains(candidates, name, 'IgnoreCase', true));
+            end
+            if isempty(hit)
+                s = '';
+            elseif isscalar(hit)
+                s = sprintf(' Did you mean ''%s''?', hit{1});
+            else
+                s = sprintf(' Did you mean one of: %s?', ...
+                    strjoin(hit(1:min(5, numel(hit))), ', '));
+            end
         end
     end
 
@@ -1620,6 +1931,9 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'shuffled_indices'), obj.shuffled_indices = s.shuffled_indices; end
                 if isfield(s, 'num_combinations'), obj.num_combinations = s.num_combinations; end
                 if isfield(s, 'vector_param_lookup'), obj.vector_param_lookup = s.vector_param_lookup; end
+                % Absent for runs saved before resolved_defaults existed; stays
+                % empty, and effective_param / same_config fall back accordingly.
+                if isfield(s, 'resolved_defaults'), obj.resolved_defaults = s.resolved_defaults; end
             else
                 % Object was saved directly (already a ParamSpaceAnalysis2)
                 obj = s;
@@ -1966,6 +2280,7 @@ classdef ParamSpaceAnalysis2 < handle
             summary_data.num_combinations = obj.num_combinations;
             summary_data.conditions = obj.conditions;
             summary_data.model_defaults = obj.model_defaults;
+            summary_data.resolved_defaults = obj.resolved_defaults;
             summary_data.shuffled_indices = obj.shuffled_indices;
             summary_data.analysis_start_time = obj.analysis_start_time;
             summary_data.analysis_completed = datestr(now);

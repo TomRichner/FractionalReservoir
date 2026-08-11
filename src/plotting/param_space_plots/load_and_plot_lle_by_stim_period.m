@@ -19,6 +19,7 @@ function fig = load_and_plot_lle_by_stim_period(results_dir, options)
 %       'periods_to_plot' - Logical vector selecting which periods to plot
 %                           e.g., [1 1 0] plots first 2 periods but not 3rd
 %                           (default: all periods)
+%       'color_by'        - SRNNModel2 parameter to colour by (default: 'f')
 %
 % See also: ParamSpaceAnalysis2, load_and_plot_param_space_analysis
 
@@ -26,6 +27,7 @@ arguments
     results_dir (1,:) char
     options.transient_skip (1,1) double = 0
     options.periods_to_plot (1,:) logical = logical([])
+    options.color_by (1,:) char = 'f'
 end
 
 if ~exist(results_dir, 'dir')
@@ -76,23 +78,14 @@ if ~has_local_lya
         'Re-run PSA with store_local_lya = true.']);
 end
 
-%% Extract step configuration from model_defaults
-if isfield(psa.model_defaults, 'input_config')
-    n_steps = psa.model_defaults.input_config.n_steps;
-    no_stim_pattern = psa.model_defaults.input_config.no_stim_pattern;
-else
-    % Use SRNNModel defaults
-    n_steps = 3;
-    no_stim_pattern = false(1, 3);
-    no_stim_pattern(1:2:end) = true;
-end
+%% Extract step configuration (run-wide, so no per-result context is needed)
+stim_config = psa.effective_param([], 'input_config');
+n_steps = stim_config.n_steps;
+no_stim_pattern = stim_config.no_stim_pattern;
 
 % Get T_stim (positive time portion)
-if isfield(psa.model_defaults, 'T_range')
-    T_stim = psa.model_defaults.T_range(2);
-else
-    T_stim = 50;  % Default
-end
+T_stim_range = psa.effective_param([], 'T_range');
+T_stim = T_stim_range(2);
 
 step_period = T_stim / n_steps;
 fprintf('Step configuration: %d steps, period = %.2f s\n', n_steps, step_period);
@@ -136,12 +129,8 @@ for c_idx = 1:num_conditions
         t_lya = res.t_lya;
         local_lya = res.local_lya;
 
-        % Extract f value if available
-        if isfield(res, 'config') && isfield(res.config, 'f')
-            f_values(sim_idx) = res.config.f;
-        elseif isfield(psa.model_defaults, 'f')
-            f_values(sim_idx) = psa.model_defaults.f;
-        end
+        % Colour-parameter value for this simulation
+        f_values(sim_idx) = psa.effective_param(res, options.color_by);
 
         % Truncate to t >= 0
         valid_mask = t_lya >= 0;
@@ -174,10 +163,12 @@ for c_idx = 1:num_conditions
 end
 all_f_combined = all_f_combined(~isnan(all_f_combined));
 
-if ~isempty(all_f_combined)
+% A constant colour parameter would give a degenerate range, so fall back to
+% the unit range as if no values had been found at all.
+if ~isempty(all_f_combined) && max(all_f_combined) > min(all_f_combined)
     f_min = min(all_f_combined);
     f_max = max(all_f_combined);
-    has_f_variation = (f_max > f_min);
+    has_f_variation = true;
 else
     f_min = 0;
     f_max = 1;
@@ -185,7 +176,7 @@ else
 end
 
 if has_f_variation
-    fprintf('Coloring by f value: [%.3f, %.3f]\n', f_min, f_max);
+    fprintf('Coloring by %s value: [%.3f, %.3f]\n', options.color_by, f_min, f_max);
 end
 
 %% Create figure

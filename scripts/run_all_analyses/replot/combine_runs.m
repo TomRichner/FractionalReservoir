@@ -66,8 +66,9 @@ function combined_dir = combine_runs(run_dirs, out_dir)
     fprintf('Combining %d runs -> %s\n\n', numel(run_dirs), out_dir);
 
     % Load run manifests and verify compatibility. The manifest fingerprints the
-    % nonlinearity (activation + S_a/S_c), which same_config cannot see, so this
-    % is what guards against pooling e.g. a piecewise run with a logistic one.
+    % nonlinearity (activation + S_a/S_c). same_config now also compares
+    % resolved_defaults, which covers the activation for runs made since that
+    % field was added; the manifest check still guards older runs.
     run_info = check_manifests(run_dirs);
 
     % Record which runs were combined (provenance) into the output dir.

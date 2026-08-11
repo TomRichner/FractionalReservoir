@@ -51,9 +51,14 @@ fprintf('Run mode: %s\n\n', run_mode);
 % Machine-readable run manifest for reproducibility + self-documentation, and
 % so combine_runs can verify pooled runs used the SAME nonlinearity. We
 % fingerprint the CLASS-DEFAULT activation via a throwaway SRNNModel2
-% (constructor sets it in set_defaults; no build needed) -- the run_all
-% sub-scripts all use that default and never override model parameters in
-% model_defaults, so it is not otherwise recorded.
+% (constructor sets it in set_defaults; no build needed).
+%
+% NOTE: each PSA now also freezes its FULL effective parameter set into
+% psa.resolved_defaults (saved in psa_object.mat and param_space_summary.mat),
+% which records the activation actually used even when a sub-script overrides
+% model parameters. same_config compares that directly, so these manifest
+% fields are redundant for pooling; they are kept for continuity with runs
+% made before resolved_defaults existed.
 m0 = SRNNModel2();
 run_manifest = struct( ...
     'run_mode', run_mode, ...
