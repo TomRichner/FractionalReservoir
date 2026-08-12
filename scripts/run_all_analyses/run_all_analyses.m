@@ -45,7 +45,7 @@ master_save_figs = 'save_all_figs';
 %   'production' - full-size sweeps, fs=400, T_range=[0,50] (for real results)
 % Defaults to 'medium'. To pick another WITHOUT editing this file, set the
 % variable first in the console:   run_mode = 'fast'; run_all_analyses
-if ~exist('run_mode', 'var'); run_mode = 'medium'; end
+if ~exist('run_mode', 'var'); run_mode = 'fastFor '; end
 fprintf('Run mode: %s\n\n', run_mode);
 
 % Which network to simulate, as opposed to how much compute to spend on it
