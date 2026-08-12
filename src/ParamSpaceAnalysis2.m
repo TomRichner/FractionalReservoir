@@ -37,7 +37,12 @@ classdef ParamSpaceAnalysis2 < handle
 
     %% Model Default Properties
     properties
-        model_defaults = struct()   % Default SRNNModel2 properties
+        % Which model class to sweep. Any class constructible from name-value
+        % pairs with build()/run() methods works -- PSA needs a constructor and
+        % a property list, not a common base class, so the two model classes are
+        % duck-typed rather than sharing a hierarchy.
+        model_class = 'SRNNModel2'  % e.g. 'SRNNModel2' | 'SRNNCellTypePairs'
+        model_defaults = struct()   % Default properties of model_class
         verbose = true              % Print progress during execution
     end
 
@@ -280,7 +285,7 @@ classdef ParamSpaceAnalysis2 < handle
             fields = fieldnames(obj.model_defaults);
             if isempty(fields); return; end
 
-            info = ParamSpaceAnalysis2.srnn_property_info();
+            info = ParamSpaceAnalysis2.srnn_property_info(obj.model_class);
             condition_fields = obj.condition_set_fields();
             problems = {};
 
@@ -347,8 +352,8 @@ classdef ParamSpaceAnalysis2 < handle
                 end
             end
 
-            m = SRNNModel2(model_args{:});
-            info = ParamSpaceAnalysis2.srnn_property_info();
+            m = feval(obj.model_class, model_args{:});
+            info = ParamSpaceAnalysis2.srnn_property_info(obj.model_class);
             obj.resolved_defaults = struct();
             for i = 1:numel(info.settable)
                 pname = info.settable{i};
@@ -382,9 +387,8 @@ classdef ParamSpaceAnalysis2 < handle
             % condition-owned would silently drop a model_defaults value for the
             % inhibitory ones (which is exactly the bug this replaces).
             names = {};
-            owned = ParamSpaceAnalysis2.condition_field_names();
             for c_idx = 1:numel(obj.conditions)
-                names = union(names, intersect(owned, fieldnames(obj.conditions{c_idx})));
+                names = union(names, setdiff(fieldnames(obj.conditions{c_idx}), {'name'}));
             end
             names = names(:)';
         end
@@ -409,11 +413,12 @@ classdef ParamSpaceAnalysis2 < handle
             %   f = psa.effective_param(res, 'f');
             %   T = psa.effective_param([], 'T_range');
 
-            info = ParamSpaceAnalysis2.srnn_property_info();
+            info = ParamSpaceAnalysis2.srnn_property_info(obj.model_class);
             if ~ismember(name, info.settable)
                 error('ParamSpaceAnalysis2:UnknownModelParam', ...
-                    '''%s'' is not a settable property of SRNNModel2.%s', ...
-                    name, ParamSpaceAnalysis2.suggest_property(name, info.settable));
+                    '''%s'' is not a settable property of %s.%s', ...
+                    name, obj.model_class, ...
+                    ParamSpaceAnalysis2.suggest_property(name, info.settable));
             end
 
             % 1-2. Per-config grid value
@@ -448,7 +453,18 @@ classdef ParamSpaceAnalysis2 < handle
             elseif isfield(obj.model_defaults, name)
                 val = obj.model_defaults.(name);
             else
-                val = ParamSpaceAnalysis2.class_default(name);
+                % Last resort: the class's own default. Some model classes have
+                % required constructor arguments and cannot be default-built, in
+                % which case there is no class default to report.
+                try
+                    val = ParamSpaceAnalysis2.class_default(name, obj.model_class);
+                catch
+                    error('ParamSpaceAnalysis2:NoValueForParam', ...
+                        ['''%s'' is not set by the grid, the conditions, or ' ...
+                        'model_defaults, and %s cannot be default-constructed to ' ...
+                        'supply a class default. Set it in model_defaults.'], ...
+                        name, obj.model_class);
+                end
             end
         end
 
@@ -472,11 +488,20 @@ classdef ParamSpaceAnalysis2 < handle
                     'No conditions defined.');
             end
 
-            % Reject a grid axis that the conditions own. Checked here as well as
-            % in add_grid_parameter/add_vector_parameter because grid_params is
-            % publicly settable and could be assigned directly or restored from an
-            % older saved object.
-            owned = intersect(obj.grid_params, ParamSpaceAnalysis2.condition_field_names());
+            if ~ischar(obj.model_class) || isempty(meta.class.fromName(obj.model_class))
+                error('ParamSpaceAnalysis2:UnknownModelClass', ...
+                    'model_class must name a class on the path; got ''%s''.', ...
+                    char(string(obj.model_class)));
+            end
+
+            % Reject a grid axis that the conditions own -- both the names this
+            % class reserves and any field the configured conditions actually
+            % set, since a grid value would silently override the condition.
+            % Checked here as well as in add_grid_parameter/add_vector_parameter
+            % because grid_params is publicly settable and could be assigned
+            % directly or restored from an older saved object.
+            owned = intersect(obj.grid_params, ...
+                [ParamSpaceAnalysis2.condition_field_names(), obj.condition_set_fields()]);
             if ~isempty(owned)
                 error('ParamSpaceAnalysis2:ConditionFieldAsGridParam', ...
                     ['%s cannot be a grid parameter: the adaptation conditions set ' ...
@@ -587,6 +612,13 @@ classdef ParamSpaceAnalysis2 < handle
                 switch lower(varargin{i})
                     case 'allow_legacy', allow_legacy = varargin{i+1};
                 end
+            end
+
+            % Different model classes are never poolable, whatever the parameters.
+            if ~strcmp(obj.model_class, other.model_class)
+                reason = sprintf('model_class differs: %s vs %s', ...
+                    obj.model_class, other.model_class);
+                return;
             end
 
             % Grid parameter names (order-independent set).
@@ -1748,6 +1780,7 @@ classdef ParamSpaceAnalysis2 < handle
             s.network_seed_offset = obj.network_seed_offset;
 
             % Model Default Properties (public)
+            s.model_class = obj.model_class;
             s.model_defaults = obj.model_defaults;
             s.verbose = obj.verbose;
 
@@ -1775,24 +1808,58 @@ classdef ParamSpaceAnalysis2 < handle
 
     %% Model-default introspection helpers
     methods (Static)
-        function val = class_default(name)
-            % CLASS_DEFAULT Value SRNNModel2 gives NAME when nothing overrides it
+        function val = class_default(name, class_name)
+            % CLASS_DEFAULT Value a model class gives NAME with nothing overriding
             %
-            % Backed by a cached throwaway model: the constructor runs
-            % set_defaults (which binds the activation handles and input_config,
-            % and computes plot_deci), so no build() is needed. The cached object
-            % is never mutated. Using this instead of a hand-copied literal is
-            % what keeps plotting fallbacks from drifting when a class default
-            % changes.
-            persistent m0
-            if isempty(m0) || ~isvalid(m0)
-                m0 = SRNNModel2();
+            % Backed by a cached throwaway model per class: the constructor runs
+            % set_defaults (which fills input_config and computes plot_deci), so
+            % no build() is needed. The cached object is never mutated. Using this
+            % instead of a hand-copied literal is what keeps plotting fallbacks
+            % from drifting when a class default changes.
+            %
+            % Classes whose constructor has required arguments cannot be default-
+            % constructed; for those this errors, and effective_param falls back
+            % before reaching here (it only consults the class default when the
+            % name appears nowhere else).
+            if nargin < 2, class_name = 'SRNNModel2'; end
+            persistent cache
+            if isempty(cache)
+                cache = containers.Map('KeyType', 'char', 'ValueType', 'any');
             end
+            if ~cache.isKey(class_name) || ~isvalid(cache(class_name))
+                cache(class_name) = feval(class_name);
+            end
+            m0 = cache(class_name);
             val = m0.(name);
         end
     end
 
     methods (Static, Access = private)
+        function val = pooled_mean(s)
+            % POOLED_MEAN Mean over every leaf array of a plot_data field,
+            % ignoring NaNs. Works for any number of cell types and for either
+            % nesting depth: SRNNModel2's br is keyed by type (.E, .I) while
+            % SRNNCellTypePairs' synaptic_output is keyed by ROUTE
+            % (.E.E, .E.I, ...), because its synapses are per-route.
+            v = ParamSpaceAnalysis2.collect_leaves(s);
+            v = v(~isnan(v));
+            if isempty(v), val = NaN; else, val = mean(v); end
+        end
+
+        function v = collect_leaves(s)
+            % COLLECT_LEAVES Every numeric element under a (possibly nested) struct.
+            if ~isstruct(s)
+                v = double(s(:));
+                return;
+            end
+            f = fieldnames(s);
+            parts = cell(numel(f), 1);
+            for i = 1:numel(f)
+                parts{i} = ParamSpaceAnalysis2.collect_leaves(s.(f{i}));
+            end
+            v = vertcat(parts{:});
+        end
+
         function names = per_job_param_names(grid_params, condition_fields)
             % PER_JOB_PARAM_NAMES Parameters that vary per job, not per run
             %
@@ -1867,8 +1934,8 @@ classdef ParamSpaceAnalysis2 < handle
             reason = '';
         end
 
-        function info = srnn_property_info()
-            % SRNN_PROPERTY_INFO Classify SRNNModel2's properties for validation
+        function info = srnn_property_info(class_name)
+            % SRNN_PROPERTY_INFO Classify a model class's properties for validation
             %
             % Returns a struct with cell-array fields:
             %   settable  - publicly settable (what model_defaults may contain)
@@ -1880,13 +1947,21 @@ classdef ParamSpaceAnalysis2 < handle
             % called once per result by effective_param, so plotting loops hit it
             % thousands of times).
             %
-            % DEVELOPMENT NOTE: because it is cached, adding or renaming an
-            % SRNNModel2 property mid-session leaves this list stale, and the new
-            % name is then reported as "not a property of SRNNModel2". Run
-            % `clear classes` after editing the classdef.
-            persistent cached
-            if isempty(cached)
-                mc = ?SRNNModel2;
+            % DEVELOPMENT NOTE: because it is cached, adding or renaming a model
+            % property mid-session leaves this list stale, and the new name is
+            % then reported as "not a property of <class>". Run `clear classes`
+            % after editing a classdef -- `clear <classname>` and
+            % `clear functions` do NOT clear this.
+            persistent cache
+            if isempty(cache)
+                cache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            end
+            if ~cache.isKey(class_name)
+                mc = meta.class.fromName(class_name);
+                if isempty(mc)
+                    error('ParamSpaceAnalysis2:UnknownModelClass', ...
+                        '''%s'' is not a class on the path.', class_name);
+                end
                 props = mc.PropertyList;
                 names = {props.Name};
                 is_dependent = [props.Dependent];
@@ -1896,12 +1971,13 @@ classdef ParamSpaceAnalysis2 < handle
                 % the latter as non-public, which is what we want here.
                 is_public = cellfun(@(a) ischar(a) && strcmp(a, 'public'), {props.SetAccess});
 
-                cached = struct();
-                cached.settable  = names(is_public & (~is_dependent | has_setter));
-                cached.dependent = names(is_dependent & ~has_setter);
-                cached.nonpublic = names(~is_public & ~is_dependent);
+                info = struct();
+                info.settable  = names(is_public & (~is_dependent | has_setter));
+                info.dependent = names(is_dependent & ~has_setter);
+                info.nonpublic = names(~is_public & ~is_dependent);
+                cache(class_name) = info;
             end
-            info = cached;
+            info = cache(class_name);
         end
 
         function s = suggest_property(name, candidates)
@@ -1992,6 +2068,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'network_seed_offset'), obj.network_seed_offset = s.network_seed_offset; end
 
                 % Model Default Properties (public)
+                if isfield(s, 'model_class'), obj.model_class = s.model_class; end
                 if isfield(s, 'model_defaults'), obj.model_defaults = s.model_defaults; end
                 if isfield(s, 'verbose'), obj.verbose = s.verbose; end
 
@@ -2023,27 +2100,42 @@ classdef ParamSpaceAnalysis2 < handle
         end
 
         function result = run_single_job(job, model_defaults_local, grid_params_local, ...
-                verbose_local, store_local_lya_local, store_local_lya_dt_local, vector_param_lookup_local)
+                verbose_local, store_local_lya_local, store_local_lya_dt_local, ...
+                vector_param_lookup_local, model_class_local)
             % RUN_SINGLE_JOB Execute a single simulation job
             % Extracted to allow use with both parfor and for loops
 
             run_start = tic;
 
             try
-                % Build model arguments
+                % Build model arguments IN PRECEDENCE ORDER, weakest first, and
+                % let the constructor's last-write-wins settle collisions:
+                %
+                %   model_defaults  <  condition  <  grid parameters
+                %
+                % Ordering by precedence rather than skipping duplicates matters
+                % for more than tidiness. Grid parameters used to be appended
+                % before model_defaults, so a swept property was assigned before
+                % the defaults that give it meaning -- setting mu_EE_relative
+                % before n_cellTypes, for instance. Feeding the defaults first
+                % means the model is always fully configured by the time a swept
+                % value lands on it.
                 model_args = {'rng_seeds', [job.network_seed, job.network_seed + 1]};
 
-                % Add condition parameters when present, and record WHICH ones this
-                % condition actually supplied -- only those may be skipped from
-                % model_defaults below.
-                condition_fields = ParamSpaceAnalysis2.condition_field_names();
-                supplied_by_condition = {};
-                for cf_idx = 1:length(condition_fields)
-                    field_name = condition_fields{cf_idx};
-                    if isfield(job.condition, field_name)
-                        model_args = [model_args, {field_name, job.condition.(field_name)}]; %#ok<AGROW>
-                        supplied_by_condition{end+1} = field_name; %#ok<AGROW>
-                    end
+                default_fields = fieldnames(model_defaults_local);
+                for d_idx = 1:length(default_fields)
+                    fname = default_fields{d_idx};
+                    model_args = [model_args, {fname, model_defaults_local.(fname)}]; %#ok<AGROW>
+                end
+
+                % EVERY condition field except 'name' -- not a hardcoded list of
+                % SRNNModel2's four adaptation counts. This is what lets a
+                % condition carry a whole synapse_config struct for
+                % SRNNCellTypePairs.
+                cond_fields = setdiff(fieldnames(job.condition), {'name'})';
+                for cf_idx = 1:numel(cond_fields)
+                    field_name = cond_fields{cf_idx};
+                    model_args = [model_args, {field_name, job.condition.(field_name)}]; %#ok<AGROW>
                 end
 
                 % Add grid parameters
@@ -2058,22 +2150,8 @@ classdef ParamSpaceAnalysis2 < handle
                     end
                 end
 
-                % Add model defaults, skipping only names already supplied above.
-                % Skipping by the condition's ACTUAL fields (not the static four)
-                % is what lets model_defaults.n_a_I take effect when no condition
-                % sets it -- previously it was dropped here and never supplied,
-                % so the model silently ran at the class default.
-                default_fields = fieldnames(model_defaults_local);
-                for d_idx = 1:length(default_fields)
-                    fname = default_fields{d_idx};
-                    if ~ismember(fname, grid_params_local) && ...
-                            ~ismember(fname, supplied_by_condition)
-                        model_args = [model_args, {fname, model_defaults_local.(fname)}]; %#ok<AGROW>
-                    end
-                end
-
                 % Create and run model
-                model = SRNNModel2(model_args{:});
+                model = feval(model_class_local, model_args{:});
                 model.build();
                 model.run();
 
@@ -2106,21 +2184,25 @@ classdef ParamSpaceAnalysis2 < handle
                     end
                 end
 
-                % Extract mean firing rate
+                % Extract mean firing rate and mean synaptic output, pooled over
+                % EVERY cell type rather than a hardcoded E/I pair: plot_data.r is
+                % keyed by cell type name, so a 3-type model has .E/.PV/.SST and
+                % the old .E/.I access would have silently missed a population.
+                %
+                % The synaptic-output field is called 'br' by SRNNModel2 (it is
+                % literally b.*r) and 'synaptic_output' by SRNNCellTypePairs,
+                % where facilitation makes 'br' a misnomer. Accept either.
+                result.mean_rate = NaN;
+                result.mean_synaptic_output = NaN;
                 if ~isempty(model.plot_data) && isfield(model.plot_data, 'r')
-                    r_E = model.plot_data.r.E;
-                    r_I = model.plot_data.r.I;
-                    all_rates = [r_E(:); r_I(:)];
-                    result.mean_rate = mean(all_rates(~isnan(all_rates)));
-
-                    % Extract mean synaptic output (b .* r)
-                    br_E = model.plot_data.br.E;
-                    br_I = model.plot_data.br.I;
-                    all_br = [br_E(:); br_I(:)];
-                    result.mean_synaptic_output = mean(all_br(~isnan(all_br)));
-                else
-                    result.mean_rate = NaN;
-                    result.mean_synaptic_output = NaN;
+                    result.mean_rate = ParamSpaceAnalysis2.pooled_mean(model.plot_data.r);
+                    for cand = {'br', 'synaptic_output'}
+                        if isfield(model.plot_data, cand{1})
+                            result.mean_synaptic_output = ...
+                                ParamSpaceAnalysis2.pooled_mean(model.plot_data.(cand{1}));
+                            break;
+                        end
+                    end
                 end
 
             catch ME
@@ -2304,6 +2386,7 @@ classdef ParamSpaceAnalysis2 < handle
                 store_local_lya_local = obj.store_local_lya;
                 store_local_lya_dt_local = obj.store_local_lya_dt;
                 vector_param_lookup_local = obj.vector_param_lookup;
+                model_class_local = obj.model_class;   % char, so parfor-safe
 
                 % Determine execution mode
                 run_parallel = obj.use_parallel && canUseParallelPool;
@@ -2321,13 +2404,15 @@ classdef ParamSpaceAnalysis2 < handle
                     parfor j = 1:total_jobs
                         parallel_results{j} = ParamSpaceAnalysis2.run_single_job(...
                             jobs{j}, model_defaults_local, grid_params_local, ...
-                            verbose_local, store_local_lya_local, store_local_lya_dt_local, vector_param_lookup_local);
+                            verbose_local, store_local_lya_local, store_local_lya_dt_local, ...
+                            vector_param_lookup_local, model_class_local);
                     end
                 else
                     for j = 1:total_jobs
                         parallel_results{j} = ParamSpaceAnalysis2.run_single_job(...
                             jobs{j}, model_defaults_local, grid_params_local, ...
-                            verbose_local, store_local_lya_local, store_local_lya_dt_local, vector_param_lookup_local);
+                            verbose_local, store_local_lya_local, store_local_lya_dt_local, ...
+                            vector_param_lookup_local, model_class_local);
                     end
                 end
 
@@ -2368,6 +2453,7 @@ classdef ParamSpaceAnalysis2 < handle
             summary_data.n_levels = obj.n_levels;
             summary_data.num_combinations = obj.num_combinations;
             summary_data.conditions = obj.conditions;
+            summary_data.model_class = obj.model_class;
             summary_data.model_defaults = obj.model_defaults;
             summary_data.resolved_defaults = obj.resolved_defaults;
             summary_data.shuffled_indices = obj.shuffled_indices;

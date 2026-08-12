@@ -102,6 +102,21 @@ classdef SRNNCellTypePairs < handle
         sigma_tilde                     % C x C absolute block std devs = relative * F
         R                               % Bulk spectral radius (generalizes Harris Eq. 18)
         lambda_O                        % Outlier eigenvalues, descending by magnitude
+
+        % Scalar aliases into mu_tilde_relative / sigma_tilde_relative for the
+        % two-type case, named (post, pre) -- mu_EI is "E receives from I".
+        % These exist so a single block can be a SWEEP AXIS: ParamSpaceAnalysis2
+        % passes each grid parameter as a constructor name-value pair, so the
+        % thing being swept has to be a settable property in its own right.
+        % Reading or writing one on a model with other than 2 types errors.
+        mu_EE_relative
+        mu_EI_relative
+        mu_IE_relative
+        mu_II_relative
+        sigma_EE_relative
+        sigma_EI_relative
+        sigma_IE_relative
+        sigma_II_relative
         activation_function             % Built from activation + S_a/S_c
         activation_function_derivative
         n_per_type
@@ -222,6 +237,25 @@ classdef SRNNCellTypePairs < handle
             [~, order] = sort(abs(lam), 'descend');
             val = lam(order);
         end
+
+        % --- Two-type scalar block aliases -----------------------------------
+        function v = get.mu_EE_relative(obj),    v = obj.get_block('mu', 1, 1); end
+        function v = get.mu_EI_relative(obj),    v = obj.get_block('mu', 1, 2); end
+        function v = get.mu_IE_relative(obj),    v = obj.get_block('mu', 2, 1); end
+        function v = get.mu_II_relative(obj),    v = obj.get_block('mu', 2, 2); end
+        function v = get.sigma_EE_relative(obj), v = obj.get_block('sigma', 1, 1); end
+        function v = get.sigma_EI_relative(obj), v = obj.get_block('sigma', 1, 2); end
+        function v = get.sigma_IE_relative(obj), v = obj.get_block('sigma', 2, 1); end
+        function v = get.sigma_II_relative(obj), v = obj.get_block('sigma', 2, 2); end
+
+        function set.mu_EE_relative(obj, v),    obj.set_block('mu', 1, 1, v); end
+        function set.mu_EI_relative(obj, v),    obj.set_block('mu', 1, 2, v); end
+        function set.mu_IE_relative(obj, v),    obj.set_block('mu', 2, 1, v); end
+        function set.mu_II_relative(obj, v),    obj.set_block('mu', 2, 2, v); end
+        function set.sigma_EE_relative(obj, v), obj.set_block('sigma', 1, 1, v); end
+        function set.sigma_EI_relative(obj, v), obj.set_block('sigma', 1, 2, v); end
+        function set.sigma_IE_relative(obj, v), obj.set_block('sigma', 2, 1, v); end
+        function set.sigma_II_relative(obj, v), obj.set_block('sigma', 2, 2, v); end
 
         function val = get.activation_function(obj)
             val = obj.build_activation(1);
@@ -446,6 +480,39 @@ classdef SRNNCellTypePairs < handle
     end
 
     methods (Access = protected)
+        function v = get_block(obj, which_stat, post, pre)
+            % GET_BLOCK One entry of a _relative block matrix, expanded first so a
+            % 1 x C presynaptic row reads correctly.
+            obj.assert_two_types();
+            M = obj.expand_block(obj.([which_stat '_tilde_relative']));
+            v = M(post, pre);
+        end
+
+        function set_block(obj, which_stat, post, pre, v)
+            % SET_BLOCK Write one entry, expanding a 1 x C row to a full block
+            % first so that setting one route does not silently change the other
+            % postsynaptic row.
+            obj.assert_two_types();
+            name = [which_stat '_tilde_relative'];
+            M = obj.expand_block(obj.(name));
+            if isempty(M)
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    'Set %s before setting one of its blocks.', name);
+            end
+            M(post, pre) = v;
+            obj.(name) = M;
+        end
+
+        function assert_two_types(obj)
+            if ~isequal(obj.n_cellTypes, 2)
+                error('SRNNCellTypePairs:NotTwoTypes', ...
+                    ['The E/I scalar block aliases require exactly 2 cell types ' ...
+                    '(this model has %s). Use mu_tilde_relative / ' ...
+                    'sigma_tilde_relative directly.'], ...
+                    mat2str(obj.n_cellTypes));
+            end
+        end
+
         function M = expand_block(obj, rel)
             % EXPAND_BLOCK Accept a C x C block matrix or a 1 x C presynaptic row.
             % A row is broadcast DOWN the columns, i.e. the value depends only on
