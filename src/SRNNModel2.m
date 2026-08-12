@@ -867,6 +867,70 @@ classdef SRNNModel2 < handle
             hold(ax_handles(2), 'off');
         end
         
+        function [fig_handle, ax_handle] = plot_W(obj, ax, clim_val)
+            % PLOT_W Image the connectivity matrix with a diverging red/white/blue
+            % colormap and a symmetric colour range, so zero is white and the
+            % sign of every synapse is readable at a glance.
+            %
+            % Plots obj.W -- the SCALED matrix, after level_of_chaos and
+            % rescale_by_abscissa -- i.e. the network actually simulated, and the
+            % one R and lambda_O describe. RMTBlocks.plot_W shows the generator's
+            % unscaled output instead, which differs by those factors.
+            %
+            % E/I boundaries are drawn over the image, so each quadrant is one
+            % route: a raised mu_EE_relative reddens the top-left block only.
+            %
+            %   plot_W()             - new figure, clim from the off-diagonal max
+            %   plot_W(ax)           - draw into ax
+            %   plot_W(ax, clim_val) - draw into ax with a shared clim, for
+            %                          comparing two networks on equal footing
+            if ~obj.is_built
+                error('SRNNModel:NotBuilt', 'Call build() first.');
+            end
+            if nargin < 2 || isempty(ax)
+                fig_handle = figure('Name', 'SRNNModel2 W');
+                ax = axes(fig_handle);
+            else
+                fig_handle = ancestor(ax, 'figure');
+            end
+            ax_handle = ax;
+
+            W_plot = full(obj.W);
+
+            % Auto range from the OFF-DIAGONAL entries, so a diagonal shift (if
+            % any) saturates rather than flattening the rest of the picture.
+            if nargin < 3 || isempty(clim_val)
+                W_no_diag = W_plot;
+                W_no_diag(1:obj.n+1:end) = 0;
+                clim_val = ceil(max(abs(W_no_diag(:))) * 10) / 10;
+                if clim_val == 0 || ~isfinite(clim_val)
+                    clim_val = 0.1;
+                end
+            end
+
+            imagesc(ax, W_plot);
+            colormap(ax, redwhiteblue_colormap(256));
+            clim(ax, [-clim_val, clim_val]);
+            axis(ax, 'square');
+            colorbar(ax);
+
+            % E/I boundary and labels at the centre of each band.
+            counts = [obj.n_E, obj.n_I];
+            edge = obj.n_E + 0.5;
+            hold(ax, 'on');
+            plot(ax, [edge edge], [0.5, obj.n + 0.5], 'k-', 'LineWidth', 0.75);
+            plot(ax, [0.5, obj.n + 0.5], [edge edge], 'k-', 'LineWidth', 0.75);
+            hold(ax, 'off');
+            centres = cumsum(counts) - counts / 2 + 0.5;
+            set(ax, 'XTick', centres, 'XTickLabel', {'E', 'I'}, ...
+                    'YTick', centres, 'YTickLabel', {'E', 'I'}, ...
+                    'TickLength', [0 0]);
+            xlabel(ax, 'presynaptic type');
+            ylabel(ax, 'postsynaptic type');
+            title(ax, sprintf('W  (level\\_of\\_chaos = %g,  R = %.3f)', ...
+                obj.level_of_chaos, obj.R));
+        end
+
         function [fig_handle, ax_handle] = plot_weight_histogram(obj, bin_edges, show_legend)
             % PLOT_WEIGHT_HISTOGRAM Histogram of W entries split by E/I presynaptic population
             %
