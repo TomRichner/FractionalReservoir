@@ -71,6 +71,12 @@ model.plot_celltypes();
 % circle as the network engages.
 model.plot_eigenvalues([2 10 18]);
 
+% W itself, imaged with a diverging colormap so zero is white and the sign of
+% each synapse reads at a glance. Cell-type boundaries mark the (post, pre)
+% blocks, so a raised mu_EE shows as one quadrant going redder. This is the
+% SCALED W -- what was simulated -- not the generator's unscaled output.
+model.plot_W();
+
 % Eigenvalues of W itself. This is where a raised mu_EE shows up directly --
 % the outlier leaving the bulk disk of radius R, rather than only as the
 % lambda_O number printed below.

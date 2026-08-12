@@ -1152,6 +1152,75 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
+        function [fig_handle, ax_handle] = plot_W(obj, ax, clim_val)
+            % PLOT_W Image the connectivity matrix with a diverging red/white/blue
+            % colormap and a symmetric colour range, so zero is white and the
+            % sign of every synapse is readable at a glance.
+            %
+            % This plots obj.W -- the SCALED matrix, after level_of_chaos and
+            % rescale_by_abscissa -- i.e. the network actually simulated, and the
+            % one R and lambda_O describe. RMTBlocks.plot_W shows the generator's
+            % unscaled output instead, which differs by those factors.
+            %
+            % Cell-type boundaries are drawn over the image, since the point of
+            % this class is that the (post, pre) blocks can differ: each block of
+            % the picture is one route.
+            %
+            %   plot_W()             - new figure, clim from the off-diagonal max
+            %   plot_W(ax)           - draw into ax
+            %   plot_W(ax, clim_val) - draw into ax with a shared clim, for
+            %                          comparing two networks on equal footing
+            if ~obj.is_built
+                error('SRNNCellTypePairs:NotBuilt', 'Call build() first.');
+            end
+            if nargin < 2 || isempty(ax)
+                fig_handle = figure('Name', 'SRNNCellTypePairs W');
+                ax = axes(fig_handle);
+            else
+                fig_handle = ancestor(ax, 'figure');
+            end
+            ax_handle = ax;
+
+            W_plot = full(obj.W);
+
+            % Auto range from the OFF-DIAGONAL entries: a diagonal shift, if any,
+            % is rendered as-is and simply saturates rather than flattening the
+            % rest of the picture.
+            if nargin < 3 || isempty(clim_val)
+                W_no_diag = W_plot;
+                W_no_diag(1:obj.n+1:end) = 0;
+                clim_val = ceil(max(abs(W_no_diag(:))) * 10) / 10;
+                if clim_val == 0 || ~isfinite(clim_val)
+                    clim_val = 0.1;
+                end
+            end
+
+            imagesc(ax, W_plot);
+            colormap(ax, redwhiteblue_colormap(256));
+            clim(ax, [-clim_val, clim_val]);
+            axis(ax, 'square');
+            colorbar(ax);
+
+            % Block boundaries and type labels at the centre of each band.
+            counts = obj.n_per_type;
+            edges = cumsum(counts);
+            hold(ax, 'on');
+            for k = 1:numel(edges) - 1
+                e = edges(k) + 0.5;
+                plot(ax, [e e], [0.5, obj.n + 0.5], 'k-', 'LineWidth', 0.75);
+                plot(ax, [0.5, obj.n + 0.5], [e e], 'k-', 'LineWidth', 0.75);
+            end
+            hold(ax, 'off');
+            centres = cumsum(counts) - counts / 2 + 0.5;
+            set(ax, 'XTick', centres, 'XTickLabel', obj.cell_type_names, ...
+                    'YTick', centres, 'YTickLabel', obj.cell_type_names, ...
+                    'TickLength', [0 0]);
+            xlabel(ax, 'presynaptic type');
+            ylabel(ax, 'postsynaptic type');
+            title(ax, sprintf('W  (level\\_of\\_chaos = %g,  R = %.3f)', ...
+                obj.level_of_chaos, obj.R));
+        end
+
         function [fig_handle, ax_handle] = plot_weight_histogram(obj, bin_edges)
             if ~obj.is_built
                 error('SRNNCellTypePairs:NotBuilt', 'Call build() first.');
