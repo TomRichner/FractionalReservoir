@@ -47,7 +47,7 @@ classdef SRNNCellTypePairs < handle
         activation_function
         activation_function_derivative
         S_a = 0.9
-        S_c = 0.35
+        S_c = 0.40                      % matches SRNNModel2's default
         fs = 400
         T_range = [0, 50]
         T_plot
