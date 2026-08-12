@@ -26,10 +26,30 @@ classdef SRNNCellTypePairs < handle
         n_cellTypes
         cell_type_names
         f
-        mu_tilde
-        sigma_tilde
+
+        % RMT block statistics in multiples of F = default_val, indexed
+        % (POSTsynaptic, PREsynaptic) as in RMTBlocks -- so mu_tilde_relative(1,2)
+        % is "type 1 receives from type 2". A 1 x C row is accepted and broadcast
+        % down the columns, which is the classical presynaptic-only setting.
+        %
+        % The absolute mu_tilde / sigma_tilde are Dependent on these; storing the
+        % multiplier is what lets them be swept (F depends on n and indegree) and
+        % recorded. Dale's law is a COLUMN constraint: signs must stay constant
+        % down each column.
+        mu_tilde_relative
+        sigma_tilde_relative
+
+        % Which network F is computed for. true (default) tracks the current
+        % n/indegree, making the bulk radius R independent of n; false pins F to
+        % the reference network below. Freezing F does NOT freeze the network --
+        % connectivity still tracks n/indegree, only the weight SCALE is pinned.
+        F_tracks_network = true
+        F_ref_n          = 300
+        F_ref_indegree   = 100
+
         level_of_chaos = 1.0
         rescale_by_abscissa = false
+        zrs_mode = 'none'           % 'none' | 'ZRS' | 'SZRS' | 'Partial_SZRS'
     end
 
     %% Per-type SFA and pair-specific STD/STF
@@ -44,8 +64,14 @@ classdef SRNNCellTypePairs < handle
     %% Shared dynamics and simulation settings
     properties
         tau_d = 0.1
-        activation_function
-        activation_function_derivative
+
+        % The nonlinearity is chosen by NAME and parameterised by S_a / S_c; the
+        % activation_function / _derivative handles are Dependent and rebuilt
+        % from these, so S_a and S_c always describe the function actually in
+        % use. 'logistic' uses S_c only, 'piecewise' uses both, 'tanh' neither.
+        % activation_custom = {fn, dfn} overrides the name when non-empty.
+        activation = 'logistic'         % 'logistic' | 'piecewise' | 'tanh'
+        activation_custom = {}
         S_a = 0.9
         S_c = 0.40                      % matches SRNNModel2's default
         fs = 400
@@ -71,6 +97,13 @@ classdef SRNNCellTypePairs < handle
 
     properties (Dependent)
         alpha
+        default_val                     % F = 1/sqrt(N*alpha*(2-alpha)) (Harris 2023)
+        mu_tilde                        % C x C absolute block means    = relative * F
+        sigma_tilde                     % C x C absolute block std devs = relative * F
+        R                               % Bulk spectral radius (generalizes Harris Eq. 18)
+        lambda_O                        % Outlier eigenvalues, descending by magnitude
+        activation_function             % Built from activation + S_a/S_c
+        activation_function_derivative
         n_per_type
         type_indices
         cell_indices
@@ -104,26 +137,98 @@ classdef SRNNCellTypePairs < handle
             end
             supplied = string(varargin(1:2:end));
             required = ["n_cellTypes", "cell_type_names", "f", ...
-                "mu_tilde", "sigma_tilde"];
+                "mu_tilde_relative", "sigma_tilde_relative"];
             missing = required(~ismember(required, supplied));
             if ~isempty(missing)
                 error('SRNNCellTypePairs:MissingConfig', ...
                     'Required constructor properties: %s.', strjoin(cellstr(missing), ', '));
             end
+            % These became Dependent (computed from the settable names given
+            % here), so assigning them would raise MATLAB's generic read-only
+            % error. isprop() is true for Dependent properties, so check first.
+            renamed = struct( ...
+                'mu_tilde',    'mu_tilde_relative', ...
+                'sigma_tilde', 'sigma_tilde_relative', ...
+                'activation_function',            'activation', ...
+                'activation_function_derivative', 'activation');
             for k = 1:2:numel(varargin)
                 name = varargin{k};
-                if ~(ischar(name) || (isstring(name) && isscalar(name))) || ...
-                        ~isprop(obj, char(name))
+                if ~(ischar(name) || (isstring(name) && isscalar(name)))
                     error('SRNNCellTypePairs:UnknownProperty', ...
-                        'Unknown property: %s', string(name));
+                        'Property names must be character vectors or strings.');
                 end
-                obj.(char(name)) = varargin{k + 1};
+                name = char(name);
+                if isfield(renamed, name)
+                    error('SRNNCellTypePairs:RenamedProperty', ...
+                        ['''%s'' is now a computed (Dependent) property. Set ''%s'' ' ...
+                        'instead -- the tildes are held in multiples of ' ...
+                        'F = default_val, and the nonlinearity is chosen by name.'], ...
+                        name, renamed.(name));
+                end
+                if ~isprop(obj, name)
+                    error('SRNNCellTypePairs:UnknownProperty', ...
+                        'Unknown property: %s', name);
+                end
+                obj.(name) = varargin{k + 1};
             end
             obj.complete_type_defaults();
             obj.validate();
             if isempty(obj.plot_deci)
                 obj.plot_deci = max(1, round(obj.fs / obj.plot_freq));
             end
+        end
+
+        function val = get.default_val(obj)
+            % F = 1/sqrt(N*alpha*(2-alpha)), the factor that yields R = 1 when
+            % every tilde equals 1 (Harris 2023). Unchanged by block or
+            % multi-type structure: setting all tildes equal reduces the block
+            % radius to Harris Eq. (18).
+            %
+            % F_tracks_network = false pins F to (F_ref_n, F_ref_indegree) so a
+            % sweep over n or indegree leaves the weight distribution fixed.
+            % This does NOT freeze the network: build_network still passes the
+            % real alpha, so connectivity tracks the current n/indegree.
+            if obj.F_tracks_network
+                n_F = obj.n;         a_F = obj.alpha;
+            else
+                n_F = obj.F_ref_n;   a_F = obj.F_ref_indegree / obj.F_ref_n;
+            end
+            val = 1 / sqrt(n_F * a_F * (2 - a_F));
+        end
+
+        function val = get.mu_tilde(obj)
+            val = SRNNCellTypePairs.scale_tilde_mat( ...
+                obj.expand_block(obj.mu_tilde_relative), obj.default_val);
+        end
+
+        function val = get.sigma_tilde(obj)
+            val = SRNNCellTypePairs.scale_tilde_mat( ...
+                obj.expand_block(obj.sigma_tilde_relative), obj.default_val);
+        end
+
+        function val = get.R(obj)
+            % Perron root of the block variance matrix V(a,b) = n*f_b*sigma_s_sq,
+            % generalizing Harris Eq. (18); see RMTBlocks.R.
+            V = obj.n * (obj.f .* obj.block_sigma_s_sq());
+            val = sqrt(max(0, max(real(eig(V))))) * obj.level_of_chaos;
+        end
+
+        function val = get.lambda_O(obj)
+            % Outliers of E[W], descending by MAGNITUDE (in an
+            % inhibition-dominated network the dominant one is large and
+            % negative). Generalizes Harris Eq. (17); see RMTBlocks.lambda_O.
+            K = obj.n * (obj.f .* (obj.alpha * obj.mu_tilde));
+            lam = eig(K) * obj.level_of_chaos;
+            [~, order] = sort(abs(lam), 'descend');
+            val = lam(order);
+        end
+
+        function val = get.activation_function(obj)
+            val = obj.build_activation(1);
+        end
+
+        function val = get.activation_function_derivative(obj)
+            val = obj.build_activation(2);
         end
 
         function value = get.alpha(obj)
@@ -341,10 +446,68 @@ classdef SRNNCellTypePairs < handle
     end
 
     methods (Access = protected)
+        function M = expand_block(obj, rel)
+            % EXPAND_BLOCK Accept a C x C block matrix or a 1 x C presynaptic row.
+            % A row is broadcast DOWN the columns, i.e. the value depends only on
+            % the presynaptic type -- the classical Harris setting.
+            C = obj.n_cellTypes;
+            if isempty(rel)
+                M = [];
+            elseif isvector(rel) && numel(rel) == C
+                M = repmat(reshape(rel, 1, []), C, 1);
+            else
+                M = rel;
+            end
+        end
+
+        function val = block_sigma_s_sq(obj)
+            % Sparse-effective block variances, Harris Eq. (16) blockwise.
+            mg = obj.mu_tilde;
+            sg = obj.sigma_tilde;
+            val = obj.alpha * (1 - obj.alpha) * mg.^2 + obj.alpha * sg.^2;
+        end
+
+        function h = build_activation(obj, which_one)
+            % BUILD_ACTIVATION Handle for the chosen nonlinearity (1=fn, 2=deriv).
+            % Parameters are captured BY VALUE and the handle is rebuilt on every
+            % access, so it can never disagree with S_a / S_c.
+            if ~isempty(obj.activation_custom)
+                SRNNCellTypePairs.check_activation_custom(obj.activation_custom);
+                h = obj.activation_custom{which_one};
+                return;
+            end
+            a = obj.S_a;
+            c = obj.S_c;
+            switch obj.activation
+                case 'logistic'
+                    if which_one == 1
+                        h = @(x) SRNNCellTypePairs.logisticSigmoid(x, c);
+                    else
+                        h = @(x) SRNNCellTypePairs.logisticSigmoidDerivative(x, c);
+                    end
+                case 'piecewise'
+                    if which_one == 1
+                        h = @(x) SRNNCellTypePairs.piecewiseSigmoid(x, a, c);
+                    else
+                        h = @(x) SRNNCellTypePairs.piecewiseSigmoidDerivative(x, a, c);
+                    end
+                case 'tanh'
+                    if which_one == 1
+                        h = @SRNNCellTypePairs.tanhActivation;
+                    else
+                        h = @SRNNCellTypePairs.tanhActivationDerivative;
+                    end
+                otherwise
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        'Unknown activation ''%s''. Valid: %s.', ...
+                        char(string(obj.activation)), ...
+                        strjoin(SRNNCellTypePairs.activation_names(), ', '));
+            end
+        end
+
         function set_defaults(obj)
-            obj.activation_function = @(x) SRNNCellTypePairs.logisticSigmoid(x, obj.S_c);
-            obj.activation_function_derivative = ...
-                @(x) SRNNCellTypePairs.logisticSigmoidDerivative(x, obj.S_c);
+            % The activation needs no setup: `activation` defaults to 'logistic'
+            % as a plain property and the handles are Dependent.
             obj.input_config = struct( ...
                 'n_steps', 3, ...
                 'step_density', struct(), ...
@@ -362,8 +525,8 @@ classdef SRNNCellTypePairs < handle
             end
             obj.cell_type_names = cellstr(obj.cell_type_names);
             obj.f = reshape(obj.f, 1, []);
-            obj.mu_tilde = reshape(obj.mu_tilde, 1, []);
-            obj.sigma_tilde = reshape(obj.sigma_tilde, 1, []);
+            % The _relative tildes are left in whatever shape they were given:
+            % expand_block accepts a 1 x C presynaptic row or a full C x C block.
             if isempty(obj.n_a), obj.n_a = zeros(1, C); end
             if isempty(obj.c), obj.c = repmat(0.15 / 3, 1, C); end
             obj.n_a = reshape(obj.n_a, 1, []);
@@ -414,11 +577,37 @@ classdef SRNNCellTypePairs < handle
                     'f must contain one positive fraction per type and sum to 1.');
             end
             RMTCellTypes.allocate_counts(obj.n, obj.f);
-            if numel(obj.mu_tilde) ~= C || any(~isfinite(obj.mu_tilde)) || ...
-                    numel(obj.sigma_tilde) ~= C || any(~isfinite(obj.sigma_tilde)) || ...
-                    any(obj.sigma_tilde < 0)
+            mu_b = obj.expand_block(obj.mu_tilde_relative);
+            sg_b = obj.expand_block(obj.sigma_tilde_relative);
+            if ~isequal(size(mu_b), [C C]) || any(~isfinite(mu_b(:))) || ...
+                    ~isequal(size(sg_b), [C C]) || any(~isfinite(sg_b(:))) || ...
+                    any(sg_b(:) < 0)
                 error('SRNNCellTypePairs:InvalidParams', ...
-                    'mu_tilde and sigma_tilde must have one valid value per type.');
+                    ['mu_tilde_relative and sigma_tilde_relative must each be a ' ...
+                    '%d x %d block matrix (post, pre) or a 1 x %d presynaptic ' ...
+                    'row, finite, with sigma nonnegative.'], C, C, C);
+            end
+
+            % Activation choice, so a typo fails here rather than at the first
+            % phi() evaluation inside the solver.
+            if ~isempty(obj.activation_custom)
+                SRNNCellTypePairs.check_activation_custom(obj.activation_custom);
+            elseif ~ismember(obj.activation, SRNNCellTypePairs.activation_names())
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    'Unknown activation ''%s''. Valid: %s.', ...
+                    char(string(obj.activation)), ...
+                    strjoin(SRNNCellTypePairs.activation_names(), ', '));
+            end
+
+            % Reference network for F, when it is pinned.
+            if ~obj.F_tracks_network
+                if ~isscalar(obj.F_ref_n) || ~isscalar(obj.F_ref_indegree) || ...
+                        obj.F_ref_n <= 0 || obj.F_ref_indegree <= 0 || ...
+                        obj.F_ref_indegree > obj.F_ref_n
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        ['F_ref_n and F_ref_indegree must be positive scalars with ' ...
+                        'F_ref_indegree <= F_ref_n.']);
+                end
             end
 
             vector_fields = {'n_a', 'c'};
@@ -577,9 +766,23 @@ classdef SRNNCellTypePairs < handle
 
         function build_network(obj)
             rng(obj.rng_seeds(1));
-            rmt = RMTCellTypes(obj.n, obj.alpha, obj.f, ...
-                obj.mu_tilde, obj.sigma_tilde);
-            W_raw = rmt.W;
+            % RMTBlocks rather than RMTCellTypes: it indexes the statistics by
+            % BOTH postsynaptic (row) and presynaptic (column) type, so E->E can
+            % differ from E->I, and it supplies R and lambda_O. RMTCellTypes
+            % applied the tildes raw with no normalization and had neither.
+            % g_mu / g_sigma stay at 1 -- level_of_chaos is applied to the
+            % assembled W below, because rescale_by_abscissa divides by the
+            % abscissa BEFORE that multiply.
+            rmt = RMTBlocks(obj.n);
+            rmt.alpha = obj.alpha;
+            rmt.f = obj.f;
+            rmt.mu_tilde = obj.mu_tilde;
+            rmt.sigma_tilde = obj.sigma_tilde;
+            rmt.zrs_mode = obj.zrs_mode;
+            % RMTBlocks returns a DENSE matrix where RMTCellTypes returned a
+            % sparse one. Restore sparse storage: this class is built for sparse
+            % connectivity and its state indexing assumes it.
+            W_raw = sparse(rmt.W);
             if obj.rescale_by_abscissa
                 abscissa = max(real(eig(full(W_raw))));
                 if abs(abscissa) <= eps
@@ -908,6 +1111,30 @@ classdef SRNNCellTypePairs < handle
 
     %% State layout, dynamics, and Jacobian
     methods (Static)
+        function names = activation_names()
+            % ACTIVATION_NAMES Valid values of the `activation` property.
+            names = {'logistic', 'piecewise', 'tanh'};
+        end
+
+        function check_activation_custom(c)
+            % CHECK_ACTIVATION_CUSTOM Validate the escape-hatch {fn, dfn} pair.
+            ok = iscell(c) && numel(c) == 2 && ...
+                all(cellfun(@(h) isa(h, 'function_handle'), c));
+            if ~ok
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    ['activation_custom must be a 1x2 cell of function handles, ' ...
+                    '{phi, phi_derivative}, or empty to use the named `activation`.']);
+            end
+        end
+
+        function val = scale_tilde_mat(rel, F)
+            % SCALE_TILDE_MAT Elementwise rel*F, keeping exact zeros at zero.
+            % A disconnected network has alpha = 0 hence F = Inf, and 0*Inf would
+            % be NaN, which would then poison W.
+            val = rel * F;
+            val(rel == 0) = 0;
+        end
+
         function layout = make_state_layout(n, counts, n_a, n_b, n_g)
             C = numel(counts);
             layout = struct('a', {cell(1, C)}, 'b', {cell(1, C)}, ...

@@ -520,9 +520,22 @@ classdef SRNNCellTypes < handle
 
         function build_network(obj)
             rng(obj.rng_seeds(1));
-            rmt = RMTCellTypes(obj.n, obj.alpha, obj.f, ...
-                obj.mu_tilde, obj.sigma_tilde);
-            W_raw = rmt.W;
+            % RMTBlocks rather than RMTCellTypes so all three model classes share
+            % one generator. The tildes here are per-PREsynaptic-type, so they are
+            % broadcast down the columns, which is the column-uniform case
+            % RMTBlocks reduces to exactly. This also fixes the RNG order:
+            % RMTCellTypes drew rand-then-randn while RMTBlocks (like RMTMatrix in
+            % SRNNModel2) draws randn-then-rand, so a matched seed now gives the
+            % same W in every class.
+            rmt = RMTBlocks(obj.n);
+            rmt.alpha = obj.alpha;
+            rmt.f = obj.f;
+            rmt.mu_tilde = repmat(reshape(obj.mu_tilde, 1, []), obj.n_cellTypes, 1);
+            rmt.sigma_tilde = repmat(reshape(obj.sigma_tilde, 1, []), obj.n_cellTypes, 1);
+            % RMTBlocks returns a DENSE matrix where RMTCellTypes returned a
+            % sparse one. Restore sparse storage: this class is built for sparse
+            % connectivity and its state indexing assumes it.
+            W_raw = sparse(rmt.W);
             if obj.rescale_by_abscissa
                 abscissa = max(real(eig(full(W_raw))));
                 if abs(abscissa) <= eps
