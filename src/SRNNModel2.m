@@ -41,6 +41,26 @@ classdef SRNNModel2 < handle
         sigma_E_tilde_relative =  1     % Normalized excitatory std dev, in multiples of F
         sigma_I_tilde_relative =  1     % Normalized inhibitory std dev, in multiples of F
         E_W_relative           =  0     % Mean offset (multiples of F): added to both mu tildes
+
+        % BLOCK overrides, indexed (POSTsynaptic, PREsynaptic) as in RMTBlocks.
+        % Empty means "use the column shorthand above", i.e. the value depends
+        % only on the presynaptic type, which is the classical Harris (2023)
+        % setting. Setting one of these lets, say, E->E differ from E->I:
+        %
+        %   mu_EE = E receives from E      mu_EI = E receives from I
+        %   mu_IE = I receives from E      mu_II = I receives from I
+        %
+        % Dale's law is a COLUMN constraint, so signs must stay constant down
+        % each column (mu_EE and mu_IE share the sign of mu_E_tilde_relative).
+        % Like the shorthands, these are multiples of F.
+        mu_EE_relative    = []
+        mu_EI_relative    = []
+        mu_IE_relative    = []
+        mu_II_relative    = []
+        sigma_EE_relative = []
+        sigma_EI_relative = []
+        sigma_IE_relative = []
+        sigma_II_relative = []
         zrs_mode = 'none'           % ZRS mode: 'none', 'ZRS', 'SZRS', 'Partial_SZRS'
 
         % Which network F is computed for. When true (default), F follows the
@@ -149,6 +169,9 @@ classdef SRNNModel2 < handle
         sigma_E_tilde       % Normalized excitatory std dev = sigma_E_tilde_relative * F
         sigma_I_tilde       % Normalized inhibitory std dev = sigma_I_tilde_relative * F
         E_W                 % Mean offset added to both mu tildes = E_W_relative * F
+        mu_tilde_block      % 2x2 absolute block means (post, pre), including E_W
+        sigma_tilde_block   % 2x2 absolute block std devs (post, pre)
+        lambda_O            % Outlier eigenvalues of E[W], by descending magnitude
         activation_function            % Nonlinearity handle, built from activation + S_a/S_c
         activation_function_derivative % Its derivative, built the same way
         mu_se               % Sparse excitatory mean
@@ -293,6 +316,56 @@ classdef SRNNModel2 < handle
             val = SRNNModel2.scale_tilde(obj.E_W_relative, obj.default_val);
         end
 
+        function val = f_vector(obj)
+            % Population fractions as the 1 x 2 row [f_E, f_I] that the block
+            % formulas expect (they scale COLUMNS, i.e. presynaptic types).
+            val = [obj.f, 1 - obj.f];
+        end
+
+        function val = block_mu_s(obj)
+            % Sparse-effective block means, Harris Eq. (15) blockwise.
+            val = obj.alpha * obj.mu_tilde_block;
+        end
+
+        function val = block_sigma_s_sq(obj)
+            % Sparse-effective block variances, Harris Eq. (16) blockwise. The
+            % first term is why sparsity couples the MEAN into the bulk radius.
+            mg = obj.mu_tilde_block;
+            sg = obj.sigma_tilde_block;
+            val = obj.alpha * (1 - obj.alpha) * mg.^2 + obj.alpha * sg.^2;
+        end
+
+        function val = get.mu_tilde_block(obj)
+            % 2x2 absolute block means, (post, pre). A block override wins over
+            % the column shorthand; E_W is added to every entry, as it was when
+            % this was two scalars.
+            rel = [SRNNModel2.pick(obj.mu_EE_relative, obj.mu_E_tilde_relative), ...
+                   SRNNModel2.pick(obj.mu_EI_relative, obj.mu_I_tilde_relative); ...
+                   SRNNModel2.pick(obj.mu_IE_relative, obj.mu_E_tilde_relative), ...
+                   SRNNModel2.pick(obj.mu_II_relative, obj.mu_I_tilde_relative)];
+            val = SRNNModel2.scale_tilde_mat(rel, obj.default_val) + obj.E_W;
+        end
+
+        function val = get.sigma_tilde_block(obj)
+            rel = [SRNNModel2.pick(obj.sigma_EE_relative, obj.sigma_E_tilde_relative), ...
+                   SRNNModel2.pick(obj.sigma_EI_relative, obj.sigma_I_tilde_relative); ...
+                   SRNNModel2.pick(obj.sigma_IE_relative, obj.sigma_E_tilde_relative), ...
+                   SRNNModel2.pick(obj.sigma_II_relative, obj.sigma_I_tilde_relative)];
+            val = SRNNModel2.scale_tilde_mat(rel, obj.default_val);
+        end
+
+        function val = get.lambda_O(obj)
+            % Outlier eigenvalues of E[W], descending by MAGNITUDE (an outlier is
+            % defined by lying outside the bulk disk, and in an
+            % inhibition-dominated network the dominant one is large and
+            % negative). Generalizes Harris Eq. (17); see RMTBlocks.lambda_O.
+            % Scaled by level_of_chaos because build_network multiplies W by it.
+            K = obj.n * (obj.f_vector .* obj.block_mu_s);
+            lam = eig(K) * obj.level_of_chaos;
+            [~, order] = sort(abs(lam), 'descend');
+            val = lam(order);
+        end
+
         function val = get.activation_function(obj)
             val = obj.build_activation(1);
         end
@@ -322,11 +395,14 @@ classdef SRNNModel2 < handle
         end
         
         function val = get.R(obj)
-            if isnan(obj.sigma_se) || isnan(obj.sigma_si)
-                val = NaN;
-            else
-                val = sqrt(obj.n * (obj.f * obj.sigma_se^2 + (1 - obj.f) * obj.sigma_si^2)) * obj.level_of_chaos;
-            end
+            % Bulk spectral radius. Generalizes Harris Eq. (18) to block
+            % statistics: the transition is at the Perron root of the block
+            % variance matrix V(a,b) = n * f_b * sigma_s_sq(a,b), and R is its
+            % square root (see RMTBlocks.R). Reduces exactly to the old
+            % column-uniform formula, since every row of V is then identical and
+            % the dominant eigenvalue is the trace.
+            V = obj.n * (obj.f_vector .* obj.block_sigma_s_sq);
+            val = sqrt(max(0, max(real(eig(V))))) * obj.level_of_chaos;
         end
         
         function val = get.n_E(obj)
@@ -1081,16 +1157,24 @@ classdef SRNNModel2 < handle
                 obj.tau_a_I = logspace(log10(0.25), log10(10), obj.n_a_I);
             end
             
-            % Create W matrix using RMTMatrix
-            rmt = RMTMatrix(obj.n);
+            % Create W matrix using RMTBlocks, which indexes the statistics by
+            % BOTH postsynaptic (row) and presynaptic (column) type, so E->E can
+            % differ from E->I. With no block overrides set the blocks are
+            % column-uniform and this reproduces the old RMTMatrix result
+            % exactly -- including bit-for-bit, since RMTBlocks consumes the RNG
+            % in the same order (randn(N) then rand(N) via update_sparsity).
+            %
+            % g_mu / g_sigma are left at 1: level_of_chaos is still applied to
+            % the assembled W below, because rescale_by_abscissa divides by the
+            % abscissa BEFORE that multiply and folding the scale into the
+            % generator would not be equivalent.
+            rmt = RMTBlocks(obj.n);
             rmt.alpha = obj.alpha;
             rmt.f = obj.f;
-            rmt.mu_tilde_e = obj.mu_E_tilde + obj.E_W;
-            rmt.mu_tilde_i = obj.mu_I_tilde + obj.E_W;
-            rmt.sigma_tilde_e = obj.sigma_E_tilde;
-            rmt.sigma_tilde_i = obj.sigma_I_tilde;
+            rmt.mu_tilde = obj.mu_tilde_block;
+            rmt.sigma_tilde = obj.sigma_tilde_block;
             rmt.zrs_mode = obj.zrs_mode;
-            
+
             W_raw = rmt.W;
             
             % Scale W
@@ -3089,6 +3173,19 @@ classdef SRNNModel2 < handle
                     ['activation_custom must be a 1x2 cell of function handles, ' ...
                     '{phi, phi_derivative}, or empty to use the named `activation`.']);
             end
+        end
+
+        function val = pick(override, fallback)
+            % PICK The block override when set, else the column shorthand.
+            if isempty(override), val = fallback; else, val = override; end
+        end
+
+        function val = scale_tilde_mat(rel, F)
+            % SCALE_TILDE_MAT Elementwise rel*F, keeping exact zeros at zero.
+            % Same rationale as scale_tilde: alpha = 0 gives F = Inf, and 0*Inf
+            % would be NaN.
+            val = rel * F;
+            val(rel == 0) = 0;
         end
 
         function val = scale_tilde(relative, F)
