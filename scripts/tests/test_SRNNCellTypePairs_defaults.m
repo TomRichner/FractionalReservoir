@@ -50,10 +50,36 @@ model = SRNNCellTypePairs( ...
 model.ode_solver = @ode_rk4;
 model.fs = 200;
 
-%% Build, run, and plot
+% plot_eigenvalues reads the Jacobian off the full trajectory, so the full state
+% has to be kept. At n=300 over [0 20] at fs=200 that is ~4001 x N_sys_eqs
+% doubles -- tens of MB, fine here, but drop it if you scale n up.
+model.store_full_state = true;
+
+%% Build and run
 model.build();
 model.run();
-model.plot();
+
+%% Plots
+model.plot();                       % compact summary: one panel per quantity
+
+% Per-cell-type view: one COLUMN per type, every individual neuron trace, with
+% b and g collapsed across routes as prod(b) and coloured by target type.
+model.plot_celltypes();
+
+% Effective-Jacobian spectrum at three times: early (still settling), middle,
+% and late. Watch whether adaptation pulls eigenvalues back inside the unit
+% circle as the network engages.
+model.plot_eigenvalues([2 10 18]);
+
+% Eigenvalues of W itself. This is where a raised mu_EE shows up directly --
+% the outlier leaving the bulk disk of radius R, rather than only as the
+% lambda_O number printed below.
+model.plot_W_spectrum();
+
+% Weight distribution per cell type. The negative tail on the E columns is the
+% Gaussian sampler, not a bug: Dale's law here is statistical, so a fraction
+% ~normcdf(-mu_tilde/sigma_tilde) of E synapses come out negative.
+model.plot_weight_histogram();
 
 %% Report the RMT predictions the block generator provides
 fprintf('\n=== SRNNCellTypePairs defaults ===\n');
