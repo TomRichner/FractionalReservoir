@@ -14,16 +14,25 @@
 % ode_solver=@ode45, f=0.5, rng_seeds=[1 2]). ode45 is required: the QR
 % variational step integrates on a 2-point span that ode_rk4 rejects.
 %
-% T_range starts negative ([-15, 15]) so the settling transient happens at
-% t<0. Both Lyapunov methods gate their accumulation at t>=0, so the reported
-% (finite-time) exponent averages only the post-transient window [0, 15].
+% T_range starts negative ([-10, 15]) so the settling transient happens at
+% t<0. Both methods accumulate over lya_T_interval, which defaults here to
+% [T_range(1)+15, T_range(2)] = [5, 15], and both iterate for lya_warmup
+% seconds before that so the perturbation / basis can align first.
+%
+% lya_warmup is raised to 10 s here rather than left at the class default of
+% 5. This test cross-validates two independent algorithms, so both must be run
+% at CONVERGED settings or it measures warmup bias instead of method
+% agreement. On this network QR is still ~12% from its plateau at 5 s of
+% warmup while Benettin is within 0.2% (see the table on SRNNModel2.lya_warmup);
+% at 10 s both have plateaued.
 
 close all; clear; clc;
 
 %% Shared configuration
 % Same rng_seeds (default [1 2]) => identical W, stimulus, and fiducial
 % trajectory for both models; only the Lyapunov computation differs.
-common = {'n', 40, 'indegree', 20, 'n_a_E', 3, 'n_b_E', 1, 'T_range', [-10, 15]};
+common = {'n', 40, 'indegree', 20, 'n_a_E', 3, 'n_b_E', 1, ...
+    'T_range', [-10, 15], 'lya_warmup', 10};
 
 %% Benettin
 fprintf('\n=== Benettin (largest Lyapunov exponent) ===\n');

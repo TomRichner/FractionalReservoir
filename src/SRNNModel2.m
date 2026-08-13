@@ -12,7 +12,7 @@ classdef SRNNModel2 < handle
     %   - compute_lyapunov_exponents_internal (static) - main Lyapunov dispatcher
     %   - benettin_algorithm_internal (static) - Benettin's LLE algorithm
     %   - lyapunov_spectrum_qr_internal (static) - QR full spectrum method
-    %   - get_minMaxRange_internal (static) - state bounds for Benettin
+    %   - lyapunov_sample_grid (static) - shared Benettin/QR segment grid
     %   - compute_kaplan_yorke_dimension_internal (static) - Kaplan-Yorke dimension
     %
     % Usage:
@@ -173,6 +173,35 @@ classdef SRNNModel2 < handle
     properties
         lya_method = 'benettin'     % Lyapunov method: 'benettin', 'qr', or 'none'
         lya_T_interval              % Time interval for Lyapunov computation
+
+        % Seconds of Lyapunov iteration BEFORE lya_T_interval(1) used to let the
+        % Benettin perturbation (or the QR basis Q) align with the leading
+        % direction. Nothing is accumulated during it, so it costs compute and
+        % buys alignment. Iteration starts at
+        %
+        %   max(T_range(1), lya_T_interval(1) - lya_warmup)
+        %
+        % i.e. the request is CLAMPED to the data that exists rather than
+        % abandoned: if the simulation does not start early enough, the warmup
+        % is shortened (with a warning) instead of dropped, since the samples
+        % before the accumulation window are free alignment either way.
+        %
+        % TOO SHORT A WARMUP BIASES THE EXPONENT, and the two methods do not
+        % need the same amount. Measured on the test_benettin_vs_qr network
+        % (n=40, indegree=20, n_a_E=3, n_b_E=1, T_range=[-10,15]):
+        %
+        %   warmup:   0.5s     1s      2s      5s     10s     25s
+        %   Benettin -0.1318 -0.1177 -0.1062 -0.1015 -0.1013 -0.1013
+        %   QR            -       -  -0.2197 -0.1121 -0.1004 -0.1003
+        %
+        % Convergence tracks PHYSICAL time (the spectral gap), not the number
+        % of renormalisations: QR reaches its plateau at the same ~10 s as
+        % Benettin despite taking 5x fewer steps to get there. The default of 5
+        % is comfortable for Benettin (0.2% from plateau) but NOT converged for
+        % QR (~12% out) -- raise it for QR work, and expect systems with slow
+        % adaptation (the tau_a sweeps reach 60 s) to need more still.
+        lya_warmup = 5
+
         filter_local_lya = false    % Whether to filter local Lyapunov exponent
         lya_filter_order = 2        % Butterworth filter order
         lya_filter_cutoff = 0.25    % Normalized cutoff frequency (fraction of Nyquist)
@@ -565,7 +594,7 @@ classdef SRNNModel2 < handle
             rhs = @(t, S) SRNNModel2.dynamics_fast(t, S, params);
             
             fprintf('Computing Lyapunov exponents using %s method\n', obj.lya_method);
-            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, params, obj.ode_opts, obj.ode_solver, rhs, obj.t_ex, obj.u_ex);
+            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, params, obj.ode_opts, obj.ode_solver, rhs);
             
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
@@ -2232,7 +2261,7 @@ classdef SRNNModel2 < handle
         % =====================================================================
         % Internalized from ConnectivityAdaptation to avoid path conflicts.
         
-        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, params, opts, ode_solver, rhs_func, t_ex, u_ex)
+        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, lya_warmup, params, opts, ode_solver, rhs_func)
             % Compute Lyapunov exponents using Benettin or QR method.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/compute_lyapunov_exponents.m
             
@@ -2268,7 +2297,7 @@ classdef SRNNModel2 < handle
                     fprintf('Computing largest Lyapunov exponent using Benettin''s algorithm...\n');
                     d0 = 1e-3;
                     tic
-                    [LLE, local_lya, finite_lya, t_lya] = SRNNModel2.benettin_algorithm_internal(S_out, t_out, dt, fs, d0, T_interval, lya_dt, params, opts, rhs_func, t_ex, u_ex, ode_solver);
+                    [LLE, local_lya, finite_lya, t_lya] = SRNNModel2.benettin_algorithm_internal(S_out, t_out, dt, fs, d0, T_interval, lya_dt, lya_warmup, opts, rhs_func, ode_solver);
                     toc
                     lya_results.LLE = LLE;
                     lya_results.local_lya = local_lya;
@@ -2281,7 +2310,7 @@ classdef SRNNModel2 < handle
                     fprintf('Computing full Lyapunov spectrum using QR decomposition method...\n');
                     tic
                     jacobian_wrapper = @(tt, S, p) SRNNModel2.compute_Jacobian_fast(S, p);
-                    [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya] = SRNNModel2.lyapunov_spectrum_qr_internal(S_out, t_out, lya_dt, params, ode_solver, opts, jacobian_wrapper, T_interval, params.N_sys_eqs, fs);
+                    [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya] = SRNNModel2.lyapunov_spectrum_qr_internal(S_out, t_out, lya_dt, params, ode_solver, opts, jacobian_wrapper, T_interval, lya_warmup, params.N_sys_eqs, fs);
                     toc
                     fprintf('Lyapunov Dimension: %.2f\n', SRNNModel2.compute_kaplan_yorke_dimension_internal(LE_spectrum));
                     lya_results.LE_spectrum = LE_spectrum;
@@ -2304,63 +2333,55 @@ classdef SRNNModel2 < handle
             end
         end
         
-        function [LLE, local_lya, finite_lya, t_lya] = benettin_algorithm_internal(X, t, dt, fs, d0, T, lya_dt, params, ode_options, dynamics_func, t_ex, u_ex, ode_solver)
+        function [LLE, local_lya, finite_lya, t_lya] = benettin_algorithm_internal(X, t, dt, fs, d0, T, lya_dt, lya_warmup, ode_options, dynamics_func, ode_solver)
             % Benettin's algorithm to compute the largest Lyapunov exponent.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/benettin_algorithm.m
-            
+            %
+            % T is lya_T_interval. Accumulation runs over [max(0,T(1)), T(2)];
+            % iteration starts lya_warmup seconds earlier so the perturbation
+            % can align with the leading direction first.
+
             if ~isscalar(lya_dt) || ~isnumeric(lya_dt) || lya_dt <= 0
                 error('lya_dt must be a positive scalar.');
             end
-            
+
             deci_lya = round(lya_dt * fs);
             if deci_lya < 1
                 error('lya_dt * fs must result in at least 1 sample per Lyapunov interval.');
             end
-            
+
             tau_lya = dt * deci_lya;
-            t_lya = t(1:deci_lya:end);
-            
-            if t_lya(end) + tau_lya > T(2)
-                t_lya(end) = [];
-            end
+            tol = dt * 1e-6;
+
+            [idx_all, t_lya, acc_start] = SRNNModel2.lyapunov_sample_grid( ...
+                t, dt, deci_lya, tau_lya, T, lya_warmup, 'SRNNModel');
             nt_lya = numel(t_lya);
-            
+
             local_lya = zeros(nt_lya, 1);
             finite_lya = nan(nt_lya, 1);
             sum_log_stretching_factors = 0;
-            
+
             n_state = size(X, 2);
             rnd_IC = randn(n_state, 1);
             pert = (rnd_IC ./ norm(rnd_IC)) .* d0;
-            
-            min_max_range = SRNNModel2.get_minMaxRange_internal(params);
-            min_bnds = min_max_range(:, 1);
-            max_bnds = min_max_range(:, 2);
-            
+
             for k = 1:nt_lya
-                idx_start = (k - 1) * deci_lya + 1;
+                idx_start = idx_all(k);
                 idx_end = idx_start + deci_lya;
-                
-                X_start = X(idx_start, :).';
-                X_k_pert = X_start + pert;
-                
-                idx_violates_min = ~isnan(min_bnds) & (X_k_pert < min_bnds);
-                X_k_pert(idx_violates_min) = min_bnds(idx_violates_min);
-                
-                idx_violates_max = ~isnan(max_bnds) & (X_k_pert > max_bnds);
-                X_k_pert(idx_violates_max) = max_bnds(idx_violates_max);
-                
+
+                X_k_pert = X(idx_start, :).' + pert;
+
                 t_seg_detailed = t_lya(k) + (0:dt:tau_lya);
-                
+
                 [~, X_pert_output_all_steps] = ode_solver(dynamics_func, t_seg_detailed, X_k_pert, ode_options);
-                
+
                 X_pert_end = X_pert_output_all_steps(end, :).';
                 X_end = X(idx_end, :).';
-                
+
                 delta = X_pert_end - X_end;
                 d_k = norm(delta);
                 local_lya(k) = log(d_k / d0) / tau_lya;
-                
+
                 if ~isfinite(local_lya(k))
                     warning('System diverged at t=%f. Truncating results.', t_lya(k));
                     if k > 1
@@ -2379,27 +2400,92 @@ classdef SRNNModel2 < handle
                     t_lya(k:end) = [];
                     return;
                 end
-                
+
                 pert = (delta ./ d_k) .* d0;
-                
-                if t_lya(k) >= 0
+
+                % Accumulate only inside lya_T_interval; the warmup samples
+                % before acc_start align the perturbation but do not count.
+                if t_lya(k) >= acc_start - tol && t_lya(k) < T(2)
                     sum_log_stretching_factors = sum_log_stretching_factors + log(d_k / d0);
-                    finite_lya(k, 1) = sum_log_stretching_factors / max(t_lya(k) + tau_lya, eps);
+                    elapsed = t_lya(k) + tau_lya - acc_start;
+                    finite_lya(k, 1) = sum_log_stretching_factors / max(elapsed, eps);
                 end
             end
-            
+
             last_valid = finite_lya(~isnan(finite_lya));
             if ~isempty(last_valid)
                 LLE = last_valid(end);
             else
+                % Segments existed but none fell inside the window. Reporting a
+                % bare 0 here would read as "edge of chaos" rather than "not
+                % measured", so say what happened.
+                warning('SRNNModel:LyapunovWindowEmpty', ...
+                    ['No Lyapunov segment fell inside lya_T_interval = [%g, %g] ' ...
+                     '(segment length %g s); LLE is reported as 0. Widen the ' ...
+                     'window or reduce lya_dt.'], T(1), T(2), tau_lya);
                 LLE = 0;
             end
         end
+
+        function [idx_all, t_lya, acc_start] = lyapunov_sample_grid(t, dt, deci_lya, tau_lya, T, lya_warmup, err_id_prefix)
+            % Shared Benettin/QR sample grid: which trajectory rows start a
+            % Lyapunov segment, and where accumulation begins.
+            %
+            % Accumulation begins at acc_start = max(0, T(1)) -- lya_T_interval
+            % is honoured, and a negative T_range pre-window is never counted.
+            % Iteration begins lya_warmup seconds earlier, CLAMPED to t(1): a
+            % warmup that would reach before the simulation start is shortened
+            % (with a warning) rather than dropped, because those samples are
+            % free alignment. Segments that would run past the data or past
+            % T(2) are trimmed.
+
+            tol = dt * 1e-6;
+            acc_start = max(0, T(1));
+
+            requested_start = acc_start - lya_warmup;
+            if requested_start < t(1) - tol
+                available = max(0, acc_start - t(1));
+                if lya_warmup > 0
+                    warning([err_id_prefix ':LyapunovWarmupClamped'], ...
+                        ['lya_warmup = %g s would start the Lyapunov iteration at ' ...
+                         't = %g s, before the simulation start t = %g s. Using %g s ' ...
+                         'of warmup instead.'], ...
+                        lya_warmup, requested_start, t(1), available);
+                end
+                i_start = 1;
+            else
+                i_start = round((requested_start - t(1)) / dt) + 1;
+                i_start = max(1, min(i_start, numel(t)));
+            end
+
+            idx_all = i_start:deci_lya:numel(t);
+            t_lya = t(idx_all);
+            t_lya = t_lya(:);
+
+            % A segment needs deci_lya further samples, and must not extend
+            % past the end of the requested Lyapunov window.
+            last_allowed = min(t(end), T(2));
+            keep = (idx_all + deci_lya <= numel(t)) & ...
+                (t_lya(:).' + tau_lya <= last_allowed + tol);
+            idx_all = idx_all(keep);
+            t_lya = t_lya(keep);
+
+            if isempty(t_lya)
+                error([err_id_prefix ':NoLyapunovIntervals'], ...
+                    ['No Lyapunov intervals fit in lya_T_interval = [%g, %g] with ' ...
+                     'lya_dt giving tau = %g s over a trajectory spanning [%g, %g].'], ...
+                    T(1), T(2), tau_lya, t(1), t(end));
+            end
+        end
         
-        function [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya_vec] = lyapunov_spectrum_qr_internal(X_fid_traj, t_fid_traj, lya_dt_interval, params, ode_solver, ode_options_main, jacobian_func_handle, T_full_interval, N_states_sys, fs_fid)
+        function [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya_vec] = lyapunov_spectrum_qr_internal(X_fid_traj, t_fid_traj, lya_dt_interval, params, ode_solver, ode_options_main, jacobian_func_handle, T_full_interval, lya_warmup, N_states_sys, fs_fid)
             % QR method for full Lyapunov spectrum.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/lyapunov_spectrum_qr.m
-            
+            %
+            % Honours T_full_interval (= lya_T_interval) the same way Benettin
+            % does: accumulate over [max(0,T(1)), T(2)], iterate from lya_warmup
+            % seconds earlier so Q can align with the leading subspace first.
+
             fiducial_interpolants = cell(N_states_sys, 1);
             for i = 1:N_states_sys
                 fiducial_interpolants{i} = griddedInterpolant(t_fid_traj, X_fid_traj(:, i), 'pchip');
@@ -2423,23 +2509,11 @@ classdef SRNNModel2 < handle
             end
             tau_lya = dt_fid * deci_lya;
             
-            t_lya_indices = 1:deci_lya:length(t_fid_traj);
-            t_lya_vec = t_fid_traj(t_lya_indices);
-            
-            if ~isempty(t_lya_vec) && (t_lya_vec(end) + tau_lya > t_fid_traj(end) + eps(t_fid_traj(end)))
-                t_lya_vec(end) = [];
-                t_lya_indices(end) = [];
-            end
-            
+            [~, t_lya_vec, acc_start] = SRNNModel2.lyapunov_sample_grid( ...
+                t_fid_traj, dt_fid, deci_lya, tau_lya, T_full_interval, lya_warmup, 'SRNNModel');
+            tol_acc = dt_fid * 1e-6;
             nt_lya = numel(t_lya_vec);
-            if nt_lya == 0
-                warning('No Lyapunov intervals could be formed.');
-                LE_spectrum = nan(N_states_sys, 1);
-                local_LE_spectrum_t = [];
-                finite_LE_spectrum_t = [];
-                return;
-            end
-            
+
             Q_current = eye(N_states_sys);
             sum_log_R_diag = zeros(N_states_sys, 1);
             
@@ -2498,14 +2572,18 @@ classdef SRNNModel2 < handle
                 current_local_LEs(~valid_diag_R) = -Inf;
                 local_LE_spectrum_t(k, :) = current_local_LEs';
                 
-                if t_start_segment >= -eps(0)
+                % Accumulate only inside lya_T_interval; the warmup segments
+                % before acc_start align Q but do not count.
+                in_window = t_start_segment >= acc_start - tol_acc && ...
+                    t_start_segment < T_full_interval(2);
+                if in_window
                     sum_log_R_diag(valid_diag_R) = sum_log_R_diag(valid_diag_R) + log_abs_diag_R(valid_diag_R);
                     total_positive_time_accumulated = total_positive_time_accumulated + current_segment_duration;
                 end
-                
+
                 if total_positive_time_accumulated > eps
                     finite_LE_spectrum_t(k, :) = (sum_log_R_diag / total_positive_time_accumulated)';
-                elseif k > 1 && t_start_segment >= -eps(0)
+                elseif k > 1 && in_window
                     finite_LE_spectrum_t(k, :) = finite_LE_spectrum_t(k-1, :);
                 else
                     finite_LE_spectrum_t(k, :) = NaN;
@@ -2532,27 +2610,6 @@ classdef SRNNModel2 < handle
             Psi_matrix = reshape(current_Psi_vec, [N_states_sys, N_states_sys]);
             dPsi_matrix_dt = J_matrix * Psi_matrix;
             dPsi_vec_dt = reshape(dPsi_matrix_dt, [], 1);
-        end
-        
-        function min_max_range = get_minMaxRange_internal(params)
-            % Returns bounds per state variable for the SRNN state vector.
-            % By default no hard bounds (NaN), but vector matches state layout.
-            n = params.n;
-            n_E = params.n_E;
-            n_I = params.n_I;
-            n_a_E = params.n_a_E;
-            n_a_I = params.n_a_I;
-            n_b_E = params.n_b_E;
-            n_b_I = params.n_b_I;
-            
-            len_a_E = n_E * n_a_E;
-            len_a_I = n_I * n_a_I;
-            len_b_E = n_E * n_b_E;
-            len_b_I = n_I * n_b_I;
-            len_x = n;
-            
-            N_sys_eqs = len_a_E + len_a_I + len_b_E + len_b_I + len_x;
-            min_max_range = nan(N_sys_eqs, 2);
         end
         
         function D_KY = compute_kaplan_yorke_dimension_internal(lambda)

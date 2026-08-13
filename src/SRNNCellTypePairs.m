@@ -110,6 +110,13 @@ classdef SRNNCellTypePairs < handle
         reps = 1
         lya_method = 'benettin'
         lya_T_interval
+        % Seconds of Lyapunov iteration before lya_T_interval(1) during which
+        % the perturbation (Benettin) or basis Q (QR) aligns with the leading
+        % direction without accumulating. Clamped to T_range(1) with a warning
+        % when the run does not start early enough. Too short a warmup biases
+        % the exponent, and QR needs more of it than Benettin -- see
+        % SRNNModel2.lya_warmup for the measured convergence table.
+        lya_warmup = 5
         filter_local_lya = false
         lya_filter_order = 2
         lya_filter_cutoff = 0.25
@@ -467,7 +474,8 @@ classdef SRNNCellTypePairs < handle
             rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, params);
             obj.lya_results = SRNNCellTypePairs.compute_lyapunov_exponents_internal( ...
                 obj.lya_method, obj.S_out, obj.t_out, 1 / obj.fs, obj.fs, ...
-                obj.lya_T_interval, params, obj.ode_opts, obj.ode_solver, rhs);
+                obj.lya_T_interval, obj.lya_warmup, params, obj.ode_opts, ...
+                obj.ode_solver, rhs);
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
@@ -2245,7 +2253,7 @@ classdef SRNNCellTypePairs < handle
     %% Lyapunov algorithms
     methods (Static, Access = protected)
         function results = compute_lyapunov_exponents_internal(method, S_out, t_out, ...
-                dt, fs, interval, params, opts, ode_solver, rhs)
+                dt, fs, interval, lya_warmup, params, opts, ode_solver, rhs)
             results = struct();
             switch lower(method)
                 case 'benettin'
@@ -2266,8 +2274,8 @@ classdef SRNNCellTypePairs < handle
 
             if strcmpi(method, 'benettin')
                 [LLE, local, finite, times] = SRNNCellTypePairs.benettin_algorithm_internal( ...
-                    S_out, t_out, dt, fs, 1e-3, interval, lya_dt, ...
-                    params, opts, rhs, ode_solver);
+                    S_out, t_out, dt, fs, 1e-3, interval, lya_dt, lya_warmup, ...
+                    opts, rhs, ode_solver);
                 results.LLE = LLE;
                 results.local_lya = local;
                 results.finite_lya = finite;
@@ -2275,7 +2283,8 @@ classdef SRNNCellTypePairs < handle
             else
                 [spectrum, local, finite, times] = ...
                     SRNNCellTypePairs.lyapunov_spectrum_qr_internal( ...
-                    S_out, t_out, lya_dt, params, ode_solver, opts, fs);
+                    S_out, t_out, lya_dt, interval, lya_warmup, params, ...
+                    ode_solver, opts, fs);
                 [spectrum, order] = sort(real(spectrum), 'descend');
                 results.LE_spectrum = spectrum;
                 results.local_LE_spectrum_t = local(:, order);
@@ -2292,14 +2301,18 @@ classdef SRNNCellTypePairs < handle
 
         function [LLE, local_lya, finite_lya, t_lya] = ...
                 benettin_algorithm_internal(X, t, dt, fs, d0, interval, ...
-                lya_dt, ~, ode_options, dynamics_func, ode_solver)
+                lya_dt, lya_warmup, ode_options, dynamics_func, ode_solver)
+            % Accumulation runs over [max(0,interval(1)), interval(2)];
+            % iteration starts lya_warmup seconds earlier so the perturbation
+            % can align with the leading direction first.
             decimation = round(lya_dt * fs);
             tau = dt * decimation;
-            t_lya = t(1:decimation:end);
-            if ~isempty(t_lya) && t_lya(end) + tau > t(end)
-                t_lya(end) = [];
-            end
+            tol = dt * 1e-6;
+
+            [idx_all, t_lya, acc_start] = SRNNCellTypePairs.lyapunov_sample_grid( ...
+                t, dt, decimation, tau, interval, lya_warmup);
             n_intervals = numel(t_lya);
+
             local_lya = zeros(n_intervals, 1);
             finite_lya = nan(n_intervals, 1);
             perturbation = randn(size(X, 2), 1);
@@ -2307,7 +2320,7 @@ classdef SRNNCellTypePairs < handle
             accumulated = 0;
 
             for k = 1:n_intervals
-                start_index = (k - 1) * decimation + 1;
+                start_index = idx_all(k);
                 end_index = start_index + decimation;
                 perturbed_start = X(start_index, :)' + perturbation;
                 detailed_times = t_lya(k) + (0:dt:tau);
@@ -2325,19 +2338,79 @@ classdef SRNNCellTypePairs < handle
                     break;
                 end
                 perturbation = d0 .* delta ./ distance;
-                if t_lya(k) >= max(0, interval(1)) && t_lya(k) < interval(2)
+                if t_lya(k) >= acc_start - tol && t_lya(k) < interval(2)
                     accumulated = accumulated + log(distance / d0);
-                    elapsed = t_lya(k) + tau - max(0, interval(1));
+                    elapsed = t_lya(k) + tau - acc_start;
                     finite_lya(k) = accumulated / max(elapsed, eps);
                 end
             end
             valid = finite_lya(isfinite(finite_lya));
-            if isempty(valid), LLE = 0; else, LLE = valid(end); end
+            if isempty(valid)
+                % See SRNNModel2: a bare 0 would read as "edge of chaos"
+                % rather than "not measured".
+                warning('SRNNCellTypePairs:LyapunovWindowEmpty', ...
+                    ['No Lyapunov segment fell inside lya_T_interval = [%g, %g] ' ...
+                     '(segment length %g s); LLE is reported as 0. Widen the ' ...
+                     'window or reduce lya_dt.'], interval(1), interval(2), tau);
+                LLE = 0;
+            else
+                LLE = valid(end);
+            end
+        end
+
+        function [idx_all, t_lya, acc_start] = lyapunov_sample_grid( ...
+                t, dt, decimation, tau, interval, lya_warmup)
+            % Shared Benettin/QR segment grid. Twin of
+            % SRNNModel2.lyapunov_sample_grid -- the two classes are duck-typed
+            % siblings, so each carries its own copy.
+            %
+            % Accumulation begins at acc_start = max(0, interval(1)), so
+            % lya_T_interval is honoured and a negative T_range pre-window never
+            % counts. Iteration begins lya_warmup seconds earlier, CLAMPED to
+            % t(1): a warmup reaching before the simulation start is shortened
+            % (with a warning) rather than dropped.
+            tol = dt * 1e-6;
+            acc_start = max(0, interval(1));
+
+            requested_start = acc_start - lya_warmup;
+            if requested_start < t(1) - tol
+                if lya_warmup > 0
+                    warning('SRNNCellTypePairs:LyapunovWarmupClamped', ...
+                        ['lya_warmup = %g s would start the Lyapunov iteration at ' ...
+                         't = %g s, before the simulation start t = %g s. Using %g s ' ...
+                         'of warmup instead.'], ...
+                        lya_warmup, requested_start, t(1), max(0, acc_start - t(1)));
+                end
+                i_start = 1;
+            else
+                i_start = round((requested_start - t(1)) / dt) + 1;
+                i_start = max(1, min(i_start, numel(t)));
+            end
+
+            idx_all = i_start:decimation:numel(t);
+            t_lya = t(idx_all);
+            t_lya = t_lya(:);
+
+            last_allowed = min(t(end), interval(2));
+            keep = (idx_all + decimation <= numel(t)) & ...
+                (t_lya(:).' + tau <= last_allowed + tol);
+            idx_all = idx_all(keep);
+            t_lya = t_lya(keep);
+
+            if isempty(t_lya)
+                error('SRNNCellTypePairs:NoLyapunovIntervals', ...
+                    ['No Lyapunov intervals fit in lya_T_interval = [%g, %g] with ' ...
+                     'lya_dt giving tau = %g s over a trajectory spanning [%g, %g].'], ...
+                    interval(1), interval(2), tau, t(1), t(end));
+            end
         end
 
         function [spectrum, local_spectrum, finite_spectrum, t_lya] = ...
-                lyapunov_spectrum_qr_internal(X, t, lya_dt, params, ...
-                ode_solver, ode_options, fs)
+                lyapunov_spectrum_qr_internal(X, t, lya_dt, interval, ...
+                lya_warmup, params, ode_solver, ode_options, fs)
+            % Honours lya_T_interval the same way Benettin does: accumulate over
+            % [max(0,interval(1)), interval(2)], iterate from lya_warmup seconds
+            % earlier so Q can align with the leading subspace first.
             N = params.N_sys_eqs;
             interpolants = cell(N, 1);
             for state = 1:N
@@ -2346,11 +2419,9 @@ classdef SRNNCellTypePairs < handle
             dt = 1 / fs;
             decimation = round(lya_dt / dt);
             tau = decimation * dt;
-            sample_indices = 1:decimation:numel(t);
-            t_lya = t(sample_indices);
-            if ~isempty(t_lya) && t_lya(end) + tau > t(end) + eps(t(end))
-                t_lya(end) = [];
-            end
+            tol = dt * 1e-6;
+            [~, t_lya, acc_start] = SRNNCellTypePairs.lyapunov_sample_grid( ...
+                t, dt, decimation, tau, interval, lya_warmup);
             n_intervals = numel(t_lya);
             local_spectrum = zeros(n_intervals, N);
             finite_spectrum = nan(n_intervals, N);
@@ -2379,7 +2450,7 @@ classdef SRNNCellTypePairs < handle
                 [Q, R] = qr(evolved);
                 log_diag = log(max(abs(diag(R)), realmin));
                 local_spectrum(k, :) = (log_diag ./ (t_end - t_start))';
-                if t_start >= 0
+                if t_start >= acc_start - tol && t_start < interval(2)
                     accumulated = accumulated + log_diag;
                     elapsed = elapsed + (t_end - t_start);
                     finite_spectrum(k, :) = (accumulated ./ elapsed)';
@@ -2388,6 +2459,9 @@ classdef SRNNCellTypePairs < handle
             if elapsed > 0
                 spectrum = accumulated ./ elapsed;
             else
+                warning('SRNNCellTypePairs:LyapunovWindowEmpty', ...
+                    ['No QR segment fell inside lya_T_interval = [%g, %g]; ' ...
+                     'the spectrum is all NaN.'], interval(1), interval(2));
                 spectrum = nan(N, 1);
             end
         end
