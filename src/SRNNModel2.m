@@ -174,6 +174,21 @@ classdef SRNNModel2 < handle
         lya_method = 'benettin'     % Lyapunov method: 'benettin', 'qr', or 'none'
         lya_T_interval              % Time interval for Lyapunov computation
 
+        % Rescaling interval (s): how far the perturbation is allowed to grow
+        % (Benettin) or the variational flow to run (QR) before renormalising.
+        % EMPTY takes the per-method default -- 0.02 for 'benettin', 0.1 for
+        % 'qr' -- which is what the hardcoded values used to be. The two differ
+        % because QR renormalises a whole N x N basis per step and Benettin only
+        % one vector, so QR can afford far fewer, larger steps.
+        %
+        % Must be an integer multiple of 1/fs and at least 3/fs; both are
+        % checked, with the failing ratio reported. Larger values are cheaper
+        % but coarser: the local exponent is a mean over the interval, and an
+        % interval long enough for the perturbation to leave the linear regime
+        % biases the estimate. Note lya_warmup is in seconds, so changing
+        % lya_dt does not change how much alignment time the warmup buys.
+        lya_dt = []
+
         % Seconds of Lyapunov iteration BEFORE lya_T_interval(1) used to let the
         % Benettin perturbation (or the QR basis Q) align with the leading
         % direction. Nothing is accumulated during it, so it costs compute and
@@ -594,7 +609,7 @@ classdef SRNNModel2 < handle
             rhs = @(t, S) SRNNModel2.dynamics_fast(t, S, params);
             
             fprintf('Computing Lyapunov exponents using %s method\n', obj.lya_method);
-            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, params, obj.ode_opts, obj.ode_solver, rhs);
+            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, obj.ode_solver, rhs);
             
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
@@ -2261,35 +2276,18 @@ classdef SRNNModel2 < handle
         % =====================================================================
         % Internalized from ConnectivityAdaptation to avoid path conflicts.
         
-        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, lya_warmup, params, opts, ode_solver, rhs_func)
+        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs_func)
             % Compute Lyapunov exponents using Benettin or QR method.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/compute_lyapunov_exponents.m
-            
+
             lya_results = struct();
-            
+
             if strcmpi(Lya_method, 'none')
                 return;
             end
-            
-            % Adjust lya_dt based on method
-            if strcmpi(Lya_method, 'qr')
-                lya_dt = 0.1;
-            elseif strcmpi(Lya_method, 'benettin')
-                lya_dt = 0.02;
-            else
-                lya_dt = 0.1;
-            end
-            
-            lya_dt_vs_dt_factor = lya_dt / dt;
-            
-            if abs(round(lya_dt_vs_dt_factor) - lya_dt_vs_dt_factor) > 1e-11
-                error(['lya_dt must be a multiple of dt. lya_dt_vs_dt_factor = ' num2str(lya_dt_vs_dt_factor)]);
-            end
-            
-            if lya_dt_vs_dt_factor < 3
-                error(['lya_dt must be 3*dt or more. lya_dt_vs_dt_factor = ' num2str(lya_dt_vs_dt_factor) ' Increase fs or increase lya_dt']);
-            end
-            
+
+            lya_dt = SRNNModel2.resolve_lya_dt(lya_dt, Lya_method, dt, 'SRNNModel');
+
             lya_fs = 1 / lya_dt;
             
             switch lower(Lya_method)
@@ -2478,6 +2476,38 @@ classdef SRNNModel2 < handle
             end
         end
         
+        function lya_dt = resolve_lya_dt(lya_dt, method, dt, err_id_prefix)
+            % Resolve the lya_dt property: empty means the per-method default.
+            % The two differ because QR renormalises an N x N basis per step
+            % while Benettin renormalises one vector, so QR can afford far
+            % fewer, larger steps.
+            if isempty(lya_dt)
+                if strcmpi(method, 'benettin')
+                    lya_dt = 0.02;
+                else
+                    lya_dt = 0.1;
+                end
+            end
+
+            if ~isscalar(lya_dt) || ~isnumeric(lya_dt) || ~isfinite(lya_dt) || lya_dt <= 0
+                error([err_id_prefix ':InvalidLyapunovStep'], ...
+                    'lya_dt must be a positive finite scalar (or empty for the %s default).', ...
+                    lower(method));
+            end
+
+            factor = lya_dt / dt;
+            if abs(round(factor) - factor) > 1e-11
+                error([err_id_prefix ':InvalidLyapunovStep'], ...
+                    ['lya_dt must be an integer multiple of dt = 1/fs. ' ...
+                     'lya_dt = %g and dt = %g give a ratio of %g.'], lya_dt, dt, factor);
+            end
+            if factor < 3
+                error([err_id_prefix ':InvalidLyapunovStep'], ...
+                    ['lya_dt must be at least 3*dt. lya_dt = %g and dt = %g give a ' ...
+                     'ratio of %g; increase fs or increase lya_dt.'], lya_dt, dt, factor);
+            end
+        end
+
         function [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya_vec] = lyapunov_spectrum_qr_internal(X_fid_traj, t_fid_traj, lya_dt_interval, params, ode_solver, ode_options_main, jacobian_func_handle, T_full_interval, lya_warmup, N_states_sys, fs_fid)
             % QR method for full Lyapunov spectrum.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/lyapunov_spectrum_qr.m

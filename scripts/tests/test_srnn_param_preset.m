@@ -43,8 +43,11 @@ all_passed = check('unknown preset name errors and lists the valid ones', ...
     contains(err.message, 'overconnected')) && all_passed;
 
 %% A preset must not carry names that belong to run_mode or the conditions
-banned = {'fs', 'T_range', 'ode_solver', 'lya_T_interval', ...
-    'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I', 'n_levels', 'n_reps'};
+% lya_dt and lya_warmup join lya_T_interval here for the same reason: they are
+% Lyapunov cost/fidelity knobs, so they belong to analysis_run_config (how much
+% compute) rather than to a preset (which network).
+banned = {'fs', 'T_range', 'ode_solver', 'lya_T_interval', 'lya_dt', ...
+    'lya_warmup', 'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I', 'n_levels', 'n_reps'};
 for i = 1:numel(preset_names)
     d = srnn_param_preset(preset_names{i});
     bad = intersect(fieldnames(d), banned);

@@ -110,6 +110,10 @@ classdef SRNNCellTypePairs < handle
         reps = 1
         lya_method = 'benettin'
         lya_T_interval
+        % Rescaling interval (s). Empty takes the per-method default, 0.02 for
+        % 'benettin' and 0.1 for 'qr'. Must be an integer multiple of 1/fs and
+        % at least 3/fs. See SRNNModel2.lya_dt.
+        lya_dt = []
         % Seconds of Lyapunov iteration before lya_T_interval(1) during which
         % the perturbation (Benettin) or basis Q (QR) aligns with the leading
         % direction without accumulating. Clamped to T_range(1) with a warning
@@ -474,8 +478,8 @@ classdef SRNNCellTypePairs < handle
             rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, params);
             obj.lya_results = SRNNCellTypePairs.compute_lyapunov_exponents_internal( ...
                 obj.lya_method, obj.S_out, obj.t_out, 1 / obj.fs, obj.fs, ...
-                obj.lya_T_interval, obj.lya_warmup, params, obj.ode_opts, ...
-                obj.ode_solver, rhs);
+                obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
+                obj.ode_opts, obj.ode_solver, rhs);
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
@@ -2253,24 +2257,19 @@ classdef SRNNCellTypePairs < handle
     %% Lyapunov algorithms
     methods (Static, Access = protected)
         function results = compute_lyapunov_exponents_internal(method, S_out, t_out, ...
-                dt, fs, interval, lya_warmup, params, opts, ode_solver, rhs)
+                dt, fs, interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs)
             results = struct();
             switch lower(method)
-                case 'benettin'
-                    lya_dt = 0.02;
-                case 'qr'
-                    lya_dt = 0.1;
+                case {'benettin', 'qr'}
+                    % handled below
                 case 'none'
                     return;
                 otherwise
                     error('SRNNCellTypePairs:UnknownLyapunovMethod', ...
                         'Unknown Lyapunov method: %s', method);
             end
-            factor = lya_dt / dt;
-            if abs(factor - round(factor)) > 1e-11 || factor < 3
-                error('SRNNCellTypePairs:InvalidLyapunovStep', ...
-                    'Lyapunov interval must be an integer multiple of at least 3*dt.');
-            end
+
+            lya_dt = SRNNCellTypePairs.resolve_lya_dt(lya_dt, method, dt);
 
             if strcmpi(method, 'benettin')
                 [LLE, local, finite, times] = SRNNCellTypePairs.benettin_algorithm_internal( ...
@@ -2355,6 +2354,36 @@ classdef SRNNCellTypePairs < handle
                 LLE = 0;
             else
                 LLE = valid(end);
+            end
+        end
+
+        function lya_dt = resolve_lya_dt(lya_dt, method, dt)
+            % Empty lya_dt takes the per-method default. Twin of
+            % SRNNModel2.resolve_lya_dt; see there for why the two differ.
+            if isempty(lya_dt)
+                if strcmpi(method, 'benettin')
+                    lya_dt = 0.02;
+                else
+                    lya_dt = 0.1;
+                end
+            end
+
+            if ~isscalar(lya_dt) || ~isnumeric(lya_dt) || ~isfinite(lya_dt) || lya_dt <= 0
+                error('SRNNCellTypePairs:InvalidLyapunovStep', ...
+                    'lya_dt must be a positive finite scalar (or empty for the %s default).', ...
+                    lower(method));
+            end
+
+            factor = lya_dt / dt;
+            if abs(round(factor) - factor) > 1e-11
+                error('SRNNCellTypePairs:InvalidLyapunovStep', ...
+                    ['lya_dt must be an integer multiple of dt = 1/fs. ' ...
+                     'lya_dt = %g and dt = %g give a ratio of %g.'], lya_dt, dt, factor);
+            end
+            if factor < 3
+                error('SRNNCellTypePairs:InvalidLyapunovStep', ...
+                    ['lya_dt must be at least 3*dt. lya_dt = %g and dt = %g give a ' ...
+                     'ratio of %g; increase fs or increase lya_dt.'], lya_dt, dt, factor);
             end
         end
 
