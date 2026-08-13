@@ -93,7 +93,10 @@ assert(numel(std_SST_lines) == model.n_per_type(1));
 assert(numel(stf_PV_lines) == model.n_per_type(1));
 std_E_colors = vertcat(std_E_lines.Color);
 assert(size(unique(round(std_E_colors, 8), 'rows'), 1) > 1);
-post_colors = lines(model.n_cellTypes);
+% Per-TYPE colours come from type_colors (lines() with the first two rows
+% swapped, so E reads warm and I cool); the per-NEURON accent blended in below
+% is plain lines(), which type_colors deliberately does not touch.
+post_colors = SRNNCellTypePairs.type_colors(model.n_cellTypes);
 expected_E_colors = 0.5 .* repmat(post_colors(1, :), ...
     model.n_per_type(1), 1) + 0.5 .* lines(model.n_per_type(1));
 assert(max(abs(sortrows(std_E_colors) - sortrows(expected_E_colors)), ...
