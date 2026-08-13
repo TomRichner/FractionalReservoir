@@ -191,6 +191,40 @@ switch name
         d.F_ref_indegree   = 100;
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_all_std_n500'
+        % Depression on ALL FOUR routes, SFA on E only, and a setpoint split of
+        % E at 0.15 / I at 0.25. Everything else is ..._n500_fixedF: n = 500,
+        % pinned F, level_of_chaos 1.4, mu_tilde_relative [4.5 -3; 4 -3].
+        %
+        % Where the earlier presets depressed only the two within-type routes,
+        % here every synapse in the network depresses -- n_b becomes [1 1; 1 1]
+        % rather than [1 0; 0 1], so the state vector gains the two cross-route
+        % b variables. This is the case SRNNModel2 cannot express at all: its
+        % n_b_E/n_b_I are per-PREsynaptic-population counts, so it can say "all
+        % outgoing E synapses depress" but never distinguish E->E from E->I.
+        %
+        % The two STD time constants are set independently, and they are not the
+        % same knob:
+        %   tau_rec  recovery, b -> 1 at rate (1-b)/tau_rec. SMALLER = recovers
+        %            sooner. E->E is 1 s against 3 s elsewhere, so excitatory
+        %            recurrence bounces back while the rest stays depressed.
+        %   tau_rel  release, the depression term b*r/tau_rel. SMALLER = depresses
+        %            HARDER for a given rate. I->I is 0.15 against 0.25
+        %            elsewhere, so inhibition-onto-inhibition is the quickest to
+        %            give way -- which the mu_II sweep flagged as the strongest
+        %            single driver of chaos once STD is present.
+        [d, model_class] = srnn_param_preset('celltype_pairs_S_c_by_type_n500_fixedF');
+        d.mu_S_c    = [0.15 0.25];   % E less excitable than before, I unchanged
+        d.sigma_S_c = [0.0  0.0];    % no cell-to-cell spread, only the type means
+
+        std_routes = struct();
+        std_routes.E.E.std = struct('tau_rec', 1, 'tau_rel', 0.25);
+        std_routes.E.I.std = struct('tau_rec', 3, 'tau_rel', 0.25);
+        std_routes.I.E.std = struct('tau_rec', 3, 'tau_rel', 0.25);
+        std_routes.I.I.std = struct('tau_rec', 3, 'tau_rel', 0.15);
+        % NOTE the nesting is synapse_config.<PRE>.<POST>, so .E.I is E -> I.
+        % That is the opposite order from the mu_EI naming, which is (post, pre).
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -208,7 +242,7 @@ function names = srnn_param_preset_names()
 % The valid preset names, kept next to the switch above so they stay in sync.
 names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500', ...
-    'celltype_pairs_S_c_by_type_n500_fixedF'};
+    'celltype_pairs_S_c_by_type_n500_fixedF', 'celltype_pairs_all_std_n500'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
