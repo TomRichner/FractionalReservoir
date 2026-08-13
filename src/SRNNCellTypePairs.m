@@ -1032,7 +1032,7 @@ classdef SRNNCellTypePairs < handle
             has_lya = ~strcmpi(obj.lya_method, 'none') && ~isempty(obj.lya_results);
             n_rows = 4 + has_a + has_b + has_g + has_lya;
             C = obj.n_cellTypes;
-            colors = lines(C);
+            colors = SRNNCellTypePairs.type_colors(C);
             b_collapsed = SRNNCellTypePairs.collapse_routes(p.b, 'prod');
             g_collapsed = SRNNCellTypePairs.collapse_routes(p.g, 'prod');
             fig_handle = figure('Name', 'SRNNCellTypePairs by presynaptic type');
@@ -1231,7 +1231,7 @@ classdef SRNNCellTypePairs < handle
                 if isempty(radius) || radius == 0, radius = 1; end
                 bin_edges = linspace(-radius, radius, 51);
             end
-            colors = lines(obj.n_cellTypes);
+            colors = SRNNCellTypePairs.type_colors(obj.n_cellTypes);
             fig_handle = figure('Name', 'Weights by presynaptic cell type');
             ax_handle = axes(fig_handle); hold(ax_handle, 'on');
             for q = 1:obj.n_cellTypes
@@ -1846,7 +1846,7 @@ classdef SRNNCellTypePairs < handle
 
         function plot_named_series(t, data, names, label, show_legend)
             if nargin < 5, show_legend = true; end
-            colors = lines(numel(names));
+            colors = SRNNCellTypePairs.type_colors(numel(names));
             hold on;
             handles = gobjects(0); labels = {};
             for q = 1:numel(names)
@@ -1893,7 +1893,7 @@ classdef SRNNCellTypePairs < handle
 
         function plot_postsynaptic_route_lines(ax, t, routes, post_names)
             % Plot every presynaptic-neuron trace, colored by target type.
-            colors = lines(numel(post_names));
+            colors = SRNNCellTypePairs.type_colors(numel(post_names));
             handles = gobjects(0); labels = {};
             hold(ax, 'on');
             for post = 1:numel(post_names)
@@ -1919,6 +1919,25 @@ classdef SRNNCellTypePairs < handle
             text(ax, 0.5, 0.5, label, 'Units', 'normalized', ...
                 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
                 'Color', [0.4 0.4 0.4]);
+        end
+
+        function C = type_colors(n)
+            % TYPE_COLORS Per-cell-type colours: lines(), with the first two
+            % swapped.
+            %
+            % MATLAB's lines() starts blue then orange-red. With cell types
+            % conventionally ordered {E, I}, that paints excitation blue and
+            % inhibition red -- the opposite of the usual reading. Swapping the
+            % first two rows gives E a warm colour and I a cool one, and leaves
+            % every later type untouched.
+            %
+            % Used only where the index IS a cell type. Per-neuron accents and
+            % per-route colours keep plain lines(), since their index means
+            % something else.
+            C = lines(n);
+            if n >= 2
+                C([1 2], :) = C([2 1], :);
+            end
         end
 
         function line_handles = plot_celltype_lines(ax, t, values, type_color)
