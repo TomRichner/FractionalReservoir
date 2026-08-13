@@ -144,6 +144,25 @@ switch name
         std_routes.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.25);
         std_routes.I.I.std = struct('tau_rec', 4, 'tau_rel', 0.5);
 
+    case 'celltype_pairs_S_c_by_type_n500'
+        % 'celltype_pairs_S_c_by_type' at n = 500 instead of 300. Derived from it
+        % rather than copied, so the two cannot drift apart -- the whole point of
+        % this preset is that n is the ONLY difference.
+        %
+        % indegree stays at 100, so alpha drops from 1/3 to 0.2. That does not
+        % move the bulk radius: F_tracks_network is true by default, which makes
+        % R exactly independent of n (the n*alpha cancels in get.R). What changes
+        % is the network, not its scale -- sparser connectivity and a larger
+        % state vector.
+        %
+        % Note this is the fixed-n value only. The n sensitivity sweep and the
+        % param_space grid both vary n over [100, 1000] and override it; it is
+        % the OTHER sweeps (f_E, level_of_chaos, mu_EE_relative, tau_a_E) that
+        % actually run at 500.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_S_c_by_type');
+        d.n = 500;
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -159,7 +178,8 @@ end
 
 function names = srnn_param_preset_names()
 % The valid preset names, kept next to the switch above so they stay in sync.
-names = {'default', 'overconnected', 'celltype_pairs', 'celltype_pairs_S_c_by_type'};
+names = {'default', 'overconnected', 'celltype_pairs', ...
+    'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)

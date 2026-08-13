@@ -20,11 +20,13 @@ function cfg = analysis_run_config(analysis, run_mode)
 %
 % Modes:
 %   'fast'       - few levels/reps, fs=200, short T_range; finishes quickly
-%   'fast2'      - 'fast' with twice the reps on the 1-D sensitivity sweeps, and
-%                  identical to 'fast' everywhere else. The point is the spread
-%                  WITHIN a level: at 3 reps a sensitivity histogram is too thin
-%                  to read, and doubling reps costs far less than the extra
-%                  levels or longer T_range that separate 'fast' from 'medium'.
+%   'fast2'      - 'fast' with twice the reps on the 1-D sensitivity sweeps and
+%                  twice the T_range on those and on param_space. The reps buy
+%                  the spread WITHIN a level, which at 3 reps is too thin to
+%                  read; the longer window buys an LLE that is less of a
+%                  transient. tau_sensitivity is untouched, so it is still
+%                  exactly 'fast'. Cheaper than the extra LEVELS that separate
+%                  'fast' from 'medium'.
 %   'medium'     - roughly halfway; for a usable but not publication-size run
 %   'production' - full-size sweeps at fs=400 (for real results)
 %
@@ -50,8 +52,12 @@ switch analysis
                 % fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3).
                 cfg = pack(4,  3,  @ode_rk4, 200, [0, 10], [5, 10]);
             case 'fast2'
-                % The one row where fast2 differs from fast: 6 reps, not 3.
-                cfg = pack(4,  6,  @ode_rk4, 200, [0, 10], [5, 10]);
+                % fast2 differs from fast here in two ways: 6 reps rather than
+                % 3, and twice the T_range. The LLE window is doubled with it,
+                % so it stays the same FRACTION of the run (the second half) --
+                % a longer simulation with the old [5,10] window would have
+                % measured the same transient from further away.
+                cfg = pack(4,  6,  @ode_rk4, 200, [0, 20], [10, 20]);
             case 'medium'
                 cfg = pack(11, 15, @ode_rk4, 400, [0, 20], [10, 20]);
             case 'production'
@@ -77,9 +83,12 @@ switch analysis
     case 'param_space'
         % Multi-dimensional grid with no reps axis, so n_levels^n_params configs.
         switch run_mode
-            case {'fast', 'fast2'}
-                % No reps axis here, so fast2 is exactly fast.
+            case 'fast'
                 cfg = pack(3, [], @ode_rk4, 200, [0, 20], [10, 20]);
+            case 'fast2'
+                % No reps axis here, so the only fast2 difference is the doubled
+                % T_range (and the LLE window doubled with it).
+                cfg = pack(3, [], @ode_rk4, 200, [0, 40], [20, 40]);
             case 'medium'
                 cfg = pack(4, [], @ode_rk4, 400, [0, 20], [10, 20]);
             case 'production'
