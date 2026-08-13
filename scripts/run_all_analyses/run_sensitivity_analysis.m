@@ -70,10 +70,21 @@ lle_hist_range = [-2, 2];
 params_to_sweep = {
     'n',              [100, 1000];
     'f',              [0.2, 0.8];
-    'level_of_chaos', [0.25, 4];
+    'level_of_chaos', [0.5, 2.0];
     };
 if strcmp(model_class, 'SRNNCellTypePairs')
     params_to_sweep{2, 1} = 'f_E';
+
+    % E->E connection strength, swept from half to twice whatever the preset
+    % operates at rather than over fixed absolute numbers. mu_EE_relative is a
+    % multiplier of F = 1/sqrt(n*alpha*(2-alpha)), so "the default level" is only
+    % meaningful relative to the preset -- and mu_tilde_relative is a REQUIRED
+    % constructor property with no class default to fall back on, which is why
+    % this reads the preset rather than ParamSpaceAnalysis2.class_default.
+    mu_EE_base = mu_EE_from_preset(preset_defaults);
+    params_to_sweep(end+1, :) = {'mu_EE_relative', [0.5, 2.0] * mu_EE_base};
+    fprintf('[run_sensitivity_analysis] mu_EE_relative base = %g, sweeping [%g %g]\n', ...
+        mu_EE_base, params_to_sweep{end, 2}(1), params_to_sweep{end, 2}(2));
 end
 
 % params_to_sweep = {
@@ -172,3 +183,19 @@ for p_idx = 1:size(params_to_sweep, 1)
     fprintf('  %s: %s\n', params_to_sweep{p_idx, 1}, all_output_dirs{p_idx});
 end
 fprintf('Done!\n');
+
+%% Local functions
+function v = mu_EE_from_preset(preset_defaults)
+% The E<-E entry of a preset's mu_tilde_relative, whichever shape it is given in.
+% SRNNCellTypePairs.expand_block accepts a full C x C block indexed (post, pre)
+% or a 1 x C presynaptic row broadcast down the columns; E<-E is (1,1) either
+% way. Errors rather than guessing, because there is no class default here --
+% mu_tilde_relative is a required constructor property.
+if ~isfield(preset_defaults, 'mu_tilde_relative') || isempty(preset_defaults.mu_tilde_relative)
+    error('run_sensitivity_analysis:NoMuEE', ...
+        ['Sweeping mu_EE_relative relative to its default needs the preset to ' ...
+        'set mu_tilde_relative; SRNNCellTypePairs has no class default for it.']);
+end
+M = preset_defaults.mu_tilde_relative;
+v = M(1, 1);
+end

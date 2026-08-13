@@ -91,7 +91,7 @@ else
 end
 psa.add_grid_parameter('n',              [100, 1000]);   % network size
 psa.add_grid_parameter(f_param,          [0.25, 0.75]);  % fraction excitatory
-psa.add_grid_parameter('level_of_chaos', [0.5, 3]);      % W scaling (edge of chaos)
+psa.add_grid_parameter('level_of_chaos', [0.5, 2.0]);    % W scaling (edge of chaos)
 
 % Dynamics parameters (uncomment to include)
 % psa.add_grid_parameter('tau_d', [0.05, 0.2]);           % Dendritic time constant

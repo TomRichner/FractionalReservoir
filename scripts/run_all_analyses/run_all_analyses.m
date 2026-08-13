@@ -40,9 +40,12 @@ master_save_figs = 'save_all_figs';
 
 % Run mode for the sub-analyses (controls n_levels / n_reps, fs, T_range, and
 % the LLE window):
-%   'fast'       - few levels/reps, fs=200, T_range=[0,20]; finishes quickly (testing)
-%   'medium'     - ode45, fs=400, 15 levels x 50 reps, T_range=[0,30] (tau: [0,50]); ~halfway
+%   'fast'       - few levels/reps, fs=200, short T_range; finishes quickly (testing)
+%   'fast2'      - 'fast' but with twice the reps on the 1-D sensitivity sweeps,
+%                  so their histograms have enough samples per level to read
+%   'medium'     - fs=400, 11 levels, T_range=[0,20] (tau: ode45 over [0,50])
 %   'production' - full-size sweeps, fs=400, T_range=[0,50] (for real results)
+% See analysis_run_config.m for the actual per-analysis numbers.
 % Defaults to 'medium'. To pick another WITHOUT editing this file, set the
 % variable first in the console:   run_mode = 'fast'; run_all_analyses
 if ~exist('run_mode', 'var'); run_mode = 'medium'; end
