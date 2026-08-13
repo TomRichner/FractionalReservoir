@@ -40,18 +40,32 @@ fprintf('[run_tau_sensitivity_analysis] run_mode=%s, n_levels=%d, n_reps=%d, ode
     run_mode, n_levels, n_reps, func2str(cfg.model.ode_solver), cfg.model.fs, ...
     cfg.model.T_range(1), cfg.model.T_range(2));
 
-% Which network to simulate. run_all_analyses sets master_model_overrides from
-% srnn_param_preset; standalone runs get the class defaults.
+% Which network to simulate, and with which model class. run_all_analyses sets
+% both from srnn_param_preset; standalone runs get SRNNModel2 class defaults.
 if exist('master_model_overrides', 'var')
     preset_defaults = master_model_overrides;
 else
     preset_defaults = srnn_param_preset('default');
 end
+if exist('master_model_class', 'var')
+    model_class = master_model_class;
+else
+    model_class = 'SRNNModel2';
+end
 
 note = 'tau_timescales';
 
-% Condition: SFA + STD (n_a_E=3, n_b_E=1)
-condition = {struct('name', 'sfa_and_std', 'n_a_E', 3, 'n_b_E', 1)};
+% Condition: SFA + STD, taken from the shared four-regime set rather than
+% respelled here, so this sweep uses exactly the regime the other analyses call
+% 'sfa_and_std'. Whichever class is in play, it gives E three SFA timescales --
+% which is what n_elements = 3 below is coupled to.
+if exist('master_conditions', 'var')
+    all_conditions = master_conditions;
+else
+    all_conditions = srnn_adaptation_conditions(model_class);
+end
+is_sfa_and_std = cellfun(@(c) strcmp(c.name, 'sfa_and_std'), all_conditions);
+condition = all_conditions(is_sfa_and_std);
 
 %% 1. tau_a_E(end) sweep — vector parameter
 fprintf('\n========================================\n');
@@ -66,6 +80,8 @@ psa_tau_a = ParamSpaceAnalysis2(...
     'verbose', true ...
     );
 psa_tau_a.folder_prefix = 'tau_sensitivity';
+psa_tau_a.model_class = model_class;
+psa_tau_a.integer_params = {'n', 'indegree'};
 if exist('master_output_dir', 'var')
     psa_tau_a.output_dir = master_output_dir;
 end
@@ -75,8 +91,11 @@ psa_tau_a.model_defaults = merge_struct(preset_defaults, cfg.model);
 
 psa_tau_a.set_conditions(condition);
 
-% tau_a_E is a vector of length n_a_E=3, logspaced from 0.25 to max
-% We sweep the max (last element) from 5 to 60
+% tau_a_E is a vector of length 3, logspaced from 0.25 to max, and we sweep the
+% max (last element) from 5 to 60. It is a real property on SRNNModel2 and a
+% scalar-row alias onto tau_a{1} on SRNNCellTypePairs, so the same axis name
+% works for both. n_elements stays coupled BY HAND to the condition's three SFA
+% timescales above.
 psa_tau_a.add_vector_parameter('tau_a_E', ...
     'vary_element', 'last', ...
     'fixed_value', 0.25, ...

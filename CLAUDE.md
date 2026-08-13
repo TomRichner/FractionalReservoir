@@ -90,10 +90,13 @@ What it buys, and what it costs:
 - **Per-type parameters are `1 x C` rows**: `f`, `n_a`, `c`, `mu_S_c`, `sigma_S_c`, and
   `tau_a` as a `1 x C` cell. `mu_tilde_relative` / `sigma_tilde_relative` are `C x C`
   blocks `(post, pre)`, or a `1 x C` presynaptic row broadcast down the columns.
-- **Scalar block aliases** `mu_EE_relative`, `mu_EI_relative`, … (Dependent *with*
-  setters, so they count as settable) exist for the two-type case only, because a PSA
-  grid axis has to be a settable scalar property. Reading or writing one when
-  `n_cellTypes ~= 2` errors.
+- **Scalar sweep aliases** (Dependent *with* setters, so they count as settable) exist
+  because a PSA grid axis has to be a settable property in its own right, and the
+  per-type parameters are rows, blocks and cells. `mu_EE_relative`, `mu_EI_relative`, …
+  and `f_E` (writing it sets `f = [f_E, 1-f_E]`) are **two-type only** and error when
+  `n_cellTypes ~= 2`; `tau_a_E` aliases `tau_a{1}` for any number of types but errors
+  unless `cell_type_names{1}` is `'E'`, so the name cannot lie. Add an alias rather than
+  teaching the sweep scripts to special-case a shape.
 - **`plot_data.r` is keyed by `cell_type_names`**, and `br` is called
   **`synaptic_output`** here — with STF in play the quantity is not `b·r`, so it is not
   a misnamed `br`. It nests by route (`.E.E`), which is why PSA's poolers recurse.
@@ -135,10 +138,11 @@ The older 1D-only predecessor `src/SensitivityAnalysis.m` was removed in the cle
 
 Two orthogonal knobs, deliberately kept apart:
 
-- **`src/srnn_param_preset.m`** — *which network*. `srnn_param_preset(name)` returns a struct of `SRNNModel2` overrides (the name is only a lookup key; the struct is what reaches the model). Assign it to `psa.model_defaults` and layer tweaks on with plain field assignment. Presets carry physics **including** swept axes like `n`/`f`/`level_of_chaos` — a grid axis overrides the preset for the sweep that varies it, while sweeps holding that axis fixed use the preset's value. They must **not** carry `n_levels`/`n_reps` (not model properties), the run_mode timing knobs, or condition fields.
+- **`src/srnn_param_preset.m`** — *which network*. `[d, model_class] = srnn_param_preset(name)` returns a struct of model overrides **plus the model class they are written for** (the name is only a lookup key; the struct is what reaches the model). Assign it to `psa.model_defaults` and layer tweaks on with plain field assignment. Presets carry physics **including** swept axes like `n`/`f`/`level_of_chaos` — a grid axis overrides the preset for the sweep that varies it, while sweeps holding that axis fixed use the preset's value. They must **not** carry `n_levels`/`n_reps` (not model properties), the run_mode timing knobs, or condition fields. The second output exists because the two model classes have **disjoint** parameter vocabularies, so a preset that did not carry its class would only fail later inside `validate_model_defaults`; it defaults to `'SRNNModel2'`. `'celltype_pairs'` is the `SRNNCellTypePairs` preset (E/I with STD on E→E and I→I).
+- **`src/srnn_adaptation_conditions.m`** — *which adaptation regimes*. `srnn_adaptation_conditions(model_class)` returns the four conditions (`no_adaptation`, `sfa_only`, `std_only`, `sfa_and_std`) spelled for that class: `n_a_E`/`n_b_E` counts for `SRNNModel2`, an `n_a` row plus a whole `synapse_config` struct for `SRNNCellTypePairs`. The **names** are identical across classes, which is what keeps the `condition_titles` maps inside PSA's plotters working. Use this instead of `ParamSpaceAnalysis2`'s built-in defaults, which are `SRNNModel2`-shaped and would be passed verbatim to whatever `model_class` is set.
 - **`scripts/run_all_analyses/analysis_run_config.m`** — *how much compute*. `analysis_run_config(analysis, run_mode)` returns `n_levels`, `n_reps`, and a `cfg.model` struct of timing settings (`ode_solver`, `fs`, `T_range`, and `lya_T_interval` only when it should be set).
 
-Sub-scripts combine them with `merge_struct(preset_defaults, cfg.model)` — **preset first**, so `run_mode` keeps final say over its own knobs, and so a whole-struct assignment cannot clobber them. `run_all_analyses.m` picks the preset in one line (`preset_name`) and records it in `run_manifest`.
+Sub-scripts combine them with `merge_struct(preset_defaults, cfg.model)` — **preset first**, so `run_mode` keeps final say over its own knobs, and so a whole-struct assignment cannot clobber them. `run_all_analyses.m` picks the preset in one line (`preset_name`) and records it, with the model class, in `run_manifest`.
 
 ### Master-orchestrator conventions
 
@@ -146,6 +150,7 @@ Sub-scripts combine them with `merge_struct(preset_defaults, cfg.model)` — **p
 
 - `master_output_dir` — when set, sub-scripts write into this shared dir instead of creating their own and **skip their `clear`/`clc`/`close all`**.
 - `master_save_figs` — `'save_all_figs'` / `'save_no_figs'` / `'follow_scripts_save_figs'` overrides each sub-script's local `save_figs` flag.
+- `master_model_class` — the preset's model class. Each sub-script reads it into a local `model_class` (defaulting to `'SRNNModel2'` when run standalone), assigns `psa.model_class`, resets `integer_params` to `{'n','indegree'}` (the class default lists `SRNNModel2`'s adaptation counts), and takes its conditions from `srnn_adaptation_conditions(model_class)`. Two axes are renamed per class: the fraction-excitatory sweep is `f` on `SRNNModel2` and `f_E` on `SRNNCellTypePairs`, and `plot`'s `color_by` must be given explicitly for Pairs because its default `'f'` is a row there and breaks the histogram colouring.
 
 Preserve this pattern when adding new analysis scripts.
 

@@ -45,37 +45,66 @@ master_save_figs = 'save_all_figs';
 %   'production' - full-size sweeps, fs=400, T_range=[0,50] (for real results)
 % Defaults to 'medium'. To pick another WITHOUT editing this file, set the
 % variable first in the console:   run_mode = 'fast'; run_all_analyses
-if ~exist('run_mode', 'var'); run_mode = 'fastFor '; end
+if ~exist('run_mode', 'var'); run_mode = 'medium'; end
 fprintf('Run mode: %s\n\n', run_mode);
 
 % Which network to simulate, as opposed to how much compute to spend on it
 % (that is run_mode). Edit this ONE line to run the whole pipeline on a
-% different SRNNModel2 parameter set; see src/srnn_param_preset.m for the
-% available names and for what may and may not go in a preset.
-if ~exist('preset_name', 'var'); preset_name = 'default'; end
-master_model_overrides = srnn_param_preset(preset_name);
-fprintf('Parameter preset: %s (%d override(s))\n\n', ...
-    preset_name, numel(fieldnames(master_model_overrides)));
+% different parameter set; see src/srnn_param_preset.m for the available names
+% and for what may and may not go in a preset.
+%
+% The preset also names the MODEL CLASS its overrides are written for -- the two
+% classes have disjoint parameter vocabularies -- and the ADAPTATION CONDITIONS
+% to sweep them under, since a preset with its own depression timescales can only
+% express them through a condition. The sub-scripts pick their sweep axes and
+% plot settings off master_model_class.
+if ~exist('preset_name', 'var'); preset_name = 'celltype_pairs_S_c_by_type'; end
+[master_model_overrides, master_model_class, master_conditions] = ...
+    srnn_param_preset(preset_name);
+fprintf('Parameter preset: %s (%d override(s)) on %s\n', ...
+    preset_name, numel(fieldnames(master_model_overrides)), master_model_class);
+fprintf('Conditions: %s\n\n', ...
+    strjoin(cellfun(@(c) c.name, master_conditions, 'UniformOutput', false), ', '));
 
 % Machine-readable run manifest for reproducibility + self-documentation. The
-% activation fields fingerprint the CLASS-DEFAULT nonlinearity via a throwaway
-% SRNNModel2 (no build needed).
+% activation fields record the nonlinearity in force: the preset's, where it
+% overrides one, otherwise the class default.
 %
-% NOTE: these fields are now redundant. Each PSA freezes its FULL effective
+% This used to default-construct an SRNNModel2 and func2str its handles.
+% Neither survives the move to multiple model classes: SRNNCellTypePairs has
+% five required constructor arguments and so cannot be default-constructed at
+% all, and the nonlinearity is named data now, so the NAME is the honest record.
+%
+% NOTE: these fields are largely redundant. Each PSA freezes its FULL effective
 % parameter set into psa.resolved_defaults (saved in psa_object.mat and
 % param_space_summary.mat), and since the nonlinearity is named data
 % (`activation` + S_a/S_c) rather than a function handle, same_config compares
-% it EXACTLY -- no func2str fingerprinting needed. The manifest fields are kept
-% only for continuity with runs made before resolved_defaults existed.
-m0 = SRNNModel2();
+% it EXACTLY. The manifest fields are kept only for continuity with runs made
+% before resolved_defaults existed.
+activation_fields = struct('activation', [], 'S_a', [], 'S_c', []);
+for fn = fieldnames(activation_fields)'
+    if isfield(master_model_overrides, fn{1})
+        activation_fields.(fn{1}) = master_model_overrides.(fn{1});
+    else
+        % class_default errors for a class with required constructor arguments
+        % (SRNNCellTypePairs). Nothing here is worth failing a run over, and in
+        % practice such a preset has to name the nonlinearity itself anyway.
+        try
+            activation_fields.(fn{1}) = ...
+                ParamSpaceAnalysis2.class_default(fn{1}, master_model_class);
+        catch
+            activation_fields.(fn{1}) = 'unknown';
+        end
+    end
+end
 run_manifest = struct( ...
     'run_mode', run_mode, ...
     'preset_name', preset_name, ...
+    'model_class', master_model_class, ...
     'master_save_figs', master_save_figs, ...
-    'activation', func2str(m0.activation_function), ...
-    'activation_derivative', func2str(m0.activation_function_derivative), ...
-    'S_a', m0.S_a, ...
-    'S_c', m0.S_c, ...
+    'activation', activation_fields.activation, ...
+    'S_a', activation_fields.S_a, ...
+    'S_c', activation_fields.S_c, ...
     'git_commit', prov.commit, ...
     'git_commit_short', prov.commit_short, ...
     'git_branch', prov.branch, ...
@@ -83,7 +112,7 @@ run_manifest = struct( ...
     'matlab_version', version, ...
     'timestamp', dt_str);
 save(fullfile(master_output_dir, 'run_manifest.mat'), 'run_manifest');
-clear m0;
+clear activation_fields fn;
 
 %% 1. General Sensitivity Analysis
 fprintf('========================================\n');
@@ -116,21 +145,21 @@ fprintf('[3/4] Running Parameter Space Analysis...\n');
 fprintf('========================================\n');
 run_param_space_analysis2;
 
-%% 4. DC Lyapunov Analysis
-fprintf('========================================\n');
-fprintf('[4/4] Running DC Lyapunov Analysis...\n');
-fprintf('========================================\n');
-run_dc_lle_analysis;
+% %% 4. DC Lyapunov Analysis
+% fprintf('========================================\n');
+% fprintf('[4/4] Running DC Lyapunov Analysis...\n');
+% fprintf('========================================\n');
+% run_dc_lle_analysis;
 
-%% 4b. Replot the DC Lyapunov figure from saved data
-% run_dc_lle_analysis saves dc_lle_results.mat into a dc_lle_nSeeds_* subfolder.
-% replot_dc_lle rebuilds the DC-vs-LLE confplot figure from that .mat alone.
-if ~strcmp(master_save_figs, 'save_no_figs')
-    fprintf('========================================\n');
-    fprintf('Replotting DC Lyapunov figure...\n');
-    fprintf('========================================\n');
-    replot_dc_lle(master_output_dir);
-end
+% %% 4b. Replot the DC Lyapunov figure from saved data
+% % run_dc_lle_analysis saves dc_lle_results.mat into a dc_lle_nSeeds_* subfolder.
+% % replot_dc_lle rebuilds the DC-vs-LLE confplot figure from that .mat alone.
+% if ~strcmp(master_save_figs, 'save_no_figs')
+%     fprintf('========================================\n');
+%     fprintf('Replotting DC Lyapunov figure...\n');
+%     fprintf('========================================\n');
+%     replot_dc_lle(master_output_dir);
+% end
 
 % %% Fig 2: Fraction Excitatory Analysis
 % fprintf('========================================\n');

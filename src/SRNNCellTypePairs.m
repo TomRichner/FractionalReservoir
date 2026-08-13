@@ -141,6 +141,17 @@ classdef SRNNCellTypePairs < handle
         sigma_EI_relative
         sigma_IE_relative
         sigma_II_relative
+
+        % Two more aliases for the same reason: a sweep axis has to be a
+        % settable property, and f / tau_a are a row and a cell array.
+        %   f_E     -- the excitatory fraction as a SCALAR; writing it sets
+        %              f = [v, 1-v], so the two types stay a partition. Two-type
+        %              only, like the block aliases above.
+        %   tau_a_E -- tau_a of the FIRST cell type as a plain numeric row, so
+        %              add_vector_parameter can sweep the SFA timescales.
+        %              Guarded on the first type actually being named E.
+        f_E
+        tau_a_E
         activation_function             % Built from activation + S_a/S_c
         activation_function_derivative
         n_per_type
@@ -286,6 +297,45 @@ classdef SRNNCellTypePairs < handle
         function set.sigma_EI_relative(obj, v), obj.set_block('sigma', 1, 2, v); end
         function set.sigma_IE_relative(obj, v), obj.set_block('sigma', 2, 1, v); end
         function set.sigma_II_relative(obj, v), obj.set_block('sigma', 2, 2, v); end
+
+        % --- Scalar / row aliases for the remaining per-type sweep axes -------
+        function v = get.f_E(obj)
+            obj.assert_two_types();
+            if isempty(obj.f)
+                v = [];
+            else
+                v = obj.f(1);
+            end
+        end
+
+        function set.f_E(obj, v)
+            obj.assert_two_types();
+            if ~isscalar(v) || ~isfinite(v) || v <= 0 || v >= 1
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    'f_E must be a scalar strictly between 0 and 1.');
+            end
+            obj.f = [v, 1 - v];
+        end
+
+        function v = get.tau_a_E(obj)
+            obj.assert_first_type_is_E();
+            if isempty(obj.tau_a)
+                v = [];
+            else
+                v = obj.tau_a{1};
+            end
+        end
+
+        function set.tau_a_E(obj, v)
+            obj.assert_first_type_is_E();
+            % tau_a is completed to a 1 x C cell by complete_type_defaults, which
+            % runs AFTER the constructor's name-value loop -- so this setter has
+            % to be able to create the cell itself.
+            if ~iscell(obj.tau_a) || numel(obj.tau_a) ~= obj.n_cellTypes
+                obj.tau_a = cell(1, obj.n_cellTypes);
+            end
+            obj.tau_a{1} = reshape(v, 1, []);
+        end
 
         function val = get.activation_function(obj)
             val = obj.build_activation(1);
@@ -539,10 +589,29 @@ classdef SRNNCellTypePairs < handle
         function assert_two_types(obj)
             if ~isequal(obj.n_cellTypes, 2)
                 error('SRNNCellTypePairs:NotTwoTypes', ...
-                    ['The E/I scalar block aliases require exactly 2 cell types ' ...
-                    '(this model has %s). Use mu_tilde_relative / ' ...
+                    ['The E/I scalar aliases require exactly 2 cell types ' ...
+                    '(this model has %s). Use f / mu_tilde_relative / ' ...
                     'sigma_tilde_relative directly.'], ...
                     mat2str(obj.n_cellTypes));
+            end
+        end
+
+        function assert_first_type_is_E(obj)
+            % tau_a_E indexes tau_a{1}, so the name is only honest if type 1 is
+            % actually E. Any number of types is fine -- unlike the block
+            % aliases, this one does not need a 2 x 2.
+            names = obj.cell_type_names;
+            % cellstr, because the constructor may not have reached
+            % complete_type_defaults yet -- names can still be a char row or a
+            % string array at this point rather than the cellstr it ends up as.
+            % Anything else malformed falls through to the error below rather
+            % than throwing cellstr's; validate() reports it properly.
+            usable = ~isempty(names) && (iscellstr(names) || ischar(names) || isstring(names)); %#ok<ISCLSTR>
+            if usable, names = cellstr(names); end
+            if ~usable || ~strcmp(names{1}, 'E')
+                error('SRNNCellTypePairs:NotTypeE', ...
+                    ['tau_a_E aliases tau_a{1}, which requires cell_type_names{1} ' ...
+                    'to be ''E''. Use tau_a directly.']);
             end
         end
 

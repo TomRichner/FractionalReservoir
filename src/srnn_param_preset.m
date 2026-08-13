@@ -1,13 +1,25 @@
-function d = srnn_param_preset(name)
-% SRNN_PARAM_PRESET Named sets of SRNNModel2 parameter overrides.
+function [d, model_class, conditions] = srnn_param_preset(name)
+% SRNN_PARAM_PRESET Named sets of model parameter overrides.
 %
 % Returns a struct suitable for assigning to ParamSpaceAnalysis2.model_defaults
-% (or splatting into an SRNNModel2 constructor). The NAME is only a lookup key;
-% it is the returned struct that reaches the model.
+% (or splatting into a model constructor), plus the MODEL CLASS those overrides
+% are written for and the ADAPTATION CONDITIONS to sweep them under.
+% The NAME is only a lookup key; it is the returned struct that reaches the model.
 %
 % Usage:
-%   psa.model_defaults = srnn_param_preset('overconnected');
+%   [psa.model_defaults, psa.model_class] = srnn_param_preset('celltype_pairs');
 %   psa.model_defaults.fs = 200;                 % layer a tweak on top
+%
+% The second output exists because the two model classes have disjoint parameter
+% vocabularies -- 'overconnected' is meaningless to SRNNCellTypePairs and
+% 'celltype_pairs' is meaningless to SRNNModel2 -- so a preset that did not carry
+% its class would only fail later, inside validate_model_defaults. It defaults to
+% 'SRNNModel2', so existing single-output callers are unaffected.
+%
+% The third is srnn_adaptation_conditions(model_class) unless the preset needs
+% different depression routes. Those timescales are physics and would belong in
+% the struct above, except that synapse_config can only reach the model through
+% a condition -- so the preset passes them to srnn_adaptation_conditions instead.
 %
 % What belongs in a preset: the physics -- which network is being simulated.
 % Three things deliberately do NOT:
@@ -17,7 +29,9 @@ function d = srnn_param_preset(name)
 %   * fs / T_range / ode_solver / lya_T_interval -- these are cost/fidelity
 %     knobs owned by run_mode, again via analysis_run_config. A preset that set
 %     them would silently redefine what 'fast' and 'production' mean.
-%   * n_a_E / n_a_I / n_b_E / n_b_I -- owned by the adaptation conditions.
+%   * n_a_E / n_a_I / n_b_E / n_b_I -- owned by the adaptation conditions, as
+%     are their SRNNCellTypePairs counterparts n_a and synapse_config. See
+%     srnn_adaptation_conditions.
 %
 % The nonlinearity is named data (`activation` plus S_a/S_c), not a function
 % handle, so a preset cannot end up with a handle whose captured constants
@@ -30,11 +44,15 @@ function d = srnn_param_preset(name)
 % PSA per swept parameter, a preset carrying all three makes each 1-D sweep hold
 % the other two at this operating point rather than at class defaults.
 %
-% See also: analysis_run_config, merge_struct, ParamSpaceAnalysis2, SRNNModel2
+% See also: analysis_run_config, merge_struct, srnn_adaptation_conditions,
+%           ParamSpaceAnalysis2, SRNNModel2, SRNNCellTypePairs
 
 arguments
     name (1,:) char
 end
+
+model_class = 'SRNNModel2';
+std_routes = [];        % [] = whatever srnn_adaptation_conditions defaults to
 
 switch name
     case 'default'
@@ -60,14 +78,102 @@ switch name
             'mu_E_tilde_relative',  3, ...   % class default
             'mu_I_tilde_relative', -6);      % class default -4; doubled, half as many I neurons
 
+    case 'celltype_pairs'
+        % The operating point from scripts/tests/test_SRNNCellTypePairs_defaults.m:
+        % a two-type E/I network run through SRNNCellTypePairs so that depression
+        % can be put on ONE ROUTE at a time. The question it exists to ask is what
+        % changes when I->I synapses depress as well as E->E, which SRNNModel2
+        % cannot express (its n_b_E = 1 depresses every outgoing E synapse).
+        %
+        % Note the asymmetric mu block: E receives more excitation than I does
+        % (4 vs 3) and both are inhibited equally (-3), which is what pushes this
+        % network away from the symmetric class default.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    300, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [4 -3; 3 -3], ...   % multiples of F, (post <- pre)
+            'sigma_tilde_relative', [1 1; 1 1], ...
+            'level_of_chaos',       1.3, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.0, ...
+            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
+            'input_config',         pairs_input_config(0.1));
+        % Per-neuron setpoint heterogeneity (mu_S_c / sigma_S_c) is deliberately
+        % left off, matching the commented-out lines in the source script: with
+        % both empty, S_c_vec stays empty and every path takes the scalar branch.
+
+    case 'celltype_pairs_S_c_by_type'
+        % scripts/tests/example_SRNNCellTypePairs_S_c_by_type.m: 'celltype_pairs'
+        % with a separate nonlinearity setpoint per cell type, plus a stronger,
+        % more asymmetric connectivity.
+        %
+        % The setpoint is where the interest is. phi is centred on S_c, so
+        % raising I's to 0.25 slides its curve RIGHT and makes the I population
+        % LESS excitable -- and the example's own comparison shows the network
+        % does not simply turn inhibition down: the I rate barely moves while the
+        % E rate more than doubles, so the whole E/I operating point shifts.
+        % sigma_S_c = 0 means no cell-to-cell spread, only the two type means.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    300, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [4.5 -3; 4 -3], ...  % multiples of F, (post <- pre)
+            'sigma_tilde_relative', [1 1; 1 1], ...
+            'level_of_chaos',       1.5, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.0, ...     % unused: mu_S_c below overrides it
+            'mu_S_c',               [0.0 0.25], ...
+            'sigma_S_c',            [0.0 0.0], ...
+            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
+            'input_config',         pairs_input_config(0.1));
+        % This preset's I->I release constant is 0.5, not the default 1.
+        std_routes = struct();
+        std_routes.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.25);
+        std_routes.I.I.std = struct('tau_rec', 4, 'tau_rel', 0.5);
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
             name, strjoin(srnn_param_preset_names(), ', '));
 end
+
+if isempty(std_routes)
+    conditions = srnn_adaptation_conditions(model_class);
+else
+    conditions = srnn_adaptation_conditions(model_class, std_routes);
+end
 end
 
 function names = srnn_param_preset_names()
 % The valid preset names, kept next to the switch above so they stay in sync.
-names = {'default', 'overconnected'};
+names = {'default', 'overconnected', 'celltype_pairs', 'celltype_pairs_S_c_by_type'};
+end
+
+function ic = pairs_input_config(intrinsic_drive)
+% Assigning input_config REPLACES the struct SRNNCellTypePairs.set_defaults
+% built, so a preset that wants to change one field has to restate all of them.
+% This mirrors that default exactly apart from intrinsic_drive.
+%
+% intrinsic_drive is a SCALAR here, not 0.1*ones(n,1) as in the source script:
+% n is a sweep axis, so no fixed-length vector is right at more than one grid
+% point. generate_external_input accepts "scalar or n-by-1".
+%
+% step_density is left empty; complete_type_defaults fills one 0.2 entry per
+% cell type, which is what the class default would have done anyway.
+ic = struct( ...
+    'n_steps',          3, ...
+    'step_density',     struct(), ...
+    'amp',              0.5, ...
+    'no_stim_pattern',  logical([1 0 1]), ...
+    'intrinsic_drive',  intrinsic_drive, ...
+    'positive_only',    false);
 end
