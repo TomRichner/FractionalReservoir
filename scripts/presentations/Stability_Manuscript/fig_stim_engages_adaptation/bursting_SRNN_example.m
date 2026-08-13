@@ -156,7 +156,7 @@ T_plot     = [];           % plotting window; [] -> T_range
 %   @ode45    - adaptive RK4(5); accurate, but VERY slow with noisy forcing.
 %   @ode_rk4  - fixed-step classic RK4 at the fs grid (local fn, bottom of file);
 %               fast and well-behaved when white noise is added. Recommended here.
-ode_solver = @ode_rk4;     % @ode45 (adaptive) | @ode_rk4 (fixed-step, fast with noise)
+ode_solver = 'rk4';     % 'ode45' (adaptive) | 'rk4' (fixed-step, fast with noise)
 % rng_seeds is set & auto-incremented at the TOP of this script (see header).
 % [network seed, stimulus seed]. Do not reassign it here, or the per-run
 % increment will be clobbered.

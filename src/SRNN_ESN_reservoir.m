@@ -388,7 +388,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % Integrate entire trajectory at once
             fprintf('  Integrating ESN dynamics...\n');
             tic
-            [obj.t_out, obj.S_out] = obj.ode_solver(rhs, obj.t_ex, obj.S0, obj.ode_opts);
+            [obj.t_out, obj.S_out] = obj.integrate(rhs, obj.t_ex, obj.S0);
             integration_time = toc;
             fprintf('  Integration complete in %.2f seconds.\n', integration_time);
         end

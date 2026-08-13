@@ -101,7 +101,9 @@ classdef SRNNCellTypePairs < handle
         fs = 400
         T_range = [0, 50]
         T_plot
-        ode_solver = @ode45
+        % Integrator chosen by name: 'ode45' | 'ode15s' | 'rk4'. Passing a
+        % handle errors. See SRNNModel2.ode_solver.
+        ode_solver = 'ode45'
         ode_opts
         x0_std = 0.1
         input_config
@@ -235,6 +237,11 @@ classdef SRNNCellTypePairs < handle
                 if ~isprop(obj, name)
                     error('SRNNCellTypePairs:UnknownProperty', ...
                         'Unknown property: %s', name);
+                end
+                if strcmp(name, 'ode_solver')
+                    % Fail here rather than at the first solver call, and give
+                    % the handle-to-name mapping while the caller can see it.
+                    SRNNCellTypePairs.check_ode_solver(varargin{k + 1});
                 end
                 obj.(name) = varargin{k + 1};
             end
@@ -434,7 +441,7 @@ classdef SRNNCellTypePairs < handle
 
             fprintf('Integrating SRNNCellTypePairs equations\n');
             tic;
-            [t_raw, S_raw] = obj.ode_solver(rhs, obj.t_ex, obj.S0, obj.ode_opts);
+            [t_raw, S_raw] = obj.integrate(rhs, obj.t_ex, obj.S0);
             fprintf('Integration complete in %.2f seconds.\n', toc);
             if numel(t_raw) ~= numel(obj.t_ex) || ...
                     max(abs(t_raw(:) - obj.t_ex(:))) > 1e-9
@@ -462,6 +469,14 @@ classdef SRNNCellTypePairs < handle
             fprintf('Simulation complete.\n');
         end
 
+        function [t_out, S_out] = integrate(obj, rhs, tspan, S0)
+            % INTEGRATE Run the trajectory integrator named by ode_solver.
+            % Twin of SRNNModel2.integrate; the classes are duck-typed
+            % siblings and share no implementation.
+            solver = SRNNCellTypePairs.resolve_solver(obj.ode_solver);
+            [t_out, S_out] = solver(rhs, tspan, S0, obj.ode_opts);
+        end
+
         function compute_lyapunov(obj)
             if isempty(obj.S_out)
                 error('SRNNCellTypePairs:NoStateData', 'State data are not available.');
@@ -479,7 +494,7 @@ classdef SRNNCellTypePairs < handle
             obj.lya_results = SRNNCellTypePairs.compute_lyapunov_exponents_internal( ...
                 obj.lya_method, obj.S_out, obj.t_out, 1 / obj.fs, obj.fs, ...
                 obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
-                obj.ode_opts, obj.ode_solver, rhs);
+                obj.ode_opts, SRNNCellTypePairs.resolve_solver(obj.ode_solver), rhs);
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
@@ -751,6 +766,10 @@ classdef SRNNCellTypePairs < handle
         end
 
         function validate(obj)
+            % Catch an ode_solver assigned after construction, so a typo fails
+            % here rather than at the first solver call inside run().
+            SRNNCellTypePairs.check_ode_solver(obj.ode_solver);
+
             C = obj.n_cellTypes;
             if ~isscalar(C) || ~isfinite(C) || C < 1 || C ~= round(C)
                 error('SRNNCellTypePairs:InvalidParams', 'n_cellTypes must be a positive integer.');
@@ -1458,6 +1477,54 @@ classdef SRNNCellTypePairs < handle
 
     %% State layout, dynamics, and Jacobian
     methods (Static)
+        function names = solver_names()
+            % SOLVER_NAMES The valid values of the `ode_solver` property.
+            names = {'ode45', 'ode15s', 'rk4'};
+        end
+
+        function fn = resolve_solver(name)
+            % RESOLVE_SOLVER Map an ode_solver name to a solver callable.
+            switch lower(name)
+                case 'ode45'
+                    fn = @ode45;
+                case 'ode15s'
+                    fn = @ode15s;
+                case 'rk4'
+                    fn = @ode_rk4;
+                otherwise
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        'Unknown ode_solver ''%s''. Valid: %s.', ...
+                        char(string(name)), strjoin(SRNNCellTypePairs.solver_names(), ', '));
+            end
+        end
+
+        function check_ode_solver(value)
+            % CHECK_ODE_SOLVER Reject handles by name and validate the string.
+            % Twin of SRNNModel2.check_ode_solver; see there for why this is not
+            % a set method.
+            if isa(value, 'function_handle')
+                legacy = struct('ode45', 'ode45', 'ode15s', 'ode15s', ...
+                    'ode_rk4', 'rk4', 'ode23', 'ode45', 'ode113', 'ode45');
+                as_str = func2str(value);
+                if isfield(legacy, as_str)
+                    hint = sprintf('use ''%s'' instead of @%s', legacy.(as_str), as_str);
+                else
+                    hint = sprintf('valid names are %s', ...
+                        strjoin(SRNNCellTypePairs.solver_names(), ', '));
+                end
+                error('SRNNCellTypePairs:RenamedProperty', ...
+                    ['''ode_solver'' now takes a NAME rather than a function ' ...
+                     'handle, so the choice survives into resolved_defaults and ' ...
+                     'compares cleanly across runs: %s.'], hint);
+            end
+            if ~(ischar(value) || isstring(value)) || ...
+                    ~ismember(lower(char(string(value))), SRNNCellTypePairs.solver_names())
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    'Unknown ode_solver ''%s''. Valid: %s.', ...
+                    char(string(value)), strjoin(SRNNCellTypePairs.solver_names(), ', '));
+            end
+        end
+
         function names = activation_names()
             % ACTIVATION_NAMES Valid values of the `activation` property.
             names = {'logistic', 'piecewise', 'tanh'};
@@ -2436,7 +2503,7 @@ classdef SRNNCellTypePairs < handle
 
         function [spectrum, local_spectrum, finite_spectrum, t_lya] = ...
                 lyapunov_spectrum_qr_internal(X, t, lya_dt, interval, ...
-                lya_warmup, params, ode_solver, ode_options, fs)
+                lya_warmup, params, ~, ode_options, fs)
             % Honours lya_T_interval the same way Benettin does: accumulate over
             % [max(0,interval(1)), interval(2)], iterate from lya_warmup seconds
             % earlier so Q can align with the leading subspace first.
@@ -2465,7 +2532,12 @@ classdef SRNNCellTypePairs < handle
                 psi0 = Q(:);
                 variational = @(tt, psi) SRNNCellTypePairs.variational_equations( ...
                     tt, psi, interpolants, N, params);
-                [~, solution] = ode_solver(variational, [t_start, t_end], ...
+                % ode45 rather than the model's ode_solver: this is a 2-POINT
+                % span, which the fixed-step solvers reject (see ode_rk4.m), so
+                % QR has only ever worked with an adaptive solver. The
+                % variational equation is deterministic and independent of how
+                % the fiducial trajectory was produced.
+                [~, solution] = ode45(variational, [t_start, t_end], ...
                     psi0, variational_options);
                 evolved = reshape(solution(end, :)', N, N);
                 if any(~isfinite(evolved(:)))

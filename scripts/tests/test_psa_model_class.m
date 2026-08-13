@@ -22,7 +22,7 @@ psa.set_conditions({struct('name','sfa_and_std','n_a_E',3,'n_b_E',1)});
 psa.add_grid_parameter('level_of_chaos', [1, 1.4]);
 psa.model_defaults.n = 24; psa.model_defaults.indegree = 8;
 psa.model_defaults.T_range = [0 2]; psa.model_defaults.fs = 200;
-psa.model_defaults.ode_solver = @ode_rk4;
+psa.model_defaults.ode_solver = 'rk4';
 psa.run();
 r = psa.results.sfa_and_std;
 lle_default = cellfun(@(x) x.LLE, r(~cellfun(@isempty, r)));
@@ -55,7 +55,7 @@ p2.model_defaults.sigma_tilde_relative = [1 1];
 p2.model_defaults.n_a = [0 0];
 p2.model_defaults.T_range = [0 2];
 p2.model_defaults.fs = 200;
-p2.model_defaults.ode_solver = @ode_rk4;
+p2.model_defaults.ode_solver = 'rk4';
 try
     p2.run();
     ran = true;

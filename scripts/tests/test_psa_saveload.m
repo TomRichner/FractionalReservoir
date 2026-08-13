@@ -37,7 +37,7 @@ psa.model_defaults.n = 20;
 psa.model_defaults.indegree = 10;
 psa.model_defaults.T_range = [0, 10];
 psa.model_defaults.fs = 200;
-psa.model_defaults.ode_solver = @ode_rk4;
+psa.model_defaults.ode_solver = 'rk4';
 psa.model_defaults.lya_T_interval = [5, 10];
 psa.model_defaults.lya_method = 'benettin';
 psa.store_local_lya = true;
@@ -88,12 +88,15 @@ all_passed = check('captures the activation as plain data', ...
     isfield(rd, 'activation') && strcmp(rd.activation, 'logistic') && ...
     ~isfield(rd, 'activation_function') && ...
     ~isfield(rd, 'activation_function_derivative')) && all_passed;
-% ode_solver is legitimately a handle; the nonlinearity no longer is, so it is
-% the only one left and same_config can compare the activation exactly.
+% Neither the nonlinearity nor the integrator is a handle any more -- both are
+% recorded as names -- so a frozen parameter set now contains NO function
+% handles at all, and same_config compares every field exactly.
 handle_fields = fieldnames(rd);
 handle_fields = handle_fields(structfun(@(v) isa(v, 'function_handle'), rd));
-all_passed = check('ode_solver is the only function handle left', ...
-    isequal(handle_fields(:)', {'ode_solver'})) && all_passed;
+all_passed = check('no function handles survive into resolved_defaults', ...
+    isempty(handle_fields)) && all_passed;
+all_passed = check('the integrator is recorded as a name', ...
+    isfield(rd, 'ode_solver') && strcmp(rd.ode_solver, 'rk4')) && all_passed;
 all_passed = check('captures an untouched class default (tau_d)', ...
     isfield(rd, 'tau_d') && ...
     isequal(rd.tau_d, ParamSpaceAnalysis2.class_default('tau_d'))) && all_passed;

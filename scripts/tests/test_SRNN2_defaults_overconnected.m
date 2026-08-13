@@ -10,7 +10,7 @@ rng_seeds = [19 20]+4;
 
 %% Create model
 model = SRNNModel2('n',300,'indegree',100,'check_connectivity',true,'level_of_chaos', 1,'S_c',0.0,'tau_d',1,'tau_b_E_rec',1,'rng_seeds',rng_seeds,'c_E', 1/3,'n_a_E', 3, 'n_b_E',1, 'f', 2/3, 'T_range', [0 40], ...
-    'ode_solver', @ode_rk4, 'fs', 200);
+    'ode_solver', 'rk4', 'fs', 200);
 
 %% E:I ratio of 2:1 (f=2/3), with per-synapse inhibition doubled to compensate
 % The _relative properties are in multiples of the RMT normalization factor

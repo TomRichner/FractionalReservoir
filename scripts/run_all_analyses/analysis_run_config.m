@@ -50,18 +50,18 @@ switch analysis
         switch run_mode
             case 'fast'
                 % fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3).
-                cfg = pack(4,  3,  @ode_rk4, 200, [0, 10], [5, 10]);
+                cfg = pack(4,  3,  'rk4',   200, [0, 10], [5, 10]);
             case 'fast2'
                 % fast2 differs from fast here in two ways: 6 reps rather than
                 % 3, and twice the T_range. The LLE window is doubled with it,
                 % so it stays the same FRACTION of the run (the second half) --
                 % a longer simulation with the old [5,10] window would have
                 % measured the same transient from further away.
-                cfg = pack(4,  6,  @ode_rk4, 200, [0, 20], [10, 20]);
+                cfg = pack(4,  6,  'rk4',   200, [0, 20], [10, 20]);
             case 'medium'
-                cfg = pack(11, 15, @ode_rk4, 400, [0, 20], [10, 20]);
+                cfg = pack(11, 15, 'rk4',   400, [0, 20], [10, 20]);
             case 'production'
-                cfg = pack(25, 50, @ode45,   400, [0, 50], [20, 50]);
+                cfg = pack(25, 50, 'ode45', 400, [0, 50], [20, 50]);
         end
 
     case 'tau_sensitivity'
@@ -73,26 +73,26 @@ switch analysis
                 % NOTE: this window is far shorter than the swept tau, so long-tau
                 % LLE reflects a transient -- accepted for fast qualitative runs.
                 % fast2 doubles reps on the 1-D sweeps above only, not here.
-                cfg = pack(7,  7,  @ode_rk4, 200, [0, 20], [10, 20]);
+                cfg = pack(7,  7,  'rk4',   200, [0, 20], [10, 20]);
             case 'medium'
-                cfg = pack(11, 25, @ode45,   400, [0, 50], []);
+                cfg = pack(11, 25, 'ode45', 400, [0, 50], []);
             case 'production'
-                cfg = pack(25, 50, @ode45,   400, [0, 50], []);
+                cfg = pack(25, 50, 'ode45', 400, [0, 50], []);
         end
 
     case 'param_space'
         % Multi-dimensional grid with no reps axis, so n_levels^n_params configs.
         switch run_mode
             case 'fast'
-                cfg = pack(3, [], @ode_rk4, 200, [0, 20], [10, 20]);
+                cfg = pack(3, [], 'rk4',   200, [0, 20], [10, 20]);
             case 'fast2'
                 % No reps axis here, so the only fast2 difference is the doubled
                 % T_range (and the LLE window doubled with it).
-                cfg = pack(3, [], @ode_rk4, 200, [0, 40], [20, 40]);
+                cfg = pack(3, [], 'rk4',   200, [0, 40], [20, 40]);
             case 'medium'
-                cfg = pack(4, [], @ode_rk4, 400, [0, 20], [10, 20]);
+                cfg = pack(4, [], 'rk4',   400, [0, 20], [10, 20]);
             case 'production'
-                cfg = pack(5, [], @ode45,   400, [0, 50], []);
+                cfg = pack(5, [], 'ode45', 400, [0, 50], []);
         end
 
     otherwise

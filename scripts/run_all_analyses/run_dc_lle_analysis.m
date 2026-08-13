@@ -58,18 +58,18 @@ switch run_mode
     case 'fast'
         n_seeds    = 25;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
-        ode_solver = @ode_rk4;
-        % ode_solver = @ode45;
+        ode_solver = 'rk4';
+        % ode_solver = 'ode45';
     case 'medium'
         % Roughly halfway between fast and production: more seeds, still the
         % fast fixed-step solver to keep the (expensive) staircase runs quick.
         n_seeds    = 38;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
-        ode_solver = @ode_rk4;
+        ode_solver = 'rk4';
     case 'production'
         n_seeds    = 50;
         dc_levels  = [0 0.0125 0.025 0.05 0.075 0.1 0.15 0.2 0.3];
-        ode_solver = @ode45;
+        ode_solver = 'ode45';
     otherwise
         error('run_dc_lle_analysis:badMode', ...
             'Unknown run_mode ''%s'' (expected ''fast'', ''medium'', or ''production'').', run_mode);
@@ -77,7 +77,7 @@ end
 nL = numel(dc_levels);
 use_parallel = true;   % set false for serial debugging
 fprintf('[run_dc_lle_analysis] run_mode=%s, n_seeds=%d, nL=%d, ode_solver=%s\n', ...
-    run_mode, n_seeds, nL, func2str(ode_solver));
+    run_mode, n_seeds, nL, ode_solver);
 
 %% Network / model configuration (single SFA+STD "bursting" regime)
 % Mirrors scripts/presentations/Stability_Manuscript/
@@ -169,7 +169,7 @@ end
 config = struct('n', n, 'f', f, 'indegree', indegree, 'S_a', S_a, 'S_c', S_c, ...
     'hold_dur', hold_dur, 'ramp_dur', ramp_dur, 'noise_intensity', noise_intensity, ...
     'psd_settle', psd_settle, 'fs', fs, 'T_range', T_range, ...
-    'ode_solver', func2str(ode_solver), 'run_mode', run_mode);
+    'ode_solver', ode_solver, 'run_mode', run_mode);
 
 dc_lle_results = struct( ...
     'dc_levels', dc_levels, 'hold_dur', hold_dur, 'psd_settle', psd_settle, ...

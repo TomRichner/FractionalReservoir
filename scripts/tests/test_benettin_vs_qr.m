@@ -11,7 +11,7 @@
 % QR cost scales ~ N_states^2 and is infeasible at the default n=300, so this
 % test uses a small network at the default connection regime (alpha=1/3):
 % n=40, indegree=20. Everything else is at SRNNModel2 defaults (fs=400,
-% ode_solver=@ode45, f=0.5, rng_seeds=[1 2]). ode45 is required: the QR
+% ode_solver='ode45', f=0.5, rng_seeds=[1 2]). ode45 is required: the QR
 % variational step integrates on a 2-point span that ode_rk4 rejects.
 %
 % T_range starts negative ([-10, 15]) so the settling transient happens at

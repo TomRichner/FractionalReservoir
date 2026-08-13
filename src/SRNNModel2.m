@@ -156,7 +156,23 @@ classdef SRNNModel2 < handle
         fs = 400                    % Sampling frequency (Hz)
         T_range = [0, 50]           % Simulation time interval [start, end]
         T_plot                      % Plotting time interval (defaults to T_range)
-        ode_solver = @ode45         % ODE solver function handle
+        % The integrator is chosen BY NAME, not by passing a handle, for the
+        % same reason `activation` is: the name is data, so it survives into
+        % resolved_defaults, compares cleanly in same_config, and a sweep can
+        % carry it without smuggling a function handle through a struct.
+        %
+        %   'ode45'  - adaptive Runge-Kutta 4(5) (the default)
+        %   'ode15s' - adaptive stiff solver
+        %   'rk4'    - fixed-step classic RK4 (src/ode_rk4.m); much faster than
+        %              ode45 with noisy forcing, since there is no step-size
+        %              control to thrash
+        %
+        % Passing a function handle raises SRNNModel:RenamedProperty naming the
+        % string that replaces it.
+        %
+        % NOTE the QR Lyapunov method always integrates its variational
+        % equation with ode45 regardless of this setting -- see compute_lyapunov.
+        ode_solver = 'ode45'        % 'ode45' | 'ode15s' | 'rk4'
         ode_opts                    % ODE solver options struct
         x0_std = 0.1                % Std dev of the random initial dendritic state x0 (0 = deterministic x0=0)
     end
@@ -324,6 +340,11 @@ classdef SRNNModel2 < handle
                     error('SRNNModel:RenamedProperty', ...
                         '''%s'' is now a computed (Dependent) property. Set ''%s'' instead, %s.', ...
                         name, renamed.(name).set, renamed.(name).hint);
+                elseif ischar(name) && strcmp(name, 'ode_solver')
+                    % Fail here rather than at the first solver call, and give
+                    % the handle-to-name mapping while the caller can see it.
+                    SRNNModel2.check_ode_solver(varargin{i+1});
+                    obj.ode_solver = varargin{i+1};
                 elseif isprop(obj, name)
                     obj.(name) = varargin{i+1};
                 else
@@ -549,7 +570,7 @@ classdef SRNNModel2 < handle
             % Integrate
             fprintf('Integrating equations\n');
             tic
-            [t_raw, S_raw] = obj.ode_solver(rhs, obj.t_ex, obj.S0, obj.ode_opts);
+            [t_raw, S_raw] = obj.integrate(rhs, obj.t_ex, obj.S0);
             integration_time = toc;
             fprintf('Integration complete in %.2f seconds.\n', integration_time);
             
@@ -609,7 +630,13 @@ classdef SRNNModel2 < handle
             rhs = @(t, S) SRNNModel2.dynamics_fast(t, S, params);
             
             fprintf('Computing Lyapunov exponents using %s method\n', obj.lya_method);
-            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, obj.ode_solver, rhs);
+            % Benettin re-integrates trajectory segments, so it must use the
+            % same integrator as the trajectory itself -- that is what makes the
+            % discretisation error common to both trajectories and cancel in the
+            % difference. (The QR path integrates a variational equation on a
+            % 2-point span instead and always uses ode45; see below.)
+            solver = SRNNModel2.resolve_solver(obj.ode_solver);
+            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, solver, rhs);
             
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
@@ -1472,6 +1499,17 @@ classdef SRNNModel2 < handle
     
     %% Private Methods
     methods (Access = protected)
+        function [t_out, S_out] = integrate(obj, rhs, tspan, S0)
+            % INTEGRATE Run the trajectory integrator named by ode_solver.
+            %
+            % The single place the main trajectory is stepped, so that
+            % SRNN_ESN_reservoir -- which does not go through run(), it has its
+            % own run_reservoir_esn -- gets any integrator work for free rather
+            % than silently missing it.
+            solver = SRNNModel2.resolve_solver(obj.ode_solver);
+            [t_out, S_out] = solver(rhs, tspan, S0, obj.ode_opts);
+        end
+
         function h = build_activation(obj, which_one)
             % BUILD_ACTIVATION Handle for the chosen nonlinearity (1=fn, 2=derivative)
             %
@@ -1549,7 +1587,11 @@ classdef SRNNModel2 < handle
         
         function validate(obj)
             % VALIDATE Check parameter consistency and constraints
-            
+
+            % Catch an ode_solver assigned after construction, so a typo fails
+            % here rather than at the first solver call inside run().
+            SRNNModel2.check_ode_solver(obj.ode_solver);
+
             % Check n_E and n_I
             if obj.n_E < 1
                 error('SRNNModel:InvalidParams', 'n_E must be >= 1. Current: %d (n=%d, f=%.2f)', obj.n_E, obj.n, obj.f);
@@ -2508,7 +2550,7 @@ classdef SRNNModel2 < handle
             end
         end
 
-        function [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya_vec] = lyapunov_spectrum_qr_internal(X_fid_traj, t_fid_traj, lya_dt_interval, params, ode_solver, ode_options_main, jacobian_func_handle, T_full_interval, lya_warmup, N_states_sys, fs_fid)
+        function [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya_vec] = lyapunov_spectrum_qr_internal(X_fid_traj, t_fid_traj, lya_dt_interval, params, ~, ode_options_main, jacobian_func_handle, T_full_interval, lya_warmup, N_states_sys, fs_fid)
             % QR method for full Lyapunov spectrum.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/lyapunov_spectrum_qr.m
             %
@@ -2574,7 +2616,13 @@ classdef SRNNModel2 < handle
                 Psi0_vec = reshape(Q_current, [], 1);
                 
                 variational_eqs = @(tt, current_Psi_vec) SRNNModel2.variational_eqs_ode_internal(tt, current_Psi_vec, fiducial_interpolants, N_states_sys, jacobian_func_handle, params);
-                [~, Psi_solution_vec] = ode_solver(variational_eqs, t_span_ode, Psi0_vec, ode_options_var);
+                % ode45 rather than the model's ode_solver: this is a 2-POINT
+                % span, which the fixed-step solvers reject outright (see
+                % ode_rk4.m), so QR has only ever worked with an adaptive
+                % solver. The variational equation is deterministic and
+                % independent of how the fiducial trajectory was produced, so
+                % pinning it here is not a loss of generality.
+                [~, Psi_solution_vec] = ode45(variational_eqs, t_span_ode, Psi0_vec, ode_options_var);
                 
                 Psi_evolved_matrix = reshape(Psi_solution_vec(end, :)', [N_states_sys, N_states_sys]);
                 
@@ -3448,6 +3496,60 @@ classdef SRNNModel2 < handle
         end
     end
     
+    methods (Static)
+        function names = solver_names()
+            % SOLVER_NAMES The valid values of the `ode_solver` property.
+            names = {'ode45', 'ode15s', 'rk4'};
+        end
+
+        function fn = resolve_solver(name)
+            % RESOLVE_SOLVER Map an ode_solver name to a callable with the
+            % solver(odefun, tspan, y0, opts) signature.
+            switch lower(name)
+                case 'ode45'
+                    fn = @ode45;
+                case 'ode15s'
+                    fn = @ode15s;
+                case 'rk4'
+                    fn = @ode_rk4;
+                otherwise
+                    error('SRNNModel:InvalidParams', ...
+                        'Unknown ode_solver ''%s''. Valid: %s.', ...
+                        char(string(name)), strjoin(SRNNModel2.solver_names(), ', '));
+            end
+        end
+
+        function check_ode_solver(value)
+            % CHECK_ODE_SOLVER Reject handles by name and validate the string.
+            % Called from the constructor (so a bad name fails at the point of
+            % the mistake) and from validate() (so a later assignment is caught
+            % too). Not a set method: ParamSpaceAnalysis2 assigns properties
+            % weakest-first and may set one before the ones that give it
+            % meaning, so this class deliberately has no setters.
+            if isa(value, 'function_handle')
+                legacy = struct('ode45', 'ode45', 'ode15s', 'ode15s', ...
+                    'ode_rk4', 'rk4', 'ode23', 'ode45', 'ode113', 'ode45');
+                as_str = func2str(value);
+                if isfield(legacy, as_str)
+                    hint = sprintf('use ''%s'' instead of @%s', legacy.(as_str), as_str);
+                else
+                    hint = sprintf('valid names are %s', ...
+                        strjoin(SRNNModel2.solver_names(), ', '));
+                end
+                error('SRNNModel:RenamedProperty', ...
+                    ['''ode_solver'' now takes a NAME rather than a function ' ...
+                     'handle, so the choice survives into resolved_defaults and ' ...
+                     'compares cleanly across runs: %s.'], hint);
+            end
+            if ~(ischar(value) || isstring(value)) || ...
+                    ~ismember(lower(char(string(value))), SRNNModel2.solver_names())
+                error('SRNNModel:InvalidParams', ...
+                    'Unknown ode_solver ''%s''. Valid: %s.', ...
+                    char(string(value)), strjoin(SRNNModel2.solver_names(), ', '));
+            end
+        end
+    end
+
     methods (Static, Access = private)
         function names = activation_names()
             % ACTIVATION_NAMES The valid values of the `activation` property.
