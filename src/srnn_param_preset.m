@@ -225,6 +225,40 @@ switch name
         % NOTE the nesting is synapse_config.<PRE>.<POST>, so .E.I is E -> I.
         % That is the opposite order from the mu_EI naming, which is (post, pre).
 
+    case 'celltype_pairs_uniform_std_n500'
+        % The homogeneous control for celltype_pairs_all_std_n500: same four
+        % depressing routes, but nothing distinguishes any of them from any
+        % other, and nothing distinguishes E from I except its sign.
+        %
+        % Three heterogeneities are removed at once:
+        %   * STD is identical on every route, tau_rec = 2 and tau_rel = 0.25,
+        %     rather than E->E recovering faster and I->I depressing harder.
+        %   * Both types share S_c = 0, rather than 0.15 / 0.25.
+        %   * The weights are symmetric, mu_tilde_relative = [4 -4; 4 -4],
+        %     rather than the asymmetric [4.5 -3; 4 -3]. Every population sends
+        %     the same magnitude and receives the same magnitude; only the sign
+        %     differs. Note this leaves the RMT unity condition unmet (mu_rel is
+        %     4, not 1), so R still varies across the n sweep.
+        %
+        % The setpoint is cleared rather than set to [0 0]. Both give every
+        % neuron a centre of zero, but leaving mu_S_c/sigma_S_c EMPTY keeps
+        % S_c_vec empty, which holds the whole model on the scalar-S_c code
+        % path -- the branch that is bit-identical to the pre-heterogeneity
+        % code, and cheaper. Setting [0 0] would draw a vector of zeros and take
+        % the per-neuron path to compute the same thing.
+        [d, model_class] = srnn_param_preset('celltype_pairs_S_c_by_type_n500_fixedF');
+        d.mu_tilde_relative = [4 -4; 4 -4];   % multiples of F, (post <- pre)
+        d.S_c       = 0.0;
+        d.mu_S_c    = [];
+        d.sigma_S_c = [];
+
+        std_routes = struct();
+        uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
+        std_routes.E.E.std = uniform_std;
+        std_routes.E.I.std = uniform_std;
+        std_routes.I.E.std = uniform_std;
+        std_routes.I.I.std = uniform_std;
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -242,7 +276,8 @@ function names = srnn_param_preset_names()
 % The valid preset names, kept next to the switch above so they stay in sync.
 names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500', ...
-    'celltype_pairs_S_c_by_type_n500_fixedF', 'celltype_pairs_all_std_n500'};
+    'celltype_pairs_S_c_by_type_n500_fixedF', 'celltype_pairs_all_std_n500', ...
+    'celltype_pairs_uniform_std_n500'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
