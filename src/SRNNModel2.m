@@ -175,6 +175,39 @@ classdef SRNNModel2 < handle
         ode_solver = 'ode45'        % 'ode45' | 'ode15s' | 'rk4'
         ode_opts                    % ODE solver options struct
         x0_std = 0.1                % Std dev of the random initial dendritic state x0 (0 = deterministic x0=0)
+
+        % Additive Wiener noise on the dendritic state:
+        %
+        %   dx_i = (-x_i + sum_j w_ij b_j r_j + u_i)/tau_d dt + sigma_u_noise/tau_d dW_i
+        %
+        % sigma_u_noise is INPUT-REFERRED: it is in the same units as u, so it
+        % is directly comparable to intrinsic_drive and the stimulus amplitude
+        % ("the noise is 20% of the DC drive"), and migrating the older
+        % noise-through-the-stimulus route is the identity rather than a
+        % conversion. The raw diffusion coefficient the integrator actually
+        % multiplies dW by is the Dependent sigma_x_raw = sigma_u_noise/tau_d;
+        % x_noise_std reports the same thing as a stationary std of x.
+        %
+        % Noise enters ONLY x. That keeps the diffusion constant, which is what
+        % makes Ito and Stratonovich coincide, kills the Milstein term, leaves
+        % the QR variational equation untouched, and -- because the two
+        % trajectories share one noise path -- makes the additive noise cancel
+        % in Benettin's difference, so the LLE stays measurable at any noise
+        % level rather than only at small ones.
+        %
+        % sigma_u_noise > 0 REQUIRES a stochastic integrator ('euler', 'heun'
+        % or 'sra1'); asking for noise with ode45/ode15s/rk4 is an error, not a
+        % silent drop. sigma_u_noise = 0 skips noise generation entirely and is
+        % bit-identical to the deterministic model.
+        sigma_u_noise = 0
+
+        % Seed for the noise draw. Empty derives it from rng_seeds(1) with an
+        % offset well away from the streams that build W and the S_c setpoints,
+        % so a reps sweep varies the noise realisation too. Under
+        % ParamSpaceAnalysis2 that gives the same noise path across all
+        % conditions at a grid point (they share a network seed) while varying
+        % it across reps and across grid points. Set it to pin the realisation.
+        noise_seed = []
     end
     
     %% Input Configuration Properties
@@ -260,6 +293,8 @@ classdef SRNNModel2 < handle
         lambda_O            % Outlier eigenvalues of E[W], by descending magnitude
         activation_function            % Nonlinearity handle, built from activation + S_a/S_c
         activation_function_derivative % Its derivative, built the same way
+        sigma_x_raw         % Raw diffusion coefficient = sigma_u_noise / tau_d
+        x_noise_std         % Nominal stationary std of x from noise alone (W=0, u=0)
         mu_se               % Sparse excitatory mean
         mu_si               % Sparse inhibitory mean
         sigma_se            % Sparse excitatory std dev
@@ -283,6 +318,16 @@ classdef SRNNModel2 < handle
         u_interpolant               % griddedInterpolant for external input (avoids persistent vars)
         S0                          % Initial state vector
         cached_params               % Cached params struct (set by build)
+
+        % Pre-generated Wiener increments for the current run, or empty. Built
+        % at the top of run() rather than in build(): it is large (n x nt x 2
+        % doubles, ~96 MB at n=300, T=50 s, fs=400), it is only needed while
+        % integrating, and keeping it out of build() keeps it out of the
+        % build-comparison in verify_shared_build. It stays alive through
+        % compute_lyapunov -- Benettin re-integrates segments and must see the
+        % same increments -- and is cleared alongside S_out. Never saved: it is
+        % regenerable from noise_seed.
+        noise_increments = []
 
         % Realized per-neuron nonlinearity setpoints (n x 1), drawn by
         % build_setpoints() from mu_S_c_* / sigma_S_c_*. EMPTY means every
@@ -331,7 +376,11 @@ classdef SRNNModel2 < handle
                 'activation_function', struct('set', 'activation', ...
                     'hint', 'one of ''logistic'', ''piecewise'', ''tanh'', parameterised by S_a/S_c (or set activation_custom for a bespoke nonlinearity)'), ...
                 'activation_function_derivative', struct('set', 'activation', ...
-                    'hint', 'the derivative follows the same choice; there is no separate setting'));
+                    'hint', 'the derivative follows the same choice; there is no separate setting'), ...
+                'sigma_x_raw', struct('set', 'sigma_u_noise', ...
+                    'hint', 'which holds the noise INPUT-REFERRED, in the units of u (sigma_x_raw = sigma_u_noise/tau_d)'), ...
+                'x_noise_std', struct('set', 'sigma_u_noise', ...
+                    'hint', 'which holds the noise input-referred; x_noise_std = sigma_u_noise/sqrt(2*tau_d) is the stationary std it implies'));
 
             % Parse name-value pairs
             for i = 1:2:length(varargin)
@@ -518,6 +567,21 @@ classdef SRNNModel2 < handle
             val = (obj.n_E + 1):obj.n;
         end
         
+        function val = get.sigma_x_raw(obj)
+            % The coefficient the integrator multiplies dW by. sigma_u_noise is
+            % input-referred (units of u), and u enters dx/dt divided by tau_d.
+            val = obj.sigma_u_noise / obj.tau_d;
+        end
+
+        function val = get.x_noise_std(obj)
+            % Stationary std of x driven by noise alone: for the OU part
+            % dx = -x/tau_d dt + sigma_x_raw dW, var = sigma_x_raw^2*tau_d/2.
+            % NOMINAL only -- it ignores W and u, exactly as x0_std does -- but
+            % it is the number to compare against S_c and the sigmoid width
+            % when judging whether the noise is large enough to matter.
+            val = obj.sigma_u_noise / sqrt(2 * obj.tau_d);
+        end
+
         function val = get.N_sys_eqs(obj)
             nE = obj.n_E;
             nI = obj.n_I;
@@ -566,7 +630,12 @@ classdef SRNNModel2 < handle
             u_interp = obj.u_interpolant;
             params.u_interpolant = u_interp;  % Add to params for dynamics_fast
             rhs = @(t, S) SRNNModel2.dynamics_fast(t, S, params);
-            
+
+            % Pre-generate the Wiener increments (a no-op at sigma_u_noise = 0).
+            % Must happen before both the trajectory and compute_lyapunov, since
+            % Benettin re-integrates segments against the same increments.
+            obj.build_noise();
+
             % Integrate
             fprintf('Integrating equations\n');
             tic
@@ -601,7 +670,12 @@ classdef SRNNModel2 < handle
             if ~obj.store_full_state
                 obj.S_out = [];
             end
-            
+
+            % The noise tensor has done its job (trajectory + Benettin) and is
+            % the largest thing on the object; drop it. It is regenerable from
+            % noise_seed, so nothing is lost.
+            obj.noise_increments = [];
+
             obj.has_run = true;
             fprintf('Simulation complete.\n');
         end
@@ -635,7 +709,7 @@ classdef SRNNModel2 < handle
             % discretisation error common to both trajectories and cancel in the
             % difference. (The QR path integrates a variational equation on a
             % 2-point span instead and always uses ode45; see below.)
-            solver = SRNNModel2.resolve_solver(obj.ode_solver);
+            solver = SRNNModel2.resolve_solver(obj.ode_solver, obj.noise_increments);
             obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, solver, rhs);
             
             if isfield(obj.lya_results, 'LLE')
@@ -1506,8 +1580,44 @@ classdef SRNNModel2 < handle
             % SRNN_ESN_reservoir -- which does not go through run(), it has its
             % own run_reservoir_esn -- gets any integrator work for free rather
             % than silently missing it.
-            solver = SRNNModel2.resolve_solver(obj.ode_solver);
+            solver = SRNNModel2.resolve_solver(obj.ode_solver, obj.noise_increments);
             [t_out, S_out] = solver(rhs, tspan, S0, obj.ode_opts);
+        end
+
+        function build_noise(obj)
+            % BUILD_NOISE Pre-generate the Wiener increments for this run.
+            %
+            % Unit-variance normals, not scaled increments: sde_fixed_step
+            % forms dW = sqrt(h)*xi at use time, which keeps the stored numbers
+            % independent of the step size.
+            obj.noise_increments = [];
+            if obj.sigma_u_noise == 0
+                return;     % no allocation, and bit-identical to the ODE path
+            end
+
+            seed = obj.noise_seed;
+            if isempty(seed)
+                % A different offset from the S_c draw's 104729, so the W,
+                % setpoint and noise streams cannot overlap.
+                seed = obj.rng_seeds(1) + 224737;
+            end
+
+            % Own RNG substream, saved and restored, so W, the stimulus, the
+            % setpoints and x0 are bit-identical whether or not noise is drawn.
+            n_steps = numel(obj.t_ex) - 1;
+            stream_state = rng;
+            rng(seed);
+            xi1 = randn(obj.n, n_steps);
+            xi2 = randn(obj.n, n_steps);
+            rng(stream_state);
+
+            % Noise reaches x only: the trailing n entries of the state vector.
+            N = obj.N_sys_eqs;
+            obj.noise_increments = struct( ...
+                'xi1', xi1, 'xi2', xi2, ...
+                't0', obj.t_ex(1), 'fs', obj.fs, ...
+                'sigma', obj.sigma_x_raw, ...
+                'idx', (N - obj.n + 1):N);
         end
 
         function h = build_activation(obj, which_one)
@@ -1591,6 +1701,7 @@ classdef SRNNModel2 < handle
             % Catch an ode_solver assigned after construction, so a typo fails
             % here rather than at the first solver call inside run().
             SRNNModel2.check_ode_solver(obj.ode_solver);
+            SRNNModel2.check_noise_settings(obj.sigma_u_noise, obj.ode_solver, 'SRNNModel');
 
             % Check n_E and n_I
             if obj.n_E < 1
@@ -3499,12 +3610,32 @@ classdef SRNNModel2 < handle
     methods (Static)
         function names = solver_names()
             % SOLVER_NAMES The valid values of the `ode_solver` property.
+            names = [SRNNModel2.deterministic_solver_names(), ...
+                SRNNModel2.stochastic_solver_names()];
+        end
+
+        function names = deterministic_solver_names()
+            % Solvers that ignore sigma_u_noise; the only ones usable at sigma = 0.
             names = {'ode45', 'ode15s', 'rk4'};
         end
 
-        function fn = resolve_solver(name)
+        function names = stochastic_solver_names()
+            % Fixed-step SDE schemes (src/sde_fixed_step.m). Required when
+            % sigma_u_noise > 0; usable at sigma = 0 too, where they degenerate
+            % to their deterministic parents (which is what the convergence
+            % tests rely on).
+            names = {'euler', 'heun', 'sra1'};
+        end
+
+        function fn = resolve_solver(name, noise)
             % RESOLVE_SOLVER Map an ode_solver name to a callable with the
             % solver(odefun, tspan, y0, opts) signature.
+            %
+            % The stochastic schemes close over the pre-generated noise. A
+            % closure is safe here where it would not be on the property
+            % itself: this handle is built per call and never stored or
+            % compared -- what is persisted and compared is the NAME.
+            if nargin < 2, noise = []; end
             switch lower(name)
                 case 'ode45'
                     fn = @ode45;
@@ -3512,10 +3643,37 @@ classdef SRNNModel2 < handle
                     fn = @ode15s;
                 case 'rk4'
                     fn = @ode_rk4;
+                case {'euler', 'heun', 'sra1'}
+                    scheme = lower(name);
+                    fn = @(f, tsp, y0, o) sde_fixed_step(f, tsp, y0, o, noise, scheme);
                 otherwise
                     error('SRNNModel:InvalidParams', ...
                         'Unknown ode_solver ''%s''. Valid: %s.', ...
                         char(string(name)), strjoin(SRNNModel2.solver_names(), ', '));
+            end
+        end
+
+        function check_noise_settings(sigma_u_noise, ode_solver, err_id_prefix)
+            % CHECK_NOISE_SETTINGS Validate sigma_u_noise and its pairing with
+            % the integrator. Shared by both model classes and by
+            % ParamSpaceAnalysis2's pre-flight, so a swept sigma with a
+            % deterministic solver fails before a sweep starts rather than at
+            % the first nonzero grid point.
+            if ~isscalar(sigma_u_noise) || ~isnumeric(sigma_u_noise) || ...
+                    ~isreal(sigma_u_noise) || ~isfinite(sigma_u_noise) || sigma_u_noise < 0
+                error([err_id_prefix ':InvalidParams'], ...
+                    'sigma_u_noise must be a finite non-negative real scalar.');
+            end
+            if sigma_u_noise > 0 && ...
+                    ~ismember(lower(char(string(ode_solver))), SRNNModel2.stochastic_solver_names())
+                error([err_id_prefix ':InvalidParams'], ...
+                    ['sigma_u_noise = %g requires a stochastic integrator; ' ...
+                     'ode_solver is ''%s''. Set ode_solver to one of %s. ' ...
+                     '(The adaptive solvers cannot step an SDE at all, and ' ...
+                     '''rk4'' is kept deterministic so sigma = 0 work stays ' ...
+                     'bit-identical to earlier runs.)'], ...
+                    sigma_u_noise, char(string(ode_solver)), ...
+                    strjoin(SRNNModel2.stochastic_solver_names(), ', '));
             end
         end
 

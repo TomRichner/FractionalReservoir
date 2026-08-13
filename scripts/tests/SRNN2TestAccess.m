@@ -5,6 +5,14 @@ classdef SRNN2TestAccess < SRNNModel2
     %              analytic Jacobian (compute_Jacobian_fast)
     %   lya_grid - lyapunov_sample_grid, the segment layout shared by the
     %              Benettin and QR paths (see test_lya_window)
+    methods
+        function build_noise_for_test(obj)
+            % Expose the protected build_noise so a test can inspect the drawn
+            % increments without running a whole simulation.
+            obj.build_noise();
+        end
+    end
+
     methods (Static)
         function dS = rhs(t, S, params)
             dS = SRNNModel2.dynamics_fast(t, S, params);

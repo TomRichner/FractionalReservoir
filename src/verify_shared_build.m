@@ -45,7 +45,8 @@ function verify_shared_build(esn_array, expected_to_differ, also_check_protected
     % Properties to always skip (run-output, complex objects, or
     % derived aggregates that legitimately differ when config differs)
     always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', ...
-                   'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results'};
+                   'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
+                   'noise_increments'};
 
     n_checked = 0;
     n_matched = 0;

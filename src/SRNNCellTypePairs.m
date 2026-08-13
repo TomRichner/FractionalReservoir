@@ -106,6 +106,12 @@ classdef SRNNCellTypePairs < handle
         ode_solver = 'ode45'
         ode_opts
         x0_std = 0.1
+        % Additive Wiener noise on x, input-referred (units of u). Requires a
+        % stochastic integrator when > 0; 0 is bit-identical to the ODE path.
+        % See SRNNModel2.sigma_u_noise for the full rationale.
+        sigma_u_noise = 0
+        % Seed for the noise draw; empty derives it from rng_seeds(1).
+        noise_seed = []
         input_config
         u_ex_scale = 1.0
         rng_seeds = [1 2]
@@ -167,6 +173,8 @@ classdef SRNNCellTypePairs < handle
         tau_a_E
         activation_function             % Built from activation + S_a/S_c
         activation_function_derivative
+        sigma_x_raw                     % Raw diffusion coefficient = sigma_u_noise / tau_d
+        x_noise_std                     % Nominal stationary std of x from noise alone
         n_per_type
         type_indices
         cell_indices
@@ -181,6 +189,12 @@ classdef SRNNCellTypePairs < handle
         % shares the scalar S_c, which is the default and keeps every code path
         % on the scalar branch.
         S_c_vec = []
+
+        % Pre-generated Wiener increments for the current run, or empty. Built
+        % at the top of run(), kept alive through compute_lyapunov so Benettin
+        % sees the same path, then cleared. Regenerable from noise_seed, so it
+        % is never saved. See SRNNModel2.noise_increments.
+        noise_increments = []
 
         W
         is_built = false
@@ -219,7 +233,9 @@ classdef SRNNCellTypePairs < handle
                 'mu_tilde',    'mu_tilde_relative', ...
                 'sigma_tilde', 'sigma_tilde_relative', ...
                 'activation_function',            'activation', ...
-                'activation_function_derivative', 'activation');
+                'activation_function_derivative', 'activation', ...
+                'sigma_x_raw',  'sigma_u_noise', ...
+                'x_noise_std',  'sigma_u_noise');
             for k = 1:2:numel(varargin)
                 name = varargin{k};
                 if ~(ischar(name) || (isstring(name) && isscalar(name)))
@@ -229,9 +245,10 @@ classdef SRNNCellTypePairs < handle
                 name = char(name);
                 if isfield(renamed, name)
                     error('SRNNCellTypePairs:RenamedProperty', ...
-                        ['''%s'' is now a computed (Dependent) property. Set ''%s'' ' ...
-                        'instead -- the tildes are held in multiples of ' ...
-                        'F = default_val, and the nonlinearity is chosen by name.'], ...
+                        ['''%s'' is now a computed (Dependent) property; set ''%s'' ' ...
+                        'instead. The tildes are held in multiples of ' ...
+                        'F = default_val, the nonlinearity is chosen by name, and ' ...
+                        'the noise is held input-referred in the units of u.'], ...
                         name, renamed.(name));
                 end
                 if ~isprop(obj, name)
@@ -394,6 +411,17 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
+        function value = get.sigma_x_raw(obj)
+            % Coefficient the integrator multiplies dW by; sigma_u_noise is
+            % input-referred and u enters dx/dt divided by tau_d.
+            value = obj.sigma_u_noise / obj.tau_d;
+        end
+
+        function value = get.x_noise_std(obj)
+            % Nominal stationary std of x from noise alone (W = 0, u = 0).
+            value = obj.sigma_u_noise / sqrt(2 * obj.tau_d);
+        end
+
         function value = get.N_sys_eqs(obj)
             if isempty(obj.n_a) || isempty(obj.n_cellTypes)
                 value = obj.n;
@@ -439,6 +467,11 @@ classdef SRNNCellTypePairs < handle
             end
             rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, params);
 
+            % Pre-generate the Wiener increments (a no-op at sigma_u_noise = 0)
+            % before both the trajectory and compute_lyapunov, since Benettin
+            % re-integrates segments against the same increments.
+            obj.build_noise();
+
             fprintf('Integrating SRNNCellTypePairs equations\n');
             tic;
             [t_raw, S_raw] = obj.integrate(rhs, obj.t_ex, obj.S0);
@@ -465,6 +498,10 @@ classdef SRNNCellTypePairs < handle
             if ~obj.store_full_state
                 obj.S_out = [];
             end
+            % The noise tensor has done its job (trajectory + Benettin) and is
+            % the largest thing on the object; drop it. Regenerable from
+            % noise_seed, so nothing is lost.
+            obj.noise_increments = [];
             obj.has_run = true;
             fprintf('Simulation complete.\n');
         end
@@ -473,8 +510,37 @@ classdef SRNNCellTypePairs < handle
             % INTEGRATE Run the trajectory integrator named by ode_solver.
             % Twin of SRNNModel2.integrate; the classes are duck-typed
             % siblings and share no implementation.
-            solver = SRNNCellTypePairs.resolve_solver(obj.ode_solver);
+            solver = SRNNCellTypePairs.resolve_solver(obj.ode_solver, obj.noise_increments);
             [t_out, S_out] = solver(rhs, tspan, S0, obj.ode_opts);
+        end
+
+        function build_noise(obj)
+            % BUILD_NOISE Pre-generate the Wiener increments for this run.
+            % Twin of SRNNModel2.build_noise; see there for the reasoning.
+            obj.noise_increments = [];
+            if obj.sigma_u_noise == 0
+                return;
+            end
+
+            seed = obj.noise_seed;
+            if isempty(seed)
+                seed = obj.rng_seeds(1) + 224737;
+            end
+
+            n_steps = numel(obj.t_ex) - 1;
+            stream_state = rng;
+            rng(seed);
+            xi1 = randn(obj.n, n_steps);
+            xi2 = randn(obj.n, n_steps);
+            rng(stream_state);
+
+            % layout.x names the dendritic block directly, so unlike
+            % SRNNModel2 this class does not have to derive it from N_sys_eqs.
+            obj.noise_increments = struct( ...
+                'xi1', xi1, 'xi2', xi2, ...
+                't0', obj.t_ex(1), 'fs', obj.fs, ...
+                'sigma', obj.sigma_x_raw, ...
+                'idx', obj.cached_params.state_layout.x);
         end
 
         function compute_lyapunov(obj)
@@ -494,7 +560,8 @@ classdef SRNNCellTypePairs < handle
             obj.lya_results = SRNNCellTypePairs.compute_lyapunov_exponents_internal( ...
                 obj.lya_method, obj.S_out, obj.t_out, 1 / obj.fs, obj.fs, ...
                 obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
-                obj.ode_opts, SRNNCellTypePairs.resolve_solver(obj.ode_solver), rhs);
+                obj.ode_opts, ...
+                SRNNCellTypePairs.resolve_solver(obj.ode_solver, obj.noise_increments), rhs);
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
@@ -769,6 +836,8 @@ classdef SRNNCellTypePairs < handle
             % Catch an ode_solver assigned after construction, so a typo fails
             % here rather than at the first solver call inside run().
             SRNNCellTypePairs.check_ode_solver(obj.ode_solver);
+            SRNNModel2.check_noise_settings(obj.sigma_u_noise, obj.ode_solver, ...
+                'SRNNCellTypePairs');
 
             C = obj.n_cellTypes;
             if ~isscalar(C) || ~isfinite(C) || C < 1 || C ~= round(C)
@@ -1479,11 +1548,22 @@ classdef SRNNCellTypePairs < handle
     methods (Static)
         function names = solver_names()
             % SOLVER_NAMES The valid values of the `ode_solver` property.
+            names = [SRNNCellTypePairs.deterministic_solver_names(), ...
+                SRNNCellTypePairs.stochastic_solver_names()];
+        end
+
+        function names = deterministic_solver_names()
             names = {'ode45', 'ode15s', 'rk4'};
         end
 
-        function fn = resolve_solver(name)
+        function names = stochastic_solver_names()
+            names = {'euler', 'heun', 'sra1'};
+        end
+
+        function fn = resolve_solver(name, noise)
             % RESOLVE_SOLVER Map an ode_solver name to a solver callable.
+            % See SRNNModel2.resolve_solver.
+            if nargin < 2, noise = []; end
             switch lower(name)
                 case 'ode45'
                     fn = @ode45;
@@ -1491,6 +1571,9 @@ classdef SRNNCellTypePairs < handle
                     fn = @ode15s;
                 case 'rk4'
                     fn = @ode_rk4;
+                case {'euler', 'heun', 'sra1'}
+                    scheme = lower(name);
+                    fn = @(f, tsp, y0, o) sde_fixed_step(f, tsp, y0, o, noise, scheme);
                 otherwise
                     error('SRNNCellTypePairs:InvalidParams', ...
                         'Unknown ode_solver ''%s''. Valid: %s.', ...

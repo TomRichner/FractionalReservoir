@@ -388,7 +388,12 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % Integrate entire trajectory at once
             fprintf('  Integrating ESN dynamics...\n');
             tic
+            % Pre-generate Wiener increments (a no-op at sigma_u_noise = 0).
+            % run_reservoir_esn does not go through SRNNModel2.run, so it has
+            % to do this itself; integrate() then picks the tensor up.
+            obj.build_noise();
             [obj.t_out, obj.S_out] = obj.integrate(rhs, obj.t_ex, obj.S0);
+            obj.noise_increments = [];
             integration_time = toc;
             fprintf('  Integration complete in %.2f seconds.\n', integration_time);
         end
@@ -925,7 +930,8 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             n_obj = numel(esn_array);
 
             always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', ...
-                           'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results'};
+                           'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
+                           'noise_increments'};
 
             n_checked = 0;
             n_matched = 0;

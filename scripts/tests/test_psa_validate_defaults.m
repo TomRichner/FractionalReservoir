@@ -106,6 +106,43 @@ all_passed = check('run() rejects bad defaults', threw) && all_passed;
 all_passed = check('  ... and leaves no dated output folder', ...
     strcmp(psa.output_dir, dir_before) && ~exist(psa.output_dir, 'dir')) && all_passed;
 
+%% 10. A swept sigma_u_noise with a deterministic integrator is caught up front
+% The model would catch this too, but only at the first NONZERO grid point --
+% which for a sweep starting at sigma = 0 can be an hour in, after a partial
+% run directory exists. run() therefore pre-flights it beside the defaults
+% check, before the output directory is created.
+psa = make_psa();
+psa.add_grid_parameter('sigma_u_noise', [0, 0.5]);
+psa.model_defaults.ode_solver = 'rk4';
+dir_before = psa.output_dir;
+[threw, err] = capture_error(@() psa.run());
+all_passed = check('a swept sigma with a deterministic solver is rejected', ...
+    threw && contains(err.message, 'sra1')) && all_passed;
+all_passed = check('  ... before any output folder is created', ...
+    strcmp(psa.output_dir, dir_before) && ~exist(psa.output_dir, 'dir')) && all_passed;
+
+% The same sweep with a stochastic integrator passes the pre-flight.
+psa = make_psa();
+psa.add_grid_parameter('sigma_u_noise', [0, 0.5]);
+psa.model_defaults.ode_solver = 'sra1';
+[threw, ~] = capture_error(@() psa.validate_noise_settings());
+all_passed = check('the same sweep with ''sra1'' passes', ~threw) && all_passed;
+
+% A sweep that never leaves zero needs no stochastic solver at all.
+psa = make_psa();
+psa.add_grid_parameter('sigma_u_noise', [0, 0]);
+psa.model_defaults.ode_solver = 'rk4';
+[threw, ~] = capture_error(@() psa.validate_noise_settings());
+all_passed = check('an all-zero sigma sweep is left alone', ~threw) && all_passed;
+
+% A scalar default (not a grid axis) is checked the same way.
+psa = make_psa();
+psa.model_defaults.sigma_u_noise = 0.2;
+psa.model_defaults.ode_solver = 'ode45';
+[threw, err] = capture_error(@() psa.validate_noise_settings());
+all_passed = check('a scalar sigma default with ode45 is rejected too', ...
+    threw && contains(err.message, 'sra1')) && all_passed;
+
 %% Result
 fprintf('\n========================================\n');
 if all_passed

@@ -262,6 +262,42 @@ classdef ParamSpaceAnalysis2 < handle
             end
         end
 
+        function validate_noise_settings(obj)
+            % VALIDATE_NOISE_SETTINGS Reject a swept sigma_u_noise paired with a
+            % deterministic integrator, before the sweep starts.
+            %
+            % The model would catch this too, but only when it reached the first
+            % NONZERO grid point -- which for a sweep starting at sigma = 0 can
+            % be an hour in, after a partial run directory has been written.
+            % Runs next to validate_model_defaults, before the output directory
+            % exists.
+
+            name = 'sigma_u_noise';
+            sigma_levels = [];
+            if isfield(obj.model_defaults, name)
+                sigma_levels = obj.model_defaults.(name)(:);
+            end
+            % Grid levels live in param_ranges ([min max], expanded to n_levels)
+            % or in explicit_vectors; the largest value is what decides.
+            if isfield(obj.param_ranges, name)
+                sigma_levels = [sigma_levels; obj.param_ranges.(name)(:)];
+            end
+            if isfield(obj.explicit_vectors, name)
+                sigma_levels = [sigma_levels; obj.explicit_vectors.(name)(:)];
+            end
+            if isempty(sigma_levels) || ~any(sigma_levels > 0)
+                return;     % nothing asks for noise
+            end
+
+            solver = 'ode45';   % the class default, unless overridden
+            if isfield(obj.model_defaults, 'ode_solver')
+                solver = obj.model_defaults.ode_solver;
+            end
+            % Delegate so the rule and its message live in one place. Report the
+            % largest requested level, which is the one that will certainly bite.
+            SRNNModel2.check_noise_settings(max(sigma_levels), solver, 'ParamSpaceAnalysis2');
+        end
+
         function validate_model_defaults(obj)
             % VALIDATE_MODEL_DEFAULTS Check model_defaults against SRNNModel2's properties
             %
@@ -515,6 +551,7 @@ classdef ParamSpaceAnalysis2 < handle
             % Reject unusable model_defaults BEFORE the output directory is
             % created, so a rejected config leaves no empty dated folder behind.
             obj.validate_model_defaults();
+            obj.validate_noise_settings();
             obj.report_shadowed_defaults();
 
             % Create timestamped output directory
