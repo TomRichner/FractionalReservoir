@@ -134,6 +134,17 @@ if ~strcmp(master_save_figs, 'save_no_figs')
     fprintf('========================================\n');
     sens_replot_dir = replot_sensitivity(master_output_dir);
     assemble_sensitivity_figure(sens_replot_dir, 'LLE');
+
+    % A second sheet with just the four connectivity blocks, in (post, pre)
+    % reading order rather than the alphabetical order the call above uses.
+    % They are only interpretable against each other -- what matters is whether
+    % E->E and I->I behave alike, and whether the two cross terms do -- and on
+    % the all-parameters sheet they are interleaved with n, f_E and
+    % level_of_chaos. Skipped with a warning on a model class that has no mu
+    % blocks, so this costs nothing on an SRNNModel2 run.
+    assemble_sensitivity_figure(sens_replot_dir, 'LLE', ...
+        {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relative'}, ...
+        'mu_blocks');
 end
 
 %% 2. Tau Sensitivity Analysis

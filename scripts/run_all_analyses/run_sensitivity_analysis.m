@@ -72,19 +72,29 @@ params_to_sweep = {
     'f',              [0.2, 0.8];
     'level_of_chaos', [0.5, 2.0];
     };
+% The four connectivity blocks, each swept from half to twice whatever the
+% preset operates at rather than over fixed absolute numbers. mu_*_relative is a
+% multiplier of F = 1/sqrt(n*alpha*(2-alpha)), so "the default level" is only
+% meaningful relative to the preset -- and mu_tilde_relative is a REQUIRED
+% constructor property with no class default to fall back on, which is why this
+% reads the preset rather than ParamSpaceAnalysis2.class_default.
+mu_block_params = {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relative'};
+mu_sweep_factors = [0.5, 2.0];
+
 if strcmp(model_class, 'SRNNCellTypePairs')
     params_to_sweep{2, 1} = 'f_E';
 
-    % E->E connection strength, swept from half to twice whatever the preset
-    % operates at rather than over fixed absolute numbers. mu_EE_relative is a
-    % multiplier of F = 1/sqrt(n*alpha*(2-alpha)), so "the default level" is only
-    % meaningful relative to the preset -- and mu_tilde_relative is a REQUIRED
-    % constructor property with no class default to fall back on, which is why
-    % this reads the preset rather than ParamSpaceAnalysis2.class_default.
-    mu_EE_base = mu_EE_from_preset(preset_defaults);
-    params_to_sweep(end+1, :) = {'mu_EE_relative', [0.5, 2.0] * mu_EE_base};
-    fprintf('[run_sensitivity_analysis] mu_EE_relative base = %g, sweeping [%g %g]\n', ...
-        mu_EE_base, params_to_sweep{end, 2}(1), params_to_sweep{end, 2}(2));
+    for b_idx = 1:numel(mu_block_params)
+        base = mu_block_from_preset(preset_defaults, mu_block_params{b_idx});
+        % SORT, because add_grid_parameter rejects a descending range and the
+        % inhibitory blocks are negative: 0.5x and 2x of -3 is [-1.5, -6]. After
+        % sorting, an inhibitory axis runs from STRONGEST to weakest inhibition,
+        % i.e. the 2x end is on the left. Same multipliers either way.
+        rng_b = sort(mu_sweep_factors * base);
+        params_to_sweep(end+1, :) = {mu_block_params{b_idx}, rng_b}; %#ok<SAGROW>
+        fprintf('[run_sensitivity_analysis] %s base = %+g, sweeping [%+g %+g]\n', ...
+            mu_block_params{b_idx}, base, rng_b(1), rng_b(2));
+    end
 end
 
 % params_to_sweep = {
@@ -185,17 +195,31 @@ end
 fprintf('Done!\n');
 
 %% Local functions
-function v = mu_EE_from_preset(preset_defaults)
-% The E<-E entry of a preset's mu_tilde_relative, whichever shape it is given in.
-% SRNNCellTypePairs.expand_block accepts a full C x C block indexed (post, pre)
-% or a 1 x C presynaptic row broadcast down the columns; E<-E is (1,1) either
-% way. Errors rather than guessing, because there is no class default here --
-% mu_tilde_relative is a required constructor property.
+function v = mu_block_from_preset(preset_defaults, block_name)
+% One entry of a preset's mu_tilde_relative, named the way the scalar aliases
+% are: mu_EI is "E receives from I", i.e. (post, pre) = (1, 2).
+%
+% Handles either shape the block may be given in. SRNNCellTypePairs.expand_block
+% accepts a full C x C matrix or a 1 x C PRESYNAPTIC row broadcast down the
+% columns -- so for a row, the entry depends only on the presynaptic index and
+% mu_EE == mu_IE. Errors rather than guessing, because there is no class default
+% to fall back on: mu_tilde_relative is a required constructor property.
 if ~isfield(preset_defaults, 'mu_tilde_relative') || isempty(preset_defaults.mu_tilde_relative)
-    error('run_sensitivity_analysis:NoMuEE', ...
-        ['Sweeping mu_EE_relative relative to its default needs the preset to ' ...
-        'set mu_tilde_relative; SRNNCellTypePairs has no class default for it.']);
+    error('run_sensitivity_analysis:NoMuBlock', ...
+        ['Sweeping %s relative to its default needs the preset to set ' ...
+        'mu_tilde_relative; SRNNCellTypePairs has no class default for it.'], ...
+        block_name);
 end
+idx = struct('mu_EE_relative', [1 1], 'mu_EI_relative', [1 2], ...
+             'mu_IE_relative', [2 1], 'mu_II_relative', [2 2]);
+if ~isfield(idx, block_name)
+    error('run_sensitivity_analysis:UnknownMuBlock', ...
+        'Unknown block ''%s''.', block_name);
+end
+ij = idx.(block_name);
 M = preset_defaults.mu_tilde_relative;
-v = M(1, 1);
+if isvector(M)
+    M = repmat(reshape(M, 1, []), numel(M), 1);   % presynaptic row -> full block
+end
+v = M(ij(1), ij(2));
 end
