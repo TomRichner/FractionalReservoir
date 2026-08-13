@@ -74,6 +74,30 @@ classdef SRNNCellTypePairs < handle
         activation_custom = {}
         S_a = 0.9
         S_c = 0.40                      % matches SRNNModel2's default
+
+        % Per-type setpoints, 1 x C each (a scalar is broadcast to every type).
+        % By default every neuron shares the scalar S_c above; give a type a
+        % mean and/or a standard deviation here and build() draws a length-n
+        % setpoint vector instead:
+        %
+        %   S_c_i = mu_S_c(q) + sigma_S_c(q) * randn   for each neuron of type q
+        %
+        % An empty mu_S_c falls back to S_c, so sigma alone adds spread around
+        % the shared centre and mu alone gives the types different excitability
+        % with no spread. The realized vector is S_c_vec (read-only, empty
+        % unless heterogeneity was requested).
+        %
+        % Only 'logistic' and 'piecewise' take a centre: requesting
+        % heterogeneity with 'tanh' or with activation_custom is an error. In
+        % heterogeneous mode the activation_function handle is only valid for
+        % length-n input.
+        mu_S_c = []                     % 1 x C means ([] = use S_c for all types)
+        sigma_S_c = []                  % 1 x C std devs ([] = zeros, no spread)
+
+        % Seed for the setpoint draw. Empty derives it from rng_seeds(1), so a
+        % sweep over network seeds also varies the setpoints while keeping the
+        % draw off the stream that generated W. Set it to pin the draw.
+        S_c_seed = []
         fs = 400
         T_range = [0, 50]
         T_plot
@@ -128,6 +152,12 @@ classdef SRNNCellTypePairs < handle
     end
 
     properties (SetAccess = protected)
+        % Realized per-neuron nonlinearity setpoints (n x 1), drawn by
+        % build_setpoints() from mu_S_c / sigma_S_c. EMPTY means every neuron
+        % shares the scalar S_c, which is the default and keeps every code path
+        % on the scalar branch.
+        S_c_vec = []
+
         W
         is_built = false
         t_ex
@@ -439,6 +469,9 @@ classdef SRNNCellTypePairs < handle
             params.tau_d = obj.tau_d;
             params.activation_function = obj.activation_function;
             params.activation_function_derivative = obj.activation_function_derivative;
+            % The realized per-neuron setpoints, for diagnostics: the handles
+            % above already carry them. Empty in the homogeneous case.
+            params.S_c_vec = obj.S_c_vec;
             params.x0_std = obj.x0_std;
             params.N_sys_eqs = obj.N_sys_eqs;
             params.state_layout = SRNNCellTypePairs.make_state_layout( ...
@@ -544,7 +577,11 @@ classdef SRNNCellTypePairs < handle
                 return;
             end
             a = obj.S_a;
-            c = obj.S_c;
+            % A per-neuron setpoint vector, once build_setpoints() has drawn
+            % one, otherwise the shared scalar. In the vector case the handle
+            % is only valid for length-n input, since c lines up with x
+            % element by element.
+            c = SRNNCellTypePairs.pick(obj.S_c_vec, obj.S_c);
             switch obj.activation
                 case 'logistic'
                     if which_one == 1
@@ -598,6 +635,18 @@ classdef SRNNCellTypePairs < handle
             if isempty(obj.c), obj.c = repmat(0.15 / 3, 1, C); end
             obj.n_a = reshape(obj.n_a, 1, []);
             obj.c = reshape(obj.c, 1, []);
+
+            % Setpoint statistics: a scalar means "the same for every type".
+            % mu_S_c stays empty when unset -- that is what selects the shared
+            % scalar S_c -- while sigma_S_c fills in as zeros.
+            if isscalar(obj.mu_S_c), obj.mu_S_c = repmat(obj.mu_S_c, 1, C); end
+            if isempty(obj.sigma_S_c)
+                obj.sigma_S_c = zeros(1, C);
+            elseif isscalar(obj.sigma_S_c)
+                obj.sigma_S_c = repmat(obj.sigma_S_c, 1, C);
+            end
+            obj.mu_S_c = reshape(obj.mu_S_c, 1, []);
+            obj.sigma_S_c = reshape(obj.sigma_S_c, 1, []);
 
             if isempty(obj.tau_a), obj.tau_a = cell(1, C); end
             if iscell(obj.tau_a), obj.tau_a = reshape(obj.tau_a, 1, []); end
@@ -664,6 +713,35 @@ classdef SRNNCellTypePairs < handle
                     'Unknown activation ''%s''. Valid: %s.', ...
                     char(string(obj.activation)), ...
                     strjoin(SRNNCellTypePairs.activation_names(), ', '));
+            end
+
+            % Per-type setpoint statistics.
+            if ~isempty(obj.mu_S_c) && (numel(obj.mu_S_c) ~= C || ...
+                    ~isnumeric(obj.mu_S_c) || any(~isfinite(obj.mu_S_c)))
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    ['mu_S_c must be empty, a scalar, or a finite 1 x %d row ' ...
+                    '(one mean setpoint per cell type).'], C);
+            end
+            if numel(obj.sigma_S_c) ~= C || ~isnumeric(obj.sigma_S_c) || ...
+                    any(~isfinite(obj.sigma_S_c)) || any(obj.sigma_S_c < 0)
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    ['sigma_S_c must be empty, a scalar, or a finite nonnegative ' ...
+                    '1 x %d row (one standard deviation per cell type).'], C);
+            end
+            if obj.has_setpoint_heterogeneity()
+                if ~isempty(obj.activation_custom)
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        ['Per-type setpoints (mu_S_c / sigma_S_c) cannot be applied to ' ...
+                        'activation_custom: a custom handle takes only x, so the model ' ...
+                        'has no way to inject a per-neuron centre. Build the ' ...
+                        'heterogeneity into the custom handle itself, or clear it.']);
+                end
+                if strcmp(obj.activation, 'tanh')
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        ['Per-type setpoints (mu_S_c / sigma_S_c) require a nonlinearity ' ...
+                        'with a centre; ''tanh'' has none. Use ''logistic'' or ' ...
+                        '''piecewise''.']);
+                end
             end
 
             % Reference network for F, when it is pinned.
@@ -876,6 +954,58 @@ classdef SRNNCellTypePairs < handle
             fprintf('W created: spectral radius = %.3f, abscissa = %.3f\n', ...
                 max(abs(eig_W)), max(real(eig_W)));
             fprintf('Pair-specific dead-end states: %d\n', obj.dead_state_count);
+
+            % Per-neuron nonlinearity setpoints. Drawn here, after W, so the
+            % vector exists before build_stimulus() and get_params().
+            obj.build_setpoints();
+        end
+
+        function tf = has_setpoint_heterogeneity(obj)
+            % HAS_SETPOINT_HETEROGENEITY Whether a per-neuron S_c was requested.
+            tf = ~isempty(obj.mu_S_c) || any(obj.sigma_S_c > 0);
+        end
+
+        function build_setpoints(obj)
+            % BUILD_SETPOINTS Draw the per-neuron nonlinearity setpoints S_c_vec
+            %
+            % S_c_i = mu_S_c(q) + sigma_S_c(q) * randn for each neuron of type
+            % q, with an empty mu_S_c falling back to the shared scalar S_c.
+            % Leaves S_c_vec EMPTY when no heterogeneity was requested, which
+            % keeps every downstream code path on the scalar branch and the
+            % results bit-identical to a model without this feature.
+
+            obj.S_c_vec = [];
+            if ~obj.has_setpoint_heterogeneity()
+                return;
+            end
+
+            % Own RNG substream: the state is saved and restored so W, the
+            % stimulus and x0 are bit-identical whether or not setpoints are
+            % drawn (initialize_state draws x0 from whatever state build left
+            % behind). The offset keeps the draw off the stream that produced
+            % W's first column, which seeding with rng_seeds(1) would not do.
+            seed = obj.S_c_seed;
+            if isempty(seed)
+                seed = obj.rng_seeds(1) + 104729;
+            end
+            stream_state = rng;
+            rng(seed);
+            z = randn(obj.n, 1);
+            rng(stream_state);
+
+            C = obj.n_cellTypes;
+            idx = obj.type_indices;
+            mu = SRNNCellTypePairs.pick(obj.mu_S_c, repmat(obj.S_c, 1, C));
+            vals = zeros(obj.n, 1);
+            parts = cell(1, C);
+            for q = 1:C
+                vals(idx{q}) = mu(q) + obj.sigma_S_c(q) * z(idx{q});
+                parts{q} = sprintf('%s %.4f +/- %.4f', ...
+                    obj.cell_type_names{q}, mu(q), obj.sigma_S_c(q));
+            end
+            obj.S_c_vec = vals;
+
+            fprintf('Per-neuron S_c drawn (seed %g): %s\n', seed, strjoin(parts, ', '));
         end
 
         function build_stimulus(obj)
@@ -1269,6 +1399,11 @@ classdef SRNNCellTypePairs < handle
             % be NaN, which would then poison W.
             val = rel * F;
             val(rel == 0) = 0;
+        end
+
+        function val = pick(override, fallback)
+            % PICK The override when set, else the fallback.
+            if isempty(override), val = fallback; else, val = override; end
         end
 
         function layout = make_state_layout(n, counts, n_a, n_b, n_g)
@@ -1960,6 +2095,17 @@ classdef SRNNCellTypePairs < handle
         end
 
         function y = piecewiseSigmoid(x, a, c)
+            % c may be a scalar or an array that broadcasts against x (an n x 1
+            % per-neuron S_c_vec against an n x 1 state or an n x nt
+            % trajectory). The curve is a pure TRANSLATION in c -- every
+            % threshold is c + const and the linear branch is (x - c) + 0.5 --
+            % so a per-neuron centre is exactly the c = 0 curve evaluated at
+            % x - c. That keeps one implementation of the branch structure and
+            % leaves the scalar path bit-identical.
+            if ~isscalar(c)
+                y = SRNNCellTypePairs.piecewiseSigmoid(x - c, a, 0);
+                return;
+            end
             if a < 0 || a > 1
                 error('SRNNCellTypePairs:InvalidActivation', 'a must be between 0 and 1.');
             end
@@ -1981,6 +2127,13 @@ classdef SRNNCellTypePairs < handle
         end
 
         function dy = piecewiseSigmoidDerivative(x, a, c)
+            % As with piecewiseSigmoid, c may be a scalar or an array that
+            % broadcasts against x, and the derivative is likewise a pure
+            % translation in c.
+            if ~isscalar(c)
+                dy = SRNNCellTypePairs.piecewiseSigmoidDerivative(x - c, a, 0);
+                return;
+            end
             if a < 0 || a > 1
                 error('SRNNCellTypePairs:InvalidActivation', 'a must be between 0 and 1.');
             end

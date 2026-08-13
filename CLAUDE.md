@@ -38,7 +38,9 @@ Primary entry points (current, not legacy) — the orchestrator and its three su
 
 `setup_paths.m` lives at the **repo root** and derives everything from its own location. It deliberately enumerates `src/` and `scripts/` rather than `genpath`-ing the root: `data/`, `figs/` and `docs/` must stay off the path, and `data/param_space/run_all_*/` holds copies of the launcher scripts that would otherwise shadow the originals. It never calls `savepath`. `run_all_analyses.m` and friends derive `project_root = fileparts(which('setup_paths'))`, so they tolerate living in a subdirectory.
 
-There is no standalone test framework; ad-hoc verification scripts are named `scripts/test_*.m` (e.g. `test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_sensitivity_refactor.m`). Run them from the MATLAB editor or via the matlab MCP `run_matlab_file` tool.
+There is no standalone test framework; ad-hoc verification scripts live in `scripts/tests/` as `test_*.m` (e.g. `test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_SRNNCellTypePairs.m`, `test_SRNN2_S_c_heterogeneity.m`). Run them from the MATLAB editor or via the matlab MCP `run_matlab_file` tool. Two report styles coexist: some print `PASS`/`FAIL` per check and a final banner, others `assert` and are silent until they throw.
+
+**Run the tests that cover what you touched, including the plotting assertions.** Several tests reach into figure objects (`test_SRNNCellTypePairs` checks the actual line colours of `plot_celltypes`), so a change to a colormap or a plot helper can break a test that looks unrelated to the model maths.
 
 **Always run MATLAB through the matlab MCP server — never `matlab -batch` or any other shell invocation.** Use `check_matlab_code` for static analysis and `run_matlab_file` / `evaluate_matlab_code` for execution. The MCP server drives the user's running MATLAB desktop, which is the visible UI for any figures; a `-batch` process would be headless, would not share that session, and is not how this project is meant to be driven. Since the session is shared and live, leave it as you found it: restore the path if a check calls `restoredefaultpath`, and don't clear the workspace beyond what the script itself does.
 
@@ -50,7 +52,9 @@ which reads like a bug in the calling code rather than a stale cache. `clear Par
 
 ## Architecture
 
-The codebase has converged on **two main classes** that drive everything. Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
+The codebase has converged on **one analysis driver** (`ParamSpaceAnalysis2`) and **two model classes it can drive** (`SRNNModel2` and `SRNNCellTypePairs`), plus `SRNNCellTypes`, which survives only as the parity reference. Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
+
+The two model classes are **duck-typed siblings, not a hierarchy**: they share no implementation (separate `dynamics_fast`, `compute_Jacobian_fast`, state packing, and their own copies of the nonlinearity statics). A behavioural change to one is **not** inherited by the other — check whether the change belongs in both. `ParamSpaceAnalysis2` reaches either by name, so no base class is needed.
 
 ### `src/SRNNModel2.m` (the model)
 
@@ -58,9 +62,52 @@ A `handle` class encapsulating the full SRNN simulation: parameter storage (with
 
 State vector packing is `S = [a_E(:); a_I(:); b_E(:); b_I(:); x(:)]` of length `N_sys_eqs = n_E*n_a_E + n_I*n_a_I + n_E*n_b_E + n_I*n_b_I + n`. The classes assume `n_b_E, n_b_I ∈ {0, 1}`.
 
+Beyond `plot()` it carries `plot_W` (the **scaled** W — the one actually simulated, including `level_of_chaos` — imaged with a diverging colormap so zero is white and the E/I blocks read at a glance).
+
 Many functions formerly in `src/` have been **internalized as static methods on `SRNNModel2`** (commit `6e2c58f`, 2026-02-27): `compute_Jacobian_fast`, `dynamics_fast`, `generate_external_input`, `compute_lyapunov_exponents_internal`, `benettin_algorithm_internal`, `lyapunov_spectrum_qr_internal`, `decimate_states`, `initialize_state`, `unpack_and_compute_states`, all `plot_*` and colormap helpers, and the activation functions. The standalone `src/` copies that were no longer referenced by any kept script have since been **deleted**; a few standalone helpers remain only because example/figure scripts still call them directly (e.g. `plotting/plot_firing_rate.m`, `algorithms/Jacobian/compute_Jacobian_fast.m`). When editing model behavior, **prefer the class method**, not any remaining standalone file. See `docs/refactors/internalize_functions_into_classes.md` for the original mapping.
 
-The older single-class predecessor `src/SRNNModel.m` (default `n=100`, `indegree=20`) was removed in the cleanup; `SRNNModel2` (default `n=300`, `indegree=100`) is the only model class. Its Echo State Network subclass `src/SRNN_ESN_reservoir.m` adds memory-capacity tooling.
+The older single-class predecessor `src/SRNNModel.m` (default `n=100`, `indegree=20`) was removed in the cleanup; `SRNNModel2` (default `n=300`, `indegree=100`) is the E/I model class. Its Echo State Network subclass `src/SRNN_ESN_reservoir.m` adds memory-capacity tooling.
+
+### `src/SRNNCellTypePairs.m` (the per-cell-type model)
+
+The generalization of `SRNNModel2` from two hardwired populations to **C named cell
+types with per-route synapses**. Same lifecycle (`build()` → `run()` → `plot()`) and
+the same duck-typed result contract, so `ParamSpaceAnalysis2` drives it via
+`model_class = 'SRNNCellTypePairs'`.
+
+What it buys, and what it costs:
+
+- **Per-route STD/STF.** `synapse_config.<pre>.<post>.std` / `.stf` puts depression or
+  facilitation on one route only — `synapse_config.E.E.std` is "STD on E→E
+  connections and nowhere else", which `SRNNModel2` cannot express (its `n_b_E = 1`
+  depresses *every* outgoing E synapse). STD fields are `tau_rec`/`tau_rel`; STF fields
+  are `tau_dec`/`tau_fac`/`G`, with `dg/dt = (1−g)/tau_dec + (G−g)·r/tau_fac`, so `G`
+  is the ceiling the facilitated gain approaches.
+- **Required constructor arguments.** `n_cellTypes`, `cell_type_names`, `f`,
+  `mu_tilde_relative`, `sigma_tilde_relative` have no defaults — the class is general
+  over cell types, so there is no sensible one. Everything else defaults to
+  `SRNNModel2`'s values (`n=300`, `indegree=100`, `S_c=0.40`, `tau_d=0.1`, …).
+- **Per-type parameters are `1 x C` rows**: `f`, `n_a`, `c`, `mu_S_c`, `sigma_S_c`, and
+  `tau_a` as a `1 x C` cell. `mu_tilde_relative` / `sigma_tilde_relative` are `C x C`
+  blocks `(post, pre)`, or a `1 x C` presynaptic row broadcast down the columns.
+- **Scalar block aliases** `mu_EE_relative`, `mu_EI_relative`, … (Dependent *with*
+  setters, so they count as settable) exist for the two-type case only, because a PSA
+  grid axis has to be a settable scalar property. Reading or writing one when
+  `n_cellTypes ~= 2` errors.
+- **`plot_data.r` is keyed by `cell_type_names`**, and `br` is called
+  **`synaptic_output`** here — with STF in play the quantity is not `b·r`, so it is not
+  a misnamed `br`. It nests by route (`.E.E`), which is why PSA's poolers recurse.
+- **Its own plots**: `plot` (compact summary), `plot_celltypes` (one column per type,
+  every neuron trace, `prod(b)` collapsed across routes), `plot_eigenvalues(times_sec)`
+  (needs `store_full_state = true`), `plot_W`, `plot_W_spectrum`,
+  `plot_weight_histogram`. `type_colors` swaps `lines()` rows 1 and 2 so type 1 (E) is
+  warm and type 2 (I) is cool.
+- `RMTBlocks` returns a **dense** W; this class re-sparsifies, because its state
+  indexing assumes sparse connectivity.
+
+`src/SRNNCellTypes.m` is the earlier per-type class. It still takes **absolute** tildes
+(no `_relative` port) and still binds its activation handles by capturing `obj`. It is
+kept only for `test_SRNNCellTypes_parity_lyapunov.m`; do not build new work on it.
 
 ### `src/ParamSpaceAnalysis2.m` (the analysis driver)
 
@@ -106,7 +153,7 @@ Preserve this pattern when adding new analysis scripts.
 
 - `algorithms/Jacobian/` — `compute_Jacobian_fast.m`, `compute_Jacobian_at_indices.m`, `compute_J_eff.m` (called directly by example scripts; `SRNNModel2` also carries internalized equivalents). The standalone `algorithms/Lyapunov/` files and `algorithms/info/mutual_info_SISO.m` were removed (internalized / unused).
 - `connectivity/` — **`RMTBlocks.m`** is the generator all three model classes now use. It extends Harris (2023) to full D×D block statistics indexed **(postsynaptic, presynaptic)**, so `mu_EE` can differ from `mu_IE`, and it supplies the bulk radius `R` and the outlier eigenvalues `lambda_O`. `RMTMatrix.m` and `RMTCellTypes.m` remain but are no longer used by the model classes. Note `RMTBlocks` returns a **dense** matrix; the CellTypes classes re-sparsify after assembly.
-- `nonlinearities/` — `piecewiseSigmoid`, `tanhActivation` and their derivatives (also internalized into `SRNNModel2`; the standalone `logisticSigmoid.m` was removed, but `logisticSigmoid`/`logisticSigmoidDerivative` live as static methods). Select one with `activation` (see "Conventions" below), not by building a handle. The **default** is `'logistic'` = `logisticSigmoid(x, S_c)` = `1/(1+exp(-4*(x-c)))` (centred at `S_c = 0.4`, range (0,1), unit slope at centre) — chosen for more robust near-edge-of-chaos stability; `'piecewise'` (`S_a = 0.9`) and `'tanh'` are the alternatives.
+- `nonlinearities/` — `piecewiseSigmoid`, `tanhActivation` and their derivatives (also internalized into `SRNNModel2`; the standalone `logisticSigmoid.m` was removed, but `logisticSigmoid`/`logisticSigmoidDerivative` live as static methods). Select one with `activation` (see "Conventions" below), not by building a handle. The **default** is `'logistic'` = `logisticSigmoid(x, S_c)` = `1/(1+exp(-4*(x-c)))` (centred at `S_c = 0.4`, range (0,1), unit slope at centre) — chosen for more robust near-edge-of-chaos stability; `'piecewise'` (`S_a = 0.9`) and `'tanh'` are the alternatives. Each model class carries its **own copy** of these statics, so a fix to one is not a fix to the others.
 - `plotting/` — colormaps, line/scatter helpers, time-series panel plots, `param_space_plots/` for post-hoc visualization, `plot_saving/save_some_figs_to_folder_2.m` (used by every script that writes figures). Unused plot/colormap duplicates were removed; the standalone `plot_*` files that example/figure scripts call directly remain.
 - `SRNN_ESN_reservoir.m` — Echo State Network subclass of `SRNNModel2` (memory-capacity experiments). The exploratory `SRNN_ESN.m` / `SRNN_reservoir.m` / `SRNN_reservoir_DDE.m` RHS variants were removed.
 
@@ -137,10 +184,11 @@ When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnaly
 
 - All scripts assume current MATLAB has the Parallel Computing Toolbox; set `psa.use_parallel = false` for serial debug runs.
 - The nonlinearity is chosen **by name**, not by passing handles: `activation` is `'logistic'` (default) | `'piecewise'` | `'tanh'`, parameterised by `S_a` (piecewise only) and `S_c` (piecewise and logistic; `'tanh'` uses neither). `activation_function` / `activation_function_derivative` are **Dependent, read-only** — read them freely (the QR Lyapunov method needs the derivative), but set `activation`. Assigning a handle raises `SRNNModel:RenamedProperty`. For a nonlinearity outside the three, set `activation_custom = {fn, dfn}`, which overrides the name. Keeping this as data is what stops `S_a`/`S_c` from silently disagreeing with the function actually in use, and lets a preset express the nonlinearity without handles.
+- **The setpoint `S_c` can be per-neuron.** Set a mean and/or a standard deviation per population and `build()` draws `S_c_i = mu + sigma·randn` into the read-only `S_c_vec` (`n x 1`); leave them alone and every neuron shares the scalar `S_c`, which is the bit-identical default. The knobs follow each class's own convention: `mu_S_c_E` / `sigma_S_c_E` / `mu_S_c_I` / `sigma_S_c_I` (scalars, hence usable as PSA grid axes) on `SRNNModel2`, and `1 x C` `mu_S_c` / `sigma_S_c` rows on `SRNNCellTypePairs`. An empty `mu` falls back to `S_c`, so `sigma` alone means "spread around the shared centre". `S_c_seed` pins the draw; left empty it is derived from `rng_seeds(1)` (offset well away from the stream that builds `W`), so a reps sweep varies the setpoints too. The draw saves and restores the RNG state, so `W`, the stimulus and `x0` are unaffected either way. Two consequences: `'tanh'` and `activation_custom` have no centre to vary and **error** rather than silently ignoring the request, and in heterogeneous mode the `activation_function` handle is **only valid for length-`n` input** (`c` lines up with `x` elementwise) — evaluate φ on a plotting grid only for a homogeneous model.
 - The `c_E` / `c_I` adaptation scaling is conventionally `0.15/3 ≈ 0.05` in current scripts (one-third of a "total" adaptation budget split over three timescales).
 - `level_of_chaos` is a multiplicative scale on the W matrix; values >1 push the network past the edge of chaos. The `R` dependent property reports the theoretical spectral radius.
 - The five RMT connectivity parameters are set as **multipliers of** `F = default_val = 1/sqrt(n·α(2−α))`: `mu_E_tilde_relative` (default 3), `mu_I_tilde_relative` (−4), `sigma_E_tilde_relative` (1), `sigma_I_tilde_relative` (1), `E_W_relative` (0). The absolute `mu_E_tilde` / `sigma_E_tilde` / `E_W` are **Dependent, read-only** — read them freely, but set the `_relative` ones. (Setting an absolute name raises `SRNNModel:RenamedProperty` naming the replacement.) Storing the multiplier is what lets these be swept — `F` depends on `n` and `indegree`, so no constant absolute value is right at more than one grid point — and frozen into `resolved_defaults`. Note `_relative` ≠ `_rel`: `tau_b_E_rel` / `tau_b_I_rel` are the STD **release** constants.
-- `F_tracks_network` (default `true`) computes `F` from the current `n`/`indegree`, which makes `R` *exactly* independent of `n` (the `n·α` cancels in `get.R`). Set it `false` to pin `F` to `(F_ref_n, F_ref_indegree)` — the weight distribution then stays fixed while `R` varies with network size. Freezing `F` does **not** freeze the network: `build()` still passes the real `alpha` to `RMTMatrix`, so connectivity tracks the grid point. The choice is recorded in `resolved_defaults`, and `same_config` refuses to pool runs that used different conventions.
+- `F_tracks_network` (default `true`) computes `F` from the current `n`/`indegree`, which makes `R` *exactly* independent of `n` (the `n·α` cancels in `get.R`). Set it `false` to pin `F` to `(F_ref_n, F_ref_indegree)` — the weight distribution then stays fixed while `R` varies with network size. Freezing `F` does **not** freeze the network: `build()` still passes the real `alpha` to `RMTBlocks`, so connectivity tracks the grid point. The choice is recorded in `resolved_defaults`, and `same_config` refuses to pool runs that used different conventions.
 - Time vectors typically start negative (e.g. `T_range = [-10, 20]`) to allow transient settling before the analysis window.
 
 ## Commit messages

@@ -118,6 +118,32 @@ classdef SRNNModel2 < handle
         S_a = 0.9                   % Activation function parameter a (piecewise only)
         S_c = 0.4                   % Activation function parameter c, the centre (piecewise, logistic)
 
+        % Per-neuron setpoints. By default every neuron shares the scalar S_c
+        % above. Give a population a mean and/or a standard deviation here and
+        % build() draws a length-n S_c vector instead:
+        %
+        %   S_c_i = mu_S_c_<pop> + sigma_S_c_<pop> * randn,   pop = E or I
+        %
+        % An empty mu falls back to S_c, so setting sigma alone adds spread
+        % around the shared centre, and setting mu alone gives E and I
+        % different excitability with no spread. The realized vector is
+        % S_c_vec (read-only, empty unless heterogeneity was requested).
+        %
+        % Only 'logistic' and 'piecewise' take a centre: requesting
+        % heterogeneity with 'tanh' or with activation_custom is an error, not
+        % a silent no-op. Note that in heterogeneous mode the
+        % activation_function handle is only valid for length-n input.
+        mu_S_c_E = []               % Mean setpoint for E neurons ([] = use S_c)
+        mu_S_c_I = []               % Mean setpoint for I neurons ([] = use S_c)
+        sigma_S_c_E = 0             % Std dev of the E setpoint (0 = no spread)
+        sigma_S_c_I = 0             % Std dev of the I setpoint (0 = no spread)
+
+        % Seed for the setpoint draw. Empty derives it from rng_seeds(1) (so a
+        % reps sweep, which varies the network seed, also varies the setpoints)
+        % while keeping it well away from the stream that generated W. Set it
+        % to pin the draw across networks.
+        S_c_seed = []
+
         % Escape hatch for a nonlinearity that is not one of the named three:
         % a 1x2 cell {fn, dfn} of function handles. When non-empty it overrides
         % `activation`. Leave empty for the normal case, which keeps the
@@ -197,6 +223,12 @@ classdef SRNNModel2 < handle
         u_interpolant               % griddedInterpolant for external input (avoids persistent vars)
         S0                          % Initial state vector
         cached_params               % Cached params struct (set by build)
+
+        % Realized per-neuron nonlinearity setpoints (n x 1), drawn by
+        % build_setpoints() from mu_S_c_* / sigma_S_c_*. EMPTY means every
+        % neuron shares the scalar S_c, which is the default and keeps every
+        % code path on the scalar branch.
+        S_c_vec = []
     end
     
     %% Results Properties (conditionally stored)
@@ -1114,6 +1146,9 @@ classdef SRNNModel2 < handle
             params.tau_d = obj.tau_d;
             params.activation_function = obj.activation_function;
             params.activation_function_derivative = obj.activation_function_derivative;
+            % The realized per-neuron setpoints, for diagnostics: the handles
+            % above already carry them. Empty in the homogeneous case.
+            params.S_c_vec = obj.S_c_vec;
             params.x0_std = obj.x0_std;
             
             % Connection matrix (if built)
@@ -1278,8 +1313,82 @@ classdef SRNNModel2 < handle
                 end
                 fprintf('  SCC sizes: %s\n', scc_str);
             end
+
+            % Per-neuron nonlinearity setpoints. Drawn here, after W, so the
+            % vector exists before build_stimulus() caches params.
+            obj.build_setpoints();
         end
-        
+
+        function build_setpoints(obj)
+            % BUILD_SETPOINTS Draw the per-neuron nonlinearity setpoints S_c_vec
+            %
+            % S_c_i = mu_S_c_<pop> + sigma_S_c_<pop> * randn, with an empty mu
+            % falling back to the shared scalar S_c. Leaves S_c_vec EMPTY when
+            % no heterogeneity was requested, which keeps every downstream code
+            % path on the scalar branch and the results bit-identical to a
+            % model without this feature.
+
+            obj.S_c_vec = [];
+
+            % Validated unconditionally, so a nonsensical value (a negative
+            % standard deviation, say) is caught even though it would not by
+            % itself switch heterogeneity on.
+            SRNNModel2.check_setpoint_stat(obj.mu_S_c_E,    'mu_S_c_E',    true);
+            SRNNModel2.check_setpoint_stat(obj.mu_S_c_I,    'mu_S_c_I',    true);
+            SRNNModel2.check_setpoint_stat(obj.sigma_S_c_E, 'sigma_S_c_E', false);
+            SRNNModel2.check_setpoint_stat(obj.sigma_S_c_I, 'sigma_S_c_I', false);
+
+            has_mu    = ~isempty(obj.mu_S_c_E) || ~isempty(obj.mu_S_c_I);
+            has_sigma = any([obj.sigma_S_c_E, obj.sigma_S_c_I] > 0);
+            if ~(has_mu || has_sigma)
+                return;
+            end
+
+            % Only 'logistic' and 'piecewise' take a centre. Failing loudly
+            % here beats silently ignoring the request.
+            if ~isempty(obj.activation_custom)
+                error('SRNNModel:InvalidParams', ...
+                    ['Per-neuron setpoints (mu_S_c_* / sigma_S_c_*) cannot be applied ' ...
+                    'to activation_custom: a custom handle takes only x, so the model ' ...
+                    'has no way to inject a per-neuron centre. Build the heterogeneity ' ...
+                    'into the custom handle itself, or clear activation_custom.']);
+            end
+            if strcmp(obj.activation, 'tanh')
+                error('SRNNModel:InvalidParams', ...
+                    ['Per-neuron setpoints (mu_S_c_* / sigma_S_c_*) require a ' ...
+                    'nonlinearity with a centre; ''tanh'' has none. Use ''logistic'' ' ...
+                    'or ''piecewise''.']);
+            end
+
+            % Own RNG substream: the state is saved and restored so W, the
+            % stimulus and x0 are bit-identical whether or not setpoints are
+            % drawn (initialize_state draws x0 from whatever state build left
+            % behind). The offset keeps the draw off the stream that produced
+            % W's first column, which seeding with rng_seeds(1) directly would
+            % not do.
+            seed = obj.S_c_seed;
+            if isempty(seed)
+                seed = obj.rng_seeds(1) + 104729;
+            end
+            stream_state = rng;
+            rng(seed);
+            z = randn(obj.n, 1);
+            rng(stream_state);
+
+            mu_E    = SRNNModel2.pick(obj.mu_S_c_E, obj.S_c);
+            mu_I    = SRNNModel2.pick(obj.mu_S_c_I, obj.S_c);
+            sigma_E = obj.sigma_S_c_E;
+            sigma_I = obj.sigma_S_c_I;
+
+            vals = zeros(obj.n, 1);
+            vals(obj.E_indices) = mu_E + sigma_E * z(obj.E_indices);
+            vals(obj.I_indices) = mu_I + sigma_I * z(obj.I_indices);
+            obj.S_c_vec = vals;
+
+            fprintf(['Per-neuron S_c drawn (seed %g): E %.4f +/- %.4f, ' ...
+                'I %.4f +/- %.4f\n'], seed, mu_E, sigma_E, mu_I, sigma_I);
+        end
+
         function build_stimulus(obj)
             % BUILD_STIMULUS Generate external stimulus, interpolant, and initial state
             %
@@ -1339,7 +1448,11 @@ classdef SRNNModel2 < handle
             end
 
             a = obj.S_a;
-            c = obj.S_c;
+            % A per-neuron setpoint vector, once build_setpoints() has drawn
+            % one, otherwise the shared scalar. In the vector case the handle
+            % is only valid for length-n input, since c lines up with x
+            % element by element.
+            c = SRNNModel2.pick(obj.S_c_vec, obj.S_c);
             switch obj.activation
                 case 'logistic'
                     if which_one == 1
@@ -2753,12 +2866,27 @@ classdef SRNNModel2 < handle
         function y = piecewiseSigmoid(x, a, c)
             % PIECEWISESIGMOID A piecewise linear/quadratic sigmoid activation function.
             % Internalized from src/nonlinearities/piecewiseSigmoid.m
-            
+            %
+            % c may be a scalar (all neurons share a centre) or an array that
+            % broadcasts against x -- typically an n x 1 per-neuron S_c_vec
+            % against an n x 1 state or an n x nt trajectory.
+            %
+            % The curve is a pure TRANSLATION in c: every branch threshold is
+            % c + const and the linear branch is (x - c) + 0.5, so it depends
+            % on x and c only through x - c. A per-neuron centre is therefore
+            % exactly the c = 0 curve evaluated at x - c, which keeps one
+            % implementation of the branch structure and leaves the scalar path
+            % below bit-identical.
+            if ~isscalar(c)
+                y = SRNNModel2.piecewiseSigmoid(x - c, a, 0);
+                return;
+            end
+
             if a < 0 || a > 1
                 error('Parameter "a" must be between 0 and 1.');
             end
             a = a / 2;
-            
+
             if a == 0.5
                 y_linear = (x - c) + 0.5;
                 y = min(max(y_linear, 0), 1);
@@ -2793,13 +2921,21 @@ classdef SRNNModel2 < handle
         function dy = piecewiseSigmoidDerivative(x, a, c)
             % PIECEWISESIGMOIDDERIVATIVE First derivative of the piecewise sigmoid.
             % Internalized from src/nonlinearities/piecewiseSigmoidDerivative.m
-            
+            %
+            % As with piecewiseSigmoid, c may be a scalar or an array that
+            % broadcasts against x, and the derivative is likewise a pure
+            % translation in c.
+            if ~isscalar(c)
+                dy = SRNNModel2.piecewiseSigmoidDerivative(x - c, a, 0);
+                return;
+            end
+
             if a < 0 || a > 1
                 error('Parameter "a" must be between 0 and 1.');
             end
             a = a / 2;
             dy = zeros(size(x), 'like', x);
-            
+
             if a == 0.5
                 breakpoint1 = c - 0.5;
                 breakpoint2 = c + 0.5;
@@ -2834,7 +2970,10 @@ classdef SRNNModel2 < handle
             %   Range (0,1); y(c)=0.5; slope 1 at x=c (the factor 4 sets that).
             %   c is an optional center/bias (default 0): c>0 shifts the
             %   inflection to positive x, so at the resting point (x~0) the
-            %   network sits on the LOWER part of the curve.
+            %   network sits on the LOWER part of the curve. It may be a scalar
+            %   or any array that broadcasts against x (an n x 1 per-neuron
+            %   S_c_vec against an n x 1 state or an n x nt trajectory); the
+            %   expression is elementwise, so no special case is needed.
             if nargin < 2, c = 0; end
             y = 1 ./ (1 + exp(-4 * (x - c)));
         end
@@ -3242,6 +3381,24 @@ classdef SRNNModel2 < handle
         function val = pick(override, fallback)
             % PICK The block override when set, else the column shorthand.
             if isempty(override), val = fallback; else, val = override; end
+        end
+
+        function check_setpoint_stat(val, name, allow_empty)
+            % CHECK_SETPOINT_STAT Validate one mu_S_c_* / sigma_S_c_* entry.
+            % A mu may be empty (meaning "fall back to S_c"); a sigma may not,
+            % and must be nonnegative.
+            if isempty(val)
+                if allow_empty, return; end
+                error('SRNNModel:InvalidParams', '%s must not be empty.', name);
+            end
+            if ~isnumeric(val) || ~isscalar(val) || ~isfinite(val)
+                error('SRNNModel:InvalidParams', ...
+                    '%s must be a finite numeric scalar.', name);
+            end
+            if ~allow_empty && val < 0
+                error('SRNNModel:InvalidParams', ...
+                    '%s must be nonnegative (it is a standard deviation).', name);
+            end
         end
 
         function val = scale_tilde_mat(rel, F)
