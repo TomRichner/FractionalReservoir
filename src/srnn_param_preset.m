@@ -163,6 +163,34 @@ switch name
         d.n = 500;
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_S_c_by_type_n500_fixedF'
+        % ..._n500 with the weight scale F PINNED instead of tracking n.
+        %
+        % Why this exists. F = 1/sqrt(n*alpha*(2-alpha)) and n*alpha = indegree,
+        % so F = 1/sqrt(indegree*(2 - indegree/n)): with F_tracks_network = true,
+        % n enters only through alpha, and F drifts ~4% from n = 300 to n = 500.
+        % The bigger problem is the bulk radius. R is independent of n only when
+        % the relative multipliers are unity -- the n*alpha cancellation leaves
+        % f*[sigma_rel^2 + (1-alpha)*mu_rel^2]/(2-alpha), which is alpha-free
+        % only if mu_rel^2 = sigma_rel^2 = 1 (then 1 + (1-alpha) = 2-alpha).
+        % This preset's mu_rel runs 3 to 4.5, so R moves 1.40 -> 3.73 across the
+        % n sweep and "vary n" is really "vary n AND criticality".
+        %
+        % F_ref_n is 500, not the class default 300, so that AT the preset's own
+        % operating point F is exactly what the tracking version computed. The
+        % fixed-n sweeps (f_E, level_of_chaos, the mu blocks, tau_a_E) are then
+        % numerically identical to ..._n500 and the change is isolated to the n
+        % sweep and the param_space grid -- which is the comparison worth having.
+        %
+        % Pinning F does NOT freeze the network: build() still passes the real
+        % alpha to the generator, so connectivity tracks the grid point. Only the
+        % weight SCALE is held.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_S_c_by_type_n500');
+        d.F_tracks_network = false;
+        d.F_ref_n          = 500;
+        d.F_ref_indegree   = 100;
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -179,7 +207,8 @@ end
 function names = srnn_param_preset_names()
 % The valid preset names, kept next to the switch above so they stay in sync.
 names = {'default', 'overconnected', 'celltype_pairs', ...
-    'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500'};
+    'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500', ...
+    'celltype_pairs_S_c_by_type_n500_fixedF'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
