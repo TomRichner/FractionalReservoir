@@ -88,9 +88,24 @@ array-size-limit preference, estimated peak ~14 GB.
 **Leading hypothesis:** a worker process crashed and its jobs surfaced as memory
 errors — making `Out of memory` a symptom, not the cause. Unproven.
 
-**Note the apparent fix proves nothing:** the re-run that went 25/25 changed
-*two* variables (fresh pool *and* 6→5 workers) and used the wrong cluster
-profile.
+**Note the apparent fix proves nothing.** The re-run that went 25/25 changed
+**three** things at once:
+
+| | overnight (failed) | re-run (25/25) |
+|---|---|---|
+| pool age | ~6 h old | fresh |
+| workers | **10** | **5** |
+| profile | `ten_workers_one_thread` (default) | `Processes` (built-in) |
+
+`run_all_analyses` never creates a pool, so the overnight run got 10 workers
+auto-started from `parallel.defaultProfile`. The re-run hard-coded
+`parpool('Processes', 5)` — the wrong profile, and a worker count chosen from a
+memory estimate that was itself built on a mis-read cap (`parcluster('Processes')`
+reports 6, which is the built-in profile, not the default).
+
+Halving the workers alone would explain the success under a memory theory; the
+fresh pool alone would explain it under a pool-age theory. The observation
+discriminates nothing.
 
 **Next step:** run `tau_sensitivity` alone from a fresh MATLAB at the full
 default pool, with per-job memory logging, so any failure carries numbers.

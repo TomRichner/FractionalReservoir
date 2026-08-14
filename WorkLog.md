@@ -266,8 +266,12 @@ a **symptom of the worker dying, not the reason**, and no memory setting will
 help.
 
 Also recorded: the apparent "fix" (a re-run whose first batch went 25/25)
-changed **two variables at once** — fresh pool *and* 6→5 workers — and was on
-the wrong cluster profile. It validates nothing.
+changed **three things at once** — pool age (6 h → fresh), workers (**10 → 5**)
+and cluster profile (`ten_workers_one_thread` → the built-in `Processes`). The
+overnight run never created a pool explicitly, so `parfor` auto-started 10
+workers from the default profile; the re-run hard-coded `parpool('Processes', 5)`
+using a count derived from a mis-read cap. It validates nothing, and the
+worker change was a halving rather than the trim first recorded here.
 
 **Fixed** — `c6055ea`: `src/restart_parpool.m`, called before each of the three
 analyses in `run_all_analyses`. Uses `parallel.defaultProfile` rather than a
