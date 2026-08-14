@@ -324,12 +324,9 @@ Tracked in full in **`Issues.md`** and **`FeatureRequests.md`**; summarised here
 first.** It is tempting to just relaunch it, but that would be premature on
 three counts:
 
-1. **ISSUE-008 (the LLE floor) is unresolved.** If the exponent saturates at
-   `−1/max(tau_a)` wherever the network contracts, a re-run at the current
-   settings produces more floor-limited data. The tau stage is the *worst*
-   affected, because it sweeps `tau_a_E(end)` — i.e. it sweeps the floor itself.
-   Settle this first: it may change `max(tau_a)` or the sweep range, and it
-   needs no new runs, since the data is already on disk.
+1. ~~**ISSUE-008 (the LLE floor)**~~ — **settled 2026-08-14: not a defect.** See
+   below; the sweep range changed as a result, so the re-run should use the new
+   one.
 2. **ISSUE-010 / ISSUE-011 are unfixed.** A crashed run is exactly the case
    where `load_results` gets used and silently returns level indices. The last
    run *did* crash. Fix the loader before generating more data that might have
@@ -339,9 +336,36 @@ three counts:
    learning nothing again — see FR-006 for the memory pre-flight that would make
    any repeat failure legible.
 
-Suggested order: **ISSUE-008 → ISSUE-010/011 → re-run `medium2`**, with
-ISSUE-009's diagnostic (tau alone, fresh MATLAB, full default pool, per-job
-memory logging) folded into that re-run.
+Suggested order: **ISSUE-010/011 → re-run `medium2`**, with ISSUE-009's
+diagnostic (tau alone, fresh MATLAB, full default pool, per-job memory logging)
+folded into that re-run.
+
+---
+
+### 2026-08-14 · dev @ b84e898 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+**ISSUE-008 settled — it is a result, not a bug.** I had written up the LLE
+sitting at `−1/max(tau_a)` as an artefact that "says nothing about the network".
+Corrected by TR: `a` is a state variable of the closed-loop system, so its
+relaxation rate *is* a network property, and the largest Lyapunov exponent
+correctly reports the slowest mode of the coupled linearisation. When the
+recurrent dynamics contract faster than the adaptation, the slowest mode simply
+is the adaptation. Supporting detail: the measured values sit slightly *below*
+−0.1 (−0.1004…−0.1025), which is the `a`↔`x` coupling perturbing the uncoupled
+−1/tau — i.e. it is the coupled system's eigenvalue, not a bare parameter
+readback.
+
+What survives is narrow: a flat LLE across a swept parameter means the exponent
+is *insensitive* to it in that regime, and if the recurrent contraction rate is
+what is wanted specifically, that is a different exponent in the QR spectrum.
+
+**Consequence — the tau sweep became a deliberate measurement of this.** Its
+whole point is to show `tau_a_E` controlling the exponent in the stable regime.
+Range changed **[5, 60] → [1, 30] s** on `tau_a_E(end)`: a factor of 30 in
+−1/tau rather than 12, and crucially the fast end now reaches where STD's own
+slowest mode (≈ −0.6) overtakes adaptation. The prediction to check is therefore
+`max(−1/tau_a_E(end), STD mode)` — a **knee near `tau_a_E(end) ≈ 1.6 s`** that
+[5, 60] never reached.
 
 Also outstanding:
 

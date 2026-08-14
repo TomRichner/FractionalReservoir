@@ -134,12 +134,43 @@ default pool, with per-job memory logging, so any failure carries numbers.
 
 ---
 
-## 🔵 ISSUE-008 · The LLE has a floor at `−1/max(tau_a)`
+## ⚪ ISSUE-008 · The LLE tracks `−1/max(tau_a)` when the network is stable — NOT A DEFECT
 
 | | |
 |---|---|
 | Identified | 2026-08-13 · `dev` @ `ac59b42` · R5456622 |
-| Area | interpretation of every sweep, not a code defect |
+| Reclassified | 2026-08-14 · `dev` @ `b84e898` · R5456622 — **expected consequence of the equations; this is a result, not a bug** |
+| Area | interpretation |
+
+**Resolution: won't fix, because there is nothing to fix.** This was first
+written up as an artefact that "says nothing about the network". That framing
+was wrong. `a` is a state variable of the closed-loop system like any other, so
+its relaxation rate is a network property, and the largest Lyapunov exponent
+correctly reports the slowest mode of the coupled linearisation. When the
+recurrent dynamics contract faster than the adaptation, the slowest mode simply
+*is* the adaptation — and the LLE saying so is the right answer, not a masked
+one.
+
+The measured values support that reading rather than a bare eigenvalue: they sit
+slightly *below* −0.1 (−0.1004 … −0.1025), which is the `a`↔`x` coupling
+perturbing the uncoupled −1/tau.
+
+Nor is a near-zero exponent from slow adaptation misleading in itself: a network
+with `max(tau_a) = 60 s` has LLE ≈ −0.017 because perturbations genuinely
+persist for ~60 s. That is a real statement about the system's memory.
+
+**What survives as a caution, and it is narrow:** where the LLE sits flat across
+a swept parameter, it means the exponent is *insensitive* to that parameter in
+that regime — the recurrent dynamics may be changing underneath while the
+slowest mode does not move. If the recurrent contraction rate specifically is
+what is wanted, that is a different exponent in the QR spectrum, not the LLE.
+`best_presets.md`'s flat plateaus should be read that way.
+
+**Turned into a deliberate measurement.** The tau sweep exists precisely to show
+that `tau_a_E` controls the exponent in the stable regime, and its range moved
+from [5, 60] to **[1, 30]** to serve that. The prediction to check is not a bare
+−1/tau line but `max(−1/tau_a_E(end), STD mode ≈ −0.6)` — a knee near
+`tau_a_E(end) ≈ 1.6 s`, which [1, 30] brackets and [5, 60] never reached.
 
 No preset overrides `tau_a`, so all use the class default
 `logspace(log10(0.25), log10(10), n_a)` — slowest timescale **10 s**, giving a
