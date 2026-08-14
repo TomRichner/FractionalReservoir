@@ -84,3 +84,4 @@ data/param_space/*
 !data/param_space/run_all_jul_06_26_22_00/
 !data/param_space/run_all_jul_06_26_22_00/**
 
+debug.log
