@@ -70,7 +70,7 @@ lle_hist_range = [-2, 2];
 params_to_sweep = {
     'n',              [100, 1000];
     'f',              [0.2, 0.8];
-    'level_of_chaos', [0.5, 2.0];
+    'level_of_chaos', [0.5, 1.5];
     };
 % The four connectivity blocks, each swept from half to twice whatever the
 % preset operates at rather than over fixed absolute numbers. mu_*_relative is a

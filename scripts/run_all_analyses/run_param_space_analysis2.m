@@ -80,8 +80,11 @@ psa.model_defaults = merge_struct(preset_defaults, cfg.model);
 % The order in which parameters are added doesn't matter
 
 % Network structure parameters
-% Same swept variables and ranges as run_sensitivity_analysis.m (n, f,
-% level_of_chaos), but here as a joint multi-dimensional grid.
+% Same swept variables as run_sensitivity_analysis.m (n, f, level_of_chaos),
+% but here as a joint multi-dimensional grid. The RANGES deliberately do not all
+% match: f is narrower here (0.25-0.75 against 0.2-0.8) and level_of_chaos wider
+% (up to 2 against 1.5), because a joint grid spends its few levels per axis on
+% the corners while a 1-D sweep can afford to resolve one axis finely.
 % The fraction-excitatory axis is f on SRNNModel2 (a scalar property) and f_E on
 % SRNNCellTypePairs (a scalar alias onto the 1 x C row f).
 if strcmp(model_class, 'SRNNCellTypePairs')
