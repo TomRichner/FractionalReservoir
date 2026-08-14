@@ -123,25 +123,41 @@ fprintf('[1/4] Running Sensitivity Analysis...\n');
 fprintf('========================================\n');
 run_sensitivity_analysis;
 
-%% 1b. Assemble 1D sensitivity figures into one stacked figure
+%% 1b. Assemble 1D sensitivity figures into stacked figures
 % run_sensitivity_analysis saves each swept parameter's LLE figure into its own
 % 1D_sensitivity_* subfolder. replot_sensitivity gathers them into a single
 % replot_sensitivity_<dt>/figures/ folder, then assemble_sensitivity_figure
-% stacks the per-parameter LLE figures into sensitivity_LLE_combined.{fig,png}.
+% stacks them.
+%
+% TWO sheets, split by what the parameters mean rather than one sheet of all
+% seven. A row is only worth reading against the rows it is comparable to: the
+% network-scale parameters answer "how does this network respond to being made
+% bigger, more excitatory, more chaotic", while the connectivity blocks answer
+% "which route does the stability actually hinge on". Interleaving them
+% alphabetically -- f_E, level_of_chaos, mu_EE, mu_EI, mu_IE, mu_II, n -- buries
+% both questions.
 if ~strcmp(master_save_figs, 'save_no_figs')
     fprintf('========================================\n');
     fprintf('Assembling 1D sensitivity figures...\n');
     fprintf('========================================\n');
     sens_replot_dir = replot_sensitivity(master_output_dir);
-    assemble_sensitivity_figure(sens_replot_dir, 'LLE');
 
-    % A second sheet with just the four connectivity blocks, in (post, pre)
-    % reading order rather than the alphabetical order the call above uses.
-    % They are only interpretable against each other -- what matters is whether
-    % E->E and I->I behave alike, and whether the two cross terms do -- and on
-    % the all-parameters sheet they are interleaved with n, f_E and
-    % level_of_chaos. Skipped with a warning on a model class that has no mu
-    % blocks, so this costs nothing on an SRNNModel2 run.
+    % Sheet 1: the network-scale axes. f is the scalar fraction excitatory on
+    % SRNNModel2 and the f_E alias on SRNNCellTypePairs, matching what
+    % run_sensitivity_analysis actually swept.
+    if strcmp(master_model_class, 'SRNNCellTypePairs')
+        f_param = 'f_E';
+    else
+        f_param = 'f';
+    end
+    assemble_sensitivity_figure(sens_replot_dir, 'LLE', ...
+        {f_param, 'n', 'level_of_chaos'}, 'network');
+
+    % Sheet 2: the four connectivity blocks, in (post, pre) reading order rather
+    % than alphabetical. What matters here is whether E->E and I->I behave alike
+    % and whether the two cross terms do, which only reads side by side. Skipped
+    % with a warning on a model class that has no mu blocks, so this costs
+    % nothing on an SRNNModel2 run.
     assemble_sensitivity_figure(sens_replot_dir, 'LLE', ...
         {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relative'}, ...
         'mu_blocks');
