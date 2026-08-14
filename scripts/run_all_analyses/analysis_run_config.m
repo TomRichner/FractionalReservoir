@@ -110,7 +110,14 @@ switch analysis
                 % over fast2 and fs doubled over medium. ~6.5 h of the budget.
                 cfg = pack(13, 12, 'rk4',   800, [0, 25], [12.5, 25]);
             case 'production'
-                cfg = pack(25, 50, 'ode45', 400, [0, 50], [20, 50]);
+                % 25 reps, not 50. Reps buy histogram DENSITY at each level,
+                % not resolution along the swept axis, so they are the cheapest
+                % factor to cut: halving them halves the ~21 h sensitivity
+                % stage while leaving all 25 levels intact. Note this also
+                % halves plot_sensitivity's colour ceiling, which is
+                % caxis [0, total_reps] -- a production sheet now saturates at
+                % 25 agreeing reps rather than 50.
+                cfg = pack(25, 25, 'ode45', 400, [0, 50], [20, 50]);
         end
 
     case 'tau_sensitivity'
@@ -137,7 +144,9 @@ switch analysis
                 % end meaningless. ~2.3 h of the budget.
                 cfg = pack(13, 15, 'rk4',   800, [0, 50], []);
             case 'production'
-                cfg = pack(25, 50, 'ode45', 400, [0, 50], []);
+                % 25 reps here too, for the same reason and to keep the two
+                % sensitivity analyses on the same footing.
+                cfg = pack(25, 25, 'ode45', 400, [0, 50], []);
         end
 
     case 'param_space'
