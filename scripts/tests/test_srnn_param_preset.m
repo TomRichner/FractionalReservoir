@@ -13,11 +13,18 @@
 fprintf('=== Testing srnn_param_preset / analysis_run_config ===\n\n');
 all_passed = true;
 
-preset_names = {'default', 'overconnected'};
+% EVERY preset, not a hand-kept subset: the list is read from the function
+% itself, so a preset added without a test cannot go unchecked. (This used to be
+% {'default', 'overconnected'}, which left eight of eleven presets unexamined.)
+preset_names = srnn_param_preset_names_for_test();
 
-%% Every preset returns a struct whose fields are all settable SRNNModel2 params
+%% Every preset returns a struct whose fields are all settable model params
 for i = 1:numel(preset_names)
-    d = srnn_param_preset(preset_names{i});
+    % The second output names the MODEL CLASS the overrides are written for --
+    % the two classes have disjoint vocabularies, so validating a
+    % SRNNCellTypePairs preset against SRNNModel2 would reject every per-type
+    % field. Thread it through rather than assuming SRNNModel2.
+    [d, model_class] = srnn_param_preset(preset_names{i});
     all_passed = check(sprintf('%s returns a scalar struct', preset_names{i}), ...
         isstruct(d) && isscalar(d)) && all_passed;
 
@@ -25,6 +32,7 @@ for i = 1:numel(preset_names)
     % names are hard errors. Use a PSA with no grid and no conditions carrying
     % the preset, so only the preset's own fields are judged.
     psa = ParamSpaceAnalysis2('verbose', false);
+    psa.model_class = model_class;
     psa.model_defaults = d;
     [threw, err] = capture_error(@() psa.validate_model_defaults());
     all_passed = check(sprintf('%s passes validate_model_defaults', preset_names{i}), ...
@@ -78,7 +86,7 @@ all_passed = check('preset activation evaluates as piecewise(S_a, S_c)', ...
 
 %% analysis_run_config covers every analysis x mode and rejects bad input
 analyses = {'sensitivity', 'tau_sensitivity', 'param_space'};
-modes = {'fast', 'medium', 'production'};
+modes = {'fast', 'fast2', 'medium', 'production'};
 cfg_ok = true;
 for i = 1:numel(analyses)
     for j = 1:numel(modes)
@@ -90,7 +98,61 @@ for i = 1:numel(analyses)
         cfg_ok = cfg_ok && (isfield(cfg, 'n_reps') == ~strcmp(analyses{i}, 'param_space'));
     end
 end
-all_passed = check('all 3 analyses x 3 modes return a usable config', cfg_ok) && all_passed;
+all_passed = check('all 3 analyses x 4 modes return a usable config', cfg_ok) && all_passed;
+
+%% The deterministic / stochastic solver pair
+% sigma_u_noise is physics and lives in a preset, but sigma > 0 REQUIRES a
+% stochastic integrator -- so the preset selects which of a cell's two solvers
+% is used. Checking here keeps that contract pinned in one place.
+noisy = struct('sigma_u_noise', 0.02);
+quiet = struct('sigma_u_noise', 0);
+det_ok = true; sto_ok = true; leak_ok = true; zero_ok = true;
+for i = 1:numel(analyses)
+    for j = 1:numel(modes)
+        cd_ = analysis_run_config(analyses{i}, modes{j});
+        cs  = analysis_run_config(analyses{i}, modes{j}, noisy);
+        cz  = analysis_run_config(analyses{i}, modes{j}, quiet);
+        % rk4 up to medium, ode45 only at production
+        want_det = 'rk4';
+        if strcmp(modes{j}, 'production'); want_det = 'ode45'; end
+        det_ok  = det_ok  && strcmp(cd_.model.ode_solver, want_det) && ~cd_.is_stochastic;
+        sto_ok  = sto_ok  && strcmp(cs.model.ode_solver, 'sra1')   &&  cs.is_stochastic;
+        zero_ok = zero_ok && strcmp(cz.model.ode_solver, want_det) && ~cz.is_stochastic;
+        % sde_solver must stay OUT of cfg.model, which becomes model_defaults
+        leak_ok = leak_ok && ~isfield(cs.model, 'sde_solver') && ...
+            ~isfield(cs.model, 'is_stochastic');
+    end
+end
+all_passed = check('deterministic column is rk4 up to medium, ode45 at production', ...
+    det_ok) && all_passed;
+all_passed = check('a preset with sigma > 0 selects sra1 in every cell', ...
+    sto_ok) && all_passed;
+all_passed = check('a preset with sigma = 0 stays deterministic', zero_ok) && all_passed;
+all_passed = check('sde_solver/is_stochastic never leak into cfg.model', ...
+    leak_ok) && all_passed;
+
+% The noise preset must actually reach that path end to end.
+[dn, mcn] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02');
+cfg_n = analysis_run_config('sensitivity', 'fast2', dn);
+all_passed = check('the noise preset selects sra1 at fast2', ...
+    strcmp(cfg_n.model.ode_solver, 'sra1') && strcmp(mcn, 'SRNNCellTypePairs')) && all_passed;
+% ...and its merged model_defaults are what PSA will actually accept.
+psa_n = ParamSpaceAnalysis2('verbose', false);
+psa_n.model_class = mcn;
+psa_n.model_defaults = merge_struct(dn, cfg_n.model);
+[threw, err] = capture_error(@() psa_n.validate_model_defaults());
+all_passed = check('noise preset + fast2 config validates as model_defaults', ...
+    ~threw) && all_passed;
+if threw; fprintf('      %s\n', err.message); end
+[threw, ~] = capture_error(@() psa_n.validate_noise_settings());
+all_passed = check('...and passes the sigma/solver pre-flight', ~threw) && all_passed;
+% The same preset with the deterministic solver forced must be REJECTED.
+psa_bad = ParamSpaceAnalysis2('verbose', false);
+psa_bad.model_class = mcn;
+psa_bad.model_defaults = merge_struct(dn, struct('ode_solver', 'rk4'));
+[threw, err] = capture_error(@() psa_bad.validate_noise_settings());
+all_passed = check('sigma > 0 forced onto rk4 is rejected', ...
+    threw && contains(err.message, 'sra1')) && all_passed;
 
 [threw, ~] = capture_error(@() analysis_run_config('nope', 'fast'));
 all_passed = check('unknown analysis errors', threw) && all_passed;
@@ -122,6 +184,28 @@ end
 fprintf('========================================\n');
 
 %% Helpers
+function names = srnn_param_preset_names_for_test()
+% Every preset srnn_param_preset knows about.
+%
+% Read out of the function rather than kept as a second list here, so a preset
+% added without touching this file is still covered. srnn_param_preset_names is
+% local to srnn_param_preset.m and cannot be called directly, but the unknown-
+% preset error enumerates them, and that message is asserted on a few lines
+% above -- so the format is already pinned by this same test.
+try
+    srnn_param_preset('__definitely_not_a_preset__');
+    error('test_srnn_param_preset:NoError', ...
+        'srnn_param_preset accepted a bogus name; the list cannot be recovered.');
+catch err
+    if ~strcmp(err.identifier, 'srnn_param_preset:UnknownPreset')
+        rethrow(err);
+    end
+end
+marker = 'Valid presets:';
+tail = extractAfter(err.message, marker);
+names = strtrim(split(strtrim(erase(tail, '.')), ','))';
+end
+
 function [threw, err, warn_id] = capture_error(fcn)
 threw = false;
 err = [];

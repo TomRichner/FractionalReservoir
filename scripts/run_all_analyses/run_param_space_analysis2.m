@@ -41,18 +41,27 @@ setup_paths();
 % Set run_mode in the base workspace (or via run_all_analyses); defaults to
 % 'production' when this script is run standalone.
 if ~exist('run_mode', 'var'); run_mode = 'production'; end
-cfg = analysis_run_config('param_space', run_mode);
-n_levels = cfg.n_levels;
-fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
-    run_mode, n_levels, cfg.model.ode_solver, cfg.model.fs, ...
-    cfg.model.T_range(1), cfg.model.T_range(2));
 
 % Which network to simulate, and with which model class. run_all_analyses sets
 % both from srnn_param_preset; standalone runs get SRNNModel2 class defaults.
+%
+% Resolved BEFORE analysis_run_config, which needs it: a preset carrying
+% sigma_u_noise > 0 selects that mode's stochastic integrator instead of its
+% deterministic one.
 if exist('master_model_overrides', 'var')
     preset_defaults = master_model_overrides;
 else
     preset_defaults = srnn_param_preset('default');
+end
+
+cfg = analysis_run_config('param_space', run_mode, preset_defaults);
+n_levels = cfg.n_levels;
+fprintf('[run_param_space_analysis2] run_mode=%s, n_levels=%d, ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
+    run_mode, n_levels, cfg.model.ode_solver, cfg.model.fs, ...
+    cfg.model.T_range(1), cfg.model.T_range(2));
+if cfg.is_stochastic
+    fprintf('[run_param_space_analysis2] stochastic: sigma_u_noise=%g, integrator=%s\n', ...
+        preset_defaults.sigma_u_noise, cfg.model.ode_solver);
 end
 if exist('master_model_class', 'var')
     model_class = master_model_class;

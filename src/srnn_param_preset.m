@@ -314,6 +314,33 @@ switch name
         d.sigma_tilde_relative = [1.5 1.5; 1.5 1.5];   % multiples of F
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02'
+        % ..._sig1p5 run as an SDE: additive Wiener noise on the dendritic
+        % state, dx = (...)/tau_d dt + sigma_u_noise/tau_d dW.
+        %
+        % WHAT 0.02 MEANS HERE. sigma_u_noise is INPUT-REFERRED -- the units of
+        % u -- which usually makes it readable against intrinsic_drive. That
+        % framing does not apply to this preset: the drive is 0. The meaningful
+        % comparison is against the nonlinearity instead. With S_c = 0 and
+        % S_a = 0.8 the piecewise sigmoid spans +/-0.6, and
+        %
+        %   x_noise_std = sigma_u_noise / sqrt(2*tau_d) = 0.02/sqrt(0.2) = 0.0447
+        %
+        % so the noise moves a neuron over about 7.5% of its input range -- a
+        % perturbation of the operating point rather than a redefinition of it.
+        %
+        % The INTEGRATOR IS NOT NAMED HERE, deliberately. ode_solver is a
+        % run_mode knob (analysis_run_config), it is on the list of names a
+        % preset may not carry, and merge_struct gives cfg.model precedence so
+        % naming it here would be inert anyway. What happens instead is that
+        % analysis_run_config sees sigma_u_noise > 0 and selects that mode's
+        % STOCHASTIC integrator ('sra1') in place of its deterministic one.
+        % Carrying sigma_u_noise is therefore the whole of what marks this
+        % preset stochastic.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
+        d.sigma_u_noise = 0.02;
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -334,7 +361,8 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_S_c_by_type_n500_fixedF', 'celltype_pairs_all_std_n500', ...
     'celltype_pairs_uniform_std_n500', 'celltype_pairs_uniform_std_n500_mu5p5', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive', ...
-    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5'};
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5', ...
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
