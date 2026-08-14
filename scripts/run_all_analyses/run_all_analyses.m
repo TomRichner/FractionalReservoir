@@ -125,6 +125,10 @@ clear activation_fields fn;
 fprintf('========================================\n');
 fprintf('[1/4] Running Sensitivity Analysis...\n');
 fprintf('========================================\n');
+% A fresh pool before each stage. The three analyses run back to back for hours
+% against one pool otherwise; see restart_parpool for why that is worth
+% avoiding and for what is and is not established about the aug_13 failure.
+restart_parpool();
 run_sensitivity_analysis;
 
 %% 1b. Assemble 1D sensitivity figures into stacked figures
@@ -171,12 +175,14 @@ end
 fprintf('========================================\n');
 fprintf('[2/4] Running Tau Sensitivity Analysis...\n');
 fprintf('========================================\n');
+restart_parpool();
 run_tau_sensitivity_analysis;
 
 %% 3. Parameter Space Analysis
 fprintf('========================================\n');
 fprintf('[3/4] Running Parameter Space Analysis...\n');
 fprintf('========================================\n');
+restart_parpool();
 run_param_space_analysis2;
 
 % %% 4. DC Lyapunov Analysis
