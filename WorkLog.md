@@ -318,7 +318,32 @@ Tracked in full in **`Issues.md`** and **`FeatureRequests.md`**; summarised here
   re-deriving, along with the `[0.5, 1.5]` range narrowing that rests on them.
 - 🔴 **FR-006** — memory pre-flight for PSA.
 
-Unfinished work:
+## Unfinished work — and the order it has to happen in
 
-- `medium2` `tau_sensitivity` and `param_space` still need a clean run.
-- `dev` is **ahead and unpushed** (`git push -u origin dev`).
+**⛔ `medium2` `tau_sensitivity` + `param_space` re-run is BLOCKED. Fix the bugs
+first.** It is tempting to just relaunch it, but that would be premature on
+three counts:
+
+1. **ISSUE-008 (the LLE floor) is unresolved.** If the exponent saturates at
+   `−1/max(tau_a)` wherever the network contracts, a re-run at the current
+   settings produces more floor-limited data. The tau stage is the *worst*
+   affected, because it sweeps `tau_a_E(end)` — i.e. it sweeps the floor itself.
+   Settle this first: it may change `max(tau_a)` or the sweep range, and it
+   needs no new runs, since the data is already on disk.
+2. **ISSUE-010 / ISSUE-011 are unfixed.** A crashed run is exactly the case
+   where `load_results` gets used and silently returns level indices. The last
+   run *did* crash. Fix the loader before generating more data that might have
+   to be salvaged through it.
+3. **ISSUE-009's cause is still unknown.** `restart_parpool` is insurance, not a
+   fix. Relaunching without instrumentation risks burning another night and
+   learning nothing again — see FR-006 for the memory pre-flight that would make
+   any repeat failure legible.
+
+Suggested order: **ISSUE-008 → ISSUE-010/011 → re-run `medium2`**, with
+ISSUE-009's diagnostic (tau alone, fresh MATLAB, full default pool, per-job
+memory logging) folded into that re-run.
+
+Also outstanding:
+
+- ISSUE-007: `best_presets.md` numbers need re-deriving post-window-fix, and the
+  `[0.5, 1.5]` range narrowing that rests on them re-confirming.

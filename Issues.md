@@ -34,9 +34,31 @@ wrong x-axis.
 both fields correctly — verified, it returns the real
 `tau_a_E(end) = [5, 9.58, …, 55.4, 60]`.
 
+**Blast radius — smaller than first recorded.** An earlier version of this entry
+claimed `load_results` is "the path the replot scripts actually use". That is
+**wrong**; checked 2026-08-14:
+
+| caller | path |
+|---|---|
+| all `replot_*.m` | `psa_object.mat` only, skips dirs without it ✅ |
+| `combine_runs.m` (pooling) | `psa_object.mat` + `same_config` ✅ |
+| `load_and_make_unit_histograms.m` | prefers `psa_object.mat`, falls back to `load_results` |
+| `Fig_2_fraction_excitatory_load_and_plot.m` | errors if `psa_object.mat` absent |
+
+`load_results` also only *sets* six fields without clearing anything, so calling
+it on an object already restored from `psa_object.mat` is harmless. The bug
+therefore bites in exactly one case: **`psa_object.mat` is missing**, i.e. a
+crashed or interrupted run — which is precisely when salvaging the data matters,
+and precisely how it was found.
+
 **Why the tests missed it:** `test_psa_saveload` exercises `saveobj`/`loadobj`
-(the path that works) and never calls `load_results` (the path the replot
-scripts and post-hoc analysis actually use).
+(the path that works) and never calls `load_results` at all.
+
+**Shared root with ISSUE-010:** `saveobj`/`loadobj` and `load_results` have
+diverged — the former persists the whole object, the latter restores a
+hand-picked six fields from a summary file that stores its own different
+hand-picked set. Two lists, drifting, with no test asserting they agree. Fix
+both together, with a test that the two load paths yield equivalent objects.
 
 ---
 
