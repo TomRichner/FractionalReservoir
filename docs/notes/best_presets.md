@@ -4,6 +4,25 @@ Running notes on which `srnn_param_preset` entries produced usable dynamics, and
 why. Presets themselves live in `src/srnn_param_preset.m`; this file records the
 judgement about them, which the code cannot.
 
+> ### ⚠ Every LLE number below predates the Lyapunov window fix (2026-08-13)
+>
+> These notes were written on the `refactorPSA` branch. The `SDE` branch then
+> fixed `SRNNModel2`'s Benettin — and both QR paths — which had **ignored
+> `lya_T_interval(1)` entirely** and accumulated from `t = 0` rather than over
+> the requested window. Exponents measured before that fix therefore averaged in
+> part of the settling transient, and **will shift**.
+>
+> This is not only bookkeeping. The claims below about *where* the
+> `level_of_chaos` crossing sits are what commits `c2d7f22` and `45821dc` used
+> to narrow both sweeps to `[0.5, 1.5]`. Re-confirm that the crossing still
+> falls inside that range rather than assuming it; a range chosen from shifted
+> numbers may no longer bracket it.
+>
+> The same branch also added `lya_warmup` (default 5 s), which biases nothing at
+> that value for Benettin but leaves QR roughly 12% short of its plateau — see
+> the table on `SRNNModel2.lya_warmup`. Numbers here were taken with neither
+> mechanism in place.
+
 ---
 
 ## `celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5`
