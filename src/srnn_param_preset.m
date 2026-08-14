@@ -259,6 +259,24 @@ switch name
         std_routes.I.E.std = uniform_std;
         std_routes.I.I.std = uniform_std;
 
+    case 'celltype_pairs_uniform_std_n500_mu5p5'
+        % celltype_pairs_uniform_std_n500 with the weight means raised to a
+        % magnitude of 5.5 and level_of_chaos returned to 1, so the scale lives
+        % entirely in the weights and nothing multiplies W afterwards.
+        %
+        % NOT the same network as its parent at level_of_chaos = 1.4. That
+        % equivalence needs BOTH tildes scaled -- level_of_chaos multiplies the
+        % assembled W, and a weight is drawn as mu + sigma*randn, so
+        % 1.4*(mu + sigma*randn) = 1.4*mu + (1.4*sigma)*randn. Here sigma stays
+        % at 1, and mu goes to 5.5 rather than the 5.6 that 4 * 1.4 would give.
+        % The mean-to-spread ratio therefore changes: this network has a
+        % relatively stronger deterministic block structure and a relatively
+        % weaker random bulk than the parent does.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500');
+        d.mu_tilde_relative = [5.5 -5.5; 5.5 -5.5];   % multiples of F, (post <- pre)
+        d.level_of_chaos    = 1.0;
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -277,7 +295,7 @@ function names = srnn_param_preset_names()
 names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500', ...
     'celltype_pairs_S_c_by_type_n500_fixedF', 'celltype_pairs_all_std_n500', ...
-    'celltype_pairs_uniform_std_n500'};
+    'celltype_pairs_uniform_std_n500', 'celltype_pairs_uniform_std_n500_mu5p5'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
