@@ -342,18 +342,21 @@ switch name
         return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01'
-        % ..._sig1p5 as an SDE at HALF the noise of the 0p02 preset, so the two
-        % bracket the amplitude rather than testing a single value.
+        % ..._sig1p5 with HALF the noise of the noise0p02 sibling, so the two
+        % bracket the amplitude rather than testing a single value. Also the
+        % preset the longer/finer 'medium2' runs use.
         %
-        % By the same scaling as that preset, x_noise_std = sigma / sqrt(2*tau_d)
-        % = 0.01/sqrt(0.2) = 0.0224, about 3.7% of the piecewise sigmoid's +/-0.6
-        % input span against 7.5% at 0.02. Noise enters the LLE quadratically
-        % more often than linearly, so halving sigma is not expected to halve
-        % whatever it does -- which is the reason to have both.
+        % x_noise_std = 0.01/sqrt(2*tau_d) = 0.0224, about 3.7% of the piecewise
+        % sigmoid's 0.6 half-width at S_c = 0, against 7.5% at 0.02 -- a light
+        % perturbation of the operating point. At 0.02 the same network crossed
+        % from chaotic to contracting over a fast2 sweep, so half of that is
+        % deliberately on the gentler side of the transition. Do not expect the
+        % effect to halve with sigma, though: noise enters the exponent
+        % quadratically more often than linearly, which is the reason to keep
+        % both rather than interpolate between them.
         %
-        % As with the 0p02 preset the integrator is NOT named here: carrying
-        % sigma_u_noise is the whole of what marks a preset stochastic, and
-        % analysis_run_config turns that into the run mode's 'sra1'.
+        % Like its sibling it names no integrator: analysis_run_config sees
+        % sigma_u_noise > 0 and picks the mode's stochastic scheme ('sra1').
         [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
         d.sigma_u_noise = 0.01;
         return;     % conditions already resolved by the recursive call

@@ -44,6 +44,10 @@ master_save_figs = 'save_all_figs';
 %   'fast2'      - 'fast' but with twice the reps on the 1-D sensitivity sweeps,
 %                  so their histograms have enough samples per level to read
 %   'medium'     - fs=400, 11 levels, T_range=[0,20] (tau: ode45 over [0,50])
+%   'medium2'    - between medium and production, fs=800, sized to run
+%                  overnight (~9 h). Intended for STOCHASTIC presets: the finer
+%                  step is free against medium because sra1 takes two drift
+%                  evaluations per step where rk4 takes four
 %   'production' - full-size sweeps, fs=400, T_range=[0,50] (for real results)
 % See analysis_run_config.m for the actual per-analysis numbers.
 % Defaults to 'medium'. To pick another WITHOUT editing this file, set the
@@ -121,6 +125,10 @@ clear activation_fields fn;
 fprintf('========================================\n');
 fprintf('[1/4] Running Sensitivity Analysis...\n');
 fprintf('========================================\n');
+% A fresh pool before each stage. The three analyses run back to back for hours
+% against one pool otherwise; see restart_parpool for why that is worth
+% avoiding and for what is and is not established about the aug_13 failure.
+restart_parpool();
 run_sensitivity_analysis;
 
 %% 1b. Assemble 1D sensitivity figures into stacked figures
@@ -167,12 +175,14 @@ end
 fprintf('========================================\n');
 fprintf('[2/4] Running Tau Sensitivity Analysis...\n');
 fprintf('========================================\n');
+restart_parpool();
 run_tau_sensitivity_analysis;
 
 %% 3. Parameter Space Analysis
 fprintf('========================================\n');
 fprintf('[3/4] Running Parameter Space Analysis...\n');
 fprintf('========================================\n');
+restart_parpool();
 run_param_space_analysis2;
 
 % %% 4. DC Lyapunov Analysis

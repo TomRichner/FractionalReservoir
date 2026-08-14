@@ -47,14 +47,18 @@ psa2.add_vector_parameter('tau_a_E', ...
 
 psa2.add_grid_parameter('reps', 1:3);
 
-% Verify vectors were generated correctly
+psa2.run();
+
+% Verify the per-level vectors. This has to come AFTER run(): the lookup is
+% built by generate_grid, so before the run there is nothing to print.
 fprintf('Vector param lookup:\n');
 for i = 1:3
     fprintf('  Level %d: tau_a_E = [%s]\n', i, ...
-        num2str(psa2.vector_param_config.tau_a_E.vary_range));
+        num2str(psa2.vector_param_lookup.tau_a_E{i}));
 end
-
-psa2.run();
+assert(~isequal(psa2.vector_param_lookup.tau_a_E{1}, ...
+                psa2.vector_param_lookup.tau_a_E{3}), ...
+    'Levels 1 and 3 produced the same tau_a_E vector.');
 fprintf('Test 2 PASSED: vector sensitivity run completed\n');
 
 psa2.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);

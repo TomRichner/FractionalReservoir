@@ -30,7 +30,23 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 %                  exactly 'fast'. Cheaper than the extra LEVELS that separate
 %                  'fast' from 'medium'.
 %   'medium'     - roughly halfway; for a usable but not publication-size run
+%   'medium2'    - between medium and production, at fs=800, for overnight
+%                  STOCHASTIC runs. See the note below on why its sweep sizes
+%                  sit nearer medium than the true midpoint.
 %   'production' - full-size sweeps at fs=400 (for real results)
+%
+% ON 'medium2' AND fs=800. Doubling fs is free relative to medium *per
+% simulated second*: SRA1 takes two drift evaluations per step against rk4's
+% four, so sra1 at fs=800 and rk4 at fs=400 both cost 1600 evaluations per
+% second of simulation. The finer step buys back some of the accuracy that a
+% fixed-step scheme gives up against ode45, which matters because a stochastic
+% run cannot use an adaptive solver at all.
+%
+% Its levels and reps are NOT the medium/production midpoint. Measured against
+% a completed fast2 run (19.7 min), medium alone is already ~9 h and production
+% ~80 h, so the true midpoint is a multi-day job. medium2 is sized to finish
+% overnight (~9 h) and therefore sits nearer medium: more levels than medium on
+% the 1-D sweeps, fewer reps, a longer window, and the finer step.
 %
 % DETERMINISTIC AND STOCHASTIC SOLVERS. Every cell names two integrators, and
 % which one is used depends on the PRESET rather than on the run mode:
@@ -64,7 +80,7 @@ arguments
     preset_defaults struct = struct()
 end
 
-valid_modes = {'fast', 'fast2', 'medium', 'production'};
+valid_modes = {'fast', 'fast2', 'medium', 'medium2', 'production'};
 if ~ismember(run_mode, valid_modes)
     error('analysis_run_config:badMode', ...
         'Unknown run_mode ''%s'' (expected %s).', ...
@@ -87,6 +103,12 @@ switch analysis
                 cfg = pack(4,  6,  'rk4',   200, [0, 20], [10, 20]);
             case 'medium'
                 cfg = pack(11, 15, 'rk4',   400, [0, 20], [10, 20]);
+            case 'medium2'
+                % 13 levels (up from medium's 11) but 12 reps (down from 15):
+                % the extra resolution along the axis is worth more than the
+                % extra samples per level once the window is longer. T doubled
+                % over fast2 and fs doubled over medium. ~6.5 h of the budget.
+                cfg = pack(13, 12, 'rk4',   800, [0, 25], [12.5, 25]);
             case 'production'
                 cfg = pack(25, 50, 'ode45', 400, [0, 50], [20, 50]);
         end
@@ -108,6 +130,12 @@ switch analysis
                 % comes from FAST modes, and the fastest is still tau_d = 0.1
                 % against dt = 1/400. Also faster than ode45 with MaxStep = dt.
                 cfg = pack(11, 25, 'rk4',   400, [0, 50], []);
+            case 'medium2'
+                % Keeps the full [0, 50] window and the class-default LLE
+                % interval, as medium/production do -- the swept tau reaches
+                % 60 s, so shortening the run here is what makes the long-tau
+                % end meaningless. ~2.3 h of the budget.
+                cfg = pack(13, 15, 'rk4',   800, [0, 50], []);
             case 'production'
                 cfg = pack(25, 50, 'ode45', 400, [0, 50], []);
         end
@@ -123,6 +151,12 @@ switch analysis
                 cfg = pack(3, [], 'rk4',   200, [0, 40], [20, 40]);
             case 'medium'
                 cfg = pack(4, [], 'rk4',   400, [0, 20], [10, 20]);
+            case 'medium2'
+                % 5 levels, i.e. production's, because this is the cheapest of
+                % the three stages: the grid is n_levels^3 but there is no reps
+                % axis. ~40 min of the budget, and the n = 1000 corner is what
+                % dominates it.
+                cfg = pack(5, [], 'rk4',   800, [0, 25], [12.5, 25]);
             case 'production'
                 cfg = pack(5, [], 'ode45', 400, [0, 50], []);
         end

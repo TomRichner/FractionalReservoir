@@ -180,9 +180,9 @@ for p_idx = 1:size(params_to_sweep, 1)
     psa.plot_sensitivity('metric', 'LLE', 'hist_range', lle_hist_range);
     psa.plot_sensitivity('metric', 'mean_rate');
     
-    % Save PSA object
-    save(fullfile(psa.output_dir, 'psa_object.mat'), 'psa');
-    
+    % psa_object.mat is written by run() itself -- once before batching so a
+    % crashed run stays recoverable, and again on completion.
+
     all_output_dirs{end+1} = psa.output_dir; %#ok<SAGROW>
     
     % Save figures in additional formats

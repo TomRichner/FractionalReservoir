@@ -48,23 +48,13 @@ if ~exist(results_dir, 'dir')
     error('Results directory not found:\n  %s', results_dir);
 end
 
-psa_file = fullfile(results_dir, 'psa_object.mat');
-if ~exist(psa_file, 'file')
-    error('psa_object.mat not found in:\n  %s\nDid you run the analysis first?', results_dir);
-end
-
 fprintf('=== Loading PSA Object ===\n');
 fprintf('Directory: %s\n', results_dir);
-loaded = load(psa_file);
-psa = loaded.psa;
+% from_dir reads psa_object.mat, fills in the per-condition results when the
+% object does not already carry them, and errors clearly if the run is absent.
+psa = ParamSpaceAnalysis2.from_dir(results_dir);
 fprintf('Loaded PSA object: %d combinations, %d conditions\n\n', ...
     psa.num_combinations, length(psa.conditions));
-
-%% Load results if needed
-if ~psa.has_run
-    fprintf('PSA has_run is false — loading results from per-condition MAT files...\n');
-    psa.load_results(results_dir);
-end
 
 %% Plot results
 [~, figs_hist] = load_and_make_unit_histograms(psa.output_dir, 'Metrics', metrics_to_hist);

@@ -78,7 +78,7 @@ condition = all_conditions(is_sfa_and_std);
 
 %% 1. tau_a_E(end) sweep — vector parameter
 fprintf('\n========================================\n');
-fprintf('=== Tau Sensitivity: tau_a_E(end) [5, 60] ===\n');
+fprintf('=== Tau Sensitivity: tau_a_E(end) [1, 30] ===\n');
 fprintf('========================================\n');
 
 psa_tau_a = ParamSpaceAnalysis2(...
@@ -101,14 +101,31 @@ psa_tau_a.model_defaults = merge_struct(preset_defaults, cfg.model);
 psa_tau_a.set_conditions(condition);
 
 % tau_a_E is a vector of length 3, logspaced from 0.25 to max, and we sweep the
-% max (last element) from 5 to 60. It is a real property on SRNNModel2 and a
+% max (last element) from 1 to 30 s. It is a real property on SRNNModel2 and a
 % scalar-row alias onto tau_a{1} on SRNNCellTypePairs, so the same axis name
 % works for both. n_elements stays coupled BY HAND to the condition's three SFA
 % timescales above.
+%
+% WHAT THIS SWEEP IS FOR. When the network is stable, the slowest linear mode of
+% the closed-loop system sets the largest Lyapunov exponent -- and with SFA
+% present that mode is usually the slowest adaptation state, giving LLE close to
+% -1/tau_a_E(end). This axis therefore demonstrates directly that the adaptation
+% timescale CONTROLS the exponent in the stable regime. That is a property of
+% the coupled system, not an artefact: a is a state variable like any other, and
+% the measured exponents sit slightly below -1/tau because the a<->x coupling
+% perturbs the bare eigenvalue.
+%
+% The range was [5, 60] and is now [1, 30]. The wider relative span (a factor of
+% 30 in -1/tau rather than 12) is the point, and the fast end matters most: with
+% STD also active its own slowest mode is around -(1/tau_rec + r/tau_rel) ~ -0.6,
+% so once -1/tau_a_E(end) drops below that the STD mode becomes the slowest and
+% takes over. The prediction to check is therefore NOT a bare -1/tau line but
+% max(-1/tau_a_E(end), STD mode) -- a knee around tau_a_E(end) ~ 1.6 s, which
+% [1, 30] brackets and [5, 60] did not reach.
 psa_tau_a.add_vector_parameter('tau_a_E', ...
     'vary_element', 'last', ...
     'fixed_value', 0.25, ...
-    'vary_range', [5, 60], ...
+    'vary_range', [1, 30], ...
     'n_elements', 3, ...
     'spacing', 'log', ...
     'level_spacing', 'linear');
@@ -124,7 +141,9 @@ copyfile([mfilename('fullpath') '.m'], psa_tau_a.output_dir);
 psa_tau_a.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);
 psa_tau_a.plot_sensitivity('metric', 'mean_rate');
 
-save(fullfile(psa_tau_a.output_dir, 'psa_object.mat'), 'psa_tau_a');
+% psa_object.mat is written by run() itself, always under the name `psa`. This
+% script used to save it again as `psa_tau_a`, which is why readers had to guess
+% the variable name.
 
 if save_figs
     fig_dir = fullfile(psa_tau_a.output_dir, 'figures');
@@ -165,7 +184,7 @@ copyfile([mfilename('fullpath') '.m'], psa_tau_b.output_dir);
 psa_tau_b.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);
 psa_tau_b.plot_sensitivity('metric', 'mean_rate');
 
-save(fullfile(psa_tau_b.output_dir, 'psa_object.mat'), 'psa_tau_b');
+% As above: run() writes psa_object.mat under the canonical name.
 
 if save_figs
     fig_dir = fullfile(psa_tau_b.output_dir, 'figures');

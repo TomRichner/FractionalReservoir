@@ -86,7 +86,7 @@ all_passed = check('preset activation evaluates as piecewise(S_a, S_c)', ...
 
 %% analysis_run_config covers every analysis x mode and rejects bad input
 analyses = {'sensitivity', 'tau_sensitivity', 'param_space'};
-modes = {'fast', 'fast2', 'medium', 'production'};
+modes = {'fast', 'fast2', 'medium', 'medium2', 'production'};
 cfg_ok = true;
 for i = 1:numel(analyses)
     for j = 1:numel(modes)

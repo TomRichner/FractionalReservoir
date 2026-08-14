@@ -39,8 +39,7 @@ function replot_dir = replot_param_space_analysis(data_root)
         end
 
         fprintf('Loading param_space results from:\n  %s\n', src_dir);
-        S = load(psa_file);
-        psa = S.psa;
+        psa = ParamSpaceAnalysis2.from_dir(src_dir);
 
         psa.output_dir = replot_dir;
 

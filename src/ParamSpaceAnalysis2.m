@@ -463,6 +463,19 @@ classdef ParamSpaceAnalysis2 < handle
             if isstruct(res) && isfield(res, 'config') && isfield(res.config, name)
                 if isfield(obj.vector_param_lookup, name)
                     val = obj.vector_param_lookup.(name){res.config.(name)};
+                elseif isfield(obj.vector_param_config, name)
+                    % A VECTOR parameter whose decoder is missing. res.config
+                    % holds a grid LEVEL INDEX here, not a value, so returning it
+                    % would hand back 1..n_levels dressed up as seconds. Fail
+                    % loudly instead: this was ISSUE-011, and it was only found
+                    % because a tau sweep quietly plotted against 1..13.
+                    error('ParamSpaceAnalysis2:MissingVectorLookup', ...
+                        ['''%s'' is a vector parameter, so res.config.%s holds a ' ...
+                         'grid LEVEL INDEX (%s) rather than a value, and ' ...
+                         'vector_param_lookup is not populated to decode it.\n' ...
+                         'Load the run with ParamSpaceAnalysis2.from_dir(dir), ' ...
+                         'which restores the lookup from psa_object.mat.'], ...
+                        name, name, mat2str(res.config.(name)));
                 else
                     val = res.config.(name);
                 end
@@ -604,6 +617,13 @@ classdef ParamSpaceAnalysis2 < handle
                 end
             end
 
+            % Write the object BEFORE any simulation runs, results still empty.
+            % psa_object.mat is the authoritative record of a run, and writing it
+            % here is what makes a run that dies part-way recoverable: temp_batches
+            % holds the results, and this holds the configuration needed to
+            % interpret them. Overwritten with the completed object below.
+            obj.save_object();
+
             overall_start = tic;
 
             % Run batched simulation
@@ -620,8 +640,29 @@ classdef ParamSpaceAnalysis2 < handle
 
             obj.has_run = true;
 
-            % Save summary
+            % Save summary (metadata) and the completed object (authoritative)
             obj.save_summary();
+            obj.save_object();
+        end
+
+        function save_object(obj)
+            % SAVE_OBJECT Write psa_object.mat, the authoritative record of a run.
+            %
+            % ALWAYS under the variable name `psa`. This used to be each calling
+            % script's job, and they disagreed: most saved `psa` but the tau
+            % script saved `psa_tau_a` / `psa_tau_b`, so every reader had to know
+            % about it and three of five got it wrong. from_dir selects by CLASS
+            % rather than by name, so old files still load, but nothing new should
+            % add to the problem.
+            if isempty(obj.output_dir)
+                error('ParamSpaceAnalysis2:NoOutputDir', ...
+                    'output_dir must be set before saving the object.');
+            end
+            if ~exist(obj.output_dir, 'dir')
+                mkdir(obj.output_dir);
+            end
+            psa = obj; %#ok<NASGU>
+            save(fullfile(obj.output_dir, 'psa_object.mat'), 'psa');
         end
 
         function [tf, reason] = same_config(obj, other, varargin)
@@ -1596,42 +1637,34 @@ classdef ParamSpaceAnalysis2 < handle
             end
         end
 
-        function load_results(obj, results_dir)
-            % LOAD_RESULTS Load results from a previous run
+        function load_condition_results(obj)
+            % LOAD_CONDITION_RESULTS Read the per-condition result files into
+            % obj.results. Configuration must already be set -- this loads
+            % RESULTS ONLY.
             %
-            % Usage:
-            %   psa.load_results('/path/to/param_space_...')
+            % This was `load_results`, which also restored configuration from
+            % param_space_summary.mat using its own hand-picked list of six
+            % fields. That list had drifted from the twelve the summary writes
+            % and the twenty-six saveobj writes, so a loaded object silently
+            % lost model_class and, worse, vector_param_lookup -- leaving
+            % effective_param to hand back grid LEVEL INDICES for vector
+            % parameters instead of values (see ISSUE-010, ISSUE-011).
+            %
+            % The configuration now comes from psa_object.mat via from_dir, and
+            % param_space_summary.mat is metadata only. Keeping this method to
+            % results alone is what stops a fourth restore list existing.
 
-            obj.output_dir = results_dir;
-
-            % Load summary
-            summary_file = fullfile(results_dir, 'param_space_summary.mat');
-            if exist(summary_file, 'file')
-                loaded = load(summary_file);
-                if isfield(loaded, 'summary_data')
-                    obj.grid_params = loaded.summary_data.grid_params;
-                    obj.param_ranges = loaded.summary_data.param_ranges;
-                    obj.n_levels = loaded.summary_data.n_levels;
-                    obj.conditions = loaded.summary_data.conditions;
-                    if isfield(loaded.summary_data, 'model_defaults')
-                        obj.model_defaults = loaded.summary_data.model_defaults;
-                    end
-                    if isfield(loaded.summary_data, 'resolved_defaults')
-                        obj.resolved_defaults = loaded.summary_data.resolved_defaults;
-                    end
-                end
-            end
-
-            % Load per-condition results
             for c_idx = 1:length(obj.conditions)
                 cond_name = obj.conditions{c_idx}.name;
-                results_file = fullfile(results_dir, cond_name, ...
+                results_file = fullfile(obj.output_dir, cond_name, ...
                     sprintf('param_space_results_%s.mat', cond_name));
                 if exist(results_file, 'file')
                     loaded = load(results_file, 'results');
                     obj.results.(cond_name) = loaded.results;
-                    fprintf('Loaded %d results for condition: %s\n', ...
-                        length(loaded.results), cond_name);
+                    if obj.verbose
+                        fprintf('Loaded %d results for condition: %s\n', ...
+                            length(loaded.results), cond_name);
+                    end
                 end
             end
 
@@ -1672,55 +1705,20 @@ classdef ParamSpaceAnalysis2 < handle
                         obj.output_dir);
                 end
 
-                % Load summary if it exists (to get grid configuration)
-                summary_file = fullfile(obj.output_dir, 'param_space_summary.mat');
-                if exist(summary_file, 'file')
-                    loaded = load(summary_file);
-                    if isfield(loaded, 'summary_data')
-                        obj.grid_params = loaded.summary_data.grid_params;
-                        obj.param_ranges = loaded.summary_data.param_ranges;
-                        obj.n_levels = loaded.summary_data.n_levels;
-                        obj.conditions = loaded.summary_data.conditions;
-                        if isfield(loaded.summary_data, 'num_combinations')
-                            obj.num_combinations = loaded.summary_data.num_combinations;
-                        end
-                        if isfield(loaded.summary_data, 'param_vectors')
-                            obj.param_vectors = loaded.summary_data.param_vectors;
-                        end
-                        if isfield(loaded.summary_data, 'model_defaults')
-                            obj.model_defaults = loaded.summary_data.model_defaults;
-                        end
-                        if isfield(loaded.summary_data, 'resolved_defaults')
-                            obj.resolved_defaults = loaded.summary_data.resolved_defaults;
-                        end
-                    end
-                else
-                    % Try to infer from batch files
-                    batch_files = dir(fullfile(temp_dir, 'batch_*.mat'));
-                    if isempty(batch_files)
-                        error('ParamSpaceAnalysis2:NoBatchFiles', ...
-                            'No batch files found in %s', temp_dir);
-                    end
-
-                    % Load first batch to get conditions
-                    first_batch = load(fullfile(temp_dir, batch_files(1).name));
-                    cond_names = fieldnames(first_batch.batch_results);
-                    obj.conditions = cell(length(cond_names), 1);
-                    for i = 1:length(cond_names)
-                        obj.conditions{i} = struct('name', cond_names{i});
-                    end
-
-                    % Estimate num_combinations from batch indices
-                    all_indices = [];
-                    for i = 1:length(batch_files)
-                        b = load(fullfile(temp_dir, batch_files(i).name), 'batch_indices');
-                        all_indices = [all_indices, b.batch_indices];
-                    end
-                    obj.num_combinations = max(all_indices);
-
-                    warning('ParamSpaceAnalysis2:NoSummary', ...
-                        'No summary file found. Inferred %d combinations from batch files.', ...
-                        obj.num_combinations);
+                % Configuration comes from the object, not from a summary file.
+                % run() writes psa_object.mat BEFORE batching precisely so that an
+                % interrupted run still has its configuration on disk; this method
+                % used to re-derive it from param_space_summary.mat with a third
+                % hand-maintained field list (and, failing that, to GUESS the
+                % conditions and combination count from the batch files). Both are
+                % gone: from_dir loads the object and calls this, so obj is already
+                % configured.
+                if isempty(obj.conditions) || isempty(obj.num_combinations)
+                    error('ParamSpaceAnalysis2:NotConfigured', ...
+                        ['consolidate() needs a configured object (conditions and ' ...
+                         'num_combinations).\nLoad the run with ' ...
+                         'ParamSpaceAnalysis2.from_dir(''%s'') rather than ' ...
+                         'consolidating a blank object.'], obj.output_dir);
                 end
 
                 fprintf('Consolidating results from %s...\n', temp_dir);
@@ -1847,6 +1845,81 @@ classdef ParamSpaceAnalysis2 < handle
 
     %% Model-default introspection helpers
     methods (Static)
+        function psa = from_dir(results_dir)
+            % FROM_DIR Load a completed or interrupted run from its directory.
+            %
+            %   psa = ParamSpaceAnalysis2.from_dir('/path/to/param_space_...')
+            %
+            % The ONE way to read a run back off disk. psa_object.mat is the
+            % authoritative artifact -- run() writes it before batching and again
+            % on completion -- and this resolves the rest:
+            %
+            %   1. load psa_object.mat
+            %   2. if it carries no results, load the per-condition result files
+            %   3. if temp_batches/ is present, consolidate() first (a run that
+            %      died part-way: the early object has the config, the batches
+            %      have the results)
+            %
+            % Callers used to hand-roll that three-way choice, and each guessed
+            % differently at the variable name inside psa_object.mat -- most
+            % scripts saved `psa`, the tau script saved `psa_tau_a`/`psa_tau_b`.
+            % Selection here is BY CLASS, not by name, so old files load without
+            % anyone needing to know.
+            %
+            % Not named `load`: the class already defines loadobj, and `load` is a
+            % core MATLAB function.
+            %
+            % See also: save_object, consolidate
+
+            if nargin < 1 || isempty(results_dir) || ~ischar(results_dir) && ~isstring(results_dir)
+                error('ParamSpaceAnalysis2:InvalidInput', ...
+                    'from_dir requires a results directory path.');
+            end
+            results_dir = char(results_dir);
+            if ~exist(results_dir, 'dir')
+                error('ParamSpaceAnalysis2:NoSuchDir', ...
+                    'Not a directory: %s', results_dir);
+            end
+
+            obj_file = fullfile(results_dir, 'psa_object.mat');
+            if ~exist(obj_file, 'file')
+                error('ParamSpaceAnalysis2:NoPsaObject', ...
+                    ['No psa_object.mat in %s.\nSince run() writes it before ' ...
+                     'batching, a directory without one predates that change or ' ...
+                     'was not produced by run(). If temp_batches/ is present, ' ...
+                     'set output_dir on a configured PSA and call consolidate().'], ...
+                    results_dir);
+            end
+
+            % Select by CLASS rather than by variable name.
+            S = load(obj_file);
+            fns = fieldnames(S);
+            is_psa = cellfun(@(f) isa(S.(f), 'ParamSpaceAnalysis2'), fns);
+            if ~any(is_psa)
+                error('ParamSpaceAnalysis2:BadPsaObject', ...
+                    'No ParamSpaceAnalysis2 object found in %s (variables: %s).', ...
+                    obj_file, strjoin(fns', ', '));
+            end
+            psa = S.(fns{find(is_psa, 1)});
+
+            % The directory it was loaded FROM wins over the one recorded in it:
+            % run directories get moved and copied between machines.
+            psa.output_dir = results_dir;
+
+            % An interrupted run: the early object has the configuration, the
+            % batches have whatever finished.
+            if exist(fullfile(results_dir, 'temp_batches'), 'dir')
+                fprintf(['[from_dir] temp_batches/ present -- consolidating an ' ...
+                    'interrupted run.\n']);
+                psa.consolidate();
+                return;
+            end
+
+            if isempty(fieldnames(psa.results))
+                psa.load_condition_results();
+            end
+        end
+
         function val = class_default(name, class_name)
             % CLASS_DEFAULT Value a model class gives NAME with nothing overriding
             %
@@ -2481,7 +2554,19 @@ classdef ParamSpaceAnalysis2 < handle
         end
 
         function save_summary(obj)
-            % SAVE_SUMMARY Save analysis summary to disk
+            % SAVE_SUMMARY Write param_space_summary.mat -- METADATA ONLY.
+            %
+            % NOT a restore path. It is a readable record of what a run was and
+            % how it went (grid, conditions, resolved parameters, per-condition
+            % success counts, timings), for inspection and for tooling that wants
+            % those facts without loading a whole object.
+            %
+            % Reconstructing a PSA from it is what caused ISSUE-010/011: two
+            % separate methods each restored their own hand-picked subset of
+            % these fields, drifted from the twelve written here, and silently
+            % dropped model_class and vector_param_lookup. psa_object.mat is the
+            % authoritative artifact; load runs with
+            % ParamSpaceAnalysis2.from_dir. Do not add restore logic here.
 
             summary_file = fullfile(obj.output_dir, 'param_space_summary.mat');
 

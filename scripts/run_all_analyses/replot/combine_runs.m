@@ -168,9 +168,8 @@ function combine_psa_sweep(run_dirs, pattern, fig_dir, tag, lle_hist_range)
         listing = listing([listing.isdir]);
         for k = 1:numel(listing)
             src = fullfile(listing(k).folder, listing(k).name);
-            pf = fullfile(src, 'psa_object.mat');
-            if ~exist(pf, 'file'); continue; end
-            S = load(pf); fns = fieldnames(S); psa = S.(fns{1});
+            if ~exist(fullfile(src, 'psa_object.mat'), 'file'); continue; end
+            psa = ParamSpaceAnalysis2.from_dir(src);
             swept = setdiff(psa.grid_params, {'reps'}, 'stable');
             if isempty(swept); continue; end
             key = strjoin(swept, '+');
@@ -205,9 +204,9 @@ function combine_param_space(run_dirs, fig_dir)
         listing = dir(fullfile(run_dirs{i}, 'param_space_*'));
         listing = listing([listing.isdir]);
         for k = 1:numel(listing)
-            pf = fullfile(listing(k).folder, listing(k).name, 'psa_object.mat');
-            if ~exist(pf, 'file'); continue; end
-            S = load(pf); fns = fieldnames(S); psas{end+1} = S.(fns{1}); %#ok<AGROW>
+            src = fullfile(listing(k).folder, listing(k).name);
+            if ~exist(fullfile(src, 'psa_object.mat'), 'file'); continue; end
+            psas{end+1} = ParamSpaceAnalysis2.from_dir(src); %#ok<AGROW>
         end
     end
     if isempty(psas); return; end
