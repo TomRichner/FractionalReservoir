@@ -152,7 +152,7 @@ fprintf('  state dimension     : %d\n', model.N_sys_eqs);
 fprintf('========================================================\n\n');
 
 %% Build and run
-model.S_c = 0.20;
+model.S_c = [0.20];
 model.level_of_chaos = 1.0;
 model.sigma_u_noise = 0.025;
 model.plot_deci = model.fs/20; % go from 400 Hz to 20
