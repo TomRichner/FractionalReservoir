@@ -8,6 +8,14 @@ sessions, and neither git history nor the `data/` run directories capture the
 *reasoning* — what was tried, what turned out to be wrong, and what is still
 open.
 
+Companion documents, indexed by topic rather than by date:
+
+- **`Issues.md`** — bugs and observed problems, with status and resolution
+- **`FeatureRequests.md`** — wanted changes that are not defects
+
+This file is the narrative; those two are the indexes into it. `CLAUDE.md`
+tells the AI to keep all three current.
+
 ## Conventions
 
 Every entry opens with a signature block identifying **who**, **where**, and
@@ -40,27 +48,28 @@ h = strtrim(h);
 
 Known machines:
 
+The asset-tag names are the identifier as-is — they are what the institution
+uses, so they are unambiguous across machines in a way a nickname would not be.
+
 | hostname | OS | notes |
 |---|---|---|
-| `R5456622` | Windows 11 | 6 physical cores, 64 GB RAM, default pool profile `ten_workers_one_thread` |
+| `R5456622` | Windows 11, MATLAB R2025b | 6 physical cores, 64 GB RAM, default pool profile `ten_workers_one_thread` (10 workers) |
 | _(other)_ | — | the second machine; add its hostname on first use. 14 workers. |
 
-If the asset-tag hostnames get unwieldy, a friendlier per-clone alias can be set
-without touching tracked files, since `.git/config` is local to each clone:
+`src/capture_git_provenance.m` writes the same hostname (plus platform and
+MATLAB release) into every run's `git_provenance.txt`, so a log entry here and a
+directory under `data/` can be matched to the same machine.
 
-```bash
-git config --local machine.name "mayo-desktop"
-git config --get machine.name
-```
+### Merging this file across machines
 
-### A note on merge conflicts
+A single chronological history is worth more than conflict-free separate files,
+so this is one file **by choice**. Two machines appending will collide at the
+same place in git. The rule:
 
-Two machines appending to one chronological file will collide at the same place
-in git. Entries are therefore self-contained and separated by `---`, so a
-conflict is resolved by keeping both sides and putting them in date order —
-never by choosing between them. If this becomes tiresome, the alternative is
-`docs/worklog/YYYY-MM-DD-<hostname>.md`, one file per session, which cannot
-conflict at all.
+> **Keep both sides and order by timestamp. Never choose between them.**
+
+Entries are self-contained and `---`-separated precisely so that is always safe
+and needs no judgement.
 
 ---
 
@@ -269,44 +278,43 @@ over a multi-hour run, at ~30 s per stage.
 **Also fixed** — `d58b7fe`: stopped tracking `debug.log`, swept in by a blanket
 `git add -A`.
 
+---
+
+### 2026-08-14 07:25 · dev @ 3794a09 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+**Plan:** set up cross-session, cross-machine bookkeeping.
+
+- `WorkLog.md` (this file) started, seeded with everything above.
+- `Issues.md` and `FeatureRequests.md` created, indexing the same material by
+  topic. Eleven issues and six feature requests back-filled from this session.
+- `CLAUDE.md` now instructs the AI to read all three at session start and update
+  them as work proceeds, with the signature format and the merge rule.
+- `capture_git_provenance` extended (FR-002) to stamp `hostname`, `platform` and
+  MATLAB release into every run directory, so a log entry and a `data/` folder
+  can be matched to a machine. Verified: `dev @ 3794a09 on R5456622`, `PCWIN64`,
+  `2025b`.
+
+Decision recorded: a **single** chronological `WorkLog.md` rather than
+`docs/worklog/<date>-<host>.md`. Per-file-per-session would never conflict, but a
+single history is worth more; the cost is a trivial merge, resolved by keeping
+both sides in timestamp order.
+
 ## Open items
 
-**Bugs, not yet fixed:**
+Tracked in full in **`Issues.md`** and **`FeatureRequests.md`**; summarised here:
 
-- **`load_results` loses the vector-parameter lookup.**
-  `param_space_summary.mat` never stores `vector_param_lookup` or
-  `vector_param_config`, so after `load_results` both are empty and
-  `effective_param(res, 'tau_a_E')` returns the **level index** (1…13) instead
-  of the value (5…60 s) — **silently**, no error. Plotting (`:936`) takes the
-  same wrong branch and produces a wrong x-axis. Workaround: load
-  `psa_object.mat` directly, which round-trips correctly.
-- **`load_results` does not restore `model_class`**, though
-  `summary_data.model_class` is saved. A loaded `SRNNCellTypePairs` run reports
-  `SRNNModel2`, which corrupts `effective_param`'s class-default fallback and
-  `same_config`'s cross-class refusal.
-- Both are missed by `test_psa_saveload`, which exercises `saveobj`/`loadobj`
-  (the path that **works**) and never calls `load_results` (the path the replot
-  scripts actually use).
+- 🔴 **ISSUE-011 / ISSUE-010** — `load_results` silently returns level indices
+  for vector parameters, and does not restore `model_class`. Both missed by
+  `test_psa_saveload`, which only exercises the `saveobj`/`loadobj` path.
+- 🔴 **ISSUE-009** — the `medium2` tau/param_space failure. Cause **not
+  established**; two diagnoses refuted.
+- 🔵 **ISSUE-008** — the `−1/max(tau_a)` LLE floor. Affects how every flat
+  plateau in these sweeps must be read.
+- 🔴 **ISSUE-007** — `best_presets.md` numbers predate the window fix and need
+  re-deriving, along with the `[0.5, 1.5]` range narrowing that rests on them.
+- 🔴 **FR-006** — memory pre-flight for PSA.
 
-**Interpretation, not a bug — but it affects every sweep:**
-
-- **The LLE has a floor at `−1/max(tau_a)`.** No preset overrides `tau_a`, so
-  all use the class default `logspace(log10(0.25), log10(10), n_a)` → slowest
-  timescale 10 s → eigenvalue **−0.1** exactly. Whenever the recurrent dynamics
-  contract faster than that, the largest Lyapunov exponent is the slowest
-  *linear adaptation mode* and says nothing about the network. Evidence: all 20
-  top QR exponents in `test_benettin_vs_qr` within 0.002 of −0.1; `sfa_only` /
-  `sfa_and_std` pinned at −0.101 across unrelated sweeps. The depression
-  equivalent is `−(1/tau_rec + r/tau_rel)` ≈ −0.62, matching
-  `best_presets.md`'s *"`std_only` sits flat near −0.65"*.
-  **The tau stage sweeps the floor itself** (`tau_a_E(end)` over [5, 60]), so it
-  is its own test: plot LLE against `−1/tau_a_E_max`. Supporting evidence
-  already in hand — the minimum successful LLE was **−0.2159** against a
-  predicted floor of −1/5 = −0.2.
-
-**Unfinished work:**
+Unfinished work:
 
 - `medium2` `tau_sensitivity` and `param_space` still need a clean run.
-- `best_presets.md` numbers need re-deriving post-window-fix, and the
-  `[0.5, 1.5]` range narrowing re-confirming.
-- `dev` is **13 commits ahead and unpushed** (`git push -u origin dev`).
+- `dev` is **ahead and unpushed** (`git push -u origin dev`).

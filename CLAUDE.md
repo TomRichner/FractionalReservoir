@@ -2,6 +2,46 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session bookkeeping — read and update these
+
+Three tracked documents at the repo root carry context across sessions and
+across the two machines this work happens on. **Read them at the start of a
+session** (they say what is already known, already tried, and already decided)
+and **update them as you go** — not only at the end, since a session can be
+interrupted.
+
+- **`WorkLog.md`** — chronological narrative: plans executed, bugs found, bugs
+  fixed, runs performed. Add an entry when you finish a meaningful unit of work
+  (a plan stage, a bug diagnosis, an analysis run), not once per commit.
+- **`Issues.md`** — bugs and observed problems, indexed by issue. Add one when
+  you *find* a problem, even if you fix it immediately, and update its status
+  when it is resolved or deliberately declined. Never delete an entry.
+- **`FeatureRequests.md`** — wanted changes that are not defects, same
+  lifecycle.
+
+Every entry is signed with **date · branch @ commit · hostname · agent/model,
+session id**, for example:
+
+```
+### 2026-08-14 07:06 · dev @ d58b7fe · R5456622 · Claude Code (Opus 5), session 054a29ca
+```
+
+Get the pieces with `git rev-parse --short HEAD`, `git branch --show-current`,
+and `hostname` (identical on macOS, Windows and Linux). The session id is the
+UUID in your scratchpad path. `src/capture_git_provenance.m` stamps the same
+hostname onto every run directory, so a `WorkLog` entry and a `data/` folder can
+be matched up.
+
+**Record what turned out to be wrong, not just what worked.** The wrong turns
+are the part that is otherwise lost, and they are what stops the next session
+re-deriving a dead end — see ISSUE-009, where two plausible diagnoses were both
+refuted by the data.
+
+`WorkLog.md` is a single chronological file by deliberate choice: when two
+machines both append, resolve the conflict by **keeping both entries and
+ordering by timestamp**, never by choosing between them. Entries are
+self-contained so that is always safe.
+
 ## What this project is
 
 MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD). The dynamics implemented are:

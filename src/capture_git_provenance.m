@@ -11,9 +11,16 @@ function info = capture_git_provenance(output_dir, repo_root)
 %   capture_git_provenance(master_output_dir, project_root)
 %   info = capture_git_provenance(master_output_dir, project_root)
 %
+% Also records WHICH MACHINE produced the run. The work happens on more than one
+% computer, and "which commit" alone does not distinguish two runs of the same
+% code on different hardware -- worker counts, core counts and memory all differ,
+% and the aug_13 overnight failure turned on exactly that. hostname is used
+% because it needs no setup and reads identically on macOS, Windows and Linux.
+%
 % Optional output `info` is a struct with fields commit, commit_short, branch,
-% is_dirty (empty strings / false when not a git working tree) so callers can
-% record the git state machine-readably without re-shelling out.
+% is_dirty (empty strings / false when not a git working tree), hostname and
+% platform, so callers can record the state machine-readably without re-shelling
+% out.
 %
 % If git is not available or repo_root is not a git working tree, a
 % warning is issued and a stub file is written; the caller is not
@@ -23,7 +30,8 @@ function info = capture_git_provenance(output_dir, repo_root)
         repo_root = pwd;
     end
 
-    info = struct('commit', '', 'commit_short', '', 'branch', '', 'is_dirty', false);
+    info = struct('commit', '', 'commit_short', '', 'branch', '', ...
+        'is_dirty', false, 'hostname', local_hostname(), 'platform', computer());
 
     if ~isfolder(output_dir)
         mkdir(output_dir);
@@ -43,6 +51,8 @@ function info = capture_git_provenance(output_dir, repo_root)
         fid = fopen(prov_path, 'w');
         fprintf(fid, 'Not a git working tree: %s\nTimestamp: %s\n', ...
             repo_root, char(datetime('now')));
+        fprintf(fid, 'hostname:    %s\nplatform:    %s\n', ...
+            info.hostname, info.platform);
         fclose(fid);
         return;
     end
@@ -67,6 +77,9 @@ function info = capture_git_provenance(output_dir, repo_root)
     cleanup = onCleanup(@() fclose(fid));
     fprintf(fid, 'Git provenance for run output: %s\n', output_dir);
     fprintf(fid, 'Captured at: %s\n\n', char(datetime('now')));
+    fprintf(fid, 'hostname:    %s\n', info.hostname);
+    fprintf(fid, 'platform:    %s\n', info.platform);
+    fprintf(fid, 'matlab:      %s\n', version('-release'));
     fprintf(fid, 'commit:      %s\n', commit);
     fprintf(fid, 'commit_short:%s\n', commit_short);
     fprintf(fid, 'branch:      %s\n', branch);
@@ -96,8 +109,25 @@ function info = capture_git_provenance(output_dir, repo_root)
         delete(patch_path);
     end
 
-    fprintf('Git provenance saved: %s @ %s%s\n', branch, commit_short, ...
+    fprintf('Git provenance saved: %s @ %s on %s%s\n', branch, commit_short, ...
+        info.hostname, ...
         ternary(is_dirty, ' (DIRTY — see working_changes.patch)', ''));
+end
+
+function h = local_hostname()
+% The machine identifier used across WorkLog.md, Issues.md and run provenance.
+% COMPUTERNAME is set on Windows; everywhere else fall back to the `hostname`
+% command, which exists on macOS and Linux.
+    h = getenv('COMPUTERNAME');
+    if isempty(h)
+        [status, out] = system('hostname');
+        if status == 0
+            h = strtrim(out);
+        else
+            h = 'unknown-host';
+        end
+    end
+    h = strtrim(h);
 end
 
 function out = run_git(git, args)
