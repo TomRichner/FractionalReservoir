@@ -307,9 +307,10 @@ both sides in timestamp order.
 
 Tracked in full in **`Issues.md`** and **`FeatureRequests.md`**; summarised here:
 
-- 🔴 **ISSUE-011 / ISSUE-010** — `load_results` silently returns level indices
-  for vector parameters, and does not restore `model_class`. Both missed by
-  `test_psa_saveload`, which only exercises the `saveobj`/`loadobj` path.
+- 🟢 **ISSUE-011 / ISSUE-010** — **fixed 2026-08-14** (`b6e5262`, test
+  `b445e9b`). `psa_object.mat` is now the one authoritative artifact and
+  `from_dir` the only reader; `effective_param` errors rather than returning a
+  level index.
 - 🔴 **ISSUE-009** — the `medium2` tau/param_space failure. Cause **not
   established**; two diagnoses refuted.
 - 🔵 **ISSUE-008** — the `−1/max(tau_a)` LLE floor. Affects how every flat
@@ -320,25 +321,23 @@ Tracked in full in **`Issues.md`** and **`FeatureRequests.md`**; summarised here
 
 ## Unfinished work — and the order it has to happen in
 
-**⛔ `medium2` `tau_sensitivity` + `param_space` re-run is BLOCKED. Fix the bugs
-first.** It is tempting to just relaunch it, but that would be premature on
-three counts:
+**`medium2` `tau_sensitivity` + `param_space` re-run — two of the three blockers
+are now clear:**
 
 1. ~~**ISSUE-008 (the LLE floor)**~~ — **settled 2026-08-14: not a defect.** See
    below; the sweep range changed as a result, so the re-run should use the new
    one.
-2. **ISSUE-010 / ISSUE-011 are unfixed.** A crashed run is exactly the case
-   where `load_results` gets used and silently returns level indices. The last
-   run *did* crash. Fix the loader before generating more data that might have
-   to be salvaged through it.
+2. ~~**ISSUE-010 / ISSUE-011**~~ — **fixed 2026-08-14** (`b6e5262`). A crashed
+   run is exactly the case the loader got wrong, and the last run *did* crash;
+   that data now decodes correctly and a future crash stays salvageable, since
+   `run()` writes the object before batching.
 3. **ISSUE-009's cause is still unknown.** `restart_parpool` is insurance, not a
    fix. Relaunching without instrumentation risks burning another night and
    learning nothing again — see FR-006 for the memory pre-flight that would make
    any repeat failure legible.
 
-Suggested order: **ISSUE-010/011 → re-run `medium2`**, with ISSUE-009's
-diagnostic (tau alone, fresh MATLAB, full default pool, per-job memory logging)
-folded into that re-run.
+Remaining order: fold ISSUE-009's diagnostic (tau alone, fresh MATLAB, full
+default pool, per-job memory logging) into the `medium2` re-run.
 
 ---
 
@@ -371,3 +370,74 @@ Also outstanding:
 
 - ISSUE-007: `best_presets.md` numbers need re-deriving post-window-fix, and the
   `[0.5, 1.5]` range narrowing that rests on them re-confirming.
+
+---
+
+### 2026-08-14 · dev @ c72d1e8 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+**ISSUE-010 / ISSUE-011 fixed — `psa_object.mat` is now the one authoritative
+run artifact.** Commits `b6e5262` (fix) and `b445e9b` (test).
+
+The reported symptom was that `effective_param(res,'tau_a_E')` returned `1`
+where the answer was `5 s`. `tau_a_E` is a vector parameter, so it cannot be a
+grid coordinate directly: `add_vector_parameter` pre-builds the concrete vectors
+into `vector_param_lookup` and the grid axis carries a **level index**. The runs
+were always correct — the index is stored by design. But
+`param_space_summary.mat` never stored the lookup, so after `load_results` there
+was nothing to decode with and `effective_param` fell through to its scalar
+branch. No error. The same list drift dropped `model_class`, which is ISSUE-010.
+
+**The fix removes the second load path rather than repairing it.** Three restore
+paths each carried a hand-maintained field list, against a `saveobj` that has
+long been complete. So:
+
+- `run()` saves `psa_object.mat` itself, **twice** — once after `generate_grid`
+  and before batching, once on completion. The early write is the valuable half:
+  a run that dies part-way now keeps the configuration needed to interpret its
+  `temp_batches/`. The four scripts that used to save it no longer do, which
+  also retires the non-canonical `psa_tau_a` / `psa_tau_b` variable names.
+- `ParamSpaceAnalysis2.from_dir` is the only way in. It selects the saved
+  variable **by class**, not by name, so legacy `psa_tau_a` files load for free.
+  Seven readers dropped their hand-rolled three-way choice; three lost a latent
+  hardcoded `S.psa` bug.
+- `effective_param` **fails closed** on a vector parameter it cannot decode.
+  This is the highest-value single change: it converts a silent wrong number
+  into a loud one, for the whole class of bug rather than this instance.
+
+**Backward compatibility was deliberately dropped** (TR: "I'm not too worried
+about being backward compatible with old runs... I have the git provenance").
+A run with a summary but no object file no longer loads. Exactly one such
+directory exists on disk — `FAILED_OOM_param_space_*` — and it was already the
+broken case.
+
+**Verified against the data that exposed it**, not only against fixtures:
+
+| directory | before | after |
+|---|---|---|
+| `FAILED_OOM_tau_sensitivity_*` | `tau_a_E → 1` | `[0.25 1.5478 9.5833]`, 107/195 results recovered |
+| the 7 completed sensitivity sweeps | `model_class → SRNNModel2` | `SRNNCellTypePairs`; all 7 replot, 14 figures |
+| `FAILED_OOM_param_space_*` | loaded wrongly | errors, naming `consolidate()` |
+
+Full suite green: `test_psa_loaders` (new, 19 checks), `test_psa_saveload`,
+`test_psa_validate_defaults`, `test_psa_model_class`,
+`test_sensitivity_refactor`.
+
+**Two things I could not honestly test, and did not fake.** The crash-recovery
+state is not constructible through the public API — `consolidate` deletes
+`temp_batches/` on success, and `results`/`has_run` are `SetAccess=private` — so
+`test_psa_loaders` asserts instead that the saved object carries the decode
+table and the full grid, and the recovery itself rests on the real
+`FAILED_OOM_tau_*` directory above. Separately, **file timestamps cannot prove
+the early write happened**, because the final write overwrites it; that one
+rests on control flow (`run()`:625 precedes `run_batched_simulation`:630).
+
+**Incidental find:** `test_sensitivity_refactor` printed the constant
+`vary_range` inside a loop over levels while labelling it the per-level lookup —
+so it showed `[5 60]` three times and would have looked like a bug in the
+sweep. It also printed before `run()` had built the lookup at all. Moved after
+the run, pointed at `vector_param_lookup`, and given an assertion that the
+levels actually differ.
+
+**The tau floor analysis this unblocked is inconclusive on the existing data.**
+Only 4 of 13 tau levels have surviving runs, because 88/195 OOM'd. That needs
+the clean `medium2` re-run, which now waits only on ISSUE-009.

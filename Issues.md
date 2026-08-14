@@ -26,12 +26,13 @@ grep '^## .* OPEN ·' Issues.md     # just what is outstanding
 
 ---
 
-## 🔴 OPEN · ISSUE-011 · `load_results` silently returns level indices for vector parameters
+## 🟢 FIXED · ISSUE-011 · `load_results` silently returns level indices for vector parameters
 
 | | |
 |---|---|
 | Identified | 2026-08-14 · `dev` @ `d58b7fe` · R5456622 |
 | Area | `src/ParamSpaceAnalysis2.m` |
+| Fixed | 2026-08-14 · `dev` @ `b6e5262` (+ test `b445e9b`) · R5456622 |
 
 `param_space_summary.mat` never stores `vector_param_lookup` or
 `vector_param_config` (see the save list at `:2489-2510`). After
@@ -73,14 +74,44 @@ hand-picked six fields from a summary file that stores its own different
 hand-picked set. Two lists, drifting, with no test asserting they agree. Fix
 both together, with a test that the two load paths yield equivalent objects.
 
+### Resolution
+
+Fixed by removing the second load path rather than repairing it. `run()` now
+writes `psa_object.mat` itself — once before batching, once on completion — and
+`ParamSpaceAnalysis2.from_dir` is the only supported way to read a run back.
+The config-restore blocks in `load_results` and `consolidate` are gone;
+`load_results` is now the private, results-only `load_condition_results`, and
+`param_space_summary.mat` is documented as metadata, not a restore path.
+
+`effective_param` now **errors** (`ParamSpaceAnalysis2:MissingVectorLookup`)
+when a parameter is registered in `vector_param_config` but absent from
+`vector_param_lookup`, instead of falling through to the scalar branch. That
+guard is what makes this class of bug loud rather than silent.
+
+Verified on the data that exposed it — `from_dir` on
+`run_all_aug_13_26_23_37/FAILED_OOM_tau_sensitivity_*` returns
+`effective_param(res,'tau_a_E') = [0.25 1.5478 9.5833]`, where it previously
+returned `1`, and recovers 107/195 results from the partial run. All seven
+completed sweeps in that directory replot cleanly through the migrated reader.
+
+**Backward compatibility deliberately dropped:** a run with a summary but no
+`psa_object.mat` no longer loads at all. `FAILED_OOM_param_space_*` from
+2026-08-14 is the one such casualty on disk, and it now fails with a message
+naming `consolidate()` rather than loading wrongly. Git provenance covers
+re-running old data with old code.
+
+**Test:** `scripts/tests/test_psa_loaders.m`, which sweeps a vector parameter
+alongside a scalar one — the vector is the only kind that exposed this.
+
 ---
 
-## 🔴 OPEN · ISSUE-010 · `load_results` does not restore `model_class`
+## 🟢 FIXED · ISSUE-010 · `load_results` does not restore `model_class`
 
 | | |
 |---|---|
 | Identified | 2026-08-14 · `dev` @ `d58b7fe` · R5456622 |
 | Area | `src/ParamSpaceAnalysis2.m:1612-1621` |
+| Fixed | 2026-08-14 · `dev` @ `b6e5262` (+ test `b445e9b`) · R5456622 |
 
 `summary_data.model_class` **is** saved (`:2495`) but `load_results` restores
 only six fields and this is not one of them. A loaded `SRNNCellTypePairs` run
@@ -92,6 +123,14 @@ classes cannot work on loaded runs.
 
 Same root cause as ISSUE-011 (an incomplete `load_results`) and same test blind
 spot; worth fixing together.
+
+### Resolution
+
+Fixed with ISSUE-011 — see that entry. The hand-maintained restore list is gone
+entirely, so there is no longer a field that can be forgotten: `from_dir`
+returns the saved object itself. Confirmed on last night's sweeps, which now
+report `model_class = SRNNCellTypePairs` where they previously reported
+`SRNNModel2`.
 
 ---
 
