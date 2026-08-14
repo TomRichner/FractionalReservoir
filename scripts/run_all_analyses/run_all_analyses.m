@@ -44,6 +44,10 @@ master_save_figs = 'save_all_figs';
 %   'fast2'      - 'fast' but with twice the reps on the 1-D sensitivity sweeps,
 %                  so their histograms have enough samples per level to read
 %   'medium'     - fs=400, 11 levels, T_range=[0,20] (tau: ode45 over [0,50])
+%   'medium2'    - between medium and production, fs=800, sized to run
+%                  overnight (~9 h). Intended for STOCHASTIC presets: the finer
+%                  step is free against medium because sra1 takes two drift
+%                  evaluations per step where rk4 takes four
 %   'production' - full-size sweeps, fs=400, T_range=[0,50] (for real results)
 % See analysis_run_config.m for the actual per-analysis numbers.
 % Defaults to 'medium'. To pick another WITHOUT editing this file, set the

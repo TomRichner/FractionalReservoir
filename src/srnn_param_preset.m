@@ -341,6 +341,22 @@ switch name
         d.sigma_u_noise = 0.02;
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01'
+        % ..._sig1p5 with HALF the noise of the noise0p02 sibling, for the
+        % longer/finer 'medium2' runs.
+        %
+        % x_noise_std = 0.01/sqrt(2*tau_d) = 0.0224, about 3.7% of the piecewise
+        % sigmoid's 0.6 half-width at S_c = 0 -- a light perturbation of the
+        % operating point. At 0.02 the same network crossed from chaotic to
+        % contracting over a fast2 sweep, so half of that is deliberately on the
+        % gentler side of the transition.
+        %
+        % Like its sibling it names no integrator: analysis_run_config sees
+        % sigma_u_noise > 0 and picks the mode's stochastic scheme ('sra1').
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
+        d.sigma_u_noise = 0.01;
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -362,7 +378,8 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_uniform_std_n500', 'celltype_pairs_uniform_std_n500_mu5p5', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5', ...
-    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02'};
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02', ...
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
