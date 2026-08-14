@@ -361,6 +361,36 @@ switch name
         d.sigma_u_noise = 0.01;
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_Sc0p2_noise0p025'
+        % The hand-tuned operating point from
+        % scripts/examples/example_SRNNCellTypePairs_from_preset.m, promoted out
+        % of that script's pre-build overrides so the sweeps can use it.
+        %
+        % It is ..._sig1p5 with exactly TWO changes. The example also assigned
+        % level_of_chaos = 1.0 and reasserted tau_rec = 2 / tau_rel = 0.25 on
+        % every route, but the parent already carries those, so they were no-ops
+        % and are not repeated here. plot_deci was set there too and is
+        % deliberately NOT carried: it decimates plot_data only, changes no
+        % physics, and is one of the fields same_config ignores when deciding
+        % whether two runs may be pooled.
+        %
+        % S_c = 0.2 RAISES THE THRESHOLD with the drive still at zero. phi is
+        % centred on S_c, so an unstimulated neuron sits at phi(0) rather than
+        % phi(S_c) = 0.5: with S_a = 0.8 the linear branch runs over
+        % [S_c - 0.4, S_c + 0.4], x = 0 falls inside it, and
+        % phi(0) = (0 - S_c) + 0.5 = 0.3. Still active, so the network does not
+        % go quiet the way it would at a setpoint above 0.5 -- but each neuron
+        % now starts further from saturation than the S_c = 0 parent.
+        %
+        % sigma_u_noise = 0.025 is above BOTH existing noise presets:
+        % x_noise_std = 0.025/sqrt(2*tau_d) = 0.0559, about 9.3% of the
+        % piecewise half-width, against 7.5% at 0.02 and 3.7% at 0.01. The three
+        % together span a factor of 2.5 in amplitude.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
+        d.S_c           = 0.20;
+        d.sigma_u_noise = 0.025;
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -383,7 +413,8 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02', ...
-    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01'};
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01', ...
+    'celltype_pairs_Sc0p2_noise0p025'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
