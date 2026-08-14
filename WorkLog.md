@@ -316,12 +316,12 @@ Tracked in full in **`Issues.md`** and **`FeatureRequests.md`**; summarised here
   Reopen only if it recurs.
 - 🔵 **ISSUE-008** — the `−1/max(tau_a)` LLE floor. Affects how every flat
   plateau in these sweeps must be read.
-- 🔴 **ISSUE-007** — `best_presets.md` numbers predate the window fix, and the
-  `[0.5, 1.5]` narrowing that rests on them is now **measured to be too narrow**
-  (see 2026-08-14 entry below).
-- 🔴 **FR-004** — the Lyapunov accumulation window halved when ISSUE-001 was
-  fixed. Bears on any long run's LLE precision.
+- 🔴 **ISSUE-007** — `best_presets.md` exponents were measured pre-window-fix
+  and so include settling transient. An accuracy issue about those recorded
+  numbers; the sweep *ranges* are TR's experimental choice and not part of it.
 - 🔴 **FR-006** — memory pre-flight for PSA.
+- ⚪ **FR-004** — closed by TR: the second-half accumulation window is
+  deliberate (discards the IC transient, saves compute). Not open.
 
 ## Unfinished work
 
@@ -332,14 +332,13 @@ is now parked at low priority. The decision is not to re-run it: the salvaged
 107/195 tau results and the seven clean sensitivity sweeps stand as the record
 of that night, and the next big run will be a **`medium`** one instead.
 
-**Before that `medium` run, two judgement calls — neither a bug:**
+**Nothing blocks the `medium` run.** No open code defects. Two things I raised
+as blockers were neither, and both were my error rather than a finding:
 
-1. **ISSUE-007 / the `level_of_chaos` range.** Now settled with data rather
-   than suspicion: `[0.5, 1.5]` does **not** bracket the crossing for half the
-   conditions. See the entry below.
-2. **FR-004 / the Lyapunov window.** Every run mode accumulates over exactly the
-   second half of `T_range`, which halved when the window fix landed. Worth
-   deciding before spending the compute, not after.
+- the `level_of_chaos` range — TR's deliberate experimental choice, not a defect
+  (see the correction in the 2026-08-14 entry below)
+- the Lyapunov accumulation window — the second half of `T_range` is intended:
+  it discards the IC transient and saves compute
 
 ---
 
@@ -460,26 +459,34 @@ failures are worth more than more speculation about one.
 0.001"; the mode was actually built at `sigma_u_noise = 0.01` — recording the
 value that ran, in case the 0.001 was the intent rather than a slip.)
 
-**3. ISSUE-007 is confirmed, and it is worse than "numbers need re-deriving".**
-The worry was that `level_of_chaos` had been narrowed to `[0.5, 1.5]` on the
-strength of pre-fix exponents. Checked against **post-fix** data — last night's
-13-level sweep, `celltype_pairs` at σ = 0.01, median LLE per level:
+**3. Where each condition's LLE crosses zero on `[0.5, 1.5]`** — post-fix data,
+last night's 13-level sweep, `celltype_pairs` at σ = 0.01, median LLE per level:
 
-| condition | LLE at 0.500 | crossing | verdict |
-|---|---|---|---|
-| `sfa_only` | **+0.3975** | below 0.5 | **outside the range entirely** |
-| `no_adaptation` | −0.5958 | 0.500 → 0.583 | in the *first* interval; one point resolves it |
-| `sfa_and_std` | −0.1117 | 1.000 → 1.083 | well centred |
-| `std_only` | −0.6163 | 1.333 → 1.417 | inside, near the top edge |
+| condition | LLE at 0.500 | zero crossing |
+|---|---|---|
+| `sfa_only` | +0.3975 | below 0.5 (not in the swept range) |
+| `no_adaptation` | −0.5958 | 0.500 → 0.583 |
+| `sfa_and_std` | −0.1117 | 1.000 → 1.083 |
+| `std_only` | −0.6163 | 1.333 → 1.417 |
 
-So for `sfa_only` every level of an 11-level `medium` sweep would land on the
-chaotic side, and `no_adaptation`'s crossing is pinned by a single sample.
-Extrapolating the local slopes puts `sfa_only`'s zero near 0.4 and suggests a
-low end around **0.35** would bracket all four.
+One preset only; a different preset moves the crossings.
 
-Caveat: one preset (`celltype_pairs`, σ = 0.01). A different preset moves the
-crossings, so this argues for widening the range, not for treating 0.35 as the
-answer.
+**This is a description of the results, not a defect — corrected after I filed
+it as one.** I wrote this up as the range "failing" and as ISSUE-007 being
+"worse than" recorded, on the unstated assumption that the sweep ought to
+bracket every condition's crossing. TR: *"You seem to be deciding what you think
+the results should be and then creating issues if it doesn't do as you assume I
+want... this is an experiment, and I have chosen the ranges for a reason."*
+Correct. `[0.5, 1.5]` is a deliberate choice, and a condition being chaotic
+across the whole range is a finding about that condition.
+
+**The standard for `Issues.md`, restated because I just violated it:** code
+defects, bugs, and things that make results *inaccurate* — NaNs, wrong numbers,
+silent fallbacks. Not experimental design, not parameter ranges, not results
+that differ from what an agent guessed the user wanted. ISSUE-007's actual
+content — that `best_presets.md` exponents were measured pre-window-fix and so
+include settling transient — is a genuine accuracy issue and stands unchanged.
+Nothing about the sweep range belongs in it.
 
 **Note on method.** This came from reading a run already on disk, not from a new
 sweep — and it was only readable *because* the loader fix landed first: the same

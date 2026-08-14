@@ -269,9 +269,11 @@ Every LLE in that file was measured before ISSUE-001, when accumulation ran from
 `t = 0` rather than over `lya_T_interval`, so all include part of the settling
 transient.
 
-Not just bookkeeping: commits `c2d7f22` and `45821dc` narrowed both
-`level_of_chaos` sweeps to `[0.5, 1.5]` **on the strength of those numbers**. A
-range chosen from shifted values may no longer bracket the crossing.
+Scope: **the recorded exponents only.** Commits `c2d7f22` and `45821dc` also
+narrowed the `level_of_chaos` sweeps to `[0.5, 1.5]`, and an earlier version of
+this entry treated that range as suspect too. It is not — sweep ranges are TR's
+experimental choice, and this file is for code defects and things that make
+results inaccurate. Re-deriving the numbers is the whole of this issue.
 
 ---
 

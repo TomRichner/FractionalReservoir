@@ -60,11 +60,17 @@ spread is the network and how much is the noise" becomes answerable.
 
 ---
 
-## 🔴 OPEN · FR-004 · Retune `analysis_run_config` windows after the Lyapunov fix
+## ⚪ DECLINED · FR-004 · Retune `analysis_run_config` windows after the Lyapunov fix
 
 | | |
 |---|---|
 | Raised | 2026-08-13 · `dev` @ `21acf41` · R5456622 |
+| Declined | 2026-08-14 · R5456622 — the window is deliberate |
+
+**Closed by TR, 2026-08-14.** Accumulating over the second half of `T_range` is
+the intended design: it discards the initial-condition transient and saves
+compute. The post-fix accumulation time is what was always meant to happen; the
+pre-fix behaviour was the wrong one. Nothing to retune.
 
 Every run mode sets `lya_T_interval` to exactly the second half of `T_range`.
 Once ISSUE-001 was fixed and the window actually took effect, the accumulation
