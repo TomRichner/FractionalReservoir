@@ -277,6 +277,25 @@ switch name
         d.level_of_chaos    = 1.0;
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive'
+        % ..._mu5p5 with the tonic drive removed: intrinsic_drive 0.1 -> 0.
+        %
+        % intrinsic_drive is the constant term added to every neuron's input for
+        % the whole simulation, distinct from the stepped stimulus that
+        % input_config's n_steps / amp / step_density build. Taking it to zero
+        % leaves the network driven ONLY by that stimulus, so between steps it
+        % runs autonomously. Whether it still does anything there is the point of
+        % the comparison: at S_c = 0 the piecewise nonlinearity sits at
+        % phi(0) = 0.5, so an undriven neuron is at mid-range rather than silent,
+        % and the network need not fall quiet just because the drive is gone.
+        %
+        % input_config must be restated whole -- assigning the property replaces
+        % the struct -- so this rebuilds it from the shared helper with a drive
+        % of 0 rather than poking one field.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5');
+        d.input_config = pairs_input_config(0.0);
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -295,7 +314,8 @@ function names = srnn_param_preset_names()
 names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500', ...
     'celltype_pairs_S_c_by_type_n500_fixedF', 'celltype_pairs_all_std_n500', ...
-    'celltype_pairs_uniform_std_n500', 'celltype_pairs_uniform_std_n500_mu5p5'};
+    'celltype_pairs_uniform_std_n500', 'celltype_pairs_uniform_std_n500_mu5p5', ...
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
