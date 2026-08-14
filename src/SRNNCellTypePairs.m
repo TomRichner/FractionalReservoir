@@ -1533,13 +1533,18 @@ classdef SRNNCellTypePairs < handle
             colors = SRNNCellTypePairs.type_colors(obj.n_cellTypes);
             fig_handle = figure('Name', 'Weights by presynaptic cell type');
             ax_handle = axes(fig_handle); hold(ax_handle, 'on');
-            for q = 1:obj.n_cellTypes
+            % Back-to-front, so type 1 (E) sits on top of the others; the
+            % handles are collected by TYPE index so the legend still reads in
+            % natural order.
+            bars = gobjects(1, obj.n_cellTypes);
+            for q = SRNNCellTypePairs.draw_order(obj.n_cellTypes)
                 wq = nonzeros(obj.W(:, obj.type_indices{q}));
-                histogram(ax_handle, wq, bin_edges, 'DisplayName', ...
+                bars(q) = histogram(ax_handle, wq, bin_edges, 'DisplayName', ...
                     obj.cell_type_names{q}, 'FaceColor', colors(q, :), ...
                     'EdgeColor', 'none', 'FaceAlpha', 0.45);
             end
-            hold(ax_handle, 'off'); legend(ax_handle, 'Location', 'best');
+            hold(ax_handle, 'off');
+            legend(ax_handle, bars, obj.cell_type_names, 'Location', 'best');
             xlabel(ax_handle, 'Weight'); ylabel(ax_handle, 'Count');
         end
     end
@@ -2214,12 +2219,19 @@ classdef SRNNCellTypePairs < handle
             if nargin < 5, show_legend = true; end
             colors = SRNNCellTypePairs.type_colors(numel(names));
             hold on;
-            handles = gobjects(0); labels = {};
-            for q = 1:numel(names)
+            % Draw back-to-front so type 1 (E) lands on top; colours stay
+            % indexed by q, so the reversal is purely about layering.
+            for q = SRNNCellTypePairs.draw_order(numel(names))
                 values = data.(names{q});
                 if isempty(values), continue; end
                 SRNNCellTypePairs.plot_celltype_lines( ...
                     gca, t, values, colors(q, :));
+            end
+            % Legend proxies in NATURAL order, so the key still reads E then I
+            % however the traces were layered.
+            handles = gobjects(0); labels = {};
+            for q = 1:numel(names)
+                if isempty(data.(names{q})), continue; end
                 handles(end + 1) = plot(nan, nan, '-', 'Color', colors(q, :), ...
                     'LineWidth', 1.5); %#ok<AGROW>
                 labels{end + 1} = names{q}; %#ok<AGROW>
@@ -2235,20 +2247,25 @@ classdef SRNNCellTypePairs < handle
             if nargin < 5, show_legend = true; end
             colors = lines(max(1, numel(names)^2));
             hold on;
-            handles = gobjects(0); labels = {};
-            color_index = 0;
+            % Enumerate the non-empty routes in NATURAL order first, so each one
+            % keeps the colour it would have had; drawing order is decided
+            % separately below. Doing this in one reversed loop instead would
+            % re-map every route's colour as a side effect of the layering.
+            route_pre = {}; route_post = {};
             for pre = 1:numel(names)
-                pre_name = names{pre};
                 for post = 1:numel(names)
-                    post_name = names{post};
-                    values = data.(pre_name).(post_name);
-                    if isempty(values), continue; end
-                    color_index = color_index + 1;
-                    handles(end + 1) = plot(t, mean(values, 1), ...
-                        'Color', colors(color_index, :)); %#ok<AGROW>
-                    labels{end + 1} = sprintf('%s->%s', ...
-                        pre_name, post_name); %#ok<AGROW>
+                    if isempty(data.(names{pre}).(names{post})), continue; end
+                    route_pre{end + 1} = names{pre}; %#ok<AGROW>
+                    route_post{end + 1} = names{post}; %#ok<AGROW>
                 end
+            end
+            % Back-to-front, so the E->E route ends up on top.
+            n_routes = numel(route_pre);
+            handles = gobjects(1, n_routes); labels = cell(1, n_routes);
+            for k = SRNNCellTypePairs.draw_order(n_routes)
+                values = data.(route_pre{k}).(route_post{k});
+                handles(k) = plot(t, mean(values, 1), 'Color', colors(k, :));
+                labels{k} = sprintf('%s->%s', route_pre{k}, route_post{k});
             end
             hold off;
             ylabel(label);
@@ -2260,15 +2277,21 @@ classdef SRNNCellTypePairs < handle
         function plot_postsynaptic_route_lines(ax, t, routes, post_names)
             % Plot every presynaptic-neuron trace, colored by target type.
             colors = SRNNCellTypePairs.type_colors(numel(post_names));
-            handles = gobjects(0); labels = {};
             hold(ax, 'on');
-            for post = 1:numel(post_names)
+            % Back-to-front, so the route onto type 1 (E) lands on top.
+            for post = SRNNCellTypePairs.draw_order(numel(post_names))
                 name = post_names{post};
                 values = routes.(name);
                 if isempty(values), continue; end
                 route_lines = SRNNCellTypePairs.plot_celltype_lines( ...
                     ax, t, values, colors(post, :));
                 set(route_lines, 'Tag', ['PostType_' name]);
+            end
+            % Legend proxies in natural order (see plot_named_series).
+            handles = gobjects(0); labels = {};
+            for post = 1:numel(post_names)
+                name = post_names{post};
+                if isempty(routes.(name)), continue; end
                 handles(end + 1) = plot(ax, nan, nan, '-', ...
                     'Color', colors(post, :), 'LineWidth', 1.5); %#ok<AGROW>
                 labels{end + 1} = name; %#ok<AGROW>
@@ -2288,34 +2311,87 @@ classdef SRNNCellTypePairs < handle
         end
 
         function C = type_colors(n)
-            % TYPE_COLORS Per-cell-type colours: lines(), with the first two
-            % swapped.
+            % TYPE_COLORS Per-cell-type colours: warm first, cool second.
             %
-            % MATLAB's lines() starts blue then orange-red. With cell types
-            % conventionally ordered {E, I}, that paints excitation blue and
-            % inhibition red -- the opposite of the usual reading. Swapping the
-            % first two rows gives E a warm colour and I a cool one, and leaves
-            % every later type untouched.
+            % With cell types conventionally ordered {E, I}, type 1 must read
+            % warm and type 2 cool. This used to be expressed as "lines() with
+            % rows 1 and 2 swapped", which produced the right two colours but
+            % said nothing about why -- and it sat one edit away from being
+            % undone by anyone who read it as an arbitrary permutation. The
+            % anchors are now named outright; types 3+ still come from lines(),
+            % starting at row 3 so neither anchor is repeated.
             %
-            % Used only where the index IS a cell type. Per-neuron accents and
-            % per-route colours keep plain lines(), since their index means
-            % something else.
-            C = lines(n);
-            if n >= 2
-                C([1 2], :) = C([2 1], :);
+            % The two anchors hold the values the swap produced (lines() rows 2
+            % and 1), so two-type figures that predate this rewrite still match.
+            % The one behaviour change is at n == 1, which used to fall through
+            % to lines(1) = blue and is now warm like every other type 1.
+            %
+            % Used only where the index IS a cell type. Per-route colours keep
+            % plain lines(), since their index means something else; per-neuron
+            % accents come from neuron_colors, which stays inside the type's hue.
+            warm = [0.8500 0.3250 0.0980];   % E
+            cool = [0.0000 0.4470 0.7410];   % I
+            anchors = [warm; cool];
+            if n <= 2
+                C = anchors(1:max(n, 0), :);
+                return;
             end
+            extra = lines(n);
+            C = [anchors; extra(3:n, :)];
+        end
+
+        function order = draw_order(n)
+            % DRAW_ORDER The order to DRAW n cell types (or routes) in, so that
+            % type 1 ends up on top.
+            %
+            % Overlaid traces are painted back-to-front, so a plain 1:n loop
+            % buries type 1 -- conventionally E -- under everything drawn after
+            % it. Drawing n:-1:1 puts E on top, which is what these plots are
+            % read for.
+            %
+            % This is draw order ONLY. Colours stay indexed by the type itself
+            % (see type_colors) and legends are still built in natural order, so
+            % reversing here cannot silently re-map E to I's colour.
+            order = n:-1:1;
+        end
+
+
+        function C = neuron_colors(type_color, n_neurons)
+            % NEURON_COLORS Per-neuron shades of ONE cell type's colour.
+            %
+            % Overlapping neurons still need to be told apart, but the accent
+            % must not cost the trace its type identity. This used to be
+            % 0.5*type_color + 0.5*lines(n) -- half the hue came from a palette
+            % that runs across the whole wheel, so a good fraction of "E"
+            % traces came out blue-purple and "I" traces came out warm. That was
+            % survivable while the two populations sat in separate panels; it is
+            % not, now that E is drawn ON TOP of I in the same axes, where the
+            % only cue left is colour.
+            %
+            % So the accent varies LIGHTNESS and leaves hue alone: every E trace
+            % is some shade of the E colour, every I trace some shade of the I
+            % colour. Shades are dealt out by a golden-ratio low-discrepancy
+            % sequence rather than in order, so neurons with adjacent indices
+            % land far apart in lightness and neighbouring traces stay
+            % distinguishable. Deterministic, so a re-run reproduces the figure.
+            if n_neurons <= 0
+                C = zeros(0, 3);
+                return;
+            end
+            % mod(k*phi, 1) fills [0,1) evenly for any n without ever repeating.
+            frac = mod((0:n_neurons - 1)' * 0.6180339887498949, 1);
+            shade = -0.30 + 0.60 * frac;     % <0 toward black, >0 toward white
+            base = repmat(type_color(:)', n_neurons, 1);
+            lighten = max(shade, 0);
+            darken = min(shade, 0);
+            C = base .* (1 + darken) + (1 - base) .* lighten;
+            C = min(max(C, 0), 1);
         end
 
         function line_handles = plot_celltype_lines(ax, t, values, type_color)
-            %PLOT_CELLTYPE_LINES Blend cell-type and neuron-specific colors.
-            %
-            % The cell type supplies the dominant color while lines() adds a
-            % repeatable accent for each neuron. This keeps populations easy
-            % to identify while making overlapping neurons distinguishable.
+            %PLOT_CELLTYPE_LINES Draw every neuron of one cell type, shaded.
             n_neurons = size(values, 1);
-            neuron_accents = lines(n_neurons);
-            neuron_colors = 0.5 .* repmat(type_color, n_neurons, 1) ...
-                + 0.5 .* neuron_accents;
+            neuron_colors = SRNNCellTypePairs.neuron_colors(type_color, n_neurons);
 
             line_handles = plot(ax, t, values');
             for neuron = 1:numel(line_handles)

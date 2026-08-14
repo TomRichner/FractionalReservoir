@@ -189,8 +189,14 @@ What it buys, and what it costs:
 - **Its own plots**: `plot` (compact summary), `plot_celltypes` (one column per type,
   every neuron trace, `prod(b)` collapsed across routes), `plot_eigenvalues(times_sec)`
   (needs `store_full_state = true`), `plot_W`, `plot_W_spectrum`,
-  `plot_weight_histogram`. `type_colors` swaps `lines()` rows 1 and 2 so type 1 (E) is
-  warm and type 2 (I) is cool.
+  `plot_weight_histogram`. `type_colors` names its first two colours outright — type 1
+  (E) warm, type 2 (I) cool — and takes `lines()` rows 3+ for further types. Wherever
+  types or routes are **overlaid in one axes**, they are drawn back-to-front via
+  `draw_order` (`n:-1:1`) so type 1 lands on top; colours stay indexed by type and
+  legends are built in natural order, so the reversal is layering only. Per-neuron
+  accents come from `neuron_colors`, which varies *lightness* within the type's hue —
+  the previous `0.5*type_color + 0.5*lines(n)` blend pulled in a second hue and turned a
+  fraction of the E traces blue, which the layering cannot tolerate.
 - `RMTBlocks` returns a **dense** W; this class re-sparsifies, because its state
   indexing assumes sparse connectivity.
 

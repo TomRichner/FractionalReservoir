@@ -170,10 +170,15 @@ model.build();
 model.run();
 
 %% Plots
-model.plot();                    % compact summary: one panel per quantity
+% Compact summary: one panel per quantity. Where types (or routes) share an
+% axes they are drawn back-to-front, so E sits on top of I -- see
+% SRNNCellTypePairs.draw_order. Colour still tracks the type, not the draw
+% order: E warm, I cool, with per-neuron shades of each.
+model.plot();
 
 % Per-cell-type view: one COLUMN per type, every neuron's trace, with b and g
-% collapsed across routes as prod(b) and coloured by target type.
+% collapsed across routes as prod(b) and coloured by target type (again E over I
+% within each panel).
 model.plot_celltypes();
 
 % Effective-Jacobian spectrum at three times: early (still settling), middle and

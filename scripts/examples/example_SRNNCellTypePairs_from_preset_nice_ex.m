@@ -153,8 +153,8 @@ fprintf('========================================================\n\n');
 
 %% Build and run
 model.S_c = [0.20];
-model.level_of_chaos = 0.8;
-model.sigma_u_noise = 0.04;
+model.level_of_chaos = 1;
+model.sigma_u_noise = 0.03;
 model.plot_deci = model.fs/20; % go from 400 Hz to 20
 
 sc = model.synapse_config;
