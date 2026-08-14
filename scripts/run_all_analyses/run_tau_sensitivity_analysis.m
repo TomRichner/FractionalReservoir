@@ -97,6 +97,12 @@ end
 % Parameter preset first, run_mode timings second, so run_mode keeps final say
 % over ode_solver / fs / T_range / lya_T_interval.
 psa_tau_a.model_defaults = merge_struct(preset_defaults, cfg.model);
+% ...and master_model_final_overrides last of all: the escape hatch for wanting
+% a run_mode's sweep SIZE with one of its timing knobs changed. See
+% run_sensitivity_analysis.m for why nothing earlier in the chain can do it.
+if exist('master_model_final_overrides', 'var')
+    psa_tau_a.model_defaults = merge_struct(psa_tau_a.model_defaults, master_model_final_overrides);
+end
 
 psa_tau_a.set_conditions(condition);
 

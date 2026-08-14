@@ -341,6 +341,23 @@ switch name
         d.sigma_u_noise = 0.02;
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01'
+        % ..._sig1p5 as an SDE at HALF the noise of the 0p02 preset, so the two
+        % bracket the amplitude rather than testing a single value.
+        %
+        % By the same scaling as that preset, x_noise_std = sigma / sqrt(2*tau_d)
+        % = 0.01/sqrt(0.2) = 0.0224, about 3.7% of the piecewise sigmoid's +/-0.6
+        % input span against 7.5% at 0.02. Noise enters the LLE quadratically
+        % more often than linearly, so halving sigma is not expected to halve
+        % whatever it does -- which is the reason to have both.
+        %
+        % As with the 0p02 preset the integrator is NOT named here: carrying
+        % sigma_u_noise is the whole of what marks a preset stochastic, and
+        % analysis_run_config turns that into the run mode's 'sra1'.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
+        d.sigma_u_noise = 0.01;
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -362,7 +379,8 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_uniform_std_n500', 'celltype_pairs_uniform_std_n500_mu5p5', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5', ...
-    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02'};
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02', ...
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
