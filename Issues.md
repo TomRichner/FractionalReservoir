@@ -134,13 +134,24 @@ report `model_class = SRNNCellTypePairs` where they previously reported
 
 ---
 
-## 🔴 OPEN · ISSUE-009 · `medium2` tau/param_space stages died — cause NOT established
+## 🔴 OPEN (LOW) · ISSUE-009 · `medium2` tau/param_space stages died — cause NOT established
 
 | | |
 |---|---|
 | Identified | 2026-08-14 · `dev` @ `ac59b42` · R5456622 |
 | Area | run infrastructure / MATLAB stability |
 | Mitigated by | `c6055ea` (insurance, not a fix) |
+| Priority | **LOW** — deliberately parked 2026-08-14 · R5456622 |
+
+**Parked by TR, 2026-08-14: do not spend more time chasing this.** This was the
+**first crash in a big run, ever**. A one-off with no reproduction is not worth
+open-ended debugging, and the diagnostic cost is a whole night per attempt. It
+stops blocking anything.
+
+**Reopen at normal priority if it happens a second time** — a repeat makes it a
+pattern rather than an incident, and the evidence from two failures is worth far
+more than more speculation about one. If that happens, FR-006's memory
+pre-flight is the instrumentation to add first.
 
 Overnight `medium2` run: the 7 sensitivity sweeps completed 624/624 clean, then
 `tau_sensitivity` returned `Out of memory` on **88 of 195** runs and

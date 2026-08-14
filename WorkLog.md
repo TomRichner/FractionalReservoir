@@ -311,33 +311,35 @@ Tracked in full in **`Issues.md`** and **`FeatureRequests.md`**; summarised here
   `b445e9b`). `psa_object.mat` is now the one authoritative artifact and
   `from_dir` the only reader; `effective_param` errors rather than returning a
   level index.
-- 🔴 **ISSUE-009** — the `medium2` tau/param_space failure. Cause **not
-  established**; two diagnoses refuted.
+- 🔴 **ISSUE-009 (LOW)** — the `medium2` crash. Cause **not established** and
+  **deliberately parked**: first crash ever in a big run, no reproduction.
+  Reopen only if it recurs.
 - 🔵 **ISSUE-008** — the `−1/max(tau_a)` LLE floor. Affects how every flat
   plateau in these sweeps must be read.
-- 🔴 **ISSUE-007** — `best_presets.md` numbers predate the window fix and need
-  re-deriving, along with the `[0.5, 1.5]` range narrowing that rests on them.
+- 🔴 **ISSUE-007** — `best_presets.md` numbers predate the window fix, and the
+  `[0.5, 1.5]` narrowing that rests on them is now **measured to be too narrow**
+  (see 2026-08-14 entry below).
+- 🔴 **FR-004** — the Lyapunov accumulation window halved when ISSUE-001 was
+  fixed. Bears on any long run's LLE precision.
 - 🔴 **FR-006** — memory pre-flight for PSA.
 
-## Unfinished work — and the order it has to happen in
+## Unfinished work
 
-**`medium2` `tau_sensitivity` + `param_space` re-run — two of the three blockers
-are now clear:**
+**The `medium2` σ = 0.01 re-run is cancelled — TR is moving on** (2026-08-14).
+Both of its substantive blockers had cleared (ISSUE-008 settled as a result, not
+a defect; ISSUE-010/011 fixed), and only the unexplained crash remained, which
+is now parked at low priority. The decision is not to re-run it: the salvaged
+107/195 tau results and the seven clean sensitivity sweeps stand as the record
+of that night, and the next big run will be a **`medium`** one instead.
 
-1. ~~**ISSUE-008 (the LLE floor)**~~ — **settled 2026-08-14: not a defect.** See
-   below; the sweep range changed as a result, so the re-run should use the new
-   one.
-2. ~~**ISSUE-010 / ISSUE-011**~~ — **fixed 2026-08-14** (`b6e5262`). A crashed
-   run is exactly the case the loader got wrong, and the last run *did* crash;
-   that data now decodes correctly and a future crash stays salvageable, since
-   `run()` writes the object before batching.
-3. **ISSUE-009's cause is still unknown.** `restart_parpool` is insurance, not a
-   fix. Relaunching without instrumentation risks burning another night and
-   learning nothing again — see FR-006 for the memory pre-flight that would make
-   any repeat failure legible.
+**Before that `medium` run, two judgement calls — neither a bug:**
 
-Remaining order: fold ISSUE-009's diagnostic (tau alone, fresh MATLAB, full
-default pool, per-job memory logging) into the `medium2` re-run.
+1. **ISSUE-007 / the `level_of_chaos` range.** Now settled with data rather
+   than suspicion: `[0.5, 1.5]` does **not** bracket the crossing for half the
+   conditions. See the entry below.
+2. **FR-004 / the Lyapunov window.** Every run mode accumulates over exactly the
+   second half of `T_range`, which halved when the window fix landed. Worth
+   deciding before spending the compute, not after.
 
 ---
 
@@ -441,3 +443,51 @@ levels actually differ.
 **The tau floor analysis this unblocked is inconclusive on the existing data.**
 Only 4 of 13 tau levels have surviving runs, because 88/195 OOM'd. That needs
 the clean `medium2` re-run, which now waits only on ISSUE-009.
+
+---
+
+### 2026-08-14 · dev @ e3e3102 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+**Two decisions by TR, and one measurement that came out of asking what still
+blocks a `medium` run.**
+
+**1. ISSUE-009 parked at LOW.** No further effort on the overnight crash. It was
+the first crash ever in a big run, there is no reproduction, and each diagnostic
+attempt costs a night. Reopen at normal priority only if it recurs — two
+failures are worth more than more speculation about one.
+
+**2. The `medium2` σ = 0.01 re-run is cancelled.** Moving on. (TR said "noise
+0.001"; the mode was actually built at `sigma_u_noise = 0.01` — recording the
+value that ran, in case the 0.001 was the intent rather than a slip.)
+
+**3. ISSUE-007 is confirmed, and it is worse than "numbers need re-deriving".**
+The worry was that `level_of_chaos` had been narrowed to `[0.5, 1.5]` on the
+strength of pre-fix exponents. Checked against **post-fix** data — last night's
+13-level sweep, `celltype_pairs` at σ = 0.01, median LLE per level:
+
+| condition | LLE at 0.500 | crossing | verdict |
+|---|---|---|---|
+| `sfa_only` | **+0.3975** | below 0.5 | **outside the range entirely** |
+| `no_adaptation` | −0.5958 | 0.500 → 0.583 | in the *first* interval; one point resolves it |
+| `sfa_and_std` | −0.1117 | 1.000 → 1.083 | well centred |
+| `std_only` | −0.6163 | 1.333 → 1.417 | inside, near the top edge |
+
+So for `sfa_only` every level of an 11-level `medium` sweep would land on the
+chaotic side, and `no_adaptation`'s crossing is pinned by a single sample.
+Extrapolating the local slopes puts `sfa_only`'s zero near 0.4 and suggests a
+low end around **0.35** would bracket all four.
+
+Caveat: one preset (`celltype_pairs`, σ = 0.01). A different preset moves the
+crossings, so this argues for widening the range, not for treating 0.35 as the
+answer.
+
+**Note on method.** This came from reading a run already on disk, not from a new
+sweep — and it was only readable *because* the loader fix landed first: the same
+directory is one of the seven that previously reported `model_class =
+SRNNModel2`. Worth recording as a case where the bookkeeping fix immediately
+paid for itself.
+
+**Also noted:** `grep`/`sed` patterns containing the status emoji silently
+matched nothing again this session, exactly as `CLAUDE.md` warns. The
+plain-text tokens (`OPEN`, `FIXED`, …) worked. The warning is doing its job;
+the habit is the part that needs repeating.
