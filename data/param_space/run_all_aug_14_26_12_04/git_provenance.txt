@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_12_04
+Captured at: 14-Aug-2026 12:04:19
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      94e7e242dece2a50107c0c54fe7f709200c62ce8
+commit_short:94e7e24
+branch:      dev
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Promote the hand-tuned operating point to a preset
+last_date:   2026-08-14T12:04:13-05:00
+dirty:       false
+
