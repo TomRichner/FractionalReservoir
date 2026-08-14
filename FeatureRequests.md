@@ -7,11 +7,18 @@ Each entry records when it was raised, on which branch and commit, by which
 host, and how it ended: **done**, **declined** (a deliberate decision, kept so
 the same idea is not re-proposed), or still **open**.
 
-Newest first. Status: 🔴 open · 🟢 done · ⚪ declined.
+Newest first. Headings carry a plain-text status token beside the marker so the
+list greps reliably (see `Issues.md` for why emoji alone is not enough):
+🔴 `OPEN` · 🟢 `DONE` · ⚪ `DECLINED`.
+
+```bash
+grep '^## ' FeatureRequests.md            # whole list
+grep '^## .* OPEN ·' FeatureRequests.md   # just what is outstanding
+```
 
 ---
 
-## 🔴 FR-006 · Memory pre-flight for `ParamSpaceAnalysis2`
+## 🔴 OPEN · FR-006 · Memory pre-flight for `ParamSpaceAnalysis2`
 
 | | |
 |---|---|
@@ -36,7 +43,7 @@ diagnosis considerably.
 
 ---
 
-## 🔴 FR-005 · Separate the network seed from the noise seed for reps
+## 🔴 OPEN · FR-005 · Separate the network seed from the noise seed for reps
 
 | | |
 |---|---|
@@ -53,7 +60,7 @@ spread is the network and how much is the noise" becomes answerable.
 
 ---
 
-## 🔴 FR-004 · Retune `analysis_run_config` windows after the Lyapunov fix
+## 🔴 OPEN · FR-004 · Retune `analysis_run_config` windows after the Lyapunov fix
 
 | | |
 |---|---|
@@ -70,7 +77,7 @@ to start the window earlier (say the last three quarters) or lengthen `T_range`.
 
 ---
 
-## 🔴 FR-003 · Reconsider `medium2`'s sweep sizes
+## 🔴 OPEN · FR-003 · Reconsider `medium2`'s sweep sizes
 
 | | |
 |---|---|
@@ -86,7 +93,7 @@ machine — the levels and reps are the knobs to raise.
 
 ---
 
-## 🟢 FR-002 · Record the machine in run provenance
+## 🟢 DONE · FR-002 · Record the machine in run provenance
 
 | | |
 |---|---|
@@ -105,7 +112,7 @@ Linux.
 
 ---
 
-## 🟢 FR-001 · Fresh parallel pool before each analysis
+## 🟢 DONE · FR-001 · Fresh parallel pool before each analysis
 
 | | |
 |---|---|

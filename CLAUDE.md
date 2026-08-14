@@ -37,6 +37,52 @@ are the part that is otherwise lost, and they are what stops the next session
 re-deriving a dead end — see ISSUE-009, where two plausible diagnoses were both
 refuted by the data.
 
+### Reading them without flooding your context
+
+These files grow monotonically and are never pruned, so reading all three in
+full will eventually cost more context than the work itself. Escalate only as
+far as you need:
+
+**1. The index is one grep.** Every issue and request is a `## ` heading
+carrying its status marker, ID and title, so the whole backlog is a dozen-odd
+lines:
+
+```bash
+grep '^## ' Issues.md FeatureRequests.md          # full index, status included
+grep '^## .* OPEN ·' Issues.md FeatureRequests.md # just what is outstanding
+grep -n '^### ' WorkLog.md | tail -5              # the last few entries
+```
+
+Filter on the plain-text token (`OPEN` / `FIXED` / `WONTFIX` / `DONE` /
+`DECLINED`), **not** on the emoji — `grep '^## 🔴'` silently matches nothing in
+some terminals depending on locale, which is a bad failure mode for a check
+whose whole job is to tell you what is outstanding.
+
+That is usually enough to know whether the thing you are about to do is already
+known, already tried, or already decided against. Read a single entry in full
+only when one looks relevant.
+
+**2. Delegate the synthesis when you need the narrative.** For a genuinely
+prioritised picture — what is blocked and on what, which open items touch the
+area you are about to change, what was tried and refuted — use an **Explore
+agent** rather than reading the files into your own context:
+
+> Read `WorkLog.md`, `Issues.md` and `FeatureRequests.md` at the repo root.
+> Return a compact prioritised summary: open issues and requests by status, what
+> is currently blocked and on what, the last few work-log entries, and anything
+> bearing on `<the task at hand>`. Quote IDs and headline facts, not whole
+> entries. Do not modify anything.
+
+Give it the current task so it prioritises for relevance rather than recency.
+The point is that the agent absorbs the bulk and returns the conclusion.
+
+**3. Read in full only when the narrative itself is the subject** — e.g.
+reconstructing how a decision was reached, or auditing whether the record is
+accurate.
+
+The same escalation applies to writing: appending an entry needs no prior read
+of the whole file.
+
 `WorkLog.md` is a single chronological file by deliberate choice: when two
 machines both append, resolve the conflict by **keeping both entries and
 ordering by timestamp**, never by choosing between them. Entries are

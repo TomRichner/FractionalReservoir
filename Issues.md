@@ -8,12 +8,25 @@ host, and how it ended: **fixed**, **won't fix** (a deliberate decision), or
 still **open**. Issues are never deleted; a resolved one keeps its entry with the
 resolving commit, so the same ground is not re-covered in six months.
 
-Newest first. Status: 🔴 open · 🟢 fixed · ⚪ won't fix · 🔵 observation (not a
-defect, but affects interpretation).
+Newest first. Every heading carries a **plain-text status token** next to the
+marker, so the backlog can be filtered without depending on emoji surviving a
+shell's locale (`grep '^## 🔴'` silently matches nothing in some terminals):
+
+| | token | meaning |
+|---|---|---|
+| 🔴 | `OPEN` | still outstanding |
+| 🟢 | `FIXED` | resolved; entry kept with the resolving commit |
+| ⚪ | `WONTFIX` | deliberate decision not to change anything |
+| 🔵 | `OBSERVATION` | not a defect, but affects interpretation |
+
+```bash
+grep '^## ' Issues.md              # whole backlog, one line each
+grep '^## .* OPEN ·' Issues.md     # just what is outstanding
+```
 
 ---
 
-## 🔴 ISSUE-011 · `load_results` silently returns level indices for vector parameters
+## 🔴 OPEN · ISSUE-011 · `load_results` silently returns level indices for vector parameters
 
 | | |
 |---|---|
@@ -62,7 +75,7 @@ both together, with a test that the two load paths yield equivalent objects.
 
 ---
 
-## 🔴 ISSUE-010 · `load_results` does not restore `model_class`
+## 🔴 OPEN · ISSUE-010 · `load_results` does not restore `model_class`
 
 | | |
 |---|---|
@@ -82,7 +95,7 @@ spot; worth fixing together.
 
 ---
 
-## 🔴 ISSUE-009 · `medium2` tau/param_space stages died — cause NOT established
+## 🔴 OPEN · ISSUE-009 · `medium2` tau/param_space stages died — cause NOT established
 
 | | |
 |---|---|
@@ -134,7 +147,7 @@ default pool, with per-job memory logging, so any failure carries numbers.
 
 ---
 
-## ⚪ ISSUE-008 · The LLE tracks `−1/max(tau_a)` when the network is stable — NOT A DEFECT
+## ⚪ WONTFIX · ISSUE-008 · The LLE tracks `−1/max(tau_a)` when the network is stable — NOT A DEFECT
 
 | | |
 |---|---|
@@ -195,7 +208,7 @@ in hand: the minimum successful LLE was **−0.2159** against a predicted floor 
 
 ---
 
-## 🔴 ISSUE-007 · `best_presets.md` exponents predate the Lyapunov window fix
+## 🔴 OPEN · ISSUE-007 · `best_presets.md` exponents predate the Lyapunov window fix
 
 | | |
 |---|---|
@@ -212,7 +225,7 @@ range chosen from shifted values may no longer bracket the crossing.
 
 ---
 
-## 🟢 ISSUE-006 · `test_srnn_param_preset` checked 2 of 11 presets
+## 🟢 FIXED · ISSUE-006 · `test_srnn_param_preset` checked 2 of 11 presets
 
 | | |
 |---|---|
@@ -229,7 +242,7 @@ covered, and threading `model_class` through the validation.
 
 ---
 
-## 🟢 ISSUE-005 · An unaccumulable Lyapunov window returned `LLE = 0` silently
+## 🟢 FIXED · ISSUE-005 · An unaccumulable Lyapunov window returned `LLE = 0` silently
 
 | | |
 |---|---|
@@ -240,7 +253,7 @@ If no Lyapunov segment fell inside the window, the estimate came back as a bare
 
 ---
 
-## 🟢 ISSUE-004 · `lya_method = 'qr'` could not work with a fixed-step integrator
+## 🟢 FIXED · ISSUE-004 · `lya_method = 'qr'` could not work with a fixed-step integrator
 
 | | |
 |---|---|
@@ -253,7 +266,7 @@ the fiducial trajectory was produced, so it now pins `ode45` regardless.
 
 ---
 
-## 🟢 ISSUE-003 · Dead min/max clipping in `SRNNModel2`'s Benettin
+## 🟢 FIXED · ISSUE-003 · Dead min/max clipping in `SRNNModel2`'s Benettin
 
 | | |
 |---|---|
@@ -266,7 +279,7 @@ biasing every exponent downward with no visible symptom. Deleted.
 
 ---
 
-## 🟢 ISSUE-002 · `lya_dt` was hardcoded
+## 🟢 FIXED · ISSUE-002 · `lya_dt` was hardcoded
 
 | | |
 |---|---|
@@ -278,7 +291,7 @@ means the per-method default, so nothing moved.
 
 ---
 
-## 🟢 ISSUE-001 · `SRNNModel2`'s Benettin ignored `lya_T_interval(1)`
+## 🟢 FIXED · ISSUE-001 · `SRNNModel2`'s Benettin ignored `lya_T_interval(1)`
 
 | | |
 |---|---|
