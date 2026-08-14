@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Parameter-space distributions (allStd)
 ==================================================================
 
-Generated: 14-Aug-2026 12:41:49
+Generated: 14-Aug-2026 13:58:40
 By script: Fig_param_space_allStd.m
 
 HOW IT WAS MADE
@@ -19,9 +19,9 @@ HOW IT WAS MADE
   (rate row). See git_provenance.txt for the exact commit.
 
 SOURCE RUN
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_12_04
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_12_14
   param_space subfolder(s) used:
-    param_space_test_refactor_nLevs_3_aug_14_26_12_11
+    param_space_test_refactor_nLevs_4_aug_14_26_13_35
 
 FIGURE PRODUCED (in this folder)
   Fig_ParamSpace_allStd.png / .svg / .fig
@@ -29,5 +29,5 @@ FIGURE PRODUCED (in this folder)
 READING THIS FIGURE
   The LLE histogram range is fixed at [-1.5, 1.5] inside
   ParamSpaceAnalysis2.plot and cannot be set from this script. On this
-  preset the param-space LLEs span roughly -10 to +4.9, so the outermost
+  preset the param-space LLEs span roughly -10 to +4.8, so the outermost
   bins accumulate a large share of the distribution.

@@ -32,7 +32,7 @@ setup_paths();
 project_root = fileparts(which('setup_paths'));
 
 % Source run. Swap this one line to regenerate against the medium run.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_12_04');
+data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_12_14');
 out_dir   = this_dir;   % write the final figure next to this script
 
 % --- Locate the tau sensitivity subfolder ----------------------------------
@@ -52,11 +52,12 @@ tau_dir = fullfile(tau_listing.folder, tau_listing.name);
 
 % --- Presentation constants ------------------------------------------------
 % Kept identical to the original figure by decision, so the two read the same.
-% Worth knowing when reading the output: on this preset the tau LLEs run
-% -0.23 .. +0.26 with a median of +0.002, so roughly half the distribution is
-% POSITIVE. hist_range tops out at 0.1 and the view is cropped at 0.05, which
-% puts the +inf overflow band off-screen -- the panel will look entirely
-% sub-zero when it is not. Widen lle_range / y_view together to change that.
+% Worth knowing when reading the output: on this run the tau LLEs span
+% -0.26 .. +0.29 with a median of +0.008, so slightly over half the
+% distribution is POSITIVE and 32% of it sits above the y_view ceiling of 0.05
+% -- in the +inf overflow band, which is itself off-screen. The panel therefore
+% reads as almost entirely sub-zero when it is not. Widen lle_range / y_view /
+% y_ticks together to show it.
 lle_range = [-0.3, 0.1];    % histogram range passed to plot_sensitivity
 y_view    = [-0.25, 0.05];  % visible y-range (crops the overflow bands)
 y_ticks   = -0.2:0.1:0.1;
@@ -64,7 +65,7 @@ fig_position = [457 637 264 252];
 
 tick_fs   = 14;    % tick numbers
 label_fs  = 15.4;  % axis labels
-clim_frac = 0.4;   % darken imagesc: cap CLim at total_reps*clim_frac
+clim_frac = 0.8;   % darken imagesc: cap CLim at total_reps*clim_frac
 % Colormap ramps white (0 counts) -> 90% black (max), not pure black, so the
 % blue median line stays visible over the darkest cells.
 dark_cmap    = repmat(linspace(1, 0.1, 256)', 1, 3);
@@ -164,11 +165,12 @@ fprintf(fid, '  [%.2g, %.2g], view cropped to [%.2g, %.2g].\n\n', ...
 fprintf(fid, 'READING THIS PANEL -- IMPORTANT\n');
 fprintf(fid, '  The histogram range and y-view are kept identical to the original\n');
 fprintf(fid, '  figure by choice. On this preset that crops real data: the tau LLEs\n');
-fprintf(fid, '  span about -0.23 to +0.26 with a MEDIAN of +0.002, so roughly half the\n');
-fprintf(fid, '  distribution is positive, while the view stops at %.2g and the +inf\n', y_view(2));
-fprintf(fid, '  overflow band sits off-screen. The panel therefore looks entirely\n');
-fprintf(fid, '  sub-zero when it is not. To show the full spread, widen lle_range and\n');
-fprintf(fid, '  y_view (and y_ticks) at the top of the script.\n');
+fprintf(fid, '  span about -0.26 to +0.29 with a MEDIAN of +0.008, so slightly over\n');
+fprintf(fid, '  half the distribution is positive and 32%% of it sits above the view\n');
+fprintf(fid, '  ceiling of %.2g -- in the +inf overflow band, which is itself\n', y_view(2));
+fprintf(fid, '  off-screen. The panel therefore reads as almost entirely sub-zero\n');
+fprintf(fid, '  when it is not. To show the full spread, widen lle_range, y_view and\n');
+fprintf(fid, '  y_ticks together at the top of the script.\n');
 
 clear cleanup;  % flush + close
 fprintf('Description written: %s\n', desc_path);

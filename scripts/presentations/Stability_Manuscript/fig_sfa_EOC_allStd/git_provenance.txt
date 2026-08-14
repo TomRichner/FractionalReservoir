@@ -1,41 +1,66 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sfa_EOC_allStd
-Captured at: 14-Aug-2026 12:41:33
+Captured at: 14-Aug-2026 14:03:49
 
 hostname:    R5456622
 platform:    PCWIN64
 matlab:      2025b
-commit:      c1ab56f2f788a41a57eb3c583b7d11881ea595fb
-commit_short:c1ab56f
+commit:      b880c411e3a2bb93ba6b9aa2357b7eafc606d40b
+commit_short:b880c41
 branch:      dev
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Commit the fast2 run for celltype_pairs_Sc0p2_noise0p025
-last_date:   2026-08-14T12:18:47-05:00
+last_msg:    Merge branch 'dev' of github.com:TomRichner/FractionalReservoir into dev
+last_date:   2026-08-14T13:52:36-05:00
 dirty:       true
 
 --- git status --porcelain ---
-?? scripts/presentations/Stability_Manuscript/fig_param_space_allStd/
-?? scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/
-?? scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/
+M Issues.md
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.svg
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/working_changes.patch
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_analysis_allStd.m
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/working_changes.patch
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_mu.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_analysis_allStd2.m
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_mu.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/README_fig_sensitivity_analysis_allStd2.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/working_changes.patch
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.fig
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.png
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.svg
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_sfa_EOC_allStd.m
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/README_fig_sfa_EOC_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/working_changes.patch
+?? scripts/examples/example_SRNNCellTypePairs_from_preset_nice_ex.m
 
 --- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.fig
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.png
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.svg
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_analysis_allStd.m
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.fig
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.png
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.svg
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.fig
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.png
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
-scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/working_changes.patch
-scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.fig
-scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.png
-scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.svg
-scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_sfa_EOC_allStd.m
+scripts/examples/example_SRNNCellTypePairs_from_preset_nice_ex.m

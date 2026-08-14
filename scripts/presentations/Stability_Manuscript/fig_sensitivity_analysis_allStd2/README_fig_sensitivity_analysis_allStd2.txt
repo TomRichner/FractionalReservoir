@@ -1,7 +1,7 @@
 Stability_Manuscript figures: LLE + mean firing rate Sensitivity (allStd2)
 ========================================================================
 
-Generated: 14-Aug-2026 12:55:25
+Generated: 14-Aug-2026 13:33:46
 By script: Fig_sensitivity_analysis_allStd2.m
 
 HOW THEY WERE MADE
@@ -44,9 +44,29 @@ SHARED LAYOUT (all sheets)
   (RMT block means, indexed (post, pre)). Rows are identified by their
   index in the sheet's parameter list, NOT by inspecting the data -- the
   original figure guessed from max(xlim), which mislabels the mu sweeps.
+
+  PERCENT AXES. The Synaptic Gain and the four mu axes are shown as
+  percent departure from the preset default, (value/default - 1)*100,
+  rather than in raw mu_tilde_relative units -- absolute values mean
+  little on their own, and this puts the preset's own network at 0%
+  and makes the four mu panels directly comparable. Defaults are read
+  from the preset named in the run's run_manifest.mat, so they follow
+  data_root rather than being hardcoded. For this run:
+    level_of_chaos   default 1
+    mu_EE_relative   default 5.5
+    mu_EI_relative   default -5.5
+    mu_IE_relative   default 5.5
+    mu_II_relative   default -5.5
+  SIGN: mu_EI and mu_II have NEGATIVE defaults, so "+100%" means twice
+  as inhibitory. In raw data coordinates that is further LEFT, so those
+  two panels have their x-direction REVERSED; on all four mu panels
+  rightward therefore means "stronger synapse of this type" and the
+  percent axis ascends left-to-right. Only the ruler changes -- the
+  underlying image is untouched.
+
   Larger tick fonts. Condition titles kept only on the top row; vertical
   gray dividers separate the condition columns. imagesc CLim capped at
-  total_reps*0.4 (shared within a figure); colormap white -> 90% black
+  total_reps*0.6 (shared within a figure); colormap white -> 90% black
   so the blue median line stays visible over the darkest cells. Panel
   letters added up-and-left of each plot (AddLetters2Plots). Blue median
   line: alpha 0.35, 25% thinner. Titles not bold; axis boxes removed.

@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA Edge of Chaos (tau_a sensitivity, allStd)
 =========================================================================
 
-Generated: 14-Aug-2026 12:41:33
+Generated: 14-Aug-2026 14:03:51
 By script: Fig_sfa_EOC_allStd.m
 
 HOW IT WAS MADE
@@ -12,9 +12,9 @@ HOW IT WAS MADE
   git_provenance.txt for the exact commit.
 
 SOURCE RUN
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_12_04
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_12_14
   tau sensitivity subfolder used:
-    tau_sensitivity_tau_timescales_tau_a_E_max_nLevs_7_aug_14_26_12_10
+    tau_sensitivity_tau_timescales_tau_a_E_max_nLevs_11_aug_14_26_13_24
 
 FIGURES PRODUCED (in this folder)
   Fig_SFA_EOC_allStd.png
@@ -26,7 +26,7 @@ FIGURES PRODUCED (in this folder)
   tau_a_E elements). x-axis relabelled tau_a_E(last) -> "max \tau_a (s)";
   ylabel kept as \lambda_1 (latex, matching the xlabel); condition title
   ("SFA + STD") removed.
-  imagesc CLim capped at total_reps*0.4; colormap white -> 90% black so
+  imagesc CLim capped at total_reps*0.8; colormap white -> 90% black so
   the blue median line stays visible. Blue median: alpha 0.35, width 3;
   green zero line width 2; axis box removed. LLE histogram range
   [-0.3, 0.1], view cropped to [-0.25, 0.05].
@@ -34,8 +34,9 @@ FIGURES PRODUCED (in this folder)
 READING THIS PANEL -- IMPORTANT
   The histogram range and y-view are kept identical to the original
   figure by choice. On this preset that crops real data: the tau LLEs
-  span about -0.23 to +0.26 with a MEDIAN of +0.002, so roughly half the
-  distribution is positive, while the view stops at 0.05 and the +inf
-  overflow band sits off-screen. The panel therefore looks entirely
-  sub-zero when it is not. To show the full spread, widen lle_range and
-  y_view (and y_ticks) at the top of the script.
+  span about -0.26 to +0.29 with a MEDIAN of +0.008, so slightly over
+  half the distribution is positive and 32% of it sits above the view
+  ceiling of 0.05 -- in the +inf overflow band, which is itself
+  off-screen. The panel therefore reads as almost entirely sub-zero
+  when it is not. To show the full spread, widen lle_range, y_view and
+  y_ticks together at the top of the script.

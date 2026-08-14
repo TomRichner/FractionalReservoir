@@ -26,6 +26,49 @@ grep '^## .* OPEN ·' Issues.md     # just what is outstanding
 
 ---
 
+## 🔴 OPEN · ISSUE-012 · Default-value marker never appears on the `_allStd` sensitivity figures
+
+| | |
+|---|---|
+| Identified | 2026-08-14 · `dev` @ `b880c41` · R5456622 · Claude Code (Opus 5), session 054a29ca |
+| Area | `scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd{,2}/` |
+
+`Fig_sensitivity_analysis_allStd.m` is supposed to draw a short reddish-gray
+tick rising off the x-axis at the preset's default for each row (`:244-266`,
+helper `mark_default_value` at `:650`). **It does not appear.** Every other
+change in the same edit landed correctly — percent axes, `clim_frac = 0.6`
+(`CLim = [0 9]` on a 15-rep run), horizontal tick labels, the dropped
+`(% of default)` suffix — so the figures are usable; only the marker is missing.
+
+Inspecting the saved `Fig_Sensitivity_LLE_core.fig`, each axes contains exactly
+**one** line object: the blue median (`n=11`, spanning the full x-range,
+LineWidth 3). No second, short line exists at all.
+
+**What has been ruled out:**
+
+- Not the in-range guard. All seven defaults were verified independently to sit
+  inside their swept ranges (`f_E` 0.5 in [0.2, 0.8], gain 1 in [0.5, 1.5],
+  `n` 500 in [100, 1000], `mu_*` ±5.5 in ±[2.75, 11]) for both runs, so
+  `mark_default_value` should not be returning early.
+- Not a failed default lookup — the run emitted no `NoDefault`,
+  `PresetProbeFailed` or `NoManifest` warning, so `preset_default_values`
+  apparently resolved values without complaint.
+- Not the median-line restyle overwriting it: the marker is drawn *after* that
+  block, deliberately, since the restyle selects on `Type 'line'`.
+
+**Not yet checked:** whether `default_value` is genuinely non-empty at runtime
+(the map is built before the sheet loop; `isKey` may be failing on the exact
+key strings), whether `mark_default_value` is reached at all, and whether the
+later axis-repositioning / `AddLetters2Plots` passes discard added children.
+
+Affects `_allStd2` identically — same code, regenerated from the same source —
+though `_allStd2` has not been re-run since the marker was added.
+
+**Deferred by TR 2026-08-14**: the figures are otherwise correct and were
+needed; come back to this rather than chase it inline.
+
+---
+
 ## 🟢 FIXED · ISSUE-011 · `load_results` silently returns level indices for vector parameters
 
 | | |

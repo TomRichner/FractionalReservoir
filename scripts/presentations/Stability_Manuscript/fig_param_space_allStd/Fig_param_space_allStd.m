@@ -16,7 +16,7 @@ clc
 %
 % Note the LLE histogram range is fixed at [-1.5, 1.5] inside
 % ParamSpaceAnalysis2.plot and is not settable from here. On this preset the
-% param-space LLEs span roughly -10 to +4.9, so the outermost bins carry a large
+% param-space LLEs span roughly -10 to +4.8, so the outermost bins carry a large
 % share of the distribution.
 %
 % See also: Fig_sensitivity_analysis_allStd, Fig_sfa_EOC_allStd
@@ -28,7 +28,7 @@ project_root = fileparts(which('setup_paths'));
 
 % Source run (a run_all_<dt> folder with a param_space_* subdir).
 % Swap this one line to regenerate against the medium run.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_12_04');
+data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_12_14');
 out_dir   = this_dir;   % write the final figure next to this script
 
 % --- Presentation constants ------------------------------------------------
@@ -183,7 +183,7 @@ fprintf(fid, '  %s.png / .svg / .fig\n\n', fig_tag);
 fprintf(fid, 'READING THIS FIGURE\n');
 fprintf(fid, '  The LLE histogram range is fixed at [-1.5, 1.5] inside\n');
 fprintf(fid, '  ParamSpaceAnalysis2.plot and cannot be set from this script. On this\n');
-fprintf(fid, '  preset the param-space LLEs span roughly -10 to +4.9, so the outermost\n');
+fprintf(fid, '  preset the param-space LLEs span roughly -10 to +4.8, so the outermost\n');
 fprintf(fid, '  bins accumulate a large share of the distribution.\n');
 
 clear cleanup;  % flush + close
