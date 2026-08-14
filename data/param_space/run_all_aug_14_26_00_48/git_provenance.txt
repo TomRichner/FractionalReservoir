@@ -1,0 +1,16 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_00_48
+Captured at: 14-Aug-2026 00:48:45
+
+commit:      9cb280eff48dd79a4700320c98dbbee4cf456391
+commit_short:9cb280e
+branch:      dev
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Add an overnight queue runner, a 0.01-noise preset, and a final-override hook
+last_date:   2026-08-13T23:29:49-05:00
+dirty:       true
+
+--- git status --porcelain ---
+M scripts/run_all_analyses/run_overnight_queue.m
+ M scripts/run_all_analyses/run_param_space_analysis2.m
+ M scripts/run_all_analyses/run_sensitivity_analysis.m
+ M scripts/run_all_analyses/run_tau_sensitivity_analysis.m
