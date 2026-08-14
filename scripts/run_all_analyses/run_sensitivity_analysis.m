@@ -141,14 +141,6 @@ for p_idx = 1:size(params_to_sweep, 1)
     % Parameter preset first, run_mode timings second, so run_mode keeps final
     % say over ode_solver / fs / T_range / lya_T_interval.
     psa.model_defaults = merge_struct(preset_defaults, cfg.model);
-    % ...and master_model_final_overrides last of all, for the one case the
-    % two-layer scheme cannot express: wanting a run_mode's sweep SIZE with one
-    % of its timing knobs changed. fs belongs to run_mode, so a preset carrying
-    % it is inert (cfg.model wins) -- "medium but at fs = 800" therefore has
-    % nowhere else to live. Deliberately last and deliberately unset by default.
-    if exist('master_model_final_overrides', 'var')
-        psa.model_defaults = merge_struct(psa.model_defaults, master_model_final_overrides);
-    end
 
     % --- Adaptation conditions --------------------------------------------
     psa.set_conditions(conditions);
