@@ -46,9 +46,9 @@ function replot_dir = replot_tau_sensitivity(data_root, lle_hist_range)
         end
 
         fprintf('Loading tau sensitivity from:\n  %s\n', src_dir);
-        S = load(psa_file);
-        fns = fieldnames(S);
-        psa = S.(fns{1});  % saved as psa_tau_a / psa_tau_b
+        % from_dir selects the object BY CLASS, so the old psa_tau_a /
+        % psa_tau_b variable names in existing run directories still load.
+        psa = ParamSpaceAnalysis2.from_dir(src_dir);
 
         swept = setdiff(psa.grid_params, {'reps'}, 'stable');
         if isempty(swept)

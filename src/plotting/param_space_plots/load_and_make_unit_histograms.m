@@ -48,30 +48,11 @@ end
 fprintf('=== Loading Parameter Space Analysis for Unit Histograms ===\n');
 fprintf('Directory: %s\n\n', results_dir);
 
-%% Load PSA object (same as load_and_plot_param_space_analysis)
-psa_file = fullfile(results_dir, 'psa_object.mat');
-if exist(psa_file, 'file')
-    fprintf('Loading PSA object from: %s\n', psa_file);
-    loaded = load(psa_file);
-    psa = loaded.psa;
-    fprintf('Loaded PSA object successfully.\n');
-else
-    fprintf('No psa_object.mat found. Creating new object and loading results...\n');
-    psa = ParamSpaceAnalysis2();
-    psa.output_dir = results_dir;
-end
-
-%% Check if consolidation is needed
-temp_dir = fullfile(results_dir, 'temp_batches');
-if exist(temp_dir, 'dir')
-    fprintf('\nFound unconsolidated batch files in temp_batches/\n');
-    fprintf('Running consolidation...\n');
-    psa.consolidate();
-    fprintf('Consolidation complete.\n');
-elseif ~psa.has_run
-    fprintf('Loading results from per-condition MAT files...\n');
-    psa.load_results(results_dir);
-end
+%% Load the run
+% from_dir handles what this used to do by hand: read psa_object.mat, fall back
+% to the per-condition result files, and consolidate temp_batches/ for a run that
+% was interrupted.
+psa = ParamSpaceAnalysis2.from_dir(results_dir);
 
 %% Get condition info
 condition_names = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);

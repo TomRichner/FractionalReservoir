@@ -76,8 +76,7 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate
         end
 
         fprintf('Loading sensitivity from:\n  %s\n', src_dir);
-        S = load(psa_file);
-        psa = S.psa;
+        psa = ParamSpaceAnalysis2.from_dir(src_dir);
 
         swept = setdiff(psa.grid_params, {'reps'}, 'stable');
         if isempty(swept)

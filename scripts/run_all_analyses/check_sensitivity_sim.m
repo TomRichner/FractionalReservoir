@@ -48,11 +48,8 @@ if isempty(psa_dir)
     [~, newest] = max([hits.datenum]);
     psa_dir = hits(newest).folder;
 end
-psa_file = fullfile(psa_dir, 'psa_object.mat');
-assert(isfile(psa_file), 'psa_object.mat not found in %s', psa_dir);
-fprintf('Loading PSA from:\n  %s\n', psa_file);
-loaded = load(psa_file, 'psa');
-psa = loaded.psa;
+fprintf('Loading PSA from:\n  %s\n', psa_dir);
+psa = ParamSpaceAnalysis2.from_dir(psa_dir);
 
 %% ---- Sanity checks on the loaded sweep ----
 assert(ismember('level_of_chaos', psa.grid_params), ...

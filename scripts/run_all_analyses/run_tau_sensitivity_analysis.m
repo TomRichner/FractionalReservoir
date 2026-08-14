@@ -141,7 +141,9 @@ copyfile([mfilename('fullpath') '.m'], psa_tau_a.output_dir);
 psa_tau_a.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);
 psa_tau_a.plot_sensitivity('metric', 'mean_rate');
 
-save(fullfile(psa_tau_a.output_dir, 'psa_object.mat'), 'psa_tau_a');
+% psa_object.mat is written by run() itself, always under the name `psa`. This
+% script used to save it again as `psa_tau_a`, which is why readers had to guess
+% the variable name.
 
 if save_figs
     fig_dir = fullfile(psa_tau_a.output_dir, 'figures');
@@ -182,7 +184,7 @@ copyfile([mfilename('fullpath') '.m'], psa_tau_b.output_dir);
 psa_tau_b.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);
 psa_tau_b.plot_sensitivity('metric', 'mean_rate');
 
-save(fullfile(psa_tau_b.output_dir, 'psa_object.mat'), 'psa_tau_b');
+% As above: run() writes psa_object.mat under the canonical name.
 
 if save_figs
     fig_dir = fullfile(psa_tau_b.output_dir, 'figures');

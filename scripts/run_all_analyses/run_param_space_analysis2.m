@@ -158,10 +158,10 @@ psa.run();
 % Copy this script to the output directory for reproducibility
 copyfile([mfilename('fullpath') '.m'], psa.output_dir);
 
-%% Save the PSA object
-save_file = fullfile(psa.output_dir, 'psa_object.mat');
-save(save_file, 'psa');
-fprintf('PSA object saved to: %s\n', save_file);
+%% The PSA object
+% run() writes psa_object.mat itself -- once before batching so an interrupted
+% run stays recoverable, and again on completion.
+fprintf('PSA object saved to: %s\n', fullfile(psa.output_dir, 'psa_object.mat'));
 
 %% Plot results
 % Generate histograms showing metric distributions across the parameter space
@@ -207,8 +207,7 @@ fprintf('Conditions: %s\n', strjoin(cellfun(@(c) c.name, psa.conditions, 'Unifor
 %   histogram(LLEs);
 
 %% Optional: Load results from a previous run
-% psa_loaded = ParamSpaceAnalysis2();
-% psa_loaded.load_results('/path/to/param_space_...');
+% psa_loaded = ParamSpaceAnalysis2.from_dir('/path/to/param_space_...');
 % psa_loaded.plot('metric', 'LLE');
 
 fprintf('\nDone! Results saved to: %s\n', psa.output_dir);
