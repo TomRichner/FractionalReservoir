@@ -296,6 +296,24 @@ switch name
         d.input_config = pairs_input_config(0.0);
         return;     % conditions already resolved by the recursive call
 
+    case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5'
+        % ..._mu5p5_nodrive with the weight SPREAD raised, sigma_tilde_relative
+        % 1 -> 1.5, mu left at 5.5.
+        %
+        % This is the opposite lever from the mu change. mu sets the block means
+        % -- the deterministic E/I structure, which is what produces the outlier
+        % eigenvalues -- while sigma sets the scatter around them, which is what
+        % sets the bulk radius R. Raising sigma alone therefore inflates the
+        % random bulk against a fixed deterministic skeleton, the reverse of the
+        % mu5p5 step, and pushes R up substantially.
+        %
+        % Note the property is sigma_tilde_relative, a multiplier of
+        % F = 1/sqrt(n*alpha*(2-alpha)). The absolute sigma_tilde is Dependent
+        % and read-only; assigning it raises SRNNModel:RenamedProperty.
+        [d, model_class, conditions] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive');
+        d.sigma_tilde_relative = [1.5 1.5; 1.5 1.5];   % multiples of F
+        return;     % conditions already resolved by the recursive call
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -315,7 +333,8 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_S_c_by_type', 'celltype_pairs_S_c_by_type_n500', ...
     'celltype_pairs_S_c_by_type_n500_fixedF', 'celltype_pairs_all_std_n500', ...
     'celltype_pairs_uniform_std_n500', 'celltype_pairs_uniform_std_n500_mu5p5', ...
-    'celltype_pairs_uniform_std_n500_mu5p5_nodrive'};
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive', ...
+    'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
