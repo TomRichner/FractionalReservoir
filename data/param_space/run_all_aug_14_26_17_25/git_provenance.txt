@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_17_25
+Captured at: 14-Aug-2026 17:25:02
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      a5033e6789e62db92f58bff566a8ef8bebe885f2
+commit_short:a5033e6
+branch:      dev
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Halve production reps to 25, keeping all 25 levels
+last_date:   2026-08-14T17:23:52-05:00
+dirty:       false
+
