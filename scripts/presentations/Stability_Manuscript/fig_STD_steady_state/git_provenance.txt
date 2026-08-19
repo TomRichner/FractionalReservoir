@@ -1,0 +1,24 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_STD_steady_state
+Captured at: 19-Aug-2026 15:04:04
+
+hostname:    R5456622
+platform:    PCWIN64
+matlab:      2025b
+commit:      bda85b8ce27b8cf40048f6b770d1c6ac3a4ff759
+commit_short:bda85b8
+branch:      dualStd
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    example_SRNNCellTypePairs_play.m playing
+last_date:   2026-08-19T11:39:31-05:00
+dirty:       true
+
+--- git status --porcelain ---
+?? scripts/presentations/Stability_Manuscript/fig_STD_steady_state/
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.fig
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.m
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.png
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.svg
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/README_fig_STD_steady_state.txt
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/git_provenance.txt

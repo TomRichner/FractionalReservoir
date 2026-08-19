@@ -627,7 +627,7 @@ switch name
         % Changed:
         %   S_c            0.0     -> 0.20
         %   sigma_u_noise  (absent) -> 0.025   NEW
-        % Derived presets: none.
+        % Derived presets: celltype_pairs_Sc0p2_noise0p025_dualStd.
         %
         % The hand-tuned operating point from
         % scripts/examples/example_SRNNCellTypePairs_from_preset.m, promoted out
@@ -683,6 +683,66 @@ switch name
         std_routes.I.E.std = uniform_std;
         std_routes.I.I.std = uniform_std;
 
+    case 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+        % Copied from celltype_pairs_Sc0p2_noise0p025. Changed:
+        %   STD, every route   tau_rec  2     -> [2 4]        (n_b 1 -> 2)
+        %                      tau_rel  0.25  -> [0.25 0.5]
+        % Derived presets: none.
+        %
+        % A SECOND, SLOWER DEPRESSION TIMESCALE on each of the four routes. The
+        % original pair (2, 0.25) is kept as the first element, so this preset
+        % adds a slow component to the depression already in use rather than
+        % replacing it. compile_synapse_config reads n_b off numel(tau_rec), so
+        % a 2-element row IS the request for two timescales; the b-states are
+        % integrated as columns and enter the synapse as prod(b, 2).
+        %
+        % WHAT THE SECOND TIMESCALE ACTUALLY COSTS. Both pairs share the same
+        % ratio tau_rec/tau_rel = 8, so both b-states relax toward the SAME
+        % steady state 1/(1 + 8r) and differ only in how fast they get there.
+        % But the synapse multiplies them, so the steady-state depression is
+        % the SQUARE of the parent's:
+        %
+        %   parent  b     = 1/(1 + 8r)        = 0.29  at r = 0.3
+        %   here    b1*b2 = 1/(1 + 8r)^2      = 0.086 at r = 0.3
+        %
+        % i.e. about 3.4x deeper, not merely slower. Read a shift in LLE or
+        % mean rate against celltype_pairs_Sc0p2_noise0p025 as the combined
+        % effect of both changes -- the added timescale and the deeper
+        % depression -- because this preset does not separate them. Equalising
+        % the depth would mean retuning the ratios, which would change the
+        % steady state the parent was tuned at.
+        %
+        % Cost: the std_only and sfa_and_std conditions carry 2000 b-states
+        % rather than 1000, so N_sys_eqs goes 2250 -> 3250 at n = 500.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    500, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % operative: mu_S_c is empty
+            'mu_S_c',               [], ...
+            'sigma_S_c',            [], ...
+            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
+            'input_config',         pairs_input_config(0.0), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              500, ...
+            'F_ref_indegree',       100, ...
+            'sigma_u_noise',        0.025);
+
+        std_routes = struct();
+        dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        std_routes.E.E.std = dual_std;
+        std_routes.E.I.std = dual_std;
+        std_routes.I.E.std = dual_std;
+        std_routes.I.I.std = dual_std;
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
@@ -706,7 +766,8 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01', ...
-    'celltype_pairs_Sc0p2_noise0p025'};
+    'celltype_pairs_Sc0p2_noise0p025', ...
+    'celltype_pairs_Sc0p2_noise0p025_dualStd'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)

@@ -657,6 +657,59 @@ rather than vacuously passing.
 
 ---
 
+### 2026-08-18 21:30 · dualStd @ 8d19470 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+Added the `celltype_pairs_Sc0p2_noise0p025_dualStd` preset — two STD
+timescales on every route, `tau_rec = [2 4]`, `tau_rel = [0.25 0.5]` —
+plus `scripts/examples/example_SRNNCellTypePairs_dualStd.m`, and shook it
+out with a `fast` `run_all` (branch `dualStd`, off `dev` at 4837f10).
+
+**No model change was needed, and that was the main thing to establish.**
+`compile_synapse_config` already sets `n_b(pre,post) = numel(tau_rec)`,
+`dynamics_fast` reshapes the route's b-states to `npre x nb` and takes
+`prod(b_state, 2)`, and `test_SRNNCellTypePairs.m:150` already exercises a
+2-element `tau_rec`. `srnn_adaptation_conditions` likewise needed no edit:
+it already spells `sfa_and_std` as `n_a = [3 0]` plus whatever
+`synapse_config` the preset hands it, so a preset carrying 2-element taus
+produces the requested `n_a = 3 / n_b = 2` and `n_b = 2` regimes on its
+own. The whole change is one `case` in `srnn_param_preset.m`.
+
+**The physics is not a free extra timescale.** Both pairs share
+`tau_rec/tau_rel = 8`, so the two b-states settle at the *same*
+`1/(1 + 8r)` and differ only in relaxation speed — but the synapse
+multiplies them, making steady-state depression the SQUARE of the parent
+preset's: 0.086 vs 0.29 at r = 0.3, ~3.4x deeper. Any LLE or rate shift
+against `celltype_pairs_Sc0p2_noise0p025` is the two changes combined.
+Recorded in the preset comment so it cannot be read as timescale-only.
+
+**Wrong prediction, corrected.** The plan claimed both STD conditions grow
+to 3250 state variables. Only `sfa_and_std` does; `std_only` has no SFA
+states and lands at 2500 (2000 b + 500 x). Measured: 500 / 1250 / 2500 /
+3250 across the four conditions.
+
+`fast` run: `data/param_space/run_all_aug_18_26_21_18`, 10.33 min, every
+job successful (7x 1D sensitivity, tau, param space), **no NaN LLEs**.
+
+| condition | med LLE | med rate | % positive |
+|---|---|---|---|
+| no_adaptation | -4.755 | 0.501 | 33.3% |
+| sfa_only | -0.100 | 0.224 | 33.3% |
+| std_only | -0.393 | 0.307 | 7.4% |
+| sfa_and_std | -0.113 | 0.303 | 7.4% |
+
+The recurring `LLE = -9.9957` is **not a failure sentinel** — it is
+`-1/tau_d = -10`, the quiescent fixed point where phi' is zero and the
+Jacobian reduces to `-I/tau_d`. It appears only in `no_adaptation` (33% of
+its grid points, the high-`level_of_chaos`/high-`n` corner).
+
+Worth flagging before the `medium` run: the tau_a_E panel came back
+**0% positive** (n=49, median -0.074, max -0.040), where the parent
+preset's tau panel ran -0.26..+0.29 with median +0.008 and slightly over
+half positive (see `fig_sfa_EOC_allStd/README`). That is the deeper
+depression showing up as expected, but the comparison is `fast` against
+`medium`, so it is suggestive of direction only, not a matched contrast.
+TR runs `medium` personally.
+
 ### 2026-08-18 21:37 · dev @ fc6af94 · R5611351 · Claude Code (Opus 5), session b651fa7a
 
 **New presentation figure: sensitivity medians collapsed across conditions**
@@ -784,6 +837,67 @@ Verified by reading all six regenerated PNGs at native resolution: every tick
 label complete on both medians sheets and all four allStd sheets.
 
 ---
+
+### 2026-08-19 · dualStd @ bda85b8 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+New presentation figure `fig_STD_steady_state/`: the analytic steady state of
+the dual-timescale STD preset. Left panel `prod(b)` vs r, right panel
+`prod(b)*r` vs r, each with one component `b_k` dashed for reference. Taus are
+read off the preset's `sfa_and_std` condition rather than hardcoded, so the
+figure cannot drift from what is swept. Styling matches `Fig_FI_curve`.
+
+Two results worth keeping:
+
+- **`prod(b)*r` is non-monotonic**, peaking at r = 0.13 (value 0.031) then
+  decaying to 0.0123 at r = 1. Past the peak, depression outruns the rate
+  driving it and firing harder delivers LESS to the recurrent sum. A single
+  timescale never does this: `b_k*r` rises monotonically to the asymptote
+  `tau_rel/tau_rec` = 0.125. The turnover is specific to `n_b > 1`.
+- The medium run's measured mean rates (E 0.265, I 0.383) sit **past that
+  peak**, on the descending branch — a plausible mechanism for the strongly
+  negative LLEs that preset produces.
+
+**Gotcha found and fixed here, still present elsewhere.** `Fig_FI_curve.m`
+hardcodes `'Position', [4429, 565, 623, 322]` — a second-monitor coordinate
+from the machine it was written on. Copying that line put the new figure
+off-screen on a 1920-wide display, which reads as "the figure never opened".
+Saved output was unaffected (`save_some_figs_to_folder_2` exports from the
+figure object, not the screen), so the bug is invisible in the committed
+`.png`. The new script computes its origin from `groot`'s `ScreenSize`
+instead. The other `fig_*` scripts have NOT been swept for this.
+
+### 2026-08-19 · dualStd @ a007c01 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+New presentation figure `fig_SFA_steady_state/`, the SFA counterpart to
+`fig_STD_steady_state`. Left: `c*sum(a)` vs r for n_a = 3 (c = 0.5/3) against
+n_a = 1 (c = 0.5). Right: the transient response to a step r: 0 -> 1. Both
+panels on [0, 1], plotted with the POSITIVE adaptation variable (the model
+applies it as `phi(x - c*sum a)`, so larger here means more suppression).
+
+**The left panel's two curves are identical, to machine precision** — measured
+`max|difference| = 0`. Not a plotting bug: `da_k/dt = 0` gives `a_k = r` for
+every timescale regardless of `tau_k`, so the steady-state current is
+`c*n_a*r`, a function of the PRODUCT `c*n_a` only. Splitting c as a budget
+holds that product at 0.5 either way. The n_a = 1 case is drawn dashed *over*
+the thick n_a = 3 line so the panel evidences that both were computed. This is
+the justification for the project's `c_E = 0.15/3` convention: adding
+timescales does not silently move the operating point.
+
+**The SFA/STD asymmetry is the reason both figures exist.** SFA enters the
+dynamics as a SUM, so a budget-split c makes n_a invisible at steady state.
+STD enters as a PRODUCT, and no choice of taus can make dual STD match single
+STD — the dual product `1/((1+r*rho1)(1+r*rho2))` is quadratic in r where any
+single timescale is linear, so they agree only if a ratio is zero. That is
+why `n_b = 2` changed the network's behaviour and `n_a = 3` does not.
+
+Where n_a does show up is the transient: three timescales give fast partial
+adaptation plus a slow tail, one gives a single exponential. Same destination.
+
+Two defaults in this figure are mine, not specified, and may want revisiting:
+the 20 s window cuts off before either curve settles (the 10 s component is
+~86% there), and `tau_1 = 10 s` comes from the model's own
+`logspace(log10(0.25), log10(10), 1)` collapsing to the slow end — a single
+timescale at the geometric mean 1.58 s would be the fairer comparison.
 
 ### 2026-08-19 17:36 · dev @ 5dac5bb · R5611351 · Claude Code (Opus 5), session b651fa7a
 
