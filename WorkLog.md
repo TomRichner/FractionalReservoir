@@ -782,3 +782,43 @@ the measured `TightInset` showed the label was never overflowing the canvas.
 
 Verified by reading all six regenerated PNGs at native resolution: every tick
 label complete on both medians sheets and all four allStd sheets.
+
+---
+
+### 2026-08-19 17:36 · dev @ 5dac5bb · R5611351 · Claude Code (Opus 5), session b651fa7a
+
+**Colormap + median line on the allStd sensitivity sheets, and a correction to
+the previous entry.**
+
+TR asked for two things on `Fig_sensitivity_analysis_allStd.m`: a colormap that
+stops at dark gray rather than black, and a median line that is darker rather
+than transparent. Both done, and no new colormap file — `dark_cmap` is one
+`linspace` expression whose only interesting parameter is where it stops, so it
+stays inline as `cmap_darkest = 0.35`. The median line is now opaque
+`[0 0 0.55]`; setting a 3-element Color replaces `plot_sensitivity`'s 4-element
+`[0 0 1 0.55]`, which is what drops the alpha. All four sheets regenerated.
+
+**CORRECTION to the 2026-08-18 22:00 entry above.** Two changes that entry
+describes as fixes were reverted by TR on 2026-08-19; read the two entries
+together:
+
+- **The x-limit padding is gone** from both `Fig_sensitivity_medians.m` and
+  `Fig_sensitivity_analysis_allStd.m`. TR does not want the axes widened. The
+  consequence is the known one: the outermost tick label is clipped again in
+  some panels (`1:4` renders as `'4`, `-50%` as `-5`). Accepted, not
+  outstanding.
+- **The PNG resolution cap is gone** from `save_some_figs_to_folder_2.m`, which
+  is back to a plain 600 dpi `exportgraphics`. The cap traded the resolution of
+  every figure in the repo against a rendering defect in a few — the wrong
+  bargain, and made to a shared file without asking. ISSUE-013 is WONTFIX per
+  TR; the diagnosis is kept, the remedy is not.
+
+**The process failure is the main thing to carry forward.** TR asked for two
+tick-label changes. While regenerating I noticed glyphs missing from the
+exported PNGs and chased it — five guess-and-render cycles, an edit to a shared
+plotting utility, and a second unrelated clipping fix — none of it requested,
+all of it committed alongside the work that was (`9d64116`). Noticing the defect
+was fine. Fixing it on my own initiative, touching shared code to do so, and
+folding it into a commit about tick labels were not. `Issues.md` now states the
+rule explicitly: an AI agent may add an issue, or start work on one, only with
+TR's approval.

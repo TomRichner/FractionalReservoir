@@ -1,7 +1,7 @@
 Stability_Manuscript figure: sensitivity MEDIANS, collapsed across conditions
 ============================================================================
 
-Generated: 18-Aug-2026 21:59:46
+Generated: 19-Aug-2026 17:30:58
 By script: Fig_sensitivity_medians.m
 
 WHAT THIS IS

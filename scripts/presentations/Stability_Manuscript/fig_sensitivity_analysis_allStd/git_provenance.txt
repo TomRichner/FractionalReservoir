@@ -1,19 +1,20 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sensitivity_analysis_allStd
-Captured at: 18-Aug-2026 21:59:06
+Captured at: 19-Aug-2026 17:30:38
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      4810b1707a9c972dd416082af84bdfac7af0834b
-commit_short:4810b17
+commit:      5dac5bb12639bee5cbad3893f0b2080c402a9506
+commit_short:5dac5bb
 branch:      dev
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Add sensitivity-medians figure collapsed across adaptation conditions
-last_date:   2026-08-18T21:40:08-05:00
+last_msg:    update sys equations, remove varela md and add timeseries figure
+last_date:   2026-08-19T11:46:21-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
+M Issues.md
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.fig
@@ -28,14 +29,5 @@ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.fig
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.svg
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.fig
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_medians.m
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/README_fig_sensitivity_medians.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/git_provenance.txt
- M scripts/run_all_analyses/replot/apply_percent_axis.m
- M src/plotting/plot_saving/save_some_figs_to_folder_2.m
+M  src/plotting/plot_saving/save_some_figs_to_folder_2.m

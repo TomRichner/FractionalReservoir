@@ -127,7 +127,6 @@ label_fs  = 15.4;  % axis labels
 legend_fs = 14;
 letter_fs = 18;    % panel letters
 line_lw   = 2.5;   % opaque: four overlaid curves, so the allStd alpha would muddy them
-x_pad_frac = 0.035;% x-limit padding each side, so the end ticks' labels are not clipped
 band_alpha = 0.15; % only used when band_pcts is non-empty
 
 zeroline_lw = 2;                        % green dashed lambda_1 = 0 line
@@ -318,16 +317,6 @@ for mi = 1:numel(metric_specs)
                 end
             end
         end
-
-        % Breathing room at both ends of the x-axis. The sweeps run edge to edge,
-        % so the outermost tick lands exactly ON the axis limit and half its
-        % label overhangs the axes; the overhang is then clipped, which cost the
-        % "%" off "+100%" in the right-hand column and is invisible until you
-        % read the rendered file. Widening the limits by a couple of percent
-        % pulls the last tick inside, which fixes it in data space rather than
-        % relying on figure margins or export resolution.
-        xl = xlim(ax);
-        xlim(ax, xl + x_pad_frac * diff(xl) * [-1, 1]);
 
         % Default marker LAST: it re-pins xlim/ylim, so everything that sets
         % them must already have run.

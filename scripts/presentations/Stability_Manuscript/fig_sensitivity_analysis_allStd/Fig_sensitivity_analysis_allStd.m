@@ -116,13 +116,23 @@ letter_fs = 18;    % panel letters -- matches MC figure
 row_shrink = 0.85; % shrink each row's height to open gaps between rows
 top_headroom = 0.06; % shift the row stack down (normalized) to clear room above the top row for column headers
 title_y   = 1.22;  % condition-title height above the top-row axes (normalized), reads as a column header
-% Colormap ramps white (0 counts) -> 90% black (max), not pure black, so the
-% blue median line stays visible over the darkest cells.
-dark_cmap = repmat(linspace(1, 0.1, 256)', 1, 3);
-median_alpha = 0.35;   % blue median line transparency (plot_sensitivity uses 0.55)
+% Colormap ramps white (0 counts) -> DARK GRAY (max), stopping well short of
+% black. A ramp into black makes the densest cells read as a solid slab and
+% swallows the overflow bands, which then dominate the panel; ending at 0.35 grey
+% keeps the density gradient legible at the top end and leaves the median line
+% clearly on top of it. Built inline rather than as a named colormap file -- it
+% is one expression, and the interesting parameter is the end point, which is
+% easier to see and tune here than behind a function call.
+cmap_darkest = 0.35;   % grey level of the densest cell (0 = black, 1 = white)
+dark_cmap = repmat(linspace(1, cmap_darkest, 256)', 1, 3);
+% Median line: OPAQUE dark blue, not a transparent pure blue. Transparency was
+% there to keep the line readable over near-black cells; with the colormap
+% stopping at dark grey it is no longer needed, and an opaque line reads as one
+% curve rather than as a wash whose apparent colour changes with the density
+% underneath it.
+median_color = [0 0 0.55];
 median_lw    = 3;      % blue median line width, 25% thinner (plot_sensitivity uses 4)
 zeroline_lw  = 2;      % green dashed zero line width (plot_sensitivity uses 4)
-x_pad_frac   = 0.035;  % x-limit padding each side, so the end ticks' labels are not clipped
 
 % Short tick rising off the x-axis at the preset's default value for that row --
 % the "you are here" mark for the network the sweep departs from. Deliberately
@@ -203,7 +213,7 @@ for si = 1:numel(sheets)
         set(ax, 'FontSize', tick_fs);         % enlarge x & y tick numbers
         set(get(ax, 'Title'), 'FontWeight', 'normal', 'FontSize', title_fs);  % condition titles, not bold, enlarged
         box(ax, 'off');                       % drop the rectangle; keep x/y axes+ticks
-        colormap(ax, dark_cmap);              % white -> 90% black (blue line stays visible)
+        colormap(ax, dark_cmap);              % white -> dark grey, not black
 
         % Darken the histogram density: the panels are drawn with CLim = [0,
         % total_reps]; lower the ceiling so typical bin counts use more of the
@@ -211,15 +221,12 @@ for si = 1:numel(sheets)
         cl = get(ax, 'CLim');
         set(ax, 'CLim', [0, cl(2) * spec.clim_frac]);
 
-        % Blue median line: more transparent + 25% thinner. (imagesc is Type
-        % 'image', the zero line is 'constantline', so 'line' is the median.)
+        % Median line: opaque dark blue + 25% thinner. Setting a 3-element Color
+        % REPLACES plot_sensitivity's 4-element [0 0 1 0.55], which is what drops
+        % the alpha. (imagesc is Type 'image', the zero line is 'constantline',
+        % so 'line' is the median.)
         ml = findobj(ax, 'Type', 'line');
-        for m = 1:numel(ml)
-            mc = get(ml(m), 'Color');
-            if numel(mc) < 4; mc(4) = 1; end
-            mc(4) = median_alpha;
-            set(ml(m), 'Color', mc, 'LineWidth', median_lw);
-        end
+        set(ml, 'Color', median_color, 'LineWidth', median_lw);
         % Green dashed zero line: thinner for LLE, dropped for mean_rate.
         zl = findobj(ax, 'Type', 'constantline');
         if spec.zero_line
@@ -258,16 +265,6 @@ for si = 1:numel(sheets)
                 end
             end
         end
-
-        % Breathing room at both ends of the x-axis. The sweeps run edge to edge,
-        % so the outermost tick lands exactly ON the axis limit and half its
-        % label overhangs the axes; the overhang is clipped, which in the
-        % rightmost column collided "+100%" into "+50%" as "+50%00%". Widening
-        % the limits by a few percent pulls the last tick inside. It leaves a
-        % thin white margin either side of the imagesc, which is the cost of a
-        % readable ruler.
-        xl_pad = xlim(ax);
-        xlim(ax, xl_pad + x_pad_frac * diff(xl_pad) * [-1, 1]);
 
         % Short tick at the preset's default for this parameter. Drawn LAST so
         % it is not caught by the median-line restyle above, which selects on
@@ -441,10 +438,15 @@ end
 fprintf(fid, '\n');
 fprintf(fid, '  Larger tick fonts. Condition titles kept only on the top row; vertical\n');
 fprintf(fid, '  gray dividers separate the condition columns. imagesc CLim capped at\n');
-fprintf(fid, '  total_reps*0.8 (shared within a figure); colormap white -> 90%% black\n');
-fprintf(fid, '  so the blue median line stays visible over the darkest cells. Panel\n');
-fprintf(fid, '  letters added up-and-left of each plot (AddLetters2Plots). Blue median\n');
-fprintf(fid, '  line: alpha 0.35, 25%% thinner. Titles not bold; axis boxes removed.\n');
+fprintf(fid, '  total_reps*0.8 (shared within a figure); colormap ramps white -> grey\n');
+fprintf(fid, '  %.2f, stopping well short of black -- a ramp into black makes the\n', cmap_darkest);
+fprintf(fid, '  densest cells a solid slab and lets the overflow bands dominate the\n');
+fprintf(fid, '  panel. Panel letters added up-and-left of each plot (AddLetters2Plots).\n');
+fprintf(fid, '  Median line: OPAQUE dark blue [%.2f %.2f %.2f], %g pt (plot_sensitivity\n', ...
+    median_color, median_lw);
+fprintf(fid, '  draws it as transparent pure blue at 4 pt); the transparency existed\n');
+fprintf(fid, '  only to survive near-black cells and is not needed now. Titles not\n');
+fprintf(fid, '  bold; axis boxes removed.\n');
 
 fprintf(fid, '\nPER-FIGURE DIFFERENCES\n');
 fprintf(fid, '  Both metrics use n_bins = %d (linspace edges), i.e. %d plotted rows:\n', n_bins, n_bins + 1);

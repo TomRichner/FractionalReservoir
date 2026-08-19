@@ -1,7 +1,7 @@
 Stability_Manuscript figures: LLE + mean firing rate Sensitivity (allStd)
 ========================================================================
 
-Generated: 18-Aug-2026 21:59:06
+Generated: 19-Aug-2026 17:30:38
 By script: Fig_sensitivity_analysis_allStd.m
 
 HOW THEY WERE MADE
@@ -84,10 +84,14 @@ SHARED LAYOUT (all sheets)
 
   Larger tick fonts. Condition titles kept only on the top row; vertical
   gray dividers separate the condition columns. imagesc CLim capped at
-  total_reps*0.8 (shared within a figure); colormap white -> 90% black
-  so the blue median line stays visible over the darkest cells. Panel
-  letters added up-and-left of each plot (AddLetters2Plots). Blue median
-  line: alpha 0.35, 25% thinner. Titles not bold; axis boxes removed.
+  total_reps*0.8 (shared within a figure); colormap ramps white -> grey
+  0.35, stopping well short of black -- a ramp into black makes the
+  densest cells a solid slab and lets the overflow bands dominate the
+  panel. Panel letters added up-and-left of each plot (AddLetters2Plots).
+  Median line: OPAQUE dark blue [0.00 0.00 0.55], 3 pt (plot_sensitivity
+  draws it as transparent pure blue at 4 pt); the transparency existed
+  only to survive near-black cells and is not needed now. Titles not
+  bold; axis boxes removed.
 
 PER-FIGURE DIFFERENCES
   Both metrics use n_bins = 24 (linspace edges), i.e. 25 plotted rows:
