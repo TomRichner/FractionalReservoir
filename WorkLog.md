@@ -553,8 +553,26 @@ its own vacuity guard.
 `validate_model_defaults`, the banned-name rules, the sra1 solver selection).
 
 `scripts/tests/srnn_param_preset_old.m` is kept rather than deleted, which makes
-the equivalence test a standing regression guard on all 14 presets. The cost is
-a ~440-line frozen file in `scripts/tests/`, and the maintenance rule that comes
-with it: **a preset added or edited in `src/` will show up as an equivalence
-failure**, at which point the choice is to mirror it in the frozen copy or to
-retire the copy and its test together. Do that deliberately.
+the equivalence test a standing regression guard on all 14 presets, at the cost
+of a ~440-line frozen file in `scripts/tests/`.
+
+**Scoped to the frozen K, so new presets are free** (same session, follow-up).
+As first written the test compared *every* preset both functions knew about,
+which would have made adding a 15th preset an instant failure — a tax on all
+future work, and the fastest way to get a test disabled rather than fixed. It
+now compares only the K presets the frozen copy knows about (K read from that
+file, not hardcoded), requires them to remain the **first K in order**, and
+*names* anything newer as out-of-scope in the output so a green banner is never
+misread as "all presets verified". The rule that buys this: **append new presets
+at the bottom** of the switch and of `srnn_param_preset_names`. Inserting or
+reordering fails, deliberately.
+
+**Wrong turn, caught only by actually trying it.** I verified the change by
+temporarily adding a 15th preset — and it *failed*, on a check I had not thought
+of: "unknown-preset message unchanged" compared the whole error string, which
+ends with the full preset list and therefore grows whenever one is appended.
+Reasoning about the scoping change would not have found that; running the probe
+did. The check now compares the message *preamble* exactly and separately
+asserts every frozen name is still listed. Both directions are verified:
+appending passes with the new preset named as uncovered, inserting at position 2
+fails and prints the position-by-position divergence.

@@ -15,10 +15,14 @@ function [d, model_class, conditions] = srnn_param_preset_old(name)
 % the equivalence test would pass no matter what -- which is why that test
 % greps this file for `srnn_param_preset(` and fails if it finds one.
 %
-% If a preset is added or changed in src/srnn_param_preset.m, it will show up
-% here as an equivalence failure. That is the point: decide deliberately
-% whether to mirror the change here (keeping the guard live) or to retire this
-% file and its test together.
+% ADDING a preset to src/srnn_param_preset.m costs nothing here: the test only
+% compares the presets THIS file knows about, and names any newer ones as
+% out-of-scope. Append them at the bottom of the live switch and its name list,
+% though -- the frozen names must stay the first K, in order.
+%
+% CHANGING one of the presets below is what shows up as an equivalence failure,
+% which is the point. Decide deliberately whether to mirror the change here
+% (keeping the guard live) or to retire this file and its test together.
 % ---------------------------------------------------------------------------
 %
 % Original documentation follows.

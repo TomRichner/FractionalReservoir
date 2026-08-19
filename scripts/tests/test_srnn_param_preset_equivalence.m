@@ -1,12 +1,21 @@
 % test_srnn_param_preset_equivalence.m
-% Prove the FLATTENED srnn_param_preset returns exactly what the old CHAINED
-% implementation did, for every preset and every call form.
+% Prove the FLATTENED srnn_param_preset still returns exactly what the old
+% CHAINED implementation did, for the presets that existed at the flattening.
 %
 % srnn_param_preset used to build ten of its fourteen presets by calling itself
 % recursively, up to seven hops deep. Flattening it into self-contained cases is
 % a pure readability change, so the only thing that must be established is that
 % nothing moved. scripts/tests/srnn_param_preset_old.m is the frozen chained
 % implementation; this script compares the two output-for-output.
+%
+% SCOPE -- READ THIS BEFORE ADDING A PRESET. Only the K presets the frozen copy
+% knows about are compared. A preset added to srnn_param_preset.m AFTER the
+% freeze has no old counterpart to compare against, so it is skipped and NAMED
+% in the output rather than treated as a failure. That is what keeps this test
+% from taxing every future preset. The requirement it does impose is ordering:
+% the frozen K must remain the FIRST K, in their original order, so APPEND NEW
+% PRESETS AT THE BOTTOM. Reordering, renaming or deleting one of the original K
+% fails, by design -- those are exactly the changes worth catching.
 %
 % The comparison is only meaningful if the frozen copy is genuinely independent,
 % so the first check greps it for calls to the live function. Without that guard
@@ -57,19 +66,61 @@ spares_names = isempty(regexp('    n = srnn_param_preset_names();', ...
 all_passed = check('the delegation guard fires on a real delegation', ...
     bites && spares_old && spares_names) && all_passed;
 
-%% Both functions must know the same presets
-% Recovered from the UnknownPreset message rather than kept as a third list
-% here, so a preset added to either side without a test cannot go unchecked.
-% (Same idiom as test_srnn_param_preset.m.)
+%% Scope: the K presets the frozen copy knows about, and only those
+% K is whatever srnn_param_preset_old enumerates -- not a hardcoded number, so
+% this needs no maintenance. The frozen list must still be a PREFIX of the live
+% one: presets appended to the bottom of srnn_param_preset.m are new work with
+% no old counterpart and are skipped, while REORDERING, RENAMING or DELETING
+% one of the original K is a failure, because that is a change to something this
+% test is supposed to be guarding.
+%
+% Both lists are recovered from the UnknownPreset message rather than kept as a
+% third list here, so nothing has to be updated in this file when a preset is
+% added. (Same idiom as test_srnn_param_preset.m.)
+%
+% ==> APPEND NEW PRESETS AT THE BOTTOM of the switch in srnn_param_preset.m and
+%     at the end of its srnn_param_preset_names list. Inserting one in the
+%     middle breaks the prefix and fails here.
 names_old = preset_names_from_error(@srnn_param_preset_old);
 names_new = preset_names_from_error(@srnn_param_preset);
-all_passed = check('both implementations enumerate the same preset list', ...
-    isequal(names_old, names_new)) && all_passed;
-if ~isequal(names_old, names_new)
-    fprintf('      old only: %s\n', strjoin(setdiff(names_old, names_new), ', '));
-    fprintf('      new only: %s\n', strjoin(setdiff(names_new, names_old), ', '));
+K = numel(names_old);
+
+enough = numel(names_new) >= K;
+all_passed = check('live function still defines all K frozen presets', enough) && all_passed;
+if ~enough
+    fprintf('      frozen has %d presets, live has %d -- one was deleted.\n', ...
+        K, numel(names_new));
+    fprintf('      missing: %s\n', strjoin(setdiff(names_old, names_new), ', '));
 end
-fprintf('  (%d presets under comparison)\n\n', numel(names_old));
+
+prefix_ok = enough && isequal(names_new(1:K), names_old);
+all_passed = check('the K frozen presets are still the first K, in order', ...
+    prefix_ok) && all_passed;
+if enough && ~prefix_ok
+    for i = 1:K
+        if ~strcmp(names_old{i}, names_new{i})
+            fprintf('      position %d: frozen ''%s'', live ''%s''\n', ...
+                i, names_old{i}, names_new{i});
+        end
+    end
+    fprintf(['      Append new presets at the END of the list; do not insert ' ...
+        'or reorder.\n']);
+end
+
+added = names_new(K+1:end);
+if isempty(added)
+    fprintf('\n  %d presets under comparison; none added since the freeze.\n\n', K);
+else
+    % Not a failure -- just say plainly what this test does NOT cover, so a
+    % green banner is never read as "every preset is verified".
+    fprintf('\n  %d presets under comparison. NOT COVERED (added since the freeze): %s\n', ...
+        K, strjoin(added, ', '));
+    fprintf(['  Those have no frozen counterpart; test_srnn_param_preset.m is ' ...
+        'what validates them.\n\n']);
+end
+
+% Only the frozen K are compared below.
+names_old = names_old(1:K);
 
 %% Every preset, all three outputs
 for i = 1:numel(names_old)
@@ -142,11 +193,27 @@ all_passed = check('both reject an unknown preset', ...
     threw_old && threw_new) && all_passed;
 all_passed = check('unknown-preset identifier unchanged', ...
     threw_old && threw_new && strcmp(err_old.identifier, err_new.identifier)) && all_passed;
-ok = threw_old && threw_new && strcmp(err_old.message, err_new.message);
-all_passed = check('unknown-preset message unchanged', ok) && all_passed;
+
+% Compare the message STRUCTURE, not the whole string. The message ends with
+% the full preset list, which legitimately grows every time a preset is
+% appended -- comparing it verbatim would make adding a preset a failure, which
+% is exactly what this test is meant not to do. So: the part before the list
+% must match exactly, and the frozen names must still all be in the live list.
+marker = 'Valid presets:';
+ok = threw_old && threw_new && ...
+    strcmp(extractBefore(err_old.message, marker), ...
+           extractBefore(err_new.message, marker));
+all_passed = check('unknown-preset message preamble unchanged', ok) && all_passed;
 if ~ok && threw_old && threw_new
     fprintf('      old: %s\n', err_old.message);
     fprintf('      new: %s\n', err_new.message);
+end
+
+missing = setdiff(names_old, names_new, 'stable');
+all_passed = check('unknown-preset message still lists every frozen preset', ...
+    isempty(missing)) && all_passed;
+if ~isempty(missing)
+    fprintf('      absent from the live message: %s\n', strjoin(missing, ', '));
 end
 
 %% Result
