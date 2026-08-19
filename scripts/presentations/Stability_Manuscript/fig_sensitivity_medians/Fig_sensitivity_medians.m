@@ -74,7 +74,7 @@ row_style = containers.Map( ...
      'mu_IE_relative', 'mu_II_relative'}, ...
     {struct('xlabel', 'E:I neuron ratio', 'xticks', [0.2 0.5 0.8], ...
                                           'xticklabels', {{'100:400','250:250','400:100'}}), ...
-     struct('xlabel', 'Network Size',     'xticks', [100 400 700 1000], 'xticklabels', {{}}), ...
+     struct('xlabel', 'Network Size',     'xticks', [100 500 1000], 'xticklabels', {{}}), ...
      struct('xlabel', '\mu_{EE}',         'xticks', [], 'xticklabels', {{}}), ...
      struct('xlabel', '\mu_{EI}',         'xticks', [], 'xticklabels', {{}}), ...
      struct('xlabel', '\mu_{IE}',         'xticks', [], 'xticklabels', {{}}), ...
@@ -127,6 +127,7 @@ label_fs  = 15.4;  % axis labels
 legend_fs = 14;
 letter_fs = 18;    % panel letters
 line_lw   = 2.5;   % opaque: four overlaid curves, so the allStd alpha would muddy them
+x_pad_frac = 0.035;% x-limit padding each side, so the end ticks' labels are not clipped
 band_alpha = 0.15; % only used when band_pcts is non-empty
 
 zeroline_lw = 2;                        % green dashed lambda_1 = 0 line
@@ -235,17 +236,13 @@ for mi = 1:numel(metric_specs)
 
     fh = figure('Name', sprintf('%s Sensitivity medians', spec.name), ...
         'Position', [50, 50, 1300, 680], 'Color', 'w');
-    % Width 1300, not 1200: at 1200 the 600-dpi PNG that
-    % save_some_figs_to_folder_2 writes drops glyphs from two tick labels
-    % ("700" -> ")0", "+50%" -> "+%"), always at the same horizontal position in
-    % the raster and reproducibly across re-exports. The labels themselves are
-    % correct (XTickLabel reads "700") and the vector .svg is clean, so it is an
-    % exportgraphics rasterisation artifact, not a layout collision -- see
-    % Issues.md ISSUE-013. Widening moves the affected column off that seam.
     % 'loose' horizontal spacing, not 'compact': each panel has its own x-axis
     % with labels running to both ends (e.g. "+100%", "1000"), and at compact
     % spacing the last label of one tile collides with the next tile's y-axis.
-    tl = tiledlayout(fh, n_rows, n_cols, 'TileSpacing', 'loose', 'Padding', 'compact');
+    % Padding 'loose' as well as spacing: with 'compact' the last x-tick label of
+    % the right-hand column ("+100%") ends flush with the figure's right edge and
+    % gets shaved off by the canvas boundary on export.
+    tl = tiledlayout(fh, n_rows, n_cols, 'TileSpacing', 'loose', 'Padding', 'loose');
 
     ax_cell   = cell(1, numel(panel_params));
     leg_lines = gobjects(1, numel(cond_spec));
@@ -321,6 +318,16 @@ for mi = 1:numel(metric_specs)
                 end
             end
         end
+
+        % Breathing room at both ends of the x-axis. The sweeps run edge to edge,
+        % so the outermost tick lands exactly ON the axis limit and half its
+        % label overhangs the axes; the overhang is then clipped, which cost the
+        % "%" off "+100%" in the right-hand column and is invisible until you
+        % read the rendered file. Widening the limits by a couple of percent
+        % pulls the last tick inside, which fixes it in data space rather than
+        % relying on figure margins or export resolution.
+        xl = xlim(ax);
+        xlim(ax, xl + x_pad_frac * diff(xl) * [-1, 1]);
 
         % Default marker LAST: it re-pins xlim/ylim, so everything that sets
         % them must already have run.

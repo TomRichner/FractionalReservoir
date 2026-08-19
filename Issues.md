@@ -26,15 +26,18 @@ grep '^## .* OPEN ·' Issues.md     # just what is outstanding
 
 ---
 
-## 🔴 OPEN · ISSUE-013 · `exportgraphics` at 600 dpi drops glyphs from tick labels
+## 🟢 FIXED · ISSUE-013 · Wide PNG exports drop glyphs from tick labels
 
 | | |
 |---|---|
 | Identified | 2026-08-18 21:37 · `dev` @ `fc6af94` · R5611351 · Claude Code (Opus 5), session b651fa7a |
-| Area | `src/plotting/plot_saving/save_some_figs_to_folder_2.m:53` (`exportgraphics(..., 'Resolution', 600)`) |
+| Fixed | 2026-08-18 22:00 · `dev` @ `4810b17` · R5611351 · same session |
+| Area | `src/plotting/plot_saving/save_some_figs_to_folder_2.m` (the png branch) |
 
-Building `fig_sensitivity_medians`, two x-tick labels in the 600-dpi PNG came
-out with characters missing: `700` rendered as `)0` and `+50%` as `+%`.
+Building `fig_sensitivity_medians`, x-tick labels in the 600-dpi PNG came out
+with characters missing — `700` as `)0`, `+50%` as `+%`, later `500` as `50`,
+`1000` as `10`, `+100%` as `)0%`. One label per sheet, which reads as a typo in
+the tick rather than as a broken export, and is easy to ship without noticing.
 
 **Not a layout collision and not a data problem.** Reading the axes back live,
 `ax.XTickLabel` is `{'100','400','700','1000'}` and `XTickLabelRotation` is 0;
@@ -53,16 +56,38 @@ raster export:
   glyphs.
 - The vector `.svg` from the same figure is unaffected.
 
-**Workaround in use:** `Fig_sensitivity_medians.m` sets the figure width to 1300
-rather than 1200, which moves the affected column off the seam. That is a
-coincidence fix, not a repair — a different figure width, screen, or MATLAB
-version can put a seam through some other label.
+**First workaround, WRONG, recorded so it is not retried:** widening the figure
+from 1200 to 1300 made the bad label render. It only slid a *different* label
+onto the seam — the next regeneration ate `500` instead. Any "fix" that changes
+the figure's size is this same coincidence. Likewise wrong: forcing
+`Renderer = 'painters'` (no effect), and `print -dpng -r600` instead of
+`exportgraphics` (eats the same label in the same place). It is not resolution
+*per se* either — it is the resulting pixel width.
 
-**Not yet checked:** whether other project figures are silently affected (they
-all go through the same 600-dpi path and their labels may simply have missed the
-seam), whether `'Resolution', 300` or `print -dpng -r600` avoids it generally,
-and whether it is specific to R2026a Update 4. A general fix probably belongs in
-`save_some_figs_to_folder_2` rather than in each figure script.
+**Diagnosis.** The damage always lands near the end of a rasteriser tile, so
+which label is hit moves with the image width. Measured on these figures at
+2075 / 3520 / 3759 / 4001 / 5999 / 7639 / 8125 px. Bisected on this machine:
+**3520 px clean, 3759 px damaged.**
+
+**FIXED 2026-08-18 22:00** in `save_some_figs_to_folder_2.m`. The PNG branch now
+measures the file it just wrote with `imfinfo` and, if the larger dimension
+exceeds `png_max_px = 3400`, re-exports at the highest resolution that fits
+(`max(150, floor(600 * 3400 / big))`) with a warning naming the substituted dpi.
+Measured rather than predicted, because the pixel size depends on the screen's
+points-per-inch and so varies by machine and display scaling. Figures small
+enough to be safe at 600 dpi — most of them, since this needs a sheet wider than
+about 6 in — never take the branch and are bit-identical to before. The `.svg`
+is untouched and remains the full-quality deliverable.
+
+**Residual risk:** `png_max_px` is an empirical bound from two figures on one
+machine, not a documented limit. If a glyph goes missing again, bisect the width
+for that figure and lower the constant. A wide sheet now exports at roughly
+290 dpi rather than 600.
+
+**Not checked:** whether earlier project figures already in `figs/` and the
+presentation folders carry silent damage from before this fix — they all went
+through the same 600-dpi path, and their labels may simply have missed the seam.
+Worth a look the next time any of them is regenerated.
 
 ---
 

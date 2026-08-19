@@ -724,3 +724,61 @@ sheets): the marker is present in the currently committed `_allStd` PNGs and the
 extracted `mark_default_value` draws it correctly on all six panels of both new
 sheets, so the issue looks stale — but `_allStd` was not re-run, so the status is
 left OPEN rather than closed on indirect evidence.
+
+---
+
+### 2026-08-18 22:00 · dev @ 4810b17 · R5611351 · Claude Code (Opus 5), session b651fa7a
+
+**Tick-label changes on both sensitivity figures, and the export bug that came
+out from under them.**
+
+TR asked for two label changes, applied to `fig_sensitivity_medians` and to
+`fig_sensitivity_analysis_allStd`, both regenerated:
+
+- Network Size ticks `100 / 500 / 1000` instead of `100 / 400 / 700 / 1000`.
+  With three ticks they also fit horizontally, so the rotated labels the `n` row
+  used to need are gone.
+- The percent axes label their reference `+0%`, not `0%`. One line in
+  `apply_percent_axis` — `sprintf('%+g%%')` already signs zero, so the fix was
+  deleting the `labels(tp == 0) = {'0%'}` override. Every mu axis and the
+  Synaptic Gain axis now reads as a signed departure scale end to end.
+
+`Fig_sensitivity_analysis_allStd.m` was edited this time rather than left alone:
+its four local subfunctions were deleted in favour of the copies extracted last
+session into `scripts/run_all_analyses/replot/`, so the `+0%` change reaches both
+figures from one place. Its "Local helpers" section is now a pointer comment.
+
+**The export bug (ISSUE-013) is the part worth reading.** Changing the ticks
+moved which label sat on the seam, so the corruption reappeared on a different
+label after every regeneration. Four wrong turns, each of which looked like a fix
+for one round:
+
+1. *Widen the figure 1200 -> 1300.* Made `700` render; the next run ate `500`.
+   Any figure-size change is this same coincidence.
+2. *Force `Renderer = 'painters'`.* No effect. The `.svg` is clean because it
+   goes through the vector path, not because of the renderer property.
+3. *Use `print -dpng -r600` instead of `exportgraphics`.* Eats the same label in
+   the same place, so it is not exportgraphics-specific.
+4. *Assume a fixed seam at x = 4096 and cap the raster at 4000 px.* Fixed the
+   middle column and broke the right-hand one. The seam tracks the end of a
+   rasteriser *tile*, so it moves with the image width rather than sitting at one
+   absolute pixel.
+
+What actually settled it: the labels read back correct from `ax.XTickLabel`, the
+`.svg` is clean, and bisecting the width gave **3520 px clean / 3759 px damaged**.
+So `save_some_figs_to_folder_2` now measures the PNG it just wrote and re-exports
+below `png_max_px = 3400` when needed, warning with the substituted dpi. Wide
+sheets land at ~290 dpi instead of 600; narrow figures never take the branch and
+are bit-identical to before.
+
+A second, genuinely separate clipping problem was hiding underneath it: the
+sweeps run edge to edge, so the outermost tick sits exactly ON the axis limit and
+half its label overhangs the axes and is clipped. That is what turned `+100%`
+into `00%` in the right-hand column, and it is not the seam — it survived every
+resolution change. Both scripts now pad the x-limits by 3.5% each side
+(`x_pad_frac`), which fixes it in data space instead of chasing figure margins.
+`tiledlayout` `Padding`/`OuterPosition` were both tried first and neither helped;
+the measured `TightInset` showed the label was never overflowing the canvas.
+
+Verified by reading all six regenerated PNGs at native resolution: every tick
+label complete on both medians sheets and all four allStd sheets.

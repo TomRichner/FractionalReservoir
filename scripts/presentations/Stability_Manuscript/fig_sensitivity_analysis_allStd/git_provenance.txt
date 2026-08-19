@@ -1,25 +1,19 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sensitivity_analysis_allStd
-Captured at: 18-Aug-2026 19:38:00
+Captured at: 18-Aug-2026 21:59:06
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      aea08ea0fea2f294dd8a342e24c68f7247481ddc
-commit_short:aea08ea
+commit:      4810b1707a9c972dd416082af84bdfac7af0834b
+commit_short:4810b17
 branch:      dev
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Scope the preset equivalence test to the frozen presets only
-last_date:   2026-08-18T19:32:27-05:00
+last_msg:    Add sensitivity-medians figure collapsed across adaptation conditions
+last_date:   2026-08-18T21:40:08-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.svg
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
+M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.fig
@@ -33,5 +27,15 @@ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpa
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
- M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_sfa_EOC_allStd.m
- M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/README_fig_sfa_EOC_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_medians.m
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/README_fig_sensitivity_medians.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/git_provenance.txt
+ M scripts/run_all_analyses/replot/apply_percent_axis.m
+ M src/plotting/plot_saving/save_some_figs_to_folder_2.m

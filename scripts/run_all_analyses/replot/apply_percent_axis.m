@@ -40,8 +40,12 @@ function apply_percent_axis(ax, d, base_label, label_fs)
     [xt, ord] = sort(xt);
     tp = tp(ord);
 
+    % '%+g' signs every label, zero included, so the default reads "+0%" rather
+    % than "0%". Deliberate: the run of labels then shares one width and one
+    % leading glyph column, and the eye reads the axis as a signed departure
+    % scale throughout instead of hitting an unsigned value at the reference
+    % point.
     labels = arrayfun(@(v) sprintf('%+g%%', v), tp, 'UniformOutput', false);
-    labels(tp == 0) = {'0%'};
 
     set(ax, 'XTick', xt, 'XTickLabel', labels, 'XTickLabelRotation', 0);
     if d < 0
