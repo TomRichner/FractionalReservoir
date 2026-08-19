@@ -696,21 +696,19 @@ switch name
         % a 2-element row IS the request for two timescales; the b-states are
         % integrated as columns and enter the synapse as prod(b, 2).
         %
-        % WHAT THE SECOND TIMESCALE ACTUALLY COSTS. Both pairs share the same
-        % ratio tau_rec/tau_rel = 8, so both b-states relax toward the SAME
-        % steady state 1/(1 + 8r) and differ only in how fast they get there.
-        % But the synapse multiplies them, so the steady-state depression is
-        % the SQUARE of the parent's:
+        % DEEPER DEPRESSION IS THE POINT, and the second timescale is how it is
+        % obtained. Both pairs share the same ratio tau_rec/tau_rel = 8, so both
+        % b-states relax toward the same steady state 1/(1 + 8r) and differ only
+        % in how fast they get there; the synapse multiplies them, so the
+        % steady-state depression is the SQUARE of the parent's:
         %
         %   parent  b     = 1/(1 + 8r)        = 0.29  at r = 0.3
         %   here    b1*b2 = 1/(1 + 8r)^2      = 0.086 at r = 0.3
         %
-        % i.e. about 3.4x deeper, not merely slower. Read a shift in LLE or
-        % mean rate against celltype_pairs_Sc0p2_noise0p025 as the combined
-        % effect of both changes -- the added timescale and the deeper
-        % depression -- because this preset does not separate them. Equalising
-        % the depth would mean retuning the ratios, which would change the
-        % steady state the parent was tuned at.
+        % i.e. about 3.4x deeper as well as slower. The ratios are deliberately
+        % left equal rather than retuned to hold the depth fixed -- retuning
+        % them would move the steady state the parent was tuned at, and the
+        % extra depth is wanted here.
         %
         % Cost: the std_only and sfa_and_std conditions carry 2000 b-states
         % rather than 1000, so N_sys_eqs goes 2250 -> 3250 at n = 500.
