@@ -654,3 +654,73 @@ parameter list plus one caveat per analysis rather than an error), and an empty
 directory (a complete file whose every section says "None recovered"). A
 synthetic manifest naming the wrong preset confirmed the drift table is live
 rather than vacuously passing.
+
+---
+
+### 2026-08-18 21:37 · dev @ fc6af94 · R5611351 · Claude Code (Opus 5), session b651fa7a
+
+**New presentation figure: sensitivity medians collapsed across conditions**
+(`scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/`).
+
+TR asked for a compact counterpart to the `_allStd` sensitivity sheets: instead
+of tiling the four adaptation conditions as columns and drawing the full rep
+distribution per panel (28 panels over two sheets per metric), overlay the four
+conditions as **median lines only** in one axes per swept parameter. Dropping
+`level_of_chaos` leaves six parameters, which fit one 2 x 3 sheet per metric.
+Two sheets produced: `Fig_Sensitivity_LLE_medians` and
+`Fig_sensitivity_mean_rate_medians` (png/svg/fig each), from the same source run
+the `_allStd` figures use (`data/param_space/run_all_aug_14_26_17_25`). No
+simulation re-run.
+
+Decisions worth recording:
+
+- **The replot pipeline is bypassed entirely.** `replot_sensitivity` ->
+  `plot_sensitivity` -> `assemble_sensitivity_figure` exists to build the
+  `imagesc` sheets; recovering median lines from its saved `.fig` files would be
+  fragile. The medians are computed straight off the saved PSA objects, from the
+  same `ParamSpaceAnalysis2.collect_level_values` that `plot_sensitivity` medians
+  internally, so the two figures cannot disagree about what "the median" is.
+  That helper was **moved from `methods (Static, Access = private)` to the public
+  static block** — no behaviour change, but it means a `clear classes` is needed
+  after pulling this.
+- **f_E is labelled as an E:I neuron COUNT**, `100:400 / 250:250 / 400:100`, not
+  the reduced ratios `1:4 / 1:1 / 4:1` the `_allStd` sheets use. TR's call: with
+  `mu_EI`/`mu_IE` held fixed the sweep is really varying counts, and the reduced
+  ratio hides the `n = 500` those counts come from.
+- **LLE y-window kept at `[-1.75, 1.75]`** to match the `_allStd` sheets, so
+  medians that leave it are clipped rather than rescaling every panel. This run's
+  LLEs span roughly p1 = -10 to p99 = +3.7, so No Adaptation runs off the bottom
+  on four of the six panels. TR chose clipping over autoscaling.
+- **Percentiles are plumbed generally** (`pcts` / `band_pcts` at the script top,
+  `prctile` rather than `median`), so adding an IQR band later is a two-line
+  change; only the median is drawn now.
+- **Four helpers extracted** from `Fig_sensitivity_analysis_allStd.m`'s local
+  subfunctions into standalone files under `scripts/run_all_analyses/replot/`:
+  `preset_default_values`, `apply_percent_axis`, `mark_default_value`,
+  `save_figure_stable`. Bodies unchanged. `Fig_sensitivity_analysis_allStd.m` was
+  **deliberately left untouched** so its committed figures cannot shift; its local
+  copies still shadow these inside that file. Deleting them is a safe follow-up
+  the next time that figure is regenerated.
+
+Two things that went wrong and how they were diagnosed, so they are not
+re-derived:
+
+- **Tick labels came out with characters missing in the PNG** (`700` -> `)0`,
+  `+50%` -> `+%`). The obvious reading — tiles too close, labels colliding — is
+  **wrong**: `ax.XTickLabel` reads back correct, the `.svg` is clean, and
+  re-exporting the same live figure at 300 dpi renders it perfectly while 600 dpi
+  reproduces the corruption identically. Both corrupted labels sat at the same
+  horizontal pixel position in different panels, i.e. a tile seam in
+  `exportgraphics`' high-resolution rasteriser. Filed as ISSUE-013; worked around
+  here by widening the figure 1200 -> 1300, which is a coincidence fix, not a
+  repair.
+- **The `1` y-tick of the mean-rate sheet was hidden under the panel letter.**
+  `AddLetters2Plots` at the `_allStd` figure's `HShift/VShift = -0.03/-0.04` puts
+  the letter exactly where the topmost tick label sits when the ticks are pinned
+  to `[0 1]`. Now `-0.075/-0.05`.
+
+Also added a dated note to **ISSUE-012** (default marker missing on the `_allStd`
+sheets): the marker is present in the currently committed `_allStd` PNGs and the
+extracted `mark_default_value` draws it correctly on all six panels of both new
+sheets, so the issue looks stale — but `_allStd` was not re-run, so the status is
+left OPEN rather than closed on indirect evidence.

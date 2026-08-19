@@ -1,0 +1,36 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sensitivity_medians
+Captured at: 18-Aug-2026 21:36:20
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      fc6af94bd015fbd452f2f4b9b783df9841b1048e
+commit_short:fc6af94
+branch:      dev
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Describe a run_all directory in prose with write_run_parameters_md
+last_date:   2026-08-18T20:54:23-05:00
+dirty:       true
+
+--- git status --porcelain ---
+M src/ParamSpaceAnalysis2.m
+?? scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/
+?? scripts/run_all_analyses/replot/apply_percent_axis.m
+?? scripts/run_all_analyses/replot/mark_default_value.m
+?? scripts/run_all_analyses/replot/preset_default_values.m
+?? scripts/run_all_analyses/replot/save_figure_stable.m
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.fig
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.png
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.svg
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.fig
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.png
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.svg
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_medians.m
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/README_fig_sensitivity_medians.txt
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/git_provenance.txt
+scripts/run_all_analyses/replot/apply_percent_axis.m
+scripts/run_all_analyses/replot/mark_default_value.m
+scripts/run_all_analyses/replot/preset_default_values.m
+scripts/run_all_analyses/replot/save_figure_stable.m

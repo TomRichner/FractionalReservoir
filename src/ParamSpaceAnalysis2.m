@@ -2113,7 +2113,12 @@ classdef ParamSpaceAnalysis2 < handle
     end
 
     %% Static pooling helpers (used by plot / plot_sensitivity)
-    methods (Static, Access = private)
+    % collect_level_values is PUBLIC: it is the one place that knows how to walk
+    % the reps axis of a sweep and drop failed/NaN jobs, so a presentation script
+    % that wants the same per-level rep values without the imagesc panel
+    % (scripts/presentations/.../fig_sensitivity_medians) reuses it rather than
+    % reimplementing the sub2ind indexing. collect_grid_values stays private.
+    methods (Static)
         function vals = collect_level_values(psa, swept_param, level_idx, cond_name, metric)
             % Successful metric values across the reps axis for one swept-param
             % level and one condition. Reused to pool reps within & across runs.
@@ -2139,7 +2144,9 @@ classdef ParamSpaceAnalysis2 < handle
                 end
             end
         end
+    end
 
+    methods (Static, Access = private)
         function vals = collect_grid_values(results, cond_name, metric)
             % All successful metric values across the whole grid for one
             % condition. Reused to pool the param-space distribution across runs.

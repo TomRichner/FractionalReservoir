@@ -26,6 +26,46 @@ grep '^## .* OPEN ·' Issues.md     # just what is outstanding
 
 ---
 
+## 🔴 OPEN · ISSUE-013 · `exportgraphics` at 600 dpi drops glyphs from tick labels
+
+| | |
+|---|---|
+| Identified | 2026-08-18 21:37 · `dev` @ `fc6af94` · R5611351 · Claude Code (Opus 5), session b651fa7a |
+| Area | `src/plotting/plot_saving/save_some_figs_to_folder_2.m:53` (`exportgraphics(..., 'Resolution', 600)`) |
+
+Building `fig_sensitivity_medians`, two x-tick labels in the 600-dpi PNG came
+out with characters missing: `700` rendered as `)0` and `+50%` as `+%`.
+
+**Not a layout collision and not a data problem.** Reading the axes back live,
+`ax.XTickLabel` is `{'100','400','700','1000'}` and `XTickLabelRotation` is 0;
+the labels are correct in the figure. The corruption is introduced by the
+raster export:
+
+- Re-exporting the *same live figure* at `'Resolution', 300` renders `700`
+  perfectly.
+- Re-exporting at 600 reproduces the identical corruption, byte-for-byte in the
+  same place — so it is deterministic, not the intermittent
+  `MATLAB:class:InvalidHandle` export failure that `save_some_figs_to_folder_2`
+  already documents.
+- Both corrupted labels sat at roughly the same **horizontal pixel position**
+  (~x = 3750 of a 7027-px-wide raster) in different panels, which points at a
+  tile seam in the high-resolution rasteriser rather than at anything about the
+  glyphs.
+- The vector `.svg` from the same figure is unaffected.
+
+**Workaround in use:** `Fig_sensitivity_medians.m` sets the figure width to 1300
+rather than 1200, which moves the affected column off the seam. That is a
+coincidence fix, not a repair — a different figure width, screen, or MATLAB
+version can put a seam through some other label.
+
+**Not yet checked:** whether other project figures are silently affected (they
+all go through the same 600-dpi path and their labels may simply have missed the
+seam), whether `'Resolution', 300` or `print -dpng -r600` avoids it generally,
+and whether it is specific to R2026a Update 4. A general fix probably belongs in
+`save_some_figs_to_folder_2` rather than in each figure script.
+
+---
+
 ## 🔴 OPEN · ISSUE-012 · Default-value marker never appears on the `_allStd` sensitivity figures
 
 | | |
@@ -66,6 +106,23 @@ though `_allStd2` has not been re-run since the marker was added.
 
 **Deferred by TR 2026-08-14**: the figures are otherwise correct and were
 needed; come back to this rather than chase it inline.
+
+**2026-08-18 21:37 · `dev` @ `fc6af94` · R5611351 · session b651fa7a — probably
+already resolved, but not re-verified from the script.** Two data points found
+while building `fig_sensitivity_medians`:
+
+1. The **currently committed** `fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png`
+   and `_mu.png` (regenerated 2026-08-18 19:38, after this issue was filed) DO
+   show the reddish tick at the bottom of every panel.
+2. `mark_default_value` and `preset_default_values`, extracted verbatim into
+   `scripts/run_all_analyses/replot/`, draw the marker correctly on all six
+   panels of both new median sheets.
+
+So the helper works and the lookup resolves. What is not established is whether
+the `_allStd` script itself was ever broken or whether the original report
+predates a fix; `_allStd` was NOT re-run in this session (deliberately, to avoid
+churning its committed figures). Close this by re-running that script and
+confirming, not on the strength of these two observations alone.
 
 ---
 
