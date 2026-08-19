@@ -13,11 +13,11 @@ interrupted.
 - **`WorkLog.md`** — chronological narrative: plans executed, bugs found, bugs
   fixed, runs performed. Add an entry when you finish a meaningful unit of work
   (a plan stage, a bug diagnosis, an analysis run), not once per commit.
-- **`Issues.md`** — bugs and observed problems, indexed by issue. Add one when
-  you *find* a problem, even if you fix it immediately, and update its status
-  when it is resolved or deliberately declined. Never delete an entry.
+- **`Issues.md`** — bugs and observed problems, indexed by issue. Never delete an
+  entry. **Adding an issue, and starting work on one, both require TR's explicit
+  approval** — see "Issues and feature requests are TR's call" below.
 - **`FeatureRequests.md`** — wanted changes that are not defects, same
-  lifecycle.
+  lifecycle and the same approval rule.
 
 Every entry is signed with **date · branch @ commit · hostname · agent/model,
 session id**, for example:
@@ -36,6 +36,32 @@ be matched up.
 are the part that is otherwise lost, and they are what stops the next session
 re-deriving a dead end — see ISSUE-009, where two plausible diagnoses were both
 refuted by the data.
+
+### Issues and feature requests are TR's call
+
+`Issues.md` and `FeatureRequests.md` are TR's backlog, not your to-do list. Two
+hard rules:
+
+1. **Do not add an entry without TR's approval.** Noticing a problem is useful —
+   *say so in your reply*, in a sentence or two, and ask whether he wants it
+   recorded. Write the entry only if he says yes. Your judgement that something
+   is a defect is not the same as it being one worth tracking; several entries
+   have been closed WONTFIX or "not an issue" precisely because that call is his.
+2. **Do not start work on one without TR's approval.** That covers a problem you
+   just found, an entry you filed, and any `OPEN` item you happen to read.
+   Finding a defect in the middle of another task is not authorisation to fix
+   it — least of all in shared code (`src/plotting/`, the model classes,
+   `ParamSpaceAnalysis2`), and never folded into a commit about something else.
+
+This exists because of a real failure on 2026-08-18: asked for two tick-label
+changes, an agent noticed a rendering defect while regenerating the figures and
+spent the rest of the session diagnosing it, editing a shared plotting utility to
+work around it, and committing all of that alongside the requested work. The
+diagnosis was sound and the workaround worked; none of it was wanted, and it was
+reverted (ISSUE-013). **Report what you notice. Do not act on it unasked.**
+
+The same restraint applies to scope generally: finish what was asked, and raise
+anything else rather than absorbing it into the task.
 
 ### Reading them without flooding your context
 

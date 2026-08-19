@@ -24,6 +24,33 @@ grep '^## ' Issues.md              # whole backlog, one line each
 grep '^## .* OPEN ·' Issues.md     # just what is outstanding
 ```
 
+## Rules for AI agents
+
+**This file is TR's backlog, not an agent's to-do list.** Two hard rules, both
+requiring TR's explicit approval:
+
+1. **Do not add an issue without approval.** If you notice a problem while doing
+   something else, *say so in your reply* — describe it in a sentence or two and
+   ask whether TR wants it recorded. Write the entry only if he says yes. An
+   agent's judgement that something is a defect is not the same as it being one
+   worth tracking; several entries here were closed as WONTFIX or "not an issue"
+   precisely because that call is TR's.
+2. **Do not start work on an issue without approval.** This includes an issue you
+   just found, an issue you filed, and any `OPEN` entry you happen to read.
+   Finding a defect mid-task is not authorisation to fix it — least of all in
+   shared code, and never folded into a commit about something else.
+
+The failure mode these exist to prevent: on 2026-08-18 an agent was asked for two
+tick-label changes, noticed a rendering defect while regenerating the figures,
+and spent the rest of the session diagnosing it, editing a shared plotting
+utility, and committing the result alongside the requested work. The diagnosis
+was sound and the fix worked; none of it was wanted (ISSUE-013). **Noticing is
+useful. Acting unasked is not.**
+
+When TR *does* approve work on an issue, update its entry as you go rather than
+at the end, and record what turned out to be wrong as well as what worked — the
+refuted hypotheses are the part that is otherwise lost.
+
 ---
 
 ## ⚪ WONTFIX · ISSUE-013 · Wide PNG exports drop glyphs from tick labels
