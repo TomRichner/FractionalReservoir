@@ -1,5 +1,27 @@
-function [d, model_class, conditions] = srnn_param_preset(name)
-% SRNN_PARAM_PRESET Named sets of model parameter overrides.
+function [d, model_class, conditions] = srnn_param_preset_old(name)
+% SRNN_PARAM_PRESET_OLD FROZEN reference copy of srnn_param_preset.
+%
+% ---------------------------------------------------------------------------
+% DO NOT EDIT, AND DO NOT CALL FROM PRODUCTION CODE.
+%
+% This is the chained/recursive implementation of srnn_param_preset exactly as
+% it stood at commit a5033e6, kept only so that
+% test_srnn_param_preset_equivalence.m can prove the flattened rewrite in
+% src/srnn_param_preset.m returns bit-identical values for every preset.
+%
+% The ten recursive calls have been repointed at srnn_param_preset_old so this
+% file is genuinely self-contained. If they were left calling srnn_param_preset
+% this file would delegate to the very implementation it is meant to check, and
+% the equivalence test would pass no matter what -- which is why that test
+% greps this file for `srnn_param_preset(` and fails if it finds one.
+%
+% If a preset is added or changed in src/srnn_param_preset.m, it will show up
+% here as an equivalence failure. That is the point: decide deliberately
+% whether to mirror the change here (keeping the guard live) or to retire this
+% file and its test together.
+% ---------------------------------------------------------------------------
+%
+% Original documentation follows.
 %
 % Returns a struct suitable for assigning to ParamSpaceAnalysis2.model_defaults
 % (or splatting into a model constructor), plus the MODEL CLASS those overrides
@@ -7,33 +29,19 @@ function [d, model_class, conditions] = srnn_param_preset(name)
 % The NAME is only a lookup key; it is the returned struct that reaches the model.
 %
 % Usage:
-%   [psa.model_defaults, psa.model_class] = srnn_param_preset('celltype_pairs');
+%   [psa.model_defaults, psa.model_class] = srnn_param_preset_old('celltype_pairs');
 %   psa.model_defaults.fs = 200;                 % layer a tweak on top
 %
 % The second output exists because the two model classes have disjoint parameter
 % vocabularies -- 'overconnected' is meaningless to SRNNCellTypePairs and
 % 'celltype_pairs' is meaningless to SRNNModel2 -- so a preset that did not carry
-% its class would only fail later, inside validate_model_defaults.
+% its class would only fail later, inside validate_model_defaults. It defaults to
+% 'SRNNModel2', so existing single-output callers are unaffected.
 %
 % The third is srnn_adaptation_conditions(model_class) unless the preset needs
 % different depression routes. Those timescales are physics and would belong in
 % the struct above, except that synapse_config can only reach the model through
 % a condition -- so the preset passes them to srnn_adaptation_conditions instead.
-%
-% EVERY CASE IS SELF-CONTAINED. A preset states its own model_class, its own
-% complete override struct, and its own std_routes -- nothing is inherited from
-% another case at run time. This file used to build ten of its fourteen presets
-% by CALLING ITSELF, so reading off `level_of_chaos` for the preset behind a
-% finished run meant walking up to seven recursive hops, and editing a mid-chain
-% preset silently moved every descendant. Worse, whether a descendant inherited
-% its conditions depended on whether its recursive call asked for two outputs or
-% three -- load-bearing, and invisible at a glance.
-%
-% Lineage is preserved as PROSE instead: each derived preset opens with a
-% "Copied from X. Changed: ..." block naming its parent and listing exactly what
-% differs. That is the part worth keeping; the coupling is not. When you change
-% a preset, the descendants listed under "Derived presets" in its comment are
-% the ones to consider changing too -- deliberately, one at a time.
 %
 % What belongs in a preset: the physics -- which network is being simulated.
 % Three things deliberately do NOT:
@@ -65,15 +73,12 @@ arguments
     name (1,:) char
 end
 
-% No default model_class. Every case names its own, so a new SRNNCellTypePairs
-% preset cannot silently inherit 'SRNNModel2' and fail much later inside
-% validate_model_defaults with a wall of "not a property" messages.
+model_class = 'SRNNModel2';
 std_routes = [];        % [] = whatever srnn_adaptation_conditions defaults to
 
 switch name
     case 'default'
         % Everything at SRNNModel2's class defaults.
-        model_class = 'SRNNModel2';
         d = struct();
 
     case 'overconnected'
@@ -81,7 +86,6 @@ switch name
         % E:I of 2:1 with per-synapse inhibition doubled to compensate, a slower
         % dendritic time constant, stronger adaptation, and the piecewise sigmoid
         % centred at 0.
-        model_class = 'SRNNModel2';
         d = struct( ...
             'n',                   300, ...
             'f',                   2/3, ...
@@ -124,17 +128,8 @@ switch name
         % Per-neuron setpoint heterogeneity (mu_S_c / sigma_S_c) is deliberately
         % left off, matching the commented-out lines in the source script: with
         % both empty, S_c_vec stays empty and every path takes the scalar branch.
-        % std_routes stays [] -- the default E->E and I->I routes.
 
     case 'celltype_pairs_S_c_by_type'
-        % Copied from celltype_pairs. Changed:
-        %   mu_tilde_relative  [4 -3; 3 -3] -> [4.5 -3; 4 -3]
-        %   level_of_chaos     1.3 -> 1.4
-        %   mu_S_c             (absent)     -> [0.0 0.25]   NEW
-        %   sigma_S_c          (absent)     -> [0.0 0.0]    NEW
-        %   std_routes         (default)    -> I->I tau_rel 1 -> 0.5
-        % Derived presets: celltype_pairs_S_c_by_type_n500.
-        %
         % scripts/tests/example_SRNNCellTypePairs_S_c_by_type.m: 'celltype_pairs'
         % with a separate nonlinearity setpoint per cell type, plus a stronger,
         % more asymmetric connectivity.
@@ -172,11 +167,9 @@ switch name
         std_routes.I.I.std = struct('tau_rec', 4, 'tau_rel', 0.5);
 
     case 'celltype_pairs_S_c_by_type_n500'
-        % Copied from celltype_pairs_S_c_by_type. Changed:
-        %   n   300 -> 500
-        % Derived presets: celltype_pairs_S_c_by_type_n500_fixedF.
-        %
-        % n is the ONLY difference from the parent -- keep it that way.
+        % 'celltype_pairs_S_c_by_type' at n = 500 instead of 300. Derived from it
+        % rather than copied, so the two cannot drift apart -- the whole point of
+        % this preset is that n is the ONLY difference.
         %
         % indegree stays at 100, so alpha drops from 1/3 to 0.2. That does not
         % move the bulk radius: F_tracks_network is true by default, which makes
@@ -188,35 +181,11 @@ switch name
         % param_space grid both vary n over [100, 1000] and override it; it is
         % the OTHER sweeps (f_E, level_of_chaos, mu_EE_relative, tau_a_E) that
         % actually run at 500.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [4.5 -3; 4 -3], ...  % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1 1; 1 1], ...
-            'level_of_chaos',       1.4, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % unused: mu_S_c below overrides it
-            'mu_S_c',               [0.0 0.25], ...
-            'sigma_S_c',            [0.0 0.0], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.1));
-        std_routes = struct();
-        std_routes.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.I.I.std = struct('tau_rec', 4, 'tau_rel', 0.5);
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_S_c_by_type');
+        d.n = 500;
+        return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_S_c_by_type_n500_fixedF'
-        % Copied from celltype_pairs_S_c_by_type_n500. Changed:
-        %   F_tracks_network  (default true) -> false   NEW
-        %   F_ref_n           (absent)       -> 500     NEW
-        %   F_ref_indegree    (absent)       -> 100     NEW
-        % Derived presets: celltype_pairs_all_std_n500,
-        %                  celltype_pairs_uniform_std_n500.
-        %
         % ..._n500 with the weight scale F PINNED instead of tracking n.
         %
         % Why this exists. F = 1/sqrt(n*alpha*(2-alpha)) and n*alpha = indegree,
@@ -238,36 +207,13 @@ switch name
         % Pinning F does NOT freeze the network: build() still passes the real
         % alpha to the generator, so connectivity tracks the grid point. Only the
         % weight SCALE is held.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [4.5 -3; 4 -3], ...  % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1 1; 1 1], ...
-            'level_of_chaos',       1.4, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % unused: mu_S_c below overrides it
-            'mu_S_c',               [0.0 0.25], ...
-            'sigma_S_c',            [0.0 0.0], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.1), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100);
-        std_routes = struct();
-        std_routes.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.I.I.std = struct('tau_rec', 4, 'tau_rel', 0.5);
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_S_c_by_type_n500');
+        d.F_tracks_network = false;
+        d.F_ref_n          = 500;
+        d.F_ref_indegree   = 100;
+        return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_all_std_n500'
-        % Copied from celltype_pairs_S_c_by_type_n500_fixedF. Changed:
-        %   mu_S_c      [0.0 0.25] -> [0.15 0.25]
-        %   std_routes  E->E, I->I -> all four routes, own timescales
-        % Derived presets: none.
-        %
         % Depression on ALL FOUR routes, SFA on E only, and a setpoint split of
         % E at 0.15 / I at 0.25. Everything else is ..._n500_fixedF: n = 500,
         % pinned F, level_of_chaos 1.4, mu_tilde_relative [4.5 -3; 4 -3].
@@ -289,26 +235,9 @@ switch name
         %            elsewhere, so inhibition-onto-inhibition is the quickest to
         %            give way -- which the mu_II sweep flagged as the strongest
         %            single driver of chaos once STD is present.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [4.5 -3; 4 -3], ...  % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1 1; 1 1], ...
-            'level_of_chaos',       1.4, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % unused: mu_S_c below overrides it
-            'mu_S_c',               [0.15 0.25], ...  % E less excitable than the parent, I unchanged
-            'sigma_S_c',            [0.0  0.0], ...   % no cell-to-cell spread, only the type means
-            'c',                    [0.5/3, 0], ...   % SFA scaling, E only
-            'input_config',         pairs_input_config(0.1), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100);
+        [d, model_class] = srnn_param_preset_old('celltype_pairs_S_c_by_type_n500_fixedF');
+        d.mu_S_c    = [0.15 0.25];   % E less excitable than before, I unchanged
+        d.sigma_S_c = [0.0  0.0];    % no cell-to-cell spread, only the type means
 
         std_routes = struct();
         std_routes.E.E.std = struct('tau_rec', 1, 'tau_rel', 0.25);
@@ -319,14 +248,6 @@ switch name
         % That is the opposite order from the mu_EI naming, which is (post, pre).
 
     case 'celltype_pairs_uniform_std_n500'
-        % Copied from celltype_pairs_S_c_by_type_n500_fixedF. Changed:
-        %   mu_tilde_relative  [4.5 -3; 4 -3] -> [4 -4; 4 -4]
-        %   mu_S_c             [0.0 0.25]     -> []   (cleared)
-        %   sigma_S_c          [0.0 0.0]      -> []   (cleared)
-        %   std_routes         E->E, I->I     -> all four routes, all 2 / 0.25
-        %   (S_c restated as 0.0, unchanged in value but now the operative one)
-        % Derived presets: celltype_pairs_uniform_std_n500_mu5p5.
-        %
         % The homogeneous control for celltype_pairs_all_std_n500: same four
         % depressing routes, but nothing distinguishes any of them from any
         % other, and nothing distinguishes E from I except its sign.
@@ -341,34 +262,17 @@ switch name
         %     differs. Note this leaves the RMT unity condition unmet (mu_rel is
         %     4, not 1), so R still varies across the n sweep.
         %
-        % The setpoint is CLEARED rather than set to [0 0]. Both give every
+        % The setpoint is cleared rather than set to [0 0]. Both give every
         % neuron a centre of zero, but leaving mu_S_c/sigma_S_c EMPTY keeps
         % S_c_vec empty, which holds the whole model on the scalar-S_c code
         % path -- the branch that is bit-identical to the pre-heterogeneity
         % code, and cheaper. Setting [0 0] would draw a vector of zeros and take
-        % the per-neuron path to compute the same thing. The empty fields are
-        % still WRITTEN OUT below rather than omitted, because omitting them
-        % would let a stale mu_S_c survive from elsewhere in model_defaults.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [4 -4; 4 -4], ...   % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1 1; 1 1], ...
-            'level_of_chaos',       1.4, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % operative: mu_S_c is empty
-            'mu_S_c',               [], ...
-            'sigma_S_c',            [], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.1), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100);
+        % the per-neuron path to compute the same thing.
+        [d, model_class] = srnn_param_preset_old('celltype_pairs_S_c_by_type_n500_fixedF');
+        d.mu_tilde_relative = [4 -4; 4 -4];   % multiples of F, (post <- pre)
+        d.S_c       = 0.0;
+        d.mu_S_c    = [];
+        d.sigma_S_c = [];
 
         std_routes = struct();
         uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
@@ -378,14 +282,9 @@ switch name
         std_routes.I.I.std = uniform_std;
 
     case 'celltype_pairs_uniform_std_n500_mu5p5'
-        % Copied from celltype_pairs_uniform_std_n500. Changed:
-        %   mu_tilde_relative  [4 -4; 4 -4] -> [5.5 -5.5; 5.5 -5.5]
-        %   level_of_chaos     1.4 -> 1.0
-        % Derived presets: celltype_pairs_uniform_std_n500_mu5p5_nodrive.
-        %
-        % The weight means are raised to a magnitude of 5.5 and level_of_chaos
-        % returned to 1, so the scale lives entirely in the weights and nothing
-        % multiplies W afterwards.
+        % celltype_pairs_uniform_std_n500 with the weight means raised to a
+        % magnitude of 5.5 and level_of_chaos returned to 1, so the scale lives
+        % entirely in the weights and nothing multiplies W afterwards.
         %
         % NOT the same network as its parent at level_of_chaos = 1.4. That
         % equivalence needs BOTH tildes scaled -- level_of_chaos multiplies the
@@ -395,39 +294,12 @@ switch name
         % The mean-to-spread ratio therefore changes: this network has a
         % relatively stronger deterministic block structure and a relatively
         % weaker random bulk than the parent does.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1 1; 1 1], ...
-            'level_of_chaos',       1.0, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % operative: mu_S_c is empty
-            'mu_S_c',               [], ...
-            'sigma_S_c',            [], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.1), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100);
-
-        std_routes = struct();
-        uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.E.E.std = uniform_std;
-        std_routes.E.I.std = uniform_std;
-        std_routes.I.E.std = uniform_std;
-        std_routes.I.I.std = uniform_std;
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_uniform_std_n500');
+        d.mu_tilde_relative = [5.5 -5.5; 5.5 -5.5];   % multiples of F, (post <- pre)
+        d.level_of_chaos    = 1.0;
+        return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive'
-        % Copied from celltype_pairs_uniform_std_n500_mu5p5. Changed:
-        %   input_config  pairs_input_config(0.1) -> pairs_input_config(0.0)
-        % Derived presets: celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5.
-        %
         % ..._mu5p5 with the tonic drive removed: intrinsic_drive 0.1 -> 0.
         %
         % intrinsic_drive is the constant term added to every neuron's input for
@@ -439,43 +311,16 @@ switch name
         % phi(0) = 0.5, so an undriven neuron is at mid-range rather than silent,
         % and the network need not fall quiet just because the drive is gone.
         %
-        % input_config is stated whole -- assigning the property replaces the
-        % struct, so there is no such thing as changing one field of it.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1 1; 1 1], ...
-            'level_of_chaos',       1.0, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % operative: mu_S_c is empty
-            'mu_S_c',               [], ...
-            'sigma_S_c',            [], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.0), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100);
-
-        std_routes = struct();
-        uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.E.E.std = uniform_std;
-        std_routes.E.I.std = uniform_std;
-        std_routes.I.E.std = uniform_std;
-        std_routes.I.I.std = uniform_std;
+        % input_config must be restated whole -- assigning the property replaces
+        % the struct -- so this rebuilds it from the shared helper with a drive
+        % of 0 rather than poking one field.
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_uniform_std_n500_mu5p5');
+        d.input_config = pairs_input_config(0.0);
+        return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5'
-        % Copied from celltype_pairs_uniform_std_n500_mu5p5_nodrive. Changed:
-        %   sigma_tilde_relative  [1 1; 1 1] -> [1.5 1.5; 1.5 1.5]
-        % Derived presets: ..._sig1p5_noise0p02, ..._sig1p5_noise0p01,
-        %                  celltype_pairs_Sc0p2_noise0p025.
-        %
-        % The weight SPREAD is raised, mu left at 5.5.
+        % ..._mu5p5_nodrive with the weight SPREAD raised, sigma_tilde_relative
+        % 1 -> 1.5, mu left at 5.5.
         %
         % This is the opposite lever from the mu change. mu sets the block means
         % -- the deterministic E/I structure, which is what produces the outlier
@@ -487,40 +332,11 @@ switch name
         % Note the property is sigma_tilde_relative, a multiplier of
         % F = 1/sqrt(n*alpha*(2-alpha)). The absolute sigma_tilde is Dependent
         % and read-only; assigning it raises SRNNModel:RenamedProperty.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
-            'level_of_chaos',       1.0, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % operative: mu_S_c is empty
-            'mu_S_c',               [], ...
-            'sigma_S_c',            [], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.0), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100);
-
-        std_routes = struct();
-        uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.E.E.std = uniform_std;
-        std_routes.E.I.std = uniform_std;
-        std_routes.I.E.std = uniform_std;
-        std_routes.I.I.std = uniform_std;
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_uniform_std_n500_mu5p5_nodrive');
+        d.sigma_tilde_relative = [1.5 1.5; 1.5 1.5];   % multiples of F
+        return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02'
-        % Copied from celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5.
-        % Changed:
-        %   sigma_u_noise  (absent) -> 0.02   NEW
-        % Derived presets: none.
-        %
         % ..._sig1p5 run as an SDE: additive Wiener noise on the dendritic
         % state, dx = (...)/tau_d dt + sigma_u_noise/tau_d dW.
         %
@@ -543,44 +359,14 @@ switch name
         % STOCHASTIC integrator ('sra1') in place of its deterministic one.
         % Carrying sigma_u_noise is therefore the whole of what marks this
         % preset stochastic.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
-            'level_of_chaos',       1.0, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % operative: mu_S_c is empty
-            'mu_S_c',               [], ...
-            'sigma_S_c',            [], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.0), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100, ...
-            'sigma_u_noise',        0.02);
-
-        std_routes = struct();
-        uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.E.E.std = uniform_std;
-        std_routes.E.I.std = uniform_std;
-        std_routes.I.E.std = uniform_std;
-        std_routes.I.I.std = uniform_std;
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
+        d.sigma_u_noise = 0.02;
+        return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01'
-        % Copied from celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5.
-        % Changed:
-        %   sigma_u_noise  (absent) -> 0.01   NEW
-        % Derived presets: none. Sibling of ..._noise0p02, which uses 0.02.
-        %
-        % HALF the noise of the noise0p02 sibling, so the two bracket the
-        % amplitude rather than testing a single value. Also the preset the
-        % longer/finer 'medium2' runs use.
+        % ..._sig1p5 with HALF the noise of the noise0p02 sibling, so the two
+        % bracket the amplitude rather than testing a single value. Also the
+        % preset the longer/finer 'medium2' runs use.
         %
         % x_noise_std = 0.01/sqrt(2*tau_d) = 0.0224, about 3.7% of the piecewise
         % sigmoid's 0.6 half-width at S_c = 0, against 7.5% at 0.02 -- a light
@@ -593,53 +379,21 @@ switch name
         %
         % Like its sibling it names no integrator: analysis_run_config sees
         % sigma_u_noise > 0 and picks the mode's stochastic scheme ('sra1').
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
-            'level_of_chaos',       1.0, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.0, ...     % operative: mu_S_c is empty
-            'mu_S_c',               [], ...
-            'sigma_S_c',            [], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.0), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100, ...
-            'sigma_u_noise',        0.01);
-
-        std_routes = struct();
-        uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.E.E.std = uniform_std;
-        std_routes.E.I.std = uniform_std;
-        std_routes.I.E.std = uniform_std;
-        std_routes.I.I.std = uniform_std;
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
+        d.sigma_u_noise = 0.01;
+        return;     % conditions already resolved by the recursive call
 
     case 'celltype_pairs_Sc0p2_noise0p025'
-        % Copied from celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5.
-        % Changed:
-        %   S_c            0.0     -> 0.20
-        %   sigma_u_noise  (absent) -> 0.025   NEW
-        % Derived presets: none.
-        %
         % The hand-tuned operating point from
         % scripts/examples/example_SRNNCellTypePairs_from_preset.m, promoted out
-        % of that script's pre-build overrides so the sweeps can use it. This is
-        % the preset behind the production run in
-        % data/param_space/run_all_aug_14_26_17_25.
+        % of that script's pre-build overrides so the sweeps can use it.
         %
-        % The example also assigned level_of_chaos = 1.0 and reasserted
-        % tau_rec = 2 / tau_rel = 0.25 on every route; those match the values
-        % above already, so they were no-ops there. plot_deci was set there too
-        % and is deliberately NOT carried: it decimates plot_data only, changes
-        % no physics, and is one of the fields same_config ignores when deciding
+        % It is ..._sig1p5 with exactly TWO changes. The example also assigned
+        % level_of_chaos = 1.0 and reasserted tau_rec = 2 / tau_rel = 0.25 on
+        % every route, but the parent already carries those, so they were no-ops
+        % and are not repeated here. plot_deci was set there too and is
+        % deliberately NOT carried: it decimates plot_data only, changes no
+        % physics, and is one of the fields same_config ignores when deciding
         % whether two runs may be pooled.
         %
         % S_c = 0.2 RAISES THE THRESHOLD with the drive still at zero. phi is
@@ -650,38 +404,14 @@ switch name
         % go quiet the way it would at a setpoint above 0.5 -- but each neuron
         % now starts further from saturation than the S_c = 0 parent.
         %
-        % sigma_u_noise = 0.025 is above BOTH sibling noise presets:
+        % sigma_u_noise = 0.025 is above BOTH existing noise presets:
         % x_noise_std = 0.025/sqrt(2*tau_d) = 0.0559, about 9.3% of the
         % piecewise half-width, against 7.5% at 0.02 and 3.7% at 0.01. The three
         % together span a factor of 2.5 in amplitude.
-        model_class = 'SRNNCellTypePairs';
-        d = struct( ...
-            'n',                    500, ...
-            'indegree',             100, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
-            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
-            'level_of_chaos',       1.0, ...
-            'activation',           'piecewise', ...
-            'S_a',                  0.8, ...
-            'S_c',                  0.20, ...    % operative: mu_S_c is empty
-            'mu_S_c',               [], ...
-            'sigma_S_c',            [], ...
-            'c',                    [0.5/3, 0], ...     % SFA scaling, E only
-            'input_config',         pairs_input_config(0.0), ...
-            'F_tracks_network',     false, ...
-            'F_ref_n',              500, ...
-            'F_ref_indegree',       100, ...
-            'sigma_u_noise',        0.025);
-
-        std_routes = struct();
-        uniform_std = struct('tau_rec', 2, 'tau_rel', 0.25);
-        std_routes.E.E.std = uniform_std;
-        std_routes.E.I.std = uniform_std;
-        std_routes.I.E.std = uniform_std;
-        std_routes.I.I.std = uniform_std;
+        [d, model_class, conditions] = srnn_param_preset_old('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5');
+        d.S_c           = 0.20;
+        d.sigma_u_noise = 0.025;
+        return;     % conditions already resolved by the recursive call
 
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
@@ -713,10 +443,6 @@ function ic = pairs_input_config(intrinsic_drive)
 % Assigning input_config REPLACES the struct SRNNCellTypePairs.set_defaults
 % built, so a preset that wants to change one field has to restate all of them.
 % This mirrors that default exactly apart from intrinsic_drive.
-%
-% This helper is field-level, not preset-level: it spells out one property, not
-% one preset, so it does not reintroduce the inter-preset coupling this file was
-% flattened to remove. Every case still states its own call explicitly.
 %
 % intrinsic_drive is a SCALAR here, not 0.1*ones(n,1) as in the source script:
 % n is a sweep axis, so no fixed-length vector is right at more than one grid

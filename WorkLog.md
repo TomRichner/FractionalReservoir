@@ -498,3 +498,63 @@ paid for itself.
 matched nothing again this session, exactly as `CLAUDE.md` warns. The
 plain-text tokens (`OPEN`, `FIXED`, …) worked. The warning is doing its job;
 the habit is the part that needs repeating.
+
+### 2026-08-18 · dev @ d8886e2 · R5611351 · Claude Code (Opus 5), session 4ac7e853
+
+**Flattened `src/srnn_param_preset.m` — removed the preset recursion chain.**
+
+Ten of the fourteen presets were built by the function calling *itself*, up to
+seven hops deep (`celltype_pairs_Sc0p2_noise0p025` → `..._sig1p5` → `..._nodrive`
+→ `..._mu5p5` → `..._uniform_std_n500` → `..._n500_fixedF` → `..._n500` →
+`celltype_pairs_S_c_by_type`). Every case is now self-contained: its own
+`model_class`, its own complete override struct, its own `std_routes`. Lineage
+survives as a `Copied from X. Changed: ...` comment block plus a "Derived
+presets:" back-reference, so the history of which preset modifies which is still
+readable — it just isn't executable any more.
+
+Two latent hazards removed along the way:
+
+- `model_class` defaulted to `'SRNNModel2'` at the top of the function and was
+  overwritten only inside some cases. A new `SRNNCellTypePairs` preset that
+  forgot the line would have inherited the wrong class silently and failed much
+  later inside `validate_model_defaults`. There is no default now.
+- Whether a derived preset inherited its `conditions` depended on whether its
+  recursive call requested **two** outputs or **three**, and whether it
+  `return`ed early. `all_std_n500` and `uniform_std_n500` took two and rebuilt
+  conditions; the other eight took three and returned. Load-bearing, and
+  invisible at a glance.
+
+**Method (the part worth reusing).** Edited the file *in place* rather than
+building a `_rf.m` beside it and renaming later — the function keeps its name
+throughout, all ten callers stay untouched, and the whole refactor is one
+reviewable diff instead of an add-then-swap pair. The reference is a frozen copy
+of the chained implementation at `scripts/tests/srnn_param_preset_old.m`, with
+its ten recursive calls repointed at itself.
+
+**That repointing is the whole ballgame**, and it is the thing to get wrong. Had
+the frozen copy kept calling `srnn_param_preset`, it would have delegated to the
+very implementation under test and the differential test would have passed
+unconditionally. `test_srnn_param_preset_equivalence.m` therefore greps the
+frozen file for `srnn_param_preset(` and fails if it finds one.
+
+**A wrong turn worth recording.** That guard failed on its first run — and the
+only match was the *prose in the frozen file's own header* explaining the guard.
+A comment is not a delegation. Fixed by stripping full-line comments before
+searching, and then, because a guard that quietly stops matching looks exactly
+like a guard that passes, added a positive control asserting the pattern still
+fires on a synthetic `srnn_param_preset('default')` call while sparing
+`srnn_param_preset_old(` and `srnn_param_preset_names(`. A vacuity guard needs
+its own vacuity guard.
+
+**Verified:** all 14 presets agree on `model_defaults` (`isequaln`), field
+*order*, `model_class`, and the full `conditions` cell — plus the 1-, 2- and
+3-output call forms and the `UnknownPreset` identifier and message.
+`test_srnn_param_preset.m` still passes in full (every preset through
+`validate_model_defaults`, the banned-name rules, the sra1 solver selection).
+
+`scripts/tests/srnn_param_preset_old.m` is kept rather than deleted, which makes
+the equivalence test a standing regression guard on all 14 presets. The cost is
+a ~440-line frozen file in `scripts/tests/`, and the maintenance rule that comes
+with it: **a preset added or edited in `src/` will show up as an equivalence
+failure**, at which point the choice is to mirror it in the frozen copy or to
+retire the copy and its test together. Do that deliberately.
