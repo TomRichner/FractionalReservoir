@@ -26,13 +26,20 @@ grep '^## .* OPEN ·' Issues.md     # just what is outstanding
 
 ---
 
-## 🟢 FIXED · ISSUE-013 · Wide PNG exports drop glyphs from tick labels
+## ⚪ WONTFIX · ISSUE-013 · Wide PNG exports drop glyphs from tick labels
 
 | | |
 |---|---|
 | Identified | 2026-08-18 21:37 · `dev` @ `fc6af94` · R5611351 · Claude Code (Opus 5), session b651fa7a |
-| Fixed | 2026-08-18 22:00 · `dev` @ `4810b17` · R5611351 · same session |
+| Closed | 2026-08-19 · WONTFIX by TR |
 | Area | `src/plotting/plot_saving/save_some_figs_to_folder_2.m` (the png branch) |
+
+**WONTFIX by TR 2026-08-19.** The defect is real and is diagnosed below, but it
+is a MATLAB rendering bug, it only touches PNGs (the `.svg` is clean), and the
+one remedy tried cost more than the defect — see "Attempted fix, reverted". The
+saver stays at a plain 600 dpi `exportgraphics`. Do not reopen or "fix" this
+without asking; the diagnosis is recorded so the next person does not re-derive
+it, not as an invitation to act on it.
 
 Building `fig_sensitivity_medians`, x-tick labels in the 600-dpi PNG came out
 with characters missing — `700` as `)0`, `+50%` as `+%`, later `500` as `50`,
@@ -69,34 +76,40 @@ which label is hit moves with the image width. Measured on these figures at
 2075 / 3520 / 3759 / 4001 / 5999 / 7639 / 8125 px. Bisected on this machine:
 **3520 px clean, 3759 px damaged.**
 
-**FIXED 2026-08-18 22:00** in `save_some_figs_to_folder_2.m`. The PNG branch now
-measures the file it just wrote with `imfinfo` and, if the larger dimension
-exceeds `png_max_px = 3400`, re-exports at the highest resolution that fits
-(`max(150, floor(600 * 3400 / big))`) with a warning naming the substituted dpi.
-Measured rather than predicted, because the pixel size depends on the screen's
-points-per-inch and so varies by machine and display scaling. Figures small
-enough to be safe at 600 dpi — most of them, since this needs a sheet wider than
-about 6 in — never take the branch and are bit-identical to before. The `.svg`
-is untouched and remains the full-quality deliverable.
+**Attempted fix, REVERTED by TR 2026-08-19.** The PNG branch was made to measure
+the file it had just written with `imfinfo` and, when the larger dimension
+exceeded `png_max_px = 3400`, re-export at the highest resolution that fits. It
+did stop the glyph loss, but the cost is the reason it was rejected: it silently
+drops any wide sheet from 600 dpi to roughly 290, it does so for **every** script
+in the repo that saves figures, and `png_max_px` is an empirical bound measured
+on two figures on one machine rather than a documented limit. Trading the
+resolution of every figure against a rendering defect in a few is not the right
+bargain, and it was made without asking. The saver is back to a plain 600 dpi
+`exportgraphics`.
 
-**Residual risk:** `png_max_px` is an empirical bound from two figures on one
-machine, not a documented limit. If a glyph goes missing again, bisect the width
-for that figure and lower the constant. A wide sheet now exports at roughly
-290 dpi rather than 600.
+**If it ever does need addressing**, the untried options are: rasterising the
+PNG from the vector path rather than the raster one; treating the `.svg` as the
+only trustworthy output for wide sheets; or reporting it to MathWorks, since
+nothing about it looks like project code. None of these are to be attempted
+without TR asking for them.
 
-**Not checked:** whether earlier project figures already in `figs/` and the
-presentation folders carry silent damage from before this fix — they all went
-through the same 600-dpi path, and their labels may simply have missed the seam.
-Worth a look the next time any of them is regenerated.
+**Practical consequence to know about:** a tick label on a wide sheet can lose a
+character or two in the PNG. If a figure looks like it has a typo in an axis
+tick, check the `.svg` before believing it.
 
 ---
 
-## 🔴 OPEN · ISSUE-012 · Default-value marker never appears on the `_allStd` sensitivity figures
+## 🟢 FIXED · ISSUE-012 · Default-value marker never appears on the `_allStd` sensitivity figures
 
 | | |
 |---|---|
 | Identified | 2026-08-14 · `dev` @ `b880c41` · R5456622 · Claude Code (Opus 5), session 054a29ca |
+| Closed | 2026-08-19 · confirmed fixed by TR |
 | Area | `scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd{,2}/` |
+
+**FIXED — confirmed by TR 2026-08-19.** The marker draws. The narrative below is
+the original report and the intermediate evidence; the resolution is at the
+bottom.
 
 `Fig_sensitivity_analysis_allStd.m` is supposed to draw a short reddish-gray
 tick rising off the x-axis at the preset's default for each row (`:244-266`,
@@ -148,6 +161,13 @@ the `_allStd` script itself was ever broken or whether the original report
 predates a fix; `_allStd` was NOT re-run in this session (deliberately, to avoid
 churning its committed figures). Close this by re-running that script and
 confirming, not on the strength of these two observations alone.
+
+**RESOLVED 2026-08-19 · TR.** `Fig_sensitivity_analysis_allStd.m` has since been
+re-run several times and the reddish default tick is present on every panel of
+all four sheets. TR confirms this is fixed. Whether the original report described
+a real defect that was incidentally repaired, or a figure that predated the
+marker being added, is not worth establishing now — the current output is
+correct. `_allStd2` has still not been re-run, but it is the same code.
 
 ---
 
@@ -259,16 +279,20 @@ report `model_class = SRNNCellTypePairs` where they previously reported
 
 ---
 
-## 🔴 OPEN (LOW) · ISSUE-009 · `medium2` tau/param_space stages died — cause NOT established
+## ⚪ WONTFIX · ISSUE-009 · `medium2` tau/param_space stages died — cause NOT established
 
 | | |
 |---|---|
 | Identified | 2026-08-14 · `dev` @ `ac59b42` · R5456622 |
+| Closed | 2026-08-19 · WONTFIX by TR |
 | Area | run infrastructure / MATLAB stability |
 | Mitigated by | `c6055ea` (insurance, not a fix) |
-| Priority | **LOW** — deliberately parked 2026-08-14 · R5456622 |
 
-**Parked by TR, 2026-08-14: do not spend more time chasing this.** This was the
+**WONTFIX by TR 2026-08-19.** Stale. Several good production runs have completed
+since — including `run_all_aug_14_26_17_25`, which the manuscript figures are
+built from — so the crash never became a pattern. Closed, not parked.
+
+**Original disposition (2026-08-14), kept for the record.** This was the
 **first crash in a big run, ever**. A one-off with no reproduction is not worth
 open-ended debugging, and the diagnostic cost is a whole night per attempt. It
 stops blocking anything.
@@ -383,12 +407,18 @@ in hand: the minimum successful LLE was **−0.2159** against a predicted floor 
 
 ---
 
-## 🔴 OPEN · ISSUE-007 · `best_presets.md` exponents predate the Lyapunov window fix
+## ⚪ WONTFIX · ISSUE-007 · `best_presets.md` exponents predate the Lyapunov window fix
 
 | | |
 |---|---|
 | Identified | 2026-08-13 · `dev` @ `21acf41` · R5456622 |
-| Documented by | `9777966` (caveat added; numbers not yet re-derived) |
+| Closed | 2026-08-19 · WONTFIX by TR |
+| Documented by | `9777966` (caveat added; numbers not re-derived) |
+
+**WONTFIX by TR 2026-08-19: this is not an issue.** `best_presets.md` is a
+working note for choosing presets, not a results document, and the caveat added
+in `9777966` is enough. Re-deriving the exponents is not worth the compute. Do
+not re-open this to "refresh the numbers".
 
 Every LLE in that file was measured before ISSUE-001, when accumulation ran from
 `t = 0` rather than over `lya_T_interval`, so all include part of the settling
