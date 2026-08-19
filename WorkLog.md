@@ -594,3 +594,56 @@ subfolder), so the scripts' glob-based subfolder discovery picked up the
 renamed `nLevs_25` folders with no change. The "folder already exists"
 warnings from `save_some_figs_to_folder_2` are expected: the figures are
 saved next to the scripts, overwriting the previous run's copies.
+
+### 2026-08-18 21:30 · dualStd @ 8d19470 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+Added the `celltype_pairs_Sc0p2_noise0p025_dualStd` preset — two STD
+timescales on every route, `tau_rec = [2 4]`, `tau_rel = [0.25 0.5]` —
+plus `scripts/examples/example_SRNNCellTypePairs_dualStd.m`, and shook it
+out with a `fast` `run_all` (branch `dualStd`, off `dev` at 4837f10).
+
+**No model change was needed, and that was the main thing to establish.**
+`compile_synapse_config` already sets `n_b(pre,post) = numel(tau_rec)`,
+`dynamics_fast` reshapes the route's b-states to `npre x nb` and takes
+`prod(b_state, 2)`, and `test_SRNNCellTypePairs.m:150` already exercises a
+2-element `tau_rec`. `srnn_adaptation_conditions` likewise needed no edit:
+it already spells `sfa_and_std` as `n_a = [3 0]` plus whatever
+`synapse_config` the preset hands it, so a preset carrying 2-element taus
+produces the requested `n_a = 3 / n_b = 2` and `n_b = 2` regimes on its
+own. The whole change is one `case` in `srnn_param_preset.m`.
+
+**The physics is not a free extra timescale.** Both pairs share
+`tau_rec/tau_rel = 8`, so the two b-states settle at the *same*
+`1/(1 + 8r)` and differ only in relaxation speed — but the synapse
+multiplies them, making steady-state depression the SQUARE of the parent
+preset's: 0.086 vs 0.29 at r = 0.3, ~3.4x deeper. Any LLE or rate shift
+against `celltype_pairs_Sc0p2_noise0p025` is the two changes combined.
+Recorded in the preset comment so it cannot be read as timescale-only.
+
+**Wrong prediction, corrected.** The plan claimed both STD conditions grow
+to 3250 state variables. Only `sfa_and_std` does; `std_only` has no SFA
+states and lands at 2500 (2000 b + 500 x). Measured: 500 / 1250 / 2500 /
+3250 across the four conditions.
+
+`fast` run: `data/param_space/run_all_aug_18_26_21_18`, 10.33 min, every
+job successful (7x 1D sensitivity, tau, param space), **no NaN LLEs**.
+
+| condition | med LLE | med rate | % positive |
+|---|---|---|---|
+| no_adaptation | -4.755 | 0.501 | 33.3% |
+| sfa_only | -0.100 | 0.224 | 33.3% |
+| std_only | -0.393 | 0.307 | 7.4% |
+| sfa_and_std | -0.113 | 0.303 | 7.4% |
+
+The recurring `LLE = -9.9957` is **not a failure sentinel** — it is
+`-1/tau_d = -10`, the quiescent fixed point where phi' is zero and the
+Jacobian reduces to `-I/tau_d`. It appears only in `no_adaptation` (33% of
+its grid points, the high-`level_of_chaos`/high-`n` corner).
+
+Worth flagging before the `medium` run: the tau_a_E panel came back
+**0% positive** (n=49, median -0.074, max -0.040), where the parent
+preset's tau panel ran -0.26..+0.29 with median +0.008 and slightly over
+half positive (see `fig_sfa_EOC_allStd/README`). That is the deeper
+depression showing up as expected, but the comparison is `fast` against
+`medium`, so it is suggestive of direction only, not a matched contrast.
+TR runs `medium` personally.
