@@ -936,3 +936,80 @@ was fine. Fixing it on my own initiative, touching shared code to do so, and
 folding it into a commit about tick labels were not. `Issues.md` now states the
 rule explicitly: an AI agent may add an issue, or start work on one, only with
 TR's approval.
+
+---
+
+### 2026-08-19 18:13 · dev @ a822319 · R5611351 · Claude Code (Opus 5), session ba0c42bf
+
+**Merged `dualStd` into `dev`, fixed the SFA figure's single timescale, and was
+corrected on what the dual-timescale preset is for.**
+
+`dualStd` (5 commits, machine R5456622) brought in the
+`celltype_pairs_Sc0p2_noise0p025_dualStd` preset, two example scripts, and the
+`fig_SFA_steady_state/` + `fig_STD_steady_state/` presentation figures. Only
+`WorkLog.md` conflicted — both sides had appended — and it was resolved by
+interleaving all seven entries by heading timestamp, keeping every entry from
+both branches (940 lines − 3 conflict markers = 937, nothing dropped). Merge
+commit `61512bf`.
+
+The two branches touched disjoint files apart from that, so the risk was
+semantic rather than textual. Checked and clear: `preset_default_values.m` and
+`write_run_parameters_md.m` (both new on `dev`) resolve a preset by
+*constructing a model from it*, with no per-preset table, so the new preset
+needs no registration. Verified in the live session that the merged preset
+builds — `N_sys_eqs = 3250` at `n = 500`, exactly what the preset comment
+predicts, which exercises the `n_b = 2` path against `dev`'s tree.
+
+**`Fig_SFA_steady_state` was comparing against the wrong timescale.** TR spotted
+it. The script took the model's own rule literally at `n_a = 1`:
+
+```matlab
+tau_1 = logspace(log10(0.25), log10(10), 1);   % -> 10, NOT 0.25
+```
+
+`logspace(a, b, 1)` returns `10^b`, i.e. the **slow** end. So the "n_a = 1"
+curve was the *slowest* timescale, and the transient panel was contrasting 10 s
+against {0.25, 1.58, 10} s — a statement about the slow tail rather than about
+the number of timescales. Fixed to `tau_1 = tau_3(1)`, so the single timescale
+is the *fast* component of the three-timescale set and the panel reads as
+"adding slower components to a fast one". Figure regenerated; the steady-state
+panel is unchanged, as it must be — it depends only on the product `c*n_a`, and
+the script's own check still reports max |difference| = 0. Commit `afd501c`.
+
+This is worth generalising: **`logspace(a, b, 1)` silently returns the endpoint,
+not the start.** Any other script that reproduces `complete_type_defaults`'
+`logspace(log10(0.25), log10(10), n_a)` to build a single-timescale comparison
+has the same bug. Not swept for.
+
+**Where I was wrong: I read the dual-STD preset's squared depression as a
+confound.** Both `(tau_rec, tau_rel)` pairs share the ratio 8, so both b-states
+settle at the same `1/(1 + 8r)` and the synapse's `prod(b, 2)` makes the
+steady-state depression the *square* of the parent preset's — 0.086 vs 0.29 at
+`r = 0.3`, ~3.4x deeper. I flagged this to TR as "added timescale" and "deeper
+depression" being changed together and unseparable, and offered to file it.
+
+**TR: the deeper depression is exactly what he wanted, and the second timescale
+is how he got it.** He is aware the states are multiplicative. There is nothing
+to separate, because separating them was never the goal.
+
+He named this as a case for why filing issues requires his approval: the
+analysis was correct on the mathematics and wrong about whether it was a
+problem, and only the person who chose the parameters can make that call. The
+prior entry (2026-08-18 21:30) and the preset comment both framed the squaring
+as a cost — *"WHAT THE SECOND TIMESCALE ACTUALLY COSTS"*, *"this preset does not
+separate them"*, plus a suggestion to retune the ratios to hold depth fixed.
+That reads as a defect awaiting a fix. The **preset comment** has been rewritten
+to state the squaring as intent, keeping the quantitative facts (commit
+`a822319`). The **prior WorkLog entry is left as written** — it is the record of
+what that session believed, and this entry is the correction.
+
+Checked and deliberately left alone, as none framed the squaring as a problem:
+the two example scripts ("watch whether the deeper dual-timescale depression
+pulls eigenvalues back inside the unit circle faster" — an observation to make),
+`Fig_STD_steady_state.m` and its README (descriptive derivation of
+`prod_k b_k(r)`), and `Fig_SFA_steady_state.m`'s SFA-vs-STD contrast ("SFA
+enters as a SUM ... STD enters as a PRODUCT, so n_b = 2 squares the
+depression").
+
+Nothing pushed; `dev` is ahead of `origin/dev` by `61512bf`, `afd501c`,
+`a822319` and this entry.
