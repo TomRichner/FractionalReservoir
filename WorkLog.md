@@ -647,3 +647,31 @@ half positive (see `fig_sfa_EOC_allStd/README`). That is the deeper
 depression showing up as expected, but the comparison is `fast` against
 `medium`, so it is suggestive of direction only, not a matched contrast.
 TR runs `medium` personally.
+
+### 2026-08-19 · dualStd @ bda85b8 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+New presentation figure `fig_STD_steady_state/`: the analytic steady state of
+the dual-timescale STD preset. Left panel `prod(b)` vs r, right panel
+`prod(b)*r` vs r, each with one component `b_k` dashed for reference. Taus are
+read off the preset's `sfa_and_std` condition rather than hardcoded, so the
+figure cannot drift from what is swept. Styling matches `Fig_FI_curve`.
+
+Two results worth keeping:
+
+- **`prod(b)*r` is non-monotonic**, peaking at r = 0.13 (value 0.031) then
+  decaying to 0.0123 at r = 1. Past the peak, depression outruns the rate
+  driving it and firing harder delivers LESS to the recurrent sum. A single
+  timescale never does this: `b_k*r` rises monotonically to the asymptote
+  `tau_rel/tau_rec` = 0.125. The turnover is specific to `n_b > 1`.
+- The medium run's measured mean rates (E 0.265, I 0.383) sit **past that
+  peak**, on the descending branch — a plausible mechanism for the strongly
+  negative LLEs that preset produces.
+
+**Gotcha found and fixed here, still present elsewhere.** `Fig_FI_curve.m`
+hardcodes `'Position', [4429, 565, 623, 322]` — a second-monitor coordinate
+from the machine it was written on. Copying that line put the new figure
+off-screen on a 1920-wide display, which reads as "the figure never opened".
+Saved output was unaffected (`save_some_figs_to_folder_2` exports from the
+figure object, not the screen), so the bug is invisible in the committed
+`.png`. The new script computes its origin from `groot`'s `ScreenSize`
+instead. The other `fig_*` scripts have NOT been swept for this.
