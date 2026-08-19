@@ -185,6 +185,24 @@ fprintf('========================================\n');
 restart_parpool();
 run_param_space_analysis2;
 
+%% Human-readable parameter record
+% parameters.md next to run_manifest.mat: the preset and run mode, what the
+% preset set, every parameter in effect (as run under sfa_and_std), the four
+% conditions, and each analysis's sweep axes and timings. Built from the saved
+% artifacts alone, so it can be regenerated for any past run directory with
+% write_run_parameters_md(<dir>).
+%
+% Placed here rather than in the Summary block so it still runs when the
+% commented-out later stages are re-enabled, and wrapped because a failure to
+% write a description must not be the last thing a completed overnight run says.
+try
+    params_md = write_run_parameters_md(master_output_dir);
+    fprintf('Parameter record: %s\n', params_md);
+catch ME
+    warning('run_all_analyses:ParametersMdFailed', ...
+        'Could not write parameters.md: %s', ME.message);
+end
+
 % %% 4. DC Lyapunov Analysis
 % fprintf('========================================\n');
 % fprintf('[4/4] Running DC Lyapunov Analysis...\n');

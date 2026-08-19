@@ -594,3 +594,63 @@ subfolder), so the scripts' glob-based subfolder discovery picked up the
 renamed `nLevs_25` folders with no change. The "folder already exists"
 warnings from `save_some_figs_to_folder_2` are expected: the figures are
 saved next to the scripts, overwriting the previous run's copies.
+
+### 2026-08-18 20:38 · dev @ e5f7f44 · R5611351 · Claude Code (Opus 5), session b2c13259
+
+**A run directory now describes itself in prose.** New
+`src/write_run_parameters_md.m` takes a `data/param_space/run_all_<dt>/` path
+and writes `parameters.md` into it: preset and run mode at the top, a table of
+what the preset set, the per-analysis sweep axes and timings, the four
+adaptation conditions, and one unified alphabetical list of every parameter in
+effect — preset, run mode and class default alike — as run in the `sfa_and_std`
+condition, each tagged with what set it. Wired into `run_all_analyses.m` right
+after stage 3 (in a `try`, so a failure to describe a run cannot be the last
+thing a finished overnight run says), and backfilled onto
+`data/param_space/run_all_aug_14_26_17_25`.
+
+**The design point worth keeping.** It reads the *run*, never the source.
+`saveobj` persists `psa.model_defaults`, and every sub-script sets that as
+`merge_struct(preset_defaults, cfg.model)` — so subtracting the fields of
+`cfg.model` (reconstructed by re-calling `analysis_run_config` with the recorded
+`run_mode`) recovers the preset **as it was at run time**. Today's
+`srnn_param_preset` is consulted only to diff against that, and any
+disagreement is flagged as a ⚠ *Preset drift* block. That is what makes the tool
+safe on old directories, where the named preset no longer matches the source.
+`analysis_run_config` is likewise reconstructible from saved data: its only
+preset dependence is `preset_is_stochastic`, which reads `sigma_u_noise` out of
+`model_defaults`.
+
+**Wrong turns worth recording.**
+
+- `ParamSpaceAnalysis2.from_dir` looked like the obvious loader and is the wrong
+  one — with no results on the object it calls `load_condition_results`, pulling
+  in every 4 MB per-condition `.mat`. A plain `load` + pick-by-`isa` reads the
+  47–215 KB psa and nothing else.
+- `srnn_property_info` is `Static, Access = private`, so it is not reachable
+  from a plain function; `class_default` and `effective_param` are the public
+  way in.
+- `SRNNCellTypePairs` cannot be default-constructed, so recognising "this is
+  just the class default" needs a reference model built with the preset's five
+  required constructor arguments. The consequence is real and is now stated in
+  the file's own Caveats: scalar **aliases** of those arguments (`f_E` from `f`,
+  `mu_EE_relative`/`sigma_EE_relative` from the tilde blocks) compare equal to
+  that reference and therefore read as *class default* when the preset is what
+  actually set them.
+- `reps` is both a PSA grid axis and a real scalar property of the model
+  classes. The first cut reported a `reps` axis for `param_space`, which has
+  none; the axis branch is now gated on actual membership in `grid_params`, and
+  the analyses with no reps axis honestly report the model property's value of 1.
+- Two structs with the same fields render identically as a one-line field list,
+  so the first drift table flagged `input_config` as changed while showing the
+  same text in both columns. `fmt_diff`/`struct_diff_leaves` now name the moved
+  leaf (`intrinsic_drive: 0 → 0.1`).
+
+Verified on three directories through the MATLAB MCP session: the Aug-14
+production run (`sra1` reported rather than the table's `ode45`, which is the
+check that proves the stochastic-solver swap is being read from what the model
+got and not from the run-mode table; `replot_sensitivity_*` appears only under
+Caveats), the July-06 `SRNNModel2` run (pre-`resolved_defaults`, so a short
+parameter list plus one caveat per analysis rather than an error), and an empty
+directory (a complete file whose every section says "None recovered"). A
+synthetic manifest naming the wrong preset confirmed the drift table is live
+rather than vacuously passing.

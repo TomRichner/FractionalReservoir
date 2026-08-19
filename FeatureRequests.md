@@ -18,6 +18,31 @@ grep '^## .* OPEN ·' FeatureRequests.md   # just what is outstanding
 
 ---
 
+## 🟢 DONE · FR-007 · A human-readable `parameters.md` in every run directory
+
+| | |
+|---|---|
+| Raised | 2026-08-18 · `dev` @ `e5f7f44` · R5611351 |
+| Done | 2026-08-18 · `dev` @ `e5f7f44` · R5611351 |
+
+A `run_all_*` directory described itself only in `.mat` form, so learning what a
+run used meant starting MATLAB, loading objects, and knowing that
+`resolved_defaults` deliberately excludes the grid axes and the condition
+fields.
+
+`src/write_run_parameters_md.m` writes `parameters.md` next to
+`run_manifest.mat`: preset and run mode at the top, what the preset set, the
+per-analysis sweep axes and timings, the four adaptation conditions, and one
+unified list of every parameter in effect as run under `sfa_and_std`, each
+tagged with what set it. `run_all_analyses.m` calls it after stage 3; it can be
+pointed at any past directory by hand.
+
+It reads the run's own saved artifacts, never the current source — see the
+`WorkLog` entry of the same date for why that matters and what the current
+preset is still used for (a drift diff).
+
+---
+
 ## 🔴 OPEN · FR-006 · Memory pre-flight for `ParamSpaceAnalysis2`
 
 | | |
