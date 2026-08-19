@@ -19,7 +19,7 @@ S_c = 0.4;   % piecewiseSigmoid center param (class default)
 
 %% Create model
 model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.5, ...
-    'activation', 'piecewise', 'S_a', S_a, 'S_c', S_c);
+    'activation', 'logistic', 'S_a', S_a, 'S_c', S_c);
 
 %% Build, run, and plot
 model.build();
