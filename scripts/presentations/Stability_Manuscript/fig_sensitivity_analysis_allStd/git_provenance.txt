@@ -1,26 +1,24 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sensitivity_analysis_allStd
-Captured at: 14-Aug-2026 14:05:53
+Captured at: 18-Aug-2026 19:38:00
 
-hostname:    R5456622
+hostname:    R5611351
 platform:    PCWIN64
-matlab:      2025b
-commit:      b880c411e3a2bb93ba6b9aa2357b7eafc606d40b
-commit_short:b880c41
+matlab:      2026a
+commit:      aea08ea0fea2f294dd8a342e24c68f7247481ddc
+commit_short:aea08ea
 branch:      dev
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Merge branch 'dev' of github.com:TomRichner/FractionalReservoir into dev
-last_date:   2026-08-14T13:52:36-05:00
+last_msg:    Scope the preset equivalence test to the frozen presets only
+last_date:   2026-08-18T19:32:27-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M Issues.md
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
+M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.svg
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/working_changes.patch
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
@@ -35,32 +33,5 @@ M Issues.md
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/working_changes.patch
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_core.fig
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_core.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_core.svg
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_mu.fig
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_mu.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_Sensitivity_LLE_mu.svg
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_analysis_allStd2.m
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_core.fig
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_core.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_core.svg
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_mu.fig
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_mu.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/Fig_sensitivity_mean_rate_mu.svg
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/README_fig_sensitivity_analysis_allStd2.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd2/working_changes.patch
- M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.fig
- M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.png
- M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.svg
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_sfa_EOC_allStd.m
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/README_fig_sfa_EOC_allStd.txt
- M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/working_changes.patch
-?? scripts/examples/example_SRNNCellTypePairs_from_preset_nice_ex.m
-
---- untracked files (not in patch) ---
-scripts/examples/example_SRNNCellTypePairs_from_preset_nice_ex.m

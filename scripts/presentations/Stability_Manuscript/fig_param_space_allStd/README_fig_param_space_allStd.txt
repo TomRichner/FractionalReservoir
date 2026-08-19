@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Parameter-space distributions (allStd)
 ==================================================================
 
-Generated: 14-Aug-2026 13:58:40
+Generated: 18-Aug-2026 19:36:14
 By script: Fig_param_space_allStd.m
 
 HOW IT WAS MADE
@@ -19,9 +19,9 @@ HOW IT WAS MADE
   (rate row). See git_provenance.txt for the exact commit.
 
 SOURCE RUN
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_12_14
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_17_25
   param_space subfolder(s) used:
-    param_space_test_refactor_nLevs_4_aug_14_26_13_35
+    param_space_test_refactor_nLevs_5_aug_15_26_03_23
 
 FIGURE PRODUCED (in this folder)
   Fig_ParamSpace_allStd.png / .svg / .fig

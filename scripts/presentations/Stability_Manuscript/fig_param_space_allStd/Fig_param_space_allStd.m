@@ -28,7 +28,7 @@ project_root = fileparts(which('setup_paths'));
 
 % Source run (a run_all_<dt> folder with a param_space_* subdir).
 % Swap this one line to regenerate against the medium run.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_12_14');
+data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_17_25');
 out_dir   = this_dir;   % write the final figure next to this script
 
 % --- Presentation constants ------------------------------------------------

@@ -576,3 +576,21 @@ did. The check now compares the message *preamble* exactly and separately
 asserts every frozen name is still listed. Both directions are verified:
 appending passes with the new preset named as uncovered, inserting at position 2
 fails and prints the position-by-position divergence.
+
+### 2026-08-18 19:35 · dev @ aea08ea · R5611351 · Claude Code (Opus 5), session 71af9711
+
+**Repointed the three `fig_*_allStd` presentation figures at the new production
+run.** `data/param_space/run_all_aug_14_26_12_14` (11 sensitivity levels, 4
+param-space levels) → `run_all_aug_14_26_17_25` (25 levels throughout, reps
+halved to 25 per d8886e2/a5033e6). One `data_root` line changed in each of
+`Fig_param_space_allStd.m`, `Fig_sensitivity_analysis_allStd.m` and
+`Fig_sfa_EOC_allStd.m`; all three were then re-run through the MATLAB MCP
+session, which regenerated the .fig/.png/.svg deliverables and rewrote each
+folder's `README_*.txt` and `git_provenance.txt` itself.
+
+Nothing else needed touching — the new run has the same directory shape
+(one `param_space_*`, seven `1D_sensitivity_*`, one `tau_sensitivity_*`
+subfolder), so the scripts' glob-based subfolder discovery picked up the
+renamed `nLevs_25` folders with no change. The "folder already exists"
+warnings from `save_some_figs_to_folder_2` are expected: the figures are
+saved next to the scripts, overwriting the previous run's copies.

@@ -37,7 +37,7 @@ project_root = fileparts(which('setup_paths'));
 
 % Source run (a run_all_<dt> folder with 1D_sensitivity_* subdirs).
 % Swap this one line to regenerate against the medium run.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_12_14');
+data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_17_25');
 out_dir   = this_dir;   % write the final figures next to this script
 
 % Start from a clean slate: replot_sensitivity saves ALL open figures, so any
