@@ -675,3 +675,36 @@ Saved output was unaffected (`save_some_figs_to_folder_2` exports from the
 figure object, not the screen), so the bug is invisible in the committed
 `.png`. The new script computes its origin from `groot`'s `ScreenSize`
 instead. The other `fig_*` scripts have NOT been swept for this.
+
+### 2026-08-19 · dualStd @ a007c01 · R5456622 · Claude Code (Opus 5), session 054a29ca
+
+New presentation figure `fig_SFA_steady_state/`, the SFA counterpart to
+`fig_STD_steady_state`. Left: `c*sum(a)` vs r for n_a = 3 (c = 0.5/3) against
+n_a = 1 (c = 0.5). Right: the transient response to a step r: 0 -> 1. Both
+panels on [0, 1], plotted with the POSITIVE adaptation variable (the model
+applies it as `phi(x - c*sum a)`, so larger here means more suppression).
+
+**The left panel's two curves are identical, to machine precision** — measured
+`max|difference| = 0`. Not a plotting bug: `da_k/dt = 0` gives `a_k = r` for
+every timescale regardless of `tau_k`, so the steady-state current is
+`c*n_a*r`, a function of the PRODUCT `c*n_a` only. Splitting c as a budget
+holds that product at 0.5 either way. The n_a = 1 case is drawn dashed *over*
+the thick n_a = 3 line so the panel evidences that both were computed. This is
+the justification for the project's `c_E = 0.15/3` convention: adding
+timescales does not silently move the operating point.
+
+**The SFA/STD asymmetry is the reason both figures exist.** SFA enters the
+dynamics as a SUM, so a budget-split c makes n_a invisible at steady state.
+STD enters as a PRODUCT, and no choice of taus can make dual STD match single
+STD — the dual product `1/((1+r*rho1)(1+r*rho2))` is quadratic in r where any
+single timescale is linear, so they agree only if a ratio is zero. That is
+why `n_b = 2` changed the network's behaviour and `n_a = 3` does not.
+
+Where n_a does show up is the transient: three timescales give fast partial
+adaptation plus a slow tail, one gives a single exponential. Same destination.
+
+Two defaults in this figure are mine, not specified, and may want revisiting:
+the 20 s window cuts off before either curve settles (the 10 s component is
+~86% there), and `tau_1 = 10 s` comes from the model's own
+`logspace(log10(0.25), log10(10), 1)` collapsing to the slow end — a single
+timescale at the geometric mean 1.58 s would be the fairer comparison.
