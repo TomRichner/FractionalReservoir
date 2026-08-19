@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA steady state, 1 vs 3 timescales
 ===============================================================
 
-Generated: 19-Aug-2026 17:11:36
+Generated: 19-Aug-2026 18:06:13
 By script: Fig_SFA_steady_state.m
 
 WHAT IT SHOWS
@@ -30,9 +30,13 @@ CONTRAST WITH STD (see fig_STD_steady_state)
 
 WHERE THE COUNT DOES SHOW UP: THE TRANSIENT
   tau_a (n_a=3) = [0.25 1.5811 10]
-  tau_a (n_a=1) = 10   (logspace collapses to the slow end at n = 1)
+  tau_a (n_a=1) = 0.25   (= tau_a(1), the FAST component of the n_a=3 set)
+  The model rule logspace(log10(0.25), log10(10), n_a) is deliberately
+  NOT used at n_a = 1: logspace(a, b, 1) returns 10^b, the slow end, so
+  the comparison would be against the SLOWEST timescale alone and would
+  be a statement about the slow tail rather than about the count.
   Three timescales give a multi-exponential approach -- fast partial
-  adaptation followed by a slow tail -- against a single exponential.
+  adaptation followed by a slow tail -- against a single fast exponential.
   Same destination, different route. Both settle to 0.5000.
 
 FIGURES PRODUCED (in this folder)

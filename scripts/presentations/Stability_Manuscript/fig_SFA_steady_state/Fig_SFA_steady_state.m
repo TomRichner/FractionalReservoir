@@ -36,9 +36,17 @@ project_root = fileparts(which('setup_paths'));
 %% ---- Parameters -----------------------------------------------------------
 % Timescales follow the model's own rule, complete_type_defaults:
 %   tau_a = logspace(log10(0.25), log10(10), n_a)
-% which for n_a = 1 collapses to the slow end, 10 s.
+%
+% That rule is NOT used for the n_a = 1 case. logspace(a, b, 1) returns 10^b,
+% i.e. the SLOW end (10 s), so taking it literally would compare three
+% timescales against the slowest one alone -- the transient panel would then be
+% showing the difference between 10 s and {0.25, 1.58, 10} s, which is a
+% statement about the slow tail rather than about the count. The single
+% timescale is set to tau_3(1) instead, so the n_a = 1 curve is the FAST
+% component of the n_a = 3 set and the panel reads as "adding slower
+% components to a fast one".
 tau_3 = logspace(log10(0.25), log10(10), 3);
-tau_1 = logspace(log10(0.25), log10(10), 1);
+tau_1 = tau_3(1);
 
 % c as a BUDGET: the same total 0.5, split over however many timescales there
 % are. This is the 0.15/3 convention of the sweep scripts, scaled up here.
@@ -166,9 +174,13 @@ fprintf(fid, '  budget-split of tau that would make dual STD match single STD.\n
 
 fprintf(fid, 'WHERE THE COUNT DOES SHOW UP: THE TRANSIENT\n');
 fprintf(fid, '  tau_a (n_a=3) = %s\n', mat2str(round(tau_3, 4)));
-fprintf(fid, '  tau_a (n_a=1) = %s   (logspace collapses to the slow end at n = 1)\n', mat2str(tau_1));
+fprintf(fid, '  tau_a (n_a=1) = %s   (= tau_a(1), the FAST component of the n_a=3 set)\n', mat2str(round(tau_1, 4)));
+fprintf(fid, '  The model rule logspace(log10(0.25), log10(10), n_a) is deliberately\n');
+fprintf(fid, '  NOT used at n_a = 1: logspace(a, b, 1) returns 10^b, the slow end, so\n');
+fprintf(fid, '  the comparison would be against the SLOWEST timescale alone and would\n');
+fprintf(fid, '  be a statement about the slow tail rather than about the count.\n');
 fprintf(fid, '  Three timescales give a multi-exponential approach -- fast partial\n');
-fprintf(fid, '  adaptation followed by a slow tail -- against a single exponential.\n');
+fprintf(fid, '  adaptation followed by a slow tail -- against a single fast exponential.\n');
 fprintf(fid, '  Same destination, different route. Both settle to %.4f.\n\n', ...
     c_3*numel(tau_3)*r_step);
 

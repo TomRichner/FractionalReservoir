@@ -1,24 +1,19 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_SFA_steady_state
-Captured at: 19-Aug-2026 17:11:36
+Captured at: 19-Aug-2026 18:06:12
 
-hostname:    R5456622
+hostname:    R5611351
 platform:    PCWIN64
-matlab:      2025b
-commit:      a007c01a8772bda6a3350e45371f2f4a2edb9477
-commit_short:a007c01
-branch:      dualStd
+matlab:      2026a
+commit:      61512bf269a3487df27793a9ff322d4e386c4a8a
+commit_short:61512bf
+branch:      dev
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Add fig_STD_steady_state: dual-timescale STD steady state
-last_date:   2026-08-19T15:07:56-05:00
+last_msg:    Merge branch 'dualStd' into dev
+last_date:   2026-08-19T17:52:18-05:00
 dirty:       true
 
 --- git status --porcelain ---
-?? scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/
-
---- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.fig
-scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.m
-scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.png
-scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.svg
-scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/README_fig_SFA_steady_state.txt
-scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/git_provenance.txt
+M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.fig
+ M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.m
+ M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.png
+ M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.svg
