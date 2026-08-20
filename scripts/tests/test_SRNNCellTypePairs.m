@@ -110,14 +110,6 @@ assert(all(std_E_colors(:, 1) > std_E_colors(:, 3)), ...
     'Per-neuron shading pushed an E trace out of the warm half of the wheel.');
 close(figure_handle);
 
-%% Uniform routes reproduce SRNNCellTypes recurrent dynamics
-[old_model, pair_model] = make_parity_models();
-old_model.build(); pair_model.build();
-old_model.run(); pair_model.run();
-old_x = old_model.S_out(:, old_model.get_params().state_layout.x);
-pair_x = pair_model.S_out(:, pair_model.get_params().state_layout.x);
-assert(max(abs(old_x - pair_x), [], 'all') < 2e-6);
-
 %% Benettin and QR Lyapunov workflows
 benettin_model = make_lya_model('benettin');
 benettin_model.build(); benettin_model.run();
@@ -197,35 +189,6 @@ for k = 1:N
     J(:, k) = (SRNNCellTypePairs.dynamics_fast(0, plus, params) - ...
         SRNNCellTypePairs.dynamics_fast(0, minus, params)) / (2 * h);
 end
-end
-
-function [old_model, pair_model] = make_parity_models()
-% SRNNCellTypes still takes ABSOLUTE tildes while SRNNCellTypePairs takes them
-% in multiples of F, so the two constructions differ by exactly that factor.
-% Both classes build W through RMTBlocks, so a matched seed gives the same
-% network and the trajectories below are comparable.
-F_parity = 1 / sqrt(8 * 0.5 * (2 - 0.5));   % n = 8, indegree = 4 -> alpha = 0.5
-mu_abs = [0.1 -0.1];
-sigma_abs = [0.01 0.01];
-common = {'n', 8, 'indegree', 4, 'n_cellTypes', 2, ...
-    'cell_type_names', {'E', 'I'}, 'f', [0.5 0.5], ...
-    'n_a', [1 0], 'tau_a', {0.5, []}, 'c', [0.05 0], ...
-    'T_range', [0 0.1], 'fs', 200, 'lya_method', 'none', ...
-    'store_full_state', true, 'rng_seeds', [7 8]};
-old_model = SRNNCellTypes(common{:}, ...
-    'mu_tilde', mu_abs, 'sigma_tilde', sigma_abs, ...
-    'n_b', [1 0], 'tau_b_rec', {0.8, []}, 'tau_b_rel', [0.25 0.25], ...
-    'n_g', [0 1], 'tau_g_dec', {[], 0.6}, ...
-    'tau_g_fac', [0.25 0.3], 'G', [2 1.8]);
-config = struct();
-for post = {'E', 'I'}
-    config.E.(post{1}).std = struct('tau_rec', 0.8, 'tau_rel', 0.25);
-    config.I.(post{1}).stf = struct('tau_dec', 0.6, 'tau_fac', 0.3, 'G', 1.8);
-end
-pair_model = SRNNCellTypePairs(common{:}, ...
-    'mu_tilde_relative', mu_abs / F_parity, ...
-    'sigma_tilde_relative', sigma_abs / F_parity, ...
-    'synapse_config', config);
 end
 
 function model = make_lya_model(method)

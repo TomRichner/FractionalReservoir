@@ -1013,3 +1013,41 @@ depression").
 
 Nothing pushed; `dev` is ahead of `origin/dev` by `61512bf`, `afd501c`,
 `a822319` and this entry.
+
+### 2026-08-19 · dev @ c1b097f · R5611351 · Claude Code (Opus 5), session a8e9b768
+
+**Deleted `src/SRNNCellTypes.m` and everything that existed only to exercise it.**
+TR asked for a repo cleanup: first for an inventory of what used the class, then
+for the deletion.
+
+Removed:
+
+- `src/SRNNCellTypes.m` (1544 lines)
+- `scripts/tests/test_SRNNCellTypes.m`, `test_SRNNCellTypes_defaults.m`,
+  `test_SRNNCellTypes_parity_lyapunov.m`
+- `scripts/tests/example_SRNNCellTypes.m`,
+  `example_SRNNCellTypes_additional_inhibitory.m`,
+  `example_SRNNCellTypes_facilitating_inhibitory.m`
+- `docs/EquationsParametersDocs/cell_types_parameter_table.md` (69 lines, wholly
+  about the class; nothing linked to it)
+
+`test_SRNNCellTypePairs.m` was the only *live* dependency: its "Uniform routes
+reproduce SRNNCellTypes recurrent dynamics" section built an `SRNNCellTypes` via
+a `make_parity_models()` helper and asserted the `x` trajectories agreed to 2e-6.
+Both the section and the helper were removed; the rest of the file was already
+independent. It passes (Jacobian errors 1.1e-09 / 8.2e-10, Benettin and QR
+workflows fine). The `lya_warmup` clamp warnings it prints are pre-existing —
+the test's `T_range` is shorter than the 5 s default warmup.
+
+**What this costs, recorded deliberately.** The parity test was the class's
+stated reason for being kept (CLAUDE.md said so outright). Deleting it retires
+the only cross-check of `SRNNCellTypePairs` against an independent
+implementation of the same per-type dynamics; from here it is verified against
+its own finite-difference Jacobian and internal consistency only. Flagged to TR
+before deleting; he confirmed.
+
+Doc references updated rather than deleted: `CLAUDE.md` (the "converged on"
+paragraph and the paragraph describing the class, now a note that it was
+deleted and when), `cell_type_pair_parameter_table.md:85`, and two passing
+comment mentions in `docs/SRNN_docs/Code_Structure.md` and `src/SRNNModel2.m`.
+A repo-wide grep for the name now returns only the CLAUDE.md history note.

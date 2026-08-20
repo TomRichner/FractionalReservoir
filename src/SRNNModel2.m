@@ -1978,7 +1978,7 @@ classdef SRNNModel2 < handle
             % Public static: this is a pure function of (S_out, params) and touches
             % no object state, so analysis scripts can call it directly rather than
             % re-deriving the state layout themselves. Matches the convention already
-            % used by SRNNCellTypes / SRNNCellTypePairs. Because MATLAB does not pass
+            % used by SRNNCellTypePairs. Because MATLAB does not pass
             % the object when a static method is dot-called on an instance, existing
             % obj.unpack_and_compute_states(S, params) call sites work unchanged.
             %

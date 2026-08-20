@@ -704,7 +704,7 @@ The following are now **static methods on `SRNNModel2`** (previously standalone 
 - `SRNNModel2.piecewiseSigmoid()` / derivatives: Activation functions
 - `SRNNModel2.plot_*()`: Visualization functions
 - `obj.initialize_state()`: Initial condition setup (protected instance method)
-- `SRNNModel2.unpack_and_compute_states(S_out, params)`: State unpacking and firing rate computation (**public static method** — a pure function of `(S_out, params)`, callable from analysis scripts; matches the convention in `SRNNCellTypes` / `SRNNCellTypePairs`)
+- `SRNNModel2.unpack_and_compute_states(S_out, params)`: State unpacking and firing rate computation (**public static method** — a pure function of `(S_out, params)`, callable from analysis scripts; matches the convention in `SRNNCellTypePairs`)
 
 ---
 

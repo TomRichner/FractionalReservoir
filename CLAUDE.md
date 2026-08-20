@@ -164,7 +164,7 @@ which reads like a bug in the calling code rather than a stale cache. `clear Par
 
 ## Architecture
 
-The codebase has converged on **one analysis driver** (`ParamSpaceAnalysis2`) and **two model classes it can drive** (`SRNNModel2` and `SRNNCellTypePairs`), plus `SRNNCellTypes`, which survives only as the parity reference. Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
+The codebase has converged on **one analysis driver** (`ParamSpaceAnalysis2`) and **two model classes it can drive** (`SRNNModel2` and `SRNNCellTypePairs`). Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
 
 The two model classes are **duck-typed siblings, not a hierarchy**: they share no implementation (separate `dynamics_fast`, `compute_Jacobian_fast`, state packing, and their own copies of the nonlinearity statics). A behavioural change to one is **not** inherited by the other — check whether the change belongs in both. `ParamSpaceAnalysis2` reaches either by name, so no base class is needed.
 
@@ -226,9 +226,12 @@ What it buys, and what it costs:
 - `RMTBlocks` returns a **dense** W; this class re-sparsifies, because its state
   indexing assumes sparse connectivity.
 
-`src/SRNNCellTypes.m` is the earlier per-type class. It still takes **absolute** tildes
-(no `_relative` port) and still binds its activation handles by capturing `obj`. It is
-kept only for `test_SRNNCellTypes_parity_lyapunov.m`; do not build new work on it.
+The earlier per-type class `src/SRNNCellTypes.m` — absolute tildes, no `_relative`
+port, activation handles bound by capturing `obj` — was **deleted on 2026-08-19**,
+along with its tests and examples and the parity section of
+`test_SRNNCellTypePairs.m` that compared the two. `SRNNCellTypePairs` is now
+verified against its own finite-difference Jacobian and internal consistency, not
+against an independent implementation.
 
 ### `src/ParamSpaceAnalysis2.m` (the analysis driver)
 

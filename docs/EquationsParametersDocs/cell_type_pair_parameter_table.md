@@ -82,5 +82,5 @@ States are not pruned when an individual neuron happens to have no connection
 to a configured target type. `dead_state_count` reports the realized number of
 such states after `build()`.
 
-Connectivity otherwise matches `SRNNCellTypes`: `alpha = indegree/n` is
-uniform, while `mu_tilde` and `sigma_tilde` depend only on presynaptic type.
+Connectivity is uniform in `alpha = indegree/n`, while `mu_tilde` and
+`sigma_tilde` depend only on presynaptic type.
