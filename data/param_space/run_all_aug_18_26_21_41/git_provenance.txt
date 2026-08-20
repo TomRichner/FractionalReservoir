@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_18_26_21_41
+Captured at: 18-Aug-2026 21:41:47
+
+hostname:    R5456622
+platform:    PCWIN64
+matlab:      2025b
+commit:      034fb825861d6be89d7571261713ec718f2e881a
+commit_short:034fb82
+branch:      dualStd
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    WorkLog: dualStd preset, example, and fast shakedown run
+last_date:   2026-08-18T21:29:59-05:00
+dirty:       false
+
