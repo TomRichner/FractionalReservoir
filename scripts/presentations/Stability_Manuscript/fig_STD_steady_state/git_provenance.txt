@@ -1,24 +1,29 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_STD_steady_state
-Captured at: 19-Aug-2026 15:04:04
+Captured at: 20-Aug-2026 10:53:16
 
-hostname:    R5456622
+hostname:    R5611351
 platform:    PCWIN64
-matlab:      2025b
-commit:      bda85b8ce27b8cf40048f6b770d1c6ac3a4ff759
-commit_short:bda85b8
-branch:      dualStd
+matlab:      2026a
+commit:      fb3639edc754c9a992d8a4aa3992469ad48802a8
+commit_short:fb3639e
+branch:      dev
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    example_SRNNCellTypePairs_play.m playing
-last_date:   2026-08-19T11:39:31-05:00
+last_msg:    Retire the tracked backlog: delete WorkLog, Issues and FeatureRequests
+last_date:   2026-08-20T10:33:58-05:00
 dirty:       true
 
 --- git status --porcelain ---
-?? scripts/presentations/Stability_Manuscript/fig_STD_steady_state/
+M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.fig
+ M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.m
+ M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.png
+ M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.svg
+ M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/README_fig_STD_steady_state.txt
+ M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/git_provenance.txt
+?? scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.fig
+?? scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.png
+?? scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.svg
 
 --- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.fig
-scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.m
-scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.png
-scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.svg
-scripts/presentations/Stability_Manuscript/fig_STD_steady_state/README_fig_STD_steady_state.txt
-scripts/presentations/Stability_Manuscript/fig_STD_steady_state/git_provenance.txt
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.fig
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.png
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.svg
