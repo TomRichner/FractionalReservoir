@@ -14,6 +14,31 @@ and session that wrote it. Newest first.
 
 ---
 
+## Update CLAUDE.md's equations, and write an SFA version of the parameter table
+
+| | |
+|---|---|
+| Noted | 2026-08-20 11:05 · `dev` @ `fb3639e` · R5469844 · Claude Code (Opus 5), session 5f04ea68 |
+
+Three related pieces of documentation drift, raised by TR. **Not started.**
+
+1. **The equation block in `CLAUDE.md` ("What this project is") is out of date.**
+   It is written for `SRNNModel2`: a scalar `b_i` depressing every outgoing synapse,
+   no per-route synapses, no STF, and no noise term (`dx_i` is shown as a plain ODE
+   even though the model now supports additive Wiener noise on `x`).
+
+2. **`SRNNCellTypePairs` is the primary class and CLAUDE.md should say so.** It is
+   currently presented alongside `SRNNModel2` as a duck-typed sibling, with
+   "default to `SRNNModel2` + `ParamSpaceAnalysis2`" as the closing advice. That no
+   longer reflects where the work is.
+
+3. **Write an SFA version of `docs/EquationsParametersDocs/cell_type_pair_parameter_table.md`.**
+   That document covers STD and STF per route, and the additive Wiener noise on `x`,
+   but has **no mention of SFA at all** — no `a_{i,k}` states, no `c`, no `tau_a`.
+   Wanted: the same treatment for adaptation, in the per-cell-type notation.
+
+---
+
 ## Separate the network seed from the noise seed for reps
 
 | | |
