@@ -1,13 +1,15 @@
 % test_psa_loaders.m
 % Verify that a run can be read back off disk as the object that produced it.
 %
-% ISSUE-011: `tau_a_E` is a VECTOR parameter, so it cannot be a grid coordinate
-% directly -- add_vector_parameter pre-builds the concrete vectors into
-% vector_param_lookup and the grid axis carries a LEVEL INDEX, which
-% run_single_job decodes before constructing the model. The runs were always
-% correct; the loader was not. param_space_summary.mat never stored the lookup,
-% so the old load_results left effective_param handing back 1..n_levels dressed
-% up as seconds, silently. ISSUE-010 was the same loader dropping model_class.
+% This file exists because of two RESOLVED loader bugs, both fixed 2026-08-14.
+% `tau_a_E` is a VECTOR parameter, so it cannot be a grid coordinate directly --
+% add_vector_parameter pre-builds the concrete vectors into vector_param_lookup
+% and the grid axis carries a LEVEL INDEX, which run_single_job decodes before
+% constructing the model. The runs were always correct; the loader was not.
+% param_space_summary.mat never stored the lookup, so the old load_results left
+% effective_param handing back 1..n_levels dressed up as seconds, silently. The
+% same loader also dropped model_class, so a loaded SRNNCellTypePairs run
+% reported SRNNModel2.
 %
 % Both are gone because psa_object.mat is now the single authoritative artifact:
 % run() writes it before batching (so an interrupted run keeps its config) and
@@ -63,7 +65,7 @@ all_passed = check('...and every level decodes to a distinct vector', ...
     numel(unique(cellfun(@(r) max(q.effective_param(r, 'tau_a_E')), ...
         q.results.sfa_only))) == 3) && all_passed;
 
-%% ISSUE-010: model_class survives the round trip
+%% model_class survives the round trip
 all_passed = check('model_class survives from_dir', ...
     strcmp(q.model_class, psa.model_class)) && all_passed;
 % The mechanism, without paying for a SRNNCellTypePairs sweep.

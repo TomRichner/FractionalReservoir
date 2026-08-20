@@ -467,7 +467,8 @@ classdef ParamSpaceAnalysis2 < handle
                     % A VECTOR parameter whose decoder is missing. res.config
                     % holds a grid LEVEL INDEX here, not a value, so returning it
                     % would hand back 1..n_levels dressed up as seconds. Fail
-                    % loudly instead: this was ISSUE-011, and it was only found
+                    % loudly instead. This guard is here because that once
+                    % happened for real (fixed 2026-08-14) and was only caught
                     % because a tau sweep quietly plotted against 1..13.
                     error('ParamSpaceAnalysis2:MissingVectorLookup', ...
                         ['''%s'' is a vector parameter, so res.config.%s holds a ' ...
@@ -1648,7 +1649,8 @@ classdef ParamSpaceAnalysis2 < handle
             % and the twenty-six saveobj writes, so a loaded object silently
             % lost model_class and, worse, vector_param_lookup -- leaving
             % effective_param to hand back grid LEVEL INDICES for vector
-            % parameters instead of values (see ISSUE-010, ISSUE-011).
+            % parameters instead of values. Both were fixed on 2026-08-14 and
+            % are covered by test_psa_loaders.
             %
             % The configuration now comes from psa_object.mat via from_dir, and
             % param_space_summary.mat is metadata only. Keeping this method to
@@ -2568,10 +2570,11 @@ classdef ParamSpaceAnalysis2 < handle
             % success counts, timings), for inspection and for tooling that wants
             % those facts without loading a whole object.
             %
-            % Reconstructing a PSA from it is what caused ISSUE-010/011: two
-            % separate methods each restored their own hand-picked subset of
-            % these fields, drifted from the twelve written here, and silently
-            % dropped model_class and vector_param_lookup. psa_object.mat is the
+            % Reconstructing a PSA from it is what caused the two loader bugs
+            % fixed on 2026-08-14: two separate methods each restored their own
+            % hand-picked subset of these fields, drifted from the twelve written
+            % here, and silently dropped model_class and vector_param_lookup.
+            % That is why the rule below is a rule. psa_object.mat is the
             % authoritative artifact; load runs with
             % ParamSpaceAnalysis2.from_dir. Do not add restore logic here.
 
