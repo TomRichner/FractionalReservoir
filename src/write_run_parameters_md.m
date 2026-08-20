@@ -152,8 +152,12 @@ end
 function [entries, caveats] = collect_analyses(run_dir, run_mode)
 % COLLECT_ANALYSES One struct per sub-analysis directory that holds a psa.
 %
-% A directory without psa_object.mat is not an analysis -- that is what drops
-% replot_sensitivity_*, which holds only figures, without special-casing a name.
+% A directory without psa_object.mat is not an analysis. That is what drops
+% replot_*, which holds only figures regenerated from sweeps already listed
+% here: replot_sensitivity repoints a loaded psa's output_dir and saves figures,
+% never calling save_object, so the absence is expected rather than a fault. The
+% prefix is recognised only to say so -- the psa_object.mat test still does the
+% dropping, so a replot folder that somehow gained one would be reported.
 caveats = {};
 entries = struct([]);
 
@@ -166,8 +170,16 @@ d = d(order);
 for i = 1:numel(d)
     mat = fullfile(run_dir, d(i).name, 'psa_object.mat');
     if ~isfile(mat)
-        caveats{end+1} = sprintf(['Skipped `%s/` -- no `psa_object.mat` ' ...
-            '(figures-only or incomplete directory).'], d(i).name); %#ok<AGROW>
+        if startsWith(d(i).name, 'replot_')
+            caveats{end+1} = sprintf(['Skipped `%s/` -- a replot of analyses ' ...
+                'already listed above, holding only regenerated figures. Replot ' ...
+                'folders carry no `psa_object.mat` by design, so its parameters ' ...
+                'are those of the sweeps it was plotted from.'], d(i).name); %#ok<AGROW>
+        else
+            caveats{end+1} = sprintf(['Skipped `%s/` -- no `psa_object.mat`, so ' ...
+                'no parameters could be recovered from it (incomplete or ' ...
+                'interrupted run?).'], d(i).name); %#ok<AGROW>
+        end
         continue
     end
 
