@@ -43,11 +43,15 @@ preset is still used for (a drift diff).
 
 ---
 
-## 🔴 OPEN · FR-006 · Memory pre-flight for `ParamSpaceAnalysis2`
+## ⚪ DECLINED · FR-006 · Memory pre-flight for `ParamSpaceAnalysis2`
 
 | | |
 |---|---|
 | Raised | 2026-08-14 · `dev` @ `d58b7fe` · R5456622 |
+| Declined | 2026-08-20 · `dev` @ `b7fe0dc` · R5469844 — not wanted |
+
+**Closed by TR, 2026-08-20.** Not needed. The request was written by the agent,
+not by TR, and the pre-flight is not something he wants carried.
 
 Estimate the per-worker footprint at config time and warn (or refuse) before a
 long sweep starts, alongside `validate_noise_settings`. The arithmetic is
