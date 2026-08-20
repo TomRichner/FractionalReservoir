@@ -2,117 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Session bookkeeping — read and update these
+## Scope
 
-Three tracked documents at the repo root carry context across sessions and
-across the two machines this work happens on. **Read them at the start of a
-session** (they say what is already known, already tried, and already decided)
-and **update them as you go** — not only at the end, since a session can be
-interrupted.
+Finish what was asked, and raise anything else rather than absorbing it into the
+task. A defect you notice in the middle of another job is worth reporting in a
+sentence or two; it is not a reason to go fix it, least of all in shared code
+(`src/plotting/`, the model classes, `ParamSpaceAnalysis2`) or folded into a
+commit about something else.
 
-- **`WorkLog.md`** — chronological narrative: plans executed, bugs found, bugs
-  fixed, runs performed. Add an entry when you finish a meaningful unit of work
-  (a plan stage, a bug diagnosis, an analysis run), not once per commit.
-- **`Issues.md`** — bugs and observed problems, indexed by issue. Never delete an
-  entry. **Adding an issue, and starting work on one, both require TR's explicit
-  approval** — see "Issues and feature requests are TR's call" below.
-- **`FeatureRequests.md`** — wanted changes that are not defects, same
-  lifecycle and the same approval rule.
-
-Every entry is signed with **date · branch @ commit · hostname · agent/model,
-session id**, for example:
-
-```
-### 2026-08-14 07:06 · dev @ d58b7fe · R5456622 · Claude Code (Opus 5), session 054a29ca
-```
-
-Get the pieces with `git rev-parse --short HEAD`, `git branch --show-current`,
-and `hostname` (identical on macOS, Windows and Linux). The session id is the
-UUID in your scratchpad path. `src/capture_git_provenance.m` stamps the same
-hostname onto every run directory, so a `WorkLog` entry and a `data/` folder can
-be matched up.
-
-**Record what turned out to be wrong, not just what worked.** The wrong turns
-are the part that is otherwise lost, and they are what stops the next session
-re-deriving a dead end — see ISSUE-009, where two plausible diagnoses were both
-refuted by the data.
-
-### Issues and feature requests are TR's call
-
-`Issues.md` and `FeatureRequests.md` are TR's backlog, not your to-do list. Two
-hard rules:
-
-1. **Do not add an entry without TR's approval.** Noticing a problem is useful —
-   *say so in your reply*, in a sentence or two, and ask whether he wants it
-   recorded. Write the entry only if he says yes. Your judgement that something
-   is a defect is not the same as it being one worth tracking; several entries
-   have been closed WONTFIX or "not an issue" precisely because that call is his.
-2. **Do not start work on one without TR's approval.** That covers a problem you
-   just found, an entry you filed, and any `OPEN` item you happen to read.
-   Finding a defect in the middle of another task is not authorisation to fix
-   it — least of all in shared code (`src/plotting/`, the model classes,
-   `ParamSpaceAnalysis2`), and never folded into a commit about something else.
-
-This exists because of a real failure on 2026-08-18: asked for two tick-label
-changes, an agent noticed a rendering defect while regenerating the figures and
-spent the rest of the session diagnosing it, editing a shared plotting utility to
-work around it, and committing all of that alongside the requested work. The
-diagnosis was sound and the workaround worked; none of it was wanted, and it was
-reverted (ISSUE-013). **Report what you notice. Do not act on it unasked.**
-
-The same restraint applies to scope generally: finish what was asked, and raise
-anything else rather than absorbing it into the task.
-
-### Reading them without flooding your context
-
-These files grow monotonically and are never pruned, so reading all three in
-full will eventually cost more context than the work itself. Escalate only as
-far as you need:
-
-**1. The index is one grep.** Every issue and request is a `## ` heading
-carrying its status marker, ID and title, so the whole backlog is a dozen-odd
-lines:
-
-```bash
-grep '^## ' Issues.md FeatureRequests.md          # full index, status included
-grep '^## .* OPEN ·' Issues.md FeatureRequests.md # just what is outstanding
-grep -n '^### ' WorkLog.md | tail -5              # the last few entries
-```
-
-Filter on the plain-text token (`OPEN` / `FIXED` / `WONTFIX` / `DONE` /
-`DECLINED`), **not** on the emoji — `grep '^## 🔴'` silently matches nothing in
-some terminals depending on locale, which is a bad failure mode for a check
-whose whole job is to tell you what is outstanding.
-
-That is usually enough to know whether the thing you are about to do is already
-known, already tried, or already decided against. Read a single entry in full
-only when one looks relevant.
-
-**2. Delegate the synthesis when you need the narrative.** For a genuinely
-prioritised picture — what is blocked and on what, which open items touch the
-area you are about to change, what was tried and refuted — use an **Explore
-agent** rather than reading the files into your own context:
-
-> Read `WorkLog.md`, `Issues.md` and `FeatureRequests.md` at the repo root.
-> Return a compact prioritised summary: open issues and requests by status, what
-> is currently blocked and on what, the last few work-log entries, and anything
-> bearing on `<the task at hand>`. Quote IDs and headline facts, not whole
-> entries. Do not modify anything.
-
-Give it the current task so it prioritises for relevance rather than recency.
-The point is that the agent absorbs the bulk and returns the conclusion.
-
-**3. Read in full only when the narrative itself is the subject** — e.g.
-reconstructing how a decision was reached, or auditing whether the record is
-accurate.
-
-The same escalation applies to writing: appending an entry needs no prior read
-of the whole file.
-
-`WorkLog.md` is a single chronological file by deliberate choice: when two
-machines both append, resolve the conflict by **keeping both entries and
-ordering by timestamp**, never by choosing between them. Entries are
-self-contained so that is always safe.
+Commit messages are the record of what was done. Write them so a later session
+can reconstruct the reasoning without a separate narrative file, and note what
+turned out to be **wrong** as well as what worked — the wrong turns are the part
+that is otherwise lost, and they are what stops the next session re-deriving a
+dead end.
 
 ## What this project is
 

@@ -115,7 +115,7 @@ function info = capture_git_provenance(output_dir, repo_root)
 end
 
 function h = local_hostname()
-% The machine identifier used across WorkLog.md, Issues.md and run provenance.
+% The machine identifier stamped into run provenance.
 % COMPUTERNAME is set on Windows; everywhere else fall back to the `hostname`
 % command, which exists on macOS and Linux.
     h = getenv('COMPUTERNAME');
