@@ -1,7 +1,7 @@
 Stability_Manuscript figure: sensitivity MEDIANS, collapsed across conditions
 ============================================================================
 
-Generated: 19-Aug-2026 17:30:58
+Generated: 21-Aug-2026 12:53:32
 By script: Fig_sensitivity_medians.m
 
 WHAT THIS IS
@@ -14,7 +14,7 @@ WHAT THIS IS
   No simulation is re-run.
 
 SOURCE RUN
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_17_25
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_18_26_21_41
   1D_sensitivity subfolders used:
     f_E             
     n               

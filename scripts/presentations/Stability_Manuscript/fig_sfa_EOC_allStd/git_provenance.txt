@@ -1,24 +1,19 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sfa_EOC_allStd
-Captured at: 18-Aug-2026 19:38:08
+Captured at: 21-Aug-2026 12:48:14
 
-hostname:    R5611351
+hostname:    R5456622
 platform:    PCWIN64
-matlab:      2026a
-commit:      aea08ea0fea2f294dd8a342e24c68f7247481ddc
-commit_short:aea08ea
-branch:      dev
+matlab:      2025b
+commit:      d6dc3099e0153aaf9f631dd232643215b8014d61
+commit_short:d6dc309
+branch:      labmeeting
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Scope the preset equivalence test to the frozen presets only
-last_date:   2026-08-18T19:32:27-05:00
+last_msg:    docs: name SRNNCellTypePairs the primary class and v2 the paper equations
+last_date:   2026-08-21T12:00:54-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.svg
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
+M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
@@ -39,3 +34,4 @@ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpa
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.svg
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_sfa_EOC_allStd.m
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/README_fig_sfa_EOC_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/git_provenance.txt

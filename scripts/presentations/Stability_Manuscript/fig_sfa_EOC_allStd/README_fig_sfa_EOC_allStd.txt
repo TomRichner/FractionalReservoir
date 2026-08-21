@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA Edge of Chaos (tau_a sensitivity, allStd)
 =========================================================================
 
-Generated: 18-Aug-2026 19:38:09
+Generated: 21-Aug-2026 12:48:14
 By script: Fig_sfa_EOC_allStd.m
 
 HOW IT WAS MADE
@@ -12,9 +12,9 @@ HOW IT WAS MADE
   git_provenance.txt for the exact commit.
 
 SOURCE RUN
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_17_25
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_18_26_21_41
   tau sensitivity subfolder used:
-    tau_sensitivity_tau_timescales_tau_a_E_max_nLevs_25_aug_15_26_02_59
+    tau_sensitivity_tau_timescales_tau_a_E_max_nLevs_11_aug_19_26_00_14
 
 FIGURES PRODUCED (in this folder)
   Fig_SFA_EOC_allStd.png

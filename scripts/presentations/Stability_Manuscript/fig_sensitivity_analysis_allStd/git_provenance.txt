@@ -1,19 +1,19 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_sensitivity_analysis_allStd
-Captured at: 19-Aug-2026 17:30:38
+Captured at: 21-Aug-2026 12:50:06
 
-hostname:    R5611351
+hostname:    R5456622
 platform:    PCWIN64
-matlab:      2026a
-commit:      5dac5bb12639bee5cbad3893f0b2080c402a9506
-commit_short:5dac5bb
-branch:      dev
+matlab:      2025b
+commit:      d6dc3099e0153aaf9f631dd232643215b8014d61
+commit_short:d6dc309
+branch:      labmeeting
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    update sys equations, remove varela md and add timeseries figure
-last_date:   2026-08-19T11:46:21-05:00
+last_msg:    docs: name SRNNCellTypePairs the primary class and v2 the paper equations
+last_date:   2026-08-21T12:00:54-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M Issues.md
+M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
@@ -29,5 +29,9 @@ M Issues.md
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_medians.m
-M  src/plotting/plot_saving/save_some_figs_to_folder_2.m
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.fig
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.png
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.svg
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_sfa_EOC_allStd.m
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/README_fig_sfa_EOC_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/git_provenance.txt

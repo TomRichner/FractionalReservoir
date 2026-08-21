@@ -32,7 +32,7 @@ setup_paths();
 project_root = fileparts(which('setup_paths'));
 
 % Source run. Swap this one line to regenerate against the medium run.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_17_25');
+data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_18_26_21_41');
 out_dir   = this_dir;   % write the final figure next to this script
 
 % --- Locate the tau sensitivity subfolder ----------------------------------
@@ -66,9 +66,16 @@ fig_position = [457 637 264 252];
 tick_fs   = 14;    % tick numbers
 label_fs  = 15.4;  % axis labels
 clim_frac = 0.8;   % darken imagesc: cap CLim at total_reps*clim_frac
-% Colormap ramps white (0 counts) -> 90% black (max), not pure black, so the
-% blue median line stays visible over the darkest cells.
-dark_cmap    = repmat(linspace(1, 0.1, 256)', 1, 3);
+% Custom colormap: pure white is reserved for EMPTY cells (0 counts), and every
+% non-zero count lands somewhere on a grey ramp that runs 0.75 (lightest) down
+% to 0.1 (darkest). Reserving the first row for white is what makes "no data"
+% visually distinct from "one count" -- with a plain linspace(1, 0.1) ramp the
+% sparsest cells are indistinguishable from the background. The ramp is built
+% inline rather than as a named colormap file: it is two expressions, and the
+% interesting parameters are the two end points, easier to see and tune here.
+cmap_lightest = 0.75;  % grey level of the sparsest NON-ZERO cell
+cmap_darkest  = 0.1;   % grey level of the densest cell (0 = black, 1 = white)
+dark_cmap    = [1 1 1; repmat(linspace(cmap_lightest, cmap_darkest, 255)', 1, 3)];
 median_alpha = 0.35;   % blue median line transparency
 median_lw    = 3;      % blue median line width
 zeroline_lw  = 2;      % green dashed zero line width

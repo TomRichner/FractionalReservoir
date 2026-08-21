@@ -41,7 +41,7 @@ project_root = fileparts(which('setup_paths'));
 
 % Source run (a run_all_<dt> folder with 1D_sensitivity_* subdirs). Same run the
 % allStd figures are built from -- swap this one line to re-point both.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_17_25');
+data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_18_26_21_41');
 out_dir   = this_dir;   % write the final figures next to this script
 
 close all force;

@@ -1,7 +1,7 @@
 Stability_Manuscript figures: LLE + mean firing rate Sensitivity (allStd)
 ========================================================================
 
-Generated: 19-Aug-2026 17:30:38
+Generated: 21-Aug-2026 12:50:06
 By script: Fig_sensitivity_analysis_allStd.m
 
 HOW THEY WERE MADE
@@ -13,15 +13,15 @@ HOW THEY WERE MADE
   git_provenance.txt for the exact commit.
 
 SOURCE RUN
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_14_26_17_25
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_18_26_21_41
   1D_sensitivity subfolders used:
-    1D_sensitivity_sensitivity_f_E_nLevs_25_aug_14_26_19_08
-    1D_sensitivity_sensitivity_level_of_chaos_nLevs_25_aug_14_26_20_32
-    1D_sensitivity_sensitivity_mu_EE_relative_nLevs_25_aug_14_26_21_49
-    1D_sensitivity_sensitivity_mu_EI_relative_nLevs_25_aug_14_26_23_05
-    1D_sensitivity_sensitivity_mu_IE_relative_nLevs_25_aug_15_26_00_23
-    1D_sensitivity_sensitivity_mu_II_relative_nLevs_25_aug_15_26_01_40
-    1D_sensitivity_sensitivity_n_nLevs_25_aug_14_26_17_25
+    1D_sensitivity_sensitivity_f_E_nLevs_11_aug_18_26_22_07
+    1D_sensitivity_sensitivity_level_of_chaos_nLevs_11_aug_18_26_22_28
+    1D_sensitivity_sensitivity_mu_EE_relative_nLevs_11_aug_18_26_22_48
+    1D_sensitivity_sensitivity_mu_EI_relative_nLevs_11_aug_18_26_23_09
+    1D_sensitivity_sensitivity_mu_IE_relative_nLevs_11_aug_18_26_23_30
+    1D_sensitivity_sensitivity_mu_II_relative_nLevs_11_aug_18_26_23_51
+    1D_sensitivity_sensitivity_n_nLevs_11_aug_18_26_21_42
 
 SHEETS
   This run is SRNNCellTypePairs, which sweeps SEVEN parameters rather than
@@ -88,7 +88,7 @@ SHARED LAYOUT (all sheets)
   0.35, stopping well short of black -- a ramp into black makes the
   densest cells a solid slab and lets the overflow bands dominate the
   panel. Panel letters added up-and-left of each plot (AddLetters2Plots).
-  Median line: OPAQUE dark blue [0.00 0.00 0.55], 3 pt (plot_sensitivity
+  Median line: OPAQUE dark blue [0.00 0.00 0.90], 3 pt (plot_sensitivity
   draws it as transparent pure blue at 4 pt); the transparency existed
   only to survive near-black cells and is not needed now. Titles not
   bold; axis boxes removed.

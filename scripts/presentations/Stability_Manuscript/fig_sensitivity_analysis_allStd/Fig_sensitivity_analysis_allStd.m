@@ -37,7 +37,7 @@ project_root = fileparts(which('setup_paths'));
 
 % Source run (a run_all_<dt> folder with 1D_sensitivity_* subdirs).
 % Swap this one line to regenerate against the medium run.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_17_25');
+data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_18_26_21_41');
 out_dir   = this_dir;   % write the final figures next to this script
 
 % Start from a clean slate: replot_sensitivity saves ALL open figures, so any
@@ -130,7 +130,7 @@ dark_cmap = repmat(linspace(1, cmap_darkest, 256)', 1, 3);
 % stopping at dark grey it is no longer needed, and an opaque line reads as one
 % curve rather than as a wash whose apparent colour changes with the density
 % underneath it.
-median_color = [0 0 0.55];
+median_color = [0 0 0.9];
 median_lw    = 3;      % blue median line width, 25% thinner (plot_sensitivity uses 4)
 zeroline_lw  = 2;      % green dashed zero line width (plot_sensitivity uses 4)
 
