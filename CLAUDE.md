@@ -18,7 +18,26 @@ dead end.
 
 ## What this project is
 
-MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD). The dynamics implemented are:
+MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD).
+
+**The primary model class is `src/SRNNCellTypePairs.m`** — the C-cell-type,
+per-route-synapse class. New work should use it; `SRNNModel2` remains as the
+two-population (E/I) sibling that much of the existing sweep and figure code was
+written against, but it is no longer where the model is being developed.
+
+**The equations used in the current manuscript draft are
+`docs/EquationsParametersDocs/Equations_stability_paper_v2.md`** (rendered
+alongside as `_v2.pdf`). That is the authoritative statement of the dynamics:
+`M` depression variables entering the recurrent sum as the product
+`r_j ∏_m b_{jm}`, `K` adaptation timescales, an adaptation offset `a_{0_i}`, and
+additive Wiener noise on `x`. Short-term **facilitation** (STF) is implemented in
+`SRNNCellTypePairs` (`synapse_config.<pre>.<post>.stf`) but is **not used in the
+current paper**, so it does not appear in the v2 equations. Two earlier variants
+of the same system sit beside it: `Equations_stability_paper.md` (which names the
+product `θ_j`) and `_v3.md` (which additionally inlines `φ`); they are the same
+dynamics written differently — v2 is the one to cite and to update.
+
+The dynamics, in the older ASCII shorthand used through the rest of this file:
 
 ```
 dx_i/dt    = (-x_i + Σ_j w_ij · b_j r_j + u_i) / τ_d
@@ -66,7 +85,7 @@ which reads like a bug in the calling code rather than a stale cache. `clear Par
 
 ## Architecture
 
-The codebase has converged on **one analysis driver** (`ParamSpaceAnalysis2`) and **two model classes it can drive** (`SRNNModel2` and `SRNNCellTypePairs`). Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
+The codebase has converged on **one analysis driver** (`ParamSpaceAnalysis2`) and **two model classes it can drive** (`SRNNCellTypePairs`, the primary one, and `SRNNModel2`). Legacy predecessor classes and unused standalone duplicates were removed on the `refactor` cleanup branch; what remains is the current pipeline plus a small set of example/figure scripts that use the current classes.
 
 The two model classes are **duck-typed siblings, not a hierarchy**: they share no implementation (separate `dynamics_fast`, `compute_Jacobian_fast`, state packing, and their own copies of the nonlinearity statics). A behavioural change to one is **not** inherited by the other — check whether the change belongs in both. `ParamSpaceAnalysis2` reaches either by name, so no base class is needed.
 
@@ -202,7 +221,7 @@ The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_pape
 
 **Path convention:** scripts do not assume they sit at any particular depth under `scripts/`. Derive the project root as `project_root = fileparts(which('setup_paths'))` (depth-independent) rather than with a fixed-depth `fileparts(mfilename)` chain. Scripts that need their *own* folder (to locate a sibling data file or write a figure next to themselves) still use `this_dir = fileparts(mfilename('fullpath'))` — that is a data path, not a path bootstrap, and is fine to keep.
 
-When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnalysis2`.
+When working on the current pipeline, default to `SRNNCellTypePairs` + `ParamSpaceAnalysis2` (`psa.model_class = 'SRNNCellTypePairs'`). Reach for `SRNNModel2` only when extending existing two-population code that already uses it.
 
 ## Data conventions
 
