@@ -14,15 +14,71 @@ and session that wrote it. Newest first.
 
 ---
 
-## Rebuild the single-neuron STF methods figure (deliberately outside the refactorRunAll work)
+## Should STF scale STD depletion? `SRNNCellTypePairs` says no; Tsodyks–Markram says yes
 
 | | |
 |---|---|
 | Noted | 2026-08-21 · `refactorRunAll` @ `22a91ee` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Raised by | TR, while settling `tau_rel` for the rebuilt STF methods figure |
 
-TR wants this figure back eventually, but explicitly **parked it outside the
-`refactorRunAll` refactor**. Recorded here so the investigation does not have to be
-repeated. **Not started.**
+**To look into after the refactor.** Parked deliberately; the figure ships with
+`tau_rel = 0.3` in the meantime.
+
+The two depression equations differ in whether facilitation feeds back into depletion:
+
+```
+deleted SRNNModelCellTypes:  db/dt = (1-b)/tau_rec - (p * b * r)/tau_rel
+current SRNNCellTypePairs:   db/dt = (1-b)/tau_rec - (    b * r)/tau_rel
+```
+
+**The old form is the Tsodyks–Markram one.** In TM, the resource variable depletes in
+proportion to the *utilization* — release probability times available resource — so a
+facilitated synapse consumes its pool faster. The current class drops that factor, so
+`b` and `g` evolve independently and only multiply at the output.
+
+Why it may not matter: with **no STF anywhere** (which is every preset in use, the
+paper's `celltype_pairs_Sc0p2_noise0p025_dualStd` included), the missing factor is a
+constant and is fully absorbed into `tau_rel`. The two forms are then the same model
+with a rescaled constant. **The divergence only appears once facilitation is on.**
+
+Why it may: any future STF work — a facilitating route, an E→I vs I→I comparison, the
+STF figure itself — silently gets a synapse whose depression does not respond to its
+own facilitation. That is a modelling claim, not an implementation detail, and it is
+currently unstated anywhere.
+
+Concrete consequence already in hand: the rebuilt STF methods figure uses
+`tau_rel = 0.3` verbatim from the old script, which — with the `p = p0 = 0.35` factor
+gone — is about **2.9× stronger depression at rest** than the archived
+`sfa_std_stf_single_neuron_example_figure_1.png` shows. Rest could have been matched
+with `tau_rel = 0.3/0.35 = 0.857`, but nothing reproduces the *acceleration* as `p`
+rises toward 1. TR chose the literal 0.3 as the simpler thing to explain.
+
+Worth deciding: is the decoupling intentional (a deliberate simplification worth
+documenting in CLAUDE.md and the equations doc), or an oversight from the port that
+should be restored?
+
+---
+
+## ~~Rebuild the single-neuron STF methods figure~~ — SUPERSEDED, now in the refactor
+
+| | |
+|---|---|
+| Noted | 2026-08-21 · `refactorRunAll` @ `22a91ee` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| **Superseded** | 2026-08-21, same session. TR reversed the parking decision: the STF figure **is** being rebuilt as part of `refactorRunAll`, on `SRNNCellTypePairs` behind a new preset matching the old parameters. See `refactorRunAll.md` §6. |
+
+> **This entry is now history, not a to-do.** It is kept because the archaeology below
+> (which commit holds the last version, why it cannot be restored verbatim) is still
+> what a later session would otherwise have to re-derive. The *decision* it recorded —
+> "leave this outside the refactor" — no longer holds.
+>
+> One finding since: the facilitation parameters **do** map exactly. Writing the old
+> `dp/dt = (p0−p)/tau_f + kappa(1−p)r` with gain `u = p/p0` gives
+> `du/dt = (1−u)/tau_f + kappa(1/p0 − u)r`, which is the current class's
+> `dg/dt = (1−g)/tau_dec + (G−g)r/tau_fac` with `tau_dec = tau_f = 6`,
+> `tau_fac = 1/kappa = 2.5`, `G = 1/p0 = 2.857`. Only the **STD coupling** fails to
+> map: the old depletion term carried a factor `p`, the current one does not.
+
+Original entry follows.
 
 **The orphan files.** Three files sit in
 `scripts/presentations/Stability_Manuscript/fig_adaptation_methods/panel_A/` with no

@@ -89,9 +89,9 @@ model.store_full_state = true;
 % condition is n_a AND synapse_config together, and setting only one of them
 % here would leave you running something you did not name.
 
-model.level_of_chaos = 2;      % preset: 1.0. >1 pushes past the edge of chaos
+model.level_of_chaos = 1.5;      % preset: 1.0. >1 pushes past the edge of chaos
 model.S_c = 0.4;                % preset: 0.20
-model.c = [1/3, 0];
+model.c = [0.5/3, 0];
 % model.sigma_u_noise = 0.05;      % preset: 0.025 (solver is already sra1)
 % model.n = 300;                   % preset: 500
 % model.rng_seeds = [21 22];       % a different network draw

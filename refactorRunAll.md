@@ -204,6 +204,51 @@ to "one preset for everything" → open question Q2.
   actually referenced by a figure. The rest is dead weight in the repo.
 - `data/param_space/` holds **26** run directories; the figures reference 2.
 
+### 4c-bis. Git tracking of `Stability_Manuscript/` — checked 2026-08-21
+
+**127 of 133 files are tracked.** The manuscript tree is in good shape: `.png`, `.svg`
+and `.fig` are re-included for it by `.gitignore` (lines 96-101), and the 7 files that
+*would* be caught by the blanket `*.pdf` rule — `doc_equations_table/*.pdf`,
+`fig_equations/{equations.pdf, equations.tex, parameter_table.pdf}`,
+`fig_reservoir_diagram/{reservoir diagram.pdf, Reservoir Computer.html}` — are already
+tracked, so the ignore rules no longer apply to them. **Nothing there needs force-adding.**
+
+**The 6 untracked files are all `working_changes.patch`**, ignored by `.gitignore:2
+*.patch`:
+
+| Folder | size | `.m` diff | `.svg` diff |
+|---|---|---|---|
+| `fig_sfa_EOC_allStd` | 2.3 MB | 2.8 kB | **2230 kB** |
+| `fig_sensitivity_medians` | 1.8 MB | 12.2 kB | **1766 kB** |
+| `fig_sensitivity_analysis_allStd` | 1.6 MB | 12.2 kB | **1513 kB** |
+| `fig_param_space_allStd` | 268 kB | 2.8 kB | 248 kB |
+| `fig_STD_steady_state` | 261 kB | 12.9 kB | 235 kB |
+| `fig_SFA_steady_state` | 160 kB | 2.7 kB | 151 kB |
+
+`capture_git_provenance` writes these (`git diff HEAD`) **only when the tree was dirty**
+at figure-generation time — they are the missing half of the provenance, since
+`git_provenance.txt` records the commit but not the uncommitted delta.
+
+**Recommendation: do NOT force-add them as they stand.** ~6.4 MB total of which only
+~45 kB (0.7%) is source. The bulk is **SVG text diffs of figures that are already
+tracked in the same folder** — storing each figure a second time, as a diff. There are
+no binary hunks (`git diff` without `--binary` reduces PNG/FIG to a one-line marker), so
+the SVGs are the whole cost.
+
+Two better routes, in order of preference:
+
+1. **Generate final figures from a clean tree.** Then no patch is produced at all —
+   `capture_git_provenance` actively *deletes* a stale patch when the tree is clean
+   (`src/capture_git_provenance.m:106-109`), so tracking them would also mean git
+   showing spurious deletions on every clean regeneration. Making "commit, then
+   regenerate" part of the figure workflow removes the problem rather than storing it.
+2. **Narrow the diff to source.** `git diff HEAD -- '*.m'` (or excluding
+   `*.svg/*.png/*.fig`) turns 6.4 MB into ~45 kB, at which point force-adding is cheap
+   and genuinely useful as a safety net for the dirty-tree case.
+
+Route 2 touches `src/capture_git_provenance.m`, which is shared code — **proposal, not a
+drive-by fix** (CLAUDE.md Scope). Route 1 needs no code change at all.
+
 ### 4d. Smaller issues
 
 - Two spellings of the same helper (`save_figure_stable` vs `save_fig_stable`) with
@@ -278,6 +323,115 @@ Key design decisions:
 - **The `master_*` base-workspace protocol dies.** Functions take a `cfg` struct.
   `run_overnight_queue` collapses into a loop.
 
+### The two master scripts, concretely
+
+**`scripts/paper/run_all_paper_analyses.m`** — the slow one. Writes into a single dated
+run directory, one click, unattended.
+
+| Stage | Preset | Output |
+|---|---|---|
+| 7 × 1-D sensitivity (`n`, `f_E`, `level_of_chaos`, 4 × `mu_*`) | main (`_dualStd`) | `1D_sensitivity_*/` |
+| tau sensitivity (`tau_a_E`) | main | `tau_sensitivity_*/` |
+| param space (3-D grid) | main | `param_space_*/` |
+| memory capacity, 30 paired trials | MC `SRNNModel2` preset | `memory_capacity/*_results.mat` |
+| MC example, 4 conditions | MC preset | `mc_example_data.mat` |
+| eig heatmap Jacobian sampling | main | `eig_heatmap_data.mat` |
+| `parameters.md` + `run_manifest.mat` + git provenance | — | run self-describes |
+
+Everything downstream reads that one directory. `run_mode` is the cost knob (`fast` for
+smoke tests, `production` overnight); `paper_config.m` names the preset.
+
+**`scripts/paper/make_all_paper_figures.m`** — the light one. Takes a run directory,
+regenerates every figure in `Stability_Manuscript/`. Three kinds:
+
+- **Pure replot, no simulation** — `fig_sensitivity_analysis_allStd`,
+  `fig_sensitivity_medians`, `fig_param_space_allStd`, `fig_EI_param_space`,
+  `fig_sfa_EOC_allStd`, `fig_memory_capacity`, `fig_memory_capacity_example`,
+  `fig_eig_heatmap` (plot half only).
+- **Analytic, no simulation** — `fig_FI_curve`, `fig_SFA_steady_state`,
+  `fig_STD_steady_state`, `energy_landscape`. These read τ/`c` from the preset (except
+  `fig_FI_curve`, deliberately conceptual).
+- **Simulates, but cheap (seconds to minutes)** — `fig_example_timeseries`,
+  `panelA_bottom_traces` (traces + eigenspectra), `fig_adaptation_methods` A and B,
+  `fig_stim_engages_adaptation`. These are why it is "light **computing** and figure
+  making" rather than pure replotting.
+
+The split is by **cost**, not by whether a script simulates: anything measured in hours
+goes left, anything measured in minutes goes right.
+
+### Why the `fig_*` scripts MUST become functions — four blockers, two of them live bugs
+
+Passing the data path in is the obvious win, but it is not the strongest reason. Three
+of the four items below are things that **silently corrupt output** the moment fifteen
+figure scripts run back to back in one session, and which are invisible today because
+each is run alone by hand.
+
+**1. `close all force` — destroys the previous figure's output. (6 scripts)**
+
+`Fig_EI_param_space`, `Fig_param_space_allStd`, `Fig_sensitivity_analysis_allStd`,
+`Fig_sensitivity_medians`, `Fig_sfa_EOC_allStd` each call `close all force` mid-script.
+Their own comments explain why — `replot_*` saves *all open figures*, so a stray one
+pollutes the save. Correct in isolation; **destructive in a loop**, where it wipes the
+figures the previous entry just created before the master can collect or verify them.
+Fix: functions return their handles, and the "no strays" requirement is met by saving
+explicitly-named handles rather than by clearing the world.
+
+**2. `set(0, 'Default...')` — never restored, leaks into every later figure. (2 files)**
+
+`plot_memory_capacity_combined.m:50-53` and `Fig_memory_capacity_example.m:33-36` each
+set four graphics-root defaults (`DefaultAxesFontSize` 14, `DefaultAxesLineWidth` 1.0,
+`DefaultTextInterpreter` `'none'`, `DefaultLegendInterpreter` `'none'`) and **never put
+them back**. Run standalone, harmless. Run from a master script, every figure *after*
+memory capacity silently inherits them — including `DefaultTextInterpreter = 'none'`,
+which would break the `\lambda_1` and `\mu_{EE}` tex labels the sensitivity sheets
+depend on. **Order-dependent output is the worst kind of bug to chase in a figure
+pipeline.** Fix: `manuscript_style()` returns values applied per-axes, or sets roots
+under an `onCleanup` that restores them.
+
+**3. `clear` / `clc` / `clearvars` — meaningless or harmful in a function. (13 scripts)**
+
+`clear; clc; close all` opens 13 of them. `clc` in a loop destroys the master's own
+progress log. Worse, `bursting_SRNN_example.m:26` does `clearvars -except rng_seeds` —
+a script that *deliberately relies on base-workspace persistence between runs*. That
+cannot survive functionization, and shouldn't: `rng_seeds` becomes a parameter with a
+default, which is strictly better than a variable that has to survive in the caller.
+
+**4. Hardcoded `data_root` — the thing you asked about. (5 scripts)**
+
+Five scripts hardcode a run directory, and they do **not agree**: `fig_EI_param_space`
+points at `run_all_jul_06_26_22_00` while the four `_allStd`/`medians` scripts point at
+`run_all_aug_14_26_17_25`. So "regenerate the figures" today silently mixes two runs on
+two different model classes. Passing `run_dir` in from one master resolution makes that
+impossible by construction.
+
+### The signature
+
+One uniform shape, so the master is a loop rather than fifteen special cases:
+
+```matlab
+function out = fig_whatever(cfg)
+arguments
+    cfg.run_dir     (1,:) char = ''      % '' -> resolve newest run matching cfg.preset_name
+    cfg.out_dir     (1,:) char = ''      % '' -> the folder this function lives in
+    cfg.preset_name (1,:) char = ''      % '' -> read from run_dir's run_manifest.mat
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+end
+% out.figs   figure handles created (never `close all` — the caller owns lifetime)
+% out.files  cellstr of files actually written
+% out.source what it read (run dir, .mat path, or 'analytic')
+```
+
+Every figure takes the same `cfg` and ignores the fields it doesn't need — replot
+figures use `run_dir`, analytic ones use `preset_name`, simulating ones use both. Each
+keeps its current hardcoded value as the **default**, so every script stays runnable
+standalone exactly as today.
+
+What that buys the master script, beyond path injection: per-figure `try/catch` so one
+failure doesn't cost the whole set (the pattern `run_overnight_queue` already uses),
+verification that `out.files` actually appeared, and a single place that decides which
+run everything is built from.
+
 ### What `run_all_paper_analyses` would contain
 
 | Stage | Cost at `production` | Notes |
@@ -312,7 +466,11 @@ figure making").
 | Q3 | **Re-run MC here at fast settings.** Add `run_memory_capacity(cfg)` with a fast mode (few trials, short `T_train`) so the plumbing is verifiable now; the user runs the full 30-trial version overnight alongside the production sweep. |
 | Q6 | **`scripts/presentations/Stability_Manuscript/` stays where it is.** Only its contents are refactored, so no manuscript image path breaks on the Mac. `scripts/paper/` holds the new entry points and calls into it. |
 | Q7 | **All of them move to `SRNNCellTypePairs`** — see the table below. |
-| STF | **Parked, outside this refactor.** Written up in `UserNotes.md` ("Rebuild the single-neuron STF methods figure"); the three orphan files are left untouched. |
+| STF | **Reversed — now IN the refactor.** `fig_adaptation_methods` yields **two** figures: A = SFA+STD on `_dualStd`; B = SFA+STD+STF on a new preset matching the old parameters. Orphan PNGs left in place, superseded by B. |
+| FI curve | **Stays conceptual.** Logistic `S_c = 0.4`, exaggerated `c = 0.6`. Structure refactored only; nonlinearity **not** swapped to the preset's piecewise. |
+| STF `tau_rel` | **Literal `0.3`.** Accepts ~2.9× stronger rest depression than the archived PNG. The TM-coupling question is parked in `UserNotes.md`. |
+| Fig A noise | **On — the preset taken literally** (`sigma_u_noise = 0.025`). Visible jitter on `n = 1` is accepted. |
+| Eig heatmap gain | **Preset `level_of_chaos = 1.0`**, not the script's 3.0 — the preset's noise is what makes the eigenvalues wander, which the old deterministic script needed high gain for. |
 
 ### Q7 in detail — every figure onto `SRNNCellTypePairs`
 
@@ -322,10 +480,12 @@ because they are deliberately different networks; the rest take the main preset.
 | Figure | Preset | Notes |
 |---|---|---|
 | `fig_example_timeseries` (fig 3) | `celltype_pairs_Sc0p2_noise0p025_dualStd` | straight port |
-| `fig_adaptation_methods` single-neuron (fig 11) | `celltype_pairs_Sc0p2_noise0p025_dualStd` | **rebuild on `SRNNCellTypePairs`**. SFA and STD only — **no STF column**. `c` **matches the preset** (`0.5/3`), not the exaggerated `c_E = 1.0` in use today. **No new preset.** |
+| `fig_adaptation_methods` single-neuron — **figure A** (fig 11) | `celltype_pairs_Sc0p2_noise0p025_dualStd` | **rebuild on `SRNNCellTypePairs`**. SFA and STD only — no STF. `c` **matches the preset** (`0.5/3`), not the exaggerated `c_E = 1.0` in use today. **No new preset.** **Noise ON** — take the preset literally, `sigma_u_noise = 0.025`. On `n = 1` there is no population averaging, so `x_noise_std ≈ 0.056` is fully visible in every trace; that is accepted, not a bug to smooth away. Requires a stochastic integrator (`'sra1'`). |
+| `fig_adaptation_methods` single-neuron — **figure B** (STF) | **NEW preset** | **rebuild the deleted STF figure** on `SRNNCellTypePairs`, matching the old parameters. SFA + STD + STF. See the mapping below — it is exact for facilitation. |
 | `fig_stim_engages_adaptation` bursting (fig 10) | **NEW preset**, named for bursting | port to `SRNNCellTypePairs`, preset **equivalent to the current figure** (`n=50`, `indegree=10`, `f=0.7`, piecewise `S_a`/`S_c=0.5`, the DC-staircase `input_config`, …) |
 | `fig_introductory_concepts` panel A (figs 1–2) | **NEW preset** | reproduce the Sompolinsky network **on `SRNNCellTypePairs`**, preset matching the figure's current settings (`N=200`, `tanh`, `tau_d=1`, fully connected, zero-mean random connectivity, `x0_std=1`) |
-| `fig_eig_heatmap` | `celltype_pairs_Sc0p2_noise0p025_dualStd` | port from `SRNNModel2` (Q4) |
+| `fig_eig_heatmap` | `celltype_pairs_Sc0p2_noise0p025_dualStd` | port from `SRNNModel2`. **Use the preset's `level_of_chaos = 1.0`, not the script's tuned 3.0** — the preset is stochastic, and the noise is what moves the state (and so the instantaneous Jacobian) around. The old 3.0 existed because that script was *deterministic* and needed high gain to get any wandering at all. **Watch:** `sigma_u_noise > 0` requires `'euler'`/`'heun'`/`'sra1'`, and this script sets no `ode_solver`, so it would default to `ode45` and **error**. It must name `'sra1'` explicitly (it does not go through `analysis_run_config`, which is what picks the stochastic solver elsewhere). |
+| `fig_FI_curve` | **none — stays conceptual** | analytic schematic of the *form* `b·φ(x − c·a)`, not of a specific network. Keeps logistic `S_c = 0.4` and the exaggerated `c = 0.6`. **Refactor structure only** (function, shared style, generated README) — do **not** swap in the preset's piecewise φ. |
 | `fig_sensitivity_medians` | `celltype_pairs_Sc0p2_noise0p025_dualStd` | already replot-only; re-point at the `_dualStd` run (Q4) |
 | `fig_SFA_steady_state`, `fig_STD_steady_state` | `celltype_pairs_Sc0p2_noise0p025_dualStd` | analytic; read τ from the preset. Single-timescale comparison curve uses **`tau(1)`** and **`c = value/1`** (Q4) |
 | `fig_memory_capacity`, `fig_memory_capacity_example` | **NEW `SRNNModel2` preset** | `SRNN_ESN_reservoir` blocks the port; own preset now, port later (Q2) |
@@ -426,10 +586,67 @@ deleted.** And its facilitation equations are superseded:
 | STD depletion | `db/dt = (1−b)/τ_rec − (p·b·r)/τ_rel` — **coupled to `p`** | `db/dt = (1−b)/τ_rec − (b·r)/τ_rel` — independent |
 | synaptic gain | `eff = (p/p0)·b` | `g·b`, `dg/dt = (1−g)/τ_dec + (G−g)·r/τ_fac` |
 
-**Recommendation: delete the three orphan files.** Rebuilding the panel means
-re-deriving STF on `SRNNCellTypePairs`'s facilitation — a new figure, not a
-restoration — and the target preset has **no STF on any route**, so nothing in the
-paper's model facilitates. Awaiting confirmation.
+**DECIDED (reversed twice; this is the final position).** TR first parked this outside
+the refactor, then settled on: **rebuild it, inside the refactor.** So
+`fig_adaptation_methods` produces **two** figures:
+
+- **A** — SFA + STD only, on the `_dualStd` preset (the paper figure, fig 11).
+- **B** — SFA + STD + **STF**, on a **new preset** matching the old script's parameters.
+
+The three orphan files are **not** deleted; figure B supersedes them.
+
+#### The old → new parameter mapping is EXACT for facilitation
+
+Recovered from the deleted class's own header (`git show 60c2992:src/SRNNModelCellTypes.m`):
+
+```
+old:  dp/dt = (p0 - p)/tau_f + kappa*(1-p)*r ,   gain eff = (p/p0)*b
+```
+
+Rewriting in the **gain** variable `u = p/p0` (so `p = u*p0`):
+
+```
+p0*du/dt = (p0 - u*p0)/tau_f + kappa*(1 - u*p0)*r
+   du/dt = (1-u)/tau_f + kappa*(1/p0 - u)*r
+```
+
+and the current class is
+
+```
+new:  dg/dt = (1-g)/tau_dec + (G - g)*r/tau_fac
+```
+
+These are **the same equation**. Both rest at gain 1 and rise toward the same ceiling:
+
+| old | new | value |
+|---|---|---|
+| `tau_f  = 6`    | `tau_dec` | **6 s** |
+| `kappa  = 0.4`  | `tau_fac = 1/kappa` | **2.5 s** |
+| `p0     = 0.35` | `G = 1/p0` | **2.857** |
+
+SFA maps directly too (`tau_a = 3`, `c = 1.0`), as do `S_a = 1.0`, `S_c = 0.5`,
+`tau_d = 0.1`, the step stimulus (`amp 0.5`, on 5 s, off 15 s, `T_range [-10 20]`,
+`fs 400`).
+
+#### The one thing that does NOT map: STD's coupling to facilitation
+
+```
+old:  db/dt = (1-b)/tau_rec - (p * b * r)/tau_rel     <- depletion scaled by p
+new:  db/dt = (1-b)/tau_rec - (    b * r)/tau_rel     <- independent of g
+```
+
+At **rest** this is a constant factor (`p = p0 = 0.35`), so the old model depletes
+2.9× slower than a literal `tau_rel = 0.3` would give — matchable by setting
+`tau_rel = 0.3/0.35 = 0.857 s`. But as facilitation builds, the old model's depletion
+**accelerates** with `p` while the new model's does not. That is a structural
+difference in the equations, not a parameter choice, and no value of `tau_rel`
+reproduces it.
+
+**DECIDED: carry `tau_rel = 0.3` literally.** Simpler to explain, at the cost of ~2.9×
+stronger depression at rest than the archived PNG shows. The rebuilt figure will
+therefore **not** match the old image, and that is expected — do not chase it.
+The underlying question (should STF scale STD depletion? Tsodyks–Markram says yes) is
+parked in `UserNotes.md` as post-refactor work.
 
 ## 7. Still open
 
@@ -470,6 +687,56 @@ Two things to watch when doing it:
   three-type run can name its own axis.
 
 ---
+
+## 7b. GOVERNING RULE (TR, 2026-08-21): no script-to-script workspace coupling
+
+> **No script runs another script and communicates through workspace variables.**
+> Anything a callee needs is an **argument**; anything it produces is a **return value**.
+
+This is a standing rule for the refactor, not a one-off. It is what makes a pipeline
+readable: today you cannot tell what `run_sensitivity_analysis` needs without grepping
+for `exist(...)`, and you cannot tell what setting it left behind without reading to the
+end. Both become the function signature.
+
+Complete kill-list, from a sweep of `exist('<var>', 'var')` across `scripts/`
+(**43 sites, 15 files**). Category D is legitimate and stays.
+
+**A — master → sub-script coupling (the main target).** Variables: `master_output_dir`,
+`master_save_figs`, `master_model_overrides`, `master_model_class`, `master_conditions`,
+`run_mode`, `save_figs`, `preset_name`, `std_zero_floor`.
+
+| File | Sites |
+|---|---|
+| `run_all_analyses/run_sensitivity_analysis.m` | 7 |
+| `run_all_analyses/run_tau_sensitivity_analysis.m` | 8 |
+| `run_all_analyses/run_param_space_analysis2.m` | 7 |
+| `run_all_analyses/run_dc_lle_analysis.m` | 5 |
+| `run_all_analyses/run_all_analyses.m` | 2 |
+| `run_all_analyses/run_overnight_queue.m` | 1 (exists *only* to scrub the others) |
+| `EI_balance/Fig_2_fraction_excitatory_analysis.m` | 3 |
+| `EI_balance/Fig_2_fraction_excitatory_load_and_plot.m` | 1 |
+| `tests/Single_vs_dual_adaptation_example.m` | 2 |
+| `tests/Sompolinsky_N_1000_g_1p8.m` | 2 |
+
+**B — console → script overrides.** `check_sensitivity_sim.m`, 6 sites (`psa_dir`,
+`target_level_of_chaos`, `target_condition`, `target_rep`, `sim_T_range`, `sim_c_E`).
+Same anti-pattern with the human as the outer scope; becomes `arguments` with defaults.
+
+**C — run-to-run persistence in the base workspace.**
+`fig_stim_engages_adaptation/bursting_SRNN_*.m` and `tests/test_SRNN2_multi_std.m` use
+`clearvars -except rng_seeds` so a seed survives between invocations. Becomes a
+parameter with a default — strictly better, since the seed then appears in the call and
+in the saved filename rather than living invisibly in the caller.
+
+**D — legitimate, leave alone.** `fig_eig_heatmap.m`'s `exist('lle_by_cond','var')`
+checks whether a `load()` produced a variable. Not workspace coupling; a guard on file
+contents. (Cleaner as `isfield`/`who('-file')`, but not this rule's business.)
+
+Consequences worth stating: `run_overnight_queue.m` loses its entire reason to exist
+(its own header says the state-scrubbing is why it is a script rather than three console
+calls) and collapses to a loop over `run_all_analyses(preset, mode)`. And the sub-scripts
+stop needing the "no `clear`/`clc` when `master_output_dir` is set" convention — a
+function has its own scope, so the conditional-clearing dance disappears with it.
 
 ## 8. Work plan (order of operations)
 
