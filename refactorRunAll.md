@@ -278,21 +278,37 @@ scripts/
     make_all_paper_figures.m          [2] one click, all final figures
     paper_config.m                    the single place naming the preset,
                                       run_mode, and per-figure overrides
-    quick_check.m                     [3] fast-mode variant of [1] for dial-in
+                                      (no quick_check.m -- the smoke test is
+                                       run_mode='fast' on [1], per Q5)
 
-  analyses/                           (was run_all_analyses/, now all functions)
-    run_sensitivity_analysis.m        function(cfg) -> dirs
-    run_tau_sensitivity_analysis.m    function(cfg) -> dir
-    run_param_space_analysis.m        function(cfg) -> dir
-    run_memory_capacity.m             function(cfg) -> mat path   (was looped_memory_capacity)
-    run_memory_capacity_example.m     function(cfg) -> mat path
+  run_all_analyses/                   <-- KEEPS ITS NAME. CLAUDE.md documents this
+    run_all_analyses.m                path in three sections; renaming buys nothing
+                                      functional and forces a CLAUDE.md rewrite.
+                                      Now function(preset, run_mode, opts) -> run_dir,
+                                      still the SWEEP pipeline only.
+    run_sensitivity_analysis.m        function(ctx) -> dirs
+    run_tau_sensitivity_analysis.m    function(ctx) -> dir
+    run_param_space_analysis.m        function(ctx) -> dir   (drops the stale `2`)
+    run_dc_lle_analysis.m             function(ctx) -> dir
+    run_overnight_queue.m             collapses to a loop over run_all_analyses
     analysis_run_config.m             (unchanged)
     resolve_run_context.m             NEW: the shared preamble
+    replot/                           (unchanged location)
+
+  memory_capacity/                    <-- MC functions stay HERE, where MC lives
+    run_memory_capacity.m             function(cfg) -> mat path (was looped_memory_capacity)
+    plot_memory_capacity.m            (already a function)
+    replot_memory_capacity.m          (already a function)
 
   presentations/
     Stability_Manuscript/             <-- STAYS PUT (Q6): the manuscript on the Mac
       fig_*/fig_*.m                   references these paths. Contents refactored,
-                                      each now a function(run_dir, out_dir, opts).
+                                      each now a function(cfg).
+      fig_memory_capacity_example/
+        run_memory_capacity_example.m STAYS in its figure folder (was
+                                      compute_memory_capacity_example.m); it is the
+                                      compute half of one figure, not a general
+                                      analysis. Called by [1].
       _common/                        NEW, inside the manuscript tree so it stays
         manuscript_style.m            self-contained
         write_figure_readme.m         replaces ~350 lines of fprintf(fid,...)
@@ -752,8 +768,10 @@ and confirm it produces the same directory layout as `run_all_aug_18_26_21_41`.
 
 **Phase 2 — `scripts/paper/` entry points.** `paper_config.m` (the one file to edit:
 main preset, run_mode, per-figure preset overrides), `run_all_paper_analyses.m`,
-`make_all_paper_figures.m`, `quick_check.m`. Fold the MC pipeline in as
-`run_memory_capacity(cfg)` with its own named `SRNNModel2` preset (Q2).
+`make_all_paper_figures.m`. **No `quick_check.m`** — the smoke test is
+`run_mode = 'fast'` on the same master (Q5), and a separate script would duplicate it.
+Fold the MC pipeline in as `run_memory_capacity(cfg)` — living in
+`scripts/memory_capacity/`, not moved — with its own named `SRNNModel2` preset (Q2).
 
 **Phase 3 — figure helpers.** `_common/`: `manuscript_style`, `write_figure_readme`,
 `sort_axes_left_to_right`, one `save_figure_stable`, `resolve_run_dir`. Collapse the
@@ -771,12 +789,15 @@ per Q4/Q7:
   `_dualStd` run.
 - *Analytic, read τ from the preset:* `fig_SFA_steady_state`, `fig_STD_steady_state`
   — single-timescale curve uses `tau(1)` and `c = value/1`.
-- *Rebuild from `SRNNModel2` onto `SRNNCellTypePairs`:* `fig_example_timeseries`,
-  `fig_adaptation_methods` single-neuron (SFA+STD only, `c` from the preset),
-  `fig_eig_heatmap`.
+- *Rebuild from `SRNNModel2` onto `SRNNCellTypePairs`, on the main preset:*
+  `fig_example_timeseries`; `fig_adaptation_methods` **figure A** (SFA+STD, `c` from
+  the preset, noise ON); `fig_eig_heatmap` (preset `level_of_chaos = 1.0`, and it must
+  name `'sra1'` itself).
 - *Rebuild onto `SRNNCellTypePairs` behind a **new** preset:*
   `fig_stim_engages_adaptation` (bursting preset),
-  `fig_introductory_concepts` panel A (Sompolinsky preset).
+  `fig_introductory_concepts` panel A (Sompolinsky preset),
+  `fig_adaptation_methods` **figure B** (STF preset — SFA + STD + STF, the rebuild of
+  the deleted `test_single_neuron_stf.m`).
 - *Fix the colouring path, then rebuild:* `fig_EI_param_space` — plumb `color_by`
   through `load_and_make_unit_histograms` and read the value via
   `effective_param(res, 'f_E')`. `f_E` is `f(1)`, so the colormap and E:I ticks are
