@@ -43,12 +43,15 @@ Path setup is a **once-per-session** action: run `setup_paths` with the MATLAB c
 
 Entry-point scripts (the `run_all_analyses` pipeline, the `Fig_*` presentation scripts, the runnable memory-capacity scripts) still call `setup_paths()` on their first line so they can be launched cold. Smaller scripts — everything in `scripts/tests/`, examples — assume the session is already bootstrapped and contain **no path code at all**. Do not reintroduce per-script `addpath`/`genpath` bootstrap lines.
 
-Primary entry points (current, not legacy) — the orchestrator and its three sub-analyses live together in `scripts/run_all_analyses/`:
+Primary entry points (current, not legacy) — the orchestrator and its three sub-analyses live together in `scripts/run_all_analyses/`. **They are all functions**, taking a context struct and returning their output directory:
 
-- `scripts/run_all_analyses/run_param_space_analysis2.m` — multi-dimensional grid sweep across SRNNModel2 parameters
-- `scripts/run_all_analyses/run_sensitivity_analysis.m` — 1D sweeps (uses `ParamSpaceAnalysis2` with `randomize_order=false` and `reps` as a grid axis)
-- `scripts/run_all_analyses/run_tau_sensitivity_analysis.m` — vector-parameter sweep over `tau_a_E` / `tau_b_E_rec`
-- `scripts/run_all_analyses/run_all_analyses.m` — orchestrator that runs the three above into a single dated `data/param_space/run_all_<dt>/` directory
+- `run_all_analyses(preset_name, run_mode, ...)` — orchestrator; runs the three below into a single dated `data/param_space/run_all_<dt>/` directory and returns it. Defaults to the paper's preset at `'medium'`. This is the **sweep** pipeline only.
+- `run_sensitivity_analysis(ctx)` — 1D sweeps (`ParamSpaceAnalysis2` with `randomize_order=false` and `reps` as a grid axis). Returns one dir per swept parameter.
+- `run_tau_sensitivity_analysis(ctx)` — vector-parameter sweep over `tau_a_E`.
+- `run_param_space_analysis(ctx)` — multi-dimensional grid sweep. (Renamed from `run_param_space_analysis2.m`; the trailing `2` came from `ParamSpaceAnalysis2` and disambiguated nothing.)
+- `resolve_run_context(analysis, ...)` — builds the `ctx` all three take: preset, model class, conditions, `analysis_run_config` output, merged `model_defaults`, `integer_params`, and the per-class `f_param`.
+
+**No script in this repo runs another script and communicates through workspace variables.** Inputs are arguments; outputs are return values. The `master_*` base-workspace protocol that used to carry settings from the orchestrator into the sub-scripts (read with `exist(...,'var')`) is gone — see "Master-orchestrator conventions" below for what replaced it and why.
 
 `setup_paths.m` lives at the **repo root** and derives everything from its own location. It deliberately enumerates `src/` and `scripts/` rather than `genpath`-ing the root: `data/`, `figs/` and `docs/` must stay off the path, and `data/param_space/run_all_*/` holds copies of the launcher scripts that would otherwise shadow the originals. It never calls `savepath`. `run_all_analyses.m` and friends derive `project_root = fileparts(which('setup_paths'))`, so they tolerate living in a subdirectory.
 
@@ -167,17 +170,34 @@ Two orthogonal knobs, deliberately kept apart:
 
   **The two knobs are no longer fully orthogonal, and this is where they meet.** Every cell names *two* integrators — deterministic (`'rk4'` for fast/fast2/medium, `'ode45'` for production) and stochastic (`'sra1'` everywhere) — and the **preset** picks between them: `sigma_u_noise > 0` selects the stochastic one. That is why the third argument exists, and why the three sub-scripts resolve `preset_defaults` *before* calling this. Selecting here is what leaves everything else intact: `merge_struct` precedence is unchanged (`cfg.model` still wins), `ode_solver` stays banned from presets, and a σ = 0 preset is bit-identical to before the mechanism existed. `cfg.sde_solver` / `cfg.is_stochastic` live at the top level of `cfg`, never inside `cfg.model` — only `cfg.model` is merged into `model_defaults`, and neither is a model property. Note a stochastic `production` run is fixed-step and so does **not** carry `ode45`'s adaptive tolerance: there is no adaptive SDE solver, because step-size control is meaningless once increments are tied to the step.
 
-Sub-scripts combine them with `merge_struct(preset_defaults, cfg.model)` — **preset first**, so `run_mode` keeps final say over its own knobs, and so a whole-struct assignment cannot clobber them. `run_all_analyses.m` picks the preset in one line (`preset_name`) and records it, with the model class, in `run_manifest`.
+`resolve_run_context` combines them with `merge_struct(preset_defaults, cfg.model)` — **preset first**, so `run_mode` keeps final say over its own knobs, and so a whole-struct assignment cannot clobber them. That call lives in exactly one place now; it used to be copy-pasted into each of the three sub-scripts. `run_all_analyses` takes `preset_name` as its first argument and records it, with the model class, in `run_manifest`.
 
 ### Master-orchestrator conventions
 
-`run_all_analyses.m` sets two variables that downstream scripts conditionally honor:
+`run_all_analyses` passes one **`ctx` struct** to each sub-analysis, built by
+`resolve_run_context(analysis, 'preset_name', …, 'run_mode', …, 'output_dir', …, 'save_figs', …)`.
+Its fields:
 
-- `master_output_dir` — when set, sub-scripts write into this shared dir instead of creating their own and **skip their `clear`/`clc`/`close all`**.
-- `master_save_figs` — `'save_all_figs'` / `'save_no_figs'` / `'follow_scripts_save_figs'` overrides each sub-script's local `save_figs` flag.
-- `master_model_class` — the preset's model class. Each sub-script reads it into a local `model_class` (defaulting to `'SRNNModel2'` when run standalone), assigns `psa.model_class`, resets `integer_params` to `{'n','indegree'}` (the class default lists `SRNNModel2`'s adaptation counts), and takes its conditions from `srnn_adaptation_conditions(model_class)`. Two axes are renamed per class: the fraction-excitatory sweep is `f` on `SRNNModel2` and `f_E` on `SRNNCellTypePairs`, and `plot`'s `color_by` must be given explicitly for Pairs because its default `'f'` is a row there and breaks the histogram colouring.
+- `output_dir` — the shared run directory. Empty means "let `ParamSpaceAnalysis2` create its own dated folder", which is what a standalone run wants.
+- `save_figs` — a **logical**. (The old `master_save_figs` had a third value, `'follow_scripts_save_figs'`, meaning "let each sub-script use its own local flag". There are no local flags any more, so it had nothing left to mean.)
+- `model_class` + `conditions` + `preset_defaults` — all three from **one** `srnn_param_preset` call, which is what stops a Pairs preset being swept with `SRNNModel2`-shaped conditions.
+- `integer_params` — `{'n','indegree'}`, not the class default (which lists `SRNNModel2`'s adaptation counts, meaningless on Pairs).
+- `f_param` — `'f'` on `SRNNModel2`, `'f_E'` on `SRNNCellTypePairs`. The fraction-excitatory axis is a scalar property on one and a scalar *alias* onto a `1 x C` row on the other. Note `plot`'s `color_by` must be given explicitly for Pairs, because its default `'f'` is a row there and breaks the histogram colouring.
+- `cfg` / `model_defaults` — `analysis_run_config` output and `merge_struct(preset_defaults, cfg.model)`.
 
-Preserve this pattern when adding new analysis scripts.
+**Why this replaced the `master_*` variables.** The sub-scripts used to read
+`master_output_dir` / `master_save_figs` / `master_model_overrides` /
+`master_model_class` / `master_conditions` / `run_mode` / `save_figs` out of
+whatever workspace called them, via `exist(...,'var')` — 37 such sites. You could
+not tell what a sub-script needed without grepping; a variable left behind by one
+run silently applied to the next (`run_overnight_queue.m` existed *only* to scrub
+them, as its own header admitted); and the sub-scripts had to skip their own
+`clear`/`clc` when `master_output_dir` was set, leaking "am I being orchestrated?"
+into their cleanup logic. All three problems are properties of shared mutable
+scope, and all three vanish with arguments.
+
+Preserve this pattern when adding new analysis functions: take a `ctx` (or plain
+named arguments), return your output directory, and read nothing from the caller.
 
 ### `src/` layout
 
@@ -192,7 +212,7 @@ Preserve this pattern when adding new analysis scripts.
 The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_paper/`, `VAR_SRNN/`, `python_piecewise/`, `reference_files/`) and the old-API comparison/run scripts, and reorganized `scripts/` into topic subdirectories. Current layout:
 
 - `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
-- `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses, with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside. Also `analysis_run_config.m`, the single per-script table of `run_mode` settings that replaced the duplicated `switch run_mode` blocks.
+- `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses (all functions), with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside. Also `analysis_run_config.m`, the single table of `run_mode` settings that replaced the duplicated `switch run_mode` blocks, and `resolve_run_context.m`, the shared preamble that replaced the `master_*` protocol. `run_dc_lle_analysis.m` and `check_sensitivity_sim.m` are standalone tools here, not part of the pipeline.
 - `scripts/EI_balance/` — fraction-excitatory analyses: `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_load_and_plot.m`.
 - `scripts/memory_capacity/` — `example_memory_capacity.m`, `looped_memory_capacity.m` (Echo State Network experiments).
 - `scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/` —

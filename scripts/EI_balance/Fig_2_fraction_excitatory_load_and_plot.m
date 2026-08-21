@@ -26,14 +26,11 @@ save_stats = true;
 
 % ==========================================
 
-%% Master script override support
-if exist('master_save_figs', 'var')
-    if strcmp(master_save_figs, 'save_all_figs')
-        save_figs = true;
-    elseif strcmp(master_save_figs, 'save_no_figs')
-        save_figs = false;
-    end
-end
+% NOTE: save_figs is set in the USER CONFIGURATION block above. A
+% `master_save_figs` override used to be read out of the base workspace here;
+% that protocol is gone (no script in this repo passes settings to another
+% through workspace variables -- see CLAUDE.md), and the block silently did
+% nothing whenever the variable was absent.
 
 %% Setup paths
 setup_paths();

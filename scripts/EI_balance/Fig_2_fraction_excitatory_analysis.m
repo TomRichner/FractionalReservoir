@@ -9,16 +9,14 @@
 % See also: ParamSpaceAnalysis2, SRNNModel2
 
 %% Configuration
-if exist('master_save_figs', 'var')
-    if strcmp(master_save_figs, 'save_all_figs')
-        save_figs = true;
-    elseif strcmp(master_save_figs, 'save_no_figs')
-        save_figs = false;
-    end
-end
-if ~exist('save_figs', 'var')
-    save_figs = false;
-end
+% Edit these two. They used to be read out of the base workspace
+% (`master_save_figs`, `master_output_dir`) because run_all_analyses once called
+% this script; that call is commented out and the protocol is gone. No script in
+% this repo passes settings to another through workspace variables -- see
+% CLAUDE.md. If this analysis is ever wired back into a pipeline, make it a
+% function taking these as arguments.
+save_figs  = false;
+output_dir = '';    % '' = let ParamSpaceAnalysis2 create its own dated folder
 
 %% Setup paths
 setup_paths();
@@ -39,8 +37,8 @@ psa = ParamSpaceAnalysis2(...
     'verbose', true ...
     );
 psa.folder_prefix = 'fig2';
-if exist('master_output_dir', 'var')
-    psa.output_dir = master_output_dir;
+if ~isempty(output_dir)
+    psa.output_dir = output_dir;
 end
 
 %% Add parameters to the grid

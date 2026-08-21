@@ -18,17 +18,11 @@ set(groot, 'DefaultAxesTitleFontWeight', 'normal');
 % NOTE: This script sets global MATLAB figure defaults that persist for the session.
 % Run `reset(groot)` afterward to restore factory defaults if needed.
 
-% Check for master override from run_all_figures.m
-if exist('master_save_figs', 'var')
-    if strcmp(master_save_figs, 'save_all_figs')
-        save_figs = true;
-    elseif strcmp(master_save_figs, 'save_no_figs')
-        save_figs = false;
-    end
-end
-if ~exist('save_figs', 'var')
-    save_figs = false;  % Script default
-end
+% Edit here to save figures. This used to read a `master_save_figs` variable out
+% of the base workspace, set by a `run_all_figures.m` that no longer exists --
+% dead coupling to a dead script. No script in this repo passes settings to
+% another through workspace variables; see CLAUDE.md.
+save_figs = false;
 save_workspace = false;
 
 %% Shared simulation parameters

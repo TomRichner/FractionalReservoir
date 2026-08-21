@@ -766,6 +766,31 @@ base-workspace protocol and the state-scrubbing in `run_overnight_queue`. Extrac
 shared ~60-line preamble into `resolve_run_context`. **Verify with a `fast` smoke run**
 and confirm it produces the same directory layout as `run_all_aug_18_26_21_41`.
 
+> **Phase 1 findings (2026-08-21).**
+>
+> * **The param-space output folder name changes**, and not only by dropping
+>   `test_refactor`. `ParamSpaceAnalysis2` builds it as
+>   `<folder_prefix>_<note>_nLevs_N_<dt>` when `note` is non-empty and
+>   `<folder_prefix>_nLevs_N_<dt>` when it is empty. `folder_prefix` already
+>   defaults to `'param_space'`, so setting `note = 'param_space'` produced
+>   `param_space_param_space_nLevs_3_...`. The note is therefore **empty**, giving
+>   `param_space_nLevs_5_<dt>`. Anything globbing `param_space_*` still matches,
+>   which is what the replot and figure scripts do.
+> * **`run_dc_lle_analysis` cannot use `resolve_run_context`'s `cfg`.** It has no
+>   `analysis_run_config` row and should not get one: the DC staircase fixes
+>   `T_range` by construction (`nL x hold_dur`), so the fs/T_range/LLE-window
+>   tuning the three PSA analyses share is meaningless for it. `resolve_run_context`
+>   accepts `'dc_lle'` and returns an empty `cfg` with `model_defaults` = the bare
+>   preset; the function keeps its own `run_mode` switch (which sets `n_seeds` and
+>   the solver only).
+> * **The `tau_b_E_rec` sweep was deleted rather than carried as dead code.** It sat
+>   commented out inside `run_tau_sensitivity_analysis` and was `SRNNModel2`-only —
+>   `tau_b_E_rec` is not a `SRNNCellTypePairs` property, so on the current preset it
+>   would be a hard `validate_model_defaults` error, not a no-op. Git history has it.
+> * **`check_sensitivity_sim` and `run_dc_lle_analysis` now assert their model
+>   class.** Both construct `SRNNModel2` directly and read `n_a_E`/`n_b_E`; pointed
+>   at a Pairs run they used to fail confusingly deep inside the constructor.
+
 **Phase 2 — `scripts/paper/` entry points.** `paper_config.m` (the one file to edit:
 main preset, run_mode, per-figure preset overrides), `run_all_paper_analyses.m`,
 `make_all_paper_figures.m`. **No `quick_check.m`** — the smoke test is
