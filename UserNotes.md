@@ -14,6 +14,112 @@ and session that wrote it. Newest first.
 
 ---
 
+## `SRNNCellTypePairs` cannot build a ONE-cell-type network — `build_W` bypasses `set_types`
+
+| | |
+|---|---|
+| Noted | 2026-08-22 · `refactorRunAll` @ `bbc013b` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Found | during `refactorRunAll`, porting the Sompolinsky and single-neuron figures |
+| Status | **Reported, not fixed.** Model-class code; nothing currently needs it. |
+
+A latent defect, verified empirically rather than inferred. It is a one-line fix,
+but it is in `SRNNCellTypePairs`, so it was left alone rather than folded into a
+refactor about something else.
+
+### What happens
+
+```matlab
+SRNNCellTypePairs('n_cellTypes',1, 'cell_type_names',{'E'}, 'f',1, ...
+                  'mu_tilde_relative',0, 'sigma_tilde_relative',1, ...)
+```
+
+constructs **correctly** — the object holds `n_cellTypes = 1`, `numel(f) = 1`,
+`mu_tilde_relative` of size `[1 1]`. Then `build()` throws:
+
+```
+RMTBlocks:InconsistentTypes
+numel(f) = 2 but mu_tilde is [1 1]. Use set_types(f, mu_tilde, sigma_tilde)
+to change the number of cell types.
+```
+
+The error names the fix but blames the wrong caller, which is what makes it
+confusing: nothing in the user's call said 2.
+
+### Why
+
+`SRNNCellTypePairs.build_W`, `src/SRNNCellTypePairs.m:1090-1094`, assigns the
+generator **piecemeal**:
+
+```matlab
+rmt = RMTBlocks(obj.n);           % constructs at D = 2 (RMTBlocks.m:155, f = [0.5 0.5])
+rmt.alpha       = obj.alpha;
+rmt.f           = obj.f;          % scalar 1 -> the D=2 setter expands it to [1 0]
+rmt.mu_tilde    = obj.mu_tilde;   % 1x1 -> now inconsistent with numel(f) = 2
+rmt.sigma_tilde = obj.sigma_tilde;
+```
+
+`RMTBlocks.set_types`'s own docstring (`RMTBlocks.m:563`) says exactly why this
+fails:
+
+> This is the only way to **CHANGE D**. Setting `f`, `mu_tilde` and
+> `sigma_tilde` one at a time works fine when D is unchanged, but changing D
+> piecemeal would leave the object transiently inconsistent, so use this instead.
+
+`build_W` is doing the thing that docstring forbids. It works for D = 2 only
+because that is what `RMTBlocks` already defaults to, so D never actually changes.
+
+**Confirmed directly**, without editing anything: `r.f = 1` leaves
+`numel(r.f) == 2` with `f = [1 0]`, whereas `r.set_types(1, 0, 1)` builds a D = 1
+network correctly (200x200 dense, 50.3% negative weights).
+
+### The fix
+
+Replace the three assignments with the atomic setter:
+
+```matlab
+rmt.set_types(obj.f, obj.mu_tilde, obj.sigma_tilde);
+```
+
+`alpha` and `zrs_mode` stay as they are — they are not part of D.
+
+**But that alone does not make D = 1 usable in the sweep pipeline.** Two
+scalar aliases assert two types: `f_E` calls `assert_two_types()`, and `tau_a_E`
+additionally requires `cell_type_names{1} == 'E'`. Since `f_E` is the
+fraction-excitatory sweep axis and `tau_a_E` is the tau-sensitivity axis, a
+one-type preset would still fail there. Fixing `build_W` buys *construction*,
+not a swept one-type model.
+
+### Two other constraints that bite alongside it
+
+Both are deliberate and correct, but they compound with the above when trying to
+build something small:
+
+- `n >= n_cellTypes` (`SRNNCellTypePairs.m:854`) — so `n = 1` needs D = 1, which
+  is the broken path.
+- `0 < indegree <= n` (`:857`) — `indegree = 0` is rejected, so "no recurrence"
+  cannot be expressed by disconnecting; it must be expressed with zero weights.
+
+### How the refactor worked around it
+
+Neither workaround needs model-class changes, which is why the defect stayed
+unfixed:
+
+- **`sompolinsky_pairs`** — the Dale-free random network for figure 1 panel A
+  uses **two statistically identical zero-mean types** named `A`/`B`. Same
+  network; `R` comes out exactly equal to `level_of_chaos` (0.900 / 1.600 /
+  2.500 measured), and the weights are 50.0% negative as required. The traces
+  concatenate both types, since together they are the whole network.
+- **`single_neuron_stf`** and the single-neuron methods figure — `n = 2`,
+  `indegree = 1`, `mu` and `sigma` both zero, giving `W = [0 0; 0 0]` and
+  `N_sys_eqs = 5`. The smallest expressible unconnected network; only the E
+  neuron is plotted, and with `W == 0` the other cannot influence it.
+
+The cost of the workaround is cosmetic but real: type names are either arbitrary
+(`A`/`B`) or slightly dishonest (`E`/`I` for a lone neuron), and `plot_data` is
+keyed by type so any "all neurons" trace has to concatenate across types.
+
+---
+
 ## Memory capacity is still on `SRNNModel2` — the ESN class needs porting to `SRNNCellTypePairs`
 
 | | |
