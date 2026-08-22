@@ -1,43 +1,60 @@
-close all
-clc
+function out = fig_STD_steady_state(cfg)
+% FIG_STD_STEADY_STATE Multi-timescale STD steady state, and what it costs.
+%
+%   out = FIG_STD_STEADY_STATE()
+%   out = FIG_STD_STEADY_STATE('preset_name', p)
+%
+% Conceptual, ANALYTIC (no simulation). Setting db/dt = 0 in
+%     db_k/dt = (1 - b_k)/tau_rec_k - b_k*r/tau_rel_k
+% gives b_k(r) = 1/(1 + r*tau_rec_k/tau_rel_k); the synapse multiplies the
+% timescales, so it sees prod_k b_k(r).
+%
+%   Left  : prod(b) against r, with one component b_k dashed for reference.
+%   Right : prod(b)*r -- what the recurrent sum actually receives -- again with
+%           one component dashed, and a faint identity line y = r marking the
+%           UNDEPRESSED synapse. The vertical gap to a curve is what depression
+%           costs at that rate.
+%
+% TWO VERSIONS are written, differing ONLY in the right panel's y range. The
+% full-scale one keeps equal pixel scaling on both axes, so the identity line is
+% a literal 45 degrees and a vertical distance can be compared against a
+% horizontal one by eye -- honest, but both curves sit in the bottom tenth of
+% the panel. The zoom drops the 1:1 aspect deliberately (it cannot survive a y
+% range that much shorter than x without squashing the panel to a sliver, so no
+% cross-axis angle there means anything) and buys the turnover, which is the
+% point of the panel and is nearly invisible at full scale.
+%
+% CONTRAST WITH SFA (fig_SFA_steady_state): SFA enters as a SUM, so splitting c
+% as a budget makes the timescale count invisible at steady state. STD enters as
+% a PRODUCT, so two timescales SQUARE the depression however the taus are
+% chosen. There is no budget-split of tau that would make dual STD match single.
+%
+% THE TIMESCALES COME FROM THE PRESET, and specifically from its CONDITIONS:
+% synapse_config can only reach the model through a condition, so that is where
+% a preset puts its depression routes -- never in the model_defaults struct.
+%
+% See also: fig_SFA_steady_state, srnn_param_preset, srnn_adaptation_conditions
 
-% Fig_STD_steady_state.m
-% Stability_Manuscript conceptual figure: the steady-state depression of the
-% DUAL-TIMESCALE STD preset, and the synaptic output it leaves behind.
-%
-% Setting db/dt = 0 in
-%       db_k/dt = (1 - b_k)/tau_rec_k - b_k*r/tau_rel_k
-% gives, for each timescale k,
-%       b_k(r) = 1 / (1 + r * tau_rec_k / tau_rel_k)
-% and the synapse multiplies them, so it sees prod_k b_k(r).
-%
-% Analytic figure -- no simulation. The taus are READ OFF THE PRESET rather than
-% hardcoded, so this cannot drift away from what is actually being swept.
-%
-% Left panel:  prod(b) vs r  -- how much gain is left at a given rate.
-% Right panel: prod(b)*r vs r -- the synaptic output itself, which is what the
-%   recurrent sum actually receives. It is NON-MONOTONIC: depression eventually
-%   outruns the rate driving it, so beyond a peak, firing harder delivers LESS
-%   to the network. That peak is the interesting quantity here.
-%
-% TWO VERSIONS are written, differing only in the right panel's y range: the
-% square one (y over [0, 1], daspect [1 1 1]) and a zoomed one that fills the
-% panel with the curves and drops the 1:1 aspect ratio to do it. See the
-% comment above the figure loop.
-%
-% See also: Fig_FI_curve (the same mechanisms as a deformation of the F-I curve)
+arguments
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.route_pre   (1,:) char    = 'E'
+    cfg.route_post  (1,:) char    = 'E'
+    cfg.out_dir     (1,:) char    = ''
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+    cfg.run_dir     (1,:) char    = ''   % unused; accepted for a uniform call
+end
 
-this_dir = fileparts(mfilename('fullpath'));
 setup_paths();
+out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 project_root = fileparts(which('setup_paths'));
+st           = manuscript_style();
 
-%% ---- Parameters -----------------------------------------------------------
-preset_name = 'celltype_pairs_Sc0p2_noise0p025_dualStd';
 
 % Pull the depression timescales out of the preset's own STD routes. They live
 % on the conditions, not on the model_defaults struct: synapse_config can only
 % reach the model through a condition, so that is where a preset puts them.
-[~, ~, conditions] = srnn_param_preset(preset_name);
+[~, ~, conditions] = srnn_param_preset(cfg.preset_name);
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 sc = conditions{strcmp(cond_names, 'sfa_and_std')}.synapse_config;
 route = sc.E.E.std;                 % uniform across all four routes in this preset
@@ -51,10 +68,10 @@ r = linspace(0, 1, 400);            % rate, over the full range of the nonlinear
 b_each = 1 ./ (1 + ratio(:) * r);
 b_prod = prod(b_each, 1);
 
-tick_fs  = 14;    % tick numbers -- matches the other Stability_Manuscript figures
-label_fs = 15.4;  % axis labels
+tick_fs  = st.tick_fs;
+label_fs = st.label_fs;
 title_fs = 16;    % panel titles
-lw       = 2;
+lw       = st.line_lw;
 
 prod_color     = [0.85 0.325 0.098];   % warm, matching the E colour used elsewhere
 single_color   = [0.5 0.5 0.5];
@@ -178,99 +195,81 @@ text(ax2, r_peak, peak_val, sprintf('  r = %.2f', r_peak), ...
 end
 
 %% ---- Save (stable filenames) ----------------------------------------------
+
+if ~cfg.visible; set(figs, 'Visible', 'off'); end
+
+%% --- Save -------------------------------------------------------------------
 fig_tag_base = 'Fig_STD_steady_state';
 fig_tags = {fig_tag_base, [fig_tag_base '_zoom']};
-
-% One sweep for both versions, BEFORE any saving: the base tag is a prefix of
-% the zoom tag, so a per-variant delete of '<base>*' would wipe the zoom files
-% written on the previous pass.
-old = dir(fullfile(this_dir, [fig_tag_base '*']));
-for a = 1:numel(old)
-    fp = fullfile(old(a).folder, old(a).name);
-    if ~old(a).isdir && (endsWith(fp, '.png') || endsWith(fp, '.svg') || endsWith(fp, '.fig'))
-        delete(fp);
+out = struct('figs', figs, 'files', {{}}, 'source', ['preset: ' cfg.preset_name]);
+if cfg.save
+    for v = 1:numel(figs)
+        save_figure_stable(out_dir, fig_tags{v}, figs(v));
+        out.files = [out.files, existing_outputs(out_dir, fig_tags{v})];
     end
+    capture_git_provenance(out_dir, project_root);
+
+    % Numbers worth quoting, computed from the preset actually used rather than
+    % restated from a comment (the previous README hardcoded them).
+    b_at = @(rr) prod(1 ./ (1 + ratio(:) * rr), 1);
+    r_fine = linspace(0, 1, 20001);
+    out_curve = b_at(r_fine) .* r_fine;
+    [peak_val, pk] = max(out_curve);
+    single_asym = tau_rel(1) / tau_rec(1);
+
+    % NOTE the reduction factor is measured against an UNDEPRESSED synapse
+    % (b == 1), i.e. 1/prod(b), NOT the ratio of the two quoted values. Those
+    % differ by an order of magnitude here and it is easy to state the wrong
+    % one: at r = 1 the gain is 1/0.0123 = 81x down on undepressed, while the
+    % 0.3-to-1 ratio is only about 7x.
+    numbers_note = sprintf([ ...
+        'prod(b) at r = 0.3 is %.4g; at r = 1 it is %.4g -- a %.0fx reduction ' ...
+        'in synaptic gain relative to an undepressed synapse (b = 1). The ' ...
+        'output prod(b)*r PEAKS at r = %.4g with value %.4g, and DECREASES ' ...
+        'beyond it: depression outruns the rate driving it, so firing harder ' ...
+        'delivers LESS to the network. A SINGLE timescale does not do this -- ' ...
+        'b_k*r rises monotonically to an asymptote of %.4g (= tau_rel/tau_rec), ' ...
+        'which is %.1fx the product''s peak. The turnover is specific to more ' ...
+        'than one depression timescale.'], ...
+        b_at(0.3), b_at(1), 1/b_at(1), r_fine(pk), peak_val, ...
+        single_asym, single_asym/peak_val);
+
+    contrast_note = [ ...
+        'CONTRAST WITH SFA (fig_SFA_steady_state). SFA enters the dynamics as a ' ...
+        'SUM, so splitting c as a budget over its timescales makes the count ' ...
+        'invisible at steady state. STD enters as a PRODUCT, so two timescales ' ...
+        'SQUARE the depression however the taus are chosen -- there is no ' ...
+        'budget-split of tau that would make dual STD match single STD.'];
+
+    version_note = [ ...
+        'TWO VERSIONS, differing ONLY in the right panel y range. The full-scale ' ...
+        'one uses equal pixel scaling on both axes, so the identity line is a ' ...
+        'literal 45 degrees and a vertical distance can be compared against a ' ...
+        'horizontal one by eye -- honest, but both curves sit in the bottom ' ...
+        'tenth of the panel. The zoom DELIBERATELY drops the 1:1 aspect, which ' ...
+        'cannot survive a much shorter y range without squashing the panel to a ' ...
+        'sliver, so no cross-axis angle there means anything; what it buys is ' ...
+        'the turnover. The left panel is identical in both: prod(b) is a gain, ' ...
+        'already bounded by [0, 1], so there is nothing to zoom into.'];
+
+    write_figure_readme(out_dir, struct( ...
+        'tag',    'fig_STD_steady_state', ...
+        'title',  'Stability_Manuscript figure: multi-timescale STD steady state', ...
+        'script', 'fig_STD_steady_state.m', ...
+        'what',   ['Conceptual, ANALYTIC figure (no simulation). Setting ' ...
+                   'db_k/dt = 0 gives b_k(r) = 1/(1 + r*tau_rec_k/tau_rel_k), ' ...
+                   'and the synapse multiplies the timescales, so it sees ' ...
+                   'prod_k b_k(r). Left: prod(b) against r with one component ' ...
+                   'dashed. Right: prod(b)*r -- what the recurrent sum actually ' ...
+                   'receives -- with the faint identity line marking the ' ...
+                   'undepressed synapse.'], ...
+        'source', struct('preset', cfg.preset_name, ...
+                         'route', [cfg.route_pre ' -> ' cfg.route_post]), ...
+        'settings', struct('tau_rec', tau_rec, 'tau_rel', tau_rel, ...
+                           'tau_rec_over_tau_rel', ratio, 'n_b', numel(tau_rec)), ...
+        'figures', {out.files}, ...
+        'sections', struct( ...
+            'heading', {'numbers worth quoting', 'contrast with sfa', 'the two versions'}, ...
+            'body',    {numbers_note, contrast_note, version_note})));
 end
-
-for v = 1:numel(variants)
-    fig_tag = fig_tags{v};
-    save_some_figs_to_folder_2(this_dir, fig_tag, figs(v).Number, {'png', 'svg', 'fig'});
-    num = num2str(figs(v).Number);
-    movefile(fullfile(this_dir, [fig_tag '_figure_' num '.png']), fullfile(this_dir, [fig_tag '.png']));
-    movefile(fullfile(this_dir, [fig_tag '_figure_' num '.svg']), fullfile(this_dir, [fig_tag '.svg']));
-    movefile(fullfile(this_dir, [fig_tag '_f_' num '.fig']),      fullfile(this_dir, [fig_tag '.fig']));
 end
-
-capture_git_provenance(this_dir, project_root);
-
-%% -------------------- Human-readable description --------------------
-desc_path = fullfile(this_dir, 'README_fig_STD_steady_state.txt');
-fid = fopen(desc_path, 'w');
-cleanup = onCleanup(@() fclose(fid));
-
-fprintf(fid, 'Stability_Manuscript figure: dual-timescale STD steady state\n');
-fprintf(fid, '===========================================================\n\n');
-fprintf(fid, 'Generated: %s\n', char(datetime('now')));
-fprintf(fid, 'By script: %s.m\n\n', mfilename);
-
-fprintf(fid, 'WHAT IT SHOWS\n');
-fprintf(fid, '  Conceptual, ANALYTIC figure (no simulation). Setting db/dt = 0 in\n');
-fprintf(fid, '    db_k/dt = (1 - b_k)/tau_rec_k - b_k*r/tau_rel_k\n');
-fprintf(fid, '  gives b_k(r) = 1/(1 + r*tau_rec_k/tau_rel_k); the synapse multiplies\n');
-fprintf(fid, '  the timescales, so it sees prod_k b_k(r).\n\n');
-fprintf(fid, '  Left  : prod(b) vs r, with one component b_k dashed for reference.\n');
-fprintf(fid, '          Both timescales share tau_rec/tau_rel here, so b_1 and b_2\n');
-fprintf(fid, '          coincide at steady state and the dashed curve is either.\n');
-fprintf(fid, '  Right : prod(b)*r vs r -- what the recurrent sum actually receives,\n');
-fprintf(fid, '          again with one component b_k*r dashed for reference. The\n');
-fprintf(fid, '          faint green identity line y = r is the UNDEPRESSED synapse\n');
-fprintf(fid, '          (b == 1); the vertical gap down to a curve is what\n');
-fprintf(fid, '          depression costs at that rate.\n\n');
-
-fprintf(fid, 'TWO VERSIONS, differing ONLY in the right panel''s y range\n');
-fprintf(fid, '  %s      : y over [0, 1] with equal pixel scaling on both\n', fig_tag_base);
-fprintf(fid, '      axes (daspect [1 1 1]), so the identity line is a literal 45\n');
-fprintf(fid, '      degrees and a vertical distance can be compared against a\n');
-fprintf(fid, '      horizontal one by eye. Honest but small: both curves sit in the\n');
-fprintf(fid, '      bottom tenth of the panel.\n');
-fprintf(fid, '  %s_zoom : y over [0, %.2f] -- just above the largest value a\n', ...
-    fig_tag_base, zoom_ymax);
-fprintf(fid, '      SINGLE b_k ever delivers (max b_k*r = %.4f, at r = 1). The 1:1\n', ...
-    max(output_single));
-fprintf(fid, '      aspect ratio is DELIBERATELY DROPPED: it cannot survive a y range\n');
-fprintf(fid, '      9x shorter than x''s without squashing the panel to a sliver, so\n');
-fprintf(fid, '      no cross-axis angle in this version means anything and the\n');
-fprintf(fid, '      identity line leaves the top of the panel at r = %.2f. What it\n', zoom_ymax);
-fprintf(fid, '      buys is the turnover, which is the point of the panel and is\n');
-fprintf(fid, '      nearly invisible at full scale.\n');
-fprintf(fid, '  The left panel is identical in both: prod(b) is a gain, already\n');
-fprintf(fid, '  bounded by [0, 1], so there is nothing to zoom into.\n\n');
-
-fprintf(fid, 'PRESET (taus are read from it, not hardcoded)\n');
-fprintf(fid, '  %s\n', preset_name);
-fprintf(fid, '  tau_rec = %s\n', mat2str(tau_rec));
-fprintf(fid, '  tau_rel = %s\n', mat2str(tau_rel));
-fprintf(fid, '  tau_rec/tau_rel = %s  (the only combination that sets the steady state)\n\n', ...
-    mat2str(ratio));
-
-fprintf(fid, 'NUMBERS WORTH QUOTING\n');
-fprintf(fid, '  prod(b) at r = 0.3 : %.4f\n', prod(1 ./ (1 + 0.3*ratio)));
-fprintf(fid, '  prod(b) at r = 1   : %.4f   (a %.0fx reduction in synaptic gain)\n', ...
-    prod(1 ./ (1 + ratio)), 1/prod(1 ./ (1 + ratio)));
-fprintf(fid, '  output prod(b)*r peaks at r = %.3f, value %.4f\n', r_peak, peak_val);
-fprintf(fid, '  Beyond that peak the output DECREASES: depression outruns the rate\n');
-fprintf(fid, '  driving it, so firing harder delivers less to the network.\n');
-fprintf(fid, '  A SINGLE timescale does not do this -- b_k*r rises monotonically to\n');
-fprintf(fid, '  an asymptote of %.4f (= tau_rel/tau_rec), reaching %.4f at r = 1,\n', ...
-    1/ratio(1), max(output_single));
-fprintf(fid, '  i.e. %.1fx the product''s peak. The turnover is specific to n_b > 1.\n\n', ...
-    max(output_single) / peak_val);
-
-fprintf(fid, 'FIGURES PRODUCED (in this folder)\n');
-for a = 1:numel(fig_tags)
-    fprintf(fid, '  %s.png\n  %s.svg\n  %s.fig\n', ...
-        fig_tags{a}, fig_tags{a}, fig_tags{a});
-end
-
-clear cleanup;  % flush + close
-fprintf('Description written: %s\n', desc_path);

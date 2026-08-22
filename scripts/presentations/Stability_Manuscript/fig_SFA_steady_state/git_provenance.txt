@@ -1,19 +1,28 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_SFA_steady_state
-Captured at: 19-Aug-2026 18:06:12
+Captured at: 22-Aug-2026 11:06:20
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      61512bf269a3487df27793a9ff322d4e386c4a8a
-commit_short:61512bf
-branch:      dev
+commit:      d18fda103bf1b86e7e87f57bf152951447eecf1e
+commit_short:d18fda1
+branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Merge branch 'dualStd' into dev
-last_date:   2026-08-19T17:52:18-05:00
+last_msg:    Stage 5b: the replot figures become functions and resolve their own run
+last_date:   2026-08-22T11:02:54-05:00
 dirty:       true
 
 --- git status --porcelain ---
 M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.fig
- M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.m
+D  scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.m
  M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.png
- M scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/Fig_SFA_steady_state.svg
+D  scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.m
+ M scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.m
+?? scripts/presentations/Stability_Manuscript/_common/build_from_preset.m
+?? scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/fig_SFA_steady_state.m
+?? scripts/presentations/Stability_Manuscript/fig_STD_steady_state/fig_STD_steady_state.m
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/_common/build_from_preset.m
+scripts/presentations/Stability_Manuscript/fig_SFA_steady_state/fig_SFA_steady_state.m
+scripts/presentations/Stability_Manuscript/fig_STD_steady_state/fig_STD_steady_state.m

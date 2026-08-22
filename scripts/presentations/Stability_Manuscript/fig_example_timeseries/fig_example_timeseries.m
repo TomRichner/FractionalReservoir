@@ -32,25 +32,16 @@ setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 
 %% Build the model from the preset, under one adaptation condition
-[preset, model_class, conditions] = srnn_param_preset(cfg.preset_name);
-ci = find(cellfun(@(c) strcmp(c.name, cfg.condition), conditions), 1);
-assert(~isempty(ci), 'No condition named ''%s'' in preset ''%s''.', ...
-    cfg.condition, cfg.preset_name);
+% build_from_preset merges preset + condition, selects the integrator the
+% preset's noise requires, and builds. See its header for the three traps it
+% exists to close (integrator selection, flat argument expansion, and the fact
+% that adaptation counts live in the CONDITION, never in a preset).
+[model, info] = build_from_preset(cfg.preset_name, cfg.condition, ...
+    'rng_seeds', cfg.rng_seeds, 'T_range', cfg.T_range, ...
+    'fs', 400, 'lya_method', 'none');
+model_class = info.model_class;
+solver      = info.ode_solver;
 
-% A stochastic preset REQUIRES a stochastic integrator; nothing here goes
-% through analysis_run_config, which is what picks one for the sweeps.
-if isfield(preset, 'sigma_u_noise') && any(preset.sigma_u_noise(:) > 0)
-    solver = 'sra1';
-else
-    solver = 'rk4';
-end
-
-args = [struct2namevalue(preset), struct2namevalue(rmfield(conditions{ci}, 'name')), ...
-    {'rng_seeds', cfg.rng_seeds, 'T_range', cfg.T_range, ...
-     'fs', 400, 'ode_solver', solver, 'lya_method', 'none'}];
-
-model = feval(model_class, args{:});
-model.build();
 model.run();
 
 [fig_handle, ~] = model.plot();
