@@ -1,7 +1,7 @@
 Stability_Manuscript figure: single-neuron adaptation mechanisms (sfa_std_stf)
 ==============================================================================
 
-Generated: 22-Aug-2026 11:12:47
+Generated: 22-Aug-2026 11:28:13
 By:        fig_adaptation_methods.m
 
 WHAT IT SHOWS

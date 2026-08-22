@@ -1,41 +1,36 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_FI_curve
-Captured at: 22-Aug-2026 10:47:09
+Captured at: 22-Aug-2026 11:27:07
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      b7138f0162f057df7a528eb0152522ef614c7549
-commit_short:b7138f0
+commit:      7ccc23ae122aa791424a9c3eed9d87490f23c3eb
+commit_short:7ccc23a
 branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Stage 4: shared figure helpers, and fix a graphics-default leak that was live
-last_date:   2026-08-22T10:43:39-05:00
+last_msg:    Stage 5 (complete): every manuscript figure is a function on the paper's model class
+last_date:   2026-08-22T11:25:21-05:00
 dirty:       true
 
 --- git status --porcelain ---
 M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
  M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.png
- M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.svg
-RM scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.m -> scripts/presentations/Stability_Manuscript/fig_FI_curve/fig_FI_curve.m
- M scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.m
- D scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries_f_1.fig
- D scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries_figure_1.png
- D scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries_figure_1.svg
-?? scripts/presentations/Stability_Manuscript/_common/default_out_dir.m
-?? scripts/presentations/Stability_Manuscript/_common/existing_outputs.m
-?? scripts/presentations/Stability_Manuscript/_common/figure_settings.m
-?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/README_fig_example_timeseries.txt
-?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.fig
-?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.png
-?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.svg
-?? src/struct2namevalue.m
+ M scripts/presentations/Stability_Manuscript/fig_example_timeseries/README_fig_example_timeseries.txt
+ M scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.fig
+ M scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.png
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/README_fig_introductory_concepts.txt
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.fig
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.png
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/energy_landscape/README_fig_energy_landscape.txt
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/energy_landscape/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/energy_landscape/panelA_energy_landscape.fig
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/energy_landscape/panelA_energy_landscape.png
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.fig
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.png
+?? scripts/paper/
 
 --- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/_common/default_out_dir.m
-scripts/presentations/Stability_Manuscript/_common/existing_outputs.m
-scripts/presentations/Stability_Manuscript/_common/figure_settings.m
-scripts/presentations/Stability_Manuscript/fig_example_timeseries/README_fig_example_timeseries.txt
-scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.fig
-scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.png
-scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.svg
-src/struct2namevalue.m
+scripts/paper/make_all_paper_figures.m
+scripts/paper/paper_config.m
+scripts/paper/run_all_paper_analyses.m

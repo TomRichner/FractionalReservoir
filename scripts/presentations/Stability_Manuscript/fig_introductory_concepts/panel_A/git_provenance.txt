@@ -1,59 +1,25 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_introductory_concepts\panel_A
-Captured at: 22-Aug-2026 11:15:36
+Captured at: 22-Aug-2026 11:26:35
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      ec000680f740baf40e5eca9b2a14be39930bf093
-commit_short:ec00068
+commit:      7ccc23ae122aa791424a9c3eed9d87490f23c3eb
+commit_short:7ccc23a
 branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Stage 5c: analytic steady-state figures read their parameters from the preset
-last_date:   2026-08-22T11:08:08-05:00
+last_msg:    Stage 5 (complete): every manuscript figure is a function on the paper's model class
+last_date:   2026-08-22T11:25:21-05:00
 dirty:       true
 
 --- git status --porcelain ---
-D  scripts/presentations/Stability_Manuscript/fig_adaptation_methods/panel_A/test_single_neuron_adaptation.m
- D scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum_f_2.fig
- D scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum_figure_2.png
- D scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum_figure_2.svg
-D  scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/panelA_bottom_traces.m
- D scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces_f_1.fig
- D scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces_figure_1.png
- D scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces_figure_1.svg
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.fig
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.png
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.svg
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD_STF.fig
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD_STF.png
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD_STF.svg
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/README_fig_adaptation_methods_sfa_std.txt
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/README_fig_adaptation_methods_sfa_std_stf.txt
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/fig_adaptation_methods.m
-?? scripts/presentations/Stability_Manuscript/fig_adaptation_methods/git_provenance.txt
-?? scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.fig
-?? scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.png
-?? scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.svg
-?? scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/fig_introductory_concepts.m
-?? scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.fig
-?? scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.png
-?? scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.svg
+M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.fig
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.png
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.fig
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.png
+?? scripts/paper/
 
 --- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.fig
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.png
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.svg
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD_STF.fig
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD_STF.png
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD_STF.svg
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/README_fig_adaptation_methods_sfa_std.txt
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/README_fig_adaptation_methods_sfa_std_stf.txt
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/fig_adaptation_methods.m
-scripts/presentations/Stability_Manuscript/fig_adaptation_methods/git_provenance.txt
-scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.fig
-scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.png
-scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.svg
-scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/fig_introductory_concepts.m
-scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.fig
-scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.png
-scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.svg
+scripts/paper/make_all_paper_figures.m
+scripts/paper/paper_config.m
+scripts/paper/run_all_paper_analyses.m
