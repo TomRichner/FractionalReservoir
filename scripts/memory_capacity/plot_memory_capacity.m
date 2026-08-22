@@ -43,9 +43,16 @@ function [fig1, fig2] = plot_memory_capacity(results_all, out_dir)
     run_tag    = results_all.run_tag;
 
     % --- Style + palette (edit here to restyle) ---
-    set(0,'DefaultAxesFontSize',12);
-    set(0,'DefaultTextInterpreter','none');
-    set(0,'DefaultLegendInterpreter','none');
+    % Root defaults are set through with_graphics_defaults so they are RESTORED
+    % when this function returns. Previously these were bare set(0,...) calls
+    % that leaked into the rest of the session: after any memory-capacity plot,
+    % DefaultTextInterpreter stayed 'none', which renders the sensitivity and
+    % param-space sheets' '\lambda_1' / '\mu_{EE}' labels as literal backslash
+    % text. Verified live before the fix. `style_cleanup` must stay in scope.
+    style_cleanup = with_graphics_defaults( ...
+        'DefaultAxesFontSize',      12, ...
+        'DefaultTextInterpreter',   'none', ...
+        'DefaultLegendInterpreter', 'none'); %#ok<NASGU>
 
     % Colors (edit here to restyle). Black / blue / green / red; the light CI
     % fill alpha (below) keeps overlapping bands from muddying.

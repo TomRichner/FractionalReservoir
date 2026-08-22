@@ -47,10 +47,16 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     delay_s = cfg.delay_s;
 
     % --- Style + palette (edit here to restyle) ---
-    set(0,'DefaultAxesFontSize',14);   % drives tick numbers + x/y labels
-    set(0,'DefaultAxesLineWidth',1.0); % axis lines + tick marks
-    set(0,'DefaultTextInterpreter','none');
-    set(0,'DefaultLegendInterpreter','none');
+    % Root defaults are RESTORED on return; see with_graphics_defaults for the
+    % leak this replaces (bare set(0,...) here left DefaultTextInterpreter at
+    % 'none' for the rest of the session, breaking tex labels in every figure
+    % drawn afterwards). `style_cleanup` must stay in scope.
+    st = manuscript_style();
+    style_cleanup = with_graphics_defaults( ...
+        'DefaultAxesFontSize',      st.tick_fs, ...
+        'DefaultAxesLineWidth',     st.axis_lw, ...
+        'DefaultTextInterpreter',   'none', ...
+        'DefaultLegendInterpreter', 'none'); %#ok<NASGU>
 
     % Okabe-Ito colorblind-safe qualitative palette. Reddish-purple (instead of
     % bluish-green) keeps all four hues well separated -- sky-blue and bluish-
