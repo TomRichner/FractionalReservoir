@@ -1,32 +1,50 @@
-% fig_eig_heatmap.m - Plot Jacobian-eigenvalue occupancy heatmaps (load + plot)
+function out = fig_eig_heatmap(cfg)
+% FIG_EIG_HEATMAP Jacobian-eigenvalue occupancy, one panel per adaptation regime.
 %
-% Plotting half of the eig-heatmap figure. Loads the pooled eigenvalues computed
-% by compute_eig_heatmap.m (eig_heatmap_data.mat) and renders a Gaussian-smoothed
-% 2-D DENSITY over the complex plane for each of the four adaptation regimes --
-% an "occupancy" heatmap showing how much time the eigenvalues spend in each
-% region, and in particular to the RIGHT of the imaginary axis (Re > 0, locally
-% unstable). Panels share axis limits and one colorbar (log density).
+%   out = FIG_EIG_HEATMAP()
+%   out = FIG_EIG_HEATMAP('data_file', f)
 %
-% Run compute_eig_heatmap.m first to (re)generate the data. This script only
-% plots, so the figure look can be iterated without re-simulating.
+% A Gaussian-smoothed 2-D DENSITY over the complex plane for each of the four
+% adaptation regimes -- an "occupancy" heatmap showing how much time the
+% instantaneous Jacobian's eigenvalues spend in each region, and in particular
+% to the RIGHT of the imaginary axis (Re > 0, locally unstable). Panels share
+% axis limits and one log-density colorbar.
+%
+% PLOTTING HALF ONLY. run_eig_heatmap does the sampling and writes
+% eig_heatmap_data.mat, so the look can be iterated without re-simulating.
+%
+% See also: run_eig_heatmap, manuscript_style
 
-close all; clear; clc;
+arguments
+    cfg.data_file   (1,:) char    = ''    % '' -> eig_heatmap_data.mat beside this file
+    cfg.out_dir     (1,:) char    = ''
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+    cfg.run_dir     (1,:) char    = ''    % unused; accepted for a uniform call
+    cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+end
 
 setup_paths();
-this_dir = fileparts(mfilename('fullpath'));
+this_dir     = fileparts(mfilename('fullpath'));
+out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
+project_root = fileparts(which('setup_paths'));
+st           = manuscript_style(); %#ok<NASGU>
 
-%% ---- Load computed eigenvalue data ----------------------------------------
-data_file = fullfile(this_dir, 'eig_heatmap_data.mat');
+data_file = cfg.data_file;
+if isempty(data_file); data_file = fullfile(this_dir, 'eig_heatmap_data.mat'); end
 if ~isfile(data_file)
     error('fig_eig_heatmap:NoData', ...
-        'Missing %s. Run compute_eig_heatmap.m first to generate it.', data_file);
+        ['Missing %s\n' ...
+         'Run run_eig_heatmap first -- the .mat is gitignored, so a fresh ' ...
+         'clone has none.'], data_file);
 end
-load(data_file, 'evals_by_cond', 'condition_titles', 'lle_by_cond', 'lle_window');
-n_cond = numel(condition_titles);
-if ~exist('lle_by_cond', 'var')
-    error('fig_eig_heatmap:NoLLE', ...
-        '%s has no LLE data. Re-run compute_eig_heatmap.m (it now computes Benettin LLE).', data_file);
-end
+D = load(data_file);
+evals_by_cond    = D.evals_by_cond;
+condition_titles = D.condition_titles;
+lle_by_cond      = D.lle_by_cond;
+lle_window       = D.lle_window;
+n_cond           = numel(condition_titles);
+
 
 %% ---- Heatmap / plotting parameters ----------------------------------------
 grid_res   = 250;     % heatmap bins per axis
@@ -96,8 +114,67 @@ title(tl, {'Jacobian eigenvalue occupancy across adaptation regimes', ...
     sprintf('LLE = finite-time Benettin exponent over the last %g s', lle_window)}, ...
     'FontWeight', 'bold');
 
-%% ---- Save -----------------------------------------------------------------
-if save_figs
-    save_some_figs_to_folder_2(this_dir, 'fig_eig_heatmap', fig.Number, save_types);
-    fprintf('Saved figure to %s\n', this_dir);
+
+if ~cfg.visible; set(fig, 'Visible', 'off'); end
+
+%% --- Save -------------------------------------------------------------------
+fig_tag = 'fig_eig_heatmap';
+out = struct('figs', fig, 'files', {{}}, 'source', data_file);
+if cfg.save
+    save_figure_stable(out_dir, fig_tag, fig);
+    out.files = existing_outputs(out_dir, fig_tag);
+    capture_git_provenance(out_dir, project_root);
+
+    if isfield(D, 'settings'); s = D.settings; else; s = struct(); end
+    lle_note = sprintf(['Finite-time Benettin exponents over the last %g s of ' ...
+        'each run: %s.'], lle_window, ...
+        strjoin(arrayfun(@(k) sprintf('%s %+.4f', condition_titles{k}, lle_by_cond(k)), ...
+        1:n_cond, 'UniformOutput', false), ', '));
+
+    write_figure_readme(out_dir, struct( ...
+        'tag',    'fig_eig_heatmap', ...
+        'title',  'Stability_Manuscript figure: Jacobian eigenvalue occupancy', ...
+        'script', 'fig_eig_heatmap.m', ...
+        'what',   ['A Gaussian-smoothed 2-D density over the complex plane for ' ...
+                   'each adaptation regime -- how much time the instantaneous ' ...
+                   'Jacobian''s eigenvalues spend in each region, and in ' ...
+                   'particular to the RIGHT of the imaginary axis, where the ' ...
+                   'local dynamics are unstable. Panels share axis limits and ' ...
+                   'one log-density colorbar.'], ...
+        'how',    ['Plotting half only. run_eig_heatmap samples the Jacobian at ' ...
+                   'fixed intervals through each run, pools the eigenvalues, ' ...
+                   'and saves them; this renders that file, so the look can be ' ...
+                   'iterated without re-simulating. All four regimes share ' ...
+                   'rng_seeds, so W is identical and they are comparable.'], ...
+        'source', struct('data_file', data_file, ...
+                         'preset', getfield_or(s, 'preset_name', '(pre-refactor run)'), ...
+                         'run_mode', getfield_or(s, 'run_mode', '(pre-refactor run)')), ...
+        'settings', s, ...
+        'figures', {out.files}, ...
+        'sections', struct('heading', {'measured exponents', 'the gain'}, ...
+                           'body', {lle_note, readme_gain(s)})));
+end
+end
+
+%% ------------------------------------------------------------------------
+function v = getfield_or(s, name, default)
+if isstruct(s) && isfield(s, name) && ~isempty(s.(name))
+    v = s.(name);
+else
+    v = default;
+end
+end
+
+function txt = readme_gain(s)
+g = getfield_or(s, 'level_of_chaos', NaN);
+txt = sprintf([ ...
+    'SYNAPTIC GAIN IS THE PRESET''S (level_of_chaos = %g), not the 3.0 the ' ...
+    'original script set. That 3.0 existed because the original was ' ...
+    'DETERMINISTIC and needed high gain to make the eigenvalues wander at all ' ...
+    '-- its own comment said so. The paper''s preset is stochastic, and the ' ...
+    'noise is what moves the state, and therefore the Jacobian, around. Using ' ...
+    'the preset''s own gain keeps this panel showing the same network as every ' ...
+    'other figure. If the cloud turns out to be static at this gain, that is a ' ...
+    'real result about the network rather than a reason to raise the gain ' ...
+    'silently.'], g);
 end
