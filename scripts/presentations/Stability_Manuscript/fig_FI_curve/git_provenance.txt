@@ -1,22 +1,41 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_FI_curve
-Captured at: 28-Jul-2026 12:48:22
+Captured at: 22-Aug-2026 10:47:09
 
-commit:      46cc534651b70363bdc3391d7fe5bab8850e33fb
-commit_short:46cc534
-branch:      main
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      b7138f0162f057df7a528eb0152522ef614c7549
+commit_short:b7138f0
+branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    panelA_bottom_traces: save figs into statetraces/ and eigenspectra/ subfolders
-last_date:   2026-07-27T15:13:33-05:00
+last_msg:    Stage 4: shared figure helpers, and fix a graphics-default leak that was live
+last_date:   2026-08-22T10:43:39-05:00
 dirty:       true
 
 --- git status --porcelain ---
-?? scripts/presentations/Stability_Manuscript/fig_FI_curve/
+M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
+ M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.png
+ M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.svg
+RM scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.m -> scripts/presentations/Stability_Manuscript/fig_FI_curve/fig_FI_curve.m
+ M scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.m
+ D scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries_f_1.fig
+ D scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries_figure_1.png
+ D scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries_figure_1.svg
+?? scripts/presentations/Stability_Manuscript/_common/default_out_dir.m
+?? scripts/presentations/Stability_Manuscript/_common/existing_outputs.m
+?? scripts/presentations/Stability_Manuscript/_common/figure_settings.m
+?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/README_fig_example_timeseries.txt
+?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.fig
+?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.png
+?? scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.svg
+?? src/struct2namevalue.m
 
 --- untracked files (not in patch) ---
-scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
-scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.m
-scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.png
-scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.svg
-scripts/presentations/Stability_Manuscript/fig_FI_curve/README_fig_FI_curve.txt
-scripts/presentations/Stability_Manuscript/fig_FI_curve/git_provenance.txt
-scripts/presentations/Stability_Manuscript/fig_FI_curve/working_changes.patch
+scripts/presentations/Stability_Manuscript/_common/default_out_dir.m
+scripts/presentations/Stability_Manuscript/_common/existing_outputs.m
+scripts/presentations/Stability_Manuscript/_common/figure_settings.m
+scripts/presentations/Stability_Manuscript/fig_example_timeseries/README_fig_example_timeseries.txt
+scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.fig
+scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.png
+scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.svg
+src/struct2namevalue.m

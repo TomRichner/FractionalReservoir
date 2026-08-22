@@ -1,30 +1,91 @@
-% fig_example_timeseries.m - Example SRNNModel2 time-series figure
+function out = fig_example_timeseries(cfg)
+% FIG_EXAMPLE_TIMESERIES Example SRNN time series at the paper's operating point.
 %
-% Essentially scripts/tests/test_SRNN2_defaults.m (SRNNModel2 at defaults with
-% n_a_E=3 SFA and n_b_E=1 STD), but using the PIECEWISE sigmoid activation
-% instead of the class-default logistic sigmoid. The piecewise variant is
-% evaluated at the class-default parameters (S_a=0.9, S_c=0.4). model.plot()
-% renders the stimulus, dendritic state x, firing rate r, synaptic output
-% b.*r, and the adaptation/depression variables.
+%   out = FIG_EXAMPLE_TIMESERIES()
+%   out = FIG_EXAMPLE_TIMESERIES('preset_name', p, 'out_dir', d)
+%
+% One realization of the model the rest of the paper analyses: the stimulus, the
+% dendritic state x, the firing rate r, the synaptic output, and the adaptation
+% and depression variables, under SFA + STD.
+%
+% PORTED. This was SRNNModel2 at class defaults with the LOGISTIC nonlinearity,
+% n = 300, level_of_chaos = 1 and no noise -- while every sweep figure in the
+% paper is SRNNCellTypePairs, piecewise, n = 500, S_c = 0.2, sigma_u_noise =
+% 0.025. It was the "here is what the model does" figure showing a different
+% model from the one being characterised. It now takes the same preset as the
+% sweeps, so the example and the statistics describe one network.
+%
+% See also: paper_config, srnn_param_preset, SRNNCellTypePairs
 
-close all; clear; clc;
+arguments
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.out_dir     (1,:) char    = ''
+    cfg.condition   (1,:) char    = 'sfa_and_std'
+    cfg.rng_seeds   (1,2) double  = [1 2]
+    cfg.T_range     (1,2) double  = [0 20]
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+    cfg.run_dir     (1,:) char    = ''      % unused; accepted for a uniform call
+end
 
-% Add paths
 setup_paths();
-this_dir = fileparts(mfilename('fullpath'));
+out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 
-%% Piecewise sigmoid activation (class-default S_a, S_c)
-S_a = 0.9;   % piecewiseSigmoid slope param (class default)
-S_c = 0.4;   % piecewiseSigmoid center param (class default)
+%% Build the model from the preset, under one adaptation condition
+[preset, model_class, conditions] = srnn_param_preset(cfg.preset_name);
+ci = find(cellfun(@(c) strcmp(c.name, cfg.condition), conditions), 1);
+assert(~isempty(ci), 'No condition named ''%s'' in preset ''%s''.', ...
+    cfg.condition, cfg.preset_name);
 
-%% Create model
-model = SRNNModel2('n_a_E', 3, 'n_b_E', 1, 'f', 0.5, ...
-    'activation', 'logistic', 'S_a', S_a, 'S_c', S_c);
+% A stochastic preset REQUIRES a stochastic integrator; nothing here goes
+% through analysis_run_config, which is what picks one for the sweeps.
+if isfield(preset, 'sigma_u_noise') && any(preset.sigma_u_noise(:) > 0)
+    solver = 'sra1';
+else
+    solver = 'rk4';
+end
 
-%% Build, run, and plot
+args = [struct2namevalue(preset), struct2namevalue(rmfield(conditions{ci}, 'name')), ...
+    {'rng_seeds', cfg.rng_seeds, 'T_range', cfg.T_range, ...
+     'fs', 400, 'ode_solver', solver, 'lya_method', 'none'}];
+
+model = feval(model_class, args{:});
 model.build();
 model.run();
-[fig_handle, ~] = model.plot();
 
-%% Save the figure
-save_some_figs_to_folder_2(this_dir, 'fig_example_timeseries', fig_handle.Number, {'fig', 'png', 'svg'});
+[fig_handle, ~] = model.plot();
+if ~cfg.visible; set(fig_handle, 'Visible', 'off'); end
+
+%% Save
+out = struct('figs', fig_handle, 'files', {{}}, 'source', 'simulated inline');
+if cfg.save
+    save_figure_stable(out_dir, 'fig_example_timeseries', fig_handle);
+    out.files = existing_outputs(out_dir, 'fig_example_timeseries');
+
+    write_figure_readme(out_dir, struct( ...
+        'tag',    'fig_example_timeseries', ...
+        'title',  'Stability_Manuscript figure: example time series', ...
+        'script', 'fig_example_timeseries.m', ...
+        'what',   ['One realization of the network the rest of the paper ' ...
+                   'analyses: stimulus, dendritic state x, firing rate r, ' ...
+                   'synaptic output, and the adaptation/depression states, ' ...
+                   'under the SFA + STD condition. Simulated inline -- there ' ...
+                   'is no saved run behind it.'], ...
+        'how',    ['Model built from the named preset under one adaptation ' ...
+                   'condition, then model.plot(). The integrator is chosen ' ...
+                   'from the preset: a preset carrying sigma_u_noise > 0 ' ...
+                   'requires a stochastic scheme (sra1), because this figure ' ...
+                   'does not go through analysis_run_config, which is what ' ...
+                   'selects one for the sweeps.'], ...
+        'source', struct('preset', cfg.preset_name, 'model_class', model_class, ...
+                         'condition', cfg.condition, ...
+                         'rng_seeds', cfg.rng_seeds, 'ode_solver', solver), ...
+        'settings', figure_settings(model), ...
+        'figures', {out.files}, ...
+        'notes',  ['PORTED from SRNNModel2. This figure used to show a ' ...
+                   'different model from every other figure in the paper -- ' ...
+                   'logistic nonlinearity, n = 300, no noise -- while the ' ...
+                   'sweeps were SRNNCellTypePairs, piecewise, n = 500, with ' ...
+                   'noise. It now takes the same preset as the sweeps.']));
+end
+end
