@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA steady state, one timescale vs several
 =======================================================================
 
-Generated: 22-Aug-2026 11:28:19
+Generated: 22-Aug-2026 11:49:23
 By:        fig_SFA_steady_state.m
 
 WHAT IT SHOWS

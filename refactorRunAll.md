@@ -754,6 +754,60 @@ calls) and collapses to a loop over `run_all_analyses(preset, mode)`. And the su
 stop needing the "no `clear`/`clc` when `master_output_dir` is set" convention — a
 function has its own scope, so the conditional-clearing dance disappears with it.
 
+## 7c. OUTCOME (2026-08-22) — all eight stages complete
+
+```
+run_dir = run_all_paper_analyses();     % all heavy compute -> one dated run dir
+results = make_all_paper_figures();     % all 17 figures + doc tables from it
+```
+Edit `scripts/paper/paper_config.m` and both follow.
+
+| Stage | Commit | What landed |
+|---|---|---|
+| 0 | `98feb7d` | notes harmonized with the plan |
+| 1 | `e8e1c0b` | sweep pipeline → functions; `master_*` protocol deleted |
+| 2 | `b86efbb` | four figure presets; `n_a_sfa` added to the conditions API |
+| 3 | `ddf0213` | memory capacity → functions; saved metadata stopped lying |
+| 4 | `b7138f0` | `_common/` helpers; **graphics-default leak fixed** |
+| 5 | `d17d1ee`,`d18fda1`,`ec00068`,`7ccc23a` | all 17 figures → functions, one model class |
+| 6+7 | `f91b475` | `scripts/paper/` entry points; generated doc tables |
+| 8 | this | deletions, CLAUDE.md, final verification |
+
+### Defects found and fixed along the way
+
+1. **Graphics-default leak (real, and live).** `plot_memory_capacity` and
+   `plot_memory_capacity_combined` set `DefaultTextInterpreter = 'none'` on the
+   graphics root and never restored it, so after any memory-capacity plot the
+   *session* rendered `\lambda_1` as literal backslash text — exactly what the
+   sensitivity sheets use. Caught by accident when a Stage 4 check printed the
+   root default as `none` against a factory `tex`; it had been leaked minutes
+   earlier by the Stage 3 run. Fixed with `with_graphics_defaults`.
+2. **Two param-space figures built from different models.** `fig_EI_param_space`
+   hardcoded an old `SRNNModel2` run while its siblings used a
+   `SRNNCellTypePairs` run. `resolve_run_dir` makes that impossible.
+3. **MC saved metadata contradicted the run** — `std_zero_floor` recorded `true`
+   where the code set `false`, `ode_solver` as a handle-era `'ode_rk4'`.
+4. **`close all force` in a batch** destroyed the previous figure's output; and
+   removing it without replacement let `replot_*` sweep 15 stale figures into
+   its prep folder. The master now closes each entry once verified.
+5. **`SRNNCellTypePairs` cannot build a one-cell-type model** (`build_W` assigns
+   `RMTBlocks` piecemeal where `set_types` is required). Reported, not fixed —
+   both ports use two identical types instead and need no change to model code.
+
+### Things that surprised me
+
+* **The STF facilitation parameters map EXACTLY.** Rewriting the deleted model's
+  `dp/dt = (p0−p)/τ_f + κ(1−p)r` in the gain variable `u = p/p0` gives precisely
+  the current class's `dg/dt = (1−g)/τ_dec + (G−g)r/τ_fac`. Only the STD
+  *coupling* fails to map.
+* **The `f_E` colouring fix was one argument**, not a rewrite:
+  `load_and_make_unit_histograms` already had `ColorBy` and already resolved it
+  through `effective_param`.
+* **`fig_eig_heatmap` did not need gain 3.0.** At the preset's 1.0 the
+  no-adaptation condition runs at LLE = +2.65, so the eigenvalues wander plenty.
+  TR's reasoning — that the preset's noise supplies the motion the old
+  deterministic script needed high gain for — held.
+
 ## 8. Work plan (order of operations)
 
 Each phase leaves the tree runnable; nothing is half-migrated across a phase boundary.

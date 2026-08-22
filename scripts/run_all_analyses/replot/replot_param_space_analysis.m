@@ -5,7 +5,7 @@ function replot_dir = replot_param_space_analysis(data_root)
 %
 % Inputs:
 %   data_root  : path to a run_all_<dt> folder containing a param_space_*
-%                subdirectory produced by run_param_space_analysis2.m
+%                subdirectory produced by run_param_space_analysis.m
 %
 % Output:
 %   replot_dir : path to the new replot_param_space_<dt> folder under data_root

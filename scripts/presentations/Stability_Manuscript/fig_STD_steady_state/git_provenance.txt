@@ -1,19 +1,29 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_STD_steady_state
-Captured at: 22-Aug-2026 11:28:25
+Captured at: 22-Aug-2026 11:49:29
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      7ccc23ae122aa791424a9c3eed9d87490f23c3eb
-commit_short:7ccc23a
+commit:      f91b475c242e40595217a4840bc7da90e5d5ae1f
+commit_short:f91b475
 branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Stage 5 (complete): every manuscript figure is a function on the paper's model class
-last_date:   2026-08-22T11:25:21-05:00
+last_msg:    Stages 6 and 7: the two paper entry points, and generated documentation tables
+last_date:   2026-08-22T11:36:17-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
+M CLAUDE.md
+ M refactorRunAll.md
+ M scripts/paper/make_all_paper_figures.m
+ M scripts/presentations/Stability_Manuscript/doc_equations_table/adaptation_conditions.md
+ M scripts/presentations/Stability_Manuscript/doc_equations_table/equation_table.md
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.fig
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.png
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.svg
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/README_fig_EI_param_space.txt
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
  M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.png
  M scripts/presentations/Stability_Manuscript/fig_FI_curve/README_fig_FI_curve.txt
  M scripts/presentations/Stability_Manuscript/fig_FI_curve/git_provenance.txt
@@ -25,6 +35,8 @@ M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
  M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state.png
  M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.fig
  M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/Fig_STD_steady_state_zoom.png
+ M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/README_fig_STD_steady_state.txt
+ M scripts/presentations/Stability_Manuscript/fig_STD_steady_state/git_provenance.txt
  M scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.fig
  M scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD.png
  M scripts/presentations/Stability_Manuscript/fig_adaptation_methods/Fig_single_neuron_SFA_STD_STF.fig
@@ -32,6 +44,12 @@ M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
  M scripts/presentations/Stability_Manuscript/fig_adaptation_methods/README_fig_adaptation_methods_sfa_std.txt
  M scripts/presentations/Stability_Manuscript/fig_adaptation_methods/README_fig_adaptation_methods_sfa_std_stf.txt
  M scripts/presentations/Stability_Manuscript/fig_adaptation_methods/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_eig_heatmap/README_fig_eig_heatmap.txt
+ M scripts/presentations/Stability_Manuscript/fig_eig_heatmap/fig_eig_heatmap.fig
+ M scripts/presentations/Stability_Manuscript/fig_eig_heatmap/fig_eig_heatmap.png
+ M scripts/presentations/Stability_Manuscript/fig_eig_heatmap/fig_eig_heatmap.svg
+ M scripts/presentations/Stability_Manuscript/fig_eig_heatmap/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_equations/parameter_table.md
  M scripts/presentations/Stability_Manuscript/fig_example_timeseries/README_fig_example_timeseries.txt
  M scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.fig
  M scripts/presentations/Stability_Manuscript/fig_example_timeseries/fig_example_timeseries.png
@@ -45,9 +63,51 @@ M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/git_provenance.txt
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.fig
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.png
-?? scripts/paper/
-
---- untracked files (not in patch) ---
-scripts/paper/make_all_paper_figures.m
-scripts/paper/paper_config.m
-scripts/paper/run_all_paper_analyses.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.fig
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.png
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/README_fig_memory_capacity.txt
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity/plot_memory_capacity_combined.m
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.fig
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/Fig_MC_Example.png
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/README_fig_memory_capacity_example.txt
+ M scripts/presentations/Stability_Manuscript/fig_memory_capacity_example/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/README_fig_sensitivity_medians.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.fig
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.png
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.svg
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/README_fig_sfa_EOC_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/README_fig_stim_engages_adaptation.txt
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_psd.fig
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_psd.png
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_synchrony.fig
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_synchrony.png
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.fig
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.png
+ M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/git_provenance.txt
+ M scripts/run_all_analyses/replot/replot_all_analyses.m
+ M scripts/run_all_analyses/replot/replot_param_space_analysis.m

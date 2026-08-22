@@ -43,7 +43,24 @@ Path setup is a **once-per-session** action: run `setup_paths` with the MATLAB c
 
 Entry-point scripts (the `run_all_analyses` pipeline, the `Fig_*` presentation scripts, the runnable memory-capacity scripts) still call `setup_paths()` on their first line so they can be launched cold. Smaller scripts — everything in `scripts/tests/`, examples — assume the session is already bootstrapped and contain **no path code at all**. Do not reintroduce per-script `addpath`/`genpath` bootstrap lines.
 
-Primary entry points (current, not legacy) — the orchestrator and its three sub-analyses live together in `scripts/run_all_analyses/`. **They are all functions**, taking a context struct and returning their output directory:
+### The two entry points
+
+**Everything the paper needs runs from two functions in `scripts/paper/`:**
+
+```matlab
+run_dir = run_all_paper_analyses();          % all heavy compute, hours
+results = make_all_paper_figures();          % every figure, minutes
+```
+
+- **`paper_config.m` is the one file to edit.** It names the preset, the run mode, and the figure registry. Change the preset there and both masters follow.
+- `run_all_paper_analyses` runs the sweep pipeline (which creates the dated run directory and its `run_manifest.mat`), then memory capacity, the MC example, and the eig-heatmap sampling into subfolders of it — so one run directory holds everything the paper was built from. Each stage is wrapped, so one failure does not cost the rest of an overnight run.
+- `make_all_paper_figures` resolves **one** run directory and passes it to all 17 figures, then regenerates the manuscript's equation/parameter tables. It reports success as *files actually on disk*, not as "the call returned" — `save_some_figs_to_folder_2` catches export failures and carries on, so a figure can otherwise "succeed" having written nothing.
+
+Four figures name their own preset because they are deliberately different networks (bursting, Sompolinsky, the STF single-neuron cartoon, and memory capacity); every other figure inherits `cfg.preset_name`.
+
+### The sweep pipeline
+
+`scripts/run_all_analyses/` holds the orchestrator and its three sub-analyses. **They are all functions**, taking a context struct and returning their output directory:
 
 - `run_all_analyses(preset_name, run_mode, ...)` — orchestrator; runs the three below into a single dated `data/param_space/run_all_<dt>/` directory and returns it. Defaults to the paper's preset at `'medium'`. This is the **sweep** pipeline only.
 - `run_sensitivity_analysis(ctx)` — 1D sweeps (`ParamSpaceAnalysis2` with `randomize_order=false` and `reps` as a grid axis). Returns one dir per swept parameter.
@@ -212,11 +229,22 @@ named arguments), return your output directory, and read nothing from the caller
 The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_paper/`, `VAR_SRNN/`, `python_piecewise/`, `reference_files/`) and the old-API comparison/run scripts, and reorganized `scripts/` into topic subdirectories. Current layout:
 
 - `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
+- `scripts/paper/` — the two entry points and `paper_config.m`. Start here.
+- `scripts/presentations/Stability_Manuscript/` — one folder per figure, each holding a `fig_*.m` **function**, its outputs, its generated `README_*.txt` and its git provenance. `_common/` holds the shared helpers: `manuscript_style` (fonts, condition palette — returns values, never sets global state), `with_manuscript_defaults`, `build_from_preset`, `resolve_run_dir`, `write_figure_readme`, `write_manuscript_tables`, `figure_settings`, `default_out_dir`, `existing_outputs`, `sort_axes_left_to_right`.
+
+  **Every figure has the same signature**, so the master can loop over them:
+
+  ```matlab
+  function out = fig_whatever(cfg)   % cfg.run_dir/out_dir/preset_name/save/visible
+  % out.figs / out.files / out.source
+  ```
+
+  **No figure calls `close all force`.** It is correct standalone — `replot_*` saves *all* open figures — but in a batch it destroys the previous entry's output before it can be verified. `make_all_paper_figures` closes each entry's returned handles once that entry has been checked, which also stops earlier figures polluting the `replot_*` prep folders.
+
+  **Never `set(0, 'Default…')` without restoring.** Root defaults are process-global; a plotter that sets `DefaultTextInterpreter = 'none'` and does not restore it breaks the `\lambda_1` and `\mu_{EE}` labels in every figure drawn afterwards *in that session*. This actually happened. Use `with_graphics_defaults` (`src/plotting/`), which returns an `onCleanup`, or better, pass style per-object from `manuscript_style`.
 - `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses (all functions), with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside. Also `analysis_run_config.m`, the single table of `run_mode` settings that replaced the duplicated `switch run_mode` blocks, and `resolve_run_context.m`, the shared preamble that replaced the `master_*` protocol. `run_dc_lle_analysis.m` and `check_sensitivity_sim.m` are standalone tools here, not part of the pipeline.
 - `scripts/EI_balance/` — fraction-excitatory analyses: `fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_analysis.m`, `Fig_2_fraction_excitatory_load_and_plot.m`.
-- `scripts/memory_capacity/` — `example_memory_capacity.m`, `looped_memory_capacity.m` (Echo State Network experiments).
-- `scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/` —
-  `bursting_SRNN_model*.m`.
+- `scripts/memory_capacity/` — `run_memory_capacity(cfg)` (the paired-trial ensemble, a function with its own `mc_run_config` cost table), `plot_memory_capacity`, `replot_memory_capacity`, plus `example_memory_capacity.m` as an exploratory script. `SRNN_ESN_reservoir` subclasses `SRNNModel2`, so memory capacity **cannot** run on `SRNNCellTypePairs` — it is the one part of the paper on a different model class, behind the `mc_esn` preset. Porting the ESN readout is tracked follow-up work.
 - `scripts/tests/` — verification scripts (`test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_sensitivity_refactor.m`) plus the standalone example/comparison scripts `Sompolinsky_N_1000_g_1p8.m` and `Single_vs_dual_adaptation_example.m`.
 - `scripts/sine_stim/` and `scripts/paired_pulse/` — kept as references but **currently non-functional**: they still use the old script-based API, and their legacy dependencies were deleted. They must be ported to `SRNNModel2` before use.
 

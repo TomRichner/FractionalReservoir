@@ -11,11 +11,11 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
 %   (c) horizon paired trials (from Fig1 panel 1B)
 %
 % Everything is read from the saved `results_all` struct (see
-% looped_memory_capacity.m) -- no simulation is re-run. Styling is kept local to
+% run_memory_capacity.m) -- no simulation is re-run. Styling is kept local to
 % this presentation copy so it can be tuned without touching the shared plotter.
 %
 % Inputs:
-%   results_all : struct saved by looped_memory_capacity.m.
+%   results_all : struct saved by run_memory_capacity.m.
 %   out_dir     : optional. If non-empty, save Fig_Memory_Capacity.{png,svg,fig}
 %                 there (via save_some_figs_to_folder_2, which appends the figure
 %                 number). If omitted, the figure is only displayed.

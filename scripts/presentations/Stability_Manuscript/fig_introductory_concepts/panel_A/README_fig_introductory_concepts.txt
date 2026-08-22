@@ -1,7 +1,7 @@
 Stability_Manuscript figure 1 panel A: chaos onset in a random network
 ======================================================================
 
-Generated: 22-Aug-2026 11:26:35
+Generated: 22-Aug-2026 11:47:30
 By:        fig_introductory_concepts.m
 
 WHAT IT SHOWS

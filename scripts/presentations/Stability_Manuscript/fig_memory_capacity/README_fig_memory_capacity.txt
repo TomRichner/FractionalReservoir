@@ -1,7 +1,7 @@
 Stability_Manuscript figure: memory capacity
 ============================================
 
-Generated: 22-Aug-2026 11:33:31
+Generated: 22-Aug-2026 11:53:30
 By:        fig_memory_capacity.m
 
 WHAT IT SHOWS
