@@ -1,40 +1,81 @@
-close all
-clc
+function out = fig_EI_param_space(cfg)
+% FIG_EI_PARAM_SPACE Param-space distributions, each bar coloured by E:I ratio.
+%
+%   out = FIG_EI_PARAM_SPACE()
+%   out = FIG_EI_PARAM_SPACE('run_dir', d)
+%
+% A 2 x 5 sheet. Columns 1-4 are the four adaptation conditions (row 1 = LLE,
+% row 2 = mean rate); each bar is a STACK of per-network patches coloured by the
+% fraction excitatory (blue = inhibition-dominated, red = excitation-dominated).
+% Column 5 embeds the colorbar, encoding the fraction as an E:I ratio.
+%
+% The sibling of fig_param_space_allStd, which shows the same distributions in
+% plain grey. Both are paper figures: this one answers "does the E:I balance
+% explain where in the distribution a network lands", which the grey sheet
+% cannot.
+%
+% TWO THINGS CHANGED IN THE PORT.
+%
+% 1. IT WAS BUILT FROM A DIFFERENT RUN. The hardcoded data_root pointed at
+%    run_all_jul_06_26_22_00 -- an old SRNNModel2 run -- while every sibling
+%    figure pointed at an SRNNCellTypePairs run. The manuscript was therefore
+%    showing two param-space figures computed from different models. It now
+%    resolves the same run as everything else.
+%
+% 2. THE COLOUR AXIS IS NAMED, not defaulted. load_and_make_unit_histograms
+%    colours by its ColorBy option, default 'f'. On SRNNCellTypePairs `f` is a
+%    1 x C ROW, not a scalar, so the default breaks the per-network colour
+%    assignment outright. The Pairs name for the same quantity is the scalar
+%    alias f_E, which is exactly f(1) (SRNNCellTypePairs.m get.f_E), so the
+%    colormap and the E:I tick labels carry over unchanged -- only the name
+%    read off each result differs. It is resolved through
+%    psa.effective_param, NOT res.config: effective_param('f') on a Pairs run
+%    returns the class default [0.5 0.5] rather than the swept value, which
+%    would have coloured every network identically.
+%
+% See also: fig_param_space_allStd, load_and_make_unit_histograms, resolve_run_dir
 
-% Fig_EI_param_space.m
-% Stability_Manuscript presentation figure: parameter-space distributions with
-% histograms color-coded by the excitatory fraction f (E:I ratio). A 2x5 layout:
-% columns 1-4 are the four conditions (row 1 = LLE, row 2 = mean rate); each bar
-% is a stack of per-network patches colored by f (blue = inhibition-dominated,
-% red = excitation-dominated) via unit_histogram_patch. Column 5 embeds the
-% f-gradient colorbar (upper-right cell) encoding f as an E:I ratio; the
-% lower-right cell is left empty. No simulation is re-run.
+arguments
+    cfg.run_dir     (1,:) char    = ''
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.out_dir     (1,:) char    = ''
+    cfg.color_by    (1,:) char    = ''      % '' -> per model class (f_E / f)
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+end
 
-this_dir     = fileparts(mfilename('fullpath'));
-% .../Stability_Manuscript/EI_param_space -> project root is 4 up
-project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
-
-% Resolve src helpers (load_and_make_unit_histograms, unit_histogram_patch,
-% blue_gray_red_colormap, save_some_figs_to_folder_2, capture_git_provenance).
 setup_paths();
+out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
+project_root = fileparts(which('setup_paths'));
+st           = manuscript_style();
 
-% Source run + its param_space_* subdir (the colored builder takes the subdir).
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_jul_06_26_22_00');
-out_dir   = this_dir;   % write the final figures next to this script
+run_dir = resolve_run_dir('run_dir', cfg.run_dir, 'preset_name', cfg.preset_name);
 
-ps_dirs = dir(fullfile(data_root, 'param_space_*'));
+% The colour axis, per model class. get.f_E asserts exactly two cell types, so
+% a three-type run must name its own axis rather than fall through to f_E.
+color_by = cfg.color_by;
+if isempty(color_by)
+    [~, model_class] = srnn_param_preset(cfg.preset_name);
+    if strcmp(model_class, 'SRNNCellTypePairs')
+        color_by = 'f_E';
+    else
+        color_by = 'f';
+    end
+end
+
+ps_dirs = dir(fullfile(run_dir, 'param_space_*'));
 ps_dirs = ps_dirs([ps_dirs.isdir]);
-assert(~isempty(ps_dirs), 'No param_space_* subdir found in %s', data_root);
+assert(~isempty(ps_dirs), 'No param_space_* subdir found in %s', run_dir);
 ps_dir  = fullfile(ps_dirs(1).folder, ps_dirs(1).name);
 
 % Start from a clean slate.
-close all force;
+% (no 'close all force' -- destroyed sibling figures in a batch; see header)
 
 % 1) Build the f-colored per-metric histogram figures (LLE + mean_rate), matching
 %    the gray figure's LLE range [-1.5,1.5] and probability normalization. This
 %    also creates a separate 'f Value Colorbar' figure.
 [~, ~] = load_and_make_unit_histograms(ps_dir, ...
-    'Metrics', {'lle', 'r'}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5]);
+    'Metrics', {'lle', 'r'}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5], 'ColorBy', color_by);
 
 % 2) Grab the metric figures (by Name, robust) + the colorbar figure.
 lle_fig = findobj(0, 'Type', 'figure', 'Name', 'LLE Unit Histogram');
@@ -83,8 +124,8 @@ if ~isempty(cb_fig); close(cb_fig); end
 
 % 4) Clean up: fonts matched to the MC/sensitivity figures, condition titles only
 %    on the top row (not bold), y-axes linked within each row.
-tick_fs  = 14;    % tick numbers -- matches MC/sensitivity figures
-label_fs = 15.4;  % axis labels  -- matches MC/sensitivity figures
+tick_fs  = st.tick_fs;
+label_fs = st.label_fs;
 title_fs  = 20;   % condition titles -- matches sensitivity figure (column headers)
 axes_lw   = 1.0;  % x/y axis line width (default 0.5)
 letter_fs = 18;   % panel letters -- matches MC/sensitivity figures
@@ -187,74 +228,49 @@ if isgraphics(cbax)
     ylabel(cbax, 'E:I ratio', 'FontSize', label_fs);
 end
 
-% 7) Save the single combined figure (colorbar now lives inside it).
-save_fig_stable(combined, out_dir, 'Fig_EI_ParamSpace');
 
-% 8) Log the git state alongside the figures.
-capture_git_provenance(out_dir, project_root);
+if ~cfg.visible; set(combined, 'Visible', 'off'); end
 
-%% -------------------- Human-readable description --------------------
-desc_path = fullfile(out_dir, 'README_fig_EI_param_space.txt');
-fid = fopen(desc_path, 'w');
-cleanup = onCleanup(@() fclose(fid));
+%% --- Save -------------------------------------------------------------------
+fig_tag = 'Fig_EI_ParamSpace';
+out = struct('figs', combined, 'files', {{}}, 'source', ps_dir);
+if cfg.save
+    save_figure_stable(out_dir, fig_tag, combined);
+    out.files = existing_outputs(out_dir, fig_tag);
+    capture_git_provenance(out_dir, project_root);
 
-fprintf(fid, 'Stability_Manuscript figure: Parameter-space distributions (E:I colored)\n');
-fprintf(fid, '=======================================================================\n\n');
-fprintf(fid, 'Generated: %s\n', char(datetime('now')));
-fprintf(fid, 'By script: %s.m\n\n', mfilename);
-
-fprintf(fid, 'HOW IT WAS MADE\n');
-fprintf(fid, '  Presentation replot -- no simulation is re-run. load_and_make_unit_histograms\n');
-fprintf(fid, '  builds per-metric (LLE + mean_rate) 1x4 histograms where each bar is a stack\n');
-fprintf(fid, '  of per-network patches colored by f (blue_gray_red_colormap; blue = low f /\n');
-fprintf(fid, '  inhibition-dominated, red = high f / excitation-dominated), LLERange [-1.5,1.5],\n');
-fprintf(fid, '  probability-normalized. Those axes are copied into a single 2x5 figure:\n');
-fprintf(fid, '    row 1 = LLE ("Growth Rate", green dashed zero line)\n');
-fprintf(fid, '    row 2 = mean firing rate\n');
-fprintf(fid, '    columns 1-4 = No Adaptation, SFA, STD, SFA+STD\n');
-fprintf(fid, '    column 5   = f-gradient colorbar (upper-right cell); lower-right cell empty\n');
-fprintf(fid, '  Cleanups: condition titles raised into column-header position above the top\n');
-fprintf(fid, '  row (not bold, enlarged to match the sensitivity figure); extra row spacing;\n');
-fprintf(fid, '  y-ticks reduced (row 1: 0, 0.5; row 2: 0, 0.25); vertical gray column\n');
-fprintf(fid, '  dividers; panel letters (a)..(h) on the 8 data panels only; fonts matched to\n');
-fprintf(fid, '  the MC/sensitivity figures; y-axes linked within each row. The embedded\n');
-fprintf(fid, '  colorbar encodes f as an E:I ratio\n');
-fprintf(fid, '  (ticks 1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1). See git_provenance.txt.\n\n');
-
-fprintf(fid, 'SOURCE RUN\n');
-fprintf(fid, '  %s\n', data_root);
-fprintf(fid, '  param_space subfolder used:\n');
-fprintf(fid, '    %s\n\n', ps_dirs(1).name);
-
-fprintf(fid, 'FIGURES PRODUCED (in this folder)\n');
-fprintf(fid, '  Fig_EI_ParamSpace.png / .svg / .fig   (2x5: f-colored distributions + colorbar)\n');
-
-clear cleanup;  % flush + close
-fprintf('Description written: %s\n', desc_path);
-
-%% ==================== Local helpers ====================
-function ax_sorted = sort_axes_left_to_right(fig)
-% Return a figure's axes ordered left-to-right by their x-position.
-ax = findobj(fig, 'Type', 'axes');
-p = cell2mat(get(ax, 'Position'));
-[~, order] = sort(p(:, 1));
-ax_sorted = ax(order);
+    [~, ps_name] = fileparts(ps_dir);
+    write_figure_readme(out_dir, struct( ...
+        'tag',    'fig_EI_param_space', ...
+        'title',  'Stability_Manuscript figure: parameter-space distributions, E:I coloured', ...
+        'script', 'fig_EI_param_space.m', ...
+        'what',   ['A 2 x 5 sheet. Columns 1-4 are the four adaptation ' ...
+                   'conditions, row 1 the LLE distribution (green dashed zero ' ...
+                   'line) and row 2 the mean firing rate. Each bar is a stack ' ...
+                   'of per-network patches coloured by the fraction excitatory ' ...
+                   '(blue = inhibition-dominated, red = excitation-dominated). ' ...
+                   'Column 5 holds the colorbar, labelled as an E:I ratio; the ' ...
+                   'lower-right cell is empty.'], ...
+        'how',    ['Presentation replot -- no simulation is re-run. ' ...
+                   'load_and_make_unit_histograms builds per-metric histograms ' ...
+                   'whose bars are stacks of per-network patches, coloured ' ...
+                   'through blue_gray_red_colormap and normalized as ' ...
+                   'probability with the LLE range fixed at [-1.5, 1.5]. Those ' ...
+                   'axes are copied into a single combined figure.'], ...
+        'source', struct('run_dir', run_dir, 'param_space_subfolder', ps_name, ...
+                         'preset', cfg.preset_name, 'color_by', color_by), ...
+        'figures', {out.files}, ...
+        'notes',  {{['COLOUR AXIS. The bars are coloured by ''' color_by '''. On ' ...
+                    'SRNNCellTypePairs the scalar fraction excitatory is the ' ...
+                    'alias f_E (exactly f(1)); the property f is a 1 x C row ' ...
+                    'there and would break the colouring. The value is read ' ...
+                    'through psa.effective_param, not res.config, because ' ...
+                    'effective_param(''f'') on a Pairs run returns the class ' ...
+                    'default rather than the swept value.'], ...
+                   ['This figure used to be built from run_all_jul_06_26_22_00, ' ...
+                    'an older SRNNModel2 run, while its sibling grey sheet used ' ...
+                    'a SRNNCellTypePairs run -- two param-space figures in one ' ...
+                    'manuscript computed from different models. Both now ' ...
+                    'resolve the same run.']}}));
 end
-
-function save_fig_stable(fig, out_dir, base)
-% Save fig as <base>.{png,svg,fig} with a stable name: clear any prior <base>*
-% outputs, save via save_some_figs_to_folder_2 (which suffixes the figure
-% number), then rename to the fixed names.
-old = dir(fullfile(out_dir, [base '*']));
-for a = 1:numel(old)
-    fp = fullfile(old(a).folder, old(a).name);
-    if ~old(a).isdir && (endsWith(fp, '.png') || endsWith(fp, '.svg') || endsWith(fp, '.fig'))
-        delete(fp);
-    end
-end
-save_some_figs_to_folder_2(out_dir, base, fig.Number, {'png', 'svg', 'fig'});
-num = num2str(fig.Number);
-movefile(fullfile(out_dir, [base '_figure_' num '.png']), fullfile(out_dir, [base '.png']));
-movefile(fullfile(out_dir, [base '_figure_' num '.svg']), fullfile(out_dir, [base '.svg']));
-movefile(fullfile(out_dir, [base '_f_' num '.fig']),      fullfile(out_dir, [base '.fig']));
 end

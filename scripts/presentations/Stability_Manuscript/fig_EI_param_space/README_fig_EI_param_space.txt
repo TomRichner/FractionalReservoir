@@ -1,31 +1,43 @@
-Stability_Manuscript figure: Parameter-space distributions (E:I colored)
-=======================================================================
+Stability_Manuscript figure: parameter-space distributions, E:I coloured
+========================================================================
 
-Generated: 21-Jul-2026 15:58:34
-By script: Fig_EI_param_space.m
+Generated: 22-Aug-2026 10:52:06
+By:        fig_EI_param_space.m
+
+WHAT IT SHOWS
+  A 2 x 5 sheet. Columns 1-4 are the four adaptation conditions, row 1 the LLE
+  distribution (green dashed zero line) and row 2 the mean firing rate. Each
+  bar is a stack of per-network patches coloured by the fraction excitatory
+  (blue = inhibition-dominated, red = excitation-dominated). Column 5 holds
+  the colorbar, labelled as an E:I ratio; the lower-right cell is empty.
 
 HOW IT WAS MADE
-  Presentation replot -- no simulation is re-run. load_and_make_unit_histograms
-  builds per-metric (LLE + mean_rate) 1x4 histograms where each bar is a stack
-  of per-network patches colored by f (blue_gray_red_colormap; blue = low f /
-  inhibition-dominated, red = high f / excitation-dominated), LLERange [-1.5,1.5],
-  probability-normalized. Those axes are copied into a single 2x5 figure:
-    row 1 = LLE ("Growth Rate", green dashed zero line)
-    row 2 = mean firing rate
-    columns 1-4 = No Adaptation, SFA, STD, SFA+STD
-    column 5   = f-gradient colorbar (upper-right cell); lower-right cell empty
-  Cleanups: condition titles raised into column-header position above the top
-  row (not bold, enlarged to match the sensitivity figure); extra row spacing;
-  y-ticks reduced (row 1: 0, 0.5; row 2: 0, 0.25); vertical gray column
-  dividers; panel letters (a)..(h) on the 8 data panels only; fonts matched to
-  the MC/sensitivity figures; y-axes linked within each row. The embedded
-  colorbar encodes f as an E:I ratio
-  (ticks 1:3, 1:2, 2:3, 1:1, 3:2, 2:1, 3:1). See git_provenance.txt.
+  Presentation replot -- no simulation is re-run.
+  load_and_make_unit_histograms builds per-metric histograms whose bars are
+  stacks of per-network patches, coloured through blue_gray_red_colormap and
+  normalized as probability with the LLE range fixed at [-1.5, 1.5]. Those
+  axes are copied into a single combined figure.
 
-SOURCE RUN
-  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_jul_06_26_22_00
-  param_space subfolder used:
-    param_space_test_refactor_nLevs_4_jul_07_26_10_44
+SOURCE
+  run_dir                C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_21_26_17_36
+  param_space_subfolder  param_space_nLevs_3_aug_21_26_17_40
+  preset                 celltype_pairs_Sc0p2_noise0p025_dualStd
+  color_by               f_E
 
 FIGURES PRODUCED (in this folder)
-  Fig_EI_ParamSpace.png / .svg / .fig   (2x5: f-colored distributions + colorbar)
+  Fig_EI_ParamSpace.png
+  Fig_EI_ParamSpace.svg
+  Fig_EI_ParamSpace.fig
+
+READING THIS FIGURE
+  COLOUR AXIS. The bars are coloured by 'f_E'. On SRNNCellTypePairs the scalar
+  fraction excitatory is the alias f_E (exactly f(1)); the property f is a 1 x
+  C row there and would break the colouring. The value is read through
+  psa.effective_param, not res.config, because effective_param('f') on a Pairs
+  run returns the class default rather than the swept value.
+
+  This figure used to be built from run_all_jul_06_26_22_00, an older
+  SRNNModel2 run, while its sibling grey sheet used a SRNNCellTypePairs run --
+  two param-space figures in one manuscript computed from different models.
+  Both now resolve the same run.
+

@@ -86,30 +86,35 @@ font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal"
 <path vector-effect="none" fill-rule="evenodd" d="M13.7813,0 L10.5313,0 L10.5313,-20.7188 C9.75,-19.9792 8.72396,-19.2344 7.45313,-18.4844 C6.18229,-17.7344 5.04167,-17.1719 4.03125,-16.7969 L4.03125,-19.9531 C5.84375,-20.8073 7.43229,-21.8411 8.79688,-23.0547 C10.1615,-24.2682 11.125,-25.4479 11.6875,-26.5938 L13.7813,-26.5938 L13.7813,0"/>
 </g>
 
-<g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+<g fill="#000000" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="267,274.234 290.917,245.6 314.833,182.655 338.75,146.755 361.433,133 " />
-<polyline fill="none" vector-effect="none" points="568.119,133 577.917,188.226 601.833,462.173 608.775,576 " />
+<polyline fill="none" vector-effect="none" points="267,292.271 370.888,133 " />
+<polyline fill="none" vector-effect="none" points="480.503,133 553.762,576 " />
+</g>
+
+<g fill="#e69f00" fill-opacity="1" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="267,340.371 415.262,133 " />
 </g>
 
 <g fill="none" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="267,323.043 290.917,306.742 314.833,266.727 338.75,231.258 362.667,211.95 386.583,162.689 410.5,158.322 419.979,133 " />
-<polyline fill="none" vector-effect="none" points="585.258,133 601.833,251.473 625.75,367.263 649.667,367.192 673.583,367.172 697.5,367.168 721.417,367.167 745.333,367.168 769.25,367.168 793.167,367.167 817.083,367.167 841,367.167 " />
+<polyline fill="none" vector-effect="none" points="497.465,133 649.667,367.315 841,367.217 " />
 </g>
 
 <g fill="none" stroke="#56b4e9" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="267,412.903 290.917,404.323 314.833,395.395 338.75,383.182 362.667,369.972 386.583,353.018 410.5,345.985 434.417,332.499 458.333,327.955 482.25,339.115 506.167,347.693 530.083,383.881 554,415.509 577.917,421.839 601.833,421.351 625.75,421.117 649.667,438.603 673.583,500.748 697.5,572.015 698.626,576 " />
+<polyline fill="none" vector-effect="none" points="267,391.433 458.333,400.603 649.667,442.639 841,503.779 " />
 </g>
 
 <g fill="none" stroke="#cc79a7" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="267,367.39 290.917,367.267 314.833,367.196 338.75,366.244 362.667,365.052 386.583,359.165 410.5,353.18 434.417,348.647 458.333,340.761 482.25,333.378 506.167,333.523 530.083,338.232 554,351.904 577.917,358.832 601.833,360.711 625.75,361.359 649.667,361.939 673.583,359.417 697.5,367.653 721.417,367.38 745.333,367.259 769.25,367.202 793.167,367.177 817.083,367.169 841,367.168 " />
+<polyline fill="none" vector-effect="none" points="267,377.103 458.333,388.56 649.667,368.698 841,368.705 " />
 </g>
 
 <g fill="#cc9999" fill-opacity="1" stroke="#cc9999" stroke-opacity="1" stroke-width="5.33333" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
@@ -190,28 +195,28 @@ font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal"
 <path vector-effect="none" fill-rule="evenodd" d="M13.7813,0 L10.5313,0 L10.5313,-20.7188 C9.75,-19.9792 8.72396,-19.2344 7.45313,-18.4844 C6.18229,-17.7344 5.04167,-17.1719 4.03125,-16.7969 L4.03125,-19.9531 C5.84375,-20.8073 7.43229,-21.8411 8.79688,-23.0547 C10.1615,-24.2682 11.125,-25.4479 11.6875,-26.5938 L13.7813,-26.5938 L13.7813,0"/>
 </g>
 
-<g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+<g fill="#000000" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1036.25,576 1047.24,392.26 1070.83,322.226 1095.07,295.88 1118.67,161.379 1142.9,213.422 1163.71,133 " />
+<polyline fill="none" vector-effect="none" points="1081.27,576 1201.63,133 " />
 </g>
 
-<g fill="none" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+<g fill="#e69f00" fill-opacity="1" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1023,367.71 1047.24,342.278 1070.83,286.266 1095.07,221.443 1118.67,159.017 1134.61,133 " />
+<polyline fill="none" vector-effect="none" points="1023,368.472 1150.69,133 " />
 </g>
 
 <g fill="none" stroke="#56b4e9" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1023,443.184 1047.24,423.406 1070.83,423.089 1095.07,422 1118.67,421.86 1142.9,421.626 1166.5,421.21 1190.74,415.809 1214.33,418.882 1238.57,416.466 1262.17,418.661 1286.4,421.008 1310,408.234 1334.24,405.676 1357.83,407.579 1382.07,403.914 1405.67,406.288 1429.9,409.272 1453.5,406.631 1477.74,398.559 1501.33,400.027 1525.57,397.9 1549.17,396.99 1573.4,405.512 1597,401.676 " />
+<polyline fill="none" vector-effect="none" points="1023,416.18 1214.33,406.717 1405.67,414.064 1597,401.139 " />
 </g>
 
 <g fill="none" stroke="#cc79a7" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1023,368.684 1047.24,368.217 1070.83,369.281 1095.07,367.94 1118.67,366.942 1142.9,364.331 1166.5,360.922 1190.74,362.052 1214.33,355.509 1238.57,352.648 1262.17,358.854 1286.4,354.942 1310,349.612 1334.24,352.027 1357.83,353.97 1382.07,345.102 1405.67,347.517 1429.9,341.511 1453.5,342.039 1477.74,337.317 1501.33,332.479 1525.57,336.154 1549.17,338.297 1573.4,334.091 1597,333.87 " />
+<polyline fill="none" vector-effect="none" points="1023,370.716 1214.33,372.324 1405.67,379.901 1597,374.007 " />
 </g>
 
 <g fill="#cc9999" fill-opacity="1" stroke="#cc9999" stroke-opacity="1" stroke-width="5.33333" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
@@ -305,30 +310,35 @@ font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal"
 <path vector-effect="none" fill-rule="evenodd" d="M13.7813,0 L10.5313,0 L10.5313,-20.7188 C9.75,-19.9792 8.72396,-19.2344 7.45313,-18.4844 C6.18229,-17.7344 5.04167,-17.1719 4.03125,-16.7969 L4.03125,-19.9531 C5.84375,-20.8073 7.43229,-21.8411 8.79688,-23.0547 C10.1615,-24.2682 11.125,-25.4479 11.6875,-26.5938 L13.7813,-26.5938 L13.7813,0"/>
 </g>
 
-<g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+<g fill="#000000" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1779,302.41 1802.92,260.474 1826.83,234.499 1850.75,196.193 1874.67,160.648 1886.14,133 " />
-<polyline fill="none" vector-effect="none" points="1975.08,133 1994.25,407.053 2009.97,576 " />
+<polyline fill="none" vector-effect="none" points="1779,257.858 1967.83,133 " />
+<polyline fill="none" vector-effect="none" points="1970.71,133 2072.34,576 " />
+</g>
+
+<g fill="#e69f00" fill-opacity="1" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="1779,334.496 1894.82,133 " />
 </g>
 
 <g fill="none" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1779,336.939 1802.92,305.794 1826.83,288.467 1850.75,240.011 1874.67,210.07 1898.58,160.703 1908.63,133 " />
-<polyline fill="none" vector-effect="none" points="1981.4,133 1994.25,282.709 2018.17,367.249 2042.08,367.227 2066,367.198 2089.92,367.191 2113.83,367.174 2137.75,367.169 2161.67,367.168 2185.58,367.168 2209.5,367.168 2233.42,367.168 2257.33,367.168 2281.25,367.168 2305.17,367.167 2329.08,367.167 2353,367.167 " />
+<polyline fill="none" vector-effect="none" points="2039.08,133 2161.67,367.225 2353,367.215 " />
 </g>
 
 <g fill="none" stroke="#56b4e9" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1779,419.461 1802.92,415.775 1826.83,412.76 1850.75,400.643 1874.67,386.644 1898.58,362.651 1922.5,352.432 1946.42,365.526 1970.33,419.68 1994.25,421.21 2018.17,420.986 2042.08,421.021 2066,420.751 2089.92,420.794 2113.83,420.288 2137.75,420.51 2161.67,420.06 2185.58,420.524 2209.5,420.471 2233.42,420.174 2257.33,419.974 2281.25,420.401 2305.17,420.412 2329.08,420.484 2353,420.6 " />
+<polyline fill="none" vector-effect="none" points="1779,392.318 1970.33,411.035 2161.67,395.975 2353,395.894 " />
 </g>
 
 <g fill="none" stroke="#cc79a7" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1779,367.385 1802.92,367.416 1826.83,367.428 1850.75,367.364 1874.67,367.204 1898.58,363.901 1922.5,356.081 1946.42,343.117 1970.33,351.051 1994.25,365.337 2018.17,359.636 2042.08,363.513 2066,368.32 2089.92,368.089 2113.83,367.884 2137.75,367.718 2161.67,367.583 2185.58,367.423 2209.5,367.346 2233.42,367.296 2257.33,367.251 2281.25,367.225 2305.17,367.209 2329.08,367.195 2353,367.187 " />
+<polyline fill="none" vector-effect="none" points="1779,371.547 1970.33,388.201 2161.67,358.777 2353,353.908 " />
 </g>
 
 <g fill="#cc9999" fill-opacity="1" stroke="#cc9999" stroke-opacity="1" stroke-width="5.33333" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
@@ -437,27 +447,37 @@ font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal"
 <g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="841,1134.3 817.083,1115.32 793.167,1125.27 769.25,1100.03 745.333,1097.96 721.417,1066.3 697.5,1038.97 673.583,1001.64 649.667,979.867 625.75,910.103 601.833,878.809 577.917,788.663 568.194,767 " />
-<polyline fill="none" vector-effect="none" points="452.081,767 434.417,1012.37 417.161,1210 " />
+<polyline fill="none" vector-effect="none" points="841,1180.57 649.667,969.342 506.977,767 " />
+</g>
+
+<g fill="#000000" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="442.754,767 342.697,1210 " />
 </g>
 
 <g fill="none" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="841,1001.36 817.083,1001.65 793.167,1001.44 769.25,1001.46 745.333,1001.62 721.417,1001.32 697.5,1001.5 673.583,1000.99 649.667,997.922 625.75,983.807 601.833,951.479 577.917,879.074 554,838.291 530.083,773.637 528.043,767 " />
-<polyline fill="none" vector-effect="none" points="444.969,767 434.417,867.056 410.5,1001.29 386.583,1001.22 362.667,1001.18 338.75,1001.17 314.833,1001.17 290.917,1001.17 267,1001.17 " />
+<polyline fill="none" vector-effect="none" points="841,1001.67 649.667,1021.37 527.547,767 " />
+</g>
+
+<g fill="#e69f00" fill-opacity="1" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="385.432,767 267,1001.22 " />
 </g>
 
 <g fill="none" stroke="#56b4e9" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="841,1052.64 817.083,1052.69 793.167,1052.73 769.25,1052.74 745.333,1052.77 721.417,1052.82 697.5,1052.92 673.583,1052.98 649.667,1053.08 625.75,1053.52 601.833,1053.52 577.917,1046.38 554,1024.57 530.083,982.232 506.167,965.46 482.25,988.39 458.333,1046.89 434.417,1055.4 410.5,1055.05 386.583,1054.55 362.667,1054.17 338.75,1054.22 314.833,1054.39 290.917,1054.5 267,1054.6 " />
+<polyline fill="none" vector-effect="none" points="841,1023.87 649.667,1024.15 458.333,1032.67 267,1030.98 " />
 </g>
 
 <g fill="none" stroke="#cc79a7" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="841,1001.34 817.083,1001.36 793.167,1001.35 769.25,1001.36 745.333,1001.37 721.417,1001.36 697.5,1001.38 673.583,1001.4 649.667,1001.41 625.75,1001.44 601.833,1001.4 577.917,1001.45 554,1001.43 530.083,999.365 506.167,980.902 482.25,964.539 458.333,988.138 434.417,995.743 410.5,996.31 386.583,989.411 362.667,1002.65 338.75,1002.32 314.833,1002.09 290.917,1001.89 267,1001.69 " />
+<polyline fill="none" vector-effect="none" points="841,1007.27 649.667,1006.81 458.333,1009.13 267,1003.67 " />
 </g>
 
 <g fill="#cc9999" fill-opacity="1" stroke="#cc9999" stroke-opacity="1" stroke-width="5.33333" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
@@ -551,31 +571,34 @@ font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal"
 <path vector-effect="none" fill-rule="evenodd" d="M13.7813,0 L10.5313,0 L10.5313,-20.7188 C9.75,-19.9792 8.72396,-19.2344 7.45313,-18.4844 C6.18229,-17.7344 5.04167,-17.1719 4.03125,-16.7969 L4.03125,-19.9531 C5.84375,-20.8073 7.43229,-21.8411 8.79688,-23.0547 C10.1615,-24.2682 11.125,-25.4479 11.6875,-26.5938 L13.7813,-26.5938 L13.7813,0"/>
 </g>
 
+<g fill="#000000" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="1056.38,1210 1213.75,767 " />
+</g>
+
 <g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1023,1169.66 1046.92,1146.58 1070.83,1203.94 1094.75,1194.77 1107.99,1210 " />
-<polyline fill="none" vector-effect="none" points="1125.24,1210 1142.58,1177.58 1166.5,1051.67 1190.42,923.417 1207.1,767 " />
-<polyline fill="none" vector-effect="none" points="1516.48,767 1525.25,775.077 1549.17,779.556 1573.08,771.404 1597,770.355 " />
+<polyline fill="none" vector-effect="none" points="1224.09,767 1405.67,797.73 1597,810.546 " />
 </g>
 
-<g fill="none" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+<g fill="#e69f00" fill-opacity="1" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1023,1001.17 1046.92,1001.17 1070.83,1001.17 1094.75,1001.22 1118.67,1001.23 1142.58,1001.25 1166.5,980.718 1190.42,810.939 1196.5,767 " />
-<polyline fill="none" vector-effect="none" points="1398.42,767 1405.67,777.375 1429.58,774.847 1453.5,777.749 1477.42,790.054 1501.33,798.987 1525.25,796.764 1549.17,809.512 1573.08,803.994 1597,817.123 " />
+<polyline fill="none" vector-effect="none" points="1023,1001.22 1145.58,767 " />
 </g>
 
 <g fill="none" stroke="#56b4e9" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1023,1054.16 1046.92,1054.27 1070.83,1054.14 1094.75,1054.43 1118.67,1054.39 1142.58,1054.78 1166.5,1054.77 1190.42,1055.56 1214.33,1053.68 1238.25,1010.61 1262.17,976.28 1286.08,962.778 1310,955.209 1333.92,951.469 1357.83,955.741 1381.75,960.776 1405.67,966.905 1429.58,965.076 1453.5,967.899 1477.42,976.955 1501.33,975.192 1525.25,981.677 1549.17,992.377 1573.08,977.015 1597,981.945 " />
+<polyline fill="none" vector-effect="none" points="1023,1029.61 1214.33,1045.03 1405.67,1136.33 1597,1017.85 " />
 </g>
 
 <g fill="none" stroke="#cc79a7" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="1023,1002.22 1046.92,1002.35 1070.83,1002.7 1094.75,990.828 1118.67,995.228 1142.58,993.958 1166.5,999.441 1190.42,998.188 1214.33,985.051 1238.25,968.536 1262.17,962.382 1286.08,962.494 1310,964.782 1333.92,968.401 1357.83,975.693 1381.75,977.963 1405.67,980.536 1429.58,980.728 1453.5,983.187 1477.42,984.058 1501.33,983.36 1525.25,986.763 1549.17,987.832 1573.08,984.653 1597,987.792 " />
+<polyline fill="none" vector-effect="none" points="1023,959.45 1214.33,1022.2 1405.67,1041.22 1597,1024.63 " />
 </g>
 
 <g fill="#cc9999" fill-opacity="1" stroke="#cc9999" stroke-opacity="1" stroke-width="5.33333" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
@@ -672,27 +695,37 @@ font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal"
 <g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="2353,927.172 2329.08,930.725 2305.17,953.376 2281.25,970.029 2257.33,1020.32 2233.42,983.089 2209.5,1055.68 2185.58,1162.07 2161.67,1057.91 2137.75,1107.95 2113.83,1167.09 2089.92,1082.59 2066,1125.25 2042.08,1098.14 2018.17,980.185 1994.25,924.917 1978.82,767 " />
-<polyline fill="none" vector-effect="none" points="1888.86,767 1874.67,828.498 1850.75,1003.95 1826.83,1125.25 1808.17,1210 " />
+<polyline fill="none" vector-effect="none" points="2353,801.246 2161.67,1003.38 2013.55,767 " />
+</g>
+
+<g fill="#000000" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="1947.67,767 1802.15,1210 " />
 </g>
 
 <g fill="none" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="2353,940.993 2329.08,919.961 2305.17,974.116 2281.25,977.37 2257.33,982.003 2233.42,981.464 2209.5,1001.14 2185.58,1001.18 2161.67,1001.04 2137.75,1001.17 2113.83,1001.17 2089.92,1001.21 2066,1001.2 2042.08,984.743 2018.17,911.46 1994.25,778.657 1992.24,767 " />
-<polyline fill="none" vector-effect="none" points="1913.72,767 1898.58,809.462 1874.67,961.81 1850.75,1001.51 1826.83,1001.51 1802.92,1001.29 1779,1001.29 " />
+<polyline fill="none" vector-effect="none" points="2353,786.809 2161.67,982.841 2046.96,767 " />
+</g>
+
+<g fill="#e69f00" fill-opacity="1" stroke="#e69f00" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
+font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="1897.58,767 1779,1002.01 " />
 </g>
 
 <g fill="none" stroke="#56b4e9" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="2353,967.53 2329.08,981.904 2305.17,1003.55 2281.25,1018.45 2257.33,1028.02 2233.42,1050.73 2209.5,1054.39 2185.58,1055.26 2161.67,1054.81 2137.75,1054.85 2113.83,1054.3 2089.92,1054.68 2066,1054.55 2042.08,1054.78 2018.17,1055.1 1994.25,1055.87 1970.33,1046.89 1946.42,997.117 1922.5,991.345 1898.58,1016.18 1874.67,1053.86 1850.75,1053.39 1826.83,1053 1802.92,1052.76 1779,1052.54 " />
+<polyline fill="none" vector-effect="none" points="2353,984.59 2161.67,1029.87 1970.33,1032.67 1779,1024.23 " />
 </g>
 
 <g fill="none" stroke="#cc79a7" stroke-opacity="1" stroke-width="6.66667" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"
 font-family="Segoe UI" font-size="9" font-weight="400" font-style="normal" 
 >
-<polyline fill="none" vector-effect="none" points="2353,955.057 2329.08,974.55 2305.17,995.809 2281.25,1003.52 2257.33,1003.3 2233.42,1003.14 2209.5,1002.97 2185.58,1002.69 2161.67,1002.86 2137.75,1003.16 2113.83,1002.98 2089.92,996.55 2066,994.412 2042.08,995.221 2018.17,997.416 1994.25,996.907 1970.33,988.138 1946.42,976.456 1922.5,994.316 1898.58,1001.47 1874.67,1001.46 1850.75,1001.43 1826.83,1001.4 1802.92,1001.37 1779,1001.35 " />
+<polyline fill="none" vector-effect="none" points="2353,1002.13 2161.67,1005.78 1970.33,1009.13 1779,1006.41 " />
 </g>
 
 <g fill="#cc9999" fill-opacity="1" stroke="#cc9999" stroke-opacity="1" stroke-width="5.33333" stroke-linecap="butt" stroke-linejoin="round" transform="matrix(0.375,0,0,0.375,-31.5,-10.5)"

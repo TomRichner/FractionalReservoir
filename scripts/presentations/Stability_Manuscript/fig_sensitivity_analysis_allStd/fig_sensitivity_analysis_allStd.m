@@ -1,49 +1,53 @@
-close all
-clc
+function out = fig_sensitivity_analysis_allStd(cfg)
+% FIG_SENSITIVITY_ANALYSIS_ALLSTD Stacked 1-D sensitivity sheets, LLE and rate.
+%
+%   out = FIG_SENSITIVITY_ANALYSIS_ALLSTD()
+%   out = FIG_SENSITIVITY_ANALYSIS_ALLSTD('run_dir', d)
+%
+% Rows are swept parameters, columns are adaptation conditions, each panel an
+% imagesc of the full rep distribution with a median line. No simulation is
+% re-run: the saved 1-D sensitivity PSA objects are reloaded, replot_sensitivity
+% regenerates the per-parameter panels, and assemble_sensitivity_figure stacks
+% them.
+%
+% TWO SHEETS PER METRIC. The Pairs sweeps cover SEVEN parameters, and seven rows
+% on one sheet is about 2100 px tall. They are split by what the parameters MEAN
+% rather than alphabetically: 'core' is the network-scale axes (f_E,
+% level_of_chaos, n), 'mu' the four connectivity blocks, which are only really
+% comparable side by side.
+%
+% ROWS ARE IDENTIFIED BY INDEX, not guessed from the data. The original inferred
+% which parameter a row showed from max(xlim) -- <=1 is f, <=10 is
+% level_of_chaos, else n -- which silently mislabels the Pairs sweeps
+% (mu_EE_relative, max 11, reads as "Network Size"). assemble_sensitivity_figure
+% takes an ordered parameter list, so row -> parameter is already known exactly.
+%
+% NO 'close all force'. Correct standalone -- replot_sensitivity saves ALL open
+% figures -- but in a batch it destroys the previous figure's output before the
+% caller can collect it. Explicitly named handles are saved instead.
+%
+% See also: resolve_run_dir, replot_sensitivity, assemble_sensitivity_figure,
+%           preset_default_values, fig_sensitivity_medians
 
-% Fig_sensitivity_analysis_allStd.m
-% Stability_Manuscript presentation figures: combined LLE + mean_rate sensitivity,
-% for the SRNNCellTypePairs "allStd" runs. Regenerates the stacked 1D-sensitivity
-% figures from a saved run_all_<dt> run and writes the final figures into this
-% presentation folder. No simulation is re-run -- edit data_root below to point at
-% a different run_all output.
-%
-% Sibling of ../fig_sensitivity_analysis/Fig_sensitivity_analysis.m, which is left
-% untouched. Three things differ, all forced by the move to SRNNCellTypePairs:
-%
-%   1. SEVEN swept parameters, not three. The Pairs sweeps add the four mu blocks
-%      (mu_EE/EI/IE/II_relative) to f_E / level_of_chaos / n. Seven rows on one
-%      sheet is ~2100 px tall, so each metric is split into two sheets: the three
-%      "core" network parameters, and the four mu blocks (which are only really
-%      comparable side by side anyway).
-%   2. Rows are identified BY INDEX, not by guessing from the data. The original
-%      inferred which parameter a row showed from max(xlim) -- <=1 is f, <=10 is
-%      level_of_chaos, else n. That silently mislabels the Pairs sweeps:
-%      mu_EE_relative (max 11) reads as "Network Size" and mu_EI_relative
-%      (max -2.75) as "E:I ratio". Since assemble_sensitivity_figure takes an
-%      ordered params list, row index -> parameter is already known exactly, so
-%      the heuristic is replaced by a lookup. See row_style below.
-%   3. f -> f_E, spanning [0.2, 0.8] rather than [0.25, 0.75], so the E:I ratio
-%      ticks are different. Note effective_param(res,'f') on a Pairs run returns
-%      the class default [0.5 0.5] rather than the swept value -- read f_E.
-%
-% See also: Fig_sfa_EOC_allStd, Fig_param_space_allStd, assemble_sensitivity_figure
+arguments
+    cfg.run_dir     (1,:) char    = ''
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.out_dir     (1,:) char    = ''
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+end
 
-this_dir     = fileparts(mfilename('fullpath'));
-% Depth-independent project root (CLAUDE.md convention) -- setup_paths.m lives at
-% the repo root, so this tolerates the script moving between subdirectories.
 setup_paths();
+out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 project_root = fileparts(which('setup_paths'));
+st           = manuscript_style();
 
-% Source run (a run_all_<dt> folder with 1D_sensitivity_* subdirs).
-% Swap this one line to regenerate against the medium run.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_17_25');
-out_dir   = this_dir;   % write the final figures next to this script
+run_dir = resolve_run_dir('run_dir', cfg.run_dir, 'preset_name', cfg.preset_name);
+made_tags = {};
 
-% Start from a clean slate: replot_sensitivity saves ALL open figures, so any
 % stray figure lingering in the session (e.g. a previous combined figure) would
 % pollute the per-param save and break assemble_sensitivity_figure.
-close all force;
+% (no 'close all force' -- destroyed sibling figures in a batch; see header)
 
 % --- Which parameters go on which sheet ------------------------------------
 % Order here IS the row order, and is what row_style is indexed by. Names must
@@ -94,7 +98,7 @@ row_style = containers.Map( ...
 % ones, because they also place the default marker (see default_mark_* below):
 % on the f_E and Network Size rows there is no 0% tick to carry that
 % information, which is exactly where the marker earns its keep.
-default_value = preset_default_values(data_root, ...
+default_value = preset_default_values(run_dir, ...
     {'f_E', 'level_of_chaos', 'n', 'mu_EE_relative', 'mu_EI_relative', ...
      'mu_IE_relative', 'mu_II_relative'});
 pct_params = {'level_of_chaos', 'mu_EE_relative', 'mu_EI_relative', ...
@@ -109,8 +113,8 @@ pct_params = {'level_of_chaos', 'mu_EE_relative', 'mu_EI_relative', ...
 lle_range = [-1.75, 1.75];
 n_bins    = 24;    % counts linspace EDGES, so 25 plotted rows (23 interior + 2 overflow)
 
-tick_fs   = 14;    % tick numbers -- matches MC figure DefaultAxesFontSize
-label_fs  = 15.4;  % axis labels -- matches MC figure (14 * 1.1 label multiplier)
+tick_fs   = st.tick_fs;
+label_fs  = st.label_fs;
 title_fs  = 20;    % condition titles (no adaptation, sfa only, ...) -- enlarged
 letter_fs = 18;    % panel letters -- matches MC figure
 row_shrink = 0.85; % shrink each row's height to open gaps between rows
@@ -144,7 +148,7 @@ default_mark_frac  = 0.05;              % height as a fraction of the y-range
 
 % Regenerate the per-param figures. One call produces BOTH the LLE and the
 % mean_rate figures for every swept parameter (replot_sensitivity plots both).
-replot_dir = replot_sensitivity(data_root, lle_range, n_bins, n_bins);
+replot_dir = replot_sensitivity(run_dir, lle_range, n_bins, n_bins);
 
 % --- One combined figure per metric per sheet ------------------------------
 % assemble_sensitivity_figure matches the per-param figs by their Name prefix
@@ -340,146 +344,81 @@ for si = 1:numel(sheets)
 end
 end
 
+%% --- Clean up and record ----------------------------------------------------
 % Prep figures (per-param LLE + mean_rate, and the intermediate combined ones)
-% exist only to build the final figures -- remove the whole replot folder so no
-% extra figs are left behind in the data dir. Must come after BOTH metrics.
+% exist only to build the finals -- remove the whole replot folder so no extra
+% figs are left in the data dir. Must come after BOTH metrics.
 if isfolder(replot_dir)
     rmdir(replot_dir, 's');
 end
 
-% Log the git state alongside the figures so this presentation output can be
-% traced back to an exact commit (+ working-tree diff if dirty).
-capture_git_provenance(out_dir, project_root);
+out = struct('figs', gobjects(0), 'files', {{}}, 'source', run_dir);
+if cfg.save
+    for k = 1:numel(made_tags)
+        out.files = [out.files, existing_outputs(out_dir, made_tags{k})];
+    end
+    capture_git_provenance(out_dir, project_root);
 
-%% -------------------- Human-readable description --------------------
-% Write a plain-text record of how these figures were produced: the source run,
-% the swept-parameter subfolders used, the pipeline, and the output filenames.
-sens_dirs = dir(fullfile(data_root, '1D_sensitivity_*'));
-sens_dirs = sens_dirs([sens_dirs.isdir]);
+    axis_note = [ ...
+        'x-axes are relabelled per parameter: f_E to E:I ratio; level_of_chaos ' ...
+        'to Synaptic Gain; n to Network Size; mu_XY_relative to mu_{XY} (RMT ' ...
+        'block means, indexed (post, pre)). The Synaptic Gain and the four mu ' ...
+        'axes are shown as PERCENT DEPARTURE from the preset default, ' ...
+        '(value/default - 1)*100, because absolute mu_tilde_relative values ' ...
+        'mean little on their own; this puts the preset own network at 0 percent ' ...
+        'and makes the four mu panels directly comparable. SIGN: mu_EI and ' ...
+        'mu_II have NEGATIVE defaults, so +100 percent means twice as ' ...
+        'inhibitory, which in raw coordinates is further LEFT -- those two ' ...
+        'panels have their x-direction reversed so that on all four, rightward ' ...
+        'means "stronger synapse of this type". Only the ruler changes; the ' ...
+        'underlying image is untouched.'];
 
-desc_path = fullfile(out_dir, 'README_fig_sensitivity_analysis_allStd.txt');
-fid = fopen(desc_path, 'w');
-cleanup = onCleanup(@() fclose(fid));
+    default_note = [ ...
+        'Every row carries a short reddish-grey tick rising from the x-axis at ' ...
+        'the preset default for that parameter -- the network the sweep departs ' ...
+        'from. On the percent axes it sits at 0 percent; on the f_E and Network ' ...
+        'Size rows there is no 0 percent tick, which is where it earns its ' ...
+        'keep. A default outside the swept range is NOT drawn rather than ' ...
+        'clamped to the edge. The values come from preset_default_values, which ' ...
+        'reads the run own run_manifest.mat, constructs a model from that ' ...
+        'preset and reads each value off the object, so the CLASS accessors ' ...
+        'resolve the aliases. resolved_defaults cannot serve here: ' ...
+        'ParamSpaceAnalysis2 excludes grid axes from it, and each of these ' ...
+        'parameters is the axis of one of the sweeps.'];
 
-fprintf(fid, 'Stability_Manuscript figures: LLE + mean firing rate Sensitivity (allStd)\n');
-fprintf(fid, '========================================================================\n\n');
-fprintf(fid, 'Generated: %s\n', char(datetime('now')));
-fprintf(fid, 'By script: %s.m\n\n', mfilename);
+    metric_note = [ ...
+        'Both metrics use the same bin count so they have the same vertical ' ...
+        'resolution. The LLE sheets keep the green dashed zero line -- the sign ' ...
+        'of lambda_1 marks the edge of chaos -- and the solid bands at top and ' ...
+        'bottom are the overflow bins. On the aug_14 preset the LLEs spanned ' ...
+        'roughly p1 = -10.0 to p99 = +3.7, so those bands carried a large share ' ...
+        'of the distribution; re-check that against the run actually plotted. ' ...
+        'The rate sheets use range [0, 1], where nothing can fall outside, so ' ...
+        'their overflow bins are always empty and the zero line is dropped as ' ...
+        'meaningless for a rate.'];
 
-fprintf(fid, 'HOW THEY WERE MADE\n');
-fprintf(fid, '  Presentation replot -- no simulation is re-run. The script reloads the\n');
-fprintf(fid, '  saved 1D-sensitivity PSA objects from a run_all_<dt> run and calls\n');
-fprintf(fid, '  replot_sensitivity (which plots BOTH metrics) -> assemble_sensitivity_figure\n');
-fprintf(fid, '  once per metric per sheet to rebuild the stacked figures (rows = swept\n');
-fprintf(fid, '  params, cols = adaptation conditions), then saves them here. See\n');
-fprintf(fid, '  git_provenance.txt for the exact commit.\n\n');
-
-fprintf(fid, 'SOURCE RUN\n');
-fprintf(fid, '  %s\n', data_root);
-fprintf(fid, '  1D_sensitivity subfolders used:\n');
-for k = 1:numel(sens_dirs)
-    fprintf(fid, '    %s\n', sens_dirs(k).name);
+    write_figure_readme(out_dir, struct( ...
+        'tag',    'fig_sensitivity_analysis_allStd', ...
+        'title',  'Stability_Manuscript figures: LLE and mean firing rate sensitivity', ...
+        'script', 'fig_sensitivity_analysis_allStd.m', ...
+        'what',   ['One row per swept parameter, one column per adaptation ' ...
+                   'condition. Each panel is an imagesc of the full ' ...
+                   'across-reps distribution at each level, with the median ' ...
+                   'overlaid. Two sheets per metric: core (f_E, ' ...
+                   'level_of_chaos, n) and mu (the four connectivity blocks).'], ...
+        'how',    ['Presentation replot -- no simulation is re-run. ' ...
+                   'replot_sensitivity reloads the saved PSA objects and ' ...
+                   'regenerates both metrics; assemble_sensitivity_figure ' ...
+                   'stacks them per sheet; the result is restyled and saved ' ...
+                   'here, and the prep folder is deleted.'], ...
+        'source', struct('run_dir', run_dir, 'preset', cfg.preset_name), ...
+        ... % clim_frac is per-metric (it lives in the `spec` struct array), so
+        ... % record the LLE sheet's value, which is the one worth quoting.
+        'settings', struct('lle_range', lle_range, 'n_bins', n_bins, ...
+                           'clim_frac_LLE', spec(1).clim_frac), ...
+        'figures', {out.files}, ...
+        'sections', struct( ...
+            'heading', {'axis conventions', 'default marker', 'per-metric differences'}, ...
+            'body',    {axis_note, default_note, metric_note})));
 end
-fprintf(fid, '\n');
-
-fprintf(fid, 'SHEETS\n');
-fprintf(fid, '  This run is SRNNCellTypePairs, which sweeps SEVEN parameters rather than\n');
-fprintf(fid, '  the three of the original SRNNModel2 figure. Seven rows on one sheet is\n');
-fprintf(fid, '  unreadably tall, so each metric is split in two:\n');
-for si = 1:numel(sheets)
-    fprintf(fid, '    %-5s : %s\n', sheets(si).tag, strjoin(sheets(si).params, ', '));
 end
-fprintf(fid, '\n');
-
-fprintf(fid, 'FIGURES PRODUCED (in this folder)\n');
-for k = 1:numel(made_tags)
-    fprintf(fid, '  %s.png / .svg / .fig\n', made_tags{k});
-end
-
-fprintf(fid, '\nSHARED LAYOUT (all sheets)\n');
-fprintf(fid, '  One row per swept parameter, one column per adaptation condition.\n');
-fprintf(fid, '  x-axes relabelled per parameter: f_E -> "E:I ratio"\n');
-fprintf(fid, '  (E:I = f_E:(1-f_E), ticks 1:4, 2:3, 3:2, 4:1); level_of_chaos ->\n');
-fprintf(fid, '  "Synaptic Gain"; n -> "Network Size"; mu_XY_relative -> \\mu_{XY}\n');
-fprintf(fid, '  (RMT block means, indexed (post, pre)). Rows are identified by their\n');
-fprintf(fid, '  index in the sheet''s parameter list, NOT by inspecting the data -- the\n');
-fprintf(fid, '  original figure guessed from max(xlim), which mislabels the mu sweeps.\n\n');
-fprintf(fid, '  PERCENT AXES. The Synaptic Gain and the four mu axes are shown as\n');
-fprintf(fid, '  percent departure from the preset default, (value/default - 1)*100,\n');
-fprintf(fid, '  rather than in raw mu_tilde_relative units -- absolute values mean\n');
-fprintf(fid, '  little on their own, and this puts the preset''s own network at 0%%\n');
-fprintf(fid, '  and makes the four mu panels directly comparable.\n\n');
-fprintf(fid, '  SIGN: mu_EI and mu_II have NEGATIVE defaults, so "+100%%" means twice\n');
-fprintf(fid, '  as inhibitory. In raw data coordinates that is further LEFT, so those\n');
-fprintf(fid, '  two panels have their x-direction REVERSED; on all four mu panels\n');
-fprintf(fid, '  rightward therefore means "stronger synapse of this type" and the\n');
-fprintf(fid, '  percent axis ascends left-to-right. Only the ruler changes -- the\n');
-fprintf(fid, '  underlying image is untouched.\n\n');
-fprintf(fid, '  DEFAULT MARKER. Every row carries a short reddish-gray tick rising\n');
-fprintf(fid, '  from the x-axis (%g of the y-range, %g pt) at the preset''s default\n', ...
-    default_mark_frac, default_mark_lw);
-fprintf(fid, '  for that parameter -- the network the sweep departs from. On the\n');
-fprintf(fid, '  percent axes it sits at 0%%; on the f_E and Network Size rows there\n');
-fprintf(fid, '  is no 0%% tick, which is where it earns its keep. A default lying\n');
-fprintf(fid, '  outside the swept range is NOT drawn rather than clamped to the edge.\n\n');
-fprintf(fid, '  WHERE THE DEFAULTS COME FROM. Not hardcoded, and not assumed from the\n');
-fprintf(fid, '  preset struct''s field layout: the run''s run_manifest.mat names the\n');
-fprintf(fid, '  preset and the model class, a model is constructed from that preset,\n');
-fprintf(fid, '  and each value is read off the object so the CLASS''s own accessors\n');
-fprintf(fid, '  resolve the aliases (f_E -> f(1), mu_EE_relative ->\n');
-fprintf(fid, '  mu_tilde_relative(1,1) indexed (post,pre), and a 1 x C row broadcast\n');
-fprintf(fid, '  down the columns). The run''s resolved_defaults cannot serve here:\n');
-fprintf(fid, '  ParamSpaceAnalysis2 excludes grid axes from it, and each of these\n');
-fprintf(fid, '  parameters is the axis of one of the sweeps. For this run:\n');
-pk = keys(default_value);
-for k = 1:numel(pk)
-    fprintf(fid, '    %-16s default %g\n', pk{k}, default_value(pk{k}));
-end
-fprintf(fid, '\n');
-fprintf(fid, '  Larger tick fonts. Condition titles kept only on the top row; vertical\n');
-fprintf(fid, '  gray dividers separate the condition columns. imagesc CLim capped at\n');
-fprintf(fid, '  total_reps*0.8 (shared within a figure); colormap ramps white -> grey\n');
-fprintf(fid, '  %.2f, stopping well short of black -- a ramp into black makes the\n', cmap_darkest);
-fprintf(fid, '  densest cells a solid slab and lets the overflow bands dominate the\n');
-fprintf(fid, '  panel. Panel letters added up-and-left of each plot (AddLetters2Plots).\n');
-fprintf(fid, '  Median line: OPAQUE dark blue [%.2f %.2f %.2f], %g pt (plot_sensitivity\n', ...
-    median_color, median_lw);
-fprintf(fid, '  draws it as transparent pure blue at 4 pt); the transparency existed\n');
-fprintf(fid, '  only to survive near-black cells and is not needed now. Titles not\n');
-fprintf(fid, '  bold; axis boxes removed.\n');
-
-fprintf(fid, '\nPER-FIGURE DIFFERENCES\n');
-fprintf(fid, '  Both metrics use n_bins = %d (linspace edges), i.e. %d plotted rows:\n', n_bins, n_bins + 1);
-fprintf(fid, '  %d interior bins plus the two -inf/+inf overflow bins. Matching the\n', n_bins - 1);
-fprintf(fid, '  bin count gives the two metrics the same vertical resolution.\n\n');
-fprintf(fid, '  Fig_Sensitivity_LLE_*:       ylabel \\lambda_1; histogram range\n');
-fprintf(fid, '                               [%.2f, %.2f]; green dashed zero line kept\n', lle_range(1), lle_range(2));
-fprintf(fid, '                               (thinner) -- the sign of lambda_1 marks the\n');
-fprintf(fid, '                               edge of chaos. The solid bands at the top and\n');
-fprintf(fid, '                               bottom are the overflow bins (reps outside\n');
-fprintf(fid, '                               the range). NOTE: this preset''s LLEs span\n');
-fprintf(fid, '                               roughly p1 = -10.0 to p99 = +3.7, so those\n');
-fprintf(fid, '                               overflow bands carry a large share of the\n');
-fprintf(fid, '                               distribution. The range is kept identical to\n');
-fprintf(fid, '                               the original figure by choice; widen\n');
-fprintf(fid, '                               lle_range in the script to change that.\n');
-fprintf(fid, '  Fig_sensitivity_mean_rate_*: ylabel "Mean Firing Rate"; histogram range\n');
-fprintf(fid, '                               [0, 1] (plot_sensitivity default; nothing can\n');
-fprintf(fid, '                               fall outside it, so the overflow bins are\n');
-fprintf(fid, '                               always empty); y ticks at 0 and 1 only; zero\n');
-fprintf(fid, '                               line removed -- at y=0 it lands on the bottom\n');
-fprintf(fid, '                               axis and carries no meaning for a rate.\n');
-
-clear cleanup;  % flush + close
-fprintf('Description written: %s\n', desc_path);
-
-
-%% ==================== Local helpers ====================
-% There are none any more. preset_default_values, apply_percent_axis,
-% mark_default_value and save_figure_stable were local subfunctions here until
-% fig_sensitivity_medians needed the same four; they now live as standalone
-% files in scripts/run_all_analyses/replot/ (on the path via setup_paths) and
-% this script calls those. The bodies moved unchanged, EXCEPT that
-% apply_percent_axis now signs the zero label ("+0%" rather than "0%"), which is
-% why the mu and Synaptic Gain axes here read differently from the figures
-% committed before 2026-08-18.

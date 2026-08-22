@@ -1,46 +1,67 @@
-%% Plot the Stability_Manuscript example memory-capacity figure.
-% Loads mc_example_data.mat (written by compute_memory_capacity_example.m) and
-% renders a single manuscript figure -- no simulation is re-run, so the look can
-% be iterated quickly. Run compute_memory_capacity_example.m first.
+function out = fig_memory_capacity_example(cfg)
+% FIG_MEMORY_CAPACITY_EXAMPLE Example memory capacity, one network, 4 conditions.
 %
-% Layout (styled to match fig_memory_capacity/Fig_memory_capacity.m):
-%   (a) Cumulative Memory Capacity vs delay (0-10 s), all 4 conditions.
-%   (b) Per-delay R^2 vs delay (0-10 s), all 4 conditione t a few delays -- target
-%   u(t-d) vs the trained readout -- each panel titled with the delay in seconds
-%   and its R^2. Built from the saved mc_results (predictions/t_pred/R2_d).
+%   out = FIG_MEMORY_CAPACITY_EXAMPLE()
+%   out = FIG_MEMORY_CAPACITY_EXAMPLE('data_file', f)
+%
+% (a) cumulative memory capacity against delay, all four conditions.
+% (b) per-delay R^2, all four conditions.
+% Below: input reconstruction (target against trained readout) at a few delays
+% for the SFA+STD condition, each panel titled with its delay and R^2.
+%
+% TWO-STEP, no re-simulation at plot time: run_memory_capacity_example runs the
+% protocol and saves mc_example_data.mat (gitignored); this renders it, so the
+% look can be iterated without re-running the reservoir.
+%
+% See also: run_memory_capacity_example, fig_memory_capacity, manuscript_style
 
-clear; clc; close all;
+arguments
+    cfg.data_file   (1,:) char    = ''    % '' -> mc_example_data.mat beside this file
+    cfg.out_dir     (1,:) char    = ''
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+    cfg.run_dir     (1,:) char    = ''    % unused; accepted for a uniform call
+    cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+end
 
-% Assumes setup_paths.m has already been run (src/ + scripts/ on the MATLAB path).
-% this_dir locates mc_example_data.mat and is where the final figure is saved.
-this_dir = fileparts(mfilename('fullpath'));
-% scripts/presentations/Stability_Manuscript/fig_memory_capacity_example -> root is 4 up
-project_root = fileparts(fileparts(fileparts(fileparts(this_dir))));
-out_dir = this_dir;   % write the final figure next to this script
+setup_paths();
+this_dir     = fileparts(mfilename('fullpath'));
+out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
+project_root = fileparts(which('setup_paths'));
 
 %% Load precomputed results
-data_file = fullfile(this_dir, 'mc_example_data.mat');
-assert(isfile(data_file), ...
-    'Missing %s -- run compute_memory_capacity_example.m first.', data_file);
+data_file = cfg.data_file;
+if isempty(data_file)
+    data_file = fullfile(this_dir, 'mc_example_data.mat');
+end
+if ~isfile(data_file)
+    error('fig_memory_capacity_example:NoData', ...
+        ['Missing %s\n' ...
+         'Run run_memory_capacity_example first -- the .mat is gitignored, so a ' ...
+         'fresh clone has none.'], data_file);
+end
 S = load(data_file);
 results         = S.results;
-R2              = S.R2;
+R2              = S.R2; %#ok<NASGU>
 delay_s         = S.delay_s;
 condition_names = S.condition_names;
 n_cond          = numel(condition_names);
 
 %% Style + palette (matched to Fig_memory_capacity.m / plot_memory_capacity_combined.m)
-set(0,'DefaultAxesFontSize',14);    % tick numbers + x/y labels
-set(0,'DefaultAxesLineWidth',1.0);  % axis lines + tick marks
-set(0,'DefaultTextInterpreter','none');
-set(0,'DefaultLegendInterpreter','none');
+% Root defaults are RESTORED on return. These were bare set(0,...) calls that
+% leaked 'none' interpreters into the rest of the session and broke every tex
+% label drawn afterwards. style_cleanup must stay in scope for the whole build.
+st = manuscript_style();
+style_cleanup = with_manuscript_defaults(); %#ok<NASGU>
 
 % Okabe-Ito colorblind-safe palette (same as the combined MC figure):
 %   Baseline black, SFA orange, STD sky blue, SFA+STD reddish purple.
-colors = [0.000 0.000 0.000;
-          0.902 0.624 0.000;
-          0.337 0.706 0.914;
-          0.800 0.475 0.655];
+% Condition colours come from manuscript_style, keyed BY NAME, so this figure
+% and the ensemble MC figure cannot drift apart on them.
+colors = [st.condition_color('Baseline');
+          st.condition_color('SFA');
+          st.condition_color('STD');
+          st.condition_color('SFA+STD')];
 if size(colors,1) < n_cond
     colors = lines(n_cond);
 end
@@ -168,62 +189,58 @@ text(recon_ax(1), -0.025, 1.16, '(c)', 'Units', 'normalized', ...
     'FontSize', 18, 'FontWeight', 'normal', 'HorizontalAlignment', 'center', ...
     'VerticalAlignment', 'bottom', 'Clipping', 'off');
 
-%% ==================== Save the figure ====================
-% Stable names (png/svg/fig), matching the other Stability_Manuscript scripts.
-save_fig_stable(fig, out_dir, 'Fig_MC_Example');
 
-% Log the git state alongside the figure.
-capture_git_provenance(out_dir, project_root);
+if ~cfg.visible; set(fig, 'Visible', 'off'); end
 
-%% -------------------- Human-readable description --------------------
-desc_path = fullfile(out_dir, 'README_fig_memory_capacity_example.txt');
-fid = fopen(desc_path, 'w');
-cleanup = onCleanup(@() fclose(fid));
+%% --- Save -------------------------------------------------------------------
+fig_tag = 'Fig_MC_Example';
+out = struct('figs', fig, 'files', {{}}, 'source', data_file);
+if cfg.save
+    save_figure_stable(out_dir, fig_tag, fig);
+    out.files = existing_outputs(out_dir, fig_tag);
+    capture_git_provenance(out_dir, project_root);
 
-fprintf(fid, 'Stability_Manuscript figure: Example memory capacity\n');
-fprintf(fid, '====================================================\n\n');
-fprintf(fid, 'Generated: %s\n', char(datetime('now')));
-fprintf(fid, 'By script: %s.m\n\n', mfilename);
+    if isfield(S, 'settings'); mc_set = S.settings; else; mc_set = struct(); end
 
-fprintf(fid, 'HOW IT WAS MADE\n');
-fprintf(fid, '  Two-step, no re-simulation at plot time: compute_memory_capacity_example.m\n');
-fprintf(fid, '  runs the memory-capacity protocol for the 4 adaptation conditions and saves\n');
-fprintf(fid, '  the per-condition mc_results structs to mc_example_data.mat (gitignored).\n');
-fprintf(fid, '  This script loads that file and renders the figure, so the look can be\n');
-fprintf(fid, '  iterated without re-running the sim. See git_provenance.txt for the commit.\n\n');
+    write_figure_readme(out_dir, struct( ...
+        'tag',    'fig_memory_capacity_example', ...
+        'title',  'Stability_Manuscript figure: example memory capacity', ...
+        'script', 'fig_memory_capacity_example.m', ...
+        'what',   ['(a) cumulative memory capacity against delay, all four ' ...
+                   'adaptation conditions. (b) per-delay R^2, all four ' ...
+                   'conditions. Below, input reconstruction for the SFA+STD ' ...
+                   'condition at a few delays -- target against trained ' ...
+                   'readout -- each panel titled with the delay in seconds and ' ...
+                   'its R^2, all sharing y-limits.'], ...
+        'how',    ['Two-step, no re-simulation at plot time. ' ...
+                   'run_memory_capacity_example runs the protocol for the four ' ...
+                   'conditions on ONE network and saves the per-delay R^2 plus ' ...
+                   'the reconstruction traces to mc_example_data.mat; this ' ...
+                   'function renders that file. The full mc_results also holds ' ...
+                   'the complete state time series (~0.6 GB per condition), ' ...
+                   'which the figure does not use and which is stripped before ' ...
+                   'saving.'], ...
+        'source', struct('data_file', data_file, ...
+                         'preset', getfield_or(mc_set, 'preset_name', '(pre-refactor run)'), ...
+                         'run_mode', getfield_or(mc_set, 'run_mode', '(pre-refactor run)')), ...
+        'settings', mc_set, ...
+        'figures', {out.files}, ...
+        'notes',  {{['CONDITION COLOURS come from manuscript_style and are keyed ' ...
+                    'BY NAME, so this figure and the ensemble memory-capacity ' ...
+                    'figure cannot drift apart on them.'], ...
+                   ['MODEL CLASS. SRNN_ESN_reservoir subclasses SRNNModel2, so ' ...
+                    'the memory-capacity network is NOT the SRNNCellTypePairs ' ...
+                    'network the rest of the paper shows. The ESN readout has ' ...
+                    'not been ported to the Pairs class; the methods section ' ...
+                    'must say so.']}}));
+end
+end
 
-fprintf(fid, 'MODEL SETTINGS\n');
-fprintf(fid, '  Match looped_memory_capacity.m (c_E = 0.5/3, sample_hold input, n = 300,\n');
-fprintf(fid, '  f = 0.6, level_of_chaos = 2.5). See compute_memory_capacity_example.m.\n\n');
-
-fprintf(fid, 'FIGURE PRODUCED (in this folder)\n');
-fprintf(fid, '  Fig_MC_Example.png / .svg / .fig\n');
-fprintf(fid, '    (a) Cumulative Memory Capacity vs delay (0-%d s), all 4 conditions.\n', xmax_s);
-fprintf(fid, '    (b) Per-delay R^2 vs delay (0-%d s), all 4 conditions (legend).\n', xmax_s);
-fprintf(fid, '    Below: SFA+STD input reconstruction (target vs readout) for hold-delays\n');
-fprintf(fid, '    %s (delay indices), each titled with the delay in seconds and R^2;\n', mat2str(recon_delays));
-fprintf(fid, '    all reconstruction panels share y-limits [%g, %g].\n', recon_ylim(1), recon_ylim(2));
-
-clear cleanup;  % flush + close
-fprintf('Description written: %s\n', desc_path);
-
-fprintf('Rendered + saved the example memory-capacity figure.\n');
-
-%% ==================== Local helpers ====================
-function save_fig_stable(fig, out_dir, base)
-% Save fig as <base>.{png,svg,fig} with a stable name: clear any prior <base>*
-% outputs, save via save_some_figs_to_folder_2 (which suffixes the figure
-% number), then rename to the fixed names.
-    old = dir(fullfile(out_dir, [base '*']));
-    for a = 1:numel(old)
-        fp = fullfile(old(a).folder, old(a).name);
-        if ~old(a).isdir && (endsWith(fp, '.png') || endsWith(fp, '.svg') || endsWith(fp, '.fig'))
-            delete(fp);
-        end
-    end
-    save_some_figs_to_folder_2(out_dir, base, fig.Number, {'png', 'svg', 'fig'});
-    num = num2str(fig.Number);
-    movefile(fullfile(out_dir, [base '_figure_' num '.png']), fullfile(out_dir, [base '.png']));
-    movefile(fullfile(out_dir, [base '_figure_' num '.svg']), fullfile(out_dir, [base '.svg']));
-    movefile(fullfile(out_dir, [base '_f_' num '.fig']),      fullfile(out_dir, [base '.fig']));
+%% ------------------------------------------------------------------------
+function v = getfield_or(s, name, default)
+if isstruct(s) && isfield(s, name) && ~isempty(s.(name))
+    v = s.(name);
+else
+    v = default;
+end
 end

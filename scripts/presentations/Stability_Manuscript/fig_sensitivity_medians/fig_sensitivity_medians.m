@@ -1,50 +1,48 @@
-close all
-clc
-
-% Fig_sensitivity_medians.m
-% Stability_Manuscript presentation figure: the 1D sensitivity sweeps COLLAPSED
-% ACROSS CONDITIONS. One subplot per swept parameter, four median lines per
-% subplot (one per adaptation condition), 2 x 3 on a single sheet per metric.
+function out = fig_sensitivity_medians(cfg)
+% FIG_SENSITIVITY_MEDIANS Sensitivity medians, conditions overlaid, 2 x 3.
 %
-% Sibling of ../fig_sensitivity_analysis_allStd/Fig_sensitivity_analysis_allStd.m,
-% which is left untouched. That script lays the same run out as rows = swept
-% parameter, columns = condition, each panel an imagesc of the full rep
-% distribution -- 28 panels over two sheets per metric. Here the conditions are
-% overlaid instead of tiled, which is what makes the comparison between them
-% direct and fits everything on one sheet. Three consequences:
+%   out = FIG_SENSITIVITY_MEDIANS()
+%   out = FIG_SENSITIVITY_MEDIANS('run_dir', d)
 %
-%   1. NO DISTRIBUTIONS. Only the median across reps is drawn. The percentile
-%      machinery is written generally (see pcts / band_pcts below) so adding an
-%      IQR band later is a two-line change, but nothing but the median is
-%      plotted now.
+% The compact counterpart of fig_sensitivity_analysis_allStd. That figure tiles
+% the four adaptation conditions as COLUMNS and shows the full rep distribution
+% per panel (28 panels over two sheets per metric). Here the conditions are
+% OVERLAID in one axes per swept parameter, as median lines only, so all six
+% parameters fit one 2 x 3 sheet and the conditions can be compared directly
+% rather than across columns. No simulation is re-run.
+%
+% THREE CONSEQUENCES of that choice:
+%   1. NO DISTRIBUTIONS -- only the median across reps is drawn. The percentile
+%      machinery is written generally (see pcts / band_pcts) so adding an IQR
+%      band later is a two-line change.
 %   2. SIX PARAMETERS, not seven. level_of_chaos ("Synaptic Gain") is dropped so
-%      the remaining six fit 2 x 3.
+%      the rest fit 2 x 3; it is the least surprising of the seven, since it
+%      simply scales W.
 %   3. NO REPLOT DETOUR. replot_sensitivity / plot_sensitivity /
 %      assemble_sensitivity_figure exist to build the imagesc sheets; harvesting
 %      median lines back out of their saved .fig files would be fragile. The
-%      medians are computed straight off the saved PSA objects here, from the
-%      same ParamSpaceAnalysis2.collect_level_values that plot_sensitivity
-%      medians internally.
+%      medians are computed straight off the saved PSA objects, from the same
+%      ParamSpaceAnalysis2.collect_level_values that plot_sensitivity uses.
 %
-% NOTE ON SHARED HELPERS. preset_default_values / apply_percent_axis /
-% mark_default_value / save_figure_stable now live as standalone files in
-% scripts/run_all_analyses/replot/. They were lifted verbatim from
-% Fig_sensitivity_analysis_allStd.m, which still carries its own local copies so
-% its committed figures cannot shift; deleting those copies in favour of these is
-% a safe follow-up once that figure is next regenerated.
-%
-% See also: Fig_sensitivity_analysis_allStd, Fig_memory_capacity_example
+% See also: fig_sensitivity_analysis_allStd, resolve_run_dir,
+%           preset_default_values, manuscript_style
 
-this_dir = fileparts(mfilename('fullpath'));
+arguments
+    cfg.run_dir     (1,:) char    = ''
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.out_dir     (1,:) char    = ''
+    cfg.save        (1,1) logical = true
+    cfg.visible     (1,1) logical = true
+end
+
 setup_paths();
+out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 project_root = fileparts(which('setup_paths'));
+st           = manuscript_style();
 
-% Source run (a run_all_<dt> folder with 1D_sensitivity_* subdirs). Same run the
-% allStd figures are built from -- swap this one line to re-point both.
-data_root = fullfile(project_root, 'data', 'param_space', 'run_all_aug_14_26_17_25');
-out_dir   = this_dir;   % write the final figures next to this script
+run_dir = resolve_run_dir('run_dir', cfg.run_dir, 'preset_name', cfg.preset_name);
 
-close all force;
+% (no 'close all force' -- destroyed sibling figures in a batch; see header)
 
 %% -------------------- What goes in which panel --------------------
 % Panel order IS the tile order (row-major over 2 x 3), and is what the panel
@@ -90,7 +88,7 @@ pct_params = {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relat
 % Preset defaults for every panel, not just the percent ones: they also place the
 % default marker, and on the f_E and Network Size panels there is no 0% tick to
 % carry that information, which is exactly where the marker earns its keep.
-default_value = preset_default_values(data_root, panel_params);
+default_value = preset_default_values(run_dir, panel_params);
 
 %% -------------------- Conditions: colour, order, labels --------------------
 % Okabe-Ito colorblind-safe palette, copied from
@@ -106,10 +104,10 @@ default_value = preset_default_values(data_root, panel_params);
 cond_spec = struct( ...
     'name',    {'no_adaptation', 'sfa_only',  'std_only',  'sfa_and_std'}, ...
     'display', {'No Adaptation', 'SFA Only',  'STD Only',  'SFA + STD'}, ...
-    'color',   {[0.000 0.000 0.000], ...   % black          #000000
-                [0.902 0.624 0.000], ...   % orange         #E69F00
-                [0.337 0.706 0.914], ...   % sky blue       #56B4E9
-                [0.800 0.475 0.655]});     % reddish purple #CC79A7
+    'color',   {st.condition_color('no_adaptation'), ...
+                st.condition_color('sfa_only'),      ...
+                st.condition_color('std_only'),      ...
+                st.condition_color('sfa_and_std')});
 
 %% -------------------- Percentiles --------------------
 % pcts(median_col) is the curve that gets drawn. Everything downstream indexes
@@ -122,8 +120,8 @@ assert(~isempty(median_col), 'pcts must include 50 (the median is the plotted cu
 band_pcts  = [];   % e.g. [find(pcts==25) find(pcts==75)] to shade the IQR
 
 %% -------------------- Styling --------------------
-tick_fs   = 14;    % tick numbers -- matches the allStd + MC figures
-label_fs  = 15.4;  % axis labels
+tick_fs   = st.tick_fs;
+label_fs  = st.label_fs;
 legend_fs = 14;
 letter_fs = 18;    % panel letters
 line_lw   = 2.5;   % opaque: four overlaid curves, so the allStd alpha would muddy them
@@ -143,11 +141,11 @@ default_mark_frac  = 0.05;
 % One 1D_sensitivity_* subfolder per swept parameter. Which parameter a folder
 % swept is read off the PSA itself (the single non-reps grid param), exactly as
 % replot_sensitivity does -- never guessed from the folder name.
-sens_listing = dir(fullfile(data_root, '1D_sensitivity_*'));
+sens_listing = dir(fullfile(run_dir, '1D_sensitivity_*'));
 sens_listing = sens_listing([sens_listing.isdir]);
 if isempty(sens_listing)
-    error('Fig_sensitivity_medians:NotFound', ...
-        'No 1D_sensitivity_* subfolder found in:\n  %s', data_root);
+    error('fig_sensitivity_medians:NotFound', ...
+        'No 1D_sensitivity_* subfolder found in:\n  %s', run_dir);
 end
 
 psa_of_param = containers.Map('KeyType', 'char', 'ValueType', 'any');
@@ -176,7 +174,7 @@ missing = panel_params(~cellfun(@(p) isKey(psa_of_param, p), panel_params));
 if ~isempty(missing)
     error('Fig_sensitivity_medians:MissingSweep', ...
         ['No 1D_sensitivity_* sweep found for: %s\n' ...
-         'Source run: %s'], strjoin(missing, ', '), data_root);
+         'Source run: %s'], strjoin(missing, ', '), run_dir);
 end
 
 %% -------------------- Collect the percentile curves --------------------
@@ -350,101 +348,71 @@ for mi = 1:numel(metric_specs)
 end
 
 % Log the git state alongside the figures so this presentation output can be
-% traced back to an exact commit (+ working-tree diff if dirty).
-capture_git_provenance(out_dir, project_root);
 
-%% -------------------- Human-readable description --------------------
-desc_path = fullfile(out_dir, 'README_fig_sensitivity_medians.txt');
-fid = fopen(desc_path, 'w');
-cleanup = onCleanup(@() fclose(fid));
-
-fprintf(fid, 'Stability_Manuscript figure: sensitivity MEDIANS, collapsed across conditions\n');
-fprintf(fid, '============================================================================\n\n');
-fprintf(fid, 'Generated: %s\n', char(datetime('now')));
-fprintf(fid, 'By script: %s.m\n\n', mfilename);
-
-fprintf(fid, 'WHAT THIS IS\n');
-fprintf(fid, '  The compact counterpart of ../fig_sensitivity_analysis_allStd. That figure\n');
-fprintf(fid, '  tiles the four adaptation conditions as COLUMNS and shows the full rep\n');
-fprintf(fid, '  distribution per panel as an imagesc histogram (28 panels over two sheets\n');
-fprintf(fid, '  per metric). Here the conditions are OVERLAID in one axes per swept\n');
-fprintf(fid, '  parameter, as median lines only, so all six parameters fit one 2 x 3 sheet\n');
-fprintf(fid, '  and the conditions can be compared directly rather than across columns.\n');
-fprintf(fid, '  No simulation is re-run.\n\n');
-
-fprintf(fid, 'SOURCE RUN\n');
-fprintf(fid, '  %s\n', data_root);
-fprintf(fid, '  1D_sensitivity subfolders used:\n');
-for pi = 1:numel(panel_params)
-    fprintf(fid, '    %-16s\n', panel_params{pi});
-end
-fprintf(fid, '\n');
-
-fprintf(fid, 'FIGURES PRODUCED (in this folder)\n');
-for k = 1:numel(made_tags)
-    fprintf(fid, '  %s.png / .svg / .fig\n', made_tags{k});
-end
-fprintf(fid, '\n');
-
-fprintf(fid, 'PANELS (row-major, 2 x 3)\n');
-for pi = 1:numel(panel_params)
-    rs = row_style(panel_params{pi});
-    fprintf(fid, '  (%c) %-16s  x-axis: %s\n', char('a' + pi - 1), panel_params{pi}, rs.xlabel);
-end
-fprintf(fid, '\n');
-fprintf(fid, '  level_of_chaos ("Synaptic Gain") is deliberately DROPPED: the allStd run\n');
-fprintf(fid, '  sweeps seven parameters, which do not tile 2 x 3, and the gain sweep is the\n');
-fprintf(fid, '  least surprising of the seven (it simply scales W).\n\n');
-
-fprintf(fid, 'E:I NEURON RATIO. The f_E sweep varies the fraction excitatory with mu_EI and\n');
-fprintf(fid, '  mu_IE held fixed, so what the axis really reports is the E:I neuron COUNT.\n');
-fprintf(fid, '  This run has n = 500, so the ticks read 100:400 / 250:250 / 400:100 rather\n');
-fprintf(fid, '  than the reduced ratios 1:4 / 1:1 / 4:1, which would hide the network size\n');
-fprintf(fid, '  the counts come from.\n\n');
-
-fprintf(fid, 'PERCENT AXES. The four mu axes are shown as percent departure from the preset\n');
-fprintf(fid, '  default, (value/default - 1)*100. mu_EI and mu_II have NEGATIVE defaults, so\n');
-fprintf(fid, '  "+100%%" means twice as inhibitory; those two panels have their x-direction\n');
-fprintf(fid, '  REVERSED so that on all four rightward means "stronger synapse of this type".\n');
-fprintf(fid, '  Only the ruler changes -- the plotted data is untouched.\n\n');
-
-fprintf(fid, 'DEFAULT MARKER. Every panel carries a short reddish-gray tick rising from the\n');
-fprintf(fid, '  x-axis (%g of the y-range, %g pt) at the preset default for that parameter.\n', ...
-    default_mark_frac, default_mark_lw);
-fprintf(fid, '  Resolved by preset_default_values() from the run''s own run_manifest.mat, not\n');
-fprintf(fid, '  hardcoded. For this run:\n');
-for pi = 1:numel(panel_params)
-    if isKey(default_value, panel_params{pi})
-        fprintf(fid, '    %-16s default %g\n', panel_params{pi}, default_value(panel_params{pi}));
+%% --- Record ------------------------------------------------------------------
+out = struct('figs', gobjects(0), 'files', {{}}, 'source', run_dir);
+if cfg.save
+    for k = 1:numel(made_tags)
+        out.files = [out.files, existing_outputs(out_dir, made_tags{k})];
     end
+    capture_git_provenance(out_dir, project_root);
+
+    panels_note = [ ...
+        'Panels, row-major over 2 x 3: f_E (E:I neuron ratio), n (Network ' ...
+        'Size), then the four connectivity blocks mu_EE, mu_EI, mu_IE, mu_II. ' ...
+        'level_of_chaos is deliberately dropped -- seven parameters do not tile ' ...
+        '2 x 3, and the gain sweep is the least surprising of the seven.'];
+
+    ei_note = [ ...
+        'E:I NEURON RATIO. The f_E sweep varies the fraction excitatory with ' ...
+        'mu_EI and mu_IE held fixed, so what the axis really reports is the ' ...
+        'E:I neuron COUNT. The ticks are therefore spelled as counts rather ' ...
+        'than as reduced ratios, which would hide the network size the counts ' ...
+        'are drawn from.'];
+
+    pct_note = [ ...
+        'PERCENT AXES. The four mu axes are shown as percent departure from the ' ...
+        'preset default, (value/default - 1)*100. mu_EI and mu_II have NEGATIVE ' ...
+        'defaults, so +100 percent means twice as inhibitory; those two panels ' ...
+        'have their x-direction reversed so that on all four, rightward means ' ...
+        'stronger synapse of this type. Only the ruler changes -- the plotted ' ...
+        'data is untouched. Every panel also carries a short reddish-grey tick ' ...
+        'at the preset default, resolved by preset_default_values from the ' ...
+        'run own run_manifest.mat rather than hardcoded.'];
+
+    stat_note = [ ...
+        'STATISTIC. Median across reps at each swept level, per condition ' ...
+        '(ParamSpaceAnalysis2.collect_level_values then prctile) -- exactly the ' ...
+        'blue median line of the allStd sheets. Failed or NaN reps are excluded ' ...
+        'first. Condition colours come from manuscript_style and are matched BY ' ...
+        'NAME, so a run declaring its conditions in a different order cannot ' ...
+        'silently recolour the figure.'];
+
+    clip_note = [ ...
+        'CLIPPING. The LLE panel keeps the same y window as the allStd sheets ' ...
+        'and the green dashed zero line (the sign of lambda_1 marks the edge of ' ...
+        'chaos). On the aug_14 preset several medians -- No Adaptation above ' ...
+        'all -- left that window and were CLIPPED rather than rescaling every ' ...
+        'panel around them. Re-check against the run actually plotted. The rate ' ...
+        'panel uses [0, 1], where nothing can fall outside, so its zero line is ' ...
+        'dropped as meaningless for a rate.'];
+
+    write_figure_readme(out_dir, struct( ...
+        'tag',    'fig_sensitivity_medians', ...
+        'title',  'Stability_Manuscript figure: sensitivity medians, conditions overlaid', ...
+        'script', 'fig_sensitivity_medians.m', ...
+        'what',   ['One subplot per swept parameter, four median lines per ' ...
+                   'subplot (one per adaptation condition), 2 x 3 on a single ' ...
+                   'sheet per metric. The compact counterpart of the allStd ' ...
+                   'sheets, which tile the conditions as columns instead.'], ...
+        'how',    ['Medians are computed straight off the saved PSA objects ' ...
+                   'via ParamSpaceAnalysis2.collect_level_values -- no replot ' ...
+                   'detour, because harvesting median lines out of saved .fig ' ...
+                   'files would be fragile.'], ...
+        'source', struct('run_dir', run_dir, 'preset', cfg.preset_name), ...
+        'figures', {out.files}, ...
+        'sections', struct( ...
+            'heading', {'panels', 'e:i axis', 'percent axes', 'statistic', 'clipping'}, ...
+            'body',    {panels_note, ei_note, pct_note, stat_note, clip_note})));
 end
-fprintf(fid, '\n');
-
-fprintf(fid, 'CONDITION COLOURS (Okabe-Ito, colorblind-safe; same as fig_memory_capacity_example)\n');
-for ci = 1:numel(cond_spec)
-    c = cond_spec(ci).color;
-    fprintf(fid, '  %-14s %-14s [%.3f %.3f %.3f]\n', ...
-        cond_spec(ci).name, cond_spec(ci).display, c(1), c(2), c(3));
 end
-fprintf(fid, '  Conditions are matched to colours BY NAME, so a run declaring them in a\n');
-fprintf(fid, '  different order cannot silently recolour the figure.\n\n');
-
-fprintf(fid, 'STATISTIC. Median across reps at each swept-parameter level, per condition\n');
-fprintf(fid, '  (ParamSpaceAnalysis2.collect_level_values -> prctile), i.e. exactly the blue\n');
-fprintf(fid, '  median line of the allStd sheets. Failed / NaN reps are excluded first. The\n');
-fprintf(fid, '  script computes prctile(vals, pcts) with pcts = %s and plots only the median;\n', mat2str(pcts));
-fprintf(fid, '  adding e.g. an IQR band means extending pcts and setting band_pcts, whose\n');
-fprintf(fid, '  shading branch is already written.\n\n');
-
-fprintf(fid, 'PER-METRIC DIFFERENCES\n');
-fprintf(fid, '  %s: ylabel \\lambda_1; y window [%.2f, %.2f], kept identical to the\n', ...
-    metric_specs(1).fig_tag, metric_specs(1).ylim(1), metric_specs(1).ylim(2));
-fprintf(fid, '    allStd sheets; green dashed zero line kept (the sign of lambda_1 marks the\n');
-fprintf(fid, '    edge of chaos). NOTE: this preset''s LLEs span roughly p1 = -10.0 to\n');
-fprintf(fid, '    p99 = +3.7, so several medians -- No Adaptation above all -- leave the\n');
-fprintf(fid, '    window and are CLIPPED rather than rescaling every panel around them.\n');
-fprintf(fid, '  %s: ylabel "Mean Firing Rate"; y window [0, 1] (nothing can\n', metric_specs(2).fig_tag);
-fprintf(fid, '    fall outside it); y ticks at 0 and 1 only; zero line removed.\n');
-
-clear cleanup;  % flush + close
-fprintf('Description written: %s\n', desc_path);

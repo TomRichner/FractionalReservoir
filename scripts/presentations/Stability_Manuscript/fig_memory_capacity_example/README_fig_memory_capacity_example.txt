@@ -1,24 +1,52 @@
-Stability_Manuscript figure: Example memory capacity
+Stability_Manuscript figure: example memory capacity
 ====================================================
 
-Generated: 22-Jul-2026 14:40:10
-By script: Fig_memory_capacity_example.m
+Generated: 22-Aug-2026 11:02:26
+By:        fig_memory_capacity_example.m
+
+WHAT IT SHOWS
+  (a) cumulative memory capacity against delay, all four adaptation
+  conditions. (b) per-delay R^2, all four conditions. Below, input
+  reconstruction for the SFA+STD condition at a few delays -- target against
+  trained readout -- each panel titled with the delay in seconds and its R^2,
+  all sharing y-limits.
 
 HOW IT WAS MADE
-  Two-step, no re-simulation at plot time: compute_memory_capacity_example.m
-  runs the memory-capacity protocol for the 4 adaptation conditions and saves
-  the per-condition mc_results structs to mc_example_data.mat (gitignored).
-  This script loads that file and renders the figure, so the look can be
-  iterated without re-running the sim. See git_provenance.txt for the commit.
+  Two-step, no re-simulation at plot time. run_memory_capacity_example runs
+  the protocol for the four conditions on ONE network and saves the per-delay
+  R^2 plus the reconstruction traces to mc_example_data.mat; this function
+  renders that file. The full mc_results also holds the complete state time
+  series (~0.6 GB per condition), which the figure does not use and which is
+  stripped before saving.
 
-MODEL SETTINGS
-  Match looped_memory_capacity.m (c_E = 0.5/3, sample_hold input, n = 300,
-  f = 0.6, level_of_chaos = 2.5). See compute_memory_capacity_example.m.
+SOURCE
+  data_file  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity_example\mc_example_data.mat
+  preset     mc_esn
+  run_mode   fast
 
-FIGURE PRODUCED (in this folder)
-  Fig_MC_Example.png / .svg / .fig
-    (a) Cumulative Memory Capacity vs delay (0-7.500000e+00 s), all 4 conditions.
-    (b) Per-delay R^2 vs delay (0-7.500000e+00 s), all 4 conditions (legend).
-    Below: SFA+STD input reconstruction (target vs readout) for hold-delays
-    [1 5 10 15] (delay indices), each titled with the delay in seconds and R^2;
-    all reconstruction panels share y-limits [-0.6, 0.6].
+PARAMETERS AS RUN
+  preset_name     mc_esn
+  run_mode        fast
+  fs              200
+  T_hold          0.3
+  input_type      sample_hold
+  readout_signal  synaptic
+  T_train_sec     60
+  T_test_sec      30
+  T_wash_sec      10
+  d_max_sec       5
+
+FIGURES PRODUCED (in this folder)
+  Fig_MC_Example.png
+  Fig_MC_Example.svg
+  Fig_MC_Example.fig
+
+READING THIS FIGURE
+  CONDITION COLOURS come from manuscript_style and are keyed BY NAME, so this
+  figure and the ensemble memory-capacity figure cannot drift apart on them.
+
+  MODEL CLASS. SRNN_ESN_reservoir subclasses SRNNModel2, so the
+  memory-capacity network is NOT the SRNNCellTypePairs network the rest of the
+  paper shows. The ESN readout has not been ported to the Pairs class; the
+  methods section must say so.
+

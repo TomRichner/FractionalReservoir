@@ -1,17 +1,72 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_memory_capacity
-Captured at: 22-Jul-2026 16:31:28
+Captured at: 22-Aug-2026 11:01:11
 
-commit:      83680c3c6f710dc52b570b748cb89dc069682356
-commit_short:83680c3
-branch:      celltypes-v2
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      d17d1ee448ac04090f237d82bf3c22bec1750e9c
+commit_short:d17d1ee
+branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    bursting figs cleand up
-last_date:   2026-07-22T15:34:23-05:00
+last_msg:    Stage 5a: first figures become functions; four more shared helpers
+last_date:   2026-08-22T10:49:27-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/memory_capacity/looped_memory_capacity.m
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_f_3.fig
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.png
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.svg
- M scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
+M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.fig
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.png
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.svg
+D  scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_param_space.m
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/README_fig_EI_param_space.txt
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/git_provenance.txt
+ D scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_f_3.fig
+ D scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.png
+ D scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity_figure_3.svg
+D  scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_memory_capacity.m
+A  scripts/presentations/Stability_Manuscript/fig_memory_capacity/fig_memory_capacity.m
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.svg
+D  scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_mu.svg
+D  scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_analysis_allStd.m
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_core.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_sensitivity_mean_rate_mu.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/README_fig_sensitivity_analysis_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.svg
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.fig
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.png
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.svg
+D  scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_medians.m
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/README_fig_sensitivity_medians.txt
+ M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/git_provenance.txt
+?? scripts/presentations/Stability_Manuscript/fig_EI_param_space/fig_EI_param_space.m
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.fig
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.png
+?? scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.svg
+?? scripts/presentations/Stability_Manuscript/fig_param_space_allStd/fig_param_space_allStd.m
+?? scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/fig_sensitivity_analysis_allStd.m
+?? scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/fig_sensitivity_medians.m
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_EI_param_space/fig_EI_param_space.m
+scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.fig
+scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.png
+scripts/presentations/Stability_Manuscript/fig_memory_capacity/Fig_Memory_Capacity.svg
+scripts/presentations/Stability_Manuscript/fig_param_space_allStd/fig_param_space_allStd.m
+scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/fig_sensitivity_analysis_allStd.m
+scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/fig_sensitivity_medians.m

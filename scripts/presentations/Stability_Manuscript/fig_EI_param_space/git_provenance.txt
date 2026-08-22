@@ -1,22 +1,31 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_EI_param_space
-Captured at: 21-Jul-2026 15:58:33
+Captured at: 22-Aug-2026 10:52:05
 
-commit:      ce55ba43955a60e77890ea802b535641e02ad405
-commit_short:ce55ba4
-branch:      celltypes-v2
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      d17d1ee448ac04090f237d82bf3c22bec1750e9c
+commit_short:d17d1ee
+branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    param space figure cleanup
-last_date:   2026-07-21T15:44:57-05:00
+last_msg:    Stage 5a: first figures become functions; four more shared helpers
+last_date:   2026-08-22T10:49:27-05:00
 dirty:       true
 
 --- git status --porcelain ---
-D scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_Colorbar.fig
- D scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_Colorbar.png
- D scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_Colorbar.svg
- M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.fig
+M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.fig
  M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.png
  M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.svg
- M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_param_space.m
- M scripts/presentations/Stability_Manuscript/fig_EI_param_space/README_fig_EI_param_space.txt
- M scripts/presentations/Stability_Manuscript/fig_EI_param_space/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_EI_param_space/working_changes.patch
+D  scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_param_space.m
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.svg
+D  scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_param_space_allStd.m
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
+ M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
+?? scripts/presentations/Stability_Manuscript/fig_EI_param_space/fig_EI_param_space.m
+?? scripts/presentations/Stability_Manuscript/fig_param_space_allStd/fig_param_space_allStd.m
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_EI_param_space/fig_EI_param_space.m
+scripts/presentations/Stability_Manuscript/fig_param_space_allStd/fig_param_space_allStd.m
