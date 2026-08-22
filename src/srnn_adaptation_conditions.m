@@ -1,4 +1,4 @@
-function conds = srnn_adaptation_conditions(model_class, synapse_config)
+function conds = srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa)
 % SRNN_ADAPTATION_CONDITIONS The four adaptation regimes, per model class.
 %
 % Returns a cell array of condition structs for ParamSpaceAnalysis2.set_conditions.
@@ -28,9 +28,31 @@ function conds = srnn_adaptation_conditions(model_class, synapse_config)
 %
 % See also: ParamSpaceAnalysis2/set_conditions, srnn_param_preset
 
+% The optional N_A_SFA is how many SFA timescales the two SFA regimes switch on.
+% It defaults to 3, which is the paper's operating point and what every sweep
+% preset uses. It exists for the single-neuron METHODS figures, which show one
+% exaggerated timescale so the rate decay is legible on a single trace -- and
+% whose preset would otherwise contradict its own conditions (a preset carrying
+% one tau_a fails validate against a condition demanding three).
+%
+% It is a COUNT, not the timescales themselves: tau_a still comes from the
+% preset (or is auto-filled by complete_type_defaults). The two must agree in
+% length, which is exactly what this argument lets a preset guarantee.
+
 arguments
     model_class (1,:) char
-    synapse_config struct = default_std_routes()
+    synapse_config = []          % [] -> default_std_routes(); else a struct
+    n_a_sfa (1,1) double {mustBeInteger, mustBePositive} = 3
+end
+
+% [] means "the default routes". Accepting it here is what lets a caller pass
+% n_a_sfa without also having to restate the routes -- and so keeps the default
+% defined in exactly one place, namely default_std_routes() below.
+if isempty(synapse_config)
+    synapse_config = default_std_routes();
+elseif ~isstruct(synapse_config)
+    error('srnn_adaptation_conditions:BadSynapseConfig', ...
+        'synapse_config must be a struct or [] (got %s).', class(synapse_config));
 end
 
 switch model_class
@@ -42,10 +64,10 @@ switch model_class
                 'Named routes require SRNNCellTypePairs.']);
         end
         conds = { ...
-            struct('name', 'no_adaptation', 'n_a_E', 0, 'n_b_E', 0), ...
-            struct('name', 'sfa_only',      'n_a_E', 3, 'n_b_E', 0), ...
-            struct('name', 'std_only',      'n_a_E', 0, 'n_b_E', 1), ...
-            struct('name', 'sfa_and_std',   'n_a_E', 3, 'n_b_E', 1) ...
+            struct('name', 'no_adaptation', 'n_a_E', 0,       'n_b_E', 0), ...
+            struct('name', 'sfa_only',      'n_a_E', n_a_sfa, 'n_b_E', 0), ...
+            struct('name', 'std_only',      'n_a_E', 0,       'n_b_E', 1), ...
+            struct('name', 'sfa_and_std',   'n_a_E', n_a_sfa, 'n_b_E', 1) ...
             };
 
     case 'SRNNCellTypePairs'
@@ -55,13 +77,15 @@ switch model_class
         % treats an absent or empty mechanism as absent, so no b states are created.
         no_synapses = struct();
 
-        % SFA on E only, three timescales; tau_a{1} is then filled by
-        % complete_type_defaults as logspace(0.25, 10, 3) unless swept.
+        % SFA on E only, n_a_sfa timescales; tau_a{1} is then filled by
+        % complete_type_defaults as logspace(0.25, 10, n_a_sfa) unless the preset
+        % carries its own (in which case it must have n_a_sfa elements).
+        sfa_row = [n_a_sfa 0];
         conds = { ...
-            struct('name', 'no_adaptation', 'n_a', [0 0], 'synapse_config', no_synapses), ...
-            struct('name', 'sfa_only',      'n_a', [3 0], 'synapse_config', no_synapses), ...
-            struct('name', 'std_only',      'n_a', [0 0], 'synapse_config', sc), ...
-            struct('name', 'sfa_and_std',   'n_a', [3 0], 'synapse_config', sc) ...
+            struct('name', 'no_adaptation', 'n_a', [0 0],   'synapse_config', no_synapses), ...
+            struct('name', 'sfa_only',      'n_a', sfa_row, 'synapse_config', no_synapses), ...
+            struct('name', 'std_only',      'n_a', [0 0],   'synapse_config', sc), ...
+            struct('name', 'sfa_and_std',   'n_a', sfa_row, 'synapse_config', sc) ...
             };
 
     otherwise

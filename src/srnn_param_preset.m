@@ -69,6 +69,10 @@ end
 % preset cannot silently inherit 'SRNNModel2' and fail much later inside
 % validate_model_defaults with a wall of "not a property" messages.
 std_routes = [];        % [] = whatever srnn_adaptation_conditions defaults to
+n_a_sfa    = 3;         % SFA timescales the two SFA conditions switch on.
+                        % Override ONLY when the preset carries its own tau_a of
+                        % a different length -- the count and the timescales must
+                        % agree or validate() rejects the pair.
 
 switch name
     case 'default'
@@ -741,17 +745,246 @@ switch name
         std_routes.I.E.std = dual_std;
         std_routes.I.I.std = dual_std;
 
+    % ====================================================================
+    %  FIGURE PRESETS. Each exists because one manuscript figure is
+    %  DELIBERATELY a different network from the paper's operating point,
+    %  and hardcoding that network inside the figure script is what let the
+    %  paper drift into showing several unrelated models.
+    % ====================================================================
+
+    case 'bursting_pairs'
+        % The hand-tuned bursting network from
+        % scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/
+        % bursting_SRNN_example.m, ported from SRNNModel2 to SRNNCellTypePairs.
+        % Derived presets: none.
+        %
+        % Numerically equivalent to that script by construction -- every value
+        % below is copied from it. Only the CLASS changes, so the whole paper
+        % speaks one model vocabulary.
+        %
+        % WHY THIS NETWORK IS DIFFERENT, and must stay different: it is small
+        % (n = 50) and sparse (indegree = 10, so alpha = 0.2) precisely so that
+        % individual neurons are visible as traces and the population is small
+        % enough to burst coherently. The paper's operating point (n = 500,
+        % indegree = 100) averages that away.
+        %
+        % TRANSLATION FROM THE SRNNModel2 SPELLING:
+        %   f 0.7                      -> f = [0.7 0.3]
+        %   mu_E_tilde_relative  3     -> mu_tilde_relative(:,1) = 3   (E is PRE)
+        %   mu_I_tilde_relative -2     -> mu_tilde_relative(:,2) = -2  (I is PRE)
+        %   sigma_{E,I}_tilde_relative -> sigma_tilde_relative = ones(2)
+        %   c_E 0.5/3, c_I unused      -> c = [0.5/3, 0]   (SFA on E only)
+        % The mu block is column-uniform because SRNNModel2 has no notion of a
+        % postsynaptic-dependent mean: every neuron sees the same statistics
+        % from a given presynaptic population. Writing it as a full 2x2 with
+        % equal rows is the exact Pairs statement of that.
+        %
+        % The DC-staircase stimulus is NOT here. input_config carries a
+        % generator FUNCTION HANDLE (@dc_staircase_stimulus) plus the sweep of
+        % DC levels, which is stimulus protocol rather than network physics, and
+        % a handle in a preset is exactly what the "nonlinearity is named data"
+        % rule exists to avoid. The figure builds it.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    50, ...
+            'indegree',             10, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.7 0.3], ...
+            'mu_tilde_relative',    [3 -2; 3 -2], ...   % (post <- pre), column-uniform
+            'sigma_tilde_relative', [1 1; 1 1], ...
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.9, ...
+            'S_c',                  0.5, ...
+            'tau_d',                0.1, ...
+            'c',                    [0.5/3, 0]);        % SFA scaling, E only
+        % STD on E->E only. SRNNModel2's n_b_E = 1 depresses every OUTGOING
+        % excitatory synapse, i.e. E->E and E->I alike; the source script had
+        % n_b_I = 0, so I synapses did not depress. E->E and E->I with the same
+        % constants is the faithful translation.
+        std_routes = struct();
+        bursting_std = struct('tau_rec', 1, 'tau_rel', 0.25);
+        std_routes.E.E.std = bursting_std;
+        std_routes.E.I.std = bursting_std;
+
+    case 'sompolinsky_pairs'
+        % The Sompolinsky-Crisanti-Sommers (1988) reproduction behind Figure 1
+        % panel A (traces + eigenspectra), on SRNNCellTypePairs.
+        % Derived presets: none.
+        %
+        % A purely RANDOM, Dale-free network: zero-mean Gaussian weights, tanh,
+        % no adaptation, no external input. The spectral radius is then
+        % R = level_of_chaos exactly, so chaos onset sits at gain 1 -- which is
+        % the entire point of the figure.
+        %
+        % TWO TYPES, NOT ONE, AND THE NAMES ARE 'A'/'B'. Two reasons:
+        %
+        %   * SRNNCellTypePairs CANNOT BUILD A ONE-TYPE MODEL. build_W assigns
+        %     the generator piecemeal (rmt.f, then rmt.mu_tilde, then
+        %     rmt.sigma_tilde) where RMTBlocks.set_types is the only supported
+        %     way to change D -- so a scalar f is expanded back to 2 types by
+        %     the D=2 setter and the 1x1 mu_tilde then fails validation with
+        %     RMTBlocks:InconsistentTypes. Two types with IDENTICAL zero-mean
+        %     blocks is the same network and builds today. (The one-line fix is
+        %     rmt.set_types(...); it is model-class code and is reported, not
+        %     folded into this refactor.)
+        %   * The two populations are statistically indistinguishable and the
+        %     weights take both signs, so calling them E and I would be a lie.
+        %     Nothing here needs the f_E / tau_a_E aliases, which are the only
+        %     things that care about the names.
+        %
+        % level_of_chaos is the figure's variable (gammas 0.9 / 1.6 / 2.5); the
+        % value here is only the operating point for anything holding it fixed.
+        % A grid axis or an explicit override wins, as always.
+        %
+        % tau_d = 1, not the 0.1 used everywhere else: the reference result is
+        % stated in units of the membrane time constant.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    200, ...
+            'indegree',             200, ...    % fully connected -> alpha = 1
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'A', 'B'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [0 0; 0 0], ...   % zero mean -> both signs, Dale-free
+            'sigma_tilde_relative', [1 1; 1 1], ...   % identical spread everywhere
+            'level_of_chaos',       1.6, ...
+            'activation',           'tanh', ...       % uses neither S_a nor S_c
+            'mu_S_c',               [], ...           % MUST stay empty: per-type setpoints
+            'sigma_S_c',            [], ...           % error under 'tanh' (no centre to vary)
+            'tau_d',                1.0, ...
+            'c',                    [0 0], ...        % no SFA
+            'x0_std',               1.0);             % visible relaxation in the stable panel
+        % No synapses depress or facilitate: this is the bare random network.
+        std_routes = struct();
+
+    case 'single_neuron_stf'
+        % The SFA / STD / STF single-neuron methods figure
+        % (fig_adaptation_methods figure B), rebuilt on SRNNCellTypePairs.
+        % Derived presets: none.
+        %
+        % Restores the figure produced by the deleted
+        % fig_adaptation_methods/test_single_neuron_stf.m (last version at commit
+        % 60c2992), which called SRNNModelCellTypes.dynamics_fast_ct directly --
+        % a class that no longer exists.
+        %
+        % THE FACILITATION PARAMETERS MAP EXACTLY, which is not obvious. The old
+        % model carried a release probability p resting at p0 with gain p/p0:
+        %
+        %   dp/dt = (p0 - p)/tau_f + kappa*(1-p)*r ,   gain = p/p0
+        %
+        % Substituting the gain variable u = p/p0 (so p = u*p0) gives
+        %
+        %   du/dt = (1-u)/tau_f + kappa*(1/p0 - u)*r
+        %
+        % which IS this class's  dg/dt = (1-g)/tau_dec + (G-g)*r/tau_fac  with
+        %
+        %   tau_dec = tau_f    = 6      (relaxation back to rest)
+        %   tau_fac = 1/kappa  = 2.5    (kappa was 0.4)
+        %   G       = 1/p0     = 2.857  (p0 was 0.35)
+        %
+        % Both rest at gain 1 and rise toward the same ceiling.
+        %
+        % WHAT DOES NOT MAP: the old STD depleted in proportion to p,
+        %   db/dt = (1-b)/tau_rec - (p*b*r)/tau_rel,
+        % where this class's depletion is independent of g. That is the
+        % Tsodyks-Markram coupling, and no value of tau_rel reproduces it -- at
+        % rest it is a constant factor (p0 = 0.35) but it ACCELERATES as p rises.
+        % tau_rel is carried LITERALLY as 0.3 by decision, which makes depression
+        % about 2.9x stronger at rest than the archived PNG shows. The rebuilt
+        % figure will therefore not match that image, and that is expected.
+        % Whether the decoupling is right at all is parked in UserNotes.md.
+        %
+        % Exaggerated on purpose: c = 1.0 and a single tau_a = 3 s, so the rate
+        % decay is legible on one neuron. This is a mechanism cartoon, not the
+        % paper's operating point.
+        %
+        % n = 2 with zero weights, NOT n = 1: SRNNCellTypePairs enforces
+        % n >= n_cellTypes and rejects indegree = 0 (it requires 0 < indegree
+        % <= n), and it cannot build a one-type model at all (see
+        % 'sompolinsky_pairs'). Two neurons with W = [0 0; 0 0] is the smallest
+        % expressible unconnected network; the figure plots the E neuron.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    2, ...
+            'indegree',             1, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [0 0; 0 0], ...   % W == 0: no recurrence at all
+            'sigma_tilde_relative', [0 0; 0 0], ...
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  1.0, ...          % hard sigmoid (piecewise linear)
+            'S_c',                  0.5, ...
+            'tau_d',                0.1, ...
+            'c',                    [1.0, 0], ...     % exaggerated SFA, E only
+            'tau_a',                {{3, []}}, ...    % single 3 s timescale on E
+            'x0_std',               0);               % deterministic x(0) = 0
+        % ONE SFA timescale, not the usual three. The conditions must agree with
+        % the tau_a above or validate() rejects the pair ("tau_a{1} must contain
+        % n_a(1) positive values") -- which is precisely what this argument is
+        % for. It is the only preset in the file that needs it.
+        n_a_sfa = 1;
+        % Both mechanisms on the E->E route. The figure switches them on and off
+        % per column; these are the timescales it switches ON.
+        std_routes = struct();
+        std_routes.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.3);
+        std_routes.E.E.stf = struct('tau_dec', 6, 'tau_fac', 2.5, 'G', 1/0.35);
+
+    case 'mc_esn'
+        % The memory-capacity network, from scripts/memory_capacity/
+        % run_memory_capacity.m (was looped_memory_capacity.m).
+        % Derived presets: none.
+        %
+        % THE ONE SRNNModel2 PRESET LEFT IN THE PAPER, and not by choice:
+        % SRNN_ESN_reservoir subclasses SRNNModel2, so the memory-capacity
+        % protocol cannot run on SRNNCellTypePairs at all. Porting the ESN
+        % readout onto the Pairs class is tracked follow-up work; until then the
+        % MC figures show a different network from every other figure, and the
+        % methods section has to say so.
+        %
+        % WHAT IS DELIBERATELY ABSENT. The MC protocol settings -- input_type,
+        % T_hold, T_wash, T_train, T_test, d_max, u_f_cutoff, u_alpha -- are
+        % NOT here, and neither are fs / ode_solver. They size the experiment
+        % rather than describing the network, which makes them run_mode knobs in
+        % this project's vocabulary; run_memory_capacity owns them. Keeping them
+        % out is what lets 'fast' and 'production' MC runs share one network.
+        %
+        % f = 0.6, off perfect balance, so the no-adaptation condition is not
+        % accidentally favoured. level_of_chaos = 2 sits above the edge of chaos
+        % (the logistic's mean slope < 1 pushes that edge past 1).
+        model_class = 'SRNNModel2';
+        d = struct( ...
+            'n',              300, ...
+            'f',              0.6, ...
+            'level_of_chaos', 2.0, ...
+            'tau_d',          0.1, ...
+            'activation',     'logistic', ...
+            'S_c',            0.35, ...
+            'S_a',            0.9, ...      % unused by the logistic; recorded for parity
+            ... % n_a_I / n_b_I are NOT here. looped_memory_capacity set them to 0
+            ... % explicitly, but they are condition-owned fields and a preset may
+            ... % not carry any of n_a_E / n_a_I / n_b_E / n_b_I. Both are already
+            ... % the SRNNModel2 default (0), so nothing changes -- I neurons still
+            ... % get no SFA and no STD in every condition.
+            'c_E',            0.5/3, ...
+            'tau_a_E',        logspace(log10(0.1), log10(10), 3), ...
+            'tau_b_E_rec',    1.0, ...
+            'tau_b_E_rel',    0.25, ...
+            'std_zero_floor', false);
+
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
             'Unknown preset ''%s''. Valid presets: %s.', ...
             name, strjoin(srnn_param_preset_names(), ', '));
 end
 
-if isempty(std_routes)
-    conditions = srnn_adaptation_conditions(model_class);
-else
-    conditions = srnn_adaptation_conditions(model_class, std_routes);
-end
+% std_routes stays [] for a preset that wants the default routes;
+% srnn_adaptation_conditions reads [] as "use your own default", so the default
+% lives in exactly one place rather than being restated here.
+conditions = srnn_adaptation_conditions(model_class, std_routes, n_a_sfa);
 end
 
 function names = srnn_param_preset_names()
@@ -765,7 +998,10 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02', ...
     'celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p01', ...
     'celltype_pairs_Sc0p2_noise0p025', ...
-    'celltype_pairs_Sc0p2_noise0p025_dualStd'};
+    'celltype_pairs_Sc0p2_noise0p025_dualStd', ...
+    ... % figure presets -- networks that are deliberately not the paper's
+    ... % operating point, named so the figures stop hardcoding them
+    'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', 'mc_esn'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
