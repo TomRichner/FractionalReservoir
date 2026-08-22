@@ -5,11 +5,11 @@ function [fig1, fig2] = replot_memory_capacity(mat_file, out_dir)
 %   replot_memory_capacity(mat_file, out_dir)
 %
 % Convenience wrapper: loads the `results_all` struct saved by
-% looped_memory_capacity.m and calls plot_memory_capacity -- no simulation is
+% run_memory_capacity.m and calls plot_memory_capacity -- no simulation is
 % re-run, so you can iterate on figure styling from a finished run.
 %
 % Inputs:
-%   mat_file : path to a <run_tag>_results.mat produced by looped_memory_capacity.
+%   mat_file : path to a <run_tag>_results.mat produced by run_memory_capacity.
 %   out_dir  : optional save folder for the figures (default: the mat_file's
 %              folder). Pass '' to display only, without saving.
 

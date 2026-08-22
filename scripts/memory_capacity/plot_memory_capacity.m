@@ -6,12 +6,12 @@ function [fig1, fig2] = plot_memory_capacity(results_all, out_dir)
 %
 % Rebuilds Fig1 (paired total-MC + horizon distributions) and Fig2 (per-delay
 % R^2 and cumulative MC, mean +/- 95% CI) from the `results_all` struct saved by
-% looped_memory_capacity.m -- no simulation is re-run. This is the plotting half
+% run_memory_capacity.m -- no simulation is re-run. This is the plotting half
 % of the compute/plot split, so figure styling can be iterated freely:
 %   S = load('..._results.mat'); plot_memory_capacity(S.results_all);
 %
 % Inputs:
-%   results_all : struct saved by looped_memory_capacity.m (settings, summary,
+%   results_all : struct saved by run_memory_capacity.m (settings, summary,
 %                 conditions, MC_trials, H_trials, ...).
 %   out_dir     : optional. If given (non-empty), save <run_tag>_Fig1/Fig2.{png,pdf}
 %                 there. If omitted, the figures are only displayed.
