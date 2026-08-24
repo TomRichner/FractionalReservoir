@@ -75,6 +75,20 @@ end
 n_levels = pick(opts.n_levels, ctx.n_levels);
 n_reps   = pick(opts.n_reps,   ctx.n_reps);
 
+% reps is a GRID AXIS, and add_grid_parameter needs at least two values, so
+% n_reps = 1 fails deep inside it complaining about 'param_range' -- which names
+% neither reps nor the real constraint. Say it here instead. n_levels goes the
+% same way, and a single level would not be a sweep anyway.
+if n_reps < 2
+    error('explore_sensitivity_range:TooFewReps', ...
+        ['n_reps must be at least 2: reps is a grid axis and a grid axis ' ...
+        'needs two or more values. Got %d.'], n_reps);
+end
+if n_levels < 2
+    error('explore_sensitivity_range:TooFewLevels', ...
+        'n_levels must be at least 2 to sweep anything. Got %d.', n_levels);
+end
+
 param_range = sort(opts.range);   % add_grid_parameter rejects a descending range
 n_cond = numel(ctx.conditions);
 
@@ -140,13 +154,25 @@ print_summary(summary, param, opts.metric, ctx.conditions);
 %% Figures
 % KEEP IN SYNC with run_sensitivity_analysis: same two sheets, same hist_range,
 % so an exploration sheet is directly comparable with a production one.
+%
+% Only THIS call's figures are saved. save_some_figs_to_folder_2 given an empty
+% handle list saves every figure currently open, and plot_sensitivity returns no
+% handles to pass instead -- so a second call in the same MATLAB session writes
+% the first call's sheets into the second call's folder. Observed directly: a
+% [0.25 5] run wrote five sheets, three of them left over from a [0.25 2.5] run
+% minutes earlier. Diffing the open-figure list around the plotting calls is
+% what isolates them, and it also leaves any figures the user already had open
+% untouched -- which passing 'all' cannot do and closing 'all' would destroy.
+before = findobj(0, 'Type', 'figure');
 psa.plot_sensitivity('metric', 'LLE', 'hist_range', opts.hist_range);
 psa.plot_sensitivity('metric', 'mean_rate');
+mine = setdiff(findobj(0, 'Type', 'figure'), before);
 
 if ctx.save_figs
     fig_dir = fullfile(out_dir, 'figures');
-    save_some_figs_to_folder_2(fig_dir, sprintf('explore_%s', param), [], {'fig', 'png'});
-    fprintf('Figures saved to %s\n', fig_dir);
+    save_some_figs_to_folder_2(fig_dir, sprintf('explore_%s', param), ...
+        [mine.Number], {'fig', 'png'});
+    fprintf('Figures saved to %s (%d sheet(s))\n', fig_dir, numel(mine));
 end
 
 fprintf('\n=== Explore complete ===\n');
