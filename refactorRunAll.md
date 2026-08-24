@@ -523,7 +523,8 @@ SRNNCellTypePairs(... 'n_cellTypes',1, 'f',1, 'mu_tilde_relative',0, ...)
 ```
 
 Cause, located exactly: `SRNNCellTypePairs.build_W` (`src/SRNNCellTypePairs.m:1090-1094`)
-assigns the generator **piecemeal** —
+assigns the generator **piecemeal** — *(the method is actually `build_network`;
+fixed 2026-08-23 at `0134e9b`, see the superseded note in §7c)* —
 
 ```matlab
 rmt = RMTBlocks(obj.n);   % defaults to D = 2  (RMTBlocks.m:155, f = [0.5 0.5])
@@ -793,6 +794,19 @@ Edit `scripts/paper/paper_config.m` and both follow.
 5. **`SRNNCellTypePairs` cannot build a one-cell-type model** (`build_W` assigns
    `RMTBlocks` piecemeal where `set_types` is required). Reported, not fixed —
    both ports use two identical types instead and need no change to model code.
+
+   > **Superseded 2026-08-23** (`refactorRunAll` @ `0134e9b`). Fixed, and the
+   > two-type workarounds are gone. Two corrections to what this file says
+   > about it: the method is **`build_network`**, not `build_W`; and moving
+   > `sompolinsky_pairs` to one type left `W` **bit-identical**, so Figure 1
+   > panel A did not change at all. Full account in
+   > `singleCellTypeRefactor.md`; regression in
+   > `scripts/tests/test_pairs_single_celltype.m`.
+   >
+   > Fixing it also exposed a defect this file did not catch:
+   > `fig_adaptation_methods` variant A was built from `cfg.preset_name` and so
+   > ran the whole `n = 500` recurrent network for a figure captioned "one
+   > unconnected neuron". §7c below lists four defects found; this was a fifth.
 
 ### Things that surprised me
 

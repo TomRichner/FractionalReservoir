@@ -51,7 +51,7 @@ frozen = { ...
 
 for k = 1:size(frozen, 1)
     name = frozen{k, 1};
-    W = build_W_quiet(name, {'n', 120, 'indegree', 40});
+    W = preset_W(name, {'n', 120, 'indegree', 40});
     ok = abs(sum(W(:)) - frozen{k, 2}) < 1e-9 && ...
          abs(norm(W, 'fro') - frozen{k, 3}) < 1e-9 && nnz(W) == 4856;
     all_passed = check(sprintf('%-62s W unchanged', name), ok) && all_passed;
@@ -175,7 +175,7 @@ if ok; tag = 'PASS'; else; tag = 'FAIL'; end
 fprintf('  %s  %s\n', tag, label);
 end
 
-function W = build_W_quiet(preset_name, extra)
+function W = preset_W(preset_name, extra)
 % build() is chatty; the checksum is all we want here, so evalc swallows it.
 % The argument list is assembled OUTSIDE the evalc string -- the alternative
 % interpolates preset_name into code, which the Code Analyzer cannot see through.
