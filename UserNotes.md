@@ -14,13 +14,36 @@ and session that wrote it. Newest first.
 
 ---
 
-## `SRNNCellTypePairs` cannot build a ONE-cell-type network — `build_W` bypasses `set_types`
+## ~~`SRNNCellTypePairs` cannot build a ONE-cell-type network~~ — FIXED 2026-08-23
 
 | | |
 |---|---|
 | Noted | 2026-08-22 · `refactorRunAll` @ `bbc013b` · R5611351 · Claude Code (Opus 5), session e22d2fab |
 | Found | during `refactorRunAll`, porting the Sompolinsky and single-neuron figures |
-| Status | **Reported, not fixed.** Model-class code; nothing currently needs it. |
+| **Fixed** | 2026-08-23 on `refactorRunAll`. `build_network` now calls `rmt.set_types(...)`. Verified bit-identical at `D = 2` across all 14 two-type presets. |
+
+> **This entry is now history, not a to-do.** It is kept because the diagnosis
+> below is what a later session would otherwise re-derive, and because the
+> *shape* of the bug — a class configured piecemeal where an atomic setter was
+> required, failing with an error that blamed the caller — is worth recognising
+> again.
+>
+> Three things changed since it was written:
+>
+> 1. **The method is `build_network`, not `build_W`.** There is no `build_W`;
+>    the name below is wrong throughout.
+> 2. **The plotting paths at `C = 1` were the flagged unknown, and they are all
+>    clean** — `plot`, `plot_celltypes`, `plot_W`, `plot_W_spectrum`,
+>    `plot_weight_histogram`, `plot_eigenvalues`, Benettin and QR.
+> 3. **A larger defect surfaced while fixing this.** `fig_adaptation_methods`
+>    variant A was building the paper's whole `n = 500` recurrent network for a
+>    figure captioned "one unconnected neuron", because `paper_config` handed it
+>    `cfg.preset_name`. That is what the new `single_neuron_dualStd` preset
+>    fixes. See `singleCellTypeRefactor.md` §3c.
+>
+> The workarounds described at the end of this entry are **gone**:
+> `sompolinsky_pairs` is now one type named `'all'`, and `single_neuron_stf` is
+> genuinely `n = 1`. Regression: `scripts/tests/test_pairs_single_celltype.m`.
 
 A latent defect, verified empirically rather than inferred. It is a one-line fix,
 but it is in `SRNNCellTypePairs`, so it was left alone rather than folded into a

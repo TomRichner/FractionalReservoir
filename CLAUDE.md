@@ -131,6 +131,19 @@ What it buys, and what it costs:
   `n_cellTypes ~= 2`; `tau_a_E` aliases `tau_a{1}` for any number of types but errors
   unless `cell_type_names{1}` is `'E'`, so the name cannot lie. Add an alias rather than
   teaching the sweep scripts to special-case a shape.
+- **`C = 1` works, and is for figures only.** A one-cell-type network builds, runs,
+  and plots — `sompolinsky_pairs`, `single_neuron_stf` and `single_neuron_dualStd`
+  are all `C = 1`, the last two at `n = 1` with `W = 0`. But the aliases above still
+  refuse: `f_E` and the four `mu_*_relative` blocks are the sweep axes, and both are
+  meaningless with one type (`f_E` is "the fraction excitatory"; the four blocks
+  collapse into one). So the boundary is **`C = 1` for figures, `C >= 2` for sweeps**,
+  and those errors are what enforce it — do not "fix" them, and do not teach the sweep
+  scripts to select axes conditionally. `srnn_adaptation_conditions` takes the type
+  count as its 4th argument so the four named regimes get `1 x C` `n_a` rows.
+  (Until 2026-08-23 `C = 1` failed in `build_network`, which configured `RMTBlocks`
+  piecemeal where `set_types` is the only supported way to change `D`. If you touch
+  that code, keep it atomic — and note `scripts/tests/test_pairs_single_celltype.m`
+  freezes pre-fix `W` checksums for all 14 two-type presets.)
 - **`plot_data.r` is keyed by `cell_type_names`**, and `br` is called
   **`synaptic_output`** here — with STF in play the quantity is not `b·r`, so it is not
   a misnamed `br`. It nests by route (`.E.E`), which is why PSA's poolers recurse.
@@ -182,7 +195,7 @@ The older 1D-only predecessor `src/SensitivityAnalysis.m` was removed in the cle
 Two orthogonal knobs, deliberately kept apart:
 
 - **`src/srnn_param_preset.m`** — *which network*. `[d, model_class] = srnn_param_preset(name)` returns a struct of model overrides **plus the model class they are written for** (the name is only a lookup key; the struct is what reaches the model). Assign it to `psa.model_defaults` and layer tweaks on with plain field assignment. Presets carry physics **including** swept axes like `n`/`f`/`level_of_chaos` — a grid axis overrides the preset for the sweep that varies it, while sweeps holding that axis fixed use the preset's value. They must **not** carry `n_levels`/`n_reps` (not model properties), the run_mode timing knobs, or condition fields. The second output exists because the two model classes have **disjoint** parameter vocabularies, so a preset that did not carry its class would only fail later inside `validate_model_defaults`; it defaults to `'SRNNModel2'`. `'celltype_pairs'` is the `SRNNCellTypePairs` preset (E/I with STD on E→E and I→I).
-- **`src/srnn_adaptation_conditions.m`** — *which adaptation regimes*. `srnn_adaptation_conditions(model_class)` returns the four conditions (`no_adaptation`, `sfa_only`, `std_only`, `sfa_and_std`) spelled for that class: `n_a_E`/`n_b_E` counts for `SRNNModel2`, an `n_a` row plus a whole `synapse_config` struct for `SRNNCellTypePairs`. The **names** are identical across classes, which is what keeps the `condition_titles` maps inside PSA's plotters working. Use this instead of `ParamSpaceAnalysis2`'s built-in defaults, which are `SRNNModel2`-shaped and would be passed verbatim to whatever `model_class` is set.
+- **`src/srnn_adaptation_conditions.m`** — *which adaptation regimes*. `srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa, n_cell_types)` returns the four conditions (`no_adaptation`, `sfa_only`, `std_only`, `sfa_and_std`) spelled for that class: `n_a_E`/`n_b_E` counts for `SRNNModel2`, an `n_a` row plus a whole `synapse_config` struct for `SRNNCellTypePairs`. The **names** are identical across classes, which is what keeps the `condition_titles` maps inside PSA's plotters working. Use this instead of `ParamSpaceAnalysis2`'s built-in defaults, which are `SRNNModel2`-shaped and would be passed verbatim to whatever `model_class` is set. The trailing arguments all default: `synapse_config = []` means "the default E→E and I→I routes", `n_a_sfa = 3` is how many SFA timescales the SFA regimes switch on, and `n_cell_types = 2` sets the `n_a` row length (a `C = 1` preset needs 1). `srnn_param_preset` sources that count from `d.n_cellTypes`, **not** `numel(d.f)` — the `'default'` preset has no `f` field at all.
 - **`scripts/run_all_analyses/analysis_run_config.m`** — *how much compute*. `analysis_run_config(analysis, run_mode, preset_defaults)` returns `n_levels`, `n_reps`, and a `cfg.model` struct of timing settings (`ode_solver`, `fs`, `T_range`, and `lya_T_interval` only when it should be set).
 
   **The two knobs are no longer fully orthogonal, and this is where they meet.** Every cell names *two* integrators — deterministic (`'rk4'` for fast/fast2/medium, `'ode45'` for production) and stochastic (`'sra1'` everywhere) — and the **preset** picks between them: `sigma_u_noise > 0` selects the stochastic one. That is why the third argument exists, and why the three sub-scripts resolve `preset_defaults` *before* calling this. Selecting here is what leaves everything else intact: `merge_struct` precedence is unchanged (`cfg.model` still wins), `ode_solver` stays banned from presets, and a σ = 0 preset is bit-identical to before the mechanism existed. `cfg.sde_solver` / `cfg.is_stochastic` live at the top level of `cfg`, never inside `cfg.model` — only `cfg.model` is merged into `model_defaults`, and neither is a model property. Note a stochastic `production` run is fixed-step and so does **not** carry `ode45`'s adaptive tolerance: there is no adaptive SDE solver, because step-size control is meaningless once increments are tied to the step.

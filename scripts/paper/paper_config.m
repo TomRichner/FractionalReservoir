@@ -13,12 +13,17 @@ function cfg = paper_config(opts)
 %   preset_name  WHICH NETWORK   (src/srnn_param_preset.m)
 %   run_mode     HOW MUCH COMPUTE (scripts/run_all_analyses/analysis_run_config.m)
 %
-% FIGURE PRESET OVERRIDES. Four figures are DELIBERATELY a different network
+% FIGURE PRESET OVERRIDES. Five figures are DELIBERATELY a different network
 % from the paper's operating point, and each names its own preset below. They
-% are not oversights: a single-neuron mechanism cartoon, a Sompolinsky
+% are not oversights: two single-neuron mechanism cartoons, a Sompolinsky
 % reproduction, a small bursting network and the memory-capacity reservoir are
 % all making points that the 500-neuron production network cannot make. Every
 % other figure inherits cfg.preset_name.
+%
+% A figure that needs a DIFFERENT NETWORK needs a DIFFERENT PRESET, not
+% cfg.preset_name plus overrides at the call site. fig_adaptation_methods was
+% handed cfg.preset_name for months and so silently built the whole 500-neuron
+% recurrent network for a figure captioned "one unconnected neuron".
 %
 % See also: run_all_paper_analyses, make_all_paper_figures, srnn_param_preset
 
@@ -38,6 +43,12 @@ cfg.mc_preset          = 'mc_esn';              % SRNN_ESN_reservoir; see below
 cfg.bursting_preset    = 'bursting_pairs';
 cfg.sompolinsky_preset = 'sompolinsky_pairs';
 cfg.stf_preset         = 'single_neuron_stf';
+% The single-neuron methods cartoon. It carries the PAPER'S c, SFA timescales
+% and dual depression on ONE unconnected neuron, which is why it is a separate
+% preset and not cfg.preset_name: passing cfg.preset_name here is exactly the
+% bug that made this figure plot neuron 1 of the 500-neuron recurrent network
+% while claiming to show one unconnected neuron.
+cfg.single_neuron_preset = 'single_neuron_dualStd';
 
 % The gains shared by the two halves of figure 1 panel A. They MUST match, so
 % they live here rather than as a literal in each figure.
@@ -59,7 +70,7 @@ F = add(F, 'fig_example_timeseries',         @fig_example_timeseries,         tr
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_FI_curve',                   @fig_FI_curve,                   true, {});
 F = add(F, 'fig_adaptation_methods',         @fig_adaptation_methods,         true, ...
-        {'variant', 'sfa_std', 'preset_name', cfg.preset_name});
+        {'variant', 'sfa_std', 'preset_name', cfg.single_neuron_preset});
 F = add(F, 'fig_adaptation_methods_stf',     @fig_adaptation_methods,         false, ...
         {'variant', 'sfa_std_stf', 'preset_name', cfg.stf_preset});
 F = add(F, 'fig_SFA_steady_state',           @fig_SFA_steady_state,           false, ...

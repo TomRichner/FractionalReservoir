@@ -1,7 +1,7 @@
 Stability_Manuscript figure 1 panel A: chaos onset in a random network
 ======================================================================
 
-Generated: 22-Aug-2026 11:47:30
+Generated: 23-Aug-2026 22:39:42
 By:        fig_introductory_concepts.m
 
 WHAT IT SHOWS
@@ -26,22 +26,22 @@ SOURCE
 PARAMETERS AS RUN
   n                     200
   indegree              200
-  f                     [0.5 0.5]
+  f                     1
   level_of_chaos        2.5
   tau_d                 1
   activation            tanh
   S_a                   0.9
   S_c                   0.4
-  c                     [0 0]
+  c                     0
   sigma_u_noise         0
   ode_solver            rk4
   fs                    200
   T_range               [0 60]
-  mu_tilde_relative     [0 0;0 0]
-  sigma_tilde_relative  [1 1;1 1]
+  mu_tilde_relative     0
+  sigma_tilde_relative  1
   F_tracks_network      true
-  cell_type_names       {A, B}
-  n_a                   [0 0]
+  cell_type_names       {all}
+  n_a                   0
   rng_seeds             [0 1]
   x0_std                1
   R_theoretical         2.5
@@ -59,14 +59,17 @@ FIGURES PRODUCED (in this folder)
 MEASURED EXPONENTS
   gamma = [0.9 1.6 2.5] -> LLE = [-0.0997 -0.00109 0.0989]
 
-WHY TWO CELL TYPES
-  WHY TWO CELL TYPES, NAMED A AND B. SRNNCellTypePairs cannot build a
-  one-cell-type model: build_W assigns the RMTBlocks generator piecemeal where
-  set_types is the only supported way to change the number of types, so a
-  scalar f is expanded back to two and the 1x1 mu_tilde then fails validation.
-  Two types with IDENTICAL zero-mean blocks is the same network and builds
-  today. They are named A and B rather than E and I because they are
-  statistically indistinguishable and the weights take both signs -- calling
-  them excitatory and inhibitory would be a lie. The traces concatenate both
-  types, which together are the whole network.
+ONE CELL TYPE
+  ONE CELL TYPE. This is a single undifferentiated population: zero-mean
+  Gaussian weights taking both signs, so it is Dale-free and no E/I split
+  exists to name. The type is called 'all' for that reason. Until 2026-08-23
+  the preset used TWO statistically identical types named A and B, purely
+  because SRNNCellTypePairs could not build a one-type model (build_network
+  configured its RMTBlocks generator piecemeal where set_types is required to
+  change the number of types). That is fixed, and the weight matrix is
+  BIT-IDENTICAL across the change: the two types had identical zero-mean
+  statistics, so the per-block scaling was uniform and the underlying draw
+  never depended on how it was partitioned. This figure is therefore
+  unchanged, measured exponents included. The spectral radius is R = gamma
+  exactly either way.
 

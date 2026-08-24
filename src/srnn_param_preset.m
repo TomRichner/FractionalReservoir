@@ -818,21 +818,20 @@ switch name
         % R = level_of_chaos exactly, so chaos onset sits at gain 1 -- which is
         % the entire point of the figure.
         %
-        % TWO TYPES, NOT ONE, AND THE NAMES ARE 'A'/'B'. Two reasons:
+        % ONE CELL TYPE, named 'all'. This network has a single undifferentiated
+        % population, and now says so: the weights take both signs, so 'E'/'I'
+        % would be a lie, and there is no second type to name. Nothing here needs
+        % the f_E / mu_EE_relative aliases, which require two types by design.
         %
-        %   * SRNNCellTypePairs CANNOT BUILD A ONE-TYPE MODEL. build_W assigns
-        %     the generator piecemeal (rmt.f, then rmt.mu_tilde, then
-        %     rmt.sigma_tilde) where RMTBlocks.set_types is the only supported
-        %     way to change D -- so a scalar f is expanded back to 2 types by
-        %     the D=2 setter and the 1x1 mu_tilde then fails validation with
-        %     RMTBlocks:InconsistentTypes. Two types with IDENTICAL zero-mean
-        %     blocks is the same network and builds today. (The one-line fix is
-        %     rmt.set_types(...); it is model-class code and is reported, not
-        %     folded into this refactor.)
-        %   * The two populations are statistically indistinguishable and the
-        %     weights take both signs, so calling them E and I would be a lie.
-        %     Nothing here needs the f_E / tau_a_E aliases, which are the only
-        %     things that care about the names.
+        % (Until 2026-08-23 this was TWO statistically identical types named
+        % 'A'/'B', purely because SRNNCellTypePairs could not build a one-type
+        % model -- build_network configured RMTBlocks piecemeal where set_types
+        % is required to change D. That is fixed; see singleCellTypeRefactor.md.
+        % W is BIT-IDENTICAL across that change, which was not expected: the two
+        % types had identical zero-mean statistics, so the per-block scaling was
+        % uniform and the underlying draw never depended on how it was
+        % partitioned. Figure 1 panel A is unchanged, LLEs included, and
+        % test_pairs_single_celltype.m carries the checksum that keeps it so.)
         %
         % level_of_chaos is the figure's variable (gammas 0.9 / 1.6 / 2.5); the
         % value here is only the operating point for anything holding it fixed.
@@ -844,17 +843,17 @@ switch name
         d = struct( ...
             'n',                    200, ...
             'indegree',             200, ...    % fully connected -> alpha = 1
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'A', 'B'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [0 0; 0 0], ...   % zero mean -> both signs, Dale-free
-            'sigma_tilde_relative', [1 1; 1 1], ...   % identical spread everywhere
+            'n_cellTypes',          1, ...
+            'cell_type_names',      {{'all'}}, ...
+            'f',                    1, ...
+            'mu_tilde_relative',    0, ...      % zero mean -> both signs, Dale-free
+            'sigma_tilde_relative', 1, ...
             'level_of_chaos',       1.6, ...
             'activation',           'tanh', ...       % uses neither S_a nor S_c
             'mu_S_c',               [], ...           % MUST stay empty: per-type setpoints
             'sigma_S_c',            [], ...           % error under 'tanh' (no centre to vary)
             'tau_d',                1.0, ...
-            'c',                    [0 0], ...        % no SFA
+            'c',                    0, ...            % no SFA
             'x0_std',               1.0);             % visible relaxation in the stable panel
         % No synapses depress or facilitate: this is the bare random network.
         std_routes = struct();
@@ -900,27 +899,29 @@ switch name
         % decay is legible on one neuron. This is a mechanism cartoon, not the
         % paper's operating point.
         %
-        % n = 2 with zero weights, NOT n = 1: SRNNCellTypePairs enforces
-        % n >= n_cellTypes and rejects indegree = 0 (it requires 0 < indegree
-        % <= n), and it cannot build a one-type model at all (see
-        % 'sompolinsky_pairs'). Two neurons with W = [0 0; 0 0] is the smallest
-        % expressible unconnected network; the figure plots the E neuron.
+        % ONE cell type, ONE neuron, zero weights: n = 1, indegree = 1,
+        % mu = sigma = 0, so W = 0 (1x1) and there is no recurrence at all.
+        % (Before 2026-08-23 this had to be n = 2 with two types, because the
+        % class could not build a one-type model and enforces n >= n_cellTypes.
+        % The second neuron was inert but had to be explained away.) indegree
+        % must be >= 1, so the single neuron nominally connects to itself --
+        % with mu = sigma = 0 that weight is zero, so it makes no difference.
         model_class = 'SRNNCellTypePairs';
         d = struct( ...
-            'n',                    2, ...
+            'n',                    1, ...
             'indegree',             1, ...
-            'n_cellTypes',          2, ...
-            'cell_type_names',      {{'E', 'I'}}, ...
-            'f',                    [0.5 0.5], ...
-            'mu_tilde_relative',    [0 0; 0 0], ...   % W == 0: no recurrence at all
-            'sigma_tilde_relative', [0 0; 0 0], ...
+            'n_cellTypes',          1, ...
+            'cell_type_names',      {{'E'}}, ...
+            'f',                    1, ...
+            'mu_tilde_relative',    0, ...            % W == 0: no recurrence at all
+            'sigma_tilde_relative', 0, ...
             'level_of_chaos',       1.0, ...
             'activation',           'piecewise', ...
             'S_a',                  1.0, ...          % hard sigmoid (piecewise linear)
             'S_c',                  0.5, ...
             'tau_d',                0.1, ...
-            'c',                    [1.0, 0], ...     % exaggerated SFA, E only
-            'tau_a',                {{3, []}}, ...    % single 3 s timescale on E
+            'c',                    1.0, ...          % exaggerated SFA
+            'tau_a',                {{3}}, ...        % single 3 s timescale
             'x0_std',               0);               % deterministic x(0) = 0
         % ONE SFA timescale, not the usual three. The conditions must agree with
         % the tau_a above or validate() rejects the pair ("tau_a{1} must contain
@@ -932,6 +933,69 @@ switch name
         std_routes = struct();
         std_routes.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.3);
         std_routes.E.E.stf = struct('tau_dec', 6, 'tau_fac', 2.5, 'G', 1/0.35);
+
+    case 'single_neuron_dualStd'
+        % The SFA / STD single-neuron methods figure (fig_adaptation_methods
+        % figure A), on the PAPER'S timescales.
+        % Copied from celltype_pairs_Sc0p2_noise0p025_dualStd. Changed:
+        %   n_cellTypes  2            -> 1
+        %   n            500          -> 1
+        %   indegree     100          -> 1
+        %   f            [0.5 0.5]    -> 1
+        %   mu_tilde_relative    2x2  -> 0     (W == 0)
+        %   sigma_tilde_relative 2x2  -> 0     (W == 0)
+        %   c            [0.5/3, 0]   -> 0.5/3
+        %   input_config, F_ref_*     -> dropped (no recurrence, no sweep)
+        % Derived presets: none.
+        %
+        % WHY THIS EXISTS. The figure is a mechanism cartoon: one unconnected
+        % neuron given a step, with SFA and STD switched on and off per column.
+        % It must carry the paper's timescales -- so that the cartoon explains
+        % the network figures rather than some other model -- WITHOUT the
+        % paper's recurrence, which would drown the mechanisms in network
+        % dynamics.
+        %
+        % It exists because until 2026-08-23 the figure did exactly that wrong
+        % thing: it named the dualStd preset and overrode no network parameters,
+        % so it built the whole n = 500, indegree = 100 recurrent network and
+        % plotted neuron 1. Its own generated README printed "One unconnected
+        % neuron" above "n 500". The result showed none of the mechanisms -- the
+        % no-adaptation column was network chaos and the STD columns were
+        % silent with b ~ 1. Naming the network as a preset is what stops that
+        % recurring; see singleCellTypeRefactor.md section 3c.
+        %
+        % NOISE IS DELIBERATELY KEPT (sigma_u_noise = 0.025, exactly the
+        % paper's). On one neuron there is no population averaging, so the
+        % jitter is fully visible: x_noise_std = sigma_u/sqrt(2*tau_d) = 0.056
+        % against a 0.5 step, about 11%. That is accepted as honest about the
+        % model the paper characterises (TR's decision) rather than smoothed
+        % away.
+        %
+        % n_a_sfa is NOT overridden: unlike single_neuron_stf this shows all
+        % three of the paper's SFA timescales, auto-filled by
+        % complete_type_defaults, at the paper's per-timescale c = 0.5/3.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    1, ...
+            'indegree',             1, ...
+            'n_cellTypes',          1, ...
+            'cell_type_names',      {{'E'}}, ...
+            'f',                    1, ...
+            'mu_tilde_relative',    0, ...      % W == 0: no recurrence at all
+            'sigma_tilde_relative', 0, ...
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...
+            'mu_S_c',               [], ...
+            'sigma_S_c',            [], ...
+            'tau_d',                0.1, ...
+            'c',                    0.5/3, ...  % SFA scaling, per timescale
+            'x0_std',               0, ...      % deterministic x(0) = 0
+            'sigma_u_noise',        0.025);
+        % The paper's dual depression, on the one route this network has.
+        std_routes = struct();
+        std_routes.E.E.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
 
     case 'mc_esn'
         % The memory-capacity network, from scripts/memory_capacity/
@@ -984,7 +1048,17 @@ end
 % std_routes stays [] for a preset that wants the default routes;
 % srnn_adaptation_conditions reads [] as "use your own default", so the default
 % lives in exactly one place rather than being restated here.
-conditions = srnn_adaptation_conditions(model_class, std_routes, n_a_sfa);
+%
+% The cell-type count comes from n_cellTypes, which every SRNNCellTypePairs
+% preset states explicitly, and NOT from numel(d.f): the 'default' preset has no
+% f field at all, so that would throw. SRNNModel2 presets have no n_cellTypes
+% and take the 2 that class is fixed at.
+if isfield(d, 'n_cellTypes')
+    n_cell_types = d.n_cellTypes;
+else
+    n_cell_types = 2;
+end
+conditions = srnn_adaptation_conditions(model_class, std_routes, n_a_sfa, n_cell_types);
 end
 
 function names = srnn_param_preset_names()
@@ -1001,7 +1075,8 @@ names = {'default', 'overconnected', 'celltype_pairs', ...
     'celltype_pairs_Sc0p2_noise0p025_dualStd', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
-    'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', 'mc_esn'};
+    'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', ...
+    'single_neuron_dualStd', 'mc_esn'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)

@@ -12,36 +12,44 @@ function out = fig_adaptation_methods(cfg)
 %
 % TWO VARIANTS, one function:
 %
-%   'sfa_std'      4 columns -- none, SFA, STD, SFA+STD -- on the PAPER'S
-%                  preset, so the mechanism cartoon uses the same c, tau_a and
-%                  depression timescales as the network figures. This is the
-%                  manuscript figure.
+%   'sfa_std'      4 columns -- none, SFA, STD, SFA+STD -- on the
+%                  'single_neuron_dualStd' preset, which carries the PAPER'S c,
+%                  tau_a and dual depression timescales on one unconnected
+%                  neuron. This is the manuscript figure.
 %   'sfa_std_stf'  7 columns, adding facilitation, on the 'single_neuron_stf'
 %                  preset. Rebuilds the figure produced by the deleted
 %                  test_single_neuron_stf.m (last version at commit 60c2992),
 %                  which called a class family that no longer exists.
 %
-% REBUILT ON SRNNCellTypePairs. The original was SRNNModel2 with n = 1 and
-% W = 0, and it assembled the figure by COPYING AXES out of model.plot(). Two
-% changes:
+% BOTH VARIANTS ARE GENUINELY n = 1, C = 1, W = 0 -- one cell type, one neuron,
+% no recurrence. Each preset says so itself; this function overrides no network
+% parameter, which is what keeps the figure honest about what it simulated.
 %
-%   * n = 2, not n = 1. SRNNCellTypePairs enforces n >= n_cellTypes and rejects
-%     indegree = 0 (it requires 0 < indegree <= n), and it cannot build a
-%     one-cell-type model at all (build_W assigns RMTBlocks piecemeal where
-%     set_types is required to change D). Two neurons with identically zero
-%     weights is the smallest expressible unconnected network; only the E
-%     neuron is plotted, and with W == 0 the I neuron cannot influence it.
-%   * The traces are plotted from model.plot_data DIRECTLY rather than by
-%     harvesting axes from model.plot(). Copying axes tied the figure to that
-%     method's row layout, which differs between the two model classes and
-%     would have had to be re-derived; reading the data is both stabler and
-%     lets a column show only the mechanisms it actually has.
+% THIS WAS NOT ALWAYS TRUE, and the failure is worth recording. Variant A used
+% to name the paper's celltype_pairs_Sc0p2_noise0p025_dualStd preset directly
+% and override nothing, so it built that preset WHOLE: n = 500, indegree = 100,
+% fully recurrent. It then plotted neuron 1 and called it "one unconnected
+% neuron". The generated README printed the contradiction outright -- "One
+% unconnected neuron" above "n 500" -- because figure_settings reads off the
+% BUILT OBJECT rather than the preset struct. The figure demonstrated none of
+% the mechanisms: the no-adaptation column was network chaos rather than a step
+% response, and the STD columns were silent with b ~ 1. The fix was a preset
+% (single_neuron_dualStd) that states the single-neuron network once, rather
+% than a figure that reaches into a network preset and forgets to shrink it.
 %
-% NOISE IS ON in the 'sfa_std' variant, because the preset carries
-% sigma_u_noise = 0.025 and is taken literally (TR's decision). On a single
-% neuron there is no population averaging, so the jitter is fully visible; that
-% is accepted as honest about the model the paper characterises, not a defect
-% to smooth away.
+% REBUILT ON SRNNCellTypePairs. The original was SRNNModel2 and assembled the
+% figure by COPYING AXES out of model.plot(). The traces are now plotted from
+% model.plot_data DIRECTLY: copying axes tied the figure to that method's row
+% layout, which differs between the two model classes and would have had to be
+% re-derived; reading the data is both stabler and lets a column show only the
+% mechanisms it actually has.
+%
+% NOISE IS ON in the 'sfa_std' variant, because single_neuron_dualStd inherits
+% sigma_u_noise = 0.025 from the paper's preset and is taken literally (TR's
+% decision). On a single neuron there is no population averaging, so the jitter
+% is fully visible -- x_noise_std = 0.056 against a 0.5 step, about 11%. That is
+% accepted as honest about the model the paper characterises, not a defect to
+% smooth away. single_neuron_stf carries no noise, so variant B is clean.
 %
 % See also: build_from_preset, srnn_param_preset, fig_example_timeseries
 
@@ -66,7 +74,7 @@ st           = manuscript_style();
 %% Variant -> preset, columns, figure tag
 switch cfg.variant
     case 'sfa_std'
-        preset_name = pick(cfg.preset_name, 'celltype_pairs_Sc0p2_noise0p025_dualStd');
+        preset_name = pick(cfg.preset_name, 'single_neuron_dualStd');
         combos = {'none', 'sfa', 'std', 'sfa+std'};
         fig_tag = 'Fig_single_neuron_SFA_STD';
     case 'sfa_std_stf'
@@ -207,8 +215,8 @@ if cfg.save
                          'columns', {combos}), ...
         'settings', figure_settings(model), ...
         'figures', {out.files}, ...
-        'sections', struct('heading', {'why n = 2', 'stf mapping'}, ...
-                           'body', {readme_n2(), readme_stf(cfg.variant, sc0, has_stf)})));
+        'sections', struct('heading', {'the network', 'stf mapping'}, ...
+                           'body', {readme_network(), readme_stf(cfg.variant, sc0, has_stf)})));
 end
 end
 
@@ -295,18 +303,25 @@ if isstruct(s) && isfield(s, name); v = s.(name); else; v = []; end
 end
 
 function y = first_row(M)
+% The one neuron. Both presets are n = 1, so this is the whole population
+% rather than a choice among neurons; it stays a function because the row
+% dimension is still there.
 if isempty(M); y = []; else; y = M(1, :); end
 end
 
-function s = readme_n2()
-s = ['WHY n = 2 AND NOT 1. SRNNCellTypePairs enforces n >= n_cellTypes and ' ...
-     'rejects indegree = 0 (it requires 0 < indegree <= n), and it cannot ' ...
-     'build a one-cell-type model at all -- build_W assigns the RMTBlocks ' ...
-     'generator piecemeal where set_types is the only supported way to change ' ...
-     'the number of types, so a scalar f is expanded back to two types and the ' ...
-     '1x1 mu_tilde then fails validation. Two neurons with identically zero ' ...
-     'weights is the smallest expressible unconnected network. Only the E ' ...
-     'neuron is plotted, and with W == 0 the second neuron cannot influence it.'];
+function s = readme_network()
+s = ['THE NETWORK IS ONE NEURON. Both variants run n = 1 with a single cell ' ...
+     'type and W = 0 -- no recurrence of any kind, so every trace is the ' ...
+     'mechanism responding to the external step alone. Check PARAMETERS AS ' ...
+     'RUN above: it is read off the built object, so it reports what was ' ...
+     'actually simulated. Until 2026-08-23 variant A named the paper''s ' ...
+     'n = 500 network preset and overrode nothing, so it plotted neuron 1 of a ' ...
+     'fully recurrent chaotic network while claiming to show one unconnected ' ...
+     'neuron; the mechanisms were invisible. The single-neuron networks now ' ...
+     'live in their own presets (single_neuron_dualStd, single_neuron_stf), ' ...
+     'which is what stops that recurring. Variant A inherits the paper''s c, ' ...
+     'three SFA timescales and dual depression, so the cartoon explains the ' ...
+     'network figures rather than some other model.'];
 end
 
 function s = readme_stf(variant, sc0, has_stf)

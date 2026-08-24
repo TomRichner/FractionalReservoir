@@ -1089,9 +1089,22 @@ classdef SRNNCellTypePairs < handle
             % abscissa BEFORE that multiply.
             rmt = RMTBlocks(obj.n);
             rmt.alpha = obj.alpha;
-            rmt.f = obj.f;
-            rmt.mu_tilde = obj.mu_tilde;
-            rmt.sigma_tilde = obj.sigma_tilde;
+            % set_types, NOT three separate assignments: it is the only
+            % supported way to change D (RMTBlocks.m:563), because assigning
+            % f / mu_tilde / sigma_tilde one at a time leaves the generator
+            % transiently inconsistent. The piecemeal form worked only by
+            % accident -- RMTBlocks already defaults to D = 2, so D never
+            % actually changed -- and it made a one-cell-type model impossible:
+            % a scalar f was expanded back to [1 0] by the D = 2 setter, and the
+            % 1x1 mu_tilde then failed with RMTBlocks:InconsistentTypes blaming
+            % a caller that never said 2. At D = 2 this is bit-identical (same
+            % assignments, same order, and none of these setters draws random
+            % numbers); see scripts/tests/test_pairs_single_celltype.m.
+            %
+            % alpha and zrs_mode stay separate: they are not part of D. alpha
+            % keeps its position ahead of set_types because set.alpha is the one
+            % setter here that can touch the RNG, via update_sparsity.
+            rmt.set_types(obj.f, obj.mu_tilde, obj.sigma_tilde);
             rmt.zrs_mode = obj.zrs_mode;
             % RMTBlocks returns a DENSE matrix where RMTCellTypes returned a
             % sparse one. Restore sparse storage: this class is built for sparse

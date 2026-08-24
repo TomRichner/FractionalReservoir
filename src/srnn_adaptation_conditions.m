@@ -1,4 +1,4 @@
-function conds = srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa)
+function conds = srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa, n_cell_types)
 % SRNN_ADAPTATION_CONDITIONS The four adaptation regimes, per model class.
 %
 % Returns a cell array of condition structs for ParamSpaceAnalysis2.set_conditions.
@@ -39,10 +39,20 @@ function conds = srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa
 % preset (or is auto-filled by complete_type_defaults). The two must agree in
 % length, which is exactly what this argument lets a preset guarantee.
 
+% The optional N_CELL_TYPES is how long the n_a rows are (SRNNCellTypePairs
+% only). It defaults to 2, which every sweep preset uses. It exists because
+% SRNNCellTypePairs can build a ONE-cell-type network -- the Sompolinsky panel
+% and the single-neuron methods figures are all C = 1 -- and validate() requires
+% numel(n_a) == n_cellTypes exactly, so a hardcoded [0 0] would reject them.
+%
+% SFA always lands on the FIRST type and the rest get zero, which is what the
+% two-element form already meant.
+
 arguments
     model_class (1,:) char
     synapse_config = []          % [] -> default_std_routes(); else a struct
     n_a_sfa (1,1) double {mustBeInteger, mustBePositive} = 3
+    n_cell_types (1,1) double {mustBeInteger, mustBePositive} = 2
 end
 
 % [] means "the default routes". Accepting it here is what lets a caller pass
@@ -57,6 +67,15 @@ end
 
 switch model_class
     case 'SRNNModel2'
+        % SRNNModel2 is intrinsically two populations -- its whole parameter
+        % vocabulary is _E / _I -- so accepting any other count would let the
+        % argument lie about the model being configured.
+        if n_cell_types ~= 2
+            error('srnn_adaptation_conditions:NotTwoTypes', ...
+                ['SRNNModel2 is a two-population class; n_cell_types = %d is ' ...
+                'meaningless for it. Use SRNNCellTypePairs for any other ' ...
+                'number of cell types.'], n_cell_types);
+        end
         if ~isequal(synapse_config, default_std_routes())
             error('srnn_adaptation_conditions:NoSynapseConfig', ...
                 ['SRNNModel2 has no synapse_config -- its depression is the ' ...
@@ -80,12 +99,13 @@ switch model_class
         % SFA on E only, n_a_sfa timescales; tau_a{1} is then filled by
         % complete_type_defaults as logspace(0.25, 10, n_a_sfa) unless the preset
         % carries its own (in which case it must have n_a_sfa elements).
-        sfa_row = [n_a_sfa 0];
+        sfa_row  = [n_a_sfa, zeros(1, n_cell_types - 1)];
+        zero_row = zeros(1, n_cell_types);
         conds = { ...
-            struct('name', 'no_adaptation', 'n_a', [0 0],   'synapse_config', no_synapses), ...
-            struct('name', 'sfa_only',      'n_a', sfa_row, 'synapse_config', no_synapses), ...
-            struct('name', 'std_only',      'n_a', [0 0],   'synapse_config', sc), ...
-            struct('name', 'sfa_and_std',   'n_a', sfa_row, 'synapse_config', sc) ...
+            struct('name', 'no_adaptation', 'n_a', zero_row, 'synapse_config', no_synapses), ...
+            struct('name', 'sfa_only',      'n_a', sfa_row,  'synapse_config', no_synapses), ...
+            struct('name', 'std_only',      'n_a', zero_row, 'synapse_config', sc), ...
+            struct('name', 'sfa_and_std',   'n_a', sfa_row,  'synapse_config', sc) ...
             };
 
     otherwise

@@ -1,7 +1,7 @@
 Stability_Manuscript figure: single-neuron adaptation mechanisms (sfa_std_stf)
 ==============================================================================
 
-Generated: 22-Aug-2026 11:49:16
+Generated: 23-Aug-2026 22:40:49
 By:        fig_adaptation_methods.m
 
 WHAT IT SHOWS
@@ -21,28 +21,28 @@ SOURCE
   columns  {none, sfa, std, stf, sfa+std, std+stf, sfa+std+stf}
 
 PARAMETERS AS RUN
-  n                     2
+  n                     1
   indegree              1
-  f                     [0.5 0.5]
+  f                     1
   level_of_chaos        1
   tau_d                 0.1
   activation            piecewise
   S_a                   1
   S_c                   0.5
-  c                     [1 0]
+  c                     1
   sigma_u_noise         0
   ode_solver            rk4
   fs                    400
   T_range               [0 25]
-  mu_tilde_relative     [0 0;0 0]
-  sigma_tilde_relative  [0 0;0 0]
+  mu_tilde_relative     0
+  sigma_tilde_relative  0
   F_tracks_network      true
-  cell_type_names       {E, I}
-  n_a                   [1 0]
+  cell_type_names       {E}
+  n_a                   1
   rng_seeds             [1 2]
   x0_std                0
   R_theoretical         0
-  N_sys_eqs             5
+  N_sys_eqs             4
   spectral_radius       0
 
 FIGURES PRODUCED (in this folder)
@@ -50,15 +50,18 @@ FIGURES PRODUCED (in this folder)
   Fig_single_neuron_SFA_STD_STF.svg
   Fig_single_neuron_SFA_STD_STF.fig
 
-WHY N = 2
-  WHY n = 2 AND NOT 1. SRNNCellTypePairs enforces n >= n_cellTypes and rejects
-  indegree = 0 (it requires 0 < indegree <= n), and it cannot build a
-  one-cell-type model at all -- build_W assigns the RMTBlocks generator
-  piecemeal where set_types is the only supported way to change the number of
-  types, so a scalar f is expanded back to two types and the 1x1 mu_tilde then
-  fails validation. Two neurons with identically zero weights is the smallest
-  expressible unconnected network. Only the E neuron is plotted, and with W ==
-  0 the second neuron cannot influence it.
+THE NETWORK
+  THE NETWORK IS ONE NEURON. Both variants run n = 1 with a single cell type
+  and W = 0 -- no recurrence of any kind, so every trace is the mechanism
+  responding to the external step alone. Check PARAMETERS AS RUN above: it is
+  read off the built object, so it reports what was actually simulated. Until
+  2026-08-23 variant A named the paper's n = 500 network preset and overrode
+  nothing, so it plotted neuron 1 of a fully recurrent chaotic network while
+  claiming to show one unconnected neuron; the mechanisms were invisible. The
+  single-neuron networks now live in their own presets (single_neuron_dualStd,
+  single_neuron_stf), which is what stops that recurring. Variant A inherits
+  the paper's c, three SFA timescales and dual depression, so the cartoon
+  explains the network figures rather than some other model.
 
 STF MAPPING
   STF PARAMETERS map EXACTLY from the deleted test_single_neuron_stf.m. That
