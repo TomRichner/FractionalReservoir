@@ -42,7 +42,7 @@ function run_dir = run_all_analyses(preset_name, run_mode, opts)
 %           srnn_param_preset, analysis_run_config, write_run_parameters_md
 
 arguments
-    preset_name       (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    preset_name       (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     run_mode          (1,:) char    = 'medium'
     opts.save_figs    (1,1) logical = true
     opts.output_dir   (1,:) char    = ''

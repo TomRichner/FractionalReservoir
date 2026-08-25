@@ -18,7 +18,7 @@ function out = fig_example_timeseries(cfg)
 % See also: paper_config, srnn_param_preset, SRNNCellTypePairs
 
 arguments
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.condition   (1,:) char    = 'sfa_and_std'
     cfg.rng_seeds   (1,2) double  = [1 2]

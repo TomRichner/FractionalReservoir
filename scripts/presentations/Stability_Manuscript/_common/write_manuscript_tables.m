@@ -29,7 +29,7 @@ function paths = write_manuscript_tables(cfg)
 % See also: srnn_param_preset, write_run_parameters_md, build_from_preset
 
 arguments
-    cfg.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     cfg.out_root    (1,:) char = ''
     cfg.verbose     (1,1) logical = true
 end

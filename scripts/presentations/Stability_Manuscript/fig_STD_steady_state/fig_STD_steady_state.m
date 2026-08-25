@@ -36,7 +36,7 @@ function out = fig_STD_steady_state(cfg)
 % See also: fig_SFA_steady_state, srnn_param_preset, srnn_adaptation_conditions
 
 arguments
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     cfg.route_pre   (1,:) char    = 'E'
     cfg.route_post  (1,:) char    = 'E'
     cfg.out_dir     (1,:) char    = ''

@@ -132,7 +132,7 @@ all_passed = check('sde_solver/is_stochastic never leak into cfg.model', ...
     leak_ok) && all_passed;
 
 % The noise preset must actually reach that path end to end.
-[dn, mcn] = srnn_param_preset('celltype_pairs_uniform_std_n500_mu5p5_nodrive_sig1p5_noise0p02');
+[dn, mcn] = srnn_param_preset('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond');
 cfg_n = analysis_run_config('sensitivity', 'fast2', dn);
 all_passed = check('the noise preset selects sra1 at fast2', ...
     strcmp(cfg_n.model.ode_solver, 'sra1') && strcmp(mcn, 'SRNNCellTypePairs')) && all_passed;

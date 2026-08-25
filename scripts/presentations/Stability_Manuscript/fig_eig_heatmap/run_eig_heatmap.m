@@ -41,7 +41,7 @@ function mat_file = run_eig_heatmap(cfg)
 % See also: fig_eig_heatmap, build_from_preset, srnn_param_preset
 
 arguments
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     cfg.run_mode    (1,:) char    = 'production'
     cfg.out_dir     (1,:) char    = ''
     cfg.n_samples   (1,1) double  = 0      % 0 -> per run_mode

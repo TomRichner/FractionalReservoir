@@ -83,8 +83,11 @@ classdef SRNNModel2 < handle
         n_a_I = 0                   % Number of adaptation timescales for I neurons
         tau_a_E                     % Adaptation time constants for E neurons (1 x n_a_E)
         tau_a_I                     % Adaptation time constants for I neurons (1 x n_a_I)
-        c_E = 0.15/3                 % Adaptation scaling for E neurons
-        c_I = 0.15/3                  % Adaptation scaling for I neurons
+        c_E = 0.15    % TOTAL adaptation budget for E neurons (divided by n_a_E)
+        c_I = 0.15    % TOTAL adaptation budget for I neurons (divided by n_a_I)
+        % Was 0.15/3, hand-divided on the assumption n_a = 3. The model now
+        % divides by the number of timescales actually in use (effective_c), so
+        % keeping the hand-division would apply it twice.
     end
     
     %% Short-Term Depression (STD) Properties
@@ -2061,7 +2064,8 @@ classdef SRNNModel2 < handle
                 if size(sum_a_E, 1) ~= params.n_E  % Handle case where nt=1
                     sum_a_E = sum_a_E';
                 end
-                x_eff_ts(params.E_indices, :) = x_eff_ts(params.E_indices, :) - params.c_E * sum_a_E;
+                x_eff_ts(params.E_indices, :) = x_eff_ts(params.E_indices, :) - ...
+                    SRNNModel2.effective_c(params, 'c_E', 'n_a_E') * sum_a_E;
             end
             
             % Apply adaptation effect to I neurons (scaled by c_I)
@@ -2070,7 +2074,8 @@ classdef SRNNModel2 < handle
                 if size(sum_a_I, 1) ~= params.n_I
                     sum_a_I = sum_a_I';
                 end
-                x_eff_ts(params.I_indices, :) = x_eff_ts(params.I_indices, :) - params.c_I * sum_a_I;
+                x_eff_ts(params.I_indices, :) = x_eff_ts(params.I_indices, :) - ...
+                    SRNNModel2.effective_c(params, 'c_I', 'n_a_I') * sum_a_I;
             end
             
             % Apply STD effect: the synaptic depression factor is the product
@@ -2319,8 +2324,8 @@ classdef SRNNModel2 < handle
             tau_b_I_rec = params.tau_b_I_rec;
             tau_b_I_rel = params.tau_b_I_rel;
             
-            c_E = params.c_E;
-            c_I = params.c_I;
+            c_E = SRNNModel2.effective_c(params, 'c_E', 'n_a_E');
+            c_I = SRNNModel2.effective_c(params, 'c_I', 'n_a_I');
             activation_fn = params.activation_function;
             
             %% Unpack state variables
@@ -3361,8 +3366,8 @@ classdef SRNNModel2 < handle
             tau_b_I_rec = params.tau_b_I_rec;
             tau_b_I_rel = params.tau_b_I_rel;
             
-            c_E = SRNNModel2.safe_get_param(params, 'c_E', 1.0);
-            c_I = SRNNModel2.safe_get_param(params, 'c_I', 1.0);
+            c_E = SRNNModel2.effective_c(params, 'c_E', 'n_a_E');
+            c_I = SRNNModel2.effective_c(params, 'c_I', 'n_a_I');
             
             if ~isfield(params, 'activation_function_derivative') || ...
                     ~isa(params.activation_function_derivative, 'function_handle')
@@ -3776,6 +3781,27 @@ classdef SRNNModel2 < handle
             else
                 value = default_value;
             end
+        end
+
+        function c = effective_c(params, c_field, n_a_field)
+            % EFFECTIVE_C The adaptation scaling actually applied: c / K.
+            %
+            % c is the TOTAL adaptation budget and K the number of timescales
+            % sharing it. Every a_k relaxes to the rate, so sum_k a_k -> K*r at
+            % steady state whatever the taus are; without the division the total
+            % adaptation would scale linearly with K, and changing the number of
+            % timescales in a condition would silently change adaptation
+            % STRENGTH as well as timescale STRUCTURE.
+            %
+            % One helper rather than the expression inline, because four call
+            % sites need it (the trajectory unpack, the dynamics, and two
+            % Jacobian extractions) and a partial edit would leave the analytic
+            % Jacobian disagreeing with the RHS.
+            %
+            % max(1, .) guards K = 0, where there are no a-states and the term is
+            % absent anyway. (min(1, .) would not: min(1,0) is 0.)
+            K = SRNNModel2.safe_get_param(params, n_a_field, 1);
+            c = SRNNModel2.safe_get_param(params, c_field, 1.0) / max(1, K);
         end
     end
     

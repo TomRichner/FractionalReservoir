@@ -28,7 +28,7 @@ function cfg = paper_config(opts)
 % See also: run_all_paper_analyses, make_all_paper_figures, srnn_param_preset
 
 arguments
-    opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     opts.run_mode    (1,:) char = 'production'
     opts.run_dir     (1,:) char = ''      % '' -> resolve by preset at figure time
 end

@@ -20,7 +20,7 @@ function out = fig_param_space_allStd(cfg)
 
 arguments
     cfg.run_dir     (1,:) char    = ''
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true

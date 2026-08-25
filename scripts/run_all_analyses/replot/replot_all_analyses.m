@@ -23,7 +23,7 @@ function replot_dirs = replot_all_analyses(opts)
 
 arguments
     opts.run_dir        (1,:) char   = ''
-    opts.preset_name    (1,:) char   = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    opts.preset_name    (1,:) char   = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     opts.lle_hist_range (1,2) double = [-1, 1]
     opts.assemble       (1,1) logical = true
 end

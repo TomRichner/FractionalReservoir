@@ -601,6 +601,25 @@ classdef SRNNCellTypePairs < handle
             params.n_a = obj.n_a;
             params.tau_a = obj.tau_a;
             params.c = obj.c;
+            % THE ADAPTATION SCALING ACTUALLY APPLIED, computed once here so the
+            % dynamics and every Jacobian block cannot drift apart. There are
+            % seven sites that scale an adaptation term; giving them one derived
+            % quantity to read is what stops a partial edit leaving the analytic
+            % Jacobian disagreeing with the RHS -- a discrepancy only
+            % test_SRNNCellTypePairs' finite-difference check would ever catch.
+            %
+            % c is the TOTAL adaptation budget, divided by the number of
+            % timescales sharing it. Every a_k relaxes to the rate
+            % (da_k/dt = (-a_k + r)/tau_k), so sum_k a_k -> K*r at steady state
+            % whatever the taus are, and c*sum would scale linearly with K.
+            % Dividing makes the steady-state adaptation c*r exactly,
+            % independent of how many timescales carry it -- so changing K in a
+            % condition changes the TIMESCALE STRUCTURE without also changing
+            % the adaptation STRENGTH.
+            %
+            % max(1, .) guards K = 0, where there are no a-states at all and the
+            % term is absent anyway. (min(1, .) would not: min(1,0) is 0.)
+            params.c_eff = obj.c ./ max(1, obj.n_a);
             pair = obj.compile_synapse_config();
             params.n_b_pairs = pair.n_b;
             params.tau_b_rec = pair.tau_b_rec;
@@ -795,7 +814,11 @@ classdef SRNNCellTypePairs < handle
             % The _relative tildes are left in whatever shape they were given:
             % expand_block accepts a 1 x C presynaptic row or a full C x C block.
             if isempty(obj.n_a), obj.n_a = zeros(1, C); end
-            if isempty(obj.c), obj.c = repmat(0.15 / 3, 1, C); end
+            % c is the TOTAL adaptation budget (see get_params). It is no longer
+            % divided by 3 here: the model divides by the number of timescales
+            % actually in use, so the hand-division that assumed n_a = 3 would
+            % now be applied twice.
+            if isempty(obj.c), obj.c = repmat(0.15, 1, C); end
             obj.n_a = reshape(obj.n_a, 1, []);
             obj.c = reshape(obj.c, 1, []);
 
@@ -1821,7 +1844,7 @@ classdef SRNNCellTypePairs < handle
                 nq = params.n_per_type(q);
                 if params.n_a(q) > 0
                     a{q} = reshape(S(layout.a{q}), nq, params.n_a(q));
-                    x_eff(idx) = x_eff(idx) - params.c(q) .* sum(a{q}, 2);
+                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
                 else
                     a{q} = zeros(nq, 0);
                 end
@@ -1917,7 +1940,7 @@ classdef SRNNCellTypePairs < handle
                 idx = params.type_indices{q}; nq = params.n_per_type(q);
                 if params.n_a(q) > 0
                     a{q} = reshape(S(layout.a{q}), nq, params.n_a(q));
-                    x_eff(idx) = x_eff(idx) - params.c(q) .* sum(a{q}, 2);
+                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
                 else
                     a{q} = zeros(nq, 0);
                 end
@@ -1939,7 +1962,7 @@ classdef SRNNCellTypePairs < handle
                     diag_block = kron(spdiags(-tau_inv, 0, na, na), speye(nq));
                     template = sparse(tau_inv * ones(1, na));
                     coupling = kron(template, spdiags( ...
-                        -params.c(q) .* rate_prime(idx), 0, nq, nq));
+                        -params.c_eff(q) .* rate_prime(idx), 0, nq, nq));
                     J(row_a, row_a) = diag_block + coupling;
                     vals = kron(tau_inv, rate_prime(idx));
                     J(row_a, row_x) = sparse((1:numel(row_a))', ...
@@ -1983,7 +2006,7 @@ classdef SRNNCellTypePairs < handle
                     if nb > 0
                         if na > 0
                             coeff = b_state{pre, post} .* ...
-                                (params.c(pre) .* pre_rate_prime ...
+                                (params.c_eff(pre) .* pre_rate_prime ...
                                 ./ params.tau_b_rel{pre, post});
                             stack = sparse(1:numel(row_b), ...
                                 repmat((1:npre)', nb, 1), coeff(:), ...
@@ -2005,7 +2028,7 @@ classdef SRNNCellTypePairs < handle
                     if ng > 0
                         if na > 0
                             coeff = -(params.G{pre, post} - g_state{pre, post}) .* ...
-                                (params.c(pre) .* pre_rate_prime ...
+                                (params.c_eff(pre) .* pre_rate_prime ...
                                 ./ params.tau_g_fac{pre, post});
                             stack = sparse(1:numel(row_g), ...
                                 repmat((1:npre)', ng, 1), coeff(:), ...
@@ -2034,7 +2057,7 @@ classdef SRNNCellTypePairs < handle
 
                     if na > 0
                         replicate = kron(ones(1, na), speye(npre));
-                        block = -params.c(pre) .* rate_block;
+                        block = -params.c_eff(pre) .* rate_block;
                         J(row_x(post_idx), row_a) = ...
                             J(row_x(post_idx), row_a) + ...
                             (block * replicate) ./ params.tau_d;
@@ -2112,7 +2135,7 @@ classdef SRNNCellTypePairs < handle
                 if params.n_a(q) > 0
                     aq = reshape(S_out(:, layout.a{q})', nq, params.n_a(q), nt);
                     summed = reshape(sum(aq, 2), nq, nt);
-                    x_eff(idx, :) = x_eff(idx, :) - params.c(q) .* summed;
+                    x_eff(idx, :) = x_eff(idx, :) - params.c_eff(q) .* summed;
                     a_named.(name) = aq;
                 else
                     a_named.(name) = [];

@@ -42,7 +42,7 @@ function out = fig_SFA_steady_state(cfg)
 % See also: fig_STD_steady_state, srnn_param_preset, manuscript_style
 
 arguments
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true

@@ -37,7 +37,7 @@ function out = fig_EI_param_space(cfg)
 
 arguments
     cfg.run_dir     (1,:) char    = ''
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.color_by    (1,:) char    = ''      % '' -> per model class (f_E / f)
     cfg.save        (1,1) logical = true

@@ -1,7 +1,7 @@
 function [model, info] = build_from_preset(preset_name, condition_name, varargin)
 % BUILD_FROM_PRESET Construct and build a model from a preset + one condition.
 %
-%   model = BUILD_FROM_PRESET('celltype_pairs_Sc0p2_noise0p025_dualStd')
+%   model = BUILD_FROM_PRESET('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond')
 %   model = BUILD_FROM_PRESET(p, 'sfa_only')
 %   model = BUILD_FROM_PRESET(p, 'sfa_and_std', 'n', 50, 'T_range', [0 20])
 %

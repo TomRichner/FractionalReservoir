@@ -41,7 +41,7 @@ function [out_dir, summary] = explore_sensitivity_range(opts)
 arguments
     opts.param       (1,:) char    = 'level_of_chaos'
     opts.range       (1,2) double  = [0.25, 2.5]
-    opts.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd'
+    opts.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     opts.run_mode    (1,:) char    = 'medium'
     opts.metric      (1,:) char    = 'LLE'      % the metric the table reports
     opts.n_levels    double        = []         % [] -> the run_mode's
