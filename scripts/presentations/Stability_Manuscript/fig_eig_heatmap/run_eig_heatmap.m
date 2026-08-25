@@ -69,9 +69,12 @@ if cfg.n_samples > 0; n_samples = cfg.n_samples; end
 lle_window     = min(30, diff(T_range) / 2);
 lya_T_interval = [T_range(2) - lle_window, T_range(2)];
 
-cond_names  = {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'};
+% The conditions come FROM THE PRESET, in its order. Hardcoding the four
+% original names here meant a 7-regime preset would have been sampled for only
+% four of them, silently, and the figure would have looked complete.
 [~, ~, conditions] = srnn_param_preset(cfg.preset_name);
-titles = cellfun(@(n) pretty(n), cond_names, 'UniformOutput', false);
+cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
+titles     = cellfun(@(n) pretty(n), cond_names, 'UniformOutput', false);
 
 fprintf('[eig_heatmap] preset=%s run_mode=%s T=%g s n_samples=%d\n', ...
     cfg.preset_name, cfg.run_mode, T_range(2), n_samples);
@@ -149,11 +152,14 @@ ev_all = vertcat(ev{:});
 end
 
 function s = pretty(name)
-switch name
-    case 'no_adaptation', s = 'No adaptation';
-    case 'sfa_only',      s = 'SFA only';
-    case 'std_only',      s = 'STD only';
-    case 'sfa_and_std',   s = 'SFA + STD';
-    otherwise,            s = name;
+% Display name for a condition. Delegates to manuscript_style so this figure and
+% every other one title the same regime identically, rather than keeping a
+% private list that silently falls back to the raw snake_case name whenever a
+% regime is added.
+st = manuscript_style();
+if st.condition_title.isKey(name)
+    s = st.condition_title(name);
+else
+    s = strrep(name, '_', ' ');
 end
 end

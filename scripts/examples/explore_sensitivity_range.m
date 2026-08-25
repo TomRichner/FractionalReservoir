@@ -16,7 +16,7 @@ function [out_dir, summary] = explore_sensitivity_range(opts)
 % span is visible directly.
 %
 % It is deliberately a THIN wrapper. Everything that decides what the numbers
-% mean -- the preset, the model class, the four adaptation conditions, the
+% mean -- the preset, the model class, its adaptation conditions, the
 % run_mode timings, the noise-driven integrator choice -- comes from
 % resolve_run_context, exactly as run_sensitivity_analysis gets it. If this
 % file and that one ever disagree about how a sweep is set up, the range you
@@ -32,8 +32,9 @@ function [out_dir, summary] = explore_sensitivity_range(opts)
 % its own folder_prefix, so exploration runs never sit alongside the dated
 % run_all_* directories the figures resolve against.
 %
-% COST is n_levels x n_reps x 4 conditions simulations, printed before it starts.
-% 'medium' is 11 x 15 x 4 = 660. Use 'fast' or 'fast2' to scout first.
+% COST is n_levels x n_reps x n_conditions simulations, printed before it starts.
+% 'medium' is 11 x 15 x 4 = 660 on a 4-regime preset, 1155 on a 7-regime one.
+% Use 'fast' or 'fast2' to scout first.
 %
 % See also: run_sensitivity_analysis, resolve_run_context, analysis_run_config,
 %           srnn_param_preset, ParamSpaceAnalysis2/plot_sensitivity

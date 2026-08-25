@@ -832,9 +832,7 @@ classdef ParamSpaceAnalysis2 < handle
             num_conditions = length(condition_names);
 
             % Readable titles
-            condition_titles = containers.Map(...
-                {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
-                {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+            condition_titles = srnn_condition_titles();   % one source; see that file
 
             % Create figure
             fig = figure('Name', sprintf('%s Distribution', metric), ...
@@ -963,9 +961,7 @@ classdef ParamSpaceAnalysis2 < handle
             num_conditions = length(condition_names);
 
             % Readable condition titles
-            condition_titles = containers.Map(...
-                {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
-                {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+            condition_titles = srnn_condition_titles();   % one source; see that file
 
             % Loop over each swept parameter
             for sp_idx = 1:length(swept_params)
@@ -1116,9 +1112,7 @@ classdef ParamSpaceAnalysis2 < handle
             condition_names = cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false);
             num_conditions = length(condition_names);
 
-            condition_titles = containers.Map(...
-                {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
-                {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+            condition_titles = srnn_condition_titles();   % one source; see that file
 
             % Metric configuration
             metric_config = struct();
@@ -1427,9 +1421,7 @@ classdef ParamSpaceAnalysis2 < handle
             end
 
             % Create figure
-            condition_titles = containers.Map(...
-                {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
-                {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+            condition_titles = srnn_condition_titles();   % one source; see that file
 
             fig = figure('Name', 'Mean Local LLE by Step', ...
                 'Position', [100, 100, 300 * num_conditions, 300]);
