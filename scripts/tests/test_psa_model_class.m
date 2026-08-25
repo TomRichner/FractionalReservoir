@@ -52,7 +52,10 @@ p2.model_defaults.cell_type_names = {'E','I'};
 p2.model_defaults.f = [0.5 0.5];
 p2.model_defaults.mu_tilde_relative = [3 -4];
 p2.model_defaults.sigma_tilde_relative = [1 1];
-p2.model_defaults.n_a = [0 0];
+% tau_a, not n_a: n_a is Dependent on it and read-only, so model_defaults
+% carrying n_a is now a hard validate_model_defaults error. Empty rows mean no
+% adaptation, which is what this sweep wants.
+p2.model_defaults.tau_a = {zeros(1,0), zeros(1,0)};
 p2.model_defaults.T_range = [0 2];
 p2.model_defaults.fs = 200;
 p2.model_defaults.ode_solver = 'rk4';

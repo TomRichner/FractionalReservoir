@@ -54,11 +54,37 @@ classdef SRNNCellTypePairs < handle
 
     %% Per-type SFA and pair-specific STD/STF
     properties
-        n_a
+        % TAU_A IS THE SINGLE SOURCE OF TRUTH for adaptation: a 1 x C cell, one
+        % row of timescales (seconds) per cell type, empty for a type that does
+        % not adapt. The COUNT is derived from it (see the Dependent n_a below),
+        % exactly as n_b has always been numel(tau_rec) on the synapse side.
         tau_a
         c
         synapse_config = struct()
         std_zero_floor = false
+    end
+
+    properties (Dependent, SetAccess = private)
+        % N_A How many SFA timescales each cell type carries. READ-ONLY.
+        %
+        % n_a and tau_a used to be two settable properties carrying one fact,
+        % kept consistent by a validate() check and bridged by an auto-fill that
+        % invented timescales from the count:
+        %
+        %   tau_a{q} = logspace(log10(0.25), log10(10), n_a(q))
+        %
+        % That is lossy by construction -- a count cannot say WHICH timescales --
+        % and MATLAB's logspace(a,b,1) returns 10^b, so asking for one timescale
+        % silently produced the SLOW 10 s end. Deriving the count instead makes
+        % the pair impossible to desynchronise and the question impossible to
+        % ask: callers state the timescales they want.
+        %
+        % Being read-only also means n_a cannot be a ParamSpaceAnalysis2 grid
+        % axis, which it never should have been -- a gridded n_a would silently
+        % override every adaptation condition. That was only ever prevented for
+        % SRNNModel2's n_a_E, since condition_field_names() lists that class's
+        % names alone.
+        n_a
     end
 
     %% Shared dynamics and simulation settings
@@ -420,6 +446,17 @@ classdef SRNNCellTypePairs < handle
         function value = get.x_noise_std(obj)
             % Nominal stationary std of x from noise alone (W = 0, u = 0).
             value = obj.sigma_u_noise / sqrt(2 * obj.tau_d);
+        end
+
+        function value = get.n_a(obj)
+            % Derived from tau_a, which is authoritative. Empty before
+            % complete_type_defaults has run, so callers reached during
+            % construction still see a sensible [].
+            if isempty(obj.tau_a) || ~iscell(obj.tau_a)
+                value = [];
+            else
+                value = cellfun(@numel, obj.tau_a);
+            end
         end
 
         function value = get.N_sys_eqs(obj)
@@ -813,13 +850,11 @@ classdef SRNNCellTypePairs < handle
             obj.f = reshape(obj.f, 1, []);
             % The _relative tildes are left in whatever shape they were given:
             % expand_block accepts a 1 x C presynaptic row or a full C x C block.
-            if isempty(obj.n_a), obj.n_a = zeros(1, C); end
             % c is the TOTAL adaptation budget (see get_params). It is no longer
             % divided by 3 here: the model divides by the number of timescales
             % actually in use, so the hand-division that assumed n_a = 3 would
             % now be applied twice.
             if isempty(obj.c), obj.c = repmat(0.15, 1, C); end
-            obj.n_a = reshape(obj.n_a, 1, []);
             obj.c = reshape(obj.c, 1, []);
 
             % Setpoint statistics: a scalar means "the same for every type".
@@ -834,13 +869,24 @@ classdef SRNNCellTypePairs < handle
             obj.mu_S_c = reshape(obj.mu_S_c, 1, []);
             obj.sigma_S_c = reshape(obj.sigma_S_c, 1, []);
 
-            if isempty(obj.tau_a), obj.tau_a = cell(1, C); end
-            if iscell(obj.tau_a), obj.tau_a = reshape(obj.tau_a, 1, []); end
-            if iscell(obj.tau_a) && numel(obj.tau_a) == C
-                for q = 1:C
-                    if obj.n_a(q) > 0 && isempty(obj.tau_a{q})
-                        obj.tau_a{q} = logspace(log10(0.25), log10(10), obj.n_a(q));
-                    elseif ~isempty(obj.tau_a{q})
+            % tau_a defaults to NO adaptation on any type. It is no longer
+            % auto-filled from a count: the count is now derived from it, and
+            % inventing timescales from an integer is what this refactor
+            % removed. A caller that wants the standard ladder asks for it by
+            % name -- srnn_sfa_timescales(K) -- which is also what every
+            % adaptation condition does.
+            %
+            % A numeric tau_a is accepted for the C = 1 convenience of writing
+            % 'tau_a', 0.25 rather than {0.25}; anything else must already be a
+            % cell, and validate() says so.
+            if isempty(obj.tau_a), obj.tau_a = repmat({zeros(1,0)}, 1, C); end
+            if isnumeric(obj.tau_a) && C == 1, obj.tau_a = {obj.tau_a}; end
+            if iscell(obj.tau_a)
+                obj.tau_a = reshape(obj.tau_a, 1, []);
+                for q = 1:numel(obj.tau_a)
+                    if isempty(obj.tau_a{q})
+                        obj.tau_a{q} = zeros(1, 0);   % a 1x0 row, so numel is 0
+                    else
                         obj.tau_a{q} = reshape(obj.tau_a{q}, 1, []);
                     end
                 end
@@ -947,18 +993,11 @@ classdef SRNNCellTypePairs < handle
                 end
             end
 
-            vector_fields = {'n_a', 'c'};
-            for k = 1:numel(vector_fields)
-                name = vector_fields{k};
-                if ~isnumeric(obj.(name)) || numel(obj.(name)) ~= C || ...
-                        any(~isfinite(obj.(name)))
-                    error('SRNNCellTypePairs:InvalidParams', ...
-                        '%s must have one finite numeric value per cell type.', name);
-                end
-            end
-            if any(obj.n_a < 0 | obj.n_a ~= round(obj.n_a))
+            % n_a is NOT validated here: it is Dependent on tau_a, so it cannot
+            % be wrong independently. Validating tau_a validates both.
+            if ~isnumeric(obj.c) || numel(obj.c) ~= C || any(~isfinite(obj.c))
                 error('SRNNCellTypePairs:InvalidParams', ...
-                    'n_a must contain nonnegative integers.');
+                    'c must have one finite numeric value per cell type.');
             end
             if any(obj.c < 0)
                 error('SRNNCellTypePairs:InvalidParams', ...
@@ -966,13 +1005,16 @@ classdef SRNNCellTypePairs < handle
             end
             if ~iscell(obj.tau_a) || numel(obj.tau_a) ~= C
                 error('SRNNCellTypePairs:InvalidParams', ...
-                    'tau_a must be a 1-by-n_cellTypes cell array.');
+                    ['tau_a must be a 1-by-n_cellTypes cell array of adaptation ' ...
+                    'timescales, one row per cell type (empty for no adaptation). ' ...
+                    'Got %s with %d entries for %d cell types.'], ...
+                    class(obj.tau_a), numel(obj.tau_a), C);
             end
             for q = 1:C
-                if numel(obj.tau_a{q}) ~= obj.n_a(q) || ...
+                if ~isnumeric(obj.tau_a{q}) || ...
                         any(~isfinite(obj.tau_a{q})) || any(obj.tau_a{q} <= 0)
                     error('SRNNCellTypePairs:InvalidParams', ...
-                        'tau_a{%d} must contain n_a(%d) positive values.', q, q);
+                        'tau_a{%d} must contain positive finite timescales (or be empty).', q);
                 end
             end
             obj.compile_synapse_config();

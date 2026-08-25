@@ -81,7 +81,7 @@ budget = nan(1,3);
 for K = 1:3
     m = build_from_preset('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', ...
         'sfa_and_std', 'tau_a', {srnn_sfa_timescales(K), zeros(1,0)}, ...
-        'n_a', [K 0], 'n', 8, 'indegree', 4, 'lya_method','none', 'T_range',[0 1]);
+'n', 8, 'indegree', 4, 'lya_method','none', 'T_range',[0 1]);
     p = m.get_params();
     budget(K) = p.c_eff(1) * K;      % (c/K)*sum(a) at steady state, where sum(a) = K*r
 end

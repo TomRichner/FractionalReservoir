@@ -39,8 +39,10 @@ fprintf('\n-- SRNNCellTypePairs conditions --\n');
 cond = srnn_adaptation_conditions('SRNNCellTypePairs');
 all_passed = check('every condition carries tau_a', ...
     all(cellfun(@(c) isfield(c, 'tau_a') && iscell(c.tau_a), cond))) && all_passed;
-all_passed = check('n_a == numel(tau_a) in every condition', ...
-    all(cellfun(@(c) isequal(c.n_a, cellfun(@numel, c.tau_a)), cond))) && all_passed;
+% Conditions carry tau_a ALONE. n_a is Dependent on the model and read-only, so
+% a condition setting it would now throw on every build rather than be ignored.
+all_passed = check('no condition carries n_a', ...
+    ~any(cellfun(@(c) isfield(c, 'n_a'), cond))) && all_passed;
 all_passed = check('SFA conditions carry the ladder', ...
     isequal(cond{2}.tau_a{1}, srnn_sfa_timescales(3)) && ...
     isequal(cond{4}.tau_a{1}, srnn_sfa_timescales(3))) && all_passed;
@@ -52,12 +54,12 @@ all_passed = check('SFA is on the FIRST type only', ...
 % A single-timescale request must reach the model as 0.25, not 10.
 one = srnn_adaptation_conditions('SRNNCellTypePairs', [], srnn_sfa_timescales(1));
 all_passed = check('one-timescale conditions carry 0.25', ...
-    isequal(one{2}.tau_a{1}, 0.25) && isequal(one{2}.n_a, [1 0])) && all_passed;
+    isequal(one{2}.tau_a{1}, 0.25) && numel(one{2}.tau_a{1}) == 1) && all_passed;
 
 % C = 1 still produces 1-element rows/cells.
 c1 = srnn_adaptation_conditions('SRNNCellTypePairs', [], srnn_sfa_timescales(3), 1);
 all_passed = check('C=1 gives 1-element n_a and tau_a', ...
-    all(cellfun(@(c) isscalar(c.n_a) && isscalar(c.tau_a), c1))) && all_passed;
+    all(cellfun(@(c) isscalar(c.tau_a), c1))) && all_passed;
 
 %% SRNNModel2 still speaks counts, deliberately
 fprintf('\n-- SRNNModel2 branch is untouched --\n');

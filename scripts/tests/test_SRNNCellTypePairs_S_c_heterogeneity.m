@@ -134,7 +134,7 @@ sc = struct();
 sc.A.A.std = struct('tau_rec', 1, 'tau_rel', 0.25);
 sc.B.A.stf = struct('tau_dec', 1, 'tau_fac', 0.5, 'G', 1.5);
 sc.C.B.std = struct('tau_rec', 2, 'tau_rel', 0.5);
-m = tiny_model('n', 30, 'indegree', 10, 'n_a', [2 1 0], ...
+m = tiny_model('n', 30, 'indegree', 10, 'tau_a', {srnn_sfa_timescales(2), srnn_sfa_timescales(1), []}, ...
     'synapse_config', sc, ...
     'mu_S_c', [0.4 0.1 -0.2], 'sigma_S_c', [0.1 0.1 0.1]);
 m.build();
@@ -166,7 +166,7 @@ all_passed = check('a wrong-length mu_S_c errors', threw) && all_passed;
 
 %% A heterogeneous model runs end to end and its LLE differs
 run_args = {'T_range', [0 2], 'fs', 200, 'ode_solver', 'rk4', ...
-    'lya_method', 'benettin', 'lya_T_interval', [0.5 2], 'n_a', [2 1 0]};
+    'lya_method', 'benettin', 'lya_T_interval', [0.5 2], 'tau_a', {srnn_sfa_timescales(2), srnn_sfa_timescales(1), []}};
 m = tiny_model(run_args{:});
 m.build(); m.run();
 lle_homog = m.lya_results.LLE;
