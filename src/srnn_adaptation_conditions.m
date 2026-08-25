@@ -1,4 +1,4 @@
-function conds = srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa, n_cell_types)
+function conds = srnn_adaptation_conditions(model_class, synapse_config, sfa_timescales, n_cell_types)
 % SRNN_ADAPTATION_CONDITIONS The four adaptation regimes, per model class.
 %
 % Returns a cell array of condition structs for ParamSpaceAnalysis2.set_conditions.
@@ -28,16 +28,40 @@ function conds = srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa
 %
 % See also: ParamSpaceAnalysis2/set_conditions, srnn_param_preset
 
-% The optional N_A_SFA is how many SFA timescales the two SFA regimes switch on.
-% It defaults to 3, which is the paper's operating point and what every sweep
-% preset uses. It exists for the single-neuron METHODS figures, which show one
-% exaggerated timescale so the rate decay is legible on a single trace -- and
-% whose preset would otherwise contradict its own conditions (a preset carrying
-% one tau_a fails validate against a condition demanding three).
+% The optional SFA_TIMESCALES are the adaptation timescales the SFA regimes
+% switch on, as a plain vector in seconds. It defaults to the standard ladder
+% srnn_sfa_timescales(3), which is the paper's operating point. It exists for the
+% single-neuron METHODS figures, which show one exaggerated timescale so the rate
+% decay is legible on a single trace.
 %
-% It is a COUNT, not the timescales themselves: tau_a still comes from the
-% preset (or is auto-filled by complete_type_defaults). The two must agree in
-% length, which is exactly what this argument lets a preset guarantee.
+% IT IS THE TIMESCALES, NOT A COUNT, and that is the point. This argument used to
+% be n_a_sfa, an integer, with tau_a left to the preset or to the model's
+% auto-fill -- and the two then had to agree in length or validate() rejected the
+% pair. Two consequences, both of which this spelling removes:
+%
+%   * The auto-fill was logspace(log10(0.25), log10(10), n_a), and MATLAB's
+%     logspace(a,b,1) returns 10^b. Asking for ONE timescale silently gave the
+%     SLOW 10 s end. Nothing reported it; the model just ran a different
+%     experiment.
+%   * A count cannot say WHICH timescales, so single-timescale regimes were not
+%     expressible at all.
+%
+% The conditions therefore carry tau_a EXPLICITLY, exactly as they already carry
+% synapse_config rather than a count of depression timescales. That symmetry is
+% deliberate: on the synapse side n_b has always been numel(tau_rec), derived
+% from the timescales the condition states.
+%
+% MIGRATION HAZARD, and there is no safe automatic guard for it. The third
+% argument used to be a COUNT, so an old positional call
+%
+%   srnn_adaptation_conditions(cls, routes, 3)     % once: THREE timescales
+%                                                  % now:  ONE 3-second timescale
+%
+% still passes validation and means something different. A heuristic ("a scalar
+% integer >= 2 is probably a count") cannot be added, because a single 3 s
+% timescale is exactly what the single_neuron_stf preset legitimately asks for.
+% Every in-repo caller was updated with the rename; anything outside the repo
+% must be checked by hand. Write srnn_sfa_timescales(K) when you mean K of them.
 
 % The optional N_CELL_TYPES is how long the n_a rows are (SRNNCellTypePairs
 % only). It defaults to 2, which every sweep preset uses. It exists because
@@ -51,7 +75,7 @@ function conds = srnn_adaptation_conditions(model_class, synapse_config, n_a_sfa
 arguments
     model_class (1,:) char
     synapse_config = []          % [] -> default_std_routes(); else a struct
-    n_a_sfa (1,1) double {mustBeInteger, mustBePositive} = 3
+    sfa_timescales (1,:) double {mustBePositive} = srnn_sfa_timescales(3)
     n_cell_types (1,1) double {mustBeInteger, mustBePositive} = 2
 end
 
@@ -82,6 +106,12 @@ switch model_class
                 'n_b_E count plus tau_b_E_rec/tau_b_E_rel in model_defaults. ' ...
                 'Named routes require SRNNCellTypePairs.']);
         end
+        % SRNNModel2 still speaks COUNTS -- n_a_E with tau_a_E auto-filled -- and
+        % is deliberately left that way: it is slated for deletion, and porting
+        % it to explicit timescales would be work on code that is going away.
+        % The count is therefore derived from the timescales here, so both
+        % classes are driven by the same argument.
+        n_a_sfa = numel(sfa_timescales);
         conds = { ...
             struct('name', 'no_adaptation', 'n_a_E', 0,       'n_b_E', 0), ...
             struct('name', 'sfa_only',      'n_a_E', n_a_sfa, 'n_b_E', 0), ...
@@ -96,16 +126,23 @@ switch model_class
         % treats an absent or empty mechanism as absent, so no b states are created.
         no_synapses = struct();
 
-        % SFA on E only, n_a_sfa timescales; tau_a{1} is then filled by
-        % complete_type_defaults as logspace(0.25, 10, n_a_sfa) unless the preset
-        % carries its own (in which case it must have n_a_sfa elements).
-        sfa_row  = [n_a_sfa, zeros(1, n_cell_types - 1)];
-        zero_row = zeros(1, n_cell_types);
+        % SFA on the FIRST cell type only; every other type gets no adaptation.
+        % tau_a is stated EXPLICITLY rather than left to the model's auto-fill,
+        % so the condition records which timescales it ran, not merely how many.
+        %
+        % The double brace is load-bearing: struct() given a bare cell value
+        % builds a struct ARRAY with one element per cell entry. Wrapping makes
+        % the cell the value of a scalar struct's field, which is what a
+        % condition is.
+        sfa_taus  = [{sfa_timescales}, repmat({zeros(1,0)}, 1, n_cell_types - 1)];
+        no_taus   = repmat({zeros(1,0)}, 1, n_cell_types);
+        sfa_row   = [numel(sfa_timescales), zeros(1, n_cell_types - 1)];
+        zero_row  = zeros(1, n_cell_types);
         conds = { ...
-            struct('name', 'no_adaptation', 'n_a', zero_row, 'synapse_config', no_synapses), ...
-            struct('name', 'sfa_only',      'n_a', sfa_row,  'synapse_config', no_synapses), ...
-            struct('name', 'std_only',      'n_a', zero_row, 'synapse_config', sc), ...
-            struct('name', 'sfa_and_std',   'n_a', sfa_row,  'synapse_config', sc) ...
+            struct('name','no_adaptation', 'n_a',zero_row, 'tau_a',{no_taus},  'synapse_config',no_synapses), ...
+            struct('name','sfa_only',      'n_a',sfa_row,  'tau_a',{sfa_taus}, 'synapse_config',no_synapses), ...
+            struct('name','std_only',      'n_a',zero_row, 'tau_a',{no_taus},  'synapse_config',sc), ...
+            struct('name','sfa_and_std',   'n_a',sfa_row,  'tau_a',{sfa_taus}, 'synapse_config',sc) ...
             };
 
     otherwise

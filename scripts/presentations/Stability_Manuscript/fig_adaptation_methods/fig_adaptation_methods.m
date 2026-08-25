@@ -91,21 +91,17 @@ assert(strcmp(model_class, 'SRNNCellTypePairs'), ...
     preset_name, model_class);
 ci   = find(cellfun(@(c) strcmp(c.name, 'sfa_and_std'), conditions), 1);
 sc0  = conditions{ci}.synapse_config;
-n_a0 = conditions{ci}.n_a;
 
-% The preset's own tau_a, if it carries one. Most presets do NOT -- tau_a is the
-% class default, auto-filled per n_a inside build() -- but single_neuron_stf
-% carries an explicit single 3 s timescale. That matters here: validate()
-% requires numel(tau_a{1}) == n_a(1) EXACTLY, so a column that switches SFA off
-% must also shorten tau_a, or it fails with
-%   "tau_a{1} must contain n_a(1) positive values"
-% Presets without tau_a keep [] and let the auto-fill handle every column.
-preset_struct = srnn_param_preset(preset_name);
-if isfield(preset_struct, 'tau_a') && ~isempty(preset_struct.tau_a)
-    tau_a0 = preset_struct.tau_a;
-else
-    tau_a0 = [];
-end
+
+% The SFA timescales this preset switches on, taken from the CONDITION. Every
+% preset's conditions now state tau_a explicitly, so the figure reads the
+% timescales rather than a count -- and a column that switches SFA off simply
+% empties them.
+%
+% This used to read tau_a off the PRESET and truncate it per column, because
+% validate() demanded numel(tau_a{1}) == n_a(1) and the two lived in different
+% places. Presets no longer carry tau_a at all.
+tau_a0 = conditions{ci}.tau_a;
 has_stf = isfield(sc0, 'E') && isfield(sc0.E, 'E') && isfield(sc0.E.E, 'stf');
 if strcmp(cfg.variant, 'sfa_std_stf') && ~has_stf
     error('fig_adaptation_methods:NoSTF', ...
@@ -123,11 +119,9 @@ input_config.generator = @(params, T, fs, seed, ic) ...
 n_col = numel(combos);
 P = cell(1, n_col);
 for k = 1:n_col
-    [n_a, sc, tau_a] = combo_config(combos{k}, n_a0, sc0, tau_a0);
-    extra = {};
-    if ~isempty(tau_a); extra = {'tau_a', tau_a}; end
+    [n_a, sc, tau_a] = combo_config(combos{k}, sc0, tau_a0);
     model = build_from_preset(preset_name, 'sfa_and_std', ...
-        'n_a', n_a, 'synapse_config', sc, extra{:}, ...
+        'n_a', n_a, 'tau_a', tau_a, 'synapse_config', sc, ...
         'input_config', input_config, ...
         'T_range', cfg.T_range, 'fs', 400, ...
         'lya_method', 'none', 'plot_deci', 1);
@@ -238,26 +232,23 @@ switch c
 end
 end
 
-function [n_a, sc, tau_a] = combo_config(combo, n_a0, sc0, tau_a0)
-% Adaptation counts, synapse routes and tau_a for one column.
+function [n_a, sc, tau_a] = combo_config(combo, sc0, tau_a0)
+% Adaptation timescales and synapse routes for one column.
 %
-% n_a and synapse_config are CONDITION-owned fields, which is exactly why they
-% can be overridden per column: they never live in the preset, so setting them
-% here does not fight anything.
-n_a = zeros(size(n_a0));
+% tau_a and synapse_config are CONDITION-owned, which is exactly why they can be
+% overridden per column: they never live in the preset, so setting them here
+% does not fight anything.
+%
+% A column is SFA-on or SFA-off, nothing between, so tau_a is either the
+% condition's timescales or empty. n_a follows from it and is passed only
+% because it is still a settable property; it is numel(tau_a) by construction.
+tau_a = repmat({zeros(1,0)}, 1, numel(tau_a0));
 if contains(combo, 'sfa')
-    n_a(1) = n_a0(1);            % SFA on the first (E) type only
+    tau_a{1} = tau_a0{1};        % SFA on the first (E) type only
 end
-
-% tau_a must be TRUNCATED to match, when the preset carries one at all:
-% validate() demands numel(tau_a{1}) == n_a(1) exactly, so an SFA-off column
-% with a length-1 tau_a would be rejected. Empty means "let build() auto-fill",
-% which is what every preset without an explicit tau_a wants.
-tau_a = [];
-if ~isempty(tau_a0)
-    tau_a = tau_a0;
-    tau_a{1} = tau_a0{1}(1:n_a(1));
-end
+n_a = cellfun(@numel, tau_a);
+assert(isequal(n_a(1) > 0, contains(combo, 'sfa')), ...
+    'combo_config: SFA state disagrees with the column name ''%s''.', combo);
 
 sc = struct();
 route = sc0.E.E;

@@ -68,11 +68,17 @@ end
 % No default model_class. Every case names its own, so a new SRNNCellTypePairs
 % preset cannot silently inherit 'SRNNModel2' and fail much later inside
 % validate_model_defaults with a wall of "not a property" messages.
-std_routes = [];        % [] = whatever srnn_adaptation_conditions defaults to
-n_a_sfa    = 3;         % SFA timescales the two SFA conditions switch on.
-                        % Override ONLY when the preset carries its own tau_a of
-                        % a different length -- the count and the timescales must
-                        % agree or validate() rejects the pair.
+std_routes     = [];    % [] = whatever srnn_adaptation_conditions defaults to
+sfa_timescales = srnn_sfa_timescales(3);
+                        % The adaptation timescales the SFA conditions switch on,
+                        % in seconds. Override for a preset that adapts on
+                        % something other than the paper's standard ladder.
+                        %
+                        % tau_a itself must NOT appear in the `d` struct below:
+                        % it is condition-owned, exactly like synapse_config, and
+                        % a preset carrying it would be silently overridden by
+                        % whichever condition is applied (and warned about by
+                        % validate_model_defaults).
 
 switch name
     case 'default'
@@ -921,13 +927,14 @@ switch name
             'S_c',                  0.5, ...
             'tau_d',                0.1, ...
             'c',                    1.0, ...          % exaggerated SFA
-            'tau_a',                {{3}}, ...        % single 3 s timescale
             'x0_std',               0);               % deterministic x(0) = 0
-        % ONE SFA timescale, not the usual three. The conditions must agree with
-        % the tau_a above or validate() rejects the pair ("tau_a{1} must contain
-        % n_a(1) positive values") -- which is precisely what this argument is
-        % for. It is the only preset in the file that needs it.
-        n_a_sfa = 1;
+        % ONE exaggerated 3 s timescale, so the rate decay is legible on a single
+        % trace. This lives here rather than as a `tau_a` field above because
+        % tau_a is condition-owned: the SFA-off columns need it EMPTY, and only a
+        % condition can say that. Carrying it in the preset is what used to make
+        % build_from_preset('single_neuron_stf','no_adaptation') fail outright
+        % with "tau_a{1} must contain n_a(1) positive values".
+        sfa_timescales = 3;
         % Both mechanisms on the E->E route. The figure switches them on and off
         % per column; these are the timescales it switches ON.
         std_routes = struct();
@@ -971,9 +978,8 @@ switch name
         % model the paper characterises (TR's decision) rather than smoothed
         % away.
         %
-        % n_a_sfa is NOT overridden: unlike single_neuron_stf this shows all
-        % three of the paper's SFA timescales, auto-filled by
-        % complete_type_defaults, at the paper's per-timescale c = 0.5/3.
+        % sfa_timescales is NOT overridden: unlike single_neuron_stf this shows
+        % all three of the paper's SFA timescales, at the paper's c.
         model_class = 'SRNNCellTypePairs';
         d = struct( ...
             'n',                    1, ...
@@ -1058,7 +1064,7 @@ if isfield(d, 'n_cellTypes')
 else
     n_cell_types = 2;
 end
-conditions = srnn_adaptation_conditions(model_class, std_routes, n_a_sfa, n_cell_types);
+conditions = srnn_adaptation_conditions(model_class, std_routes, sfa_timescales, n_cell_types);
 end
 
 function names = srnn_param_preset_names()
