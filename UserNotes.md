@@ -14,6 +14,111 @@ and session that wrote it. Newest first.
 
 ---
 
+## SFA scaling should be `c/K`, not `c`, so the adaptation budget is invariant to the number of timescales
+
+| | |
+|---|---|
+| Noted | 2026-08-25 · `refactorRunAll` @ `10e5fbc` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Raised by | TR, while planning two new adaptation conditions with `n_a = 1` |
+| Status | **Recorded, not implemented.** A change to the dynamics of both model classes; would invalidate every existing preset value and archived run. |
+
+### The proposal
+
+The rate currently subtracts an **unnormalized sum** over SFA timescales:
+
+```
+r_i = phi( x_i - c * sum_k a_{i,k} )          % today
+r_i = phi( x_i - (c/K) * sum_k a_{i,k} )      % proposed, K = n_a
+```
+
+With the division, `c` becomes **the total adaptation budget** and stays
+meaningful as `K` changes. Without it, `c` is a per-timescale scaling and the
+total scales linearly with `K`.
+
+### Why it matters, exactly
+
+Every adaptation state relaxes to the rate: `da_k/dt = (-a_k + r)/tau_k`, so at
+steady state `a_k -> r` for **every** timescale, whatever its `tau`. Therefore
+
+```
+sum_k a_k  ->  K * r
+```
+
+and the total steady-state adaptation is `c*K*r` today versus `(c/K)*K*r = c*r`
+under the proposal — **exactly** K-invariant, not approximately. The tau values
+set how fast each component gets there, not where it ends up, so they do not
+enter this at all.
+
+### What today's presets do instead
+
+They hand-divide. `celltype_pairs_Sc0p2_noise0p025_dualStd` carries
+`c = [0.5/3, 0]` and the sweeps run `n_a = 3`, giving a total budget of 0.5.
+That is the proposed normalization applied manually, at one hardcoded `K`. It is
+correct only as long as `n_a` is 3 — and `n_a` is a **condition** field, so
+nothing stops a condition changing it.
+
+Measured on the dualStd preset (`c = 0.1667`, budget `= c * n_a`):
+
+| `n_a` | auto-filled `tau_a` | total budget today | under `c/K` with `c = 0.5` |
+|---|---|---|---|
+| 3 | `[0.25  1.581  10]` | **0.500** | 0.500 |
+| 1 | `10` | **0.167** | 0.500 |
+
+So a proposed `[1,1]` condition would silently have **one third** the adaptation
+of `[3,1]`, confounding "how many timescales" with "how much adaptation". That
+is what this note exists to prevent.
+
+### Cost of implementing it
+
+- **Every preset's `c` must lose its hand-division**: `0.5/3 -> 0.5`,
+  `0.15/3 -> 0.15`, and so on. Miss one and that network gets 3x weaker
+  adaptation with no error.
+- **Both model classes**, which share no implementation. In
+  `SRNNCellTypePairs`: `:1824` (dynamics), `:1920` (Jacobian's `x_eff`), `:1942`
+  (the `a -> x` block) and `:1986` (the route block). In `SRNNModel2`: `:2373`
+  and `:3421`, plus the plotting readouts around `:2054-2069`. The Jacobian
+  blocks carry `c` too, so a partial change would leave the analytic Jacobian
+  disagreeing with the dynamics — which `test_SRNNCellTypePairs`'s
+  finite-difference check would catch, and nothing else would.
+- **Archived runs become incomparable.** `resolved_defaults` records `c`, not the
+  budget, so an old and a new run with the same recorded `c` would mean
+  different networks. `same_config` would not notice.
+- `n_a = 0` must not divide by zero — the branch is already guarded by
+  `n_a > 0`, but the new code has to keep it that way.
+
+### Related
+
+Same investigation surfaced a separate defect: `complete_type_defaults`
+(`SRNNCellTypePairs.m:819`, and `SRNNModel2.m:1398`) auto-fills
+`tau_a = logspace(log10(0.25), log10(10), n_a)`, and MATLAB's
+`logspace(a,b,1)` returns `10^b` — so `n_a = 1` yields the **slow** 10 s end
+rather than the fast 0.25 s one. Verified by building. TR wants the fast end.
+Both issues have to be settled before the `[1,1]` and `[3,1]` conditions mean
+anything, and neither is implemented yet.
+
+The **STD side needs no analogous normalization**, and the reason is not that
+its depth is K-invariant — it very much is not. Two things differ:
+
+1. **Nothing is auto-filled or hidden.** There is no `n_b` count to set: `n_b` is
+   `numel(tau_rec)` read off the `synapse_config` a condition carries
+   (`SRNNCellTypePairs.m:1049`), so the timescales are always written out
+   explicitly. Choosing one instead of two is an explicit edit to a route, never
+   a silent consequence of a count — which is the whole failure mode above.
+2. **Depression enters as a PRODUCT, not a sum**, so there is no budget being
+   split to normalize back up. Adding a timescale multiplies rather than
+   subdividing, and that is deliberate: with both dualStd pairs sharing
+   `tau_rec/tau_rel = 8`, the steady state is `1/(1+8r)^2` against the parent's
+   `1/(1+8r)` — 0.086 versus 0.29 at `r = 0.3`. Deeper depression is the reason
+   the preset exists.
+
+So changing `n_b` DOES change depression depth substantially. That is intended
+and visible, where changing `n_a` changes adaptation strength unintentionally
+and invisibly. Going from `tau_rec = [2 4]` to a single `tau_rec = 2` is exactly
+the parent preset `celltype_pairs_Sc0p2_noise0p025`, which makes `[.,1]` and
+`[.,2]` a clean pairing.
+
+---
+
 ## ~~`SRNNCellTypePairs` cannot build a ONE-cell-type network~~ — FIXED 2026-08-23
 
 | | |
