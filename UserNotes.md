@@ -14,6 +14,108 @@ and session that wrote it. Newest first.
 
 ---
 
+## `tau_a` should be the independent property and `n_a` Dependent on it, not both settable
+
+| | |
+|---|---|
+| Noted | 2026-08-25 · `refactorRunAll` @ `05f6827` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Raised by | TR, after the `logspace(a,b,1)` finding while planning `n_a = 1` conditions |
+| Status | **Recorded, not implemented.** Cleanup of the model classes; no science changes. |
+
+### The asymmetry
+
+The synapse side already does this correctly. The neuron side does not:
+
+| | source of truth | how the count is obtained |
+|---|---|---|
+| synapse | `tau_rec` vector inside `synapse_config` | **derived**: `n_b = numel(tau_rec)` (`SRNNCellTypePairs.m:1049`) |
+| neuron | `n_a` **and** `tau_a`, both public and settable | **duplicated**, and the two must agree |
+
+`validate()` (`:948-953`) enforces `numel(tau_a{q}) == n_a(q)` exactly, and
+`complete_type_defaults` (`:819`) papers over the duplication by auto-filling
+`tau_a{q}` from `n_a(q)` whenever `tau_a{q}` is empty.
+
+Proposal: `tau_a` becomes the only settable property and
+
+```matlab
+n_a = cellfun(@numel, tau_a);        % Dependent, read-only
+```
+
+which is exactly what the synapse side already does.
+
+### Why this is the right fix and not just tidiness
+
+The auto-fill is **lossy by construction**: a count cannot say *which*
+timescales. That is the actual disease, and the `logspace(log10(0.25),
+log10(10), n_a)` bug is only its most visible symptom — at `n_a = 1` MATLAB's
+`logspace(a,b,1)` returns `10^b`, so you silently get the **slow 10 s** end.
+
+Special-casing `n_a == 1` to 0.25 would not fix this, it would only change which
+arbitrary answer you get: for a single timescale, 0.25, the geometric middle
+1.58 and 10 are all defensible, and no count can express the choice. Making
+`tau_a` authoritative removes the question by making the caller state the
+answer, and it makes a run record self-describing — the saved config then says
+*which* timescales, not merely how many.
+
+### Do NOT wrap it in a `neuronal_config` struct
+
+TR raised this as an option, by analogy with `synapse_config`. The analogy does
+not hold. `synapse_config` is nested because it is genuinely multi-dimensional:
+`C x C` routes, times `{std, stf}`, times several parameters each. The neuron
+side is **flat** — one vector per cell type — which the existing `1 x C` cell
+`tau_a` already expresses exactly. A wrapper would add a level of nesting with
+no gain in expressiveness, and it would break `tau_a_E`, the scalar alias the
+tau-sensitivity sweep actually drives.
+
+Revisit only if per-type mechanisms multiply (intrinsic currents, per-type
+noise). Today the only per-type quantities are `tau_a` and `c`.
+
+### Cost
+
+- **~8 sites set `n_a` directly** and would have to state `tau_a` instead:
+  `srnn_adaptation_conditions.m:105-108`, `fig_adaptation_methods`'s
+  `combo_config`, and the `scripts/tests/example_SRNNCellTypePairs*` family.
+- **Presets lose the "just say 3" convenience.** Mitigate with a helper —
+  `srnn_sfa_timescales(K)` returning the standard ladder — so the default lives
+  in one place rather than being inlined at every call site.
+- **`SRNNModel2` has the identical shape** (`n_a_E` + `tau_a_E`, auto-filled at
+  `:1398`). The classes are duck-typed siblings sharing no implementation, so
+  changing only Pairs widens the gap — and memory capacity still runs on
+  `SRNNModel2`.
+- `figure_settings` and the PSA plotters read `n_a` but never write it, so a
+  Dependent read-only property serves them unchanged.
+
+### This is NOT needed to add the `[1,1]` and `[3,1]` conditions
+
+Verified by building: a **condition may carry any model property**, so having
+the new conditions state `tau_a` explicitly alongside `n_a` bypasses the
+auto-fill entirely, today, with no class change:
+
+```matlab
+% note the DOUBLE brace -- struct() with a cell value otherwise makes a struct ARRAY
+struct('name','sfa1_std1', 'n_a',[1 0], 'tau_a',{{0.25, []}}, 'synapse_config',sc1)
+% builds to:  n_a = [1 0], tau_a{1} = 0.25    (not 10)
+```
+
+So this entry is cleanup that can land whenever, and the conditions are not
+blocked on it. Sequencing note: it lands better **after** the `c/K` decision (see
+the entry above), because if that goes in, `K = numel(tau_a{q})` is then the
+same single source of truth.
+
+### Related, found while investigating
+
+`ParamSpaceAnalysis2.condition_field_names()` returns a hardcoded
+`{'n_a_E','n_a_I','n_b_E','n_b_I'}` — **`SRNNModel2` names only**. So on
+`SRNNCellTypePairs` neither `n_a` nor `synapse_config` is in the ban-list, and
+`add_grid_parameter('n_a', ...)` would not hit the guard CLAUDE.md describes as
+protecting the conditions from being silently overridden by a grid axis.
+Probably inert in practice — a row-valued axis would fail elsewhere — but the
+protection is not actually there for the class the paper sweeps. Small, separate
+fix, and it becomes moot for `n_a` if `n_a` turns Dependent (a Dependent
+property with no setter cannot be a grid axis at all).
+
+---
+
 ## SFA scaling should be `c/K`, not `c`, so the adaptation budget is invariant to the number of timescales
 
 | | |
@@ -254,6 +356,7 @@ keyed by type so any "all neurons" trace has to concatenate across types.
 |---|---|
 | Noted | 2026-08-22 · `refactorRunAll` @ `40b578a` · R5611351 · Claude Code (Opus 5), session e22d2fab |
 | Raised by | TR, at the end of the `refactorRunAll` refactor |
+| Re-confirmed | 2026-08-25 · `refactorRunAll` @ `05f6827`. TR asked for this issue again; it was already here, so it was re-checked rather than duplicated. Still open and still accurate: all four blockers below stand, `mc_esn` is still the only `SRNNModel2` preset the paper uses, and both entry points still take a preset. The single-cell-type work (`0134e9b`) did not touch it. |
 
 **The one part of the paper still on a different model class.** Everything else was
 moved onto `SRNNCellTypePairs` during the refactor; memory capacity could not be,
