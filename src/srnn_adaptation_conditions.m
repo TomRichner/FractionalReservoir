@@ -1,4 +1,4 @@
-function conds = srnn_adaptation_conditions(model_class, synapse_config, sfa_timescales, n_cell_types)
+function conds = srnn_adaptation_conditions(model_class, opts)
 % SRNN_ADAPTATION_CONDITIONS The four adaptation regimes, per model class.
 %
 % Returns a cell array of condition structs for ParamSpaceAnalysis2.set_conditions.
@@ -55,29 +55,64 @@ function conds = srnn_adaptation_conditions(model_class, synapse_config, sfa_tim
 % argument used to be a COUNT, so an old positional call
 %
 %   srnn_adaptation_conditions(cls, routes, 3)     % once: THREE timescales
-%                                                  % now:  ONE 3-second timescale
+%                                                  % later: ONE 3-second timescale
 %
-% still passes validation and means something different. A heuristic ("a scalar
-% integer >= 2 is probably a count") cannot be added, because a single 3 s
-% timescale is exactly what the single_neuron_stf preset legitimately asks for.
-% Every in-repo caller was updated with the rename; anything outside the repo
-% must be checked by hand. Write srnn_sfa_timescales(K) when you mean K of them.
-
-% The optional N_CELL_TYPES is how long the n_a rows are (SRNNCellTypePairs
-% only). It defaults to 2, which every sweep preset uses. It exists because
-% SRNNCellTypePairs can build a ONE-cell-type network -- the Sompolinsky panel
-% and the single-neuron methods figures are all C = 1 -- and validate() requires
-% numel(n_a) == n_cellTypes exactly, so a hardcoded [0 0] would reject them.
+% would have passed validation and meant something different, with no heuristic
+% able to tell them apart -- a single 3 s timescale is exactly what the
+% single_neuron_stf preset legitimately asks for. EVERYTHING AFTER MODEL_CLASS IS
+% THEREFORE NAME-VALUE, which makes that confusion unspellable and leaves room
+% for the fifth argument this needed anyway.
 %
-% SFA always lands on the FIRST type and the rest get zero, which is what the
-% two-element form already meant.
+%   'synapse_config'  [] -> default_std_routes(); else a struct of named routes
+%   'sfa_timescales'  the adaptation timescales the SFA regimes switch on (s)
+%   'n_cell_types'    length of the per-type rows. SRNNCellTypePairs can build a
+%                     ONE-type network -- the Sompolinsky panel and both
+%                     single-neuron figures are C = 1 -- so a hardcoded pair
+%                     would reject them.
+%   'regimes'         which SET of regimes to return; see below
+%
+% SFA always lands on the FIRST cell type; every other type gets none.
+%
+% THE TWO REGIME SETS
+%
+%   'standard'    4 regimes: none, SFA, STD, SFA+STD. The paper's original set.
+%   'timescales'  7 regimes, adding a one-timescale variant of each mechanism
+%                 and one mixed pair, so that TIMESCALE STRUCTURE can be varied
+%                 independently of adaptation STRENGTH:
+%
+%                   no_adaptation    -            -
+%                   sfa_only_oneTS   1 tau_a      -
+%                   sfa_only         K tau_a      -
+%                   std_only_oneTS   -            1 STD timescale
+%                   std_only         -            all STD timescales
+%                   sfa3_std1        K tau_a      1 STD timescale
+%                   sfa_and_std      K tau_a      all STD timescales
+%
+%                 Ordered so each mechanism goes one-timescale then
+%                 multi-timescale, and the two combined regimes go STD-1 then
+%                 STD-all. That order is the column order of every sweep figure.
+%
+% This is only meaningful because c is the TOTAL adaptation budget, divided by
+% the number of timescales in use. Before that, sfa_only_oneTS would have had one
+% third the adaptation of sfa_only and the comparison would have confounded
+% "how many timescales" with "how much adaptation".
+%
+% The one-timescale STD routes are DERIVED from the multi-timescale ones by
+% keeping each route's FIRST tau_rec/tau_rel pair, rather than being written out
+% separately -- so a preset that retunes its depression cannot end up with a
+% _oneTS regime describing some older network.
 
 arguments
     model_class (1,:) char
-    synapse_config = []          % [] -> default_std_routes(); else a struct
-    sfa_timescales (1,:) double {mustBePositive} = srnn_sfa_timescales(3)
-    n_cell_types (1,1) double {mustBeInteger, mustBePositive} = 2
+    opts.synapse_config = []
+    opts.sfa_timescales (1,:) double {mustBePositive} = srnn_sfa_timescales(3)
+    opts.n_cell_types (1,1) double {mustBeInteger, mustBePositive} = 2
+    opts.regimes (1,:) char {mustBeMember(opts.regimes, {'standard','timescales'})} = 'standard'
 end
+
+synapse_config = opts.synapse_config;
+sfa_timescales = opts.sfa_timescales;
+n_cell_types   = opts.n_cell_types;
 
 % [] means "the default routes". Accepting it here is what lets a caller pass
 % n_a_sfa without also having to restate the routes -- and so keeps the default
@@ -137,18 +172,59 @@ switch model_class
         % n_a is NOT set: it is Dependent on tau_a and read-only, so setting it
         % would throw. The timescales are the whole statement.
         sfa_taus  = [{sfa_timescales}, repmat({zeros(1,0)}, 1, n_cell_types - 1)];
+        one_tau   = [{sfa_timescales(1)}, repmat({zeros(1,0)}, 1, n_cell_types - 1)];
         no_taus   = repmat({zeros(1,0)}, 1, n_cell_types);
-        conds = { ...
-            struct('name','no_adaptation', 'tau_a',{no_taus},  'synapse_config',no_synapses), ...
-            struct('name','sfa_only',      'tau_a',{sfa_taus}, 'synapse_config',no_synapses), ...
-            struct('name','std_only',      'tau_a',{no_taus},  'synapse_config',sc), ...
-            struct('name','sfa_and_std',   'tau_a',{sfa_taus}, 'synapse_config',sc) ...
-            };
+        switch opts.regimes
+            case 'standard'
+                conds = { ...
+                    struct('name','no_adaptation', 'tau_a',{no_taus},  'synapse_config',no_synapses), ...
+                    struct('name','sfa_only',      'tau_a',{sfa_taus}, 'synapse_config',no_synapses), ...
+                    struct('name','std_only',      'tau_a',{no_taus},  'synapse_config',sc), ...
+                    struct('name','sfa_and_std',   'tau_a',{sfa_taus}, 'synapse_config',sc) ...
+                    };
+            case 'timescales'
+                sc1 = first_timescale_routes(sc);
+                conds = { ...
+                    struct('name','no_adaptation',  'tau_a',{no_taus},  'synapse_config',no_synapses), ...
+                    struct('name','sfa_only_oneTS', 'tau_a',{one_tau},  'synapse_config',no_synapses), ...
+                    struct('name','sfa_only',       'tau_a',{sfa_taus}, 'synapse_config',no_synapses), ...
+                    struct('name','std_only_oneTS', 'tau_a',{no_taus},  'synapse_config',sc1), ...
+                    struct('name','std_only',       'tau_a',{no_taus},  'synapse_config',sc), ...
+                    struct('name','sfa3_std1',      'tau_a',{sfa_taus}, 'synapse_config',sc1), ...
+                    struct('name','sfa_and_std',    'tau_a',{sfa_taus}, 'synapse_config',sc) ...
+                    };
+        end
 
     otherwise
         error('srnn_adaptation_conditions:UnknownModelClass', ...
             ['No adaptation conditions defined for model class ''%s''. ' ...
             'Valid: SRNNModel2, SRNNCellTypePairs.'], model_class);
+end
+end
+
+function sc = first_timescale_routes(sc)
+% The same routes with only their FIRST depression timescale kept.
+%
+% Derived rather than written out, so a preset that retunes its depression
+% cannot leave a _oneTS regime describing an older network. Keeping the first
+% pair is the meaningful choice: presets list their timescales fast-to-slow, and
+% for the paper's dual-STD network dropping to the first pair reproduces exactly
+% the single-STD preset it was derived from.
+%
+% STF IS LEFT ALONE. It is a separate mechanism with its own timescales, and the
+% _oneTS regimes are about depression; truncating facilitation too would change
+% two things at once. No preset currently combines STF with the 7-regime set.
+if ~isstruct(sc); return; end
+pre_names = fieldnames(sc);
+for i = 1:numel(pre_names)
+    post_names = fieldnames(sc.(pre_names{i}));
+    for j = 1:numel(post_names)
+        route = sc.(pre_names{i}).(post_names{j});
+        if ~isfield(route, 'std') || isempty(route.std); continue; end
+        route.std.tau_rec = route.std.tau_rec(1);
+        route.std.tau_rel = route.std.tau_rel(1);
+        sc.(pre_names{i}).(post_names{j}) = route;
+    end
 end
 end
 

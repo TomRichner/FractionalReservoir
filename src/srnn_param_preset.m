@@ -79,6 +79,11 @@ sfa_timescales = srnn_sfa_timescales(3);
                         % a preset carrying it would be silently overridden by
                         % whichever condition is applied (and warned about by
                         % validate_model_defaults).
+regimes        = 'standard';
+                        % 'standard' = the four original regimes.
+                        % 'timescales' adds one-timescale variants, for a preset
+                        % that exists to compare timescale STRUCTURE. Costs 75%
+                        % more compute per sweep, so it is opt-in.
 
 switch name
     case 'default'
@@ -181,6 +186,65 @@ switch name
         std_routes.E.I.std = dual_std;
         std_routes.I.E.std = dual_std;
         std_routes.I.I.std = dual_std;
+
+    case 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
+        % THE PAPER'S NETWORK, seven adaptation regimes. THE MAIN PRESET.
+        % Copied from celltype_pairs_Sc0p2_noise0p025_dualStd_4cond.
+        % Changed:  regimes  'standard' -> 'timescales'
+        % Derived presets: none.
+        %
+        % THE NETWORK IS IDENTICAL to the 4-condition preset -- same n, same
+        % connectivity, same nonlinearity, same noise, same c, same depression
+        % timescales. The only difference is which adaptation regimes get swept,
+        % so results are directly comparable between the two and the four shared
+        % regime names mean exactly the same thing in both.
+        %
+        % WHAT THE THREE EXTRA REGIMES BUY. sfa_only_oneTS, std_only_oneTS and
+        % sfa3_std1 hold the mechanism fixed and vary only how many timescales
+        % carry it, which isolates timescale STRUCTURE from mechanism STRENGTH.
+        % That comparison is only meaningful because c is now the total
+        % adaptation budget: the model divides by the number of timescales, so
+        % one-timescale SFA adapts exactly as hard in total as three-timescale
+        % SFA. Under the old per-timescale c it would have been three times
+        % weaker and the comparison would have measured two things at once.
+        %
+        % Depression needs no such normalization -- it enters as a PRODUCT, each
+        % b rests at 1, and the dual-timescale steady state is deliberately the
+        % square of the single one -- so std_only_oneTS IS genuinely weaker
+        % depression than std_only, and that is the intended contrast.
+        %
+        % COST: 7 regimes rather than 4 is 75% more compute at every sweep stage.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    500, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % operative: mu_S_c is empty
+            'mu_S_c',               [], ...
+            'sigma_S_c',            [], ...
+            'c',                    [0.5, 0], ...       % TOTAL SFA budget, E only
+            'input_config',         pairs_input_config(0.0), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              500, ...
+            'F_ref_indegree',       100, ...
+            'sigma_u_noise',        0.025);
+
+        % The one-timescale regimes take their route from these by keeping the
+        % FIRST tau_rec/tau_rel pair, so they cannot describe an older network.
+        std_routes = struct();
+        dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        std_routes.E.E.std = dual_std;
+        std_routes.E.I.std = dual_std;
+        std_routes.I.E.std = dual_std;
+        std_routes.I.I.std = dual_std;
+        regimes = 'timescales';
 
     % ====================================================================
     %  FIGURE PRESETS. Each exists because one manuscript figure is
@@ -495,7 +559,9 @@ if isfield(d, 'n_cellTypes')
 else
     n_cell_types = 2;
 end
-conditions = srnn_adaptation_conditions(model_class, std_routes, sfa_timescales, n_cell_types);
+conditions = srnn_adaptation_conditions(model_class, ...
+    'synapse_config', std_routes, 'sfa_timescales', sfa_timescales, ...
+    'n_cell_types', n_cell_types, 'regimes', regimes);
 end
 
 function names = retired_presets()
@@ -521,6 +587,7 @@ function names = srnn_param_preset_names()
 % Retired names are NOT here: they are a separate list with their own error.
 names = {'default', 'overconnected', ...
     'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', ...
+    'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
     'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', ...

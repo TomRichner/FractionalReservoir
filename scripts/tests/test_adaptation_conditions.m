@@ -52,14 +52,58 @@ all_passed = check('SFA is on the FIRST type only', ...
     all(cellfun(@(c) all(cellfun(@isempty, c.tau_a(2:end))), cond))) && all_passed;
 
 % A single-timescale request must reach the model as 0.25, not 10.
-one = srnn_adaptation_conditions('SRNNCellTypePairs', [], srnn_sfa_timescales(1));
+one = srnn_adaptation_conditions('SRNNCellTypePairs', 'sfa_timescales', srnn_sfa_timescales(1));
 all_passed = check('one-timescale conditions carry 0.25', ...
     isequal(one{2}.tau_a{1}, 0.25) && numel(one{2}.tau_a{1}) == 1) && all_passed;
 
 % C = 1 still produces 1-element rows/cells.
-c1 = srnn_adaptation_conditions('SRNNCellTypePairs', [], srnn_sfa_timescales(3), 1);
+c1 = srnn_adaptation_conditions('SRNNCellTypePairs', 'n_cell_types', 1);
 all_passed = check('C=1 gives 1-element n_a and tau_a', ...
     all(cellfun(@(c) isscalar(c.tau_a), c1))) && all_passed;
+
+%% The 'timescales' regime set
+fprintf('\n-- the 7-regime set --\n');
+% Explicit DUAL routes, because default_std_routes() is single-timescale and the
+% _oneTS/multi contrast would then be invisible -- std_only and std_only_oneTS
+% would be the same thing and the test would assert nothing.
+dual = struct();
+dual.E.E.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+dual.I.I.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+seven = srnn_adaptation_conditions('SRNNCellTypePairs', ...
+    'synapse_config', dual, 'regimes', 'timescales');
+want = {'no_adaptation','sfa_only_oneTS','sfa_only','std_only_oneTS', ...
+        'std_only','sfa3_std1','sfa_and_std'};
+got = cellfun(@(c) c.name, seven, 'UniformOutput', false);
+% ORDER MATTERS: it is the column order of every sweep figure.
+all_passed = check('7 regimes in the intended order', isequal(got, want)) && all_passed;
+
+n_tau = cellfun(@(c) numel(c.tau_a{1}), seven);
+all_passed = check('SFA timescale counts are [0 1 3 0 0 3 3]', ...
+    isequal(n_tau, [0 1 3 0 0 3 3])) && all_passed;
+
+n_std = cellfun(@(c) std_count(c.synapse_config), seven);
+all_passed = check('STD timescale counts are [0 0 0 1 2 1 2]', ...
+    isequal(n_std, [0 0 0 1 2 1 2])) && all_passed;
+
+% The one-timescale routes are DERIVED, so they must be the first pair of the
+% multi-timescale ones rather than an independently written value.
+all_passed = check('_oneTS keeps the FIRST tau_rec/tau_rel pair', ...
+    isequal(seven{4}.synapse_config.E.E.std.tau_rec, ...
+            seven{5}.synapse_config.E.E.std.tau_rec(1)) && ...
+    isequal(seven{4}.synapse_config.E.E.std.tau_rel, ...
+            seven{5}.synapse_config.E.E.std.tau_rel(1))) && all_passed;
+
+% The four shared names must mean exactly what they mean in the standard set,
+% or results are not comparable between the 4- and 7-condition presets.
+std4 = srnn_adaptation_conditions('SRNNCellTypePairs', 'synapse_config', dual);
+shared = {'no_adaptation','sfa_only','std_only','sfa_and_std'};
+same = true;
+for s = shared
+    a = seven{strcmp(got, s{1})};
+    b = std4{strcmp(cellfun(@(c) c.name, std4, 'UniformOutput', false), s{1})};
+    same = same && isequal(a, b);
+end
+all_passed = check('the 4 shared regimes are identical across both sets', same) && all_passed;
 
 %% SRNNModel2 still speaks counts, deliberately
 fprintf('\n-- SRNNModel2 branch is untouched --\n');
@@ -69,7 +113,7 @@ all_passed = check('carries n_a_E / n_b_E, not tau_a', ...
                      ~isfield(c,'tau_a'), m2))) && all_passed;
 all_passed = check('SFA count derives from the timescale vector', ...
     isequal(m2{2}.n_a_E, 3) && isequal(m2{4}.n_a_E, 3)) && all_passed;
-m2one = srnn_adaptation_conditions('SRNNModel2', [], srnn_sfa_timescales(1));
+m2one = srnn_adaptation_conditions('SRNNModel2', 'sfa_timescales', srnn_sfa_timescales(1));
 all_passed = check('a 1-element vector gives n_a_E = 1', ...
     isequal(m2one{2}.n_a_E, 1)) && all_passed;
 
@@ -132,11 +176,21 @@ if isprop(m, 'n_a') && isprop(m, 'tau_a')
 end
 end
 
+function n = std_count(sc)
+% How many depression timescales the E->E route of a synapse_config carries.
+if isstruct(sc) && isfield(sc, 'E') && isfield(sc.E, 'E') && isfield(sc.E.E, 'std')
+    n = numel(sc.E.E.std.tau_rec);
+else
+    n = 0;
+end
+end
+
 function names = preset_names()
 % The presets this refactor keeps working. Deliberately explicit rather than
 % enumerated from srnn_param_preset, so a preset that quietly stops being
 % covered shows up as an edit here.
-names = {'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', 'bursting_pairs', ...
+names = {'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', ...
+         'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond', 'bursting_pairs', ...
          'sompolinsky_pairs', 'single_neuron_stf', 'single_neuron_dualStd', ...
          'mc_esn', 'default', 'overconnected'};
 end

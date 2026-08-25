@@ -115,18 +115,18 @@ all_passed = check('tau_a_E works at C = 1 when type 1 is E', ...
 
 %% Adaptation conditions carry the right row length
 fprintf('\n-- srnn_adaptation_conditions --\n');
-c1 = srnn_adaptation_conditions('SRNNCellTypePairs', [], srnn_sfa_timescales(3), 1);
+c1 = srnn_adaptation_conditions('SRNNCellTypePairs', 'n_cell_types', 1);
 all_passed = check('C = 1 gives 1-element n_a rows', ...
     all(cellfun(@(c) isscalar(c.tau_a),c1))) && all_passed;
 all_passed = check('C = 1 sfa_only has 3 timescales', numel(c1{2}.tau_a{1}) == 3) && all_passed;
 
-c2 = srnn_adaptation_conditions('SRNNCellTypePairs', [], srnn_sfa_timescales(3), 2);
-c2_default = srnn_adaptation_conditions('SRNNCellTypePairs', [], srnn_sfa_timescales(3));
+c2 = srnn_adaptation_conditions('SRNNCellTypePairs', 'n_cell_types', 2);
+c2_default = srnn_adaptation_conditions('SRNNCellTypePairs');
 all_passed = check('C = 2 unchanged from the default', isequal(c2, c2_default)) && all_passed;
 all_passed = check('C = 2 sfa_only is still [3 0]', isequal(cellfun(@numel, c2{2}.tau_a), [3 0])) && all_passed;
 
 all_passed = check('SRNNModel2 refuses a non-2 type count', ...
-    throws_id(@() srnn_adaptation_conditions('SRNNModel2', [], srnn_sfa_timescales(3), 1), ...
+    throws_id(@() srnn_adaptation_conditions('SRNNModel2', 'n_cell_types', 1), ...
               'srnn_adaptation_conditions:NotTwoTypes')) && all_passed;
 
 %% The C = 1 presets
