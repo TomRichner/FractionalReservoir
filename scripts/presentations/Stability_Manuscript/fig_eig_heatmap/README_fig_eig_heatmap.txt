@@ -1,7 +1,7 @@
 Stability_Manuscript figure: Jacobian eigenvalue occupancy
 ==========================================================
 
-Generated: 22-Aug-2026 11:53:46
+Generated: 25-Aug-2026 16:42:02
 By:        fig_eig_heatmap.m
 
 WHAT IT SHOWS

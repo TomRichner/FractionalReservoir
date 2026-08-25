@@ -29,7 +29,7 @@ function out = fig_sensitivity_medians(cfg)
 
 arguments
     cfg.run_dir     (1,:) char    = ''
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
@@ -336,13 +336,12 @@ for mi = 1:numel(metric_specs)
 
     % Panel letters. Passing the ORDERED axes cell (not the figure) is what
     % guarantees (a)..(f) follow panel_params rather than a position sort.
-    panel_letters = arrayfun(@(ch) sprintf('(%c)', ch), ...
-        char('a' + (0:numel(ax_cell)-1)), 'UniformOutput', false);
+    letters = panel_letters(numel(ax_cell));   % (a).. and past (z) correctly
     % HShift/VShift are larger than the allStd figure's -0.03/-0.04: the topmost
     % y-tick label sits at the axes' top-left corner (on mean_rate it is the "1"
     % of the [0 1] ticks, right at the top), so a letter placed just outside that
     % corner lands on top of it. These offsets clear it on both metrics.
-    AddLetters2Plots(ax_cell, panel_letters, ...
+    AddLetters2Plots(ax_cell, letters, ...
         'FontSize', letter_fs, 'FontWeight', 'normal', 'HShift', -0.075, 'VShift', -0.05);
 
     save_figure_stable(out_dir, spec.fig_tag, fh);

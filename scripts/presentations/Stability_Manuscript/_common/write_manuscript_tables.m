@@ -29,7 +29,7 @@ function paths = write_manuscript_tables(cfg)
 % See also: srnn_param_preset, write_run_parameters_md, build_from_preset
 
 arguments
-    cfg.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
+    cfg.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_root    (1,:) char = ''
     cfg.verbose     (1,1) logical = true
 end
@@ -162,7 +162,10 @@ else
         '\\frac{-x_i + u_i + \\sum_j w_{ij}\\, s_j\\, r_j}{\\tau_d}\n$$\n\n']);
 end
 
-fprintf(fid, '$$\nr_i = \\phi\\!\\left( x_i - c \\sum_{k=1}^{K} a_{ik} \\right)\n$$\n\n');
+% c/K, not c: the model normalises the adaptation sum by its timescale count, so
+% c is the TOTAL adaptation budget and the steady state is c*r whatever K is.
+fprintf(fid, ['$$\nr_i = \\phi\\!\\left( x_i - \\frac{c}{K} ' ...
+    '\\sum_{k=1}^{K} a_{ik} \\right)\n$$\n\n']);
 fprintf(fid, ['The rate $r_i$ is the **pre-depression** output of the ' ...
     'nonlinearity. Depression and facilitation enter as the presynaptic factor ' ...
     '$s_j$ in the recurrent sum, so both mechanisms are driven by the raw rate ' ...
@@ -221,9 +224,14 @@ if M.n_b_max > 1
             '**%.0f-fold** reduction, %s.\n\n'], ...
             rr, rr, one, 1/one, M.n_b_max, many, 1/many, power_phrase);
     end
-    fprintf(fid, ['Adaptation, by contrast, enters as a **sum**, so splitting ' ...
-        '$c$ as a budget over its timescales leaves the steady state unchanged ' ...
-        '-- adding SFA timescales changes the route, not the destination.\n\n']);
+    fprintf(fid, ['Adaptation, by contrast, enters as a **sum**, and is ' ...
+        'normalised by its timescale count: the rate subtracts ' ...
+        '$(c/K)\\sum_{k=1}^{K} a_k$. Since every $a_k$ relaxes to the rate, ' ...
+        '$\\sum_k a_k \\to K r$ regardless of the $\\tau_k$, so the steady state ' ...
+        'is $c\\,r$ whatever $K$ is -- adding SFA timescales changes the route, ' ...
+        'not the destination. $c$ is therefore the **total** adaptation budget. ' ...
+        'No such normalisation applies to depression, which multiplies rather ' ...
+        'than sums.\n\n']);
 end
 
 fprintf(fid, ['The sparse weights are drawn element-wise and scaled by the ' ...
@@ -303,18 +311,23 @@ p = fullfile(dir_out, 'adaptation_conditions.md');
 fid = open_md(p, 'Adaptation conditions', preset_name, M);
 c = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
-fprintf(fid, ['Every sweep runs each grid point under all four regimes, on the ' ...
+fprintf(fid, ['Every sweep runs each grid point under all %d regimes, on the ' ...
     '**same network** (the weight seed is shared), so the comparison is ' ...
-    'paired.\n\n']);
+    'paired.\n\n'], numel(conditions));
 
 if M.is_pairs
-    fprintf(fid, '| Condition | SFA timescales $K$ | Depressing routes | Facilitating routes |\n');
+    fprintf(fid, ['| Condition | SFA timescales $\\tau_a$ (s) | Depressing routes ' ...
+        '| Facilitating routes |\n']);
     fprintf(fid, '|---|---|---|---|\n');
     for k = 1:numel(conditions)
         cd_ = conditions{k};
         R = cond_routes(cd_);
+        % The TIMESCALES, not a count. Conditions carry tau_a and n_a is derived
+        % from it on the model, so there is no n_a field here to read -- and the
+        % values are what a reader actually wants: two regimes can share a count
+        % and differ in which timescales they use.
         fprintf(fid, '| %s | %s | %s | %s |\n', ...
-            tidy(cd_.name), mat2str(cd_.n_a), R.std, R.stf);
+            tidy(cd_.name), tau_a_str(cd_), R.std, R.stf);
     end
     fprintf(fid, '\n');
     fprintf(fid, ['**Why this class.** `SRNNCellTypePairs` names each synaptic ' ...
@@ -337,6 +350,17 @@ fprintf(fid, ['**Implementation note.** When a mechanism is switched off its ' .
     'zero eigenvalues from disabled dynamics.\n\n']);
 end
 
+function s = tau_a_str(cd_)
+% A condition's SFA timescales, as a readable list. Conditions carry tau_a as a
+% 1 x C cell; SFA is on the first cell type, and an empty row means none.
+if ~isfield(cd_, 'tau_a') || isempty(cd_.tau_a) || isempty(cd_.tau_a{1})
+    s = 'none';
+    return
+end
+t = cd_.tau_a{1};
+s = strjoin(arrayfun(@(x) sprintf('%.4g', x), t, 'UniformOutput', false), ', ');
+end
+
 function R = cond_routes(cd_)
 R = struct('std', 'none', 'stf', 'none');
 if ~isfield(cd_, 'synapse_config') || isempty(fieldnames(cd_.synapse_config))
@@ -354,8 +378,32 @@ for a = 1:numel(pres)
         if isfield(e, 'stf') && ~isempty(e.stf); f_list{end+1} = lbl; end %#ok<AGROW>
     end
 end
-if ~isempty(s_list); R.std = strjoin(s_list, ', '); end
+if ~isempty(s_list)
+    % The routes ALONE cannot tell std_only from std_only_oneTS: both depress
+    % the same four routes and differ only in how many timescales each carries.
+    % Naming the timescales is what makes those two rows distinguishable.
+    R.std = sprintf('%s (tau_rec %s)', strjoin(s_list, ', '), std_taus(sc));
+end
 if ~isempty(f_list); R.stf = strjoin(f_list, ', '); end
+end
+
+function s = std_taus(sc)
+% The depression recovery timescales, assuming every depressing route shares
+% them -- which every preset in this repo does. Falls back to naming the routes
+% separately if one ever does not, rather than quietly reporting the first.
+pres = fieldnames(sc);
+found = {};
+for a = 1:numel(pres)
+    posts = fieldnames(sc.(pres{a}));
+    for b = 1:numel(posts)
+        e = sc.(pres{a}).(posts{b});
+        if isfield(e, 'std') && ~isempty(e.std)
+            found{end+1} = mat2str(e.std.tau_rec, 4); %#ok<AGROW>
+        end
+    end
+end
+u = unique(found);
+if isscalar(u); s = u{1}; else; s = strjoin(u, ' / '); end
 end
 
 %% ------------------------------------------------------------------------
@@ -388,6 +436,15 @@ end
 end
 
 function s = tidy(name)
+% Condition display name. Uses the shared title map so the generated tables name
+% a regime exactly as every figure does; the regexp path below is the fallback
+% for a name the map has not been taught (an archived run may carry anything),
+% and it produced things like "Sfa3 std1" for the newer regimes.
+titles = srnn_condition_titles();
+if titles.isKey(name)
+    s = strrep(titles(name), '\tau', 'tau');   % plain text, not tex, in markdown
+    return
+end
 s = strrep(name, '_', ' ');
 s = regexprep(s, '\<sfa\>', 'SFA');
 s = regexprep(s, '\<std\>', 'STD');

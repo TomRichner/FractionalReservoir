@@ -1,7 +1,7 @@
 Stability_Manuscript figure: parameter-space distributions, E:I coloured
 ========================================================================
 
-Generated: 22-Aug-2026 11:53:14
+Generated: 25-Aug-2026 16:41:32
 By:        fig_EI_param_space.m
 
 WHAT IT SHOWS
@@ -19,9 +19,9 @@ HOW IT WAS MADE
   axes are copied into a single combined figure.
 
 SOURCE
-  run_dir                C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_21_26_17_36
-  param_space_subfolder  param_space_nLevs_3_aug_21_26_17_40
-  preset                 celltype_pairs_Sc0p2_noise0p025_dualStd
+  run_dir                C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_16_06
+  param_space_subfolder  param_space_nLevs_3_aug_25_26_16_12
+  preset                 celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
   color_by               f_E
 
 FIGURES PRODUCED (in this folder)

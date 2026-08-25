@@ -1,7 +1,7 @@
 Stability_Manuscript figure: single-neuron adaptation mechanisms (sfa_std)
 ==========================================================================
 
-Generated: 23-Aug-2026 22:40:26
+Generated: 25-Aug-2026 16:36:16
 By:        fig_adaptation_methods.m
 
 WHAT IT SHOWS
@@ -29,7 +29,7 @@ PARAMETERS AS RUN
   activation            piecewise
   S_a                   0.8
   S_c                   0.2
-  c                     0.166667
+  c                     0.5
   sigma_u_noise         0.025
   ode_solver            sra1
   fs                    400

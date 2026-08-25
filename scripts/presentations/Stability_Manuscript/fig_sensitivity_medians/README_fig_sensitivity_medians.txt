@@ -1,7 +1,7 @@
 Stability_Manuscript figure: sensitivity medians, conditions overlaid
 =====================================================================
 
-Generated: 22-Aug-2026 11:52:17
+Generated: 25-Aug-2026 16:40:21
 By:        fig_sensitivity_medians.m
 
 WHAT IT SHOWS
@@ -16,8 +16,8 @@ HOW IT WAS MADE
   harvesting median lines out of saved .fig files would be fragile.
 
 SOURCE
-  run_dir  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_21_26_17_36
-  preset   celltype_pairs_Sc0p2_noise0p025_dualStd
+  run_dir  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_16_06
+  preset   celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
 
 FIGURES PRODUCED (in this folder)
   Fig_Sensitivity_LLE_medians.png

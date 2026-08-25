@@ -31,7 +31,7 @@ function out = fig_sensitivity_analysis_allStd(cfg)
 
 arguments
     cfg.run_dir     (1,:) char    = ''
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
@@ -332,9 +332,8 @@ for si = 1:numel(sheets)
     % AddLetters2Plots sorts axes left-to-right, top-to-bottom, so (a) is the
     % top-left panel. Negative HShift/VShift push each label outside the axes, up
     % and to the left of its top-left corner.
-    panel_letters = arrayfun(@(ch) sprintf('(%c)', ch), ...
-        char('a' + (0:numel(ax_all)-1)), 'UniformOutput', false);
-    AddLetters2Plots(cf, panel_letters, ...
+    letters = panel_letters(numel(ax_all));   % (a).. and past (z) correctly
+    AddLetters2Plots(cf, letters, ...
         'FontSize', letter_fs, 'FontWeight', 'normal', 'HShift', -0.03, 'VShift', -0.04);
 
     % --- Save ONLY the cleaned combined figure, with a STABLE name ---------

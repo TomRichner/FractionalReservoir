@@ -37,7 +37,7 @@ function out = fig_EI_param_space(cfg)
 
 arguments
     cfg.run_dir     (1,:) char    = ''
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.color_by    (1,:) char    = ''      % '' -> per model class (f_E / f)
     cfg.save        (1,1) logical = true
@@ -212,9 +212,8 @@ for r = 1:nRows
         letter_axes{k} = cax(r, c);
     end
 end
-panel_letters = arrayfun(@(ch) sprintf('(%c)', ch), ...
-    char('a' + (0:numel(cax)-1)), 'UniformOutput', false);
-AddLetters2Plots(letter_axes, panel_letters, ...
+letters = panel_letters(numel(cax));   % (a).. and past (z) correctly
+AddLetters2Plots(letter_axes, letters, ...
     'FontSize', letter_fs, 'FontWeight', 'normal', 'HShift', -0.03, 'VShift', -0.06);
 
 % 6) Colorbar (now embedded in the upper-right cell): relabel the f gradient bar

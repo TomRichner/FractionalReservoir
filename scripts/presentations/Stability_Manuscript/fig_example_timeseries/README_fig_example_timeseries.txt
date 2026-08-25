@@ -1,7 +1,7 @@
 Stability_Manuscript figure: example time series
 ================================================
 
-Generated: 22-Aug-2026 11:47:59
+Generated: 25-Aug-2026 16:35:56
 By:        fig_example_timeseries.m
 
 WHAT IT SHOWS
@@ -18,7 +18,7 @@ HOW IT WAS MADE
   sweeps.
 
 SOURCE
-  preset       celltype_pairs_Sc0p2_noise0p025_dualStd
+  preset       celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
   model_class  SRNNCellTypePairs
   condition    sfa_and_std
   rng_seeds    [1 2]
@@ -33,7 +33,7 @@ PARAMETERS AS RUN
   activation            piecewise
   S_a                   0.8
   S_c                   0.2
-  c                     [0.166667 0]
+  c                     [0.5 0]
   sigma_u_noise         0.025
   ode_solver            sra1
   fs                    400

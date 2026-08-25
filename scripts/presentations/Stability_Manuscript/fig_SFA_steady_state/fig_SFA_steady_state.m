@@ -13,26 +13,25 @@ function out = fig_SFA_steady_state(cfg)
 %
 % THE RESULT: THE TWO LINES IN THE LEFT PANEL COINCIDE. Because a_k = r
 % independently of tau_k, the steady-state SFA current depends only on the
-% PRODUCT c*n_a -- and splitting c as a BUDGET over the timescales holds that
-% product fixed. This is why the project uses c = budget/n_a: adding timescales
-% does not silently move the operating point.
+% PRODUCT c*n_a -- and the model divides c by n_a, which holds that product
+% fixed. This figure is the picture of why: adding timescales does not silently
+% move the operating point.
 %
 % WHERE THE COUNT DOES SHOW UP: THE TRANSIENT. Several timescales give a
 % multi-exponential approach -- fast partial adaptation then a slow tail --
 % against a single exponential. Same destination, different route.
 %
-% PARAMETERS COME FROM THE PRESET, not from literals. The BUDGET is recovered as
-% c(1)*n_a(1): the preset stores the ALREADY-DIVIDED value (c = 0.5/3), not the
-% budget, so it has to be multiplied back by the SFA count that the conditions
-% declare. tau_a is NOT in the preset at all -- it is the class default,
-% auto-filled per n_a -- so it is read off a BUILT model rather than off the
-% preset struct.
+% PARAMETERS COME FROM THE PRESET, not from literals. c IS the budget and is
+% read directly. It used to be stored ALREADY DIVIDED (c = 0.5/3) and had to be
+% multiplied back by n_a; since the model took over the division, doing that
+% here TRIPLED it, which is what this figure printed until the smoke test caught
+% it. tau_a is condition-owned rather than a preset field, so it is read off a
+% BUILT model.
 %
-% THE SINGLE-TIMESCALE CASE uses tau(1) and c = budget/1. The model's own rule,
-% logspace(log10(0.25), log10(10), n_a), is deliberately NOT used at n_a = 1:
-% logspace(a, b, 1) returns 10^b, the SLOW end, so the comparison would be
-% against the slowest timescale alone and would be a statement about the slow
-% tail rather than about the count.
+% THE SINGLE-TIMESCALE CASE uses tau(1). srnn_sfa_timescales(1) returns exactly
+% that fast end, where the auto-fill this replaced -- logspace(a, b, 1) -- would
+% have returned 10^b, the SLOW end, making the comparison a statement about the
+% slow tail rather than about the count.
 %
 % CONTRAST WITH STD (see fig_STD_steady_state): SFA enters the dynamics as a
 % SUM, so a budget-split c makes the count invisible at steady state. STD enters
@@ -42,7 +41,7 @@ function out = fig_SFA_steady_state(cfg)
 % See also: fig_STD_steady_state, srnn_param_preset, manuscript_style
 
 arguments
-    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
+    cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
@@ -149,34 +148,37 @@ if cfg.save
     result_note = sprintf([ ...
         'THE TWO LINES IN THE LEFT PANEL ARE IDENTICAL: both are %.4g*r exactly. ' ...
         'Because a_k = r independently of tau_k, the steady-state SFA current ' ...
-        'depends only on the PRODUCT c*n_a, and splitting c as a budget holds ' ...
-        'that product fixed. The dashed line is drawn over the solid one to show ' ...
-        'both were computed; they coincide to machine precision. This is why the ' ...
-        'project splits c over its timescales -- adding timescales does not ' ...
-        'silently move the operating point.'], c_budget);
+        'depends only on the PRODUCT c*n_a, and the model dividing c by n_a ' ...
+        'holds that product fixed. The dashed line is drawn over the solid one ' ...
+        'to show both were computed; they coincide to machine precision. This is ' ...
+        'why the model normalises c by its timescale count -- adding timescales ' ...
+        'does not silently move the operating point.'], c_budget);
 
     transient_note = sprintf([ ...
         'WHERE THE COUNT SHOWS UP: THE TRANSIENT. tau_a (n_a = %d) = %s against ' ...
-        'a single tau_a = %.4g, which is the FAST component of that set. The ' ...
-        'model rule logspace(log10(0.25), log10(10), n_a) is deliberately not ' ...
-        'used at n_a = 1: logspace(a, b, 1) returns 10^b, the slow end, so the ' ...
-        'comparison would be against the slowest timescale alone. Several ' ...
+        'a single tau_a = %.4g, which is the FAST component of that set. ' ...
+        'srnn_sfa_timescales(1) returns that fast end deliberately: the ' ...
+        'logspace(log10(0.25), log10(10), n_a) auto-fill it replaced returned ' ...
+        '10^b at n_a = 1, the slow end, so the comparison would have been ' ...
+        'against the slowest timescale alone. Several ' ...
         'timescales give a multi-exponential approach -- fast partial adaptation ' ...
         'then a slow tail -- against a single exponential. Both settle to %.4f.'], ...
         numel(tau_3), mat2str(tau_3, 4), tau_1, c_budget);
 
     contrast_note = [ ...
         'CONTRAST WITH STD (fig_STD_steady_state). SFA enters the dynamics as a ' ...
-        'SUM, so a budget-split c makes the count invisible at steady state. STD ' ...
-        'enters as a PRODUCT, so two timescales square the depression however ' ...
-        'the taus are chosen -- there is no budget-split of tau that would make ' ...
-        'dual STD match single STD.'];
+        'SUM, so normalising c by the count makes that count invisible at steady ' ...
+        'state. STD enters as a PRODUCT, so two timescales square the depression ' ...
+        'however the taus are chosen -- no normalisation of tau would make dual ' ...
+        'STD match single STD, and none is applied.'];
 
     provenance_note = [ ...
-        'PARAMETERS COME FROM THE PRESET. The c BUDGET is recovered as ' ...
-        'c(1)*n_a(1), because the preset stores the already-divided value, not ' ...
-        'the budget. tau_a is not in the preset at all -- it is the class ' ...
-        'default, auto-filled per n_a -- so it is read off a BUILT model.'];
+        'PARAMETERS COME FROM THE PRESET. c IS the total adaptation budget and ' ...
+        'is read directly; the model divides it by the number of timescales in ' ...
+        'use. It used to be stored already divided, so this figure multiplied it ' ...
+        'back by n_a -- which after that change tripled it. tau_a is ' ...
+        'condition-owned rather than a preset field, so it is read off a BUILT ' ...
+        'model.'];
 
     write_figure_readme(out_dir, struct( ...
         'tag',    'fig_SFA_steady_state', ...
@@ -202,27 +204,28 @@ end
 function [tau_a, c_budget, n_a] = sfa_from_preset(preset_name)
 % The SFA timescales and the c BUDGET a preset actually runs at.
 %
-% Two things have to be recovered rather than read:
+% c IS THE BUDGET, read directly. It used to be stored already divided by the
+% timescale count (c = 0.5/3), so this multiplied it back by n_a to recover the
+% budget. Since the c/K change the model does that division itself and c is the
+% total, so multiplying here would TRIPLE it -- which it did, reporting
+% budget = 1.5 for a preset whose budget is 0.5, until this was caught by
+% reading the figure's own printout during the smoke test.
 %
-%   * The BUDGET. A preset stores c already divided by the timescale count
-%     (c = 0.5/3), so the budget is c(1)*n_a(1). n_a comes from the sfa_and_std
-%     CONDITION, since adaptation counts are condition-owned and never live in
-%     a preset.
-%   * tau_a. It is usually absent from the preset, being the class default
-%     auto-filled per n_a inside build(). Reading it off a BUILT model is the
-%     only way to get the values that would actually be integrated.
+% tau_a still has to come off a BUILT model rather than the preset: it is
+% condition-owned, so it reaches the model through the sfa_and_std condition and
+% is not in the preset struct at all.
 model = build_from_preset(preset_name, 'sfa_and_std');
 
 if isprop(model, 'tau_a')            % SRNNCellTypePairs: 1 x C cell
-    tau_a = model.tau_a{1};
-    c_vec = model.c;
-    n_a_v = model.n_a;
-    n_a   = n_a_v(1);
-    c_budget = c_vec(1) * n_a;
+    tau_a    = model.tau_a{1};
+    n_a_v    = model.n_a;
+    n_a      = n_a_v(1);
+    c_vec    = model.c;
+    c_budget = c_vec(1);
 else                                  % SRNNModel2
-    tau_a = model.tau_a_E;
-    n_a   = model.n_a_E;
-    c_budget = model.c_E * n_a;
+    tau_a    = model.tau_a_E;
+    n_a      = model.n_a_E;
+    c_budget = model.c_E;
 end
 
 assert(n_a >= 1, 'The sfa_and_std condition of ''%s'' switches on no SFA.', preset_name);

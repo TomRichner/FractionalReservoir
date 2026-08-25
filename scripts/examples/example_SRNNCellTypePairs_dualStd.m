@@ -31,7 +31,7 @@
 close all; clear; clc;
 
 %% What to simulate
-preset_name    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond';
+preset_name    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond';
 condition_name = 'sfa_and_std';   % SFA on E only + dual-timescale STD, all routes
 run_mode       = 'medium';        % matches the sensitivity sweeps: fs 400, T [0 20]
 

@@ -1,7 +1,7 @@
 Stability_Manuscript figure: stimulus engages adaptation (bursting)
 ===================================================================
 
-Generated: 22-Aug-2026 11:50:12
+Generated: 25-Aug-2026 16:37:46
 By:        fig_stim_engages_adaptation.m
 
 WHAT IT SHOWS
@@ -32,7 +32,7 @@ PARAMETERS AS RUN
   activation            piecewise
   S_a                   0.9
   S_c                   0.5
-  c                     [0.166667 0]
+  c                     [0.5 0]
   sigma_u_noise         0
   ode_solver            rk4
   fs                    400

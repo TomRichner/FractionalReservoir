@@ -1,7 +1,7 @@
 Stability_Manuscript figure: memory capacity
 ============================================
 
-Generated: 22-Aug-2026 11:53:30
+Generated: 25-Aug-2026 16:41:47
 By:        fig_memory_capacity.m
 
 WHAT IT SHOWS
@@ -16,8 +16,8 @@ HOW IT WAS MADE
   shown for reference but not written to disk.
 
 SOURCE
-  mat_file  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\memory_capacity\MC_sample_hold_20260822_103708_trials4_results.mat
-  run_tag   MC_sample_hold_20260822_103708_trials4
+  mat_file  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_16_06\memory_capacity\MC_sample_hold_20260825_161529_trials4_results.mat
+  run_tag   MC_sample_hold_20260825_161529_trials4
   preset    mc_esn
   run_mode  fast
 

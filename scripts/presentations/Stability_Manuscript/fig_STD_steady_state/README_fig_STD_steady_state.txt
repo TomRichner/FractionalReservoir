@@ -1,7 +1,7 @@
 Stability_Manuscript figure: multi-timescale STD steady state
 =============================================================
 
-Generated: 22-Aug-2026 11:49:31
+Generated: 25-Aug-2026 16:36:55
 By:        fig_STD_steady_state.m
 
 WHAT IT SHOWS
@@ -12,7 +12,7 @@ WHAT IT SHOWS
   receives -- with the faint identity line marking the undepressed synapse.
 
 SOURCE
-  preset  celltype_pairs_Sc0p2_noise0p025_dualStd
+  preset  celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
   route   E -> E
 
 PARAMETERS AS RUN

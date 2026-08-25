@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA edge of chaos (tau_a sensitivity)
 ==================================================================
 
-Generated: 22-Aug-2026 11:53:20
+Generated: 25-Aug-2026 16:41:38
 By:        fig_sfa_EOC_allStd.m
 
 WHAT IT SHOWS
@@ -18,9 +18,9 @@ HOW IT WAS MADE
   to max tau_a (s).
 
 SOURCE
-  run_dir        C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_21_26_17_36
-  tau_subfolder  tau_sensitivity_tau_timescales_tau_a_E_max_nLevs_7_aug_21_26_17_40
-  preset         celltype_pairs_Sc0p2_noise0p025_dualStd
+  run_dir        C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_16_06
+  tau_subfolder  tau_sensitivity_tau_timescales_tau_a_E_max_nLevs_7_aug_25_26_16_12
+  preset         celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
 
 PARAMETERS AS RUN
   lle_range     [-0.3 0.1]
