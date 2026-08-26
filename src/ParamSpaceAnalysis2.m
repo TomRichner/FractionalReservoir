@@ -33,6 +33,34 @@ classdef ParamSpaceAnalysis2 < handle
         vector_param_config = struct() % Struct: param_name -> config for vector params
         randomize_order = true         % Whether to randomize execution order (false for sensitivity)
         network_seed_offset = 0        % Added to every per-config network seed; set per run (e.g. run_index*1e6) so repeated runs of the same config draw independent networks for pooling
+
+        % Fraction of the full grid to actually simulate, in (0, 1].
+        %
+        % A high-dimensional grid costs n_levels^n_params, which grows past
+        % what an overnight run can hold long before the QUESTION stops being
+        % answerable: the marginals and the pooled histograms are estimated
+        % from a sample, not enumerated. subset_fraction = 0.15 runs a random
+        % 15% of the grid points and leaves the rest empty.
+        %
+        % Gaps are safe by construction and this is worth stating, because it
+        % is the whole reason no other code needed changing:
+        %   - results are stored by GRID POSITION (config_idx), never by
+        %     execution order, so a partial run puts every result at its true
+        %     coordinates and leaves holes;
+        %   - the network seed is config_idx*100 + offset, tied to position
+        %     rather than order, so a grid point draws the SAME network whether
+        %     it was the 3rd or the 300th thing run -- a subset is a subset of
+        %     the same experiment, not a different one;
+        %   - every pooling/plotting path filters on isstruct(res) && res.success,
+        %     so empty slots are skipped exactly like failed ones already were.
+        %
+        % REQUIRES randomize_order = true, enforced in generate_grid. A subset
+        % of a SEQUENTIAL order is the first K configs in ndgrid order, i.e. a
+        % systematic corner of the grid (smallest n, smallest f, weakest gain),
+        % which is not a sample of anything. That is why the sensitivity sweeps
+        % -- which need randomize_order = false for their ordered axes -- cannot
+        % use this, and do not need to: they are 1-D.
+        subset_fraction = 1            % Fraction of grid points to run, (0, 1]. Needs randomize_order.
     end
 
     %% Model Default Properties
@@ -671,9 +699,11 @@ classdef ParamSpaceAnalysis2 < handle
             %   [tf, reason] = obj.same_config(other) returns true when the two
             %   runs sweep the same grid under the same conditions and model
             %   parameters, so their results can be concatenated for combined
-            %   plotting. The reps-axis LENGTH, randomize_order, and
-            %   network_seed_offset are intentionally ignored (expected to
-            %   differ across runs). `reason` explains the first mismatch found.
+            %   plotting. The reps-axis LENGTH, randomize_order,
+            %   network_seed_offset and subset_fraction are intentionally
+            %   ignored (expected to differ across runs) -- pooling two
+            %   different random subsets of the same grid is precisely what
+            %   subsetting is for. `reason` explains the first mismatch found.
             %
             %   Model parameters are compared through resolved_defaults -- the
             %   FULL parameter set each run froze at run time -- so two runs with
@@ -1721,9 +1751,16 @@ classdef ParamSpaceAnalysis2 < handle
             %% Core consolidation logic
             fprintf('\nConsolidating batch results...\n');
 
-            num_batches = ceil(obj.num_combinations / obj.batch_size);
+            % Batch count must match run_batched_simulation's, which batches
+            % over shuffled_indices. That field is persisted by saveobj/loadobj,
+            % so a consolidate() reached through from_dir gets the subset's
+            % batch count with no extra saved state.
+            n_run = numel(obj.shuffled_indices);
+            num_batches = ceil(n_run / obj.batch_size);
 
-            % Initialize results storage
+            % Storage stays FULL-GRID length: results are indexed by config_idx,
+            % so an unrun point must be an empty slot at its own coordinates,
+            % not a missing one that shifts everything after it.
             for c_idx = 1:length(obj.conditions)
                 cond_name = obj.conditions{c_idx}.name;
                 obj.results.(cond_name) = cell(obj.num_combinations, 1);
@@ -1765,9 +1802,16 @@ classdef ParamSpaceAnalysis2 < handle
                 save(save_file, 'results', '-v7.3');
 
                 % Count successes
+                % Denominator is what was ATTEMPTED. Reporting against the full
+                % grid would read a deliberate 15% subset as an 85% failure rate.
                 n_success = sum(cellfun(@(r) isstruct(r) && isfield(r, 'success') && r.success, results));
-                fprintf('Condition %s: %d/%d successful, saved to %s\n', ...
-                    cond_name, n_success, obj.num_combinations, save_file);
+                if n_run < obj.num_combinations
+                    fprintf('Condition %s: %d/%d successful (subset of %d grid points), saved to %s\n', ...
+                        cond_name, n_success, n_run, obj.num_combinations, save_file);
+                else
+                    fprintf('Condition %s: %d/%d successful, saved to %s\n', ...
+                        cond_name, n_success, n_run, save_file);
+                end
             end
 
             % Clean up temp directory if all successful
@@ -1808,6 +1852,7 @@ classdef ParamSpaceAnalysis2 < handle
             s.explicit_vectors = obj.explicit_vectors;
             s.vector_param_config = obj.vector_param_config;
             s.randomize_order = obj.randomize_order;
+            s.subset_fraction = obj.subset_fraction;
             s.network_seed_offset = obj.network_seed_offset;
 
             % Model Default Properties (public)
@@ -2178,6 +2223,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'explicit_vectors'), obj.explicit_vectors = s.explicit_vectors; end
                 if isfield(s, 'vector_param_config'), obj.vector_param_config = s.vector_param_config; end
                 if isfield(s, 'randomize_order'), obj.randomize_order = s.randomize_order; end
+                if isfield(s, 'subset_fraction'), obj.subset_fraction = s.subset_fraction; end
                 if isfield(s, 'network_seed_offset'), obj.network_seed_offset = s.network_seed_offset; end
 
                 % Model Default Properties (public)
@@ -2351,8 +2397,22 @@ classdef ParamSpaceAnalysis2 < handle
                 };
         end
 
+    end
+
+    %% Grid construction (public: needed to size a run before committing to it)
+    methods
         function generate_grid(obj)
-            % GENERATE_GRID Create the multi-dimensional parameter grid
+            % GENERATE_GRID Create the multi-dimensional parameter grid.
+            %
+            % run() calls this itself, so a normal sweep never needs to. It is
+            % public because materialising the grid WITHOUT running it is how
+            % you find out what a run will cost -- num_combinations and
+            % numel(shuffled_indices) after this call are the full grid size
+            % and the number of points subset_fraction will actually simulate.
+            % On a 7-axis grid that difference is the whole planning question.
+            %
+            % Calling it again rebuilds the grid and redraws the execution
+            % order, discarding any previous schedule.
 
             n_params = length(obj.grid_params);
             obj.param_vectors = cell(1, n_params);
@@ -2438,16 +2498,67 @@ classdef ParamSpaceAnalysis2 < handle
                 obj.shuffled_indices = 1:obj.num_combinations;
                 fprintf('Generated %d parameter combinations (sequential order)\n', obj.num_combinations);
             end
+
+            % Thin to a random subset, if asked. shuffled_indices is the single
+            % source of truth for what runs -- num_combinations stays the FULL
+            % grid size, so results still land at their true grid positions and
+            % the unrun points are simply empty. See the subset_fraction
+            % property comment for why that is safe.
+            obj.apply_subset_fraction();
         end
 
+        function apply_subset_fraction(obj)
+            % APPLY_SUBSET_FRACTION Truncate shuffled_indices to a random subset.
+            if isempty(obj.subset_fraction) || ~isscalar(obj.subset_fraction) || ...
+                    ~isnumeric(obj.subset_fraction) || ~isfinite(obj.subset_fraction) || ...
+                    obj.subset_fraction <= 0 || obj.subset_fraction > 1
+                error('ParamSpaceAnalysis2:BadSubsetFraction', ...
+                    'subset_fraction must be a scalar in (0, 1]; got %s.', ...
+                    mat2str(obj.subset_fraction));
+            end
+            if obj.subset_fraction == 1
+                return;   % full grid: shuffled_indices already correct
+            end
+            if ~obj.randomize_order
+                error('ParamSpaceAnalysis2:SubsetNeedsRandomOrder', ...
+                    ['subset_fraction = %g requires randomize_order = true.\n' ...
+                     'With sequential order a subset is the FIRST %d configs in ' ...
+                     'ndgrid order -- a systematic corner of the grid, not a ' ...
+                     'random sample of it.'], ...
+                    obj.subset_fraction, ceil(obj.subset_fraction * obj.num_combinations));
+            end
+
+            % ceil, not round: a fraction small enough to round to zero should
+            % still run one point rather than silently running nothing.
+            n_run = min(obj.num_combinations, ...
+                max(1, ceil(obj.subset_fraction * obj.num_combinations)));
+            obj.shuffled_indices = obj.shuffled_indices(1:n_run);
+            fprintf(['Subset: running %d of %d combinations (%.1f%% requested, ' ...
+                '%.1f%% actual); the rest stay empty.\n'], ...
+                n_run, obj.num_combinations, 100*obj.subset_fraction, ...
+                100*n_run/obj.num_combinations);
+        end
+    end
+
+    %% Private Methods (continued)
+    methods (Access = private)
         function run_batched_simulation(obj, temp_dir)
             % RUN_BATCHED_SIMULATION Execute simulations in batches with checkpoints
 
-            num_batches = ceil(obj.num_combinations / obj.batch_size);
+            % Batch over what will actually RUN, not over the full grid.
+            % numel(shuffled_indices) == num_combinations unless subset_fraction
+            % thinned it, so this is unchanged for a full run.
+            n_run = numel(obj.shuffled_indices);
+            num_batches = ceil(n_run / obj.batch_size);
             conditions_local = obj.conditions;
             num_conditions = length(conditions_local);
 
-            fprintf('Running %d combinations in %d batches...\n', obj.num_combinations, num_batches);
+            if n_run < obj.num_combinations
+                fprintf('Running %d of %d combinations (subset) in %d batches...\n', ...
+                    n_run, obj.num_combinations, num_batches);
+            else
+                fprintf('Running %d combinations in %d batches...\n', n_run, num_batches);
+            end
 
             for batch_idx = 1:num_batches
                 batch_file = fullfile(temp_dir, sprintf('batch_%d.mat', batch_idx));
@@ -2459,7 +2570,7 @@ classdef ParamSpaceAnalysis2 < handle
                 end
 
                 start_idx = (batch_idx - 1) * obj.batch_size + 1;
-                end_idx = min(batch_idx * obj.batch_size, obj.num_combinations);
+                end_idx = min(batch_idx * obj.batch_size, n_run);
                 batch_indices = obj.shuffled_indices(start_idx:end_idx);
                 current_batch_size = length(batch_indices);
 
@@ -2583,6 +2694,11 @@ classdef ParamSpaceAnalysis2 < handle
             summary_data.model_defaults = obj.model_defaults;
             summary_data.resolved_defaults = obj.resolved_defaults;
             summary_data.shuffled_indices = obj.shuffled_indices;
+            % So a run directory says outright that it is a partial grid --
+            % without this, a thinned histogram is indistinguishable from a
+            % full one that mostly failed.
+            summary_data.subset_fraction = obj.subset_fraction;
+            summary_data.num_run = numel(obj.shuffled_indices);
             summary_data.analysis_start_time = obj.analysis_start_time;
             summary_data.analysis_completed = datestr(now);
 

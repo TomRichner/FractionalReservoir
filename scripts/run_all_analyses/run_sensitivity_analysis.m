@@ -54,33 +54,17 @@ params_to_sweep = {
     'level_of_chaos', [0.25, 2.5];
     };
 
-% The four connectivity blocks, each swept from a QUARTER to TRIPLE whatever the
-% PRESET operates at rather than over fixed absolute numbers -- i.e. -75% to
-% +200% of the default. mu_*_relative is a multiplier of
-% F = 1/sqrt(n*alpha*(2-alpha)), so "the default level" is only meaningful
-% relative to the preset -- and mu_tilde_relative is a REQUIRED constructor
-% property with no class default to fall back on, which is why this reads the
-% preset rather than ParamSpaceAnalysis2.class_default.
-%
-% Widened from [0.5, 2.0] (-50% to +100%). Note the default does NOT sit at the
-% centre of the resulting linear axis and is not meant to: 0.25x-3x is roughly
-% symmetric in RATIO, so the preset sits about a fifth of the way along. The
-% percent ruler that apply_percent_axis draws is what makes that readable.
-mu_block_params  = {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relative'};
-mu_sweep_factors = [0.25, 3.0];
-
+% The four connectivity blocks, swept relative to the preset's own operating
+% point. mu_block_from_preset decides the ranges and is shared with
+% run_param_space_analysis, so the 1-D levels and the grid axes cover exactly
+% the same span.
 if strcmp(ctx.model_class, 'SRNNCellTypePairs')
-    for b_idx = 1:numel(mu_block_params)
-        base = mu_block_from_preset(ctx.preset_defaults, mu_block_params{b_idx});
-        % SORT, because add_grid_parameter rejects a descending range and the
-        % inhibitory blocks are negative: 0.5x and 2x of -3 is [-1.5, -6]. After
-        % sorting, an inhibitory axis runs from STRONGEST to weakest inhibition,
-        % i.e. the 2x end is on the left. Same multipliers either way.
-        rng_b = sort(mu_sweep_factors * base);
-        params_to_sweep(end+1, :) = {mu_block_params{b_idx}, rng_b}; %#ok<AGROW>
+    mu_ranges = mu_block_from_preset(ctx.preset_defaults);
+    for b_idx = 1:size(mu_ranges, 1)
+        params_to_sweep(end+1, :) = mu_ranges(b_idx, :); %#ok<AGROW>
         if ctx.verbose
-            fprintf('[sensitivity] %s base = %+g, sweeping [%+g %+g]\n', ...
-                mu_block_params{b_idx}, base, rng_b(1), rng_b(2));
+            fprintf('[sensitivity] %s sweeping [%+g %+g]\n', ...
+                mu_ranges{b_idx, 1}, mu_ranges{b_idx, 2}(1), mu_ranges{b_idx, 2}(2));
         end
     end
 end
@@ -166,34 +150,4 @@ fprintf('Parameters analyzed:\n');
 for p_idx = 1:n_params
     fprintf('  %s: %s\n', params_to_sweep{p_idx, 1}, out_dirs{p_idx});
 end
-end
-
-%% ------------------------------------------------------------------------
-function v = mu_block_from_preset(preset_defaults, block_name)
-% One entry of a preset's mu_tilde_relative, named the way the scalar aliases
-% are: mu_EI is "E receives from I", i.e. (post, pre) = (1, 2).
-%
-% Handles either shape the block may be given in. SRNNCellTypePairs.expand_block
-% accepts a full C x C matrix or a 1 x C PRESYNAPTIC row broadcast down the
-% columns -- so for a row, the entry depends only on the presynaptic index and
-% mu_EE == mu_IE. Errors rather than guessing, because there is no class default
-% to fall back on: mu_tilde_relative is a required constructor property.
-if ~isfield(preset_defaults, 'mu_tilde_relative') || isempty(preset_defaults.mu_tilde_relative)
-    error('run_sensitivity_analysis:NoMuBlock', ...
-        ['Sweeping %s relative to its default needs the preset to set ' ...
-        'mu_tilde_relative; SRNNCellTypePairs has no class default for it.'], ...
-        block_name);
-end
-idx = struct('mu_EE_relative', [1 1], 'mu_EI_relative', [1 2], ...
-             'mu_IE_relative', [2 1], 'mu_II_relative', [2 2]);
-if ~isfield(idx, block_name)
-    error('run_sensitivity_analysis:UnknownMuBlock', ...
-        'Unknown block ''%s''.', block_name);
-end
-ij = idx.(block_name);
-M = preset_defaults.mu_tilde_relative;
-if isvector(M)
-    M = repmat(reshape(M, 1, []), numel(M), 1);   % presynaptic row -> full block
-end
-v = M(ij(1), ij(2));
 end

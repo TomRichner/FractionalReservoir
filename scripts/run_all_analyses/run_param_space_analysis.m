@@ -1,12 +1,16 @@
 function out_dir = run_param_space_analysis(ctx)
-% RUN_PARAM_SPACE_ANALYSIS Multi-dimensional grid sweep over n, f and gain.
+% RUN_PARAM_SPACE_ANALYSIS Multi-dimensional grid sweep over n, f, gain and the mu blocks.
 %
 %   out_dir = RUN_PARAM_SPACE_ANALYSIS(ctx)
 %   out_dir = RUN_PARAM_SPACE_ANALYSIS()           % standalone, class defaults
 %
-% Joint grid over network size, fraction excitatory and synaptic gain, run under
-% all four adaptation conditions on the SAME W per grid point so the regimes are
-% directly comparable. No reps axis: total simulations are n_levels^3 x 4.
+% Joint grid over network size, fraction excitatory, synaptic gain and (on
+% SRNNCellTypePairs) the four connectivity blocks mu_EE / mu_EI / mu_IE / mu_II,
+% run under every adaptation condition the preset defines, on the SAME W per
+% grid point so the regimes are directly comparable. No reps axis.
+%
+% The grid is n_levels^7 but only a random n_levels^3 points are SIMULATED --
+% see the subset_fraction block below for why, and what it costs.
 %
 % ctx comes from resolve_run_context('param_space', ...).
 %
@@ -47,8 +51,8 @@ if ~isempty(ctx.output_dir)
 end
 
 %% Grid axes
-% Same swept variables as run_sensitivity_analysis (n, f, level_of_chaos), over
-% the SAME RANGES -- all three now match the 1-D sweeps exactly, so a grid point
+% Same swept variables as run_sensitivity_analysis, over the SAME RANGES -- the
+% axes match the 1-D sweeps one for one, so a grid point
 % here and a level there describe the same network and the two analyses can be
 % read against each other without a mental conversion.
 %
@@ -59,12 +63,46 @@ end
 psa.add_grid_parameter('n',              [100, 1000]);   % network size
 psa.add_grid_parameter(ctx.f_param,      [0.2, 0.8]);    % fraction excitatory
 psa.add_grid_parameter('level_of_chaos', [0.25, 2.5]);   % W scaling (edge of chaos)
-% Widened from [0.5, 1.5] to match the 1-D sweep, which was rebased on measured
-% edge-of-chaos crossings (see run_sensitivity_analysis for the numbers). The
-% cost is real and worth knowing: this grid spends the SAME number of levels
-% over a 2.25-wide gain axis instead of a 1.0-wide one, so it samples the region
-% around gain = 1 roughly half as finely and puts more of the grid deep in the
-% chaotic regime. Accepted so the two analyses keep describing the same span.
+% level_of_chaos widened from [0.5, 1.5] to match the 1-D sweep, which was
+% rebased on measured edge-of-chaos crossings (see run_sensitivity_analysis for
+% the numbers). The cost is real and worth knowing: this grid spends the SAME
+% number of levels over a 2.25-wide gain axis instead of a 1.0-wide one, so it
+% samples the region around gain = 1 roughly half as finely and puts more of the
+% grid deep in the chaotic regime. Accepted so the two analyses keep describing
+% the same span.
+
+% The four connectivity blocks, over the same ranges the 1-D sweeps use -- the
+% shared mu_block_from_preset is what guarantees "the same" rather than "written
+% the same way twice".
+%
+% These four are the reason subset_fraction exists. The 1-D sweeps can vary each
+% block with the others held at the preset, which answers "does mu_EE matter?"
+% but never "does mu_EE matter DIFFERENTLY when inhibition is strong?" -- the
+% interactions live only in the joint grid. Adding them takes the grid from
+% n_levels^3 to n_levels^7, which at 4 levels is 64 -> 16384 points.
+n_budget_axes = numel(psa.grid_params);   % the pre-mu axes: what the run is sized against
+if strcmp(ctx.model_class, 'SRNNCellTypePairs')
+    mu_ranges = mu_block_from_preset(ctx.preset_defaults);
+    for b_idx = 1:size(mu_ranges, 1)
+        psa.add_grid_parameter(mu_ranges{b_idx, 1}, mu_ranges{b_idx, 2});
+    end
+end
+
+%% Grid subsetting
+% Hold the run at the cost of the ORIGINAL 3-axis grid by simulating a random
+% n_levels^3 points out of n_levels^7 rather than enumerating them. Written as a
+% ratio of powers, not as a hardcoded fraction, so it stays correct as n_levels
+% moves with run_mode: at medium (4 levels) it runs 64 of 16384, at production
+% (5 levels) 125 of 78125 -- in both cases exactly what the 3-axis grid cost.
+%
+% What this buys and what it does not. The sample is a Monte Carlo estimate of
+% the 7-D space: pooled and marginal statistics stay unbiased, and every point
+% run is a full grid point at its true coordinates under all conditions. What it
+% CANNOT do is fill a 7-D array -- 64 points over 16384 cells is a 0.4% fill, so
+% any plot that wants a dense slice through this grid will be mostly holes. The
+% 1-D sensitivity sweeps remain the dense, per-axis picture; this grid is now the
+% scattered joint sample that shows whether the axes interact.
+psa.subset_fraction = min(1, ctx.n_levels^n_budget_axes / ctx.n_levels^numel(psa.grid_params));
 
 %% Conditions
 % From the preset rather than PSA's built-in defaults, which are spelled in
@@ -106,6 +144,8 @@ fprintf('Grid parameters: %s\n', strjoin(psa.grid_params, ', '));
 fprintf('Levels per parameter: %d\n', psa.n_levels);
 fprintf('Total combinations: %d^%d = %d\n', ...
     psa.n_levels, numel(psa.grid_params), psa.n_levels^numel(psa.grid_params));
+fprintf('Simulated: %d (subset_fraction = %.4g)\n', ...
+    numel(psa.shuffled_indices), psa.subset_fraction);
 fprintf('Conditions: %s\n', ...
     strjoin(cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false), ', '));
 end
