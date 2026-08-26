@@ -8,12 +8,16 @@ function [out_dir, summary] = explore_sensitivity_range(opts)
 %   [d, s] = explore_sensitivity_range('run_mode', 'medium');
 %
 % WHAT THIS IS FOR. run_sensitivity_analysis hardcodes the seven axes the paper
-% sweeps and the range of each -- level_of_chaos over [0.5 1.5], n over
+% sweeps and the range of each -- level_of_chaos over [0.25 2.5], n over
 % [100 1000], and so on. Those numbers have to come from somewhere, and picking
 % them by eye from a production sweep is expensive and circular. This runs ONE
 % axis over whatever range you name, on the same preset, conditions, timings and
 % solver the real sweep would use, and prints a per-level table so the useful
 % span is visible directly.
+%
+% It has already earned that: level_of_chaos was [0.5 1.5] until this tool
+% showed that range bracketed only three of the seven regimes' edge-of-chaos
+% crossings, reporting the depressing regimes as flat and stable throughout.
 %
 % It is deliberately a THIN wrapper. Everything that decides what the numbers
 % mean -- the preset, the model class, its adaptation conditions, the

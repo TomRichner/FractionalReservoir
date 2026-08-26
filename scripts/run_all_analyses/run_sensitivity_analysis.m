@@ -36,10 +36,22 @@ lle_hist_range = [-2, 2];
 %% Which parameters to sweep
 % {param_name, [min, max]}. The fraction-excitatory axis is named per class --
 % see ctx.f_param.
+% level_of_chaos [0.25, 2.5] rather than [0.5, 1.5]: measured, not guessed. A
+% medium sweep of all seven regimes puts their edge-of-chaos crossings at
+%
+%   no_adaptation 0.54   sfa_only_oneTS 0.59   sfa_only 0.48
+%   std_only_oneTS 1.18  std_only 2.27
+%   sfa3_std1 0.98       sfa_and_std 2.43
+%
+% so [0.5, 1.5] bracketed only three of the seven and reported the depressing
+% regimes as flat and stable throughout -- true, but carrying no information
+% about WHERE they stop being stable. [0.25, 2.5] contains all seven, confirmed
+% by two independent sweeps at different resolutions agreeing within ~0.1 on six
+% of them. Reproduce with scripts/examples/explore_sensitivity_range.m.
 params_to_sweep = {
     'n',              [100, 1000];
     ctx.f_param,      [0.2, 0.8];
-    'level_of_chaos', [0.5, 1.5];
+    'level_of_chaos', [0.25, 2.5];
     };
 
 % The four connectivity blocks, each swept from half to twice whatever the

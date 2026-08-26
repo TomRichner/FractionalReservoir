@@ -53,7 +53,13 @@ end
 % since a joint grid has far fewer levels per axis to spend.
 psa.add_grid_parameter('n',              [100, 1000]);   % network size
 psa.add_grid_parameter(ctx.f_param,      [0.25, 0.75]);  % fraction excitatory
-psa.add_grid_parameter('level_of_chaos', [0.5, 1.5]);    % W scaling (edge of chaos)
+psa.add_grid_parameter('level_of_chaos', [0.25, 2.5]);   % W scaling (edge of chaos)
+% Widened from [0.5, 1.5] to match the 1-D sweep, which was rebased on measured
+% edge-of-chaos crossings (see run_sensitivity_analysis for the numbers). The
+% cost is real and worth knowing: this grid spends the SAME number of levels
+% over a 2.25-wide gain axis instead of a 1.0-wide one, so it samples the region
+% around gain = 1 roughly half as finely and puts more of the grid deep in the
+% chaotic regime. Accepted so the two analyses keep describing the same span.
 
 %% Conditions
 % From the preset rather than PSA's built-in defaults, which are spelled in
