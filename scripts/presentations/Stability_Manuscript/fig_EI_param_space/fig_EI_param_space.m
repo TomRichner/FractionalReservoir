@@ -74,8 +74,16 @@ ps_dir  = fullfile(ps_dirs(1).folder, ps_dirs(1).name);
 % 1) Build the f-colored per-metric histogram figures (LLE + mean_rate), matching
 %    the gray figure's LLE range [-1.5,1.5] and probability normalization. This
 %    also creates a separate 'f Value Colorbar' figure.
+% CLim is FIXED at the swept range [0.2, 0.8] = 1:4 to 4:1, not derived from the
+% data. Derived limits came from the min/max of the f_E values actually sampled,
+% which was fine when the grid enumerated every level but is luck once the grid
+% is randomly subsampled: a run that never draws f_E = 0.2 loses the 1:4 tick,
+% the bar's span changes, and two runs' colours stop meaning the same thing. The
+% axis is a property of the SWEEP, so it belongs in the script, not in the data.
+EI_CLIM = [0.2, 0.8];
 [~, ~] = load_and_make_unit_histograms(ps_dir, ...
-    'Metrics', {'lle', 'r'}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5], 'ColorBy', color_by);
+    'Metrics', {'lle', 'r'}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5], ...
+    'ColorBy', color_by, 'CLim', EI_CLIM);
 
 % 2) Grab the metric figures (by Name, robust) + the colorbar figure.
 lle_fig = findobj(0, 'Type', 'figure', 'Name', 'LLE Unit Histogram');
@@ -219,15 +227,17 @@ AddLetters2Plots(letter_axes, letters, ...
 % 6) Colorbar (now embedded in the upper-right cell): relabel the f gradient bar
 %    with E:I ratios (E:I = f:(1-f)).
 if isgraphics(cbax)
-    % Spans the FULL swept range, 0.2 to 0.8, not just 0.25-0.75. The sweep was
-    % widened to those extremes and without the end entries the bar would run
-    % past its last labelled tick at both ends. The keep filter below drops any
-    % entry outside the colorbar's actual limits, so listing more than a given
-    % run reaches is free.
+    % Spans the FULL swept range, 0.2 to 0.8, not just 0.25-0.75. The keep
+    % filter is retained as a guard, but with EI_CLIM fixed above it now keeps
+    % every entry every time -- which is the point: the end ticks 1:4 and 4:1
+    % are always drawn, rather than appearing only when the random subsample
+    % happens to include a network at the extremes.
     ei_f   = [0.2, 0.25, 1/3, 0.4, 0.5, 0.6, 2/3, 0.75, 0.8];
     ei_lab = {'1:4', '1:3', '1:2', '2:3', '1:1', '3:2', '2:1', '3:1', '4:1'};
     ylim_cb = get(cbax, 'YLim');
     keep = ei_f >= ylim_cb(1) - 1e-6 & ei_f <= ylim_cb(2) + 1e-6;
+    assert(all(keep), ['E:I colorbar lost %d tick(s): CLim is fixed at ' ...
+        '[%g %g] so every label should fit.'], sum(~keep), EI_CLIM(1), EI_CLIM(2));
     set(cbax, 'YTick', ei_f(keep), 'YTickLabel', ei_lab(keep), 'FontSize', tick_fs);
     ylabel(cbax, 'E:I ratio', 'FontSize', label_fs);
 end

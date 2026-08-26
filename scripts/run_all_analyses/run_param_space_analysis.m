@@ -9,8 +9,8 @@ function out_dir = run_param_space_analysis(ctx)
 % run under every adaptation condition the preset defines, on the SAME W per
 % grid point so the regimes are directly comparable. No reps axis.
 %
-% The grid is n_levels^7 but only a random n_levels^3 points are SIMULATED --
-% see the subset_fraction block below for why, and what it costs.
+% The grid is n_levels^7 but only a random cfg.n_grid_points of them are
+% SIMULATED -- see the subset_fraction block below for why, and what it costs.
 %
 % ctx comes from resolve_run_context('param_space', ...).
 %
@@ -80,7 +80,6 @@ psa.add_grid_parameter('level_of_chaos', [0.25, 2.5]);   % W scaling (edge of ch
 % but never "does mu_EE matter DIFFERENTLY when inhibition is strong?" -- the
 % interactions live only in the joint grid. Adding them takes the grid from
 % n_levels^3 to n_levels^7, which at 4 levels is 64 -> 16384 points.
-n_budget_axes = numel(psa.grid_params);   % the pre-mu axes: what the run is sized against
 if strcmp(ctx.model_class, 'SRNNCellTypePairs')
     mu_ranges = mu_block_from_preset(ctx.preset_defaults);
     for b_idx = 1:size(mu_ranges, 1)
@@ -89,11 +88,12 @@ if strcmp(ctx.model_class, 'SRNNCellTypePairs')
 end
 
 %% Grid subsetting
-% Hold the run at the cost of the ORIGINAL 3-axis grid by simulating a random
-% n_levels^3 points out of n_levels^7 rather than enumerating them. Written as a
-% ratio of powers, not as a hardcoded fraction, so it stays correct as n_levels
-% moves with run_mode: at medium (4 levels) it runs 64 of 16384, at production
-% (5 levels) 125 of 78125 -- in both cases exactly what the 3-axis grid cost.
+% Simulate a random n_grid_points of the n_levels^7 rather than enumerating them.
+% The COUNT is the run_mode's to choose (analysis_run_config), not a formula
+% derived from the axis count: how many samples the joint space needs is a
+% question about statistics and budget, whereas n_levels^(axes) would silently
+% change the answer every time an axis is added. Medium runs 64 of 16384;
+% production runs 256 of 78125.
 %
 % What this buys and what it does not. The sample is a Monte Carlo estimate of
 % the 7-D space: pooled and marginal statistics stay unbiased, and every point
@@ -102,7 +102,9 @@ end
 % any plot that wants a dense slice through this grid will be mostly holes. The
 % 1-D sensitivity sweeps remain the dense, per-axis picture; this grid is now the
 % scattered joint sample that shows whether the axes interact.
-psa.subset_fraction = min(1, ctx.n_levels^n_budget_axes / ctx.n_levels^numel(psa.grid_params));
+n_target = ctx.cfg.n_grid_points;
+n_full   = ctx.n_levels ^ numel(psa.grid_params);
+psa.subset_fraction = min(1, n_target / n_full);
 
 %% Conditions
 % From the preset rather than PSA's built-in defaults, which are spelled in

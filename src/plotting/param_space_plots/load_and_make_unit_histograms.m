@@ -21,6 +21,15 @@ function [psa, fig_handles] = load_and_make_unit_histograms(results_dir, options
 %   Metrics       - Cell array of metrics to plot: 'lle', 'r', 'br'
 %                   (default: {'lle', 'r'})
 %   ColorBy       - SRNNModel2 parameter to colour points by (default: 'f')
+%   ColorFcn      - @(psa, res) -> scalar, used INSTEAD of ColorBy. For a colour
+%                   axis that is not a model property -- e.g. the realized E:I
+%                   weight balance, which has to be computed from a rebuilt W.
+%                   ColorBy still names the axis for messages when this is set.
+%   CLim          - [lo hi] fixed colour limits. Default [] derives them from the
+%                   data, which makes the colorbar's extent depend on which
+%                   networks happened to be sampled; pass an explicit range for a
+%                   bar that means the same thing in every run.
+%   ColorLabel    - y-label on the colorbar figure (default 'fraction excitatory')
 %
 % Output:
 %   psa         - The loaded ParamSpaceAnalysis object
@@ -34,11 +43,28 @@ arguments
     options.Metrics (1,:) cell = {'lle', 'r'}
     options.LLERange (1,2) double = [-2.3, 1.5]   % LLE histogram range (bin edges)
     options.ColorBy (1,:) char = 'f'
+    options.ColorFcn = []
+    options.CLim double = []
+    options.ColorLabel (1,:) char = 'fraction excitatory'
 end
 
 normalize_mode = options.NormalizeMode;
 metrics_to_plot = lower(options.Metrics);
 color_by = options.ColorBy;
+
+% One accessor for the colour value, so the two passes below cannot disagree
+% about what they are colouring by.
+if isempty(options.ColorFcn)
+    color_of = @(psa, res) psa.effective_param(res, color_by);
+else
+    color_of = options.ColorFcn;
+end
+
+if ~isempty(options.CLim)
+    assert(numel(options.CLim) == 2 && options.CLim(2) > options.CLim(1), ...
+        'load_and_make_unit_histograms:BadCLim', ...
+        'CLim must be [lo hi] with hi > lo; got %s.', mat2str(options.CLim));
+end
 
 if ~exist(results_dir, 'dir')
     error('load_and_make_unit_histograms:NotFound', ...
@@ -58,9 +84,13 @@ psa = ParamSpaceAnalysis2.from_dir(results_dir);
 condition_names = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
 num_conditions = length(condition_names);
 
-condition_titles = containers.Map(...
-    {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
-    {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+% The shared map, not a local copy. This file held a SIXTH copy of the same
+% four-entry table that srnn_condition_titles was created to replace, and it was
+% missed when the other five were consolidated -- so the three regimes added
+% since (sfa_only_oneTS, std_only_oneTS, sfa3_std1) fell through to their raw
+% snake_case names here while reading properly in every other figure. Still
+% isKey-guarded below: a saved run directory can name any condition it likes.
+condition_titles = srnn_condition_titles();
 
 %% Build metric configuration based on options
 % Map short names to internal metric names and display properties
@@ -120,15 +150,34 @@ for c_idx = 1:num_conditions
         for k = 1:length(results_cell)
             res = results_cell{k};
             if isstruct(res) && isfield(res, 'success') && res.success
-                all_f_combined(end+1) = psa.effective_param(res, color_by);
+                all_f_combined(end+1) = color_of(psa, res); %#ok<AGROW>
             end
         end
     end
 end
 
-% Compute global colour limits. A constant colour parameter would give a
-% degenerate CLim, so fall back to the unit range as if none were found.
-if ~isempty(all_f_combined) && max(all_f_combined) > min(all_f_combined)
+% Colour limits. An explicit CLim wins outright: derived limits make the bar's
+% extent depend on which networks the sweep happened to sample, so a run that
+% missed the extremes silently loses its end ticks and the bar stops being
+% comparable between runs.
+if ~isempty(options.CLim)
+    f_min = options.CLim(1);
+    f_max = options.CLim(2);
+    has_f_variation = true;
+    n_out = sum(all_f_combined < f_min | all_f_combined > f_max);
+    if n_out > 0
+        % Saying so matters: unit_histogram_patch clamps to CLim, so these
+        % networks are drawn in the end colour and read as merely extreme
+        % rather than off-scale.
+        warning('load_and_make_unit_histograms:ColorOutsideCLim', ...
+            ['%d of %d networks fall outside CLim [%g %g] (data range ' ...
+             '[%.3f %.3f]) and are clamped to the end colours.'], ...
+            n_out, numel(all_f_combined), f_min, f_max, ...
+            min(all_f_combined), max(all_f_combined));
+    end
+elseif ~isempty(all_f_combined) && max(all_f_combined) > min(all_f_combined)
+    % A constant colour parameter would give a degenerate CLim, so fall back to
+    % the unit range as if none were found.
     f_min = min(all_f_combined);
     f_max = max(all_f_combined);
     has_f_variation = true;
@@ -139,7 +188,8 @@ else
 end
 
 if has_f_variation
-    fprintf('Coloring by %s value: [%.3f, %.3f]\n', color_by, f_min, f_max);
+    fprintf('Coloring by %s: CLim [%.3f, %.3f], data [%.3f, %.3f]\n', ...
+        color_by, f_min, f_max, min(all_f_combined), max(all_f_combined));
 end
 
 % Get colormap (same as beeswarm)
@@ -173,8 +223,8 @@ for m_idx = 1:length(metrics)
                 res = results_cell{k};
                 if isstruct(res) && isfield(res, 'success') && res.success
                     if isfield(res, metric) && ~isnan(res.(metric))
-                        values(end+1) = res.(metric);
-                        f_values(end+1) = psa.effective_param(res, color_by);
+                        values(end+1) = res.(metric); %#ok<AGROW>
+                        f_values(end+1) = color_of(psa, res); %#ok<AGROW>
                     end
                 end
             end
@@ -245,7 +295,7 @@ if has_f_variation
     ax_cb.XTick = [];
     ax_cb.YDir = 'normal';
     ax_cb.XColor = 'none';  % Hide x-axis completely
-    ylabel(ax_cb, 'fraction excitatory', 'FontSize', 12);
+    ylabel(ax_cb, options.ColorLabel, 'FontSize', 12);
     box(ax_cb, 'off');
 
     % Set aspect ratio

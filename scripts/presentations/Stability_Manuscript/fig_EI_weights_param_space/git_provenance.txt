@@ -1,0 +1,29 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_EI_weights_param_space
+Captured at: 26-Aug-2026 14:46:42
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      747acd0d6a13704a314a44269ebcd9a7340c97b2
+commit_short:747acd0
+branch:      refactorRunAll
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Report attempted, not full-grid, counts for a subsetted run
+last_date:   2026-08-26T01:18:22-05:00
+dirty:       true
+
+--- git status --porcelain ---
+M scripts/paper/paper_config.m
+ M scripts/paper/run_all_paper_analyses.m
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/fig_EI_param_space.m
+ M scripts/run_all_analyses/analysis_run_config.m
+ M scripts/run_all_analyses/run_param_space_analysis.m
+ M src/ParamSpaceAnalysis2.m
+ M src/plotting/param_space_plots/load_and_make_unit_histograms.m
+?? scripts/presentations/Stability_Manuscript/fig_EI_weights_param_space/
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_EI_weights_param_space/Fig_EI_Weights_ParamSpace.fig
+scripts/presentations/Stability_Manuscript/fig_EI_weights_param_space/Fig_EI_Weights_ParamSpace.png
+scripts/presentations/Stability_Manuscript/fig_EI_weights_param_space/Fig_EI_Weights_ParamSpace.svg
+scripts/presentations/Stability_Manuscript/fig_EI_weights_param_space/fig_EI_weights_param_space.m

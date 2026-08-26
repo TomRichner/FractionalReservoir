@@ -87,6 +87,14 @@ F = add(F, 'fig_param_space_allStd',         @fig_param_space_allStd,         tr
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_EI_param_space',             @fig_EI_param_space,             true, ...
         {'preset_name', cfg.preset_name});
+% Same sheet, coloured by the balance of the WEIGHTS instead of the balance of
+% the neuron counts. Its sibling above answers "does f_E explain where a network
+% lands", which stopped being the whole question once the grid started sweeping
+% the four mu blocks -- an 80% excitatory network with inhibition three times as
+% strong is inhibition-dominated, and f_E cannot see that. Kept immediately after
+% its sibling so the pair is obvious.
+F = add(F, 'fig_EI_weights_param_space',     @fig_EI_weights_param_space,     true, ...
+        {'preset_name', cfg.preset_name});
 F = add(F, 'fig_sfa_EOC_allStd',             @fig_sfa_EOC_allStd,             true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_memory_capacity',            @fig_memory_capacity,            true, {});

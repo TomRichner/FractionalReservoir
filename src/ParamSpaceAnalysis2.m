@@ -548,6 +548,89 @@ classdef ParamSpaceAnalysis2 < handle
             end
         end
 
+        function model = rebuild_model(obj, res)
+            % REBUILD_MODEL Reconstruct the model a result came from, unbuilt.
+            %
+            %   model = psa.rebuild_model(res)
+            %
+            % Returns a CONSTRUCTED model -- build() and run() are the caller's
+            % to invoke, so a caller that only wants the connectivity pays for
+            % build() and nothing more.
+            %
+            % The reconstruction is exact because a job's network is pinned by
+            % data the result carries: run_single_job passes
+            % rng_seeds = [network_seed, network_seed + 1], and network_seed is
+            % config_idx*100 + network_seed_offset, i.e. tied to the grid
+            % POSITION. res.network_seed records it, so calling build() on what
+            % this returns reproduces the same W the sweep simulated -- also
+            % across a subsetted run, where a point's position is unchanged by
+            % how many of its neighbours were skipped.
+            %
+            % Argument precedence deliberately MIRRORS run_single_job's, weakest
+            % first, letting the constructor's last-write-wins settle collisions:
+            %
+            %   model_defaults  <  condition  <  grid parameters
+            %
+            % Keep the two in step. This reads model_defaults, not
+            % resolved_defaults: resolved_defaults is model_defaults already
+            % pushed through the constructor, so feeding it back would re-assign
+            % every class default explicitly -- harmless in principle, but it
+            % would no longer be the same call the sweep made.
+            %
+            % Used by fig_EI_weights_param_space, which needs each grid point's
+            % actual weight matrix and cannot get it from the stored results:
+            % a result records scalars (LLE, mean rate), never W.
+            if ~isstruct(res) || ~isfield(res, 'config_idx')
+                error('ParamSpaceAnalysis2:BadResult', ...
+                    'rebuild_model needs a result struct with a config_idx.');
+            end
+            if ~isfield(res, 'network_seed')
+                error('ParamSpaceAnalysis2:NoNetworkSeed', ...
+                    ['Result %d carries no network_seed, so its network cannot ' ...
+                     'be reproduced. Runs predating that field are out of reach.'], ...
+                    res.config_idx);
+            end
+
+            model_args = {'rng_seeds', [res.network_seed, res.network_seed + 1]};
+
+            default_fields = fieldnames(obj.model_defaults);
+            for k = 1:numel(default_fields)
+                model_args = [model_args, ...
+                    {default_fields{k}, obj.model_defaults.(default_fields{k})}]; %#ok<AGROW>
+            end
+
+            % The condition this result ran under, by name.
+            if isfield(res, 'condition_name')
+                for c = 1:numel(obj.conditions)
+                    if strcmp(obj.conditions{c}.name, res.condition_name)
+                        cond_fields = setdiff(fieldnames(obj.conditions{c}), {'name'})';
+                        for cf = 1:numel(cond_fields)
+                            model_args = [model_args, ...
+                                {cond_fields{cf}, obj.conditions{c}.(cond_fields{cf})}]; %#ok<AGROW>
+                        end
+                        break;
+                    end
+                end
+            end
+
+            % Grid parameters. A vector parameter stores a LEVEL INDEX in
+            % res.config, so it goes through the lookup rather than being passed
+            % as the number it appears to be.
+            if isfield(res, 'config')
+                gp = fieldnames(res.config);
+                for k = 1:numel(gp)
+                    if isfield(obj.vector_param_lookup, gp{k})
+                        v = obj.vector_param_lookup.(gp{k}){res.config.(gp{k})};
+                    else
+                        v = res.config.(gp{k});
+                    end
+                    model_args = [model_args, {gp{k}, v}]; %#ok<AGROW>
+                end
+            end
+
+            model = feval(obj.model_class, model_args{:});
+        end
+
         function run(obj)
             % RUN Execute the full parameter space analysis
             %

@@ -1,9 +1,14 @@
 function run_dir = run_all_paper_analyses(cfg)
 % RUN_ALL_PAPER_ANALYSES All heavy compute for the paper, into one run directory.
 %
-%   run_dir = RUN_ALL_PAPER_ANALYSES()                      % production
-%   run_dir = RUN_ALL_PAPER_ANALYSES('run_mode', 'fast')    % smoke test
+%   run_dir = RUN_ALL_PAPER_ANALYSES()                                  % production
+%   run_dir = RUN_ALL_PAPER_ANALYSES(paper_config('run_mode', 'fast'))  % smoke test
 %   run_dir = RUN_ALL_PAPER_ANALYSES(paper_config())
+%
+% Takes ONE argument, a config STRUCT. It does not accept name-value pairs --
+% those belong to paper_config, which is the single place a run is configured.
+% (This header used to advertise RUN_ALL_PAPER_ANALYSES('run_mode', 'fast'),
+% which errors with "Too many input arguments".)
 %
 % ENTRY POINT ONE OF TWO. This is the expensive half: everything that simulates
 % for hours. make_all_paper_figures is the cheap half, and reads what this
@@ -12,8 +17,9 @@ function run_dir = run_all_paper_analyses(cfg)
 % Stages, all into a single dated data/param_space/run_all_<dt>/ directory:
 %
 %   1. the sweep pipeline   run_all_analyses -- seven 1-D sensitivity sweeps,
-%                           the tau_a sweep, and the 3-D parameter-space grid,
-%                           each under four adaptation conditions
+%                           the tau_a sweep, and the 7-D parameter-space grid
+%                           (randomly subsampled), each under every adaptation
+%                           condition the preset defines
 %   2. memory capacity      run_memory_capacity -- paired trials across the four
 %                           conditions
 %   3. MC example           run_memory_capacity_example -- one network, kept

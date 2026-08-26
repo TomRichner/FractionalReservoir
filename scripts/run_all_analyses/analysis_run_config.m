@@ -14,6 +14,8 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 % Returns:
 %   cfg.n_levels - levels per grid parameter
 %   cfg.n_reps   - repetitions (absent for 'param_space', which has no reps axis)
+%   cfg.n_grid_points - grid points to SIMULATE ('param_space' only; the full
+%                  grid is n_levels^7 and is randomly subsampled to this many)
 %   cfg.model    - struct of SRNNModel2 settings for this mode. lya_T_interval
 %                  is simply ABSENT where the class default should apply, which
 %                  replaces the old `if ~isempty(lya_T_interval_mode)` guard.
@@ -150,24 +152,40 @@ switch analysis
         end
 
     case 'param_space'
-        % Multi-dimensional grid with no reps axis, so n_levels^n_params configs.
+        % Multi-dimensional grid with no reps axis. SEVEN axes now (n, f,
+        % level_of_chaos and the four mu blocks), so the full grid is
+        % n_levels^7 -- 16384 at 4 levels, 78125 at 5. That is never enumerated:
+        % n_grid_points is how many randomly-chosen points are actually
+        % simulated, and run_param_space_analysis turns it into a
+        % subset_fraction. See that file for what a sparse sample can and
+        % cannot support.
         switch run_mode
             case 'fast'
                 cfg = pack(3, [], 'rk4',   200, [0, 20], [10, 20]);
+                cfg.n_grid_points = 27;
             case 'fast2'
                 % No reps axis here, so the only fast2 difference is the doubled
                 % T_range (and the LLE window doubled with it).
                 cfg = pack(3, [], 'rk4',   200, [0, 40], [20, 40]);
+                cfg.n_grid_points = 27;
             case 'medium'
                 cfg = pack(4, [], 'rk4',   400, [0, 20], [10, 20]);
+                cfg.n_grid_points = 64;
             case 'medium2'
                 % 5 levels, i.e. production's, because this is the cheapest of
-                % the three stages: the grid is n_levels^3 but there is no reps
-                % axis. ~40 min of the budget, and the n = 1000 corner is what
-                % dominates it.
+                % the three stages: no reps axis, and the sample size is set
+                % here rather than growing with the axis count. ~40 min of the
+                % budget, and the n = 1000 corner is what dominates it.
                 cfg = pack(5, [], 'rk4',   800, [0, 25], [12.5, 25]);
+                cfg.n_grid_points = 125;
             case 'production'
                 cfg = pack(5, [], 'ode45', 400, [0, 50], []);
+                % 256, not the 125 that n_levels^3 would give: 125 points over a
+                % 78125-cell grid is a 0.16% sample, and four of the seven axes
+                % were only just added. The paper's grid should sample the joint
+                % space better than the smoke tests do, and this is the one run
+                % that can afford it.
+                cfg.n_grid_points = 256;
         end
 
     otherwise
