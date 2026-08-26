@@ -54,14 +54,20 @@ params_to_sweep = {
     'level_of_chaos', [0.25, 2.5];
     };
 
-% The four connectivity blocks, each swept from half to twice whatever the
-% PRESET operates at rather than over fixed absolute numbers. mu_*_relative is a
-% multiplier of F = 1/sqrt(n*alpha*(2-alpha)), so "the default level" is only
-% meaningful relative to the preset -- and mu_tilde_relative is a REQUIRED
-% constructor property with no class default to fall back on, which is why this
-% reads the preset rather than ParamSpaceAnalysis2.class_default.
+% The four connectivity blocks, each swept from a QUARTER to TRIPLE whatever the
+% PRESET operates at rather than over fixed absolute numbers -- i.e. -75% to
+% +200% of the default. mu_*_relative is a multiplier of
+% F = 1/sqrt(n*alpha*(2-alpha)), so "the default level" is only meaningful
+% relative to the preset -- and mu_tilde_relative is a REQUIRED constructor
+% property with no class default to fall back on, which is why this reads the
+% preset rather than ParamSpaceAnalysis2.class_default.
+%
+% Widened from [0.5, 2.0] (-50% to +100%). Note the default does NOT sit at the
+% centre of the resulting linear axis and is not meant to: 0.25x-3x is roughly
+% symmetric in RATIO, so the preset sits about a fifth of the way along. The
+% percent ruler that apply_percent_axis draws is what makes that readable.
 mu_block_params  = {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relative'};
-mu_sweep_factors = [0.5, 2.0];
+mu_sweep_factors = [0.25, 3.0];
 
 if strcmp(ctx.model_class, 'SRNNCellTypePairs')
     for b_idx = 1:numel(mu_block_params)
