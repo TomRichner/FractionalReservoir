@@ -47,12 +47,17 @@ if ~isempty(ctx.output_dir)
 end
 
 %% Grid axes
-% Same swept variables as run_sensitivity_analysis (n, f, level_of_chaos), but
-% here as a joint multi-dimensional grid. n and level_of_chaos use the same
-% ranges as the 1-D sweeps; only f is narrower here, 0.25-0.75 against 0.2-0.8,
-% since a joint grid has far fewer levels per axis to spend.
+% Same swept variables as run_sensitivity_analysis (n, f, level_of_chaos), over
+% the SAME RANGES -- all three now match the 1-D sweeps exactly, so a grid point
+% here and a level there describe the same network and the two analyses can be
+% read against each other without a mental conversion.
+%
+% f was 0.25-0.75 against the 1-D sweep's 0.2-0.8, on the reasoning that a joint
+% grid has fewer levels per axis to spend. That saves resolution by not asking
+% the question at the extremes at all, which is the wrong trade: the E:I extremes
+% are where the fraction-excitatory axis is most interesting. Widened to match.
 psa.add_grid_parameter('n',              [100, 1000]);   % network size
-psa.add_grid_parameter(ctx.f_param,      [0.25, 0.75]);  % fraction excitatory
+psa.add_grid_parameter(ctx.f_param,      [0.2, 0.8]);    % fraction excitatory
 psa.add_grid_parameter('level_of_chaos', [0.25, 2.5]);   % W scaling (edge of chaos)
 % Widened from [0.5, 1.5] to match the 1-D sweep, which was rebased on measured
 % edge-of-chaos crossings (see run_sensitivity_analysis for the numbers). The

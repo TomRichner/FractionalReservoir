@@ -219,8 +219,13 @@ AddLetters2Plots(letter_axes, letters, ...
 % 6) Colorbar (now embedded in the upper-right cell): relabel the f gradient bar
 %    with E:I ratios (E:I = f:(1-f)).
 if isgraphics(cbax)
-    ei_f   = [0.25, 1/3, 0.4, 0.5, 0.6, 2/3, 0.75];
-    ei_lab = {'1:3', '1:2', '2:3', '1:1', '3:2', '2:1', '3:1'};
+    % Spans the FULL swept range, 0.2 to 0.8, not just 0.25-0.75. The sweep was
+    % widened to those extremes and without the end entries the bar would run
+    % past its last labelled tick at both ends. The keep filter below drops any
+    % entry outside the colorbar's actual limits, so listing more than a given
+    % run reaches is free.
+    ei_f   = [0.2, 0.25, 1/3, 0.4, 0.5, 0.6, 2/3, 0.75, 0.8];
+    ei_lab = {'1:4', '1:3', '1:2', '2:3', '1:1', '3:2', '2:1', '3:1', '4:1'};
     ylim_cb = get(cbax, 'YLim');
     keep = ei_f >= ylim_cb(1) - 1e-6 & ei_f <= ylim_cb(2) + 1e-6;
     set(cbax, 'YTick', ei_f(keep), 'YTickLabel', ei_lab(keep), 'FontSize', tick_fs);
