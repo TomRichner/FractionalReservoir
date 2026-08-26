@@ -40,7 +40,7 @@ rng_seeds = [19 20];
 eig_times = [2 10 18];
 
 %% Assemble the operating point
-[preset_defaults, model_class, conditions] = srnn_param_preset(preset_name);
+[preset_defaults, model_class, conditions] =ssing (preset_name);
 cfg = analysis_run_config('sensitivity', run_mode, preset_defaults);
 
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);

@@ -1,14 +1,15 @@
 Stability_Manuscript figures: LLE and mean firing rate sensitivity
 ==================================================================
 
-Generated: 26-Aug-2026 14:54:06
+Generated: 26-Aug-2026 17:45:18
 By:        fig_sensitivity_analysis_allStd.m
 
 WHAT IT SHOWS
   One row per swept parameter, one column per adaptation condition. Each panel
   is an imagesc of the full across-reps distribution at each level, with the
-  median overlaid. Two sheets per metric: core (f_E, level_of_chaos, n) and mu
-  (the four connectivity blocks).
+  median overlaid as a bright blue line at 50% transparency, so it marks the
+  central tendency without hiding the cells it crosses. Two sheets per metric:
+  core (f_E, level_of_chaos, n) and mu (the four connectivity blocks).
 
 HOW IT WAS MADE
   Presentation replot -- no simulation is re-run. replot_sensitivity reloads

@@ -129,12 +129,19 @@ title_y   = 1.22;  % condition-title height above the top-row axes (normalized),
 % easier to see and tune here than behind a function call.
 cmap_darkest = 0.35;   % grey level of the densest cell (0 = black, 1 = white)
 dark_cmap = repmat(linspace(1, cmap_darkest, 256)', 1, 3);
-% Median line: OPAQUE dark blue, not a transparent pure blue. Transparency was
-% there to keep the line readable over near-black cells; with the colormap
-% stopping at dark grey it is no longer needed, and an opaque line reads as one
-% curve rather than as a wash whose apparent colour changes with the density
-% underneath it.
-median_color = [0 0 0.55];
+% Median line: BRIGHT blue at 50% transparency. A 4-element Color is [r g b a],
+% so the alpha travels with the colour rather than needing a separate handle
+% property.
+%
+% This reverses an earlier choice, and the reasoning it reversed is still on the
+% record: the line was made opaque dark blue because a transparent line reads as
+% a wash whose apparent colour shifts with the histogram density underneath it,
+% rather than as one curve. That effect is real and is the cost here. What is
+% bought back is that the median no longer hides the cells it crosses, which
+% matters most exactly where the distribution is densest and the line is
+% therefore least separable from it. Chosen deliberately (TR, 2026-08-26); the
+% dark-grey colormap ceiling above is what keeps a 50%-alpha line legible at all.
+median_color = [0.10 0.50 1.00 0.50];   % bright blue, 50% alpha
 median_lw    = 3;      % blue median line width, 25% thinner (plot_sensitivity uses 4)
 zeroline_lw  = 2;      % green dashed zero line width (plot_sensitivity uses 4)
 
@@ -225,10 +232,10 @@ for si = 1:numel(sheets)
         cl = get(ax, 'CLim');
         set(ax, 'CLim', [0, cl(2) * spec.clim_frac]);
 
-        % Median line: opaque dark blue + 25% thinner. Setting a 3-element Color
-        % REPLACES plot_sensitivity's 4-element [0 0 1 0.55], which is what drops
-        % the alpha. (imagesc is Type 'image', the zero line is 'constantline',
-        % so 'line' is the median.)
+        % Median line: bright blue at 50% alpha + 25% thinner. median_color is a
+        % 4-element [r g b a], so this KEEPS an alpha channel where a 3-element
+        % Color would drop it back to opaque. (imagesc is Type 'image', the zero
+        % line is 'constantline', so 'line' is the median.)
         ml = findobj(ax, 'Type', 'line');
         set(ml, 'Color', median_color, 'LineWidth', median_lw);
         % Green dashed zero line: thinner for LLE, dropped for mean_rate.
@@ -403,7 +410,9 @@ if cfg.save
         'what',   ['One row per swept parameter, one column per adaptation ' ...
                    'condition. Each panel is an imagesc of the full ' ...
                    'across-reps distribution at each level, with the median ' ...
-                   'overlaid. Two sheets per metric: core (f_E, ' ...
+                   'overlaid as a bright blue line at 50% transparency, so it ' ...
+                   'marks the central tendency without hiding the cells it ' ...
+                   'crosses. Two sheets per metric: core (f_E, ' ...
                    'level_of_chaos, n) and mu (the four connectivity blocks).'], ...
         'how',    ['Presentation replot -- no simulation is re-run. ' ...
                    'replot_sensitivity reloads the saved PSA objects and ' ...
