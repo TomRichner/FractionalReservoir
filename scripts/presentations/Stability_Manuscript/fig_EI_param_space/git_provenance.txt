@@ -1,15 +1,15 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_EI_param_space
-Captured at: 26-Aug-2026 01:17:13
+Captured at: 26-Aug-2026 14:55:29
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      d9bc2e5e6340305b7a397edc977bc7f41c0a21b0
-commit_short:d9bc2e5
+commit:      e629188dbc374364300851eb0bb36616ef460140
+commit_short:e629188
 branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Add subset_fraction and sweep the four mu blocks in the joint grid
-last_date:   2026-08-25T22:08:15-05:00
+last_msg:    Colour the E:I sheets by weights as well as by neuron count
+last_date:   2026-08-26T14:48:15-05:00
 dirty:       true
 
 --- git status --porcelain ---
@@ -52,7 +52,6 @@ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpac
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.png
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.fig
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.png
- M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/Fig_ParamSpace_allStd.svg
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/README_fig_param_space_allStd.txt
  M scripts/presentations/Stability_Manuscript/fig_param_space_allStd/git_provenance.txt
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/Fig_Sensitivity_LLE_core.fig
@@ -71,10 +70,8 @@ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpac
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_analysis_allStd/git_provenance.txt
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_Sensitivity_LLE_medians.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.fig
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.png
- M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/Fig_sensitivity_mean_rate_medians.svg
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/README_fig_sensitivity_medians.txt
  M scripts/presentations/Stability_Manuscript/fig_sensitivity_medians/git_provenance.txt
  M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/README_fig_stim_engages_adaptation.txt
@@ -85,5 +82,3 @@ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpac
  M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.fig
  M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.png
  M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/git_provenance.txt
- M src/ParamSpaceAnalysis2.m
- M src/write_run_parameters_md.m

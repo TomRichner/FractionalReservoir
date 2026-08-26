@@ -1,15 +1,15 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_SFA_steady_state
-Captured at: 26-Aug-2026 01:11:51
+Captured at: 26-Aug-2026 14:50:44
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      d9bc2e5e6340305b7a397edc977bc7f41c0a21b0
-commit_short:d9bc2e5
+commit:      e629188dbc374364300851eb0bb36616ef460140
+commit_short:e629188
 branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Add subset_fraction and sweep the four mu blocks in the joint grid
-last_date:   2026-08-25T22:08:15-05:00
+last_msg:    Colour the E:I sheets by weights as well as by neuron count
+last_date:   2026-08-26T14:48:15-05:00
 dirty:       true
 
 --- git status --porcelain ---
@@ -39,5 +39,3 @@ M scripts/presentations/Stability_Manuscript/fig_FI_curve/Fig_FI_curve.fig
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/git_provenance.txt
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.fig
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/statetraces/panelA_bottom_traces.png
- M src/ParamSpaceAnalysis2.m
- M src/write_run_parameters_md.m

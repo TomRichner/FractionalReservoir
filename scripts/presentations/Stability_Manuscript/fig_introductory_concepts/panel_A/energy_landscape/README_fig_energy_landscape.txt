@@ -1,7 +1,7 @@
 Stability_Manuscript figure 1 panel A (top): effective potential
 ================================================================
 
-Generated: 26-Aug-2026 01:10:44
+Generated: 26-Aug-2026 14:49:35
 By:        fig_energy_landscape.m
 
 WHAT IT SHOWS

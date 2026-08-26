@@ -1,7 +1,7 @@
 Stability_Manuscript figure: multi-timescale STD steady state
 =============================================================
 
-Generated: 26-Aug-2026 01:11:58
+Generated: 26-Aug-2026 14:50:50
 By:        fig_STD_steady_state.m
 
 WHAT IT SHOWS

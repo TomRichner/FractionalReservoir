@@ -1,7 +1,7 @@
 Stability_Manuscript figure: parameter-space distributions, E:I WEIGHT coloured
 ==============================================================================
 
-Generated: 26-Aug-2026 14:46:42
+Generated: 26-Aug-2026 14:55:56
 By:        fig_EI_weights_param_space.m
 
 WHAT IT SHOWS

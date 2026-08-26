@@ -1,7 +1,7 @@
 Stability_Manuscript figure: stimulus engages adaptation (bursting)
 ===================================================================
 
-Generated: 26-Aug-2026 01:12:51
+Generated: 26-Aug-2026 14:51:42
 By:        fig_stim_engages_adaptation.m
 
 WHAT IT SHOWS
