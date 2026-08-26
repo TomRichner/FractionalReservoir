@@ -1,7 +1,7 @@
 Stability_Manuscript figure: parameter-space distributions, E:I WEIGHT coloured
 ==============================================================================
 
-Generated: 26-Aug-2026 14:55:56
+Generated: 26-Aug-2026 17:39:21
 By:        fig_EI_weights_param_space.m
 
 WHAT IT SHOWS
@@ -26,7 +26,7 @@ SOURCE
   run_dir                C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_22_08
   param_space_subfolder  param_space_nLevs_4_aug_26_26_00_33
   preset                 celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
-  clim                   [0.05 0.95]
+  clim                   [0.0909091 0.909091]
 
 FIGURES PRODUCED (in this folder)
   Fig_EI_Weights_ParamSpace.png
@@ -46,11 +46,15 @@ READING THIS FIGURE
   correlate at only 0.675. Roughly 1:12 to 48:1 in weights against a
   construction-capped 1:4 to 4:1 in neuron counts.
 
-  COLOUR LIMITS are fixed at [0.05, 0.95] rather than taken from the data, so
-  the bar means the same thing in every run -- with a randomly subsampled
-  grid, derived limits depend on which networks happened to be drawn. A few
-  networks above 0.95 clamp to the end colour; load_and_make_unit_histograms
-  warns when that happens.
+  COLOUR LIMITS are fixed at 1:10 to 10:1 ([1/11, 10/11]) rather than taken
+  from the data, so the bar means the same thing in every run -- with a
+  randomly subsampled grid, derived limits depend on which networks happened
+  to be drawn. They were briefly 1:19 to 19:1, which covered nearly the whole
+  measured spread but spent most of the colormap on a few extreme networks and
+  flattened the contrast across the bulk near 1:1. Networks beyond 1:10 or
+  10:1 clamp to the end colours and so read as "at least 10:1" rather than
+  showing how far past it they go; load_and_make_unit_histograms warns with
+  the count.
 
   The ratio is invariant to level_of_chaos and to rescale_by_abscissa: both
   are scalars multiplying all of W and cancel between numerator and
