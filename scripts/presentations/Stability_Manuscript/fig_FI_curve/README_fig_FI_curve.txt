@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA and STD reshape the F-I curve
 ==============================================================
 
-Generated: 25-Aug-2026 16:36:03
+Generated: 26-Aug-2026 01:11:13
 By:        fig_FI_curve.m
 
 WHAT IT SHOWS

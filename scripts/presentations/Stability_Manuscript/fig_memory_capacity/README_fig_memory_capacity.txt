@@ -1,7 +1,7 @@
 Stability_Manuscript figure: memory capacity
 ============================================
 
-Generated: 25-Aug-2026 16:41:47
+Generated: 26-Aug-2026 01:17:30
 By:        fig_memory_capacity.m
 
 WHAT IT SHOWS
@@ -16,10 +16,10 @@ HOW IT WAS MADE
   shown for reference but not written to disk.
 
 SOURCE
-  mat_file  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_16_06\memory_capacity\MC_sample_hold_20260825_161529_trials4_results.mat
-  run_tag   MC_sample_hold_20260825_161529_trials4
+  mat_file  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_22_08\memory_capacity\MC_sample_hold_20260826_004249_trials15_results.mat
+  run_tag   MC_sample_hold_20260826_004249_trials15
   preset    mc_esn
-  run_mode  fast
+  run_mode  medium
 
 PARAMETERS AS RUN
   n               300
@@ -32,10 +32,10 @@ PARAMETERS AS RUN
   input_type      sample_hold
   T_hold          0.3
   readout_signal  synaptic
-  n_trials        4
-  T_train_sec     60
-  T_test_sec      30
-  d_max_sec       5
+  n_trials        15
+  T_train_sec     300
+  T_test_sec      90
+  d_max_sec       10
   ode_solver      rk4
   std_zero_floor  false
 

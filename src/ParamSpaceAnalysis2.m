@@ -2707,10 +2707,18 @@ classdef ParamSpaceAnalysis2 < handle
                 cond_name = obj.conditions{c_idx}.name;
                 if isfield(obj.results, cond_name)
                     results = obj.results.(cond_name);
+                    % n_total is what was ATTEMPTED, not the cell length. The
+                    % results cell is always full-grid length so results sit at
+                    % their true config_idx, so length(results) on a subsetted
+                    % run is the grid size -- which made a flawless 64/64 record
+                    % success_rate = 0.0039 and read as a 99.6% failure.
                     n_success = sum(cellfun(@(r) isstruct(r) && isfield(r, 'success') && r.success, results));
+                    n_attempted = numel(obj.shuffled_indices);
+                    if n_attempted == 0, n_attempted = length(results); end   % legacy/unscheduled
                     summary_data.stats.(cond_name).n_success = n_success;
-                    summary_data.stats.(cond_name).n_total = length(results);
-                    summary_data.stats.(cond_name).success_rate = n_success / length(results);
+                    summary_data.stats.(cond_name).n_total = n_attempted;
+                    summary_data.stats.(cond_name).n_grid_points = length(results);
+                    summary_data.stats.(cond_name).success_rate = n_success / n_attempted;
                 end
             end
 

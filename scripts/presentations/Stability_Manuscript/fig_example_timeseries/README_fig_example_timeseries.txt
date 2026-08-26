@@ -1,7 +1,7 @@
 Stability_Manuscript figure: example time series
 ================================================
 
-Generated: 25-Aug-2026 16:35:56
+Generated: 26-Aug-2026 01:11:08
 By:        fig_example_timeseries.m
 
 WHAT IT SHOWS

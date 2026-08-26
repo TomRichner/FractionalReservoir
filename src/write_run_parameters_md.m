@@ -491,7 +491,7 @@ if isempty(entries)
     return
 end
 
-fprintf(fid, '%s\n', '| Directory | Type | Swept | Levels | Reps | Solver | fs | `T_range` | LLE window | Conds | Grid pts |');
+fprintf(fid, '%s\n', '| Directory | Type | Swept | Levels | Reps | Solver | fs | `T_range` | LLE window | Conds | Grid pts (simulated) |');
 fprintf(fid, '%s\n', '|---|---|---|---|---|---|---|---|---|---|---|');
 for k = 1:numel(entries)
     e = entries(k);
@@ -508,9 +508,22 @@ for k = 1:numel(entries)
 
     [solver, fs_txt, tr_txt, lya_txt] = timing_cells(e);
 
+    % Grid points, and how many were actually SIMULATED. Since
+    % run_param_space_analysis started subsetting a 7-axis grid, these differ by
+    % a factor of 256 -- printing num_combinations alone would put "16384" in
+    % the run's own provenance record for a run that simulated 64. That is
+    % precisely the number someone quotes in a methods section, so it must not
+    % be the wrong one. shuffled_indices is the schedule, so its length is what
+    % ran; it is empty on a run that was configured but never executed.
     npts = '—';
     if ~isempty(psa.num_combinations)
-        npts = sprintf('%d', psa.num_combinations);
+        n_run = numel(psa.shuffled_indices);
+        if n_run > 0 && n_run < psa.num_combinations
+            npts = sprintf('%d of %d (%.2g%%)', n_run, psa.num_combinations, ...
+                100*n_run/psa.num_combinations);
+        else
+            npts = sprintf('%d', psa.num_combinations);
+        end
     end
 
     fprintf(fid, '%s\n', ['| `' e.dir_name '` | ' or_unknown(e.analysis) ' | ' swept_txt ...

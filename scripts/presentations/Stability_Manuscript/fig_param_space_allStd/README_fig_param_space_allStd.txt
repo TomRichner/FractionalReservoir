@@ -1,7 +1,7 @@
 Stability_Manuscript figure: parameter-space distributions
 ==========================================================
 
-Generated: 25-Aug-2026 16:41:18
+Generated: 26-Aug-2026 01:16:57
 By:        fig_param_space_allStd.m
 
 WHAT IT SHOWS
@@ -19,7 +19,7 @@ HOW IT WAS MADE
   within each row with sparse probability ticks.
 
 SOURCE
-  run_dir  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_16_06
+  run_dir  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_22_08
   preset   celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
 
 FIGURES PRODUCED (in this folder)

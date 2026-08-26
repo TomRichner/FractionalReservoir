@@ -1,7 +1,7 @@
 Stability_Manuscript figures: LLE and mean firing rate sensitivity
 ==================================================================
 
-Generated: 25-Aug-2026 16:46:59
+Generated: 26-Aug-2026 01:15:37
 By:        fig_sensitivity_analysis_allStd.m
 
 WHAT IT SHOWS
@@ -17,7 +17,7 @@ HOW IT WAS MADE
   and saved here, and the prep folder is deleted.
 
 SOURCE
-  run_dir  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_16_06
+  run_dir  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\param_space\run_all_aug_25_26_22_08
   preset   celltype_pairs_Sc0p2_noise0p025_dualStd_7cond
 
 PARAMETERS AS RUN
