@@ -10,12 +10,24 @@ function J_eff = compute_J_eff(S, params)
 %   at the current state). This is the effective connectivity matrix that
 %   describes the linearized dynamics of x around the current state.
 %
-%   Based on the derivation in J_eff_notes.md:
 %     J_eff(x,a,b) = (1/tau_d) * (-I + W * G)
 %   where G is the derivative of the SYNAPTIC OUTPUT b_i*r_i with respect to
 %   x_i, holding a and b fixed. Since r_i = phi(x_i - c*sum_k(a_{ik})) is the
 %   pre-depression rate and b multiplies it outside the nonlinearity,
 %     G = diag(b_i * phi'(x_i - c * sum_k(a_{ik})))
+%
+%   The derivation was in docs/.../J_eff_notes.md, deleted 2026-08-27: it
+%   belonged to Richner 2026, not to this paper. Recoverable from git history.
+%
+%   CAVEAT -- this function predates the c/K normalisation and does NOT apply
+%   it. The model divides the adaptation sum by its timescale count, so both
+%   model classes form phi(x - (c/K)*sum_k a_k) while the code below uses a raw
+%   c_E / c_I. At K = 1 they agree; at the paper's K = 3 this overstates the
+%   adaptation term threefold and J_eff will not match the model's own
+%   Jacobian. Only example scripts call this -- the sweeps use the classes'
+%   internal compute_Jacobian_fast, which is correct -- but fix it before
+%   trusting a number that comes out of here. See
+%   docs/EquationsParametersDocs/Equations_stability_paper.md.
 %
 % Inputs:
 %   S      - State vector (N_sys_eqs x 1) at a single time point
