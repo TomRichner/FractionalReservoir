@@ -1,30 +1,32 @@
 # SRNN Model Parameter Table
 
-This document describes the equations, state variables, derived quantities, and parameters used to generate Figure 2.
+This document is the **parameter reference**: state variables, derived
+quantities, the activation function, and the derivation of the default scaling
+factor $F$.
 
-## System Equations
-
-$$
-\frac{dx_i}{dt} = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \left(\prod_{n=1}^{n_f} g_{jn}\right)\left(\prod_{m=1}^{M} b_{jm}\right) r_{j}}{\tau_d}
-$$
-
-$$
-r_i = \phi\left( x_i - a_{0_i} - c \sum_{k=1}^{K} a_{ik} \right)
-$$
-
-$$
-\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K
-$$
-
-$$
-\frac{db_{im}}{dt} = \frac{1-b_{im}}{\tau_{rec_m}} - \frac{b_{im}\, r_i}{\tau_{rel}}, \qquad m = 1, \dots, M
-$$
-
-$$
-\frac{dg_{in}}{dt} = \frac{1-g_{in}}{\tau_{dec_n}} + \frac{(G - g_{in})\, r_i}{\tau_{fac}}, \qquad n = 1, \dots, n_f
-$$
-
----
+> **Equations live in
+> [`Equations_stability_paper.md`](Equations_stability_paper.md).** This file
+> used to restate them, and the copy fell behind — it showed an $a_{0_i}$
+> offset no model class implements, an un-normalised $c$ rather than $c/K$, a
+> scalar $\tau_{rel}$ where the model indexes it per timescale, and no noise
+> term. Its one unique contribution, the facilitation equations, has been moved
+> into the canonical doc, where facilitation is now stated as an optional
+> mechanism.
+>
+> **The VALUES in Table 1 are illustrative, not authoritative.** They describe an
+> earlier operating point and several are now wrong for the paper's preset — it
+> says $N = 300$ where the preset runs 500, $\tau_{a_k} = \{0.1, 1, 10\}$ s where
+> the model uses $\{0.25, 1.581, 10\}$, $c_E = 1/12$ "per timescale" where $c$ is
+> now the total adaptation budget of $0.5$, and a single shared $\tau_{rel}$
+> where the model indexes it per timescale. What this table is *for* is the
+> **meaning, units and role** of each parameter, and the reasoning behind the
+> choices — none of which the generated tables carry.
+>
+> For the values a **particular preset** actually runs at, read the generated
+> `scripts/presentations/Stability_Manuscript/doc_equations_table/equation_table.md`,
+> rebuilt from a live model object on every `make_all_paper_figures` run. That
+> file is the record of what a sweep used; this one explains what the symbols
+> mean.
 
 **Abbreviations:**
 - **SRNN**: Stable Recurrent Nonlinear Network
@@ -160,24 +162,18 @@ $$F = \frac{1}{\sqrt{N\alpha(2-\alpha)}}$$
 
 > **Note on Zero Row Sum (ZRS):** Harris (2023) describes a Zero Row Sum condition (ZRS/SZRS) that controls "local" eigenvalue outliers escaping the spectral disc. In these simulations, we deliberately did not apply the ZRS condition in order to test whether adaptation mechanisms (SFA and STD) could fulfill a similar stabilizing role—effectively examining if adaptation can substitute for ZRS in constraining network dynamics.
 
-## Table 2: Adaptation Conditions
+## Adaptation conditions
 
-The four conditions are defined by enabling/disabling SFA and STD via the number of timescales ($K = n_{a_E}$ for SFA, $M = n_{b_E}$ for STD in the equations):
+Stated in the generated
+`scripts/presentations/Stability_Manuscript/doc_equations_table/adaptation_conditions.md`,
+which is rebuilt from the preset's own condition list on every
+`make_all_paper_figures` run.
 
-| Condition | $n_{a_E}$ (K) | $n_{a_I}$ | $n_{b_E}$ | $n_{b_I}$ | Description |
-|-----------|---------------|-----------|-----------|-----------|-------------|
-| No Adaptation | 0 | 0 | 0 | 0 | Baseline |
-| SFA Only | 3 | 0 | 0 | 0 | Spike-frequency adaptation enabled |
-| STD Only | 0 | 0 | 1 | 0 | Short-term depression enabled |
-| SFA + STD | 3 | 0 | 1 | 0 | Both mechanisms enabled |
-
-**Effect on parameters:**
-
-- When $n_{a_E} = 0$: No SFA variables $a_{ik}$; the $c_E \sum_k a_{ik}$ term is zero.
-- When $n_{a_E} = 3$: Three SFA timescales with $\tau_{a_k} \in \{0.1, 1, 10\}$ s and coupling $c_E = \frac{1}{12}$.
-- When $n_{b_E} = 0$: No STD variables $b_{im}$; synaptic output equals $r_i$ (equivalent to $\prod_m b_{im} = 1$).
-- When $n_{b_E} = M \ge 1$: STD enabled with $M$ timescales, each with its own recovery constant $\tau_{rec_m}$ and a shared release constant $\tau_{rel} = \frac{1}{2}$ s; the per-timescale resources enter the recurrent term as the product $\prod_m b_{im}$. The single-timescale case $M = 1$ (with $\tau_{rec} = 1$ s) recovers the original single-$b$ STD.
-
-Inhibitory neurons have no adaptation mechanisms ($n_{a_I} = n_{b_I} = 0$).
-
-> **Implementation note:** When any of $n_{a_E}$, $n_{a_I}$, $n_{b_E}$, or $n_{b_I}$ is set to zero, the corresponding state variables ($a_{ik}$ or $b_{im}$) are excluded from the system state vector and the Jacobian matrix. This prevents spurious zero eigenvalues that would otherwise arise from including disabled adaptation dynamics.
+A hand-written table lived here and had gone badly out of date: it described
+**four** conditions where the paper now runs **seven**, spelled them in
+`SRNNModel2`'s $n_{a_E}$ / $n_{b_E}$ vocabulary while the paper runs
+`SRNNCellTypePairs`, gave $\tau_{a_k} \in \{0.1, 1, 10\}$ s where the model uses
+$\{0.25, 1.581, 10\}$, quoted $c_E = 1/12$ where $c$ is now the total adaptation
+budget of $0.5$, and claimed inhibitory neurons carry no adaptation while the
+current preset depresses all four routes including I to I. Generating it is the
+only way it stays true.
