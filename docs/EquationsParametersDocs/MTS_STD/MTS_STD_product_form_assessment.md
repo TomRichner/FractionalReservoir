@@ -1,7 +1,7 @@
 # Is the Product Form a Reasonable Model of Multi-Timescale STD?
 
-Assessment of the synaptic output term $\left(\prod_{m=1}^{M} b_{jm}\right) r_j$ used in
-`system_equations_MTS_SFA_MTS_STD.md`, with
+Assessment of the synaptic output term $\theta_j = r_j \prod_{m=1}^{M} b_{jm}$ used in
+[`../Equations_stability_paper.md`](../Equations_stability_paper.md), with
 
 $$
 \frac{db_{im}}{dt} = \frac{1-b_{im}}{\tau_{rec_m}} - \frac{b_{im}\, r_i}{\tau_{rel}}, \qquad m = 1, \dots, M

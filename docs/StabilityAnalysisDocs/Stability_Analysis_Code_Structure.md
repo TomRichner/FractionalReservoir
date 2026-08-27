@@ -8,23 +8,14 @@ This document describes the object-oriented architecture of the FractionalReserv
 
 ## System Equations
 
-The SRNN dynamics are governed by the following system of differential equations (see [system_equations.md](../EquationsParametersDocs/system_equations.md)):
+The SRNN dynamics are stated once, in
+**[Equations_stability_paper.md](../EquationsParametersDocs/Equations_stability_paper.md)**.
 
-$$
-\frac{dx_i}{dt} = \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, b_j r_{j}}{\tau_d}
-$$
-
-$$
-r_i = \phi\left( x_i - a_{0_i} - c \sum_{k=1}^{K} a_{ik} \right)
-$$
-
-$$
-\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}
-$$
-
-$$
-\frac{db_i}{dt} = \frac{1-b_i}{\tau_{rec}} - \frac{b_i\, r_i}{\tau_{rel}}
-$$
+This section used to repeat them inline. The copy drifted — it showed a single
+$b_j$ rather than the product over depression timescales, an $a_{0_i}$ offset no
+model class implements, an un-normalised $c$ instead of $c/K$, and no noise term
+— so it is now a link. The symbol table below is kept because it is this
+document's own, and is what the rest of the page refers to.
 
 | Symbol                   | Description                                        |
 | ------------------------ | -------------------------------------------------- |
@@ -399,5 +390,5 @@ The `src/` directory contains additional standalone utilities organized into sub
 ## See Also
 
 - [parameter_table.md](../EquationsParametersDocs/parameter_table.md) – Complete parameter reference
-- [system_equations.md](../EquationsParametersDocs/system_equations.md) – Mathematical model
+- [Equations_stability_paper.md](../EquationsParametersDocs/Equations_stability_paper.md) – Mathematical model
 - [Script_Notes2.md](./Script_Notes2.md) – How to run the current scripts
