@@ -6,8 +6,12 @@ function paths = write_manuscript_tables(cfg)
 %
 % Writes, into the Stability_Manuscript tree:
 %   doc_equations_table/equation_table.md         equations + parameter table
-%   doc_equations_table/adaptation_conditions.md  the four regimes, as they run
-%   fig_equations/parameter_table.md              the same parameter table
+%   doc_equations_table/adaptation_conditions.md  the regimes, as they run
+%
+% It used to write a third file, fig_equations/parameter_table.md, whose table
+% was IDENTICAL row-for-row to equation_table.md's "Parameters as run" section.
+% Dropped 2026-08-27 along with the fig_equations/ folder, which held no fig_*.m
+% and so was never a figure in the registry.
 %
 % WHY THESE ARE GENERATED. They were hand-written and had gone stale in a way
 % that mattered: equation_table.md documented a SINGLE STD timescale, the
@@ -51,8 +55,6 @@ paths{end+1} = write_equation_table( ...
     ensure_dir(fullfile(out_root, 'doc_equations_table')), cfg.preset_name, M);
 paths{end+1} = write_conditions_table( ...
     ensure_dir(fullfile(out_root, 'doc_equations_table')), cfg.preset_name, conditions, M);
-paths{end+1} = write_parameter_table( ...
-    ensure_dir(fullfile(out_root, 'fig_equations')), cfg.preset_name, M);
 
 if cfg.verbose
     fprintf('[manuscript tables] preset %s (%s)\n', cfg.preset_name, model_class);
@@ -147,11 +149,31 @@ c = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
 fprintf(fid, '## System equations\n\n');
 
+% The synaptic factor, spelled for what THIS preset actually has, built once and
+% used twice: inline in the dendritic equation, and again as the definition of
+% theta below. Writing it out in the dx equation rather than hiding it behind a
+% symbol means the equation states the model without a forward reference; theta
+% is then a NAME for that product, not a placeholder the reader must resolve.
+factor_parts = {};
+if M.n_b_max == 1; factor_parts{end+1} = 'b_j'; end
+if M.n_b_max > 1;  factor_parts{end+1} = sprintf('\\prod_{m=1}^{%d} b_{jm}', M.n_b_max); end
+if M.any_stf;      factor_parts{end+1} = 'g_j'; end
+if isempty(factor_parts)
+    theta_rhs = 'r_j';
+else
+    % '\\,' not '\,' in the DELIMITER: strjoin unescapes its delimiter, so a
+    % literal '\,' raises "Escape sequence '\,' is invalid" and silently emits a
+    % bare comma, turning the LaTeX thin-space into "r_j , \prod b". The
+    % concatenated prefix below is not passed through strjoin and so takes '\,'
+    % directly.
+    theta_rhs = ['r_j \, ' strjoin(factor_parts, ' \\, ')];
+end
+
 % The dendritic equation's FORM depends on whether the preset is stochastic.
 if M.has_noise
     fprintf(fid, ['$$\n\\mathrm{d}x_i = \\frac{-x_i + u_i + ' ...
-        '\\sum_j w_{ij}\\, s_j\\, r_j}{\\tau_d}\\,\\mathrm{d}t ' ...
-        '+ \\frac{\\sigma_u}{\\tau_d}\\,\\mathrm{d}W_i\n$$\n\n']);
+        '\\sum_j w_{ij}\\, %s}{\\tau_d}\\,\\mathrm{d}t ' ...
+        '+ \\frac{\\sigma_u}{\\tau_d}\\,\\mathrm{d}W_i\n$$\n\n'], theta_rhs);
     fprintf(fid, ['Additive Wiener noise enters **only** $x$, which keeps the ' ...
         'diffusion constant: Ito and Stratonovich coincide, the Milstein term ' ...
         'vanishes, the variational equation is untouched, and the noise ' ...
@@ -159,7 +181,7 @@ if M.has_noise
         'input-referred, so it is comparable to the stimulus amplitude.\n\n']);
 else
     fprintf(fid, ['$$\n\\frac{\\mathrm{d}x_i}{\\mathrm{d}t} = ' ...
-        '\\frac{-x_i + u_i + \\sum_j w_{ij}\\, s_j\\, r_j}{\\tau_d}\n$$\n\n']);
+        '\\frac{-x_i + u_i + \\sum_j w_{ij}\\, %s}{\\tau_d}\n$$\n\n'], theta_rhs);
 end
 
 % c/K, not c: the model normalises the adaptation sum by its timescale count, so
@@ -167,9 +189,9 @@ end
 fprintf(fid, ['$$\nr_i = \\phi\\!\\left( x_i - \\frac{c}{K} ' ...
     '\\sum_{k=1}^{K} a_{ik} \\right)\n$$\n\n']);
 fprintf(fid, ['The rate $r_i$ is the **pre-depression** output of the ' ...
-    'nonlinearity. Depression and facilitation enter as the presynaptic factor ' ...
-    '$s_j$ in the recurrent sum, so both mechanisms are driven by the raw rate ' ...
-    '$r_i$, not by $s_i r_i$.\n\n']);
+    'nonlinearity. Depression and facilitation enter presynaptically, as ' ...
+    'factors multiplying $r_j$ inside the recurrent sum, so both mechanisms are ' ...
+    'driven by the raw rate $r_i$ and not by the depressed output.\n\n']);
 
 fprintf(fid, '$$\n\\frac{\\mathrm{d}a_{ik}}{\\mathrm{d}t} = \\frac{-a_{ik} + r_i}{\\tau_{a_k}}\n$$\n\n');
 
@@ -185,13 +207,12 @@ if M.any_stf
         '\\frac{(G - g_i)\\, r_i}{\\tau_{\\mathrm{fac}}}\n$$\n\n']);
 end
 
-% The synaptic factor, spelled for what this preset actually has.
-parts = {};
-if M.n_b_max == 1; parts{end+1} = 'b_i'; end
-if M.n_b_max > 1;  parts{end+1} = sprintf('\\prod_{m=1}^{%d} b_{im}', M.n_b_max); end
-if M.any_stf;      parts{end+1} = 'g_i'; end
-if isempty(parts); parts = {'1'}; end
-fprintf(fid, '$$\ns_i = %s\n$$\n\n', strjoin(parts, ' \\, '));
+% Name the product built above. theta is the SYNAPTIC OUTPUT -- the rate after
+% depression, i.e. what the recurrent sum transmits -- and matches the notation
+% in docs/EquationsParametersDocs/Equations_stability_paper.md.
+fprintf(fid, '$$\n\\theta_j = %s\n$$\n\n', theta_rhs);
+fprintf(fid, ['$\\theta_j$ is the **synaptic output**: the presynaptic rate ' ...
+    'after depression, and the quantity the recurrent sum above transmits.\n\n']);
 if M.n_b_max > 1
     % Quote the actual depth this preset reaches. The ratio tau_rec/tau_rel is
     % the ONLY combination that sets the steady state, so it is what the numbers
@@ -246,13 +267,12 @@ write_param_rows(fid, M);
 end
 
 %% ------------------------------------------------------------------------
-function p = write_parameter_table(dir_out, preset_name, M)
-p = fullfile(dir_out, 'parameter_table.md');
-fid = open_md(p, 'SRNN model parameter table', preset_name, M);
-c = onCleanup(@() fclose(fid)); %#ok<NASGU>
-write_param_rows(fid, M);
-end
-
+% write_parameter_table lived here and wrote fig_equations/parameter_table.md by
+% calling write_param_rows into a file of its own. Its output was identical
+% row-for-row to the section write_equation_table already emits, so the only
+% thing it added was a second copy to keep in sync. Removed 2026-08-27 with the
+% fig_equations/ folder. write_param_rows stays -- it is what equation_table.md
+% uses.
 function write_param_rows(fid, M)
 fprintf(fid, '## Parameters as run\n\n');
 fprintf(fid, '| Symbol | Name | Value | Units |\n|---|---|---|---|\n');
@@ -330,11 +350,6 @@ if M.is_pairs
             tidy(cd_.name), tau_a_str(cd_), R.std, R.stf);
     end
     fprintf(fid, '\n');
-    fprintf(fid, ['**Why this class.** `SRNNCellTypePairs` names each synaptic ' ...
-        'route individually, so depression can be put on one route and not ' ...
-        'another. `SRNNModel2` cannot express that: its depression count is ' ...
-        'per **presynaptic population**, so it can say "all outgoing E ' ...
-        'synapses depress" but never distinguish E to E from E to I.\n\n']);
 else
     fprintf(fid, '| Condition | $n_{a_E}$ | $n_{b_E}$ |\n|---|---|---|\n');
     for k = 1:numel(conditions)
@@ -343,11 +358,6 @@ else
     end
     fprintf(fid, '\n');
 end
-
-fprintf(fid, ['**Implementation note.** When a mechanism is switched off its ' ...
-    'state variables are excluded from the state vector and from the Jacobian ' ...
-    'entirely, rather than being integrated at zero. This prevents spurious ' ...
-    'zero eigenvalues from disabled dynamics.\n\n']);
 end
 
 function s = tau_a_str(cd_)
@@ -373,37 +383,22 @@ for a = 1:numel(pres)
     posts = fieldnames(sc.(pres{a}));
     for b = 1:numel(posts)
         e = sc.(pres{a}).(posts{b});
-        lbl = sprintf('%s to %s', pres{a}, posts{b});
+        % Routes read as "EE", "EI", ... here -- presynaptic type first, as in
+        % the mu_EE_relative sweep aliases. The parameter table keeps the longer
+        % "E to E" form, where a route label sits next to a tau symbol.
+        lbl = sprintf('%s%s', pres{a}, posts{b});
         if isfield(e, 'std') && ~isempty(e.std); s_list{end+1} = lbl; end %#ok<AGROW>
         if isfield(e, 'stf') && ~isempty(e.stf); f_list{end+1} = lbl; end %#ok<AGROW>
     end
 end
 if ~isempty(s_list)
-    % The routes ALONE cannot tell std_only from std_only_oneTS: both depress
-    % the same four routes and differ only in how many timescales each carries.
-    % Naming the timescales is what makes those two rows distinguishable.
-    R.std = sprintf('%s (tau_rec %s)', strjoin(s_list, ', '), std_taus(sc));
+    % Routes only. NOTE this cannot tell std_only from std_only_oneTS: both
+    % depress the same four routes and differ only in how many timescales each
+    % carries, which used to be spelled out here as a tau_rec suffix. The
+    % parameter table still names those timescales.
+    R.std = strjoin(s_list, ', ');
 end
 if ~isempty(f_list); R.stf = strjoin(f_list, ', '); end
-end
-
-function s = std_taus(sc)
-% The depression recovery timescales, assuming every depressing route shares
-% them -- which every preset in this repo does. Falls back to naming the routes
-% separately if one ever does not, rather than quietly reporting the first.
-pres = fieldnames(sc);
-found = {};
-for a = 1:numel(pres)
-    posts = fieldnames(sc.(pres{a}));
-    for b = 1:numel(posts)
-        e = sc.(pres{a}).(posts{b});
-        if isfield(e, 'std') && ~isempty(e.std)
-            found{end+1} = mat2str(e.std.tau_rec, 4); %#ok<AGROW>
-        end
-    end
-end
-u = unique(found);
-if isscalar(u); s = u{1}; else; s = strjoin(u, ' / '); end
 end
 
 %% ------------------------------------------------------------------------
