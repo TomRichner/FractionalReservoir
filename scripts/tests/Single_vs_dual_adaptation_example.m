@@ -62,7 +62,7 @@ model1.c_E = 0.25/3;
 
 % RMT tilde-notation parameters (Harris 2023)
 % F = 1/sqrt(N*alpha*(2-alpha)), the scaling factor yielding R=1 when
-% all tilde parameters are equal (see parameter_table.md)
+% all tilde parameters are equal (see cell_type_pair_equations.md)
 model1.mu_E_tilde_relative = 3.5;
 model1.mu_I_tilde_relative = -3.5;
 model1.sigma_E_tilde_relative = 1;

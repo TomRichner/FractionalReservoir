@@ -177,4 +177,4 @@ Batch checkpoint files are stored in `temp_batches/` within the output directory
 ## See Also
 
 - [Stability_Analysis_Code_Structure.md](./Stability_Analysis_Code_Structure.md) – Class documentation
-- [parameter_table.md](../EquationsParametersDocs/parameter_table.md) – Parameter reference
+- [cell_type_pair_equations.md](../EquationsParametersDocs/cell_type_pair_equations.md) – Parameter reference

@@ -22,8 +22,11 @@ $$
 $$
 
 with $\tau_{rec}$ a $1\times M$ vector and $\tau_{rel}$ currently a **shared scalar**
-(`SRNNModel2.m:1107` validates `tau_b_E_rel` as scalar; default `0.25`, though
-`parameter_table.md` documents $1/2$ — worth reconciling).
+(`SRNNModel2.m:1107` validates `tau_b_E_rel` as scalar; default `0.25`). The
+$1/2$ that `parameter_table.md` used to document was simply stale; that file was
+deleted on 2026-08-27, so the discrepancy is resolved by there no longer being a
+second, hand-maintained claim. Values now come from the preset, reported in the
+generated `doc_equations_table/equation_table.md`.
 
 ## 2. What Varela actually specifies
 
@@ -215,8 +218,9 @@ Touch points in `src/SRNNModel2.m`:
   finite-difference check.
 - **Parameter export** (~line 869) and any `parfor`-sliced parameter structs.
 
-Also worth doing at the same time: reconcile the `tau_b_E_rel` default (`0.25` in code) with
-`parameter_table.md` ($1/2$).
+(The `tau_b_E_rel` reconciliation that used to be listed here is done:
+`parameter_table.md`, the only place claiming $1/2$, was deleted on 2026-08-27.
+The code default of `0.25` stands unopposed.)
 
 ---
 

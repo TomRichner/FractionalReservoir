@@ -61,7 +61,7 @@ $\tau_{rec} = [0.1,\, 1,\, 10]$ s:
 | **product** | — | **0.013** |
 
 That is a 75× attenuation, versus 3× for the single-timescale case. (The code default is
-`tau_b_E_rel = 0.25`, not the $1/2$ listed in `parameter_table.md`, which makes it ~290×.)
+`tau_b_E_rel = 0.25`, which makes it ~290×. A now-deleted `parameter_table.md` listed $1/2$.)
 The slow timescale alone nearly silences the synapse.
 
 This is the same fairness problem already solved for SFA with $c_E = 0.15/3$. The analogue

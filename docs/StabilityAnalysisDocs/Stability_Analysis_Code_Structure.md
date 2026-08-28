@@ -30,7 +30,7 @@ document's own, and is what the rest of the page refers to.
 | $\tau_{rec}, \tau_{rel}$ | STD recovery and release time constants            |
 | $c$                      | SFA coupling strength                              |
 
-For a complete parameter reference, see [parameter_table.md](../EquationsParametersDocs/parameter_table.md).
+For a complete parameter reference, see [cell_type_pair_equations.md](../EquationsParametersDocs/cell_type_pair_equations.md).
 
 ---
 
@@ -389,6 +389,6 @@ The `src/` directory contains additional standalone utilities organized into sub
 
 ## See Also
 
-- [parameter_table.md](../EquationsParametersDocs/parameter_table.md) – Complete parameter reference
+- [cell_type_pair_equations.md](../EquationsParametersDocs/cell_type_pair_equations.md) – Complete parameter reference
 - [Equations_stability_paper.md](../EquationsParametersDocs/Equations_stability_paper.md) – Mathematical model
 - [Script_Notes2.md](./Script_Notes2.md) – How to run the current scripts

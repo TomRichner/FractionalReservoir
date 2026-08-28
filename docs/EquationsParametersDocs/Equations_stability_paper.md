@@ -74,7 +74,8 @@ $g_{in}$ rests at 1, so an absent mechanism contributes an empty product of one.
 
 Facilitation is configured per presynaptic-to-postsynaptic route rather than per
 neuron — `synapse_config.<pre>.<post>.stf`, with fields `tau_dec`, `tau_fac` and
-`G`. See `cell_type_pair_parameter_table.md` for the per-route form, in which
+`G`. See [`cell_type_pair_equations.md`](cell_type_pair_equations.md) for the
+per-route form, in which
 $b$ and $g$ carry route superscripts.
 
 ## Notes on terms that are *not* in the model

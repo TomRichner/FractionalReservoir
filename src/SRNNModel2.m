@@ -420,7 +420,7 @@ classdef SRNNModel2 < handle
         function val = get.default_val(obj)
             % DEFAULT_VAL Normalization factor F = 1/sqrt(N*alpha*(2-alpha))
             % Scaling factor which yields R=1 when all tilde parameters are equal.
-            % See parameter_table.md for derivation (Harris 2023).
+            % See docs/EquationsParametersDocs/cell_type_pair_equations.md for the derivation (Harris 2023).
             %
             % F_tracks_network = true (default) computes F from the CURRENT n and
             % indegree. Because the n*alpha in R cancels against this F, the
