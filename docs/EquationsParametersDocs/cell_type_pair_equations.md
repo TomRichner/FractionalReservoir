@@ -197,8 +197,19 @@ differ from E→I; a `1 x C` row is accepted and broadcast down the columns as a
 
 Selected by name — `activation` is `'logistic'` (the class default) `'piecewise'`
 or `'tanh'`. The paper's preset uses `'piecewise'`, defined here.
-Implementation: `src/nonlinearities/piecewiseSigmoid.m`, where the arguments are
-`a` $= q_\phi$ and `c` $= a_0$ (the property `S_a` and the setpoint `S_c`).
+Implementation: `src/nonlinearities/piecewiseSigmoid.m`.
+
+**$\phi$ is defined here centred on zero**, with $\phi(0) = \tfrac{1}{2}$. The
+setpoint does not appear below: it is subtracted in the rate equation as
+$a_{0_i}$, which keeps the translation separate from the shape. The benefit is
+that $\phi$ can then be swapped for any standard sigmoid — the plain logistic,
+$\tanh$ — without each one needing its own shift parameter, and the setpoint
+means the same thing whichever is chosen.
+
+The code does it the other way round, passing the centre into the nonlinearity
+(`piecewiseSigmoid(x, S_a, S_c)`, where the third argument is the horizontal
+shift). The two agree because a translation commutes with everything else here:
+$\phi_{S_c}(z) = \phi_0(z - S_c)$.
 
 The activation function $\phi(x)$ is a **hard sigmoid with rounded corners** — a
 piecewise function composed of five regions that smoothly transitions between
@@ -215,7 +226,7 @@ $$k = \frac{1}{2(1 - 2q)}$$
 
 The four breakpoints dividing the five regions are:
 
-$$x_1 = a_0 + q - 1, \quad x_2 = a_0 - q, \quad x_3 = a_0 + q, \quad x_4 = a_0 + 1 - q$$
+$$x_1 = q - 1, \quad x_2 = -q, \quad x_3 = q, \quad x_4 = 1 - q$$
 
 **Piecewise definition:**
 
@@ -224,7 +235,7 @@ $$
 \begin{cases}
 0 & \text{if } x < x_1 \quad \text{(left saturation)} \\[4pt]
 k(x - x_1)^2 & \text{if } x_1 \le x < x_2 \quad \text{(left quadratic)} \\[4pt]
-(x - a_0) + \tfrac{1}{2} & \text{if } x_2 \le x \le x_3 \quad \text{(linear segment)} \\[4pt]
+x + \tfrac{1}{2} & \text{if } x_2 \le x \le x_3 \quad \text{(linear segment)} \\[4pt]
 1 - k(x - x_4)^2 & \text{if } x_3 < x \le x_4 \quad \text{(right quadratic)} \\[4pt]
 1 & \text{if } x > x_4 \quad \text{(right saturation)}
 \end{cases}
@@ -234,17 +245,11 @@ $$
 
 - **$q_\phi \in [0, 1]$** (`S_a`): Controls the width of the central linear region. When $q_\phi = 1$, the function reduces to a standard hard sigmoid (pure piecewise linear with corners). When $q_\phi = 0$, the function becomes purely quadratic transitions with no linear segment.
 
-- **$a_0$** (`S_c`): The horizontal center of the sigmoid. At $x = a_0$, the function outputs $\phi(a_0) = \frac{1}{2}$. This parameter shifts the entire function along the $x$-axis, allowing the resting point of the firing rate to be tuned. It may be made **per-neuron** by setting `mu_S_c` / `sigma_S_c`, in which case `build()` draws $a_{0,i}$ into the read-only `S_c_vec`.
+There is no centre parameter here — see the note above. The setpoint is
+$a_{0_i}$ in the rate equation, held in the property `S_c`, and may be drawn
+per neuron via `mu_S_c` / `sigma_S_c` into the read-only `S_c_vec`.
 
 > **Note:** The quadratic segments ensure $C^1$ continuity (smooth corners) at the transitions between the linear and saturated regions, avoiding the discontinuous derivatives of a standard hard sigmoid.
-
-> **$a_0$ and $a_{0_i}$ are the same symbol**, and earlier revisions of these
-> documents were wrong to say otherwise. $a_0$ is the centre of the
-> nonlinearity — the property `S_c` — and the $a_{0_i}$ that appears in the rate
-> equation is exactly that, written per-neuron because `S_c` may be drawn per
-> neuron into `S_c_vec`. Pulling it out of $\phi$ and subtracting it in the
-> argument is equivalent to centring $\phi$ at `S_c`, which is what the code
-> does: $\phi_{S_c}(z) = \phi_0(z - S_c)$.
 
 ---
 
