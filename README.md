@@ -50,16 +50,20 @@ setup_paths()
 Everything the paper needs then runs from two entry points in `scripts/paper/`:
 
 ```matlab
-run_dir = run_all_paper_analyses(paper_config());   % all heavy compute, hours
-results = make_all_paper_figures(paper_config());   % every figure, minutes
+run_dir = run_all_paper_analyses();   % all heavy compute, hours
+results = make_all_paper_figures();   % every figure, minutes
 ```
 
-or, to do both in one action with the paper's preset and run mode already named,
-open and run [`scripts/paper/reproduce_paper_run.m`](scripts/paper/reproduce_paper_run.m).
+Called with no argument, both take their settings from `paper_config()`. To do
+both in one action, open and run
+[`scripts/paper/reproduce_paper_run.m`](scripts/paper/reproduce_paper_run.m),
+which is those two lines and a summary.
 
 **[`scripts/paper/paper_config.m`](scripts/paper/paper_config.m) is the one file
 to edit** — it names the preset (*which network*) and the run mode (*how much
-compute*), and both entry points follow it.
+compute*), and everything else follows it. It defaults to `'medium'`: about
+3 hours of compute, and figures you can actually read. The paper's final run
+uses `'production'`, which is a deliberate edit rather than the default.
 
 ## Layout
 

@@ -29,7 +29,10 @@ function cfg = paper_config(opts)
 
 arguments
     opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
-    opts.run_mode    (1,:) char = 'production'
+    % 'medium' is the default because it is what gets run: ~3 h of compute and
+    % figures that are readable. 'production' is a deliberate act -- pass it
+    % explicitly, paper_config('run_mode', 'production'), for the final run.
+    opts.run_mode    (1,:) char = 'medium'
     opts.run_dir     (1,:) char = ''      % '' -> resolve by preset at figure time
 end
 
