@@ -21,19 +21,43 @@ dead end.
 MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD). The dynamics implemented are:
 
 ```
-dx_i/dt    = (-x_i + Σ_j w_ij · b_j r_j + u_i) / τ_d
-r_i        = φ(x_i - c · Σ_k a_{i,k})
-da_{i,k}/dt = (-a_{i,k} + r_i) / τ_k
-db_i/dt    = (1 - b_i)/τ_rec - (b_i · r_i)/τ_rel
+dx_i        = (-x_i + Σ_j w_ij · θ_j + u_i)/τ_d · dt  +  (σ_u/τ_d) · dW_i
+θ_i         = r_i · Π_m b_{i,m}
+r_i         = φ(x_i - (c/K) · Σ_k a_{i,k})
+da_{i,k}/dt = (-a_{i,k} + r_i) / τ_{a_k}
+db_{i,m}/dt = (1 - b_{i,m})/τ_rec_m - (b_{i,m} · r_i)/τ_rel_m
 ```
 
-Note the placement of `b`. The rate `r_i` is the **pre-depression** output of the
-nonlinearity; depression enters as the product `b_j r_j` in the recurrent sum, i.e.
-presynaptically and multiplicatively. Consequently SFA and STD are both driven by
-the raw rate `r_i`, not by `b_i r_i`. This is not cosmetic: the alternative framing
-`r_i = b_i·φ(...)` would make SFA integrate `b_i r_i`, make the STD ODE depend on
-`b_i² r_i`, and put a factor of `b` into the `a→x` and `a→a` Jacobian blocks. The
-code (`dynamics_fast`, `compute_Jacobian_fast`) implements the form above.
+**The equations live in ONE human-written file**, `docs/EquationsParametersDocs/Equations_stability_paper.md`
+(plus the *generated* `doc_equations_table/equation_table.md`, rebuilt from a live
+model on every figure run). They were previously restated by hand in eleven
+places and drifted apart; the block above is a summary for orientation, and that
+file is authoritative. **Do not add a twelfth copy** — link instead.
+
+Three things the block above is easy to get wrong:
+
+**Placement of `b`.** `θ_i` is the SYNAPTIC OUTPUT — the rate after depression.
+The rate `r_i` is the **pre-depression** output of the nonlinearity; depression
+enters as the product `θ_j` in the recurrent sum, i.e. presynaptically and
+multiplicatively. Consequently SFA and STD are both driven by the raw rate `r_i`,
+not by `θ_i`. This is not cosmetic: the alternative framing `r_i = b_i·φ(...)`
+would make SFA integrate `b_i r_i`, make the STD ODE depend on `b_i² r_i`, and
+put a factor of `b` into the `a→x` and `a→a` Jacobian blocks. The code
+(`dynamics_fast`, `compute_Jacobian_fast`) implements the form above.
+
+**`c` is divided by `K`, the SFA timescale count** (`params.c_eff = obj.c ./ max(1, obj.n_a)`,
+`SRNNCellTypePairs.m:659`). Every `a_k` relaxes to the rate, so `Σ_k a_k → K·r`
+and the division makes the steady-state adaptation `c·r` exactly — independent of
+how many timescales carry it. **`c` is therefore the TOTAL adaptation budget**,
+and changing `K` changes the timescale *structure* without changing adaptation
+*strength*. Depression needs no such factor because it enters as a PRODUCT: each
+`b` rests at 1, so a second timescale squares the steady state rather than
+subdividing it, which is deliberate. Note `SRNNModel2` also has `c/K` but
+`src/algorithms/Jacobian/compute_J_eff.m` does **not** — see its header.
+
+**Facilitation exists but is unused by the paper's preset.** `SRNNCellTypePairs`
+supports per-route STF, contributing a further presynaptic product `Π_n g_{i,n}`
+to `θ`, with `dg/dt = (1-g)/τ_dec + (G-g)·r/τ_fac`.
 
 Connectivity uses Random Matrix Theory (Harris 2023) tilde-notation. Outputs are largest Lyapunov exponent (LLE), full Lyapunov spectrum (QR method), firing rate statistics, and parameter-sweep histograms.
 
