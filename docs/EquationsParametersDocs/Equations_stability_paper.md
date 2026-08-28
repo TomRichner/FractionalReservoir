@@ -20,7 +20,7 @@ $$
 \begin{aligned}
 dx_i &= \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \theta_j}{\tau_d}\, dt \;+\; \frac{\sigma_u}{\tau_d}\, dW_i \\[8pt]
 \theta_i &= r_{i} \prod_{m=1}^{M} b_{im} \\[8pt]
-r_i &= \phi\left( x_i - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right) \\[8pt]
+r_i &= \phi\left( x_i - a_{0_i} - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right) \\[8pt]
 \frac{da_{ik}}{dt} &= \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K \\[8pt]
 \frac{db_{im}}{dt} &= \frac{1-b_{im}}{\tau_{rec_m}} - \frac{b_{im}\, r_i}{\tau_{rel_m}}, \qquad m = 1, \dots, M
 \end{aligned}
@@ -78,16 +78,22 @@ neuron — `synapse_config.<pre>.<post>.stf`, with fields `tau_dec`, `tau_fac` a
 per-route form, in which
 $b$ and $g$ carry route superscripts.
 
-## Notes on terms that are *not* in the model
+## Notes
 
-**There is no $a_0$ offset.** Older derivations wrote the argument of $\phi$ as
-$x_i - a_{0_i} - c\sum_k a_{ik}$, with $a_{0_i}$ standing for a threshold shift
-or preferred input. **No model class implements it**:
-`SRNNCellTypePairs.dynamics_fast` forms `x_eff = x - c_eff .* sum(a, 2)`, and
-there is no $a_0$ anywhere in `src/`. It is also redundant by construction — a
-constant subtracted inside $\phi$ is indistinguishable from a constant added to
-$u_i$, which is exactly what `input_config.intrinsic_drive` supplies. So this is
-not a missing feature to implement; it is a symbol the model never needed.
+**$a_{0_i}$ is the setpoint of the nonlinearity**, i.e. the property `S_c`, and
+$\phi$ above is the **zero-centred** function. The code writes it the other way
+round — `dynamics_fast` forms `x_eff = x - c_eff .* sum(a, 2)` and then applies a
+$\phi$ that is itself centred at `S_c`, via `piecewiseSigmoid(x, S_a, S_c)`.
+Since $\phi_{S_c}(z) = \phi_0(z - S_c)$ the two are identical; pulling the
+setpoint out is what makes it visible as the swept parameter it is rather than
+hidden inside the symbol $\phi$. It carries a neuron index because the setpoint
+may be drawn per neuron: set `mu_S_c` / `sigma_S_c` and `build()` fills `S_c_vec`.
+
+> A revision of this file dated 2026-08-27 deleted this term, claiming no model
+> class implemented it and that it was "a symbol the model never needed". That
+> was wrong. The mistake was checking `src/` for the *name* `a_0`, finding only
+> `abscissa_0`, and concluding the *quantity* was absent — when the code calls it
+> `S_c`. Restored 2026-08-28.
 
 **Noise enters only $x$.** That is what keeps the diffusion constant, which in
 turn makes Itô and Stratonovich coincide, kills the Milstein term, leaves the QR

@@ -17,14 +17,14 @@ Let $q = p(j)$ be the type of presynaptic neuron $j$ and $s = p(i)$ the type of
 postsynaptic neuron $i$. The recurrent dynamics are
 
 $$
-dx_i=\frac{-x_i+u_i+\sum_jw_{ij}
-h_j^{q\to s}r_j}{\tau_d}\,dt\;+\;\frac{\sigma_u}{\tau_d}\,dW_i,
+dx_i=\frac{-x_i+u_i+\sum_jw_{ij}\,
+\theta_j^{q\to s}}{\tau_d}\,dt\;+\;\frac{\sigma_u}{\tau_d}\,dW_i,
 $$
 
 where the rate is the **pre-depression** output of the nonlinearity,
 
 $$
-r_i = \phi\!\left( x_i - \frac{c_s}{K_s} \sum_{k=1}^{K_s} a_{ik} \right),
+r_i = \phi\!\left( x_i - a_{0_i} - \frac{c_s}{K_s} \sum_{k=1}^{K_s} a_{ik} \right),
 $$
 
 and each spike-frequency-adaptation state relaxes towards that rate,
@@ -32,6 +32,10 @@ and each spike-frequency-adaptation state relaxes towards that rate,
 $$
 \frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a,sk}}, \qquad k = 1, \dots, K_s .
 $$
+
+$a_{0_i}$ is the **setpoint** of the nonlinearity — the property `S_c`, drawn
+per neuron when `mu_S_c` / `sigma_S_c` are set — so $\phi$ here is the
+zero-centred function; see the activation section below.
 
 $c_s$, $K_s$ and $\tau_{a,sk}$ are **per cell type**, not per route: adaptation is
 a property of the neuron, so it is indexed by the neuron's own type $s$, whereas
@@ -49,16 +53,33 @@ changing $K_s$ alters the timescale *structure* without altering adaptation
 anyway.
 
 Note also that $r_i$ drives the adaptation and the synaptic states, while
-$h_j^{q\to s} r_j$ — the synaptic output — is what the recurrent sum transmits.
+$\theta_j^{q\to s}$ — the synaptic output — is what the recurrent sum transmits.
 Depression is presynaptic and multiplicative; it does **not** feed back into
 $a$, $b$ or $g$.
 
-### Route readout
+### Synaptic output
 
 $$
-h_j^{q\to s}=\left(\prod_{m=1}^{M_{qs}}b_{jm}^{q\to s}\right)
+\theta_j^{q\to s}=r_j\left(\prod_{m=1}^{M_{qs}}b_{jm}^{q\to s}\right)
 \left(\prod_{k=1}^{L_{qs}}g_{jk}^{q\to s}\right).
 $$
+
+**This is the same $\theta$ as in
+[`Equations_stability_paper.md`](Equations_stability_paper.md)**, carrying a
+route superscript. The paper writes $\theta_j = r_j \prod_m b_{jm}$; that is
+this expression in the special case of a single route with no facilitation,
+where the $g$ product is empty and equal to one. Reading the two documents
+together, $\theta$ always means *the rate after the synapse has acted on it* —
+the quantity a presynaptic neuron actually delivers, as opposed to the rate
+$r_j$ it fires at.
+
+The superscript is **directed**: $\theta_j^{q\to s}$ is what neuron $j$ of type
+$q$ delivers *to* a postsynaptic neuron of type $s$. One presynaptic neuron
+therefore has as many synaptic outputs as there are configured target types, and
+they differ whenever the routes carry different depression or facilitation. That
+is exactly what `SRNNCellTypePairs` buys over a single per-neuron $\theta$, and
+why `plot_data.synaptic_output` is nested by route (`.E.PV`) rather than being
+one trace per neuron.
 
 For every enabled STD state,
 
@@ -217,10 +238,13 @@ $$
 
 > **Note:** The quadratic segments ensure $C^1$ continuity (smooth corners) at the transitions between the linear and saturated regions, avoiding the discontinuous derivatives of a standard hard sigmoid.
 
-> $a_0$ here is the **centre of the nonlinearity**, nothing to do with the
-> $a_{0_i}$ adaptation offset that appeared in older versions of these
-> documents. That term was never implemented and has been removed; see
-> [`Equations_stability_paper.md`](Equations_stability_paper.md).
+> **$a_0$ and $a_{0_i}$ are the same symbol**, and earlier revisions of these
+> documents were wrong to say otherwise. $a_0$ is the centre of the
+> nonlinearity — the property `S_c` — and the $a_{0_i}$ that appears in the rate
+> equation is exactly that, written per-neuron because `S_c` may be drawn per
+> neuron into `S_c_vec`. Pulling it out of $\phi$ and subtracting it in the
+> argument is equivalent to centring $\phi$ at `S_c`, which is what the code
+> does: $\phi_{S_c}(z) = \phi_0(z - S_c)$.
 
 ---
 
