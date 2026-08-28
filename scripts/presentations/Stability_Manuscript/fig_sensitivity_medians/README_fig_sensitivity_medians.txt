@@ -1,7 +1,7 @@
 Stability_Manuscript figure: sensitivity medians, conditions overlaid
 =====================================================================
 
-Generated: 26-Aug-2026 14:54:20
+Generated: 27-Aug-2026 19:02:36
 By:        fig_sensitivity_medians.m
 
 WHAT IT SHOWS

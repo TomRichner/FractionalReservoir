@@ -1,7 +1,7 @@
 Stability_Manuscript figures: LLE and mean firing rate sensitivity
 ==================================================================
 
-Generated: 26-Aug-2026 17:45:18
+Generated: 27-Aug-2026 19:02:20
 By:        fig_sensitivity_analysis_allStd.m
 
 WHAT IT SHOWS

@@ -1,19 +1,21 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_introductory_concepts\panel_A\energy_landscape
-Captured at: 26-Aug-2026 14:49:35
+Captured at: 27-Aug-2026 18:57:12
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      e629188dbc374364300851eb0bb36616ef460140
-commit_short:e629188
+commit:      2b23710a60f9306601331954b318f08857b752ee
+commit_short:2b23710
 branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Colour the E:I sheets by weights as well as by neuron count
-last_date:   2026-08-26T14:48:15-05:00
+last_msg:    Name the synaptic output theta; stop generating the duplicate parameter table
+last_date:   2026-08-27T18:56:11-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/README_fig_introductory_concepts.txt
+M scripts/presentations/Stability_Manuscript/doc_equations_table/adaptation_conditions.pdf
+ M scripts/presentations/Stability_Manuscript/doc_equations_table/equation_table.pdf
+ M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/README_fig_introductory_concepts.txt
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.fig
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/eigenspectra/panelA_eigenspectrum.png
  M scripts/presentations/Stability_Manuscript/fig_introductory_concepts/panel_A/energy_landscape/panelA_energy_landscape.fig

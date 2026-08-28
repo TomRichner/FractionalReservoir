@@ -1,19 +1,21 @@
 Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\scripts\presentations\Stability_Manuscript\fig_eig_heatmap
-Captured at: 26-Aug-2026 14:56:24
+Captured at: 27-Aug-2026 19:05:01
 
 hostname:    R5611351
 platform:    PCWIN64
 matlab:      2026a
-commit:      e629188dbc374364300851eb0bb36616ef460140
-commit_short:e629188
+commit:      2b23710a60f9306601331954b318f08857b752ee
+commit_short:2b23710
 branch:      refactorRunAll
 remote:      git@github.com:TomRichner/FractionalReservoir.git
-last_msg:    Colour the E:I sheets by weights as well as by neuron count
-last_date:   2026-08-26T14:48:15-05:00
+last_msg:    Name the synaptic output theta; stop generating the duplicate parameter table
+last_date:   2026-08-27T18:56:11-05:00
 dirty:       true
 
 --- git status --porcelain ---
-M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.fig
+M scripts/presentations/Stability_Manuscript/doc_equations_table/adaptation_conditions.pdf
+ M scripts/presentations/Stability_Manuscript/doc_equations_table/equation_table.pdf
+ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.fig
  M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.png
  M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpace.svg
  M scripts/presentations/Stability_Manuscript/fig_EI_param_space/README_fig_EI_param_space.txt
@@ -97,11 +99,12 @@ M scripts/presentations/Stability_Manuscript/fig_EI_param_space/Fig_EI_ParamSpac
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/Fig_SFA_EOC_allStd.svg
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/README_fig_sfa_EOC_allStd.txt
  M scripts/presentations/Stability_Manuscript/fig_sfa_EOC_allStd/git_provenance.txt
- M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/README_fig_stim_engages_adaptation.txt
- M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_psd.fig
- M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_psd.png
- M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_synchrony.fig
- M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_synchrony.png
- M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.fig
+ D scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.fig
  M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.png
- M scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/git_provenance.txt
+ D scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries.svg
+?? scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries_f_1.fig
+?? scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries_figure_1.svg
+
+--- untracked files (not in patch) ---
+scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries_f_1.fig
+scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/bursting_timeseries_figure_1.svg

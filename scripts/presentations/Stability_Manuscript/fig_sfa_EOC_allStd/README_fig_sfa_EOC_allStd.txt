@@ -1,7 +1,7 @@
 Stability_Manuscript figure: SFA edge of chaos (tau_a sensitivity)
 ==================================================================
 
-Generated: 26-Aug-2026 14:56:01
+Generated: 27-Aug-2026 19:04:36
 By:        fig_sfa_EOC_allStd.m
 
 WHAT IT SHOWS
