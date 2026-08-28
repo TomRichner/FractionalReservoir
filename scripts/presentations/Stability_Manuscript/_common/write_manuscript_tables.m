@@ -101,9 +101,11 @@ else
 end
 
 M.n_b_max = 0;
+M.n_g_max = 0;
 M.any_stf = false;
 for k = 1:numel(M.routes)
     M.n_b_max = max(M.n_b_max, numel(M.routes(k).tau_rec));
+    M.n_g_max = max(M.n_g_max, numel(M.routes(k).tau_dec));
     M.any_stf = M.any_stf || M.routes(k).has_stf;
 end
 M.has_noise = any(M.sigma_u_noise(:) > 0);
@@ -157,7 +159,10 @@ fprintf(fid, '## System equations\n\n');
 factor_parts = {};
 if M.n_b_max == 1; factor_parts{end+1} = 'b_j'; end
 if M.n_b_max > 1;  factor_parts{end+1} = sprintf('\\prod_{m=1}^{%d} b_{jm}', M.n_b_max); end
-if M.any_stf;      factor_parts{end+1} = 'g_j'; end
+if M.any_stf && M.n_g_max == 1; factor_parts{end+1} = 'g_j'; end
+if M.any_stf && M.n_g_max > 1
+    factor_parts{end+1} = sprintf('\\prod_{n=1}^{%d} g_{jn}', M.n_g_max);
+end
 if isempty(factor_parts)
     theta_rhs = 'r_j';
 else
@@ -184,10 +189,28 @@ else
         '\\frac{-x_i + u_i + \\sum_j w_{ij}\\, %s}{\\tau_d}\n$$\n\n'], theta_rhs);
 end
 
+% Two things here are easy to get wrong.
+%
+% a_{0_i} is the SETPOINT of the nonlinearity, i.e. the property S_c, written
+% explicitly so phi is the ZERO-CENTRED function. The code folds it into phi
+% instead -- build_activation captures c = S_c and calls
+% piecewiseSigmoid(x, S_a, S_c), which centres the sigmoid at S_c -- and
+% phi_{S_c}(z) = phi_0(z - S_c), so the two forms are identical. Writing it out
+% is what makes the setpoint visible as a swept parameter rather than hidden
+% inside the symbol phi. It carries a neuron index because S_c may be per-neuron:
+% set mu_S_c / sigma_S_c and build() draws S_c_vec.
+%
 % c/K, not c: the model normalises the adaptation sum by its timescale count, so
 % c is the TOTAL adaptation budget and the steady state is c*r whatever K is.
-fprintf(fid, ['$$\nr_i = \\phi\\!\\left( x_i - \\frac{c}{K} ' ...
+fprintf(fid, ['$$\nr_i = \\phi\\!\\left( x_i - a_{0_i} - \\frac{c}{K} ' ...
     '\\sum_{k=1}^{K} a_{ik} \\right)\n$$\n\n']);
+fprintf(fid, ['$a_{0_i}$ is the **setpoint** of the nonlinearity -- the ' ...
+    'property `S_c`, %s here -- pulled out of $\\phi$ so that $\\phi$ is the ' ...
+    'zero-centred function and the setpoint reads as the swept parameter it ' ...
+    'is. The code folds it back in, centring the sigmoid at `S_c` directly; ' ...
+    '$\\phi_{S_c}(z) = \\phi_0(z - S_c)$, so the two forms agree. It carries a ' ...
+    'neuron index because the setpoint may be drawn per neuron, via ' ...
+    '`mu_S_c` / `sigma_S_c`.\n\n'], fmt(M.S_c));
 fprintf(fid, ['The rate $r_i$ is the **pre-depression** output of the ' ...
     'nonlinearity. Depression and facilitation enter presynaptically, as ' ...
     'factors multiplying $r_j$ inside the recurrent sum, so both mechanisms are ' ...
@@ -196,23 +219,32 @@ fprintf(fid, ['The rate $r_i$ is the **pre-depression** output of the ' ...
 fprintf(fid, '$$\n\\frac{\\mathrm{d}a_{ik}}{\\mathrm{d}t} = \\frac{-a_{ik} + r_i}{\\tau_{a_k}}\n$$\n\n');
 
 if M.n_b_max > 0
+    % tau_{rec_m}, not tau_{rec,m}: the timescale index is part of the subscript
+    % name, matching how the parameter table and the canonical doc write it.
     fprintf(fid, ['$$\n\\frac{\\mathrm{d}b_{im}}{\\mathrm{d}t} = ' ...
-        '\\frac{1-b_{im}}{\\tau_{\\mathrm{rec},m}} - ' ...
-        '\\frac{b_{im}\\, r_i}{\\tau_{\\mathrm{rel},m}}, \\qquad m = 1,\\dots,%d\n$$\n\n'], ...
-        M.n_b_max);
+        '\\frac{1-b_{im}}{\\tau_{rec_m}} - ' ...
+        '\\frac{b_{im}\\, r_i}{\\tau_{rel_m}}%s\n$$\n\n'], range_qual('m', M.n_b_max));
 end
 if M.any_stf
-    fprintf(fid, ['$$\n\\frac{\\mathrm{d}g_{i}}{\\mathrm{d}t} = ' ...
-        '\\frac{1-g_i}{\\tau_{\\mathrm{dec}}} + ' ...
-        '\\frac{(G - g_i)\\, r_i}{\\tau_{\\mathrm{fac}}}\n$$\n\n']);
+    % Same subscript convention as the STD equation above: the timescale index
+    % is part of the subscript name, and the state carries it.
+    fprintf(fid, ['$$\n\\frac{\\mathrm{d}g_{in}}{\\mathrm{d}t} = ' ...
+        '\\frac{1-g_{in}}{\\tau_{dec_n}} + ' ...
+        '\\frac{(G - g_{in})\\, r_i}{\\tau_{fac_n}}%s\n$$\n\n'], ...
+        range_qual('n', M.n_g_max));
 end
 
 % Name the product built above. theta is the SYNAPTIC OUTPUT -- the rate after
 % depression, i.e. what the recurrent sum transmits -- and matches the notation
 % in docs/EquationsParametersDocs/Equations_stability_paper.md.
 fprintf(fid, '$$\n\\theta_j = %s\n$$\n\n', theta_rhs);
+if M.any_stf
+    after = 'after depression and facilitation';
+else
+    after = 'after depression';
+end
 fprintf(fid, ['$\\theta_j$ is the **synaptic output**: the presynaptic rate ' ...
-    'after depression, and the quantity the recurrent sum above transmits.\n\n']);
+    '%s, and the quantity the recurrent sum above transmits.\n\n'], after);
 if M.n_b_max > 1
     % Quote the actual depth this preset reaches. The ratio tau_rec/tau_rel is
     % the ONLY combination that sets the steady state, so it is what the numbers
@@ -357,6 +389,16 @@ else
         fprintf(fid, '| %s | %d | %d |\n', tidy(cd_.name), cd_.n_a_E, cd_.n_b_E);
     end
     fprintf(fid, '\n');
+end
+end
+
+function s = range_qual(idx, n)
+% ", \qquad m = 1,...,M" -- but nothing at all when there is one timescale,
+% where "m = 1,\dots,1" is noise rather than information.
+if n <= 1
+    s = '';
+else
+    s = sprintf(', \\qquad %s = 1,\\dots,%d', idx, n);
 end
 end
 
