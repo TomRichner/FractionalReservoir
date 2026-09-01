@@ -296,7 +296,8 @@ Further RMT background: [`../RandomMatrixTheoryDocs/RMT_notes.md`](../RandomMatr
 ## Where the values are
 
 This file states **forms**, not the numbers any particular run used. For those,
-read the generated
-`scripts/presentations/Stability_Manuscript/doc_equations_table/equation_table.md`,
-rebuilt from a live model object on every `make_all_paper_figures` run, and its
-sibling `adaptation_conditions.md`.
+read the generated `equation_table.md` and its sibling
+`adaptation_conditions.md`, which `make_all_paper_figures` rebuilds from a live
+model object on every run and writes into its figure root —
+`figs/paper/doc_tables/` by default. That directory is gitignored, so they exist
+once you have run the pipeline rather than being committed and possibly stale.

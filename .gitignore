@@ -72,6 +72,13 @@ Thumbs.db
 !scripts/presentations/Stability_Manuscript/**/*.fig
 
 # Output/run directories (regenerable analysis outputs; keep out of git)
+#
+# figs/ is where make_all_paper_figures writes -- every figure, the doc tables,
+# and a manifest naming the run_dir and commit that produced them. Deliberately
+# NOT un-ignored: a full regeneration is ~200 MB of .fig/.svg, MATLAB .fig files
+# differ byte-wise on every save so git cannot deduplicate them, and one figure
+# alone (bursting_timeseries.fig) already accounts for 555 MB of this repo's
+# history across seven commits. The final set is force-added at submission.
 figs/
 results_DDE/
 

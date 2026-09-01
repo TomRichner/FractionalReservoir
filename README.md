@@ -72,7 +72,8 @@ uses `'production'`, which is a deliberate edit rather than the default.
 | `src/` | model classes, the sweep driver, connectivity, plotting |
 | `scripts/paper/` | the two entry points and their config — start here |
 | `scripts/run_all_analyses/` | the sweep pipeline (sensitivity, tau, parameter space) |
-| `scripts/presentations/Stability_Manuscript/` | one folder per manuscript figure |
+| `scripts/presentations/Stability_Manuscript/` | one folder per manuscript figure (code) |
+| `figs/paper/` | where the figures are written (gitignored, regenerable) |
 | `scripts/tests/` | verification scripts, run individually |
 | `docs/` | equations, parameter reference, design notes |
 

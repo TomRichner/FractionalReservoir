@@ -233,6 +233,8 @@ Two orthogonal knobs, deliberately kept apart:
 Its fields:
 
 - `output_dir` — the shared run directory. Empty means "let `ParamSpaceAnalysis2` create its own dated folder", which is what a standalone run wants.
+
+**The invariant that generalizes: an analysis function defaults its output into `data/`, never next to its own `.m`.** Standalone runs are supported and useful — that is how one stage gets regenerated without a 3-hour sweep — but where they *land* matters. `run_all_analyses`, `run_memory_capacity`, `run_dc_lle_analysis` and `ParamSpaceAnalysis2` all obey this. `run_eig_heatmap` and `run_memory_capacity_example` did not (they defaulted to `this_dir`, being inside figure folders), and the result was a real bug: each dropped a `.mat` beside its `.m`, the matching figure read only that path, and on 2026-08-26 two figures plotted four-day-old data while the other sixteen used the run they were handed — with every provenance file claiming the same commit. **The smell is `this_dir` in an *output* path**; `this_dir` for locating a sibling *asset* is fine. On the reading side, resolve data with `_common/resolve_data_file.m` (run directory first, then `data/`, then error naming everywhere looked) rather than a single hardcoded path.
 - `save_figs` — a **logical**. (The old `master_save_figs` had a third value, `'follow_scripts_save_figs'`, meaning "let each sub-script use its own local flag". There are no local flags any more, so it had nothing left to mean.)
 - `model_class` + `conditions` + `preset_defaults` — all three from **one** `srnn_param_preset` call, which is what stops a Pairs preset being swept with `SRNNModel2`-shaped conditions.
 - `integer_params` — `{'n','indegree'}`, not the class default (which lists `SRNNModel2`'s adaptation counts, meaningless on Pairs).
@@ -267,7 +269,13 @@ The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_pape
 
 - `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
 - `scripts/paper/` — the two entry points and `paper_config.m`. Start here.
-- `scripts/presentations/Stability_Manuscript/` — one folder per figure, each holding a `fig_*.m` **function**, its outputs, its generated `README_*.txt` and its git provenance. `_common/` holds the shared helpers: `manuscript_style` (fonts, condition palette — returns values, never sets global state), `with_manuscript_defaults`, `build_from_preset`, `resolve_run_dir`, `write_figure_readme`, `write_manuscript_tables`, `figure_settings`, `default_out_dir`, `existing_outputs`, `sort_axes_left_to_right`.
+- `scripts/presentations/Stability_Manuscript/` — one folder per figure, each holding a `fig_*.m` **function**. `_common/` holds the shared helpers: `manuscript_style` (fonts, condition palette — returns values, never sets global state), `with_manuscript_defaults`, `build_from_preset`, `resolve_run_dir`, `resolve_data_file`, `write_manuscript_tables`, `fig_doc_tables`, `write_figure_manifest`, `figure_settings`, `default_out_dir`, `existing_outputs`, `sort_axes_left_to_right`.
+
+  **Output goes to `figs/`, not into these folders.** `cfg.fig_root` (in `paper_config`) names it: set — the default `figs/paper` — means a stable directory overwritten every run; empty means `make_all_paper_figures` auto-names `figs/figures_<dt>/` so a one-off cannot clobber the paper's set. Each registry entry gets `<fig_root>/<entry name>/`, and the root carries one `manifest.md` (run_dir, preset, run mode, per-entry results) plus `git_provenance.txt`. **`figs/` is gitignored on purpose** — a regeneration is ~200 MB of `.fig`/`.svg`, and one figure already accounts for 555 MB of this repo's history.
+
+  Per-figure `README_*.txt` and per-figure `git_provenance.txt` are **gone** (2026-09-01) — 17 and 16 copies respectively, replaced by the one manifest. Do not reintroduce them.
+
+  The per-entry subdirectory is load-bearing, not tidiness: `save_figure_stable` deletes `<out_dir>/<fig_tag>*` before saving, and `Fig_single_neuron_SFA_STD` is a strict *prefix* of `Fig_single_neuron_SFA_STD_STF`. Sharing a directory, the first tag's save destroys the second's outputs.
 
   **Every figure has the same signature**, so the master can loop over them:
 

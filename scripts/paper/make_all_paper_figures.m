@@ -3,7 +3,10 @@ function results = make_all_paper_figures(cfg)
 %
 %   results = MAKE_ALL_PAPER_FIGURES()
 %   results = MAKE_ALL_PAPER_FIGURES(paper_config('run_dir', d))
-%   results = MAKE_ALL_PAPER_FIGURES(paper_config(), 'only', {'fig_FI_curve'})
+%   results = MAKE_ALL_PAPER_FIGURES(paper_config('fig_root', 'figs/try'))
+%
+% Takes ONE argument, a config struct -- not name-value pairs. (This header used
+% to advertise an 'only' option the arguments block never accepted.)
 %
 % ENTRY POINT TWO OF TWO. The cheap half: pure replots, analytic figures, and a
 % handful that simulate but finish in seconds to minutes. Everything measured in

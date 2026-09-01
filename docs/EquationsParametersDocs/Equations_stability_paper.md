@@ -5,12 +5,17 @@
 > apart — each copy carried a different subset of the corrections made during the
 > `c/K` refactor. Everything else now links here.
 >
-> The one other place the equations appear is
-> `scripts/presentations/Stability_Manuscript/doc_equations_table/equation_table.md`,
-> which is **generated** by `write_manuscript_tables` from a live model object on
-> every `make_all_paper_figures` run and therefore cannot drift from the code. It
-> also reports the values a given preset actually runs at. This file states the
-> model; that one states a particular instance of it.
+> The equations also appear in **generated** form, as `equation_table.md`, which
+> `make_all_paper_figures` writes into its figure root — `figs/paper/doc_tables/`
+> by default. It is built from a live model object on every run and therefore
+> cannot drift from the code, and it reports the values a given preset actually
+> runs at. This file states the model; that one states a particular instance of
+> it.
+>
+> That copy is **not committed** — `figs/` is gitignored, so it exists once you
+> have run the pipeline. It used to be tracked, which meant a clone could hold a
+> table describing a preset the code no longer used: exactly the drift the
+> generated table exists to prevent.
 >
 > The implementation is `SRNNCellTypePairs.dynamics_fast` (`src/SRNNCellTypePairs.m`).
 

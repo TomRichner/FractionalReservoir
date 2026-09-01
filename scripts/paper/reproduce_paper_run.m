@@ -13,7 +13,10 @@
 %      every sweep, the memory-capacity results, the eig-heatmap samples, a
 %      run_manifest.mat, a git_provenance.txt and a parameters.md.
 %   2. Every manuscript figure, written next to its own fig_*.m under
-%      scripts/presentations/Stability_Manuscript/, plus the doc tables.
+%      figs/paper/<entry name>/ -- one directory per registry entry, including
+%      the generated doc tables -- with a manifest.md and git_provenance.txt at
+%      the root recording the run_dir and commit behind them. figs/ is
+%      gitignored; cfg.fig_root chooses the location.
 %
 % COST at the default run mode ('medium'): about 3 h of compute and 8 min of
 % figures on a 2026-era desktop (R2026a, Parallel Computing Toolbox, 16 workers).
