@@ -49,8 +49,19 @@ arguments
 end
 
 setup_paths();
-this_dir = fileparts(mfilename('fullpath'));
-if isempty(cfg.out_dir); out_dir = this_dir; else; out_dir = cfg.out_dir; end
+% A standalone run writes into data/, NOT next to this file. The old default
+% dropped eig_heatmap_data.mat into the figure folder, where fig_eig_heatmap
+% then read it forever -- so a pipeline run could write fresh data into the run
+% directory and the figure would go on plotting the standalone copy. That is
+% what happened between Aug 22 and Aug 26.
+%
+% The pipeline still passes out_dir explicitly (run_all_paper_analyses), landing
+% the .mat in <run_dir>/eig_heatmap/.
+if isempty(cfg.out_dir)
+    out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'eig_heatmap');
+else
+    out_dir = cfg.out_dir;
+end
 if ~isfolder(out_dir); mkdir(out_dir); end
 
 % Cost/fidelity. T_range buys a longer trajectory to sample; n_samples buys

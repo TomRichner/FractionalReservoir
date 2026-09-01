@@ -33,7 +33,16 @@ setup_paths();
 out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 project_root = fileparts(which('setup_paths'));
 
-mat_file = resolve_mc_results(cfg.mat_file, cfg.run_dir, project_root);
+% Shared with fig_eig_heatmap and fig_memory_capacity_example. This figure's own
+% local resolver was the model those two were fixed to match; it is now one
+% implementation rather than three copies. The extra paper_ready/ entry is
+% specific to memory capacity.
+mat_file = resolve_data_file(cfg.mat_file, ...
+    {fullfile(cfg.run_dir, 'memory_capacity'), ...
+     fullfile(project_root, 'data', 'memory_capacity'), ...
+     fullfile(project_root, 'data', 'memory_capacity', 'paper_ready')}, ...
+    '*_results.mat', ...
+    'Run run_memory_capacity first');
 fprintf('[fig_memory_capacity] source: %s\n', mat_file);
 
 %% Reference figures (shown, not saved)
@@ -86,36 +95,12 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function mat_file = resolve_mc_results(explicit, run_dir, project_root)
-% Newest *_results.mat, from the most specific location that has one.
-if ~isempty(explicit)
-    if ~isfile(explicit)
-        error('fig_memory_capacity:NoSuchFile', ...
-            'mat_file does not exist:\n  %s', explicit);
-    end
-    mat_file = explicit;
-    return
-end
-
-searched = {};
-if ~isempty(run_dir); searched{end+1} = fullfile(run_dir, 'memory_capacity'); end
-searched{end+1} = fullfile(project_root, 'data', 'memory_capacity');
-searched{end+1} = fullfile(project_root, 'data', 'memory_capacity', 'paper_ready');
-
-for k = 1:numel(searched)
-    hits = dir(fullfile(searched{k}, '*_results.mat'));
-    if ~isempty(hits)
-        [~, newest] = max([hits.datenum]);
-        mat_file = fullfile(hits(newest).folder, hits(newest).name);
-        return
-    end
-end
-
-error('fig_memory_capacity:NoResults', ...
-    ['No *_results.mat found. Looked in:\n%s\n' ...
-     'Run run_memory_capacity first (it is gitignored, so a fresh clone has none).'], ...
-    sprintf('    %s\n', searched{:}));
-end
+% resolve_mc_results lived here. It was the one figure that resolved its data
+% correctly -- run directory first, then data/ -- and so became the model for
+% _common/resolve_data_file.m when fig_eig_heatmap and
+% fig_memory_capacity_example were fixed to stop reading a hardcoded sibling.
+% Replaced by that shared version 2026-09-01 rather than leaving one pattern in
+% three near-identical copies.
 
 function s = mc_settings(cfg)
 % The subset of a saved MC settings struct worth putting in the README.

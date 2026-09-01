@@ -16,30 +16,27 @@ function out = fig_memory_capacity_example(cfg)
 % See also: run_memory_capacity_example, fig_memory_capacity, manuscript_style
 
 arguments
-    cfg.data_file   (1,:) char    = ''    % '' -> mc_example_data.mat beside this file
+    cfg.data_file   (1,:) char    = ''    % '' -> search run_dir, then data/mc_example
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
-    cfg.run_dir     (1,:) char    = ''    % unused; accepted for a uniform call
+    cfg.run_dir     (1,:) char    = ''    % the run whose mc_example data to plot
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
 end
 
 setup_paths();
-this_dir     = fileparts(mfilename('fullpath'));
 out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 project_root = fileparts(which('setup_paths'));
 
 %% Load precomputed results
-data_file = cfg.data_file;
-if isempty(data_file)
-    data_file = fullfile(this_dir, 'mc_example_data.mat');
-end
-if ~isfile(data_file)
-    error('fig_memory_capacity_example:NoData', ...
-        ['Missing %s\n' ...
-         'Run run_memory_capacity_example first -- the .mat is gitignored, so a ' ...
-         'fresh clone has none.'], data_file);
-end
+% Search the RUN first, then the standalone location. This used to load a
+% hardcoded .mat beside this file, with run_dir marked "unused" -- so on
+% 2026-08-26 it plotted Aug 22 data while the sweep it was handed was Aug 25.
+data_file = resolve_data_file(cfg.data_file, ...
+    {fullfile(cfg.run_dir, 'mc_example'), ...
+     fullfile(project_root, 'data', 'mc_example')}, ...
+    'mc_example_data.mat', ...
+    'Run run_memory_capacity_example first');
 S = load(data_file);
 results         = S.results;
 R2              = S.R2; %#ok<NASGU>

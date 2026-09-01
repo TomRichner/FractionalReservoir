@@ -16,28 +16,28 @@ function out = fig_eig_heatmap(cfg)
 % See also: run_eig_heatmap, manuscript_style
 
 arguments
-    cfg.data_file   (1,:) char    = ''    % '' -> eig_heatmap_data.mat beside this file
+    cfg.data_file   (1,:) char    = ''    % '' -> search run_dir, then data/eig_heatmap
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
-    cfg.run_dir     (1,:) char    = ''    % unused; accepted for a uniform call
+    cfg.run_dir     (1,:) char    = ''    % the run whose eig_heatmap data to plot
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
 end
 
 setup_paths();
-this_dir     = fileparts(mfilename('fullpath'));
 out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 project_root = fileparts(which('setup_paths'));
 st           = manuscript_style(); %#ok<NASGU>
 
-data_file = cfg.data_file;
-if isempty(data_file); data_file = fullfile(this_dir, 'eig_heatmap_data.mat'); end
-if ~isfile(data_file)
-    error('fig_eig_heatmap:NoData', ...
-        ['Missing %s\n' ...
-         'Run run_eig_heatmap first -- the .mat is gitignored, so a fresh ' ...
-         'clone has none.'], data_file);
-end
+% Search the RUN first, then the standalone location. This used to load a
+% hardcoded .mat sitting beside this file, with run_dir marked "unused" -- so on
+% 2026-08-26 it plotted Aug 22 data while every other figure used the Aug 25
+% sweep, and nothing said so.
+data_file = resolve_data_file(cfg.data_file, ...
+    {fullfile(cfg.run_dir, 'eig_heatmap'), ...
+     fullfile(project_root, 'data', 'eig_heatmap')}, ...
+    'eig_heatmap_data.mat', ...
+    'Run run_eig_heatmap first');
 D = load(data_file);
 evals_by_cond    = D.evals_by_cond;
 condition_titles = D.condition_titles;
@@ -88,9 +88,21 @@ for i = 1:n_cond
 end
 clim = [0, cmax];
 
-%% ---- Assemble the 2x2 comparison figure -----------------------------------
-fig = figure('Position', [200, 150, 900, 760]);
-tl  = tiledlayout(fig, 2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+%% ---- Assemble the comparison figure ---------------------------------------
+% Grid derived from the condition count, not hardcoded. This was `2, 2`, which
+% fit the four adaptation regimes the preset had when it was written; the paper
+% now runs SEVEN and `nexttile` throws "The layout does not have sufficient
+% space" on the fifth. It went unnoticed because the figure was reading a
+% four-condition .mat frozen beside its own .m -- fixing the data resolution is
+% what surfaced this.
+%
+% floor(sqrt(.)) keeps 4 -> 2x2 exactly as before, and gives 7 -> 2x4 (one blank
+% tile). Panel size is held roughly constant, so the window grows with the grid
+% instead of squeezing panels.
+n_rows = max(1, floor(sqrt(n_cond)));
+n_cols = ceil(n_cond / n_rows);
+fig = figure('Position', [200, 150, 450*n_cols, 380*n_rows]);
+tl  = tiledlayout(fig, n_rows, n_cols, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 ax_panels = gobjects(n_cond, 1);
 for i = 1:n_cond

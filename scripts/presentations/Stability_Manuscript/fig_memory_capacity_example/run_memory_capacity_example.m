@@ -27,12 +27,11 @@ function mat_file = run_memory_capacity_example(opts)
 arguments
     opts.preset_name (1,:) char    = 'mc_esn'
     opts.run_mode    (1,:) char    = 'production'
-    opts.output_dir  (1,:) char    = ''      % '' -> next to this file
+    opts.output_dir  (1,:) char    = ''      % '' -> data/mc_example/
     opts.verbose     (1,1) logical = true
 end
 
 setup_paths();
-this_dir = fileparts(mfilename('fullpath'));
 
 [preset, model_class] = srnn_param_preset(opts.preset_name);
 if ~strcmp(model_class, 'SRNNModel2')
@@ -120,12 +119,16 @@ settings = struct('preset_name', opts.preset_name, 'run_mode', opts.run_mode, ..
     'readout_signal', readout_signal, 'T_train_sec', T_train_sec, ...
     'T_test_sec', T_test_sec, 'T_wash_sec', T_wash_sec, 'd_max_sec', d_max_sec);
 
+% A standalone run writes into data/, NOT next to this file. The old default
+% dropped mc_example_data.mat into the figure folder, where
+% fig_memory_capacity_example then read it forever, ignoring whatever the
+% pipeline had written into the run directory.
 if isempty(opts.output_dir)
-    out_dir = this_dir;
+    out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'mc_example');
 else
     out_dir = opts.output_dir;
-    if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 end
+if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 mat_file = fullfile(out_dir, 'mc_example_data.mat');
 save(mat_file, 'results', 'MC', 'R2', 'delay_s', 'condition_names', ...
     'base_args', 'condition_args', 'settings');
