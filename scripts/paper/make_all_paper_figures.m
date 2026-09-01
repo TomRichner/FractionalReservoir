@@ -145,6 +145,19 @@ if ~isempty(stray)
     close(stray);
 end
 
+%% Provenance and manifest, once at the root
+% Replaces the per-figure README_*.txt and the sixteen near-identical
+% git_provenance.txt files. capture_git_provenance also writes
+% working_changes.patch when the tree is dirty, which is what lets a run made
+% from uncommitted work be reproduced.
+try
+    capture_git_provenance(fig_root, project_root);
+    write_figure_manifest(fig_root, cfg, run_dir, root_mode, results, toc(t_all)/60);
+catch ME
+    warning('make_all_paper_figures:ManifestFailed', ...
+        'Could not write the manifest: %s', ME.message);
+end
+
 %% Summary
 n_ok    = sum([results.ok]);
 n_paper = sum([results.in_paper]);

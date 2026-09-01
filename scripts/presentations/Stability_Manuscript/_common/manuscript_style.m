@@ -31,7 +31,7 @@ function s = manuscript_style()
 % root defaults (some third-party plotters read them), use
 % with_manuscript_defaults below, which restores them via onCleanup.
 %
-% See also: with_manuscript_defaults, write_figure_readme, save_figure_stable
+% See also: with_manuscript_defaults, write_figure_manifest, save_figure_stable
 
 s = struct();
 

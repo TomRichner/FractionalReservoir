@@ -6,7 +6,7 @@ function files = existing_outputs(out_dir, fig_tag)
 % Returns a cellstr of file NAMES (not paths) matching <fig_tag>.{png,svg,fig}.
 %
 % Called AFTER save_figure_stable so the caller can report what was really
-% written, and so write_figure_readme lists the files that exist rather than the
+% written, and so the manifest lists the files that exist rather than the
 % ones that were intended. That distinction matters here: roughly one run in
 % four, save_some_figs_to_folder_2 hits a figure state where a rasterizing path
 % throws; it warns and carries on, so a run can legitimately be missing one
