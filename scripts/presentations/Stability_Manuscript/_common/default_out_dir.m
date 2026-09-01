@@ -3,11 +3,19 @@ function out_dir = default_out_dir(requested, caller_fullpath)
 %
 %   out_dir = DEFAULT_OUT_DIR(cfg.out_dir, mfilename('fullpath'))
 %
-% Every manuscript figure defaults to writing next to itself, which is what
-% makes the folder self-contained: the script, its README, its git provenance
-% and its outputs all sit together, and the manuscript references that path.
-% Passing a non-empty out_dir overrides it (the master script does this to
-% collect a whole set somewhere else).
+% A figure called STANDALONE writes next to itself, which is convenient when
+% iterating on one figure at the MATLAB prompt: the output appears beside the
+% code that made it.
+%
+% A figure called from make_all_paper_figures is given an explicit out_dir under
+% cfg.fig_root (default figs/paper/<entry name>), and that is where the paper's
+% figures come from. The whole set then lands in one gitignored tree with a
+% manifest recording the run_dir and commit that produced it, rather than being
+% strewn through the source tree -- which had put ~20 .m files inside 618 MB of
+% output, 216 MB of it tracked, and made `.fig` alone 813 MB of git history.
+%
+% So the default here is the CONVENIENCE path, not the authoritative one. If you
+% are wondering where the paper's figures live, the answer is cfg.fig_root.
 %
 % Note this is a DATA path, not a path bootstrap: mfilename('fullpath') is the
 % right tool here, unlike for locating the project root (use

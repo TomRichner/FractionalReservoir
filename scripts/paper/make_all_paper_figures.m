@@ -55,6 +55,33 @@ catch ME
     run_dir = '';
 end
 
+%% Resolve where the output goes
+% Two modes, per cfg.fig_root (see paper_config): a configured path is STABLE
+% and overwritten, so the manuscript can cite something that never moves; empty
+% auto-names a dated folder, so a one-off cannot clobber the paper's set. Same
+% convention as run_all_analyses' output_dir.
+%
+% Every entry gets <fig_root>/<entry name>. The per-entry subdirectory is not
+% cosmetic: save_figure_stable deletes <out_dir>/<fig_tag>* before saving, and
+% 'Fig_single_neuron_SFA_STD' is a strict PREFIX of
+% 'Fig_single_neuron_SFA_STD_STF'. Sharing one directory, the first tag's save
+% destroys the second's outputs -- which is live today in fig_adaptation_methods
+% and survives only because the registry happens to run them in that order.
+project_root = fileparts(which('setup_paths'));
+if isempty(cfg.fig_root)
+    dt_str   = lower(datestr(now, 'mmm_dd_yy_HH_MM')); %#ok<TNOW1,DATST>
+    fig_root = fullfile(project_root, 'figs', sprintf('figures_%s', dt_str));
+    root_mode = 'auto-named';
+else
+    fig_root = cfg.fig_root;
+    if ~is_absolute_path(fig_root)
+        fig_root = fullfile(project_root, fig_root);   % relative -> project root
+    end
+    root_mode = 'configured';
+end
+if ~isfolder(fig_root); mkdir(fig_root); end
+fprintf('Figure root:   %s  (%s)\n', fig_root, root_mode);
+
 figs = cfg.figures;
 n = numel(figs);
 
@@ -72,7 +99,8 @@ for k = 1:n
     fprintf('\n---- [%d/%d] %s%s\n', k, n, f.name, paper_tag(f.in_paper));
     t0 = tic;
     try
-        args = [{'run_dir', run_dir, 'save', true, 'visible', false}, f.args];
+        args = [{'run_dir', run_dir, 'out_dir', fullfile(fig_root, f.name), ...
+                 'save', true, 'visible', false}, f.args];
         out  = call_figure(f.fn, args);
 
         n_files = numel(out.files);
@@ -139,6 +167,7 @@ fprintf('\n========================================================\n');
 fprintf('PAPER FIGURES COMPLETE in %.1f min\n', toc(t_all)/60);
 fprintf('  %d/%d succeeded   (%d/%d of the in-paper figures)\n', ...
     n_ok, n, n_paper_ok, n_paper);
+fprintf('  output: %s\n', fig_root);
 fprintf('--------------------------------------------------------\n');
 for k = 1:numel(results)
     r = results(k);
@@ -157,6 +186,16 @@ fprintf('========================================================\n');
 end
 
 %% ------------------------------------------------------------------------
+function tf = is_absolute_path(p)
+% Absolute on either platform: a leading separator, or a Windows drive letter.
+%
+% Deliberately NOT isfolder(): whether a relative path happens to exist under
+% the current directory must not decide where output lands, or the same config
+% would write to two different places depending on cwd.
+tf = startsWith(p, filesep) || startsWith(p, '/') || ...
+     ~isempty(regexp(p, '^[A-Za-z]:[\\/]', 'once'));
+end
+
 function out = call_figure(fn, args)
 % Call a figure function, tolerating one that does not accept run_dir.
 %

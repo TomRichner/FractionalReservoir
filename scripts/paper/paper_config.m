@@ -13,6 +13,8 @@ function cfg = paper_config(opts)
 %   preset_name  WHICH NETWORK   (src/srnn_param_preset.m)
 %   run_mode     HOW MUCH COMPUTE (scripts/run_all_analyses/analysis_run_config.m)
 %
+% and a third that says WHERE THE OUTPUT LANDS: fig_root. See its comment below.
+%
 % FIGURE PRESET OVERRIDES. Five figures are DELIBERATELY a different network
 % from the paper's operating point, and each names its own preset below. They
 % are not oversights: two single-neuron mechanism cartoons, a Sompolinsky
@@ -34,12 +36,31 @@ arguments
     % explicitly, paper_config('run_mode', 'production'), for the final run.
     opts.run_mode    (1,:) char = 'medium'
     opts.run_dir     (1,:) char = ''      % '' -> resolve by preset at figure time
+    % WHERE THE OUTPUT GOES. Two modes, and the empty case is not an oversight:
+    %
+    %   set (default)   a STABLE directory, overwritten every run. The
+    %                   manuscript can cite a path that never moves, and there
+    %                   is never a question of which set is current.
+    %   empty           make_all_paper_figures auto-names figs/figures_<dt>/,
+    %                   so a one-off cannot clobber the paper's set.
+    %
+    % Same convention as run_all_analyses' output_dir, where empty means "make
+    % your own dated folder". A relative path resolves against the project root.
+    %
+    % This is the knob that lets a SECOND config file produce a separate set --
+    % point it at figs/something_else and the two never collide.
+    %
+    % figs/ is gitignored on purpose. Figures are regenerable from run_dir plus
+    % a commit, and both are recorded in the manifest written at the root; the
+    % final set is force-added at submission.
+    opts.fig_root    (1,:) char = 'figs/paper'
 end
 
 cfg = struct();
 cfg.preset_name = opts.preset_name;
 cfg.run_mode    = opts.run_mode;
 cfg.run_dir     = opts.run_dir;
+cfg.fig_root    = opts.fig_root;
 
 % Presets for the figures that are deliberately different networks.
 cfg.mc_preset          = 'mc_esn';              % SRNN_ESN_reservoir; see below
