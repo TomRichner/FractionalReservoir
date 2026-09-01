@@ -145,19 +145,6 @@ if ~isempty(stray)
     close(stray);
 end
 
-%% Regenerate the manuscript's equation and parameter tables
-% They belong here rather than in run_all_paper_analyses: they are documentation
-% OF the preset, cost nothing, and must not go stale while the figures are
-% rebuilt. The hand-written versions had drifted to describing a single-STD
-% logistic SRNNModel2 network the paper no longer uses.
-fprintf('\n---- doc tables\n');
-try
-    tbls = write_manuscript_tables('preset_name', cfg.preset_name, 'verbose', false);
-    fprintf('     %d table(s) regenerated\n', numel(tbls));
-catch ME
-    fprintf(2, '     FAILED %s: %s\n', ME.identifier, ME.message);
-end
-
 %% Summary
 n_ok    = sum([results.ok]);
 n_paper = sum([results.in_paper]);

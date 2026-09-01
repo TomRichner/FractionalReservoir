@@ -3,10 +3,22 @@ function paths = write_manuscript_tables(cfg)
 %
 %   paths = WRITE_MANUSCRIPT_TABLES()
 %   paths = WRITE_MANUSCRIPT_TABLES('preset_name', p)
+%   paths = WRITE_MANUSCRIPT_TABLES('out_dir', d)
 %
-% Writes, into the Stability_Manuscript tree:
-%   doc_equations_table/equation_table.md         equations + parameter table
-%   doc_equations_table/adaptation_conditions.md  the regimes, as they run
+% Writes two files DIRECTLY into out_dir:
+%   equation_table.md         equations + parameter table
+%   adaptation_conditions.md  the regimes, as they run
+%
+% THESE ARE PIPELINE OUTPUT, not documentation checked into the tree. They are
+% rebuilt from a live model on every run, describe one preset, and are
+% regenerable -- the same properties a figure has. So they go where the figures
+% go: fig_doc_tables makes them a registry entry, and make_all_paper_figures
+% hands them <fig_root>/doc_tables. They used to be written into a
+% doc_equations_table/ folder derived from this file's own location, which meant
+% the one output make_all_paper_figures produced OUTSIDE its output root.
+%
+% The PDF renders are not generated here. Run pandoc against these .md files if
+% you want them.
 %
 % It used to write a third file, fig_equations/parameter_table.md, whose table
 % was IDENTICAL row-for-row to equation_table.md's "Parameters as run" section.
@@ -34,27 +46,29 @@ function paths = write_manuscript_tables(cfg)
 
 arguments
     cfg.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
-    cfg.out_root    (1,:) char = ''
+    % Where the two .md files land. Empty defaults to figs/doc_tables/ -- under
+    % figs/ like every other output, and deliberately NOT next to this .m file,
+    % which is how the pipeline's tables ended up outside its own output root.
+    cfg.out_dir     (1,:) char = ''
     cfg.verbose     (1,1) logical = true
 end
 
 setup_paths();
-if isempty(cfg.out_root)
-    % _common/ sits directly under the manuscript root.
-    out_root = fileparts(fileparts(mfilename('fullpath')));
+if isempty(cfg.out_dir)
+    project_root = fileparts(which('setup_paths'));
+    out_dir = fullfile(project_root, 'figs', 'doc_tables');
 else
-    out_root = cfg.out_root;
+    out_dir = cfg.out_dir;
 end
+out_dir = ensure_dir(out_dir);
 
 [preset, model_class, conditions] = srnn_param_preset(cfg.preset_name);
 model = build_from_preset(cfg.preset_name, 'sfa_and_std');
 M = model_facts(model, model_class, preset);
 
 paths = {};
-paths{end+1} = write_equation_table( ...
-    ensure_dir(fullfile(out_root, 'doc_equations_table')), cfg.preset_name, M);
-paths{end+1} = write_conditions_table( ...
-    ensure_dir(fullfile(out_root, 'doc_equations_table')), cfg.preset_name, conditions, M);
+paths{end+1} = write_equation_table(out_dir, cfg.preset_name, M);
+paths{end+1} = write_conditions_table(out_dir, cfg.preset_name, conditions, M);
 
 if cfg.verbose
     fprintf('[manuscript tables] preset %s (%s)\n', cfg.preset_name, model_class);

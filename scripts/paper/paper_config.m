@@ -124,6 +124,13 @@ F = add(F, 'fig_sfa_EOC_allStd',             @fig_sfa_EOC_allStd,             tr
 F = add(F, 'fig_memory_capacity',            @fig_memory_capacity,            true, {});
 F = add(F, 'fig_memory_capacity_example',    @fig_memory_capacity_example,    true, {});
 F = add(F, 'fig_eig_heatmap',                @fig_eig_heatmap,                false, {});
+% The generated equation and conditions tables. An ordinary entry, not a special
+% call after the loop: as a special case its failures sat outside the headline
+% count, which is how the n_a refactor broke it while the run still reported
+% 17/17. Lands in <fig_root>/doc_tables/ by the same name-keying rule as the
+% figures.
+F = add(F, 'doc_tables',                     @fig_doc_tables,                 true, ...
+        {'preset_name', cfg.preset_name});
 cfg.figures = F;
 end
 
