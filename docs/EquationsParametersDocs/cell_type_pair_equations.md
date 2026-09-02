@@ -197,7 +197,7 @@ differ from E→I; a `1 x C` row is accepted and broadcast down the columns as a
 
 Selected by name — `activation` is `'logistic'` (the class default) `'piecewise'`
 or `'tanh'`. The paper's preset uses `'piecewise'`, defined here.
-Implementation: `src/nonlinearities/piecewiseSigmoid.m`.
+Implementation: `piecewiseSigmoid.m`.
 
 **$\phi$ is defined here centred on zero**, with $\phi(0) = \tfrac{1}{2}$. The
 setpoint does not appear below: it is subtracted in the rate equation as

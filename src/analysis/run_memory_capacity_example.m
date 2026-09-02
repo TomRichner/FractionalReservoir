@@ -9,10 +9,16 @@ function mat_file = run_memory_capacity_example(opts)
 % per-delay R^2 plus the reconstruction traces, so Fig_memory_capacity_example
 % can render without re-simulating.
 %
-% Lives in the figure's own folder, not in scripts/memory_capacity/, because it
-% is the compute half of ONE figure rather than a general analysis: it keeps the
-% per-delay predictions that the reconstruction panels need, which the ensemble
-% run deliberately discards.
+% It is the compute half of ONE figure rather than a general analysis: it keeps
+% the per-delay predictions the reconstruction panels need, which the ensemble
+% run (run_memory_capacity) deliberately discards.
+%
+% It used to live inside that figure's own folder for exactly that reason, and
+% defaulted to writing its .mat beside its own .m -- which is how
+% fig_memory_capacity_example came to plot four-day-old data while every sibling
+% figure used the run it was handed. Being figure-specific is not a reason to sit
+% outside the analysis layer; it writes data, so it lives with the analyses and
+% writes into data/.
 %
 % Shares the network with run_memory_capacity via the 'mc_esn' preset, so the
 % example and the ensemble figure describe the same reservoir.

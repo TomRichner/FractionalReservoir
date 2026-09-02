@@ -1,7 +1,7 @@
 # Presets worth coming back to
 
 Running notes on which `srnn_param_preset` entries produced usable dynamics, and
-why. Presets themselves live in `src/srnn_param_preset.m`; this file records the
+why. Presets themselves live in `srnn_param_preset`; this file records the
 judgement about them, which the code cannot.
 
 > ### ⚠ Every LLE number below predates the Lyapunov window fix (2026-08-13)

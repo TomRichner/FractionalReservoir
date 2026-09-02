@@ -69,13 +69,21 @@ uses `'production'`, which is a deliberate edit rather than the default.
 
 | path | what |
 |---|---|
-| `src/` | model classes, the sweep driver, connectivity, plotting |
-| `scripts/paper/` | the two entry points and their config — start here |
-| `scripts/run_all_analyses/` | the sweep pipeline (sensitivity, tau, parameter space) |
-| `scripts/presentations/Stability_Manuscript/` | one folder per manuscript figure (code) |
-| `figs/paper/` | where the figures are written (gitignored, regenerable) |
+| `src/model/` | the three model classes, connectivity, nonlinearities, integrators, Jacobians |
+| `src/presets/` | *which network* (`srnn_param_preset`) and *how much compute* (`analysis_run_config`) |
+| `src/analysis/` | `ParamSpaceAnalysis2` and everything that runs a sweep |
+| `src/figures/` | the `fig_*.m` manuscript figures, their helpers and replot tools |
+| `src/plotting/` | drawing primitives the model classes themselves call |
+| `src/util/` | cross-cutting helpers |
+| `scripts/paper/` | the two entry points and their config — **start here** |
+| `scripts/examples/` | exploratory scripts |
 | `scripts/tests/` | verification scripts, run individually |
+| `figs/paper/` | where the figures are written (gitignored, regenerable) |
+| `data/` | run directories (gitignored) |
 | `docs/` | equations, parameter reference, design notes |
+
+`scripts/` holds only what a human invokes; everything called by something else
+lives in `src/`, grouped by layer.
 
 The two model classes are **duck-typed siblings, not a hierarchy**:
 `SRNNModel2` (two hardwired E/I populations) and `SRNNCellTypePairs` (C named

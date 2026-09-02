@@ -5,7 +5,7 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
 %   fig3 = PLOT_MEMORY_CAPACITY_COMBINED(results_all, out_dir)
 %
 % Assembles a single manuscript figure from the pieces of the two figures made
-% by scripts/memory_capacity/plot_memory_capacity.m, laid out as a 1x3 strip:
+% by plot_memory_capacity, laid out as a 1x3 strip:
 %   (a) cumulative memory   (from Fig2 panel 2B)
 %   (b) per-delay memory    (from Fig2 panel 2A)
 %   (c) horizon paired trials (from Fig1 panel 1B)

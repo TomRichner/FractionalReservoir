@@ -912,7 +912,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
         function verify_shared_build(esn_array, expected_to_differ, also_check_protected)
             % VERIFY_SHARED_BUILD Verify that built ESN objects share identical configuration
-            % Internalized from src/verify_shared_build.m
+            % Internalized from verify_shared_build
             %
             % SRNN_ESN_reservoir.verify_shared_build(esn_array, expected_to_differ, also_check_protected)
             %

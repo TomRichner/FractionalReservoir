@@ -166,7 +166,7 @@ classdef SRNNModel2 < handle
         %
         %   'ode45'  - adaptive Runge-Kutta 4(5) (the default)
         %   'ode15s' - adaptive stiff solver
-        %   'rk4'    - fixed-step classic RK4 (src/ode_rk4.m); much faster than
+        %   'rk4'    - fixed-step classic RK4 (ode_rk4); much faster than
         %              ode45 with noisy forcing, since there is no step-size
         %              control to thrash
         %
@@ -3032,7 +3032,7 @@ classdef SRNNModel2 < handle
     %% ====================================================================
     %              INTERNALIZED ACTIVATION FUNCTIONS
     % =====================================================================
-    % Internalized from src/nonlinearities/ to make SRNNModel2 standalone.
+    % Internalized from the standalone nonlinearity files  to make SRNNModel2 standalone.
 
     methods (Static)
         function D = compute_eigenvalue_density(eigenvalues, re_edges, im_edges, sigma_bins)
@@ -3116,7 +3116,7 @@ classdef SRNNModel2 < handle
 
         function y = piecewiseSigmoid(x, a, c)
             % PIECEWISESIGMOID A piecewise linear/quadratic sigmoid activation function.
-            % Internalized from src/nonlinearities/piecewiseSigmoid.m
+            % Internalized from piecewiseSigmoid.m
             %
             % c may be a scalar (all neurons share a centre) or an array that
             % broadcasts against x -- typically an n x 1 per-neuron S_c_vec
@@ -3171,7 +3171,7 @@ classdef SRNNModel2 < handle
         
         function dy = piecewiseSigmoidDerivative(x, a, c)
             % PIECEWISESIGMOIDDERIVATIVE First derivative of the piecewise sigmoid.
-            % Internalized from src/nonlinearities/piecewiseSigmoidDerivative.m
+            % Internalized from piecewiseSigmoidDerivative.m
             %
             % As with piecewiseSigmoid, c may be a scalar or an array that
             % broadcasts against x, and the derivative is likewise a pure
@@ -3240,13 +3240,13 @@ classdef SRNNModel2 < handle
         
         function y = tanhActivation(x)
             % TANHACTIVATION Hyperbolic tangent activation function.
-            % Internalized from src/nonlinearities/tanhActivation.m
+            % Internalized from tanhActivation.m
             y = tanh(x);
         end
         
         function dy = tanhActivationDerivative(x)
             % TANHACTIVATIONDERIVATIVE First derivative of the hyperbolic tangent.
-            % Internalized from src/nonlinearities/tanhActivationDerivative.m
+            % Internalized from tanhActivationDerivative.m
             dy = 1 - tanh(x).^2;
         end
     end
@@ -3254,12 +3254,12 @@ classdef SRNNModel2 < handle
     %% ====================================================================
     %              INTERNALIZED STIMULUS GENERATION
     % =====================================================================
-    % Internalized from src/generate_stimulus/ to make SRNNModel2 standalone.
+    % Internalized from the standalone stimulus files  to make SRNNModel2 standalone.
     
     methods (Static, Access = protected)
         function [u_ex, t_ex] = generate_external_input(params, T, fs, rng_seed, input_config)
             % GENERATE_EXTERNAL_INPUT Generate external input for SRNN simulation.
-            % Internalized from src/generate_stimulus/generate_external_input.m
+            % Internalized from generate_external_input.m
             
             % Check for custom generator function
             if isfield(input_config, 'generator') && isa(input_config.generator, 'function_handle')
@@ -3339,12 +3339,12 @@ classdef SRNNModel2 < handle
     %% ====================================================================
     %              INTERNALIZED JACOBIAN COMPUTATION
     % =====================================================================
-    % Internalized from src/algorithms/Jacobian/ to make SRNNModel2 standalone.
+    % Internalized from the standalone Jacobian files  to make SRNNModel2 standalone.
     
     methods (Static)
         function J = compute_Jacobian_fast(S, params)
             % COMPUTE_JACOBIAN_FAST Sparse/vectorized Jacobian assembly for the SRNN system.
-            % Internalized from src/algorithms/Jacobian/compute_Jacobian_fast.m
+            % Internalized from compute_Jacobian_fast.m
             
             n = params.n;
             n_E = params.n_E;
@@ -3593,7 +3593,7 @@ classdef SRNNModel2 < handle
         
         function J_array = compute_Jacobian_at_indices(S_out, J_times, params)
             % COMPUTE_JACOBIAN_AT_INDICES Computes Jacobian matrices at multiple time indices.
-            % Internalized from src/algorithms/Jacobian/compute_Jacobian_at_indices.m
+            % Internalized from compute_Jacobian_at_indices.m
             
             N_sys_eqs = size(S_out, 2);
             n_times = length(J_times);
@@ -3625,7 +3625,7 @@ classdef SRNNModel2 < handle
         end
 
         function names = stochastic_solver_names()
-            % Fixed-step SDE schemes (src/sde_fixed_step.m). Required when
+            % Fixed-step SDE schemes (sde_fixed_step). Required when
             % sigma_u_noise > 0; usable at sigma = 0 too, where they degenerate
             % to their deterministic parents (which is what the convergence
             % tests rely on).
@@ -3813,7 +3813,7 @@ classdef SRNNModel2 < handle
     methods (Static, Access = protected)
         function [fig_handle, ax_handles] = plot_SRNN_tseries(t_out, u, x, r, a, b, br, params, lya_results, Lya_method, T_plot)
             % PLOT_SRNN_TSERIES Create comprehensive time series plots for SRNN simulation.
-            % Internalized from src/plotting/plot_SRNN_tseries.m
+            % Internalized from plot_SRNN_tseries.m (since deleted)
             
             if nargin < 11
                 T_plot = [];
@@ -3981,7 +3981,7 @@ classdef SRNNModel2 < handle
         
         function plot_adaptation(t, a, params)
             % PLOT_ADAPTATION Plot adaptation variables for E and I neurons.
-            % Internalized from src/plotting/plot_adaptation.m
+            % Internalized from plot_adaptation.m (since deleted)
             cmap_I = SRNNModel2.inhibitory_colormap(8);
             cmap_E = SRNNModel2.excitatory_colormap(8);
             has_adaptation = false;
@@ -4012,7 +4012,7 @@ classdef SRNNModel2 < handle
         
         function plot_std_variable(t, b, params)
             % PLOT_STD_VARIABLE Plot short-term depression variables for E and I neurons.
-            % Internalized from src/plotting/plot_std_variable.m
+            % Internalized from plot_std_variable.m (since deleted)
             cmap_I = SRNNModel2.inhibitory_colormap(8);
             cmap_E = SRNNModel2.excitatory_colormap(8);
             has_std = false;

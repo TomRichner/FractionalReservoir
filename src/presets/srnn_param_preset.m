@@ -255,7 +255,7 @@ switch name
 
     case 'bursting_pairs'
         % The hand-tuned bursting network from
-        % scripts/presentations/Stability_Manuscript/fig_stim_engages_adaptation/
+        % From the bursting figure (fig_stim_engages_adaptation),
         % bursting_SRNN_example.m, ported from SRNNModel2 to SRNNCellTypePairs.
         % Derived presets: none.
         %
@@ -499,7 +499,7 @@ switch name
         std_routes.E.E.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
 
     case 'mc_esn'
-        % The memory-capacity network, from scripts/memory_capacity/
+        % The memory-capacity network, from run_memory_capacity
         % run_memory_capacity.m (was looped_memory_capacity.m).
         % Derived presets: none.
         %

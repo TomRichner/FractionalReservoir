@@ -2238,7 +2238,7 @@ classdef ParamSpaceAnalysis2 < handle
     % collect_level_values is PUBLIC: it is the one place that knows how to walk
     % the reps axis of a sweep and drop failed/NaN jobs, so a presentation script
     % that wants the same per-level rep values without the imagesc panel
-    % (scripts/presentations/.../fig_sensitivity_medians) reuses it rather than
+    % (fig_sensitivity_medians) reuses it rather than
     % reimplementing the sub2ind indexing. collect_grid_values stays private.
     methods (Static)
         function vals = collect_level_values(psa, swept_param, level_idx, cond_name, metric)

@@ -10,8 +10,8 @@ function cfg = paper_config(opts)
 % resolves the matching run and rebuilds every figure from it.
 %
 % TWO ORTHOGONAL KNOBS, as everywhere else in this project:
-%   preset_name  WHICH NETWORK   (src/srnn_param_preset.m)
-%   run_mode     HOW MUCH COMPUTE (scripts/run_all_analyses/analysis_run_config.m)
+%   preset_name  WHICH NETWORK   (srnn_param_preset)
+%   run_mode     HOW MUCH COMPUTE (analysis_run_config)
 %
 % and a third that says WHERE THE OUTPUT LANDS: fig_root. See its comment below.
 %

@@ -1,5 +1,5 @@
 % test_sde_integrators.m
-% Verify src/sde_fixed_step.m: the three additive-noise schemes, their measured
+% Verify sde_fixed_step: the three additive-noise schemes, their measured
 % strong convergence orders, and the absolute-time noise indexing that Benettin
 % depends on.
 %

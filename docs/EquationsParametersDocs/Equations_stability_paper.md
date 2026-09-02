@@ -17,7 +17,7 @@
 > table describing a preset the code no longer used: exactly the drift the
 > generated table exists to prevent.
 >
-> The implementation is `SRNNCellTypePairs.dynamics_fast` (`src/SRNNCellTypePairs.m`).
+> The implementation is `SRNNCellTypePairs.dynamics_fast` (`src/model/SRNNCellTypePairs.m`).
 
 ## The model
 

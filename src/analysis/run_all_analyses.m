@@ -15,7 +15,7 @@ function run_dir = run_all_analyses(preset_name, run_mode, opts)
 % scripts/paper/run_all_paper_analyses.m, which calls this.
 %
 % INPUTS
-%   preset_name  which network to simulate. See src/srnn_param_preset.m.
+%   preset_name  which network to simulate. See srnn_param_preset.
 %                Carries the model class and the adaptation conditions too.
 %   run_mode     how much compute to spend: 'fast' | 'fast2' | 'medium' |
 %                'medium2' | 'production'. See analysis_run_config.m for the

@@ -13,7 +13,7 @@ function cleanup = with_graphics_defaults(varargin)
 % changes every figure drawn afterwards in that MATLAB session, including
 % figures belonging to entirely different scripts.
 %
-% That is not hypothetical here. scripts/memory_capacity/plot_memory_capacity.m
+% That is not hypothetical here. plot_memory_capacity
 % set DefaultTextInterpreter = 'none' and never restored it, so after any
 % memory-capacity plot the session rendered '\lambda_1' as literal backslash
 % text -- which is exactly what the sensitivity and param-space sheets use for
