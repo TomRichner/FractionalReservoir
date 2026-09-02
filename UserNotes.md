@@ -14,6 +14,72 @@ and session that wrote it. Newest first.
 
 ---
 
+## CLAUDE.md leaves the impression that the paper's STD is on E→E and I→I; it is on all four routes
+
+| | |
+|---|---|
+| Noted | 2026-09-02 · `refactorRunAll` @ `d6b7fea` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Raised by | TR, while establishing whether the MC port's `'synaptic'` readout can take a single route |
+| Status | **Recorded, not implemented.** Documentation only; the code is correct. |
+
+### What the paper's preset actually does
+
+`srnn_param_preset` builds the routes explicitly for both dualStd presets
+(lines 184-188 and 242-246), and they are **identical on all four**:
+
+```matlab
+dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+std_routes.E.E.std = dual_std;
+std_routes.E.I.std = dual_std;
+std_routes.I.E.std = dual_std;
+std_routes.I.I.std = dual_std;
+```
+
+Confirmed by resolving the conditions rather than reading the source: the
+`std_only` and `sfa_and_std` conditions of
+`celltype_pairs_Sc0p2_noise0p025_dualStd_4cond` each carry all four routes at
+`tau_rec = [2 4]`, `tau_rel = [0.25 0.5]`. `no_adaptation` and `sfa_only` carry
+no `synapse_config` at all.
+
+### Why CLAUDE.md misleads without being wrong
+
+Neither sentence is false on its own, which is what makes this hard to spot:
+
+- **Line 225** — "`synapse_config = []` means *the default E→E and I→I routes*"
+  — is **accurate**. Verified: `srnn_adaptation_conditions('SRNNCellTypePairs')`
+  with no config returns `E->E:STD  I->I:STD`.
+- **Line 224** — "`'celltype_pairs'` is the `SRNNCellTypePairs` preset (E/I with
+  STD on E→E and I→I)" — describes a preset that **no longer exists**.
+  `srnn_param_preset('celltype_pairs')` now throws
+  `srnn_param_preset:RetiredPreset`.
+
+Together they leave a reader believing the Pairs network depresses E→E and I→I.
+CLAUDE.md documents the **default** and the **retired** preset, and never says
+that every preset the paper actually runs overrides that default. The one thing
+a reader most needs — what the paper's network does — is the thing not stated.
+
+### Why it mattered here
+
+It is not cosmetic. The whole question for the memory-capacity port was whether
+a neuron has ONE synaptic output or several. Under CLAUDE.md's picture, an E
+neuron has STD on E→E but not E→I, so `b·r` is ambiguous and the `'synaptic'`
+readout is undefined — the port would need a per-route decision. Under what the
+code actually does, all of a neuron's outgoing routes share one `(tau_rec,
+tau_rel)`, the `b` trajectories are bit-identical, and reading route 1 is exact.
+Opposite conclusions from the same paragraph.
+
+### Suggested fix
+
+Two sentences in the `src/presets/` section: correct line 224 to drop the
+retired `'celltype_pairs'`, and add that the dualStd presets supply their own
+`std_routes` covering **all four** routes, so the E→E/I→I default applies only
+when a preset does not override it. Worth doing alongside the MC port, whose
+route-redundancy check is the thing that depends on it.
+
+Related: [[esn-port-to-celltype-pairs]] if that note gets written.
+
+---
+
 ## Use `C` for the cell-type count everywhere, and stop calling it `D`
 
 | | |
@@ -412,17 +478,45 @@ keyed by type so any "all neurons" trace has to concatenate across types.
 
 ---
 
-## Memory capacity is still on `SRNNModel2` — the ESN class needs porting to `SRNNCellTypePairs`
+## ~~Memory capacity is still on `SRNNModel2`~~ — DONE 2026-09-02
 
 | | |
 |---|---|
 | Noted | 2026-08-22 · `refactorRunAll` @ `40b578a` · R5611351 · Claude Code (Opus 5), session e22d2fab |
 | Raised by | TR, at the end of the `refactorRunAll` refactor |
 | Re-confirmed | 2026-08-25 · `refactorRunAll` @ `05f6827`. TR asked for this issue again; it was already here, so it was re-checked rather than duplicated. Still open and still accurate: all four blockers below stand, `mc_esn` is still the only `SRNNModel2` preset the paper uses, and both entry points still take a preset. The single-cell-type work (`0134e9b`) did not touch it. |
+| **Implemented** | 2026-09-02 · `refactorRunAll` @ `7966fc7`. `SRNN_ESN_reservoir < SRNNCellTypePairs`, `mc_esn` deleted, replaced by `mc_pairs_dualStd`. The paper pipeline is now single-class. |
 
-**The one part of the paper still on a different model class.** Everything else was
-moved onto `SRNNCellTypePairs` during the refactor; memory capacity could not be,
-and this is why. **Not started.**
+> ### ✅ Done. Kept for the reasoning, not as a description of the code.
+>
+> The blockers below were **smaller than they look**, which is the useful part
+> to carry forward. Nothing about the MC protocol needed `SRNNModel2`: the ESN
+> overrides `build_stimulus` (protected on both classes), writes properties that
+> are `protected` SetAccess on both, and calls `integrate` / `build_noise` /
+> `get_params` / `dynamics_fast`, all present on both. The genuine coupling was
+> **eight lines**.
+>
+> Two things the note below did not anticipate:
+>
+> - **The `'synaptic'` readout was the real problem**, not the inheritance.
+>   Depression is per *route* on Pairs, so a neuron can transmit a different
+>   signal to each target and `b·r` may not exist. Resolved by requiring, per
+>   presynaptic type, that a type's outgoing routes carry identical STD **and**
+>   STF — then reading route 1, which is exact rather than approximate. See
+>   `SRNN_ESN_reservoir.assert_route_redundancy` and
+>   `scripts/tests/test_esn_route_redundancy.m`.
+> - **The conditions inverted in our favour.** `tau_a` is the settable property
+>   on Pairs and `n_a` is Dependent — the reverse of `SRNNModel2` — so the
+>   `rmfield_if(preset, {'tau_a_E'})` dance *disappeared* from both entry points
+>   rather than needing translation.
+>
+> `plot_esn_timeseries` was worse than estimated: ~20 E/I-coupled sites, not 5.
+>
+> **Still open, and deliberately so:** `mc_pairs_dualStd` runs with
+> `sigma_u_noise = 0`. The mechanism to turn it on exists (`mc_run_config` now
+> selects the integrator from the preset, and takes an explicit override), but
+> the protocol has not been re-validated with noise. And the preset's physics is
+> a starting point carried over from `mc_esn` — TR expects to tune it.
 
 ### What blocks it
 
