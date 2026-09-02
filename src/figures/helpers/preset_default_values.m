@@ -98,8 +98,14 @@ function default_value = preset_default_values(data_root, params)
         if ~isempty(probe) && isprop(probe, name)
             val = probe.(name);
         else
+            % THE RUN'S OWN CLASS, not the default. class_default's second
+            % argument defaults to 'SRNNModel2', so this used to fall back to
+            % the WRONG class's default on a Pairs run whenever the probe could
+            % not be built or lacked the property -- quietly, because the
+            % try/catch turns any failure into []. model_class is already
+            % resolved above, from the run's preset.
             try
-                val = ParamSpaceAnalysis2.class_default(name);
+                val = ParamSpaceAnalysis2.class_default(name, model_class);
             catch
                 val = [];
             end

@@ -395,7 +395,7 @@ classdef SRNNModel2 < handle
                 elseif ischar(name) && strcmp(name, 'ode_solver')
                     % Fail here rather than at the first solver call, and give
                     % the handle-to-name mapping while the caller can see it.
-                    SRNNModel2.check_ode_solver(varargin{i+1});
+                    check_ode_solver(varargin{i+1}, 'SRNNModel');
                     obj.ode_solver = varargin{i+1};
                 elseif isprop(obj, name)
                     obj.(name) = varargin{i+1};
@@ -712,7 +712,7 @@ classdef SRNNModel2 < handle
             % discretisation error common to both trajectories and cancel in the
             % difference. (The QR path integrates a variational equation on a
             % 2-point span instead and always uses ode45; see below.)
-            solver = SRNNModel2.resolve_solver(obj.ode_solver, obj.noise_increments);
+            solver = resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNModel');
             obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, solver, rhs);
             
             if isfield(obj.lya_results, 'LLE')
@@ -1583,7 +1583,7 @@ classdef SRNNModel2 < handle
             % SRNN_ESN_reservoir -- which does not go through run(), it has its
             % own run_reservoir_esn -- gets any integrator work for free rather
             % than silently missing it.
-            solver = SRNNModel2.resolve_solver(obj.ode_solver, obj.noise_increments);
+            solver = resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNModel');
             [t_out, S_out] = solver(rhs, tspan, S0, obj.ode_opts);
         end
 
@@ -1703,8 +1703,8 @@ classdef SRNNModel2 < handle
 
             % Catch an ode_solver assigned after construction, so a typo fails
             % here rather than at the first solver call inside run().
-            SRNNModel2.check_ode_solver(obj.ode_solver);
-            SRNNModel2.check_noise_settings(obj.sigma_u_noise, obj.ode_solver, 'SRNNModel');
+            check_ode_solver(obj.ode_solver, 'SRNNModel');
+            check_noise_settings(obj.sigma_u_noise, obj.ode_solver, 'SRNNModel');
 
             % Check n_E and n_I
             if obj.n_E < 1
@@ -3035,84 +3035,11 @@ classdef SRNNModel2 < handle
     % Internalized from the standalone nonlinearity files  to make SRNNModel2 standalone.
 
     methods (Static)
-        function D = compute_eigenvalue_density(eigenvalues, re_edges, im_edges, sigma_bins)
-            % COMPUTE_EIGENVALUE_DENSITY 2-D Gaussian-smoothed eigenvalue density
-            %
-            % Bins the (real, imag) eigenvalue coordinates onto the grid defined
-            % by re_edges x im_edges, then smooths with a small Gaussian kernel.
-            % conv2 is used (not imgaussfilt) to avoid an Image Processing
-            % Toolbox dependency.
-            %
-            % Inputs:
-            %   eigenvalues - vector of (complex) eigenvalues
-            %   re_edges    - bin edges along the real axis (1 x nRe+1)
-            %   im_edges    - bin edges along the imag axis (1 x nIm+1)
-            %   sigma_bins  - Gaussian smoothing width in bins (default 1.5)
-            %
-            % Output:
-            %   D - smoothed density matrix, size (numel(re_edges)-1) x (numel(im_edges)-1)
-            %       rows index the real axis, columns index the imaginary axis.
-
-            if nargin < 4 || isempty(sigma_bins), sigma_bins = 1.5; end
-
-            H = histcounts2(real(eigenvalues(:)), imag(eigenvalues(:)), re_edges, im_edges);
-
-            if sigma_bins > 0
-                % Build a normalized separable Gaussian kernel (+/- 3 sigma).
-                half = max(1, ceil(3 * sigma_bins));
-                gv = exp(-((-half:half).^2) / (2 * sigma_bins^2));
-                gv = gv / sum(gv);
-                K = gv(:) * gv(:)';          % 2-D isotropic Gaussian
-                D = conv2(H, K, 'same');
-            else
-                D = H;
-            end
-        end
-
-        function ax = plot_eigenvalue_heatmap_helper(ax, D, re_edges, im_edges, clim, use_log)
-            % PLOT_EIGENVALUE_HEATMAP_HELPER Render one eigenvalue-density panel
-            %
-            % Draws the smoothed density D as an image on the complex plane and
-            % overlays the Re = 0 stability line. Pass a shared clim across
-            % multiple panels for directly-comparable color scaling.
-            %
-            % Inputs:
-            %   ax        - target axes
-            %   D         - density matrix from compute_eigenvalue_density
-            %   re_edges  - real-axis bin edges
-            %   im_edges  - imag-axis bin edges
-            %   clim      - [lo hi] color limits (shared across panels)
-            %   use_log   - if true, display log10(1 + D) (default true)
-
-            if nargin < 6 || isempty(use_log), use_log = true; end
-
-            re_centers = (re_edges(1:end-1) + re_edges(2:end)) / 2;
-            im_centers = (im_edges(1:end-1) + im_edges(2:end)) / 2;
-
-            if use_log
-                plot_val = log10(1 + D);
-            else
-                plot_val = D;
-            end
-
-            % D is (Re x Im); imagesc expects rows=y(Im), cols=x(Re) -> transpose
-            imagesc(ax, re_centers, im_centers, plot_val');
-            axis(ax, 'xy');
-            axis(ax, 'image');
-            colormap(ax, parula);
-            if nargin >= 5 && ~isempty(clim)
-                caxis(ax, clim);
-            end
-
-            % Stability line at Re = 0
-            hold(ax, 'on');
-            yl = [im_centers(1), im_centers(end)];
-            plot(ax, [0, 0], yl, 'w--', 'LineWidth', 1.25);
-            hold(ax, 'off');
-
-            xlabel(ax, 'Re(\lambda)');
-            ylabel(ax, 'Im(\lambda)');
-        end
+        % compute_eigenvalue_density and plot_eigenvalue_heatmap_helper were
+        % MOVED to src/plotting/ on 2026-09-02. Both are pure functions over
+        % arrays -- no model state, no class coupling -- and their only caller,
+        % fig_eig_heatmap, applies them to SRNNCellTypePairs data, so living
+        % here made the paper pipeline depend on this class for no reason.
 
         function y = piecewiseSigmoid(x, a, c)
             % PIECEWISESIGMOID A piecewise linear/quadratic sigmoid activation function.
@@ -3612,106 +3539,19 @@ classdef SRNNModel2 < handle
         end
     end
     
-    methods (Static)
-        function names = solver_names()
-            % SOLVER_NAMES The valid values of the `ode_solver` property.
-            names = [SRNNModel2.deterministic_solver_names(), ...
-                SRNNModel2.stochastic_solver_names()];
-        end
-
-        function names = deterministic_solver_names()
-            % Solvers that ignore sigma_u_noise; the only ones usable at sigma = 0.
-            names = {'ode45', 'ode15s', 'rk4'};
-        end
-
-        function names = stochastic_solver_names()
-            % Fixed-step SDE schemes (sde_fixed_step). Required when
-            % sigma_u_noise > 0; usable at sigma = 0 too, where they degenerate
-            % to their deterministic parents (which is what the convergence
-            % tests rely on).
-            names = {'euler', 'heun', 'sra1'};
-        end
-
-        function fn = resolve_solver(name, noise)
-            % RESOLVE_SOLVER Map an ode_solver name to a callable with the
-            % solver(odefun, tspan, y0, opts) signature.
-            %
-            % The stochastic schemes close over the pre-generated noise. A
-            % closure is safe here where it would not be on the property
-            % itself: this handle is built per call and never stored or
-            % compared -- what is persisted and compared is the NAME.
-            if nargin < 2, noise = []; end
-            switch lower(name)
-                case 'ode45'
-                    fn = @ode45;
-                case 'ode15s'
-                    fn = @ode15s;
-                case 'rk4'
-                    fn = @ode_rk4;
-                case {'euler', 'heun', 'sra1'}
-                    scheme = lower(name);
-                    fn = @(f, tsp, y0, o) sde_fixed_step(f, tsp, y0, o, noise, scheme);
-                otherwise
-                    error('SRNNModel:InvalidParams', ...
-                        'Unknown ode_solver ''%s''. Valid: %s.', ...
-                        char(string(name)), strjoin(SRNNModel2.solver_names(), ', '));
-            end
-        end
-
-        function check_noise_settings(sigma_u_noise, ode_solver, err_id_prefix)
-            % CHECK_NOISE_SETTINGS Validate sigma_u_noise and its pairing with
-            % the integrator. Shared by both model classes and by
-            % ParamSpaceAnalysis2's pre-flight, so a swept sigma with a
-            % deterministic solver fails before a sweep starts rather than at
-            % the first nonzero grid point.
-            if ~isscalar(sigma_u_noise) || ~isnumeric(sigma_u_noise) || ...
-                    ~isreal(sigma_u_noise) || ~isfinite(sigma_u_noise) || sigma_u_noise < 0
-                error([err_id_prefix ':InvalidParams'], ...
-                    'sigma_u_noise must be a finite non-negative real scalar.');
-            end
-            if sigma_u_noise > 0 && ...
-                    ~ismember(lower(char(string(ode_solver))), SRNNModel2.stochastic_solver_names())
-                error([err_id_prefix ':InvalidParams'], ...
-                    ['sigma_u_noise = %g requires a stochastic integrator; ' ...
-                     'ode_solver is ''%s''. Set ode_solver to one of %s. ' ...
-                     '(The adaptive solvers cannot step an SDE at all, and ' ...
-                     '''rk4'' is kept deterministic so sigma = 0 work stays ' ...
-                     'bit-identical to earlier runs.)'], ...
-                    sigma_u_noise, char(string(ode_solver)), ...
-                    strjoin(SRNNModel2.stochastic_solver_names(), ', '));
-            end
-        end
-
-        function check_ode_solver(value)
-            % CHECK_ODE_SOLVER Reject handles by name and validate the string.
-            % Called from the constructor (so a bad name fails at the point of
-            % the mistake) and from validate() (so a later assignment is caught
-            % too). Not a set method: ParamSpaceAnalysis2 assigns properties
-            % weakest-first and may set one before the ones that give it
-            % meaning, so this class deliberately has no setters.
-            if isa(value, 'function_handle')
-                legacy = struct('ode45', 'ode45', 'ode15s', 'ode15s', ...
-                    'ode_rk4', 'rk4', 'ode23', 'ode45', 'ode113', 'ode45');
-                as_str = func2str(value);
-                if isfield(legacy, as_str)
-                    hint = sprintf('use ''%s'' instead of @%s', legacy.(as_str), as_str);
-                else
-                    hint = sprintf('valid names are %s', ...
-                        strjoin(SRNNModel2.solver_names(), ', '));
-                end
-                error('SRNNModel:RenamedProperty', ...
-                    ['''ode_solver'' now takes a NAME rather than a function ' ...
-                     'handle, so the choice survives into resolved_defaults and ' ...
-                     'compares cleanly across runs: %s.'], hint);
-            end
-            if ~(ischar(value) || isstring(value)) || ...
-                    ~ismember(lower(char(string(value))), SRNNModel2.solver_names())
-                error('SRNNModel:InvalidParams', ...
-                    'Unknown ode_solver ''%s''. Valid: %s.', ...
-                    char(string(value)), strjoin(SRNNModel2.solver_names(), ', '));
-            end
-        end
-    end
+    % The solver registry -- solver_names, deterministic_solver_names,
+    % stochastic_solver_names, resolve_solver, check_ode_solver and
+    % check_noise_settings -- used to be statics here, duplicated verbatim on
+    % SRNNCellTypePairs. They now live as shared functions in
+    % src/model/integrators/ and are called by bare name from both classes.
+    %
+    % check_noise_settings is the one that mattered: SRNNCellTypePairs.validate
+    % called it, and validate() runs from that class's constructor AND build(),
+    % so every Pairs model in the repo depended on this class existing.
+    %
+    % This class passes 'SRNNModel' as the err_id_prefix, NOT 'SRNNModel2' --
+    % a pre-existing inconsistency that test_ode_solver_name asserts, kept
+    % deliberately.
 
     methods (Static, Access = private)
         function names = activation_names()

@@ -79,7 +79,7 @@ im_edges = linspace(im_lim(1), im_lim(2), grid_res + 1);
 D_by_cond = cell(n_cond, 1);
 cmax = 0;
 for i = 1:n_cond
-    D_by_cond{i} = SRNNModel2.compute_eigenvalue_density( ...
+    D_by_cond{i} = compute_eigenvalue_density( ...
         evals_by_cond{i}, re_edges, im_edges, sigma_bins);
     cmax = max(cmax, max(log10(1 + D_by_cond{i}(:))));  % shared log-density max
 end
@@ -104,7 +104,7 @@ tl  = tiledlayout(fig, n_rows, n_cols, 'TileSpacing', 'compact', 'Padding', 'com
 ax_panels = gobjects(n_cond, 1);
 for i = 1:n_cond
     ax_panels(i) = nexttile(tl);
-    SRNNModel2.plot_eigenvalue_heatmap_helper( ...
+    plot_eigenvalue_heatmap_helper( ...
         ax_panels(i), D_by_cond{i}, re_edges, im_edges, clim, true);
     title(ax_panels(i), condition_titles{i}, 'FontWeight', 'normal', 'FontSize', 14);
 

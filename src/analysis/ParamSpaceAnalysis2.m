@@ -323,7 +323,7 @@ classdef ParamSpaceAnalysis2 < handle
             end
             % Delegate so the rule and its message live in one place. Report the
             % largest requested level, which is the one that will certainly bite.
-            SRNNModel2.check_noise_settings(max(sigma_levels), solver, 'ParamSpaceAnalysis2');
+            check_noise_settings(max(sigma_levels), solver, 'ParamSpaceAnalysis2');
         end
 
         function validate_model_defaults(obj)

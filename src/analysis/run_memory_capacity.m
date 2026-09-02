@@ -390,7 +390,7 @@ sigma = 0;
 if isstruct(preset_defaults) && isfield(preset_defaults, 'sigma_u_noise')
     sigma = preset_defaults.sigma_u_noise;
 end
-SRNNModel2.check_noise_settings(sigma, solver, 'run_memory_capacity');
+check_noise_settings(sigma, solver, 'run_memory_capacity');
 end
 
 function cfg = pack(n_trials, T_wash_sec, T_train_sec, T_test_sec, d_max_sec, ...

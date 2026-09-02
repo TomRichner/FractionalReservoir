@@ -284,7 +284,7 @@ classdef SRNNCellTypePairs < handle
                 if strcmp(name, 'ode_solver')
                     % Fail here rather than at the first solver call, and give
                     % the handle-to-name mapping while the caller can see it.
-                    SRNNCellTypePairs.check_ode_solver(varargin{k + 1});
+                    check_ode_solver(varargin{k + 1}, 'SRNNCellTypePairs');
                 end
                 obj.(name) = varargin{k + 1};
             end
@@ -571,7 +571,7 @@ classdef SRNNCellTypePairs < handle
             % INTEGRATE Run the trajectory integrator named by ode_solver.
             % Twin of SRNNModel2.integrate; the classes are duck-typed
             % siblings and share no implementation.
-            solver = SRNNCellTypePairs.resolve_solver(obj.ode_solver, obj.noise_increments);
+            solver = resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNCellTypePairs');
             [t_out, S_out] = solver(rhs, tspan, S0, obj.ode_opts);
         end
 
@@ -622,7 +622,7 @@ classdef SRNNCellTypePairs < handle
                 obj.lya_method, obj.S_out, obj.t_out, 1 / obj.fs, obj.fs, ...
                 obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
                 obj.ode_opts, ...
-                SRNNCellTypePairs.resolve_solver(obj.ode_solver, obj.noise_increments), rhs);
+                resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNCellTypePairs'), rhs);
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
@@ -928,8 +928,8 @@ classdef SRNNCellTypePairs < handle
         function validate(obj)
             % Catch an ode_solver assigned after construction, so a typo fails
             % here rather than at the first solver call inside run().
-            SRNNCellTypePairs.check_ode_solver(obj.ode_solver);
-            SRNNModel2.check_noise_settings(obj.sigma_u_noise, obj.ode_solver, ...
+            check_ode_solver(obj.ode_solver, 'SRNNCellTypePairs');
+            check_noise_settings(obj.sigma_u_noise, obj.ode_solver, ...
                 'SRNNCellTypePairs');
 
             C = obj.n_cellTypes;
@@ -1667,67 +1667,12 @@ classdef SRNNCellTypePairs < handle
 
     %% State layout, dynamics, and Jacobian
     methods (Static)
-        function names = solver_names()
-            % SOLVER_NAMES The valid values of the `ode_solver` property.
-            names = [SRNNCellTypePairs.deterministic_solver_names(), ...
-                SRNNCellTypePairs.stochastic_solver_names()];
-        end
-
-        function names = deterministic_solver_names()
-            names = {'ode45', 'ode15s', 'rk4'};
-        end
-
-        function names = stochastic_solver_names()
-            names = {'euler', 'heun', 'sra1'};
-        end
-
-        function fn = resolve_solver(name, noise)
-            % RESOLVE_SOLVER Map an ode_solver name to a solver callable.
-            % See SRNNModel2.resolve_solver.
-            if nargin < 2, noise = []; end
-            switch lower(name)
-                case 'ode45'
-                    fn = @ode45;
-                case 'ode15s'
-                    fn = @ode15s;
-                case 'rk4'
-                    fn = @ode_rk4;
-                case {'euler', 'heun', 'sra1'}
-                    scheme = lower(name);
-                    fn = @(f, tsp, y0, o) sde_fixed_step(f, tsp, y0, o, noise, scheme);
-                otherwise
-                    error('SRNNCellTypePairs:InvalidParams', ...
-                        'Unknown ode_solver ''%s''. Valid: %s.', ...
-                        char(string(name)), strjoin(SRNNCellTypePairs.solver_names(), ', '));
-            end
-        end
-
-        function check_ode_solver(value)
-            % CHECK_ODE_SOLVER Reject handles by name and validate the string.
-            % Twin of SRNNModel2.check_ode_solver; see there for why this is not
-            % a set method.
-            if isa(value, 'function_handle')
-                legacy = struct('ode45', 'ode45', 'ode15s', 'ode15s', ...
-                    'ode_rk4', 'rk4', 'ode23', 'ode45', 'ode113', 'ode45');
-                as_str = func2str(value);
-                if isfield(legacy, as_str)
-                    hint = sprintf('use ''%s'' instead of @%s', legacy.(as_str), as_str);
-                else
-                    hint = sprintf('valid names are %s', ...
-                        strjoin(SRNNCellTypePairs.solver_names(), ', '));
-                end
-                error('SRNNCellTypePairs:RenamedProperty', ...
-                    ['''ode_solver'' now takes a NAME rather than a function ' ...
-                     'handle, so the choice survives into resolved_defaults and ' ...
-                     'compares cleanly across runs: %s.'], hint);
-            end
-            if ~(ischar(value) || isstring(value)) || ...
-                    ~ismember(lower(char(string(value))), SRNNCellTypePairs.solver_names())
-                error('SRNNCellTypePairs:InvalidParams', ...
-                    'Unknown ode_solver ''%s''. Valid: %s.', ...
-                    char(string(value)), strjoin(SRNNCellTypePairs.solver_names(), ', '));
-            end
-        end
+        % The solver registry -- solver_names, deterministic_solver_names,
+        % stochastic_solver_names, resolve_solver and check_ode_solver -- used to
+        % be statics here, duplicated verbatim from SRNNModel2. They now live as
+        % shared functions in src/model/integrators/ and are called by bare
+        % name, with this class's name passed as the err_id_prefix so the error
+        % identifiers are unchanged.
 
         function names = activation_names()
             % ACTIVATION_NAMES Valid values of the `activation` property.

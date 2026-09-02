@@ -23,23 +23,31 @@ all_passed = true;
 all_passed = check('the default is ''ode45''', ...
     strcmp(SRNNModel2().ode_solver, 'ode45')) && all_passed;
 all_passed = check('the deterministic names are ode45/ode15s/rk4', ...
-    isequal(SRNNModel2.deterministic_solver_names(), {'ode45', 'ode15s', 'rk4'})) && all_passed;
+    isequal(deterministic_solver_names(), {'ode45', 'ode15s', 'rk4'})) && all_passed;
 all_passed = check('the stochastic names are euler/heun/sra1', ...
-    isequal(SRNNModel2.stochastic_solver_names(), {'euler', 'heun', 'sra1'})) && all_passed;
+    isequal(stochastic_solver_names(), {'euler', 'heun', 'sra1'})) && all_passed;
 all_passed = check('solver_names is the union of the two', ...
-    isequal(SRNNModel2.solver_names(), ...
-        [SRNNModel2.deterministic_solver_names(), ...
-         SRNNModel2.stochastic_solver_names()])) && all_passed;
-all_passed = check('both classes offer the same names', ...
-    isequal(SRNNModel2.solver_names(), SRNNCellTypePairs.solver_names())) && all_passed;
+    isequal(solver_names(), ...
+        [deterministic_solver_names(), stochastic_solver_names()])) && all_passed;
+
+% The registry moved to src/model/integrators/ on 2026-09-02. There used to be a
+% check here that SRNNModel2.solver_names() and SRNNCellTypePairs.solver_names()
+% agreed -- necessary while each class carried its own verbatim copy, and
+% vacuous now that there is one list. What is worth asserting instead is that
+% neither class still defines its own, so a copy cannot creep back.
+all_passed = check('neither class redefines the registry', ...
+    ~any_static_named({'SRNNModel2', 'SRNNCellTypePairs'}, ...
+        {'solver_names', 'deterministic_solver_names', ...
+         'stochastic_solver_names', 'resolve_solver', 'check_ode_solver', ...
+         'check_noise_settings'})) && all_passed;
 
 %% resolve_solver maps names to the expected callables
 all_passed = check('''ode45'' resolves to @ode45', ...
-    strcmp(func2str(SRNNModel2.resolve_solver('ode45')), 'ode45')) && all_passed;
+    strcmp(func2str(resolve_solver('ode45')), 'ode45')) && all_passed;
 all_passed = check('''rk4'' resolves to @ode_rk4', ...
-    strcmp(func2str(SRNNModel2.resolve_solver('rk4')), 'ode_rk4')) && all_passed;
+    strcmp(func2str(resolve_solver('rk4')), 'ode_rk4')) && all_passed;
 all_passed = check('the name is case-insensitive', ...
-    strcmp(func2str(SRNNModel2.resolve_solver('RK4')), 'ode_rk4')) && all_passed;
+    strcmp(func2str(resolve_solver('RK4')), 'ode_rk4')) && all_passed;
 
 %% Every name actually integrates, on the requested time grid
 % The stochastic schemes are included at sigma = 0, where they degenerate to
@@ -138,6 +146,26 @@ try
     fcn();
 catch err
     threw = true;
+end
+end
+
+function tf = any_static_named(class_names, method_names)
+% True if any of the classes still defines any of the named methods.
+%
+% Guards against the solver registry being copied back onto a model class. The
+% duplication it replaced was verbatim on both classes and drifted only by error
+% identifier, which is exactly the kind of thing that reappears when someone
+% adds a solver "where it seems to belong".
+tf = false;
+for c = 1:numel(class_names)
+    mc = meta.class.fromName(class_names{c});
+    if isempty(mc); continue; end
+    have = {mc.MethodList.Name};
+    hit = intersect(have, method_names);
+    if ~isempty(hit)
+        fprintf(2, '    %s still defines: %s\n', class_names{c}, strjoin(hit, ', '));
+        tf = true;
+    end
 end
 end
 

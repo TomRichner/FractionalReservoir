@@ -38,7 +38,7 @@ st           = manuscript_style();
 
 %% ---- Parameters -----------------------------------------------------------
 S_c = 0.4;                                     % activation center (class default)
-phi = @(x) SRNNModel2.logisticSigmoid(x, S_c); % exactly the model's activation
+phi = @(x) SRNNCellTypePairs.logisticSigmoid(x, S_c); % exactly the model's activation
 
 x = linspace(-0.6, 1.4, 400);                  % input (spans the active region)
 

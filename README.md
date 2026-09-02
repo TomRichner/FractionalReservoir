@@ -69,7 +69,7 @@ uses `'production'`, which is a deliberate edit rather than the default.
 
 | path | what |
 |---|---|
-| `src/model/` | the three model classes, connectivity, nonlinearities, integrators, Jacobians |
+| `src/model/` | the three model classes, connectivity, integrators, Jacobians |
 | `src/presets/` | *which network* (`srnn_param_preset`) and *how much compute* (`analysis_run_config`) |
 | `src/analysis/` | `ParamSpaceAnalysis2` and everything that runs a sweep |
 | `src/figures/` | the `fig_*.m` manuscript figures, their helpers and replot tools |

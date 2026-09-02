@@ -77,7 +77,7 @@ else
 end
 sigma_probe = 0;
 if isfield(preset, 'sigma_u_noise'); sigma_probe = preset.sigma_u_noise; end
-SRNNModel2.check_noise_settings(sigma_probe, solver, 'run_memory_capacity_example');
+check_noise_settings(sigma_probe, solver, 'run_memory_capacity_example');
 
 fprintf('[mc_example] preset=%s run_mode=%s T_train=%gs d_max=%gs solver=%s\n', ...
     opts.preset_name, opts.run_mode, T_train_sec, d_max_sec, solver);
