@@ -1,26 +1,31 @@
-function ax = plot_eigenvalue_heatmap_helper(ax, D, re_edges, im_edges, clim, use_log)
+function ax = plot_eigenvalue_heatmap_helper(ax, D, re_edges, im_edges, color_limits, use_log)
 %PLOT_EIGENVALUE_HEATMAP_HELPER Render one eigenvalue-density panel.
 %
 %   ax = PLOT_EIGENVALUE_HEATMAP_HELPER(ax, D, re_edges, im_edges)
-%   ax = PLOT_EIGENVALUE_HEATMAP_HELPER(ax, D, re_edges, im_edges, clim, use_log)
+%   ax = PLOT_EIGENVALUE_HEATMAP_HELPER(ax, D, re_edges, im_edges, color_limits, use_log)
 %
 % Draws the smoothed density D as an image on the complex plane and overlays the
-% Re = 0 stability line. Pass a shared clim across multiple panels for
+% Re = 0 stability line. Pass the same color_limits to every panel for
 % directly-comparable color scaling.
 %
 % Inputs:
-%   ax        - target axes
-%   D         - density matrix from compute_eigenvalue_density
-%   re_edges  - real-axis bin edges
-%   im_edges  - imag-axis bin edges
-%   clim      - [lo hi] color limits (shared across panels)
-%   use_log   - if true, display log10(1 + D) (default true)
+%   ax            - target axes
+%   D             - density matrix from compute_eigenvalue_density
+%   re_edges      - real-axis bin edges
+%   im_edges      - imag-axis bin edges
+%   color_limits  - [lo hi] colour limits (shared across panels)
+%   use_log       - if true, display log10(1 + D) (default true)
 %
 % MOVED here from a static on SRNNModel2 (2026-09-02), with
 % compute_eigenvalue_density. It draws into an axes from plain arrays and knows
 % nothing about any model class.
 %
-% See also: compute_eigenvalue_density, fig_eig_heatmap
+% The fifth argument was called `clim`, which SHADOWED the clim() function it
+% needed -- so the body had to use the deprecated caxis() instead, and no
+% one-word swap could fix it. Renaming the parameter is what made the
+% deprecation removable.
+%
+% See also: compute_eigenvalue_density, fig_eig_heatmap, clim
 
 if nargin < 6 || isempty(use_log), use_log = true; end
 
@@ -38,8 +43,8 @@ imagesc(ax, re_centers, im_centers, plot_val');
 axis(ax, 'xy');
 axis(ax, 'image');
 colormap(ax, parula);
-if nargin >= 5 && ~isempty(clim)
-    caxis(ax, clim);
+if nargin >= 5 && ~isempty(color_limits)
+    clim(ax, color_limits);
 end
 
 % Stability line at Re = 0
