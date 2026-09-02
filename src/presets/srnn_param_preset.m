@@ -498,47 +498,63 @@ switch name
         std_routes = struct();
         std_routes.E.E.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
 
-    case 'mc_esn'
-        % The memory-capacity network, from run_memory_capacity
-        % run_memory_capacity.m (was looped_memory_capacity.m).
+    case 'mc_pairs_dualStd'
+        % The memory-capacity network, on SRNNCellTypePairs.
+        % Replaces 'mc_esn', deleted 2026-09-02 when SRNN_ESN_reservoir was
+        % re-parented from SRNNModel2 onto SRNNCellTypePairs. Memory capacity
+        % was the last part of the paper on a different model class; it no
+        % longer is, and the methods section no longer has to say so.
         % Derived presets: none.
         %
-        % THE ONE SRNNModel2 PRESET LEFT IN THE PAPER, and not by choice:
-        % SRNN_ESN_reservoir subclasses SRNNModel2, so the memory-capacity
-        % protocol cannot run on SRNNCellTypePairs at all. Porting the ESN
-        % readout onto the Pairs class is tracked follow-up work; until then the
-        % MC figures show a different network from every other figure, and the
-        % methods section has to say so.
+        % PHYSICS CARRIED OVER FROM mc_esn unchanged: n = 300, level_of_chaos =
+        % 2.0 (above the edge of chaos -- the logistic's mean slope < 1 pushes
+        % that edge past 1), S_c = 0.35, a TOTAL SFA budget of 0.5 over three
+        % timescales, and f off perfect balance so the no-adaptation condition
+        % is not accidentally favoured. mc_esn's scalar f = 0.6 becomes the row
+        % [0.6 0.4]; that is the same partition, since the two cell-type
+        % partitioning algorithms provably agree at C = 2 (see commit 1ed6789).
         %
-        % WHAT IS DELIBERATELY ABSENT. The MC protocol settings -- input_type,
-        % T_hold, T_wash, T_train, T_test, d_max, u_f_cutoff, u_alpha -- are
-        % NOT here, and neither are fs / ode_solver. They size the experiment
-        % rather than describing the network, which makes them run_mode knobs in
-        % this project's vocabulary; run_memory_capacity owns them. Keeping them
-        % out is what lets 'fast' and 'production' MC runs share one network.
+        % DUAL DEPRESSION ON ALL FOUR ROUTES, matching the paper's preset rather
+        % than mc_esn's route set. This is not cosmetic. mc_esn ran STD via
+        % n_b_E = 1, which on SRNNModel2 depresses every outgoing E synapse --
+        % E->E and E->I, but nothing from I. Putting identical STD on all four
+        % routes is what makes the 'synaptic' readout well defined here: a
+        % presynaptic neuron's outgoing routes then share their (tau_rec,
+        % tau_rel), so its b trajectories are bit-identical down every route and
+        % it has ONE synaptic output. SRNN_ESN_reservoir.assert_route_redundancy
+        % enforces exactly that and errors if a future edit breaks it.
         %
-        % f = 0.6, off perfect balance, so the no-adaptation condition is not
-        % accidentally favoured. level_of_chaos = 2 sits above the edge of chaos
-        % (the logistic's mean slope < 1 pushes that edge past 1).
-        model_class = 'SRNNModel2';
+        % NOISE IS OFF, deliberately and for now. mc_run_config selects the
+        % integrator the same way analysis_run_config does, so sigma_u_noise > 0
+        % would switch MC to 'sra1' automatically and work -- but the MC protocol
+        % has not been re-validated with noise, and TR wants the first ported run
+        % comparable on one axis at a time. Set sigma_u_noise here to turn it on;
+        % nothing else needs to change.
+        model_class = 'SRNNCellTypePairs';
         d = struct( ...
-            'n',              300, ...
-            'f',              0.6, ...
-            'level_of_chaos', 2.0, ...
-            'tau_d',          0.1, ...
-            'activation',     'logistic', ...
-            'S_c',            0.35, ...
-            'S_a',            0.9, ...      % unused by the logistic; recorded for parity
-            ... % n_a_I / n_b_I are NOT here. looped_memory_capacity set them to 0
-            ... % explicitly, but they are condition-owned fields and a preset may
-            ... % not carry any of n_a_E / n_a_I / n_b_E / n_b_I. Both are already
-            ... % the SRNNModel2 default (0), so nothing changes -- I neurons still
-            ... % get no SFA and no STD in every condition.
-            'c_E',            0.5, ...       % TOTAL budget (was 0.5/3)
-            'tau_a_E',        logspace(log10(0.1), log10(10), 3), ...
-            'tau_b_E_rec',    1.0, ...
-            'tau_b_E_rel',    0.25, ...
-            'std_zero_floor', false);
+            'n',                    300, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.6 0.4], ...
+            'mu_tilde_relative',    [3 -4; 3 -4], ...    % multiples of F, (post <- pre)
+            'sigma_tilde_relative', [1 1; 1 1], ...      % multiples of F
+            'level_of_chaos',       2.0, ...
+            'tau_d',                0.1, ...
+            'activation',           'logistic', ...
+            'S_c',                  0.35, ...
+            'c',                    [0.5, 0], ...        % TOTAL SFA budget, E only
+            'std_zero_floor',       false, ...
+            'sigma_u_noise',        0);
+
+        sfa_timescales = logspace(log10(0.1), log10(10), 3);
+
+        std_routes = struct();
+        mc_dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        std_routes.E.E.std = mc_dual_std;
+        std_routes.E.I.std = mc_dual_std;
+        std_routes.I.E.std = mc_dual_std;
+        std_routes.I.I.std = mc_dual_std;
 
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
@@ -591,7 +607,7 @@ names = {'default', 'overconnected', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
     'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', ...
-    'single_neuron_dualStd', 'mc_esn'};
+    'single_neuron_dualStd', 'mc_pairs_dualStd'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)

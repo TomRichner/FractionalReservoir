@@ -19,7 +19,10 @@ function [fig1, fig2] = plot_memory_capacity(results_all, out_dir)
     if nargin < 2; out_dir = ''; end
 
     % --- Unpack (no recompute; everything is already in results_all) ---
-    condition_names = results_all.conditions;
+    % Saved runs carry the project's snake_case condition KEYS; the display
+    % strings come from srnn_condition_titles, shared with every other figure.
+    % Guarded with isKey because a saved run directory can name anything.
+    condition_names = mc_display_names(results_all.conditions);
     n_cond   = numel(condition_names);
     MC_trials = results_all.MC_trials;
     H_trials  = results_all.H_trials;

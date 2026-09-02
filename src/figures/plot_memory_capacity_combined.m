@@ -29,7 +29,9 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
     end
 
     % --- Unpack (no recompute; everything is already in results_all) ---
-    condition_names = results_all.conditions;
+    % Saved runs carry snake_case condition KEYS; display strings come from
+    % srnn_condition_titles via mc_display_names, shared with every other figure.
+    condition_names = mc_display_names(results_all.conditions);
     n_cond   = numel(condition_names);
     H_trials = results_all.H_trials;
     n_trials = size(H_trials, 1);

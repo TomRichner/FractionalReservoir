@@ -47,11 +47,15 @@ F = {
     'sfa_only',       320.505680170, 10.9637823696
     'std_only',       424.368611267, 15.0522656270
     'sfa_and_std',    598.034634373, 16.6784274754 }
- 'mc_esn', {'n',60,'indegree',20}, {
-    'no_adaptation',  19107.4291486, 376.340171671
-    'sfa_only',       18584.4201121, 336.323456565
-    'std_only',       8176.46215537, 177.348510480
-    'sfa_and_std',    10877.1677395, 169.120514596 }
+ ... % The 'mc_esn' row was REMOVED 2026-09-02 with the preset itself, when
+ ... % SRNN_ESN_reservoir was re-parented onto SRNNCellTypePairs. Its
+ ... % replacement mc_pairs_dualStd is deliberately NOT given a row here: every
+ ... % number in this table was captured by running the PRE-CHANGE code at
+ ... % cbcf637, which is the whole reason it cannot drift with the tree. A value
+ ... % computed from today's code would look identical but prove nothing, and
+ ... % would quietly turn a historical record into a self-referential one.
+ ... % The old row is recoverable from git history if the mc_esn network is ever
+ ... % rebuilt.
  'overconnected', {'n',60,'indegree',40}, {
     'no_adaptation',  22173.2222384, 201.624718596
     'sfa_only',       21175.5140168, 170.518918800

@@ -20,8 +20,8 @@ function mat_file = run_memory_capacity_example(opts)
 % outside the analysis layer; it writes data, so it lives with the analyses and
 % writes into data/.
 %
-% Shares the network with run_memory_capacity via the 'mc_esn' preset, so the
-% example and the ensemble figure describe the same reservoir.
+% Shares the network with run_memory_capacity via the 'mc_pairs_dualStd' preset,
+% so the example and the ensemble figure describe the same reservoir.
 %
 % WAS A SCRIPT (compute_memory_capacity_example.m) with a hardcoded 60-line
 % config block that duplicated looped_memory_capacity's settings by hand -- and
@@ -31,18 +31,21 @@ function mat_file = run_memory_capacity_example(opts)
 % See also: run_memory_capacity, Fig_memory_capacity_example, SRNN_ESN_reservoir
 
 arguments
-    opts.preset_name (1,:) char    = 'mc_esn'
+    opts.preset_name (1,:) char    = 'mc_pairs_dualStd'
     opts.run_mode    (1,:) char    = 'production'
     opts.output_dir  (1,:) char    = ''      % '' -> data/mc_example/
     opts.verbose     (1,1) logical = true
+    % Empty -> deterministic at sigma = 0, stochastic above it. Name one to
+    % force it; 'sra1' is legal at sigma = 0. Same rule as run_memory_capacity.
+    opts.ode_solver  (1,:) char    = ''
 end
 
 setup_paths();
 
-[preset, model_class] = srnn_param_preset(opts.preset_name);
-if ~strcmp(model_class, 'SRNNModel2')
+[preset, model_class, conditions] = srnn_param_preset(opts.preset_name);
+if ~strcmp(model_class, 'SRNNCellTypePairs')
     error('run_memory_capacity_example:BadModelClass', ...
-        'Preset ''%s'' is written for %s; SRNN_ESN_reservoir needs SRNNModel2.', ...
+        'Preset ''%s'' is written for %s; SRNN_ESN_reservoir needs SRNNCellTypePairs.', ...
         opts.preset_name, model_class);
 end
 
@@ -63,13 +66,29 @@ T_hold     = 0.3;
 input_type = 'sample_hold';
 readout_signal = 'synaptic';
 
-fprintf('[mc_example] preset=%s run_mode=%s T_train=%gs d_max=%gs\n', ...
-    opts.preset_name, opts.run_mode, T_train_sec, d_max_sec);
+% Integrator: the same rule run_memory_capacity applies, kept in step with it by
+% deriving from the preset rather than hardcoding 'rk4' as this file used to.
+if ~isempty(opts.ode_solver)
+    solver = opts.ode_solver;
+elseif isfield(preset, 'sigma_u_noise') && any(preset.sigma_u_noise(:) > 0)
+    solver = 'sra1';
+else
+    solver = 'rk4';
+end
+sigma_probe = 0;
+if isfield(preset, 'sigma_u_noise'); sigma_probe = preset.sigma_u_noise; end
+SRNNModel2.check_noise_settings(sigma_probe, solver, 'run_memory_capacity_example');
 
+fprintf('[mc_example] preset=%s run_mode=%s T_train=%gs d_max=%gs solver=%s\n', ...
+    opts.preset_name, opts.run_mode, T_train_sec, d_max_sec, solver);
+
+% Nothing stripped from the preset: on SRNNCellTypePairs tau_a is the settable
+% property and n_a is Dependent on it, so the conditions carry tau_a directly.
+% (On SRNNModel2 it was the other way round and tau_a_E had to be removed.)
 base_args = [ ...
-    namevalue(rmfield_if(preset, {'tau_a_E'})), ...
+    namevalue(preset), ...
     {'fs',         fs, ...
-     'ode_solver', 'rk4', ...
+     'ode_solver', solver, ...
      'rng_seeds',  [3, 4], ...     % fixed: one representative network + stimulus
      'input_type', input_type, ...
      'T_hold',     T_hold, ...
@@ -78,12 +97,12 @@ base_args = [ ...
      'T_test',     round(T_test_sec  * fs), ...
      'd_max',      round(d_max_sec   * fs)}];
 
-condition_names = {'Baseline', 'SFA', 'STD', 'SFA+STD'};
-condition_args = { ...
-    {'n_a_E', 0, 'n_b_E', 0}, ...
-    {'n_a_E', 3, 'n_b_E', 0}, ...
-    {'n_a_E', 0, 'n_b_E', 1}, ...
-    {'n_a_E', 3, 'n_b_E', 1} };
+% From the preset, via srnn_adaptation_conditions -- the same four the ensemble
+% run uses, under the project's snake_case names. srnn_condition_titles supplies
+% display text at plot time.
+condition_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
+condition_args  = cellfun(@(c) namevalue(rmfield(c, 'name')), conditions, ...
+    'UniformOutput', false);
 n_cond = numel(condition_names);
 
 %% Build every condition on one network
@@ -92,9 +111,10 @@ for i = 1:n_cond
     esn{i} = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
     esn{i}.build();
 end
-% tau_a_E is auto-filled per n_a_E, so it legitimately differs across conditions.
+% tau_a and synapse_config are what the conditions vary, so they are expected to
+% differ; the network, input weights and stimulus must be shared.
 SRNN_ESN_reservoir.verify_shared_build(esn, ...
-    {'n_a_E', 'n_b_E', 'tau_a_E'}, ...
+    {'tau_a', 'synapse_config'}, ...
     {'W', 'W_in', 'u_scalar', 'u_ex', 't_ex'});
 
 %% Run
@@ -146,12 +166,6 @@ function nv = namevalue(s)
 f = fieldnames(s);
 nv = cell(1, 2*numel(f));
 for i = 1:numel(f); nv{2*i-1} = f{i}; nv{2*i} = s.(f{i}); end
-end
-
-function s = rmfield_if(s, names)
-for i = 1:numel(names)
-    if isfield(s, names{i}); s = rmfield(s, names{i}); end
-end
 end
 
 function out = keep_fields(s, fields)

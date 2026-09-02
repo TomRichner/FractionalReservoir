@@ -15,7 +15,7 @@ function mat_file = run_memory_capacity(opts)
 % first seed pair. Trials differ only by seed, so parfor is order-independent.
 %
 % TWO KNOBS, KEPT APART, exactly as the sweep pipeline does it:
-%   preset_name  WHICH NETWORK. srnn_param_preset('mc_esn') by default.
+%   preset_name  WHICH NETWORK. srnn_param_preset('mc_pairs_dualStd') by default.
 %   run_mode     HOW MUCH COMPUTE: trials, training/test duration, delay
 %                horizon, bootstrap/permutation counts, and fs. See the table
 %                in mc_run_config below.
@@ -27,31 +27,40 @@ function mat_file = run_memory_capacity(opts)
 % WAS A SCRIPT (looped_memory_capacity.m) with a 60-line config block, no
 % arguments, and no way to be called from a master script.
 %
-% SRNNModel2 ONLY: SRNN_ESN_reservoir subclasses it, so this cannot run on
-% SRNNCellTypePairs. Porting the ESN readout is tracked follow-up work.
+% SRNNCellTypePairs ONLY, since 2026-09-02: SRNN_ESN_reservoir was re-parented
+% off SRNNModel2, so memory capacity is no longer the one part of the paper on a
+% different model class.
 %
 % See also: SRNN_ESN_reservoir, plot_memory_capacity, replot_memory_capacity,
-%           srnn_param_preset, verify_shared_build
+%           srnn_param_preset, srnn_adaptation_conditions, verify_shared_build
 
 arguments
-    opts.preset_name            (1,:) char    = 'mc_esn'
+    opts.preset_name            (1,:) char    = 'mc_pairs_dualStd'
     opts.run_mode               (1,:) char    = 'production'
     opts.output_dir             (1,:) char    = ''
     opts.save_figs              (1,1) logical = true
     opts.verbose                (1,1) logical = true
     opts.store_internal_results (1,1) logical = false
+    % Integrator override. Empty means "decide from the preset": a deterministic
+    % scheme at sigma_u_noise = 0, the stochastic one above it, the same rule
+    % analysis_run_config applies to the sweeps. Name one explicitly to force it
+    % -- 'sra1' at sigma = 0 is legal (sde_fixed_step treats an absent noise
+    % tensor as zero) and is how an MC run is made to use the same integrator as
+    % the rest of the analyses even with noise off.
+    opts.ode_solver             (1,:) char    = ''
 end
 
 setup_paths();
 
 %% Resolve the two knobs
-[preset, model_class] = srnn_param_preset(opts.preset_name);
-if ~strcmp(model_class, 'SRNNModel2')
+[preset, model_class, conditions] = srnn_param_preset(opts.preset_name);
+if ~strcmp(model_class, 'SRNNCellTypePairs')
     error('run_memory_capacity:BadModelClass', ...
-        ['Preset ''%s'' is written for %s, but SRNN_ESN_reservoir subclasses ' ...
-         'SRNNModel2 and cannot take its parameters.'], opts.preset_name, model_class);
+        ['Preset ''%s'' is written for %s, but SRNN_ESN_reservoir now ' ...
+         'subclasses SRNNCellTypePairs and cannot take its parameters.'], ...
+        opts.preset_name, model_class);
 end
-cfg = mc_run_config(opts.run_mode);
+cfg = mc_run_config(opts.run_mode, preset, opts.ode_solver);
 
 fs = cfg.fs;
 T_wash  = round(cfg.T_wash_sec  * fs);
@@ -76,22 +85,28 @@ timestamp = datestr(now, 'yyyymmdd_HHMMSS'); %#ok<TNOW1,DATST>
 run_tag = sprintf('MC_%s_%s_trials%d', cfg.input_type, timestamp, cfg.n_trials);
 
 %% Conditions
-% Names are the MC figure's display names, not the sweep pipeline's snake_case
-% ones -- plot_memory_capacity and plot_memory_capacity_combined key on these.
-condition_names = {'Baseline', 'SFA', 'STD', 'SFA+STD'};
-condition_args = { ...
-    {'n_a_E', 0, 'n_b_E', 0}, ...
-    {'n_a_E', 3, 'n_b_E', 0}, ...
-    {'n_a_E', 0, 'n_b_E', 1}, ...
-    {'n_a_E', 3, 'n_b_E', 1} };
+% From srnn_adaptation_conditions, via the preset, rather than hardcoded here.
+% They used to be four literal {'n_a_E', 0, 'n_b_E', 0} pairs, which was a
+% second definition of the four regimes and could drift from the sweeps'.
+%
+% Names are now the project's snake_case KEYS (no_adaptation, sfa_only,
+% std_only, sfa_and_std), not the MC figure's old display strings
+% ('Baseline', 'SFA', ...). The keys are what gets saved, so an MC run
+% directory names its conditions the same way every other run does;
+% srnn_condition_titles supplies the display text at plot time.
+condition_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
+condition_args  = cellfun(@(c) namevalue(rmfield(c, 'name')), conditions, ...
+    'UniformOutput', false);
 n_cond = numel(condition_names);
 
 %% Base args: preset (the network) + protocol (the experiment)
-% tau_a_E is deliberately NOT passed: SRNNModel2 auto-fills it per n_a_E, so it
-% legitimately differs across conditions and verify_shared_build is told to
-% expect that.
+% Nothing is stripped from the preset here. On SRNNModel2 tau_a_E had to be
+% removed, because n_a_E was the settable property and tau_a_E auto-filled from
+% it, so passing both would fight. SRNNCellTypePairs inverts that -- tau_a IS
+% the property and n_a is Dependent on it, read-only -- so the conditions carry
+% tau_a directly and there is nothing to strip.
 base_args_template = [ ...
-    namevalue(rmfield_if(preset, {'tau_a_E'})), ...
+    namevalue(preset), ...
     {'fs',             fs, ...
      'ode_solver',     cfg.ode_solver, ...
      'input_type',     cfg.input_type, ...
@@ -136,7 +151,10 @@ for i = 1:n_cond
     esn_chk{i} = SRNN_ESN_reservoir(chk_args{:}, condition_args{i}{:});
     esn_chk{i}.build();
 end
-verify_shared_build(esn_chk, {'n_a_E','n_b_E','tau_a_E'}, ...
+% tau_a and synapse_config are exactly what the conditions vary, so they are
+% EXPECTED to differ; everything else -- the network, the input weights, the
+% stimulus -- must be shared, which is what makes the trials paired.
+verify_shared_build(esn_chk, {'tau_a','synapse_config'}, ...
     {'W','W_in','u_scalar','u_ex','t_ex'});
 clear esn_chk chk_args;
 
@@ -235,9 +253,14 @@ s.S_c = probe.S_c;  s.S_a = probe.S_a;
 s.activation = probe.activation;
 s.std_zero_floor = probe.std_zero_floor;
 s.ode_solver = probe.ode_solver;
-s.c_E = probe.c_E;
-s.tau_b_E_rec = probe.tau_b_E_rec;
-s.tau_b_E_rel = probe.tau_b_E_rel;
+s.sigma_u_noise = probe.sigma_u_noise;
+% Per-cell-type now, not the E/I scalars: c is a 1 x C row, cell_type_names
+% says what its entries mean, and the STD time constants live per ROUTE inside
+% synapse_config rather than as tau_b_E_rec/tau_b_E_rel.
+s.cell_type_names = probe.cell_type_names;
+s.c = probe.c;
+s.tau_a = probe.tau_a;
+s.synapse_config = probe.synapse_config;
 s.T_wash = T_wash;  s.T_train = T_train;  s.T_test = T_test;
 s.T_wash_sec = cfg.T_wash_sec;  s.T_train_sec = cfg.T_train_sec;
 s.T_test_sec = cfg.T_test_sec;
@@ -296,7 +319,7 @@ end
 %% ======================================================================
 %  RUN-MODE TABLE
 %  ======================================================================
-function cfg = mc_run_config(run_mode)
+function cfg = mc_run_config(run_mode, preset_defaults, ode_solver_override)
 % Cost/fidelity settings for one MC run. The analogue of analysis_run_config,
 % kept separate because the MC protocol has no n_levels/n_reps and its cost is
 % driven by trials x training duration rather than by a grid.
@@ -304,6 +327,13 @@ function cfg = mc_run_config(run_mode)
 % Trials buy statistical power on the paired tests; T_train buys a well-posed
 % readout (N_train = T_train_sec/T_hold hold-samples must exceed n features);
 % d_max_sec sets how far the horizon can reach.
+%
+% preset_defaults is read ONLY to choose the integrator -- see select_solver
+% below. It is the same third-argument arrangement analysis_run_config uses, and
+% for the same reason: sigma_u_noise lives in the preset while the integrator is
+% a run-mode setting, so the one place they meet has to see both.
+if nargin < 2; preset_defaults = struct(); end
+if nargin < 3; ode_solver_override = ''; end
 switch run_mode
     case 'fast'
         % Smoke test: the plumbing, not the numbers. N_train = 60/0.3 = 200
@@ -321,6 +351,46 @@ switch run_mode
         error('run_memory_capacity:badMode', ...
             'Unknown run_mode ''%s'' (expected fast, medium or production).', run_mode);
 end
+
+cfg.ode_solver = select_solver(cfg, preset_defaults, ode_solver_override);
+end
+
+function solver = select_solver(cfg, preset_defaults, override)
+% Pick the integrator, mirroring analysis_run_config's rule.
+%
+% This used to be a hardcoded cfg.ode_solver = 'rk4', which meant a preset with
+% sigma_u_noise > 0 could not run MC at all: the model rejects a deterministic
+% scheme above sigma = 0, so the run died at the first build.
+%
+% Auto (override empty): the deterministic scheme at sigma = 0, the stochastic
+% one above it. Explicit: whatever is named, still validated against sigma.
+%
+% WHY AN OVERRIDE AND NOT JUST AUTO-SELECTION. 'sra1' is legal at sigma = 0 --
+% sde_fixed_step reads has_noise = ~isempty(noise) && noise.sigma ~= 0, so with
+% no noise tensor it runs as a deterministic two-stage scheme -- and naming it
+% is how an MC run uses the SAME integrator as the sweeps even with noise off.
+% Auto-selection alone cannot express that, because at sigma = 0 it has no
+% reason to prefer sra1 over rk4.
+if ~isempty(override)
+    solver = override;
+else
+    is_stochastic = isstruct(preset_defaults) && ...
+        isfield(preset_defaults, 'sigma_u_noise') && ...
+        any(preset_defaults.sigma_u_noise(:) > 0);
+    if is_stochastic
+        solver = cfg.sde_solver;
+    else
+        solver = cfg.det_solver;
+    end
+end
+
+% Fail here rather than at the first build, and through the check both model
+% classes and ParamSpaceAnalysis2's pre-flight already share.
+sigma = 0;
+if isstruct(preset_defaults) && isfield(preset_defaults, 'sigma_u_noise')
+    sigma = preset_defaults.sigma_u_noise;
+end
+SRNNModel2.check_noise_settings(sigma, solver, 'run_memory_capacity');
 end
 
 function cfg = pack(n_trials, T_wash_sec, T_train_sec, T_test_sec, d_max_sec, ...
@@ -343,7 +413,12 @@ cfg.input_type     = 'sample_hold';
 cfg.T_hold         = 0.3;      % s; sets the MC delay increment
 cfg.u_f_cutoff     = 5;        % only used by 'bandlimited'
 cfg.u_alpha        = 1;        % only used by 'one_over_f'
-cfg.ode_solver     = 'rk4';    % fixed-step; fast and adequate here
+% The two integrators this run mode would use, deterministic and stochastic.
+% select_solver picks between them from the preset's sigma_u_noise, or takes an
+% explicit override. Named here rather than chosen here so the choice sits in
+% one place -- the same split analysis_run_config uses.
+cfg.det_solver     = 'rk4';    % fixed-step; fast and adequate at sigma = 0
+cfg.sde_solver     = 'sra1';   % Rossler SRA1: same cost as heun, strong order 1.5
 % 'synaptic' reads out br = b.*r, exposing the STD state to the linear readout.
 % Unchanged for the no-STD conditions, where br == r.
 cfg.readout_signal = 'synaptic';
@@ -359,12 +434,6 @@ function nv = namevalue(s)
 f = fieldnames(s);
 nv = cell(1, 2*numel(f));
 for i = 1:numel(f); nv{2*i-1} = f{i}; nv{2*i} = s.(f{i}); end
-end
-
-function s = rmfield_if(s, names)
-for i = 1:numel(names)
-    if isfield(s, names{i}); s = rmfield(s, names{i}); end
-end
 end
 
 function write_summary_txt(path, run_tag, s, condition_names, MC_mean, MC_sem, ...

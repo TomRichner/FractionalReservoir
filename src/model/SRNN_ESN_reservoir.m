@@ -1,12 +1,14 @@
-classdef SRNN_ESN_reservoir < SRNNModel2
+classdef SRNN_ESN_reservoir < SRNNCellTypePairs
     % SRNN_ESN_RESERVOIR Echo State Network reservoir with memory capacity measurement
     %
-    % This class extends SRNNModel2 to provide Echo State Network (ESN)
+    % This class extends SRNNCellTypePairs to provide Echo State Network (ESN)
     % functionality with the ability to measure memory capacity using the
     % protocol described in Memory_capacity_protocol.md.
     %
     % Usage:
-    %   esn = SRNN_ESN_reservoir('n', 100, 'level_of_chaos', 1.8);
+    %   esn = SRNN_ESN_reservoir('n', 100, 'level_of_chaos', 1.8, ...
+    %       'n_cellTypes', 2, 'cell_type_names', {'E','I'}, 'f', [0.6 0.4], ...
+    %       'mu_tilde_relative', mu, 'sigma_tilde_relative', sg);
     %   esn.build();
     %   MC = esn.run_memory_capacity();
     %
@@ -16,7 +18,24 @@ classdef SRNN_ESN_reservoir < SRNNModel2
     %   - Compute R^2_d between true delayed input and readout output
     %   - Memory capacity = sum of R^2_d for d = 1 to d_max
     %
-    % See also: SRNNModel, Memory_capacity_protocol.md
+    % REPARENTED 2026-09-02, from SRNNModel2 to SRNNCellTypePairs. Memory
+    % capacity was the last part of the paper on a different model class, which
+    % meant two figures showed a network built by a different class from the
+    % other fifteen and the methods section had to say so. Nothing about the
+    % protocol needed SRNNModel2: the ESN overrides build_stimulus (protected on
+    % both), writes S_out/t_out/S0/t_ex/u_interpolant/noise_increments (protected
+    % SetAccess on both), and calls integrate/build_noise/get_params/
+    % dynamics_fast (present on both). The only genuine coupling was eight lines
+    % that named the E and I fields directly.
+    %
+    % CONSEQUENCE FOR CALLERS: the constructor now requires the SRNNCellTypePairs
+    % arguments that have no sensible default -- n_cellTypes, cell_type_names, f,
+    % mu_tilde_relative, sigma_tilde_relative -- and adaptation is configured with
+    % tau_a (a 1 x C cell) and synapse_config rather than n_a_E / n_b_E. Note the
+    % inversion: on SRNNModel2 n_a_E was set and tau_a_E auto-filled; here n_a is
+    % Dependent on tau_a and is read-only.
+    %
+    % See also: SRNNCellTypePairs, run_memory_capacity, Memory_capacity_protocol.md
 
     %% ESN Input Properties
     properties
@@ -67,11 +86,14 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             %   esn = SRNN_ESN_reservoir()  % All defaults
             %   esn = SRNN_ESN_reservoir('n', 200, 'd_max', 100)
 
-            % Call superclass constructor first (MATLAB requirement)
-            % SRNNModel2 will ignore unknown properties with a warning
-            obj = obj@SRNNModel2(varargin{:});
+            % Call superclass constructor first (MATLAB requirement).
+            % SRNNCellTypePairs REQUIRES n_cellTypes, cell_type_names, f,
+            % mu_tilde_relative and sigma_tilde_relative -- the class is general
+            % over cell types, so there is no sensible default for them and it
+            % errors rather than guessing.
+            obj = obj@SRNNCellTypePairs(varargin{:});
 
-            % Define ESN-specific property names (not in SRNNModel2)
+            % Define ESN-specific property names (not in SRNNCellTypePairs)
             esn_props = {'f_in', 'sigma_in', 'rng_seed_input', ...
                 'T_wash', 'T_train', 'T_test', 'd_max', 'eta', ...
                 'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset', 'T_hold'};
@@ -185,20 +207,40 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             obj.run_reservoir_esn();
             t_all = obj.t_out;
 
-            % Unpack states using standard utility
-            [x_all, a_all, b_all, r_all, br_all] = obj.unpack_and_compute_states(obj.S_out, obj.cached_params);
+            % Unpack states using standard utility. SRNNCellTypePairs returns
+            % SIX outputs, all keyed by cell-type name, and its fifth is called
+            % synaptic_output rather than br -- with STF in play the quantity is
+            % not b*r.
+            [x_all, a_all, b_all, r_all, syn_all, g_all] = ...
+                SRNNCellTypePairs.unpack_and_compute_states(obj.S_out, obj.cached_params);
 
-            % Combine E and I readout signals for training (need n x T matrix).
-            % 'rate'     => firing rate r = phi(x_eff) (adaptation baked into x_eff,
-            %               but STD depression NOT included).
-            % 'synaptic' => br = b.*r, the STD-depressed presynaptic output (exposes
-            %               the STD state b to the linear readout). For conditions
-            %               without STD (n_b_E=0), br == r, so those are unchanged.
+            % Stack every cell type's readout signal into one n x T matrix, in
+            % TYPE ORDER, which is the same order type_indices uses -- so row i
+            % of R_all is neuron i, and the readout weights stay interpretable.
+            %
+            % 'rate'     => firing rate r = phi(x_eff) (adaptation baked into
+            %               x_eff, but depression NOT included).
+            % 'synaptic' => r * prod(b) * prod(g), the depressed/facilitated
+            %               presynaptic output, which exposes the STD state to
+            %               the linear readout. Without STD it equals r, so
+            %               those conditions are unchanged.
+            params = obj.cached_params;
             switch lower(readout_signal)
                 case 'rate'
-                    R_all = [r_all.E; r_all.I];   % n x T
+                    R_all = SRNN_ESN_reservoir.stack_by_type(r_all, params);
                 case 'synaptic'
-                    R_all = [br_all.E; br_all.I]; % n x T
+                    % Per-route on this class: a presynaptic neuron has one
+                    % synaptic output PER TARGET TYPE. They coincide only when
+                    % all of that neuron's outgoing routes carry identical
+                    % synaptic dynamics -- which this refuses to assume.
+                    SRNN_ESN_reservoir.assert_route_redundancy(params);
+                    first_route = struct();
+                    for q = 1:params.n_cellTypes
+                        name = params.cell_type_names{q};
+                        posts = fieldnames(syn_all.(name));
+                        first_route.(name) = syn_all.(name).(posts{1});
+                    end
+                    R_all = SRNN_ESN_reservoir.stack_by_type(first_route, params);
                 otherwise
                     error('SRNN_ESN_reservoir:BadReadoutSignal', ...
                         'readout_signal must be ''rate'' or ''synaptic'' (got ''%s'').', readout_signal);
@@ -232,7 +274,8 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % longer needed once R_all (decimated for sample_hold) is built. Free
             % them now to keep per-worker memory low in batch/parallel MC runs.
             if ~store_timeseries
-                x_all = []; a_all = []; b_all = []; r_all = []; br_all = [];
+                x_all = []; a_all = []; b_all = []; r_all = [];
+                syn_all = []; g_all = [];
                 obj.S_out = [];
             end
 
@@ -347,7 +390,11 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 mc_results.a = a_all;
                 mc_results.b = b_all;
                 mc_results.r = r_all;
-                mc_results.br = br_all;
+                % Named synaptic_output, not br: it nests by ROUTE (.E.E) and
+                % with STF in play the quantity is not b*r. g is kept alongside
+                % it so a stored run can show facilitation separately.
+                mc_results.synaptic_output = syn_all;
+                mc_results.g = g_all;
 
                 %% Step 7: Compute Lyapunov exponents using parent class method
                 if ~strcmpi(obj.lya_method, 'none')
@@ -383,13 +430,13 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             % Define RHS function using static method (avoids OOP overhead)
             params.u_interpolant = obj.u_interpolant;
-            rhs = @(t, S) SRNNModel2.dynamics_fast(t, S, params);
+            rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, params);
 
             % Integrate entire trajectory at once
             fprintf('  Integrating ESN dynamics...\n');
             tic
             % Pre-generate Wiener increments (a no-op at sigma_u_noise = 0).
-            % run_reservoir_esn does not go through SRNNModel2.run, so it has
+            % run_reservoir_esn does not go through SRNNCellTypePairs.run, so it has
             % to do this itself; integrate() then picks the tensor up.
             obj.build_noise();
             [obj.t_out, obj.S_out] = obj.integrate(rhs, obj.t_ex, obj.S0);
@@ -476,24 +523,26 @@ classdef SRNN_ESN_reservoir < SRNNModel2
                 end
             end
 
-            % Get stored data (using new format from unpack_and_compute_states)
+            % Stored data, all keyed by cell-type name.
             t = obj.mc_results.t_test;
             u_ex = obj.mc_results.u_ex;   % Actual neural input (n x T)
-            x = obj.mc_results.x;      % Struct with .E and .I
-            r = obj.mc_results.r;      % Struct with .E and .I
-            br = obj.mc_results.br;    % Struct with .E and .I
-            a = obj.mc_results.a;      % Struct with .E and .I
-            b = obj.mc_results.b;      % Struct with .E and .I
+            x = obj.mc_results.x;
+            r = obj.mc_results.r;
+            syn = obj.mc_results.synaptic_output;   % nests by route: .E.E
+            a = obj.mc_results.a;
+            b = obj.mc_results.b;                   % nests by route: .E.E
             params = obj.cached_params;
+            names = params.cell_type_names;
+            C = params.n_cellTypes;
 
             % Slice to test period only
             test_start_idx = obj.T_wash + obj.T_train + 1;
-            test_end_idx = size(x.E, 2);
+            test_end_idx = size(x.(names{1}), 2);
             test_indices = test_start_idx:test_end_idx;
 
             % Determine which subplots are needed
-            has_adaptation = params.n_a_E > 0 || params.n_a_I > 0;
-            has_std = params.n_b_E > 0 || params.n_b_I > 0;
+            has_adaptation = any(params.n_a > 0);
+            has_std = any(params.n_b_pairs(:) > 0);
 
             % Check for Lyapunov results
             has_lyapunov = isfield(obj.mc_results, 'lya_results') && ...
@@ -502,10 +551,10 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             % Calculate number of base plots
             n_base_plots = 3;  % u(t), x(t), r(t) always present
-            if has_std && ~isempty(br.E)
-                n_base_plots = n_base_plots + 1;  % br(t)
+            if has_std
+                n_base_plots = n_base_plots + 1;  % synaptic output
             end
-            if has_adaptation && (~isempty(a.E) || ~isempty(a.I))
+            if has_adaptation
                 n_base_plots = n_base_plots + 1;  % a(t)
             end
             if has_std
@@ -524,9 +573,13 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             ax_handles = [];
 
-            % Get colormaps
-            cmap_I = SRNNModel2.inhibitory_colormap(8);
-            cmap_E = SRNNModel2.excitatory_colormap(8);
+            % Per-type colours and layering, from the model class's own helpers
+            % rather than a local E/I pair -- type 1 warm, type 2 cool, further
+            % types from lines(). draw_order is n:-1:1, so type 1 is drawn LAST
+            % and lands on top; colours stay indexed by type, so the reversal is
+            % layering only.
+            tcolors = SRNNCellTypePairs.type_colors(C);
+            order   = SRNNCellTypePairs.draw_order(C);
 
             %% Plot 1: Actual neural input u_ex(t)
             ax_handles(end+1) = nexttile;
@@ -538,8 +591,12 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             if ~isempty(u_ex_active)
                 % Use a neutral colormap for input
                 n_active = size(u_ex_active, 1);
+                % The standalone primitives in src/plotting/, not a model class's
+                % static copy: this class no longer inherits SRNNModel2's, and
+                % SRNNCellTypePairs has none. Calling the shared functions is
+                % what keeps the ESN independent of either class's plotting.
                 cmap_input = parula(max(n_active, 8));
-                SRNNModel2.plot_lines_with_colormap(t, u_ex_active, cmap_input);
+                plot_lines_with_colormap(t, u_ex_active, cmap_input);
             end
             ylabel('u_{ex}(t)');
             set(gca, 'XTickLabel', []);
@@ -547,44 +604,32 @@ classdef SRNN_ESN_reservoir < SRNNModel2
 
             %% Plot 2: Dendritic states x(t) as line plots
             ax_handles(end+1) = nexttile;
-            % Use test period indices
-            x_E_test = x.E(:, test_indices);
-            x_I_test = x.I(:, test_indices);
-            % Plot I neurons first (background)
-            SRNNModel2.plot_lines_with_colormap(t, x_I_test, cmap_I);
-            hold on;
-            % Plot E neurons on top
-            SRNNModel2.plot_lines_with_colormap(t, x_E_test, cmap_E);
-            hold off;
+            obj.plot_types(t, x, test_indices, names, tcolors, order);
             ylabel('dendrite');
             set(gca, 'XTickLabel', []);
 
             %% Plot 3: Firing rates r(t) as line plots
             ax_handles(end+1) = nexttile;
-            r_E_test = r.E(:, test_indices);
-            r_I_test = r.I(:, test_indices);
-            % Plot I neurons first (background)
-            SRNNModel2.plot_lines_with_colormap(t, r_I_test, cmap_I);
-            hold on;
-            % Plot E neurons on top
-            SRNNModel2.plot_lines_with_colormap(t, r_E_test, cmap_E);
-            hold off;
+            obj.plot_types(t, r, test_indices, names, tcolors, order);
             ylabel('firing rate');
             ylim([0, 1]);
             yticks([0, 1]);
             set(gca, 'XTickLabel', []);
 
-            %% Plot 4 (conditional): Synaptic output br(t)
-            if has_std && ~isempty(br.E)
+            %% Plot 4 (conditional): Synaptic output
+            % Per route on this class, so take the FIRST outgoing route of each
+            % presynaptic type. Unlike the readout this does not assert
+            % redundancy: a diagnostic plot showing one representative route is
+            % informative even when the routes differ, and refusing to draw
+            % would be worse than drawing a labelled subset.
+            if has_std
                 ax_handles(end+1) = nexttile;
-                br_E_test = br.E(:, test_indices);
-                br_I_test = br.I(:, test_indices);
-                % Plot I neurons first (background)
-                SRNNModel2.plot_lines_with_colormap(t, br_I_test, cmap_I);
-                hold on;
-                % Plot E neurons on top
-                SRNNModel2.plot_lines_with_colormap(t, br_E_test, cmap_E);
-                hold off;
+                syn_first = struct();
+                for q = 1:C
+                    posts = fieldnames(syn.(names{q}));
+                    syn_first.(names{q}) = syn.(names{q}).(posts{1});
+                end
+                obj.plot_types(t, syn_first, test_indices, names, tcolors, order);
                 ylabel('synaptic output');
                 ylim([0, 1]);
                 yticks([0, 1]);
@@ -592,62 +637,48 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             end
 
             %% Plot 5 (conditional): Adaptation states a(t)
-            if has_adaptation && (~isempty(a.E) || ~isempty(a.I))
+            if has_adaptation
                 ax_handles(end+1) = nexttile;
-                has_plotted = false;
-                % Plot I adaptation first (background)
-                if ~isempty(a.I) && params.n_a_I > 0
-                    % Sum across timescales: (n_I x n_a_I x T) -> (n_I x T)
-                    a_I_sum = squeeze(sum(a.I(:, :, test_indices), 2));
-                    if size(a_I_sum, 2) == 1
-                        a_I_sum = a_I_sum';  % Ensure n_I x T
+                a_sum = struct();
+                for q = 1:C
+                    aq = a.(names{q});
+                    if isempty(aq) || params.n_a(q) == 0
+                        a_sum.(names{q}) = zeros(0, numel(test_indices));
+                        continue
                     end
-                    SRNNModel2.plot_lines_with_colormap(t, a_I_sum, cmap_I);
-                    has_plotted = true;
+                    % Sum across timescales: (nq x n_a x T) -> (nq x T)
+                    s = reshape(sum(aq(:, :, test_indices), 2), ...
+                        params.n_per_type(q), numel(test_indices));
+                    a_sum.(names{q}) = s;
                 end
-                % Plot E adaptation on top
-                if ~isempty(a.E) && params.n_a_E > 0
-                    if has_plotted
-                        hold on;
-                    end
-                    % Sum across timescales: (n_E x n_a_E x T) -> (n_E x T)
-                    a_E_sum = squeeze(sum(a.E(:, :, test_indices), 2));
-                    if size(a_E_sum, 2) == 1
-                        a_E_sum = a_E_sum';  % Ensure n_E x T
-                    end
-                    SRNNModel2.plot_lines_with_colormap(t, a_E_sum, cmap_E);
-                end
-                hold off;
+                obj.plot_types(t, a_sum, [], names, tcolors, order);
                 ylabel('adaptation');
                 set(gca, 'XTickLabel', []);
                 grid on;
             end
 
-            %% Plot 6 (conditional): STD states b(t)
+            %% Plot 6 (conditional): depression states b(t)
             if has_std
                 ax_handles(end+1) = nexttile;
-                has_plotted = false;
-                % Plot I STD first (background); collapse timescales via product
-                if ~isempty(b.I) && params.n_b_I > 0
-                    b_I_prod = reshape(prod(b.I, 2), params.n_I, []);   % n_I x nt
-                    b_I_test = b_I_prod(:, test_indices);
-                    if ~all(b_I_test(:) == 1)  % Check if actual STD dynamics
-                        SRNNModel2.plot_lines_with_colormap(t, b_I_test, cmap_I);
-                        has_plotted = true;
+                b_prod = struct();
+                for q = 1:C
+                    % Collapse timescales via product WITHIN a route, then across
+                    % routes -- the same prod(b) collapse plot_celltypes uses.
+                    posts = fieldnames(b.(names{q}));
+                    acc = [];
+                    for p = 1:numel(posts)
+                        bq = b.(names{q}).(posts{p});
+                        if isempty(bq); continue; end
+                        pr = reshape(prod(bq, 2), params.n_per_type(q), []);
+                        if isempty(acc); acc = pr; else; acc = acc .* pr; end
+                    end
+                    if isempty(acc) || all(acc(:) == 1)
+                        b_prod.(names{q}) = zeros(0, numel(test_indices));
+                    else
+                        b_prod.(names{q}) = acc(:, test_indices);
                     end
                 end
-                % Plot E STD on top; collapse timescales via product
-                if ~isempty(b.E) && params.n_b_E > 0
-                    b_E_prod = reshape(prod(b.E, 2), params.n_E, []);   % n_E x nt
-                    b_E_test = b_E_prod(:, test_indices);
-                    if ~all(b_E_test(:) == 1)  % Check if actual STD dynamics
-                        if has_plotted
-                            hold on;
-                        end
-                        SRNNModel2.plot_lines_with_colormap(t, b_E_test, cmap_E);
-                    end
-                end
-                hold off;
+                obj.plot_types(t, b_prod, [], names, tcolors, order);
                 ylabel('depression');
                 ylim([0, 1]);
                 yticks([0, 1]);
@@ -658,7 +689,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             %% Plot (conditional): Lyapunov exponent
             if has_lyapunov
                 ax_handles(end+1) = nexttile;
-                SRNNModel2.plot_lyapunov(obj.mc_results.lya_results, 'benettin', {'local', 'EOC'});
+                plot_lyapunov(obj.mc_results.lya_results, 'benettin', {'local', 'EOC'});
                 % Add LLE value to subplot title
                 title(sprintf('\\lambda_1 = %.2f', obj.mc_results.lya_results.LLE), 'FontWeight', 'normal');
                 set(gca, 'XTickLabel', []);
@@ -729,7 +760,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
         function reset(obj)
             % RESET Clear built state and memory capacity results
 
-            reset@SRNNModel2(obj);
+            reset@SRNNCellTypePairs(obj);
             obj.W_in = [];
             obj.u_scalar = [];
             obj.mc_results = [];
@@ -742,7 +773,7 @@ classdef SRNN_ESN_reservoir < SRNNModel2
         function build_stimulus(obj)
             % BUILD_STIMULUS Generate ESN-specific stimulus at build time
             %
-            % Overrides SRNNModel2.build_stimulus() to generate:
+            % Overrides SRNNCellTypePairs.build_stimulus() to generate:
             %   1. Input weight vector W_in
             %   2. Scalar input sequence u_scalar (white/bandlimited/1_over_f)
             %   3. Neural input matrix u_ex = W_in * u_scalar'
@@ -844,9 +875,14 @@ classdef SRNN_ESN_reservoir < SRNNModel2
             % 4. Create linear interpolant for ODE solver
             obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'linear', 'none');
 
-            % 5. Initialize state vector
+            % 5. Initialize state vector.
+            % Called through the class, not the instance: initialize_state is a
+            % public STATIC on SRNNCellTypePairs where it was a protected
+            % INSTANCE method on SRNNModel2. obj.initialize_state(params) happens
+            % to resolve either way in MATLAB, which is exactly why it is worth
+            % writing explicitly rather than leaving to that.
             params_init = obj.get_params();
-            obj.S0 = obj.initialize_state(params_init);
+            obj.S0 = SRNNCellTypePairs.initialize_state(params_init);
 
             fprintf('ESN stimulus built: %d samples, %d neurons receive input\n', ...
                 T_total, sum(obj.W_in ~= 0));
@@ -854,7 +890,146 @@ classdef SRNN_ESN_reservoir < SRNNModel2
     end
 
     %% Static Methods for Ridge Regression and R^2
+    methods (Access = protected)
+        function plot_types(~, t, named, test_indices, names, tcolors, order)
+            % PLOT_TYPES Draw one per-cell-type signal, correctly layered.
+            %
+            % `named` is a struct keyed by cell-type name, each field nq x T (or
+            % nq x numel(test_indices) when the caller has already sliced, in
+            % which case pass test_indices = []). An empty field is skipped, so
+            % a type with no adaptation or no depression simply does not draw.
+            %
+            % Types are drawn in `order` (n:-1:1), so type 1 lands on top --
+            % the same back-to-front convention SRNNCellTypePairs.plot_celltypes
+            % uses wherever types share an axes. Colours stay indexed BY TYPE,
+            % not by draw position, so the reversal is layering only.
+            %
+            % Per-neuron accents come from neuron_colors, which varies lightness
+            % within the type's hue. The previous E/I version used two fixed
+            % colormaps, which cannot generalize past two types.
+            drawn = false;
+            for k = order
+                data = named.(names{k});
+                if isempty(data); continue; end
+                if ~isempty(test_indices)
+                    data = data(:, test_indices);
+                end
+                if isempty(data); continue; end
+                if drawn; hold on; end
+                cmap = SRNNCellTypePairs.neuron_colors(tcolors(k, :), size(data, 1));
+                plot_lines_with_colormap(t, data, cmap);
+                drawn = true;
+            end
+            if drawn; hold off; end
+        end
+    end
+
     methods (Static)
+        function R = stack_by_type(named, params)
+            % STACK_BY_TYPE Concatenate a per-cell-type signal into one n x T.
+            %
+            % Rows come out in TYPE ORDER, which is the order type_indices
+            % assigns neurons, so row i of the result is neuron i and a trained
+            % readout weight can still be attributed to a neuron.
+            parts = cell(1, params.n_cellTypes);
+            for q = 1:params.n_cellTypes
+                parts{q} = named.(params.cell_type_names{q});
+            end
+            R = vertcat(parts{:});
+        end
+
+        function assert_route_redundancy(params)
+            % ASSERT_ROUTE_REDUNDANCY The 'synaptic' readout needs each neuron to
+            % have ONE synaptic output. On this class it has one per target type.
+            %
+            % theta_j^{q->s} = r_j * prod(b^{q->s}) * prod(g^{q->s}), so a
+            % presynaptic neuron of type q transmits a different signal down each
+            % outgoing route unless those routes share their synaptic dynamics.
+            % When they do share them the coincidence is EXACT, not approximate:
+            % db/dt = (1-b)/tau_rec - b*r_j/tau_rel depends only on the route's
+            % time constants and the presynaptic neuron's own rate, from a common
+            % b = 1 -- identical ODE, identical driver, identical initial
+            % condition, so bit-identical trajectories. Reading route 1 is then
+            % not a shortcut but the same array.
+            %
+            % PER PRESYNAPTIC TYPE, not globally. Neuron j of type q only has
+            % routes q->1 ... q->C; what other types do cannot affect it. A
+            % global check would reject a perfectly well-defined configuration
+            % such as "E->* depressed, I->* not".
+            %
+            % Checked from the CONFIG rather than by comparing trajectories: the
+            % config determines the answer exactly, and comparing npre x nt
+            % arrays per route on every trial would be wasted work. The numerical
+            % claim is asserted once, in test_esn_route_redundancy.
+            for pre = 1:params.n_cellTypes
+                pre_name = params.cell_type_names{pre};
+                ref = [];
+                for post = 1:params.n_cellTypes
+                    here = SRNN_ESN_reservoir.route_signature(params, pre, post);
+                    if post == 1
+                        ref = here;
+                        continue
+                    end
+                    if ~isequal(ref, here)
+                        error('SRNN_ESN_reservoir:AmbiguousSynapticOutput', ...
+                            ['Presynaptic type %s has non-identical synaptic ' ...
+                             'dynamics across its outgoing routes:\n' ...
+                             '  %s->%s : %s\n  %s->%s : %s\n' ...
+                             'A neuron of type %s therefore transmits a ' ...
+                             'different signal to each target, so the ' ...
+                             '''synaptic'' readout has no single value to ' ...
+                             'read.\nUse readout_signal = ''rate'', or give ' ...
+                             'every %s->* route the same std/stf settings.'], ...
+                            pre_name, ...
+                            pre_name, params.cell_type_names{1}, ...
+                            SRNN_ESN_reservoir.describe_route(ref), ...
+                            pre_name, params.cell_type_names{post}, ...
+                            SRNN_ESN_reservoir.describe_route(here), ...
+                            pre_name, pre_name);
+                    end
+                end
+            end
+        end
+
+        function sig = route_signature(params, pre, post)
+            % ROUTE_SIGNATURE The synaptic dynamics of one route, as comparable
+            % data. Covers STD *and* STF: synaptic output is
+            % r * prod(b) * prod(g), so a per-route g breaks the readout exactly
+            % as a per-route b does.
+            sig = struct('n_b', params.n_b_pairs(pre, post), ...
+                         'n_g', params.n_g_pairs(pre, post), ...
+                         'tau_rec', [], 'tau_rel', [], ...
+                         'tau_dec', [], 'tau_fac', [], 'G', []);
+            if sig.n_b > 0
+                sig.tau_rec = params.tau_b_rec{pre, post};
+                sig.tau_rel = params.tau_b_rel{pre, post};
+            end
+            if sig.n_g > 0
+                sig.tau_dec = params.tau_g_dec{pre, post};
+                sig.tau_fac = params.tau_g_fac{pre, post};
+                sig.G       = params.G{pre, post};
+            end
+        end
+
+        function s = describe_route(sig)
+            % DESCRIBE_ROUTE One-line human description, for the error above.
+            parts = {};
+            if sig.n_b > 0
+                parts{end+1} = sprintf('STD(tau_rec=%s, tau_rel=%s)', ...
+                    mat2str(sig.tau_rec, 3), mat2str(sig.tau_rel, 3));
+            end
+            if sig.n_g > 0
+                parts{end+1} = sprintf('STF(tau_dec=%s, tau_fac=%s, G=%s)', ...
+                    mat2str(sig.tau_dec, 3), mat2str(sig.tau_fac, 3), ...
+                    mat2str(sig.G, 3));
+            end
+            if isempty(parts)
+                s = 'no short-term plasticity';
+            else
+                s = strjoin(parts, ' + ');
+            end
+        end
+
         function w = train_linear_readout(X, y, eta)
             % TRAIN_LINEAR_READOUT Train a linear readout using ridge regression
             %

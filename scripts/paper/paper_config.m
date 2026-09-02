@@ -91,7 +91,11 @@ cfg.run_dir     = opts.run_dir;
 cfg.fig_root    = opts.fig_root;
 
 % Presets for the figures that are deliberately different networks.
-cfg.mc_preset          = 'mc_esn';              % SRNN_ESN_reservoir; see below
+% Memory capacity. Still its own preset -- the MC network is deliberately not
+% the paper's operating point -- but no longer its own MODEL CLASS: since the
+% 2026-09-02 re-parent, SRNN_ESN_reservoir subclasses SRNNCellTypePairs like
+% everything else here, and 'mc_esn' is gone.
+cfg.mc_preset          = 'mc_pairs_dualStd';
 cfg.bursting_preset    = 'bursting_pairs';
 cfg.sompolinsky_preset = 'sompolinsky_pairs';
 cfg.stf_preset         = 'single_neuron_stf';
