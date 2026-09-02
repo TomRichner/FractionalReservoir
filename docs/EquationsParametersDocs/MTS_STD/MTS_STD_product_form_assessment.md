@@ -1,5 +1,40 @@
 # Is the Product Form a Reasonable Model of Multi-Timescale STD?
 
+> ## ⚠ PARTLY SUPERSEDED by [`MTS_STD_notes.md`](MTS_STD_notes.md)
+>
+> This document was written **before** reading Varela et al. (1997) in detail.
+> Read `MTS_STD_notes.md` first; it is the current statement.
+>
+> **What still stands:** everything under "Why the product form is defensible",
+> and the three caveats as *descriptions of what the product form does*. The
+> maths is not in dispute.
+>
+> **What was rejected:** the "Recommendation" section below. Both of its numbered
+> items were considered and turned down —
+>
+> 1. *"Split the depression budget across timescales"* — rejected outright.
+>    There is **no depression budget to conserve**. Greater suppressive depth
+>    with larger $M$ is the intended behaviour, not a bug to be normalised away:
+>    multi-timescale STD *should* suppress more deeply than single-timescale STD.
+>    This is the deliberate asymmetry with SFA, where `c` **is** a conserved
+>    total divided by $K$. Do not carry the `c = 0.15/3` convention across to
+>    depression.
+> 2. *"State explicitly that $M \ge 2$ yields non-monotonic steady-state
+>    transmission"* — not carried over in these terms.
+>
+> Also rejected, from Caveat 1's framing: the normalized weighted sum
+> $b_{\text{eff}} = \sum_m w_m b_m$.
+>
+> What *was* adopted instead is making $\tau_{rel}$ a per-timescale vector, which
+> lets each component take its own empirically grounded strength **without**
+> imposing a conserved total. See `MTS_STD_notes.md` § "Design decisions".
+>
+> Kept because its defence of the product form is still the clearest statement of
+> it, and because the rejected options are worth being able to see. Banner added
+> 2026-09-02; the supersession itself was recorded only in the other file until
+> then, so a reader landing here directly got the rejected recommendations with
+> no warning.
+
 Assessment of the synaptic output term $\theta_j = r_j \prod_{m=1}^{M} b_{jm}$ used in
 [`../Equations_stability_paper.md`](../Equations_stability_paper.md), with
 

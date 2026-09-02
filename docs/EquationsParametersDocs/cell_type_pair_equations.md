@@ -104,8 +104,9 @@ empty product equal to one.
 Unlike adaptation, depression is **not** normalised by its timescale count,
 because it enters as a product rather than a sum: each $b$ rests at 1, so a
 second timescale squares the steady-state depression rather than subdividing it.
-That is deliberate — see
-[`MTS_STD/MTS_STD_product_form_assessment.md`](MTS_STD/MTS_STD_product_form_assessment.md).
+That is deliberate, and there is no depression budget to conserve — see
+[`MTS_STD/MTS_STD_notes.md`](MTS_STD/MTS_STD_notes.md), which supersedes the
+earlier `MTS_STD_product_form_assessment.md` on exactly this point.
 
 ## Additive Wiener noise on `x`
 

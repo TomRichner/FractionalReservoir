@@ -4,12 +4,15 @@ Working notes on whether the product form $\left(\prod_{m=1}^{M} b_{jm}\right) r
 reasonable model of multi-timescale short-term depression, and what Varela et al. (1997)
 actually specifies.
 
-Source PDF and OCR markdown: `Varela_1997.pdf` / `Varela_1997.md` in this directory.
+Source: Varela et al. (1997), cited in full at the end. The OCR markdown these notes
+were taken from was removed from the repo in `5dac5bb`, and `*.pdf` is gitignored, so
+neither is here — §2 and §3 below record what the paper specifies.
 
-> **Supersedes** the caveats in `../MTS_STD_product_form_assessment.md`. That earlier
-> document was written before reading Varela in detail; its "split the depression budget
-> across timescales" and weighted-sum recommendations have been **rejected** — see
-> [Design decisions](#design-decisions) below. Its core defense of the product form stands.
+> **Supersedes** the caveats in [`MTS_STD_product_form_assessment.md`](MTS_STD_product_form_assessment.md).
+> That earlier document was written before reading Varela in detail; its "split the
+> depression budget across timescales" and weighted-sum recommendations have been
+> **rejected** — see [Design decisions](#design-decisions) below. Its core defense of
+> the product form stands.
 
 ---
 

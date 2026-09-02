@@ -53,8 +53,11 @@ Depression needs no such factor because it enters as a **product** rather than a
 sum: each $b_{im}$ rests at 1, so adding a timescale multiplies rather than
 subdividing. With $M = 2$ sharing a common $\tau_{rec}/\tau_{rel}$ ratio the
 steady state is the square of the single-timescale value, which is deliberate.
-See `MTS_STD/MTS_STD_product_form_assessment.md` for why the product form is
-defensible and what it costs.
+See [`MTS_STD/MTS_STD_notes.md`](MTS_STD/MTS_STD_notes.md) for why the product
+form is defensible, what it costs, and why there is deliberately **no**
+depression budget to conserve. (It supersedes the earlier
+`MTS_STD_product_form_assessment.md` in the same folder, which recommended
+splitting a budget across timescales — that recommendation was rejected.)
 
 ## Facilitation (optional)
 
