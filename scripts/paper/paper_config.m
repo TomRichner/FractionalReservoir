@@ -13,7 +13,10 @@ function cfg = paper_config(opts)
 %   preset_name  WHICH NETWORK   (srnn_param_preset)
 %   run_mode     HOW MUCH COMPUTE (analysis_run_config)
 %
-% and a third that says WHERE THE OUTPUT LANDS: fig_root. See its comment below.
+% plus two that say WHERE THINGS LAND: run_dir (the data) and fig_root (the
+% figures). Each is empty-means-auto, and each is used by BOTH entry points --
+% run_dir is where the analyses write and where the figures read, because it is
+% one directory seen at two stages. See their comments below.
 %
 % FIGURE PRESET OVERRIDES. Five figures are DELIBERATELY a different network
 % from the paper's operating point, and each names its own preset below. They
@@ -35,8 +38,29 @@ arguments
     % figures that are readable. 'production' is a deliberate act -- pass it
     % explicitly, paper_config('run_mode', 'production'), for the final run.
     opts.run_mode    (1,:) char = 'medium'
-    opts.run_dir     (1,:) char = ''      % '' -> resolve by preset at figure time
-    % WHERE THE OUTPUT GOES. Two modes, and the empty case is not an oversight:
+    % THE RUN DIRECTORY -- one field, used by both entry points, because it is
+    % one directory seen at two stages. Same empty-means-auto convention on each
+    % side:
+    %
+    %              run_all_paper_analyses      make_all_paper_figures
+    %   empty      create data/param_space/    search by preset, newest match
+    %              run_all_<dt>/
+    %   set        write there                 read there
+    %
+    % A relative path resolves against the project root.
+    %
+    % Set it and the analyses REQUIRE the directory to be absent or empty --
+    % they error otherwise rather than adding a second set of sweep folders
+    % beside the first. ParamSpaceAnalysis2 appends its own timestamped
+    % subfolder, so a reused directory accumulates while the top-level manifest
+    % is replaced; figures that match a sweep folder by parameter name then find
+    % more than one. Delete or move the directory for a rerun.
+    %
+    % (There was briefly a separate output_dir for the write side. It was the
+    % same directory under a second name, and reconciling the two needed a
+    % precedence rule that explained nothing.)
+    opts.run_dir     (1,:) char = ''
+    % WHERE THE FIGURES GO. Two modes, and the empty case is not an oversight:
     %
     %   set (default)   a STABLE directory, overwritten every run. The
     %                   manuscript can cite a path that never moves, and there
@@ -53,31 +77,11 @@ arguments
     % figs/ is gitignored on purpose. Figures are regenerable from run_dir plus
     % a commit, and both are recorded in the manifest written at the root; the
     % final set is force-added at submission.
+    % Note figs/ and data/ behave DIFFERENTLY on a rerun, which is deliberate:
+    % fig_root is overwritten in place (save_figure_stable deletes <tag>* before
+    % saving), while run_dir must be empty. Figures are cheap and regenerable;
+    % a run is hours of compute and is not silently mixed with another.
     opts.fig_root    (1,:) char = 'figs/paper'
-    % WHERE THE COMPUTE LANDS -- the data-side twin of fig_root:
-    %
-    %   empty (default)  run_all_analyses creates data/param_space/run_all_<dt>/,
-    %                    so successive runs never collide. This is what the
-    %                    paper wants: a run is a dated artefact.
-    %   set              a FIXED directory, for a smoke test or side experiment
-    %                    where a pile of dated folders is noise rather than
-    %                    history.
-    %
-    % NOT "overwritten", which is what this comment first claimed. A reused
-    % directory ACCUMULATES: every sub-analysis appends its own timestamped
-    % folder (ParamSpaceAnalysis2 builds <prefix>_<note>_nLevs_<N>_<dt>), so a
-    % second run adds a parallel set beside the first -- while run_manifest,
-    % provenance and parameters.md at the top level ARE replaced. Mixed, and
-    % worth knowing: run_all_paper_analyses warns when the directory is already
-    % occupied. Delete it first for a clean run.
-    %
-    % A relative path resolves against the project root.
-    %
-    % READ SIDE vs WRITE SIDE. run_dir above says which finished run the FIGURES
-    % are built from; this says where the ANALYSES write. When run_dir is empty
-    % and this is set, make_all_paper_figures reads from here -- a config that
-    % named where it wrote should not have to guess where to read.
-    opts.output_dir  (1,:) char = ''
 end
 
 cfg = struct();
@@ -85,7 +89,6 @@ cfg.preset_name = opts.preset_name;
 cfg.run_mode    = opts.run_mode;
 cfg.run_dir     = opts.run_dir;
 cfg.fig_root    = opts.fig_root;
-cfg.output_dir  = opts.output_dir;
 
 % Presets for the figures that are deliberately different networks.
 cfg.mc_preset          = 'mc_esn';              % SRNN_ESN_reservoir; see below

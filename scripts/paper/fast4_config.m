@@ -12,21 +12,28 @@ function cfg = fast4_config(opts)
 %                every sweep does roughly half the work.
 %   run_mode     'fast' -- the smoke test. Minutes, not hours: coarse grids,
 %                short trajectories, rk4 or sra1 rather than ode45.
-%   fig_root     figs/fast_4   } both FIXED, so a smoke test leaves one
-%   output_dir   data/fast_4   } directory rather than a pile of dated ones --
+%   run_dir      data/fast_4   } both FIXED, so a smoke test leaves one pair of
+%   fig_root     figs/fast_4   } directories rather than a pile of dated ones --
 %                                the opposite choice from the paper, where a run
 %                                is a dated artefact.
 %
-% THE TWO ROOTS BEHAVE DIFFERENTLY ON A RERUN, which is not obvious and is worth
-% knowing before you run this twice:
+% run_dir is one field used by both entry points: run_all_paper_analyses writes
+% there, make_all_paper_figures reads there. So the two halves need no argument
+% passed between them --
 %
-%   figs/fast_4   overwritten. save_figure_stable deletes <out_dir>/<tag>* before
-%                 saving, so each entry's directory holds only the current set.
-%   data/fast_4   ACCUMULATES. Every sub-analysis appends its own timestamped
-%                 folder, so a second run adds a parallel set beside the first,
-%                 while run_manifest and provenance at the top level are
-%                 replaced. run_all_paper_analyses warns when it finds the
-%                 directory occupied; delete it first for a clean run.
+%     run_all_paper_analyses(fast4_config());
+%     make_all_paper_figures(fast4_config());
+%
+% THE TWO DIRECTORIES BEHAVE DIFFERENTLY ON A RERUN, which is worth knowing
+% before you run this twice:
+%
+%   figs/fast_4   overwritten. save_figure_stable deletes <out_dir>/<tag>*
+%                 before saving, so each entry holds only the current set.
+%   data/fast_4   must be ABSENT OR EMPTY. run_all_paper_analyses errors
+%                 otherwise, because a reused run directory accumulates sweep
+%                 folders rather than replacing them. Delete or move it between
+%                 runs. Figures are cheap to regenerate; a run is not, and is
+%                 not worth silently mixing with another.
 %
 % WHY A SEPARATE FILE rather than paper_config('run_mode', 'fast', ...). Because
 % the point is that it cannot collide with the paper's output. Both roots are
@@ -49,15 +56,13 @@ function cfg = fast4_config(opts)
 arguments
     opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     opts.run_mode    (1,:) char = 'fast'
-    opts.run_dir     (1,:) char = ''            % '' -> resolve by preset at figure time
+    opts.run_dir     (1,:) char = 'data/fast_4'
     opts.fig_root    (1,:) char = 'figs/fast_4'
-    opts.output_dir  (1,:) char = 'data/fast_4'
 end
 
 cfg = paper_config( ...
     'preset_name', opts.preset_name, ...
     'run_mode',    opts.run_mode, ...
     'run_dir',     opts.run_dir, ...
-    'fig_root',    opts.fig_root, ...
-    'output_dir',  opts.output_dir);
+    'fig_root',    opts.fig_root);
 end

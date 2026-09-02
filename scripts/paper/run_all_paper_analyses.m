@@ -56,19 +56,20 @@ fprintf('========================================================\n');
 t_all = tic;
 
 %% 1. The sweep pipeline -- creates the run directory and its manifest
-% cfg.output_dir empty (the paper's case) means "make your own dated folder",
-% which is what run_all_analyses does with an empty output_dir. A relative path
-% resolves against the project root, so a config can say 'data/fast_4' without
-% caring what the cwd is -- same rule as fig_root in make_all_paper_figures.
-if isempty(cfg.output_dir)
+% cfg.run_dir is the SAME field make_all_paper_figures reads from: one
+% directory, two stages. Empty (the paper's case) means "make your own dated
+% folder", which is what run_all_analyses does with an empty output_dir. A
+% relative path resolves against the project root, so a config can say
+% 'data/fast_4' without caring what the cwd is -- same rule as fig_root.
+if isempty(cfg.run_dir)
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode);
 else
-    out_dir = cfg.output_dir;
+    out_dir = cfg.run_dir;
     if ~is_absolute_path(out_dir)
         out_dir = fullfile(fileparts(which('setup_paths')), out_dir);
     end
-    fprintf('  output   : %s  (reused)\n', out_dir);
-    warn_if_occupied(out_dir);
+    assert_empty_target(out_dir);
+    fprintf('  output   : %s\n', out_dir);
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir);
 end
 
@@ -135,43 +136,43 @@ fprintf('Next: make_all_paper_figures(paper_config(''run_dir'', run_dir))\n');
 end
 
 %% ------------------------------------------------------------------------
-function warn_if_occupied(out_dir)
-% A reused output_dir ACCUMULATES; it does not overwrite.
+function assert_empty_target(out_dir)
+% A named run directory must be absent or empty. This is an ERROR, not a
+% warning, because a reused directory ACCUMULATES rather than overwriting.
 %
-% Each sub-analysis appends its own timestamped folder --
-% ParamSpaceAnalysis2 builds <folder_prefix>_<note>_nLevs_<N>_<dt> and cd's
-% into it -- so a second run into the same directory adds a parallel set
-% beside the first. What DOES get overwritten is the top level: run_manifest,
-% git_provenance and parameters.md all describe the newest run, in a directory
-% that now holds several.
+% Each sub-analysis appends its own timestamped folder -- ParamSpaceAnalysis2
+% builds <folder_prefix>_<note>_nLevs_<N>_<dt> and descends into it -- so a
+% second run adds a parallel set beside the first. What DOES get replaced is
+% the top level: run_manifest, git_provenance and parameters.md then describe
+% the newest run, in a directory holding several. Figures glob param_space_*,
+% 1D_sensitivity_* and tau_sensitivity_* inside the run directory, and
+% fig_sensitivity_medians matches those folders by PARAMETER NAME -- so it
+% would find two per parameter and silently pick one.
 %
-% That matters on the figure side. Figures glob param_space_*,
-% 1D_sensitivity_* and tau_sensitivity_* inside the run directory;
-% fig_sfa_EOC_allStd warns and takes the newest, but fig_sensitivity_medians
-% matches folders by PARAMETER NAME and would find two per parameter.
-%
-% So: say so, name what is there, and let the user decide. Deleting data
-% because a config asked for a stable path is not this function's call.
-if ~isfolder(out_dir); return; end
-patterns = {'param_space_*', '1D_sensitivity_*', 'tau_sensitivity_*'};
-found = {};
-for k = 1:numel(patterns)
-    d = dir(fullfile(out_dir, patterns{k}));
-    d = d([d.isdir]);
-    if ~isempty(d)
-        found{end+1} = sprintf('%s (%d)', patterns{k}, numel(d)); %#ok<AGROW>
-    end
+% Refusing is cheap; the alternative is discovering it in a figure hours
+% later. This does NOT delete anything: what to do with the old run is the
+% user's call, and one of the options is "keep it".
+if ~isfolder(out_dir); return; end                  % absent is fine; it gets created
+listing = dir(out_dir);
+listing = listing(~ismember({listing.name}, {'.', '..'}));
+if isempty(listing); return; end                    % exists but empty is fine
+
+names = {listing.name};
+shown = strjoin(names(1:min(6, numel(names))), ', ');
+if numel(names) > 6
+    shown = sprintf('%s, ... (%d entries)', shown, numel(names));
 end
-if isempty(found); return; end
-warning('run_all_paper_analyses:OutputDirOccupied', ...
-    ['Output directory already holds sweep results:\n' ...
+error('run_all_paper_analyses:TargetNotEmpty', ...
+    ['The run directory named by cfg.run_dir is not empty:\n' ...
      '  %s\n' ...
-     '  existing: %s\n' ...
-     'This run ADDS a parallel set rather than replacing them, and overwrites\n' ...
-     'run_manifest/provenance at the top level. Figures that match a sweep\n' ...
-     'folder by parameter name may then find more than one.\n' ...
-     'Delete or move the directory first for a clean run.'], ...
-    out_dir, strjoin(found, ', '));
+     '  contains: %s\n\n' ...
+     'Analyses are refused rather than run, because a reused directory\n' ...
+     'ACCUMULATES: each sweep appends its own timestamped subfolder while\n' ...
+     'run_manifest and provenance at the top level are replaced, leaving a\n' ...
+     'manifest that describes one run in a directory holding several.\n\n' ...
+     'Delete or move it, or point cfg.run_dir somewhere else. Leave\n' ...
+     'cfg.run_dir empty to get a fresh dated directory automatically.'], ...
+    out_dir, shown);
 end
 
 function tf = is_absolute_path(p)
