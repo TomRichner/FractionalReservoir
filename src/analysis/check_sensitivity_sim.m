@@ -24,14 +24,29 @@ function model = check_sensitivity_sim(opts)
 %   target_condition       condition name, see psa.conditions.
 %   target_rep             which 'reps' grid value to use, if reps is an axis.
 %   sim_T_range            override the swept window.
-%   sim_c_E                override SFA strength.
+%   overrides              struct of extra property overrides, applied last.
 %
-% SRNNModel2 ONLY. It constructs SRNNModel2 directly and reads the condition
-% through the n_a_E / n_b_E vocabulary, neither of which SRNNCellTypePairs
-% shares. Pointed at a Pairs run it will fail on the constructor rather than
-% silently reconstruct the wrong model.
+% EITHER MODEL CLASS, since 2026-09-02. It used to construct SRNNModel2
+% directly and read the condition through the n_a_E / n_b_E vocabulary, which
+% meant it could no longer inspect ANY sweep the paper produces -- every one is
+% SRNNCellTypePairs now. The reconstruction is delegated to
+% ParamSpaceAnalysis2.rebuild_model, which ends in feval(obj.model_class, ...)
+% and applies run_single_job's own precedence, so this file no longer needs to
+% know either class's vocabulary. Most of what was here was deleted, not
+% rewritten.
 %
-% See also: run_sensitivity_analysis, ParamSpaceAnalysis2, SRNNModel2
+% ONE BEHAVIOUR CHANGE, unavoidable and arguably a fix: the old sim_c_E argument
+% forced c_E = 1/3 on EVERY call, which contradicted this function's stated
+% purpose of reproducing the sweep exactly. c_E does not exist on
+% SRNNCellTypePairs (the equivalent is the 1 x C row `c`), so it could not be
+% ported as-is. It is replaced by the general `overrides` struct, which defaults
+% to empty -- so the default is now a faithful reconstruction, and exploring a
+% different adaptation strength is an explicit act:
+%
+%   check_sensitivity_sim('overrides', struct('c', [0.5 0]))       % Pairs
+%   check_sensitivity_sim('overrides', struct('c_E', 1/3))         % SRNNModel2
+%
+% See also: run_sensitivity_analysis, ParamSpaceAnalysis2/rebuild_model
 
 arguments
     opts.psa_dir               (1,:) char   = ''
@@ -39,7 +54,7 @@ arguments
     opts.target_condition      (1,:) char   = 'sfa_and_std'
     opts.target_rep            (1,1) double = 1
     opts.sim_T_range           (1,2) double = [0, 60]
-    opts.sim_c_E               (1,1) double = 1/3
+    opts.overrides             (1,1) struct = struct()
 end
 
 setup_paths();
@@ -69,9 +84,7 @@ assert(ismember('level_of_chaos', psa.grid_params), ...
 assert(~isempty(psa.all_configs), ...
     ['Loaded PSA has no all_configs (run may be incomplete). ', ...
      'Point psa_dir at a completed sensitivity run.']);
-assert(strcmp(psa.model_class, 'SRNNModel2'), ...
-    ['check_sensitivity_sim reconstructs an SRNNModel2, but this run used %s. ', ...
-     'Its condition vocabulary (n_a_E / n_b_E) does not apply.'], psa.model_class);
+fprintf('Model class: %s\n', psa.model_class);
 
 cond_names = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
 ci = find(strcmp(cond_names, opts.target_condition), 1);
@@ -104,63 +117,64 @@ fprintf('Selected config_idx=%d: level_of_chaos=%g', config_idx, config.level_of
 if has_reps, fprintf(', reps=%g', config.reps); end
 fprintf('  (target level_of_chaos=%g)\n', opts.target_level_of_chaos);
 
-%% Network seed (matches run_batched_simulation)
-% Prefer the seed recorded in the saved result; fall back to the PSA formula.
-network_seed = config_idx * 100 + psa.network_seed_offset;
-if isfield(psa.results, opts.target_condition)
-    res_cell = psa.results.(opts.target_condition);
-    if numel(res_cell) >= config_idx && ~isempty(res_cell{config_idx}) ...
-            && isfield(res_cell{config_idx}, 'network_seed')
-        network_seed = res_cell{config_idx}.network_seed;
+%% The saved result for that grid point, which is what rebuild_model needs
+% rebuild_model reconstructs from the RESULT, not the config: the network is
+% pinned by res.network_seed, which run_single_job derived from the grid
+% POSITION (config_idx*100 + offset). Reading it back rather than recomputing
+% the formula is what keeps this correct across a subsetted run, where a point's
+% position is unchanged by how many neighbours were skipped.
+assert(isfield(psa.results, opts.target_condition), ...
+    'This run has no results for condition ''%s''. Available: %s.', ...
+    opts.target_condition, strjoin(fieldnames(psa.results)', ', '));
+res_cell = psa.results.(opts.target_condition);
+assert(numel(res_cell) >= config_idx && ~isempty(res_cell{config_idx}), ...
+    ['Condition ''%s'' has no stored result at config_idx %d -- that grid ' ...
+     'point was skipped or the run is incomplete. Pick another ' ...
+     'target_level_of_chaos, or point psa_dir at a finished run.'], ...
+    opts.target_condition, config_idx);
+res = res_cell{config_idx};
+fprintf('network_seed = %d (offset %g)\n', res.network_seed, psa.network_seed_offset);
+
+%% Rebuild, exactly as the sweep did
+% Delegated rather than reimplemented. This file used to assemble model_args by
+% hand -- condition fields enumerated as {'n_a_E','n_a_I','n_b_E','n_b_I'}, grid
+% params, then model_defaults minus both -- which is run_single_job's precedence
+% written a second time, in SRNNModel2's vocabulary, free to drift from it.
+% rebuild_model is the same logic kept beside the driver it mirrors, and it is
+% class-generic.
+model = psa.rebuild_model(res);
+
+%% Overrides, applied after construction
+% T_range and an emptied lya_T_interval so the LLE spans the whole window --
+% this is a tool for LOOKING at the dynamics, and the swept window is usually
+% too short to see them. Anything else the caller names goes on top.
+%
+% Assigned rather than passed as name-value pairs because rebuild_model returns
+% a constructed model. Both classes are handle classes with public properties
+% and no setters, so direct assignment is the supported route.
+model.T_range = opts.sim_T_range;
+model.lya_T_interval = [];
+
+ov = fieldnames(opts.overrides);
+for k = 1:numel(ov)
+    if ~isprop(model, ov{k})
+        error('check_sensitivity_sim:UnknownOverride', ...
+            '''%s'' is not a property of %s. Its properties include: %s.', ...
+            ov{k}, class(model), strjoin(sort(properties(model))', ', '));
     end
+    model.(ov{k}) = opts.overrides.(ov{k});
 end
-fprintf('network_seed = %d (offset %g)\n', network_seed, psa.network_seed_offset);
-
-%% Assemble model_args exactly as ParamSpaceAnalysis2.run_single_job does
-model_args = {'rng_seeds', [network_seed, network_seed + 1]};
-
-% Condition parameters (adaptation counts).
-cond_fields = {'n_a_E', 'n_a_I', 'n_b_E', 'n_b_I'};
-for f = cond_fields
-    if isfield(condition, f{1})
-        model_args = [model_args, {f{1}, condition.(f{1})}]; %#ok<AGROW>
-    end
-end
-
-% Grid parameters (handle vector params via the saved lookup, like the driver).
-for p = 1:numel(psa.grid_params)
-    pname = psa.grid_params{p};
-    if isfield(psa.vector_param_lookup, pname)
-        model_args = [model_args, {pname, psa.vector_param_lookup.(pname){config.(pname)}}]; %#ok<AGROW>
-    else
-        model_args = [model_args, {pname, config.(pname)}]; %#ok<AGROW>
-    end
-end
-
-% Model defaults, skipping grid params and condition-controlled counts.
-df = fieldnames(psa.model_defaults);
-for d = 1:numel(df)
-    fn = df{d};
-    if ~ismember(fn, psa.grid_params) && ~ismember(fn, cond_fields)
-        model_args = [model_args, {fn, psa.model_defaults.(fn)}]; %#ok<AGROW>
-    end
-end
-
-% Overrides (appended last so they win over anything from model_defaults):
-%   - T_range / lya_T_interval: run the full window and let the LLE span it.
-%   - c_E: SFA strength for E neurons (differs from the swept run's default).
-model_args = [model_args, {'T_range', opts.sim_T_range, ...
-    'lya_T_interval', [], 'c_E', opts.sim_c_E}];
 
 %% Report, build, run, plot
-fprintf('Condition ''%s'': n_a_E=%d, n_b_E=%d', condition.name, ...
-    local_getfield(condition, 'n_a_E', 0), local_getfield(condition, 'n_b_E', 0));
-tau_rec = local_getfield(psa.model_defaults, 'tau_b_E_rec', []);
-if ~isempty(tau_rec), fprintf(', tau_b_E_rec=[%s]', num2str(tau_rec)); end
-fprintf('\nOverrides: T_range = [%g, %g] s, c_E = %g\n\n', ...
-    opts.sim_T_range(1), opts.sim_T_range(2), opts.sim_c_E);
+% The condition is printed generically -- whatever fields it happens to carry --
+% rather than assuming n_a_E / n_b_E. On SRNNCellTypePairs a condition carries
+% tau_a and a synapse_config struct instead.
+fprintf('Condition ''%s'': %s\n', condition.name, describe_condition(condition));
+fprintf('Overrides: T_range = [%g, %g] s, lya_T_interval = []', ...
+    opts.sim_T_range(1), opts.sim_T_range(2));
+if ~isempty(ov); fprintf(', %s', strjoin(ov', ', ')); end
+fprintf('\n\n');
 
-model = SRNNModel2(model_args{:});
 model.build();
 model.run();
 model.plot();
@@ -174,11 +188,39 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function v = local_getfield(s, f, default_val)
-% Return s.(f) if present, else default_val.
-if isstruct(s) && isfield(s, f)
-    v = s.(f);
+function s = describe_condition(condition)
+% One line naming whatever a condition actually sets, whichever class it is for.
+%
+% SRNNModel2 conditions carry n_a_E / n_b_E counts; SRNNCellTypePairs ones carry
+% a tau_a cell and a whole synapse_config struct. Enumerating either by name
+% here would put a third copy of that vocabulary in the repo, so this prints
+% what is there.
+f = setdiff(fieldnames(condition)', {'name'});
+if isempty(f); s = '(no parameters)'; return; end
+parts = cell(1, numel(f));
+for k = 1:numel(f)
+    parts{k} = sprintf('%s=%s', f{k}, summarize(condition.(f{k})));
+end
+s = strjoin(parts, ', ');
+end
+
+function s = summarize(v)
+% Compact rendering: numbers as-is, a synapse_config as its route list.
+if isnumeric(v) || islogical(v)
+    s = mat2str(v, 3);
+elseif iscell(v)
+    s = ['{' strjoin(cellfun(@(x) mat2str(x, 3), v, 'UniformOutput', false), ' ') '}'];
+elseif isstruct(v)
+    pres = fieldnames(v)';
+    routes = {};
+    for a = 1:numel(pres)
+        posts = fieldnames(v.(pres{a}))';
+        for b = 1:numel(posts)
+            routes{end+1} = [pres{a} '->' posts{b}]; %#ok<AGROW>
+        end
+    end
+    if isempty(routes); s = '(none)'; else; s = strjoin(routes, ','); end
 else
-    v = default_val;
+    s = class(v);
 end
 end
