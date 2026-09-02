@@ -84,7 +84,7 @@ Four figures name their own preset because they are deliberately different netwo
 
 ### The sweep pipeline
 
-`scripts/run_all_analyses/` holds the orchestrator and its three sub-analyses. **They are all functions**, taking a context struct and returning their output directory:
+`src/analysis/` holds the orchestrator and its three sub-analyses. **They are all functions**, taking a context struct and returning their output directory:
 
 - `run_all_analyses(preset_name, run_mode, ...)` — orchestrator; runs the three below into a single dated `data/param_space/run_all_<dt>/` directory and returns it. Defaults to the paper's preset at `'medium'`. This is the **sweep** pipeline only.
 - `run_sensitivity_analysis(ctx)` — 1D sweeps (`ParamSpaceAnalysis2` with `randomize_order=false` and `reps` as a grid axis). Returns one dir per swept parameter.
@@ -192,7 +192,7 @@ along with its tests and examples and the parity section of
 verified against its own finite-difference Jacobian and internal consistency, not
 against an independent implementation.
 
-### `src/ParamSpaceAnalysis2.m` (the analysis driver)
+### `src/analysis/ParamSpaceAnalysis2.m` (the analysis driver)
 
 A `handle` class that runs grid sweeps over `SRNNModel2`. Key behaviors not obvious from individual files:
 
@@ -249,8 +249,10 @@ Its fields:
 `master_model_class` / `master_conditions` / `run_mode` / `save_figs` out of
 whatever workspace called them, via `exist(...,'var')` — 37 such sites. You could
 not tell what a sub-script needed without grepping; a variable left behind by one
-run silently applied to the next (`run_overnight_queue.m` existed *only* to scrub
-them, as its own header admitted); and the sub-scripts had to skip their own
+run silently applied to the next (`run_overnight_queue.m` then existed *only* to
+scrub them, as its own header admitted — it has since been rewritten as a proper
+function taking a queue of `{preset, run_mode}` jobs, and is live); and the
+sub-scripts had to skip their own
 `clear`/`clc` when `master_output_dir` was set, leaking "am I being orchestrated?"
 into their cleanup logic. All three problems are properties of shared mutable
 scope, and all three vanish with arguments.
@@ -294,7 +296,9 @@ The `refactor` cleanup removed the legacy subtrees (`old_scripts/`, `review_pape
   **No figure calls `close all force`.** It is correct standalone — `replot_*` saves *all* open figures — but in a batch it destroys the previous entry's output before it can be verified. `make_all_paper_figures` closes each entry's returned handles once that entry has been checked, which also stops earlier figures polluting the `replot_*` prep folders.
 
   **Never `set(0, 'Default…')` without restoring.** Root defaults are process-global; a plotter that sets `DefaultTextInterpreter = 'none'` and does not restore it breaks the `\lambda_1` and `\mu_{EE}` labels in every figure drawn afterwards *in that session*. This actually happened. Use `with_graphics_defaults` (`src/plotting/`), which returns an `onCleanup`, or better, pass style per-object from `manuscript_style`.
-- `scripts/run_all_analyses/` — the orchestrator + its three sub-analyses (all functions), with `replot/` (the `replot_*` figure regenerators + `assemble_sensitivity_figure.m`) nested inside. `analysis_run_config.m` (the single table of `run_mode` settings that replaced the duplicated `switch run_mode` blocks) and `resolve_run_context.m` (the shared preamble that replaced the `master_*` protocol) moved to `src/presets/` on 2026-09-02, next to `srnn_param_preset` — they are the other half of the same pair. `run_dc_lle_analysis.m` and `check_sensitivity_sim.m` are standalone tools here, not part of the pipeline.
+- `src/analysis/` — `ParamSpaceAnalysis2` plus everything that *runs* a sweep: the orchestrator `run_all_analyses` and its three sub-analyses (all functions taking `ctx`), `run_memory_capacity`, `run_eig_heatmap`, `run_memory_capacity_example`, and the standalone tools `run_dc_lle_analysis`, `check_sensitivity_sim`, `run_overnight_queue`. `mu_block_from_preset` lives here too — it decides the mu sweep ranges and is shared by the 1-D and grid sweeps so they cannot drift apart. `analysis_run_config` and `resolve_run_context` are **not** here; they moved to `src/presets/`, being the other half of the preset pair.
+
+  `run_eig_heatmap` and `run_memory_capacity_example` used to sit inside the figure folders whose data they produce, and defaulted to writing their `.mat` next to their own `.m` — which is exactly how two figures came to read four-day-old data (see the invariant above). They are analyses; they belong here.
 - `scripts/memory_capacity/` — `run_memory_capacity(cfg)` (the paired-trial ensemble, a function with its own `mc_run_config` cost table), `plot_memory_capacity`, `replot_memory_capacity`, plus `example_memory_capacity.m` as an exploratory script. `SRNN_ESN_reservoir` subclasses `SRNNModel2`, so memory capacity **cannot** run on `SRNNCellTypePairs` — it is the one part of the paper on a different model class, behind the `mc_esn` preset. Porting the ESN readout is tracked follow-up work.
 - `scripts/tests/` — verification scripts (`test_SRNN2_defaults.m`, `test_psa_saveload.m`, `test_sensitivity_refactor.m`) plus the standalone example/comparison scripts `Sompolinsky_N_1000_g_1p8.m` and `Single_vs_dual_adaptation_example.m`.
 **Deleted 2026-09-02**, recoverable from git history:
