@@ -156,6 +156,11 @@ F = add(F, 'fig_sfa_EOC_allStd',             @fig_sfa_EOC_allStd,             tr
 F = add(F, 'fig_memory_capacity',            @fig_memory_capacity,            true, {});
 F = add(F, 'fig_memory_capacity_example',    @fig_memory_capacity_example,    true, {});
 F = add(F, 'fig_eig_heatmap',                @fig_eig_heatmap,                false, {});
+% The quantitative companion to fig_stim_engages_adaptation: that one shows
+% tonic drive engaging adaptation on a single bursting network, this one asks
+% whether the drive moves the Lyapunov exponent across seeds and across every
+% adaptation regime. Not in the paper, kept working and regenerated.
+F = add(F, 'fig_dc_lle',                     @fig_dc_lle,                     false, {});
 % The generated equation and conditions tables. An ordinary entry, not a special
 % call after the loop: as a special case its failures sat outside the headline
 % count, which is how the n_a refactor broke it while the run still reported

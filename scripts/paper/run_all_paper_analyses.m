@@ -25,9 +25,11 @@ function run_dir = run_all_paper_analyses(cfg)
 %   3. MC example           run_memory_capacity_example -- one network, kept
 %                           per-delay reconstructions
 %   4. eig heatmap          run_eig_heatmap -- pooled Jacobian eigenvalues
+%   5. DC-LLE               run_dc_lle_analysis -- local Lyapunov exponent vs
+%                           tonic DC drive, across seeds and every condition
 %
 % Stage 1 writes run_manifest.mat, which is what make_all_paper_figures uses to
-% find this run later. Stages 2-4 write into subfolders of it, so a run
+% find this run later. Stages 2-5 write into subfolders of it, so a run
 % directory holds everything the paper was built from.
 %
 % ERROR ISOLATION. Each stage is wrapped: a failure is reported and the queue
@@ -76,8 +78,13 @@ end
 results = struct('stage', {}, 'ok', {}, 'minutes', {}, 'detail', {}, 'err', {});
 results = record(results, 'sweeps', true, toc(t_all)/60, run_dir, '');
 
-%% 2-4. The figure-specific compute
+%% 2-5. The figure-specific compute
 % Each writes into the run directory, so the whole paper's inputs sit together.
+%
+% dc_lle runs LAST because it is the longest of the four and the only one not
+% feeding an in-paper figure: if an overnight run is going to be cut short, this
+% is the stage to lose. It takes cfg.preset_name -- the paper's own network --
+% and sweeps tonic DC across every adaptation condition.
 stages = { ...
     'memory_capacity', @() run_memory_capacity( ...
         'preset_name', cfg.mc_preset, 'run_mode', cfg.run_mode, ...
@@ -87,7 +94,10 @@ stages = { ...
         'output_dir', fullfile(run_dir, 'mc_example')); ...
     'eig_heatmap',     @() run_eig_heatmap( ...
         'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
-        'out_dir', fullfile(run_dir, 'eig_heatmap')) };
+        'out_dir', fullfile(run_dir, 'eig_heatmap')); ...
+    'dc_lle',          @() run_dc_lle_analysis( ...
+        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
+        'output_dir', run_dir) };
 
 for k = 1:size(stages, 1)
     name = stages{k, 1};
