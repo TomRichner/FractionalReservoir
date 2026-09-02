@@ -411,18 +411,42 @@ classdef SRNNCellTypePairs < handle
         end
 
         function value = get.n_per_type(obj)
+            % CUMULATIVE ROUNDING, and it must stay that way: this is the same
+            % formula RMTBlocks.get.n_per_type uses, and W is built from the
+            % RMTBlocks partition while the whole state vector is indexed by
+            % THIS one. The two have to be the same function of (n, f).
+            %
+            % Until 2026-09-02 this used RMTCellTypes.allocate_counts, which
+            % partitions by LARGEST REMAINDER. That agrees with cumulative
+            % rounding for every C = 2 model (proven, and 0 divergences in 4000
+            % random two-type trials) but disagrees for ~22% of C >= 3 draws --
+            % and where it disagreed, the model applied type-q parameters to a
+            % neuron whose outgoing synapses W had built as type-q'. At n = 10,
+            % f = [1/3 1/3 1/3] the model called neuron 4 excitatory while every
+            % weight in its W column was negative. Silent: no error, no warning,
+            % a Dale's-law violation visible only by reading the column signs
+            % back out of W. See scripts/tests/test_celltype_partition.m.
             if isempty(obj.f) || isempty(obj.n)
                 value = [];
             else
-                value = RMTCellTypes.allocate_counts(obj.n, obj.f);
+                boundaries = round(cumsum(reshape(obj.f, 1, [])) * obj.n);
+                boundaries(end) = obj.n;        % guard against rounding drift
+                value = diff([0, boundaries]);
             end
         end
 
         function value = get.type_indices(obj)
-            if isempty(obj.n_per_type)
+            counts = obj.n_per_type;
+            if isempty(counts)
                 value = {};
-            else
-                value = RMTCellTypes.make_type_indices(obj.n_per_type);
+                return;
+            end
+            value = cell(1, numel(counts));
+            first = 1;
+            for q = 1:numel(counts)
+                last = first + counts(q) - 1;
+                value{q} = first:last;
+                first = last + 1;
             end
         end
 
@@ -930,7 +954,20 @@ classdef SRNNCellTypePairs < handle
                 error('SRNNCellTypePairs:InvalidParams', ...
                     'f must contain one positive fraction per type and sum to 1.');
             end
-            RMTCellTypes.allocate_counts(obj.n, obj.f);
+            % Every type must get at least one neuron. RMTBlocks itself permits
+            % an empty population -- legal connectivity, but at the model level
+            % a type with no neurons, its own tau_a and its own synapse routes
+            % is a configuration error, so it is rejected here rather than
+            % silently producing empty state blocks. (This guard used to be a
+            % side effect of calling RMTCellTypes.allocate_counts for its error;
+            % it is explicit now that the partition is computed inline.)
+            counts = obj.n_per_type;
+            if any(counts < 1)
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    ['Every cell type must receive at least one neuron ' ...
+                    '(n = %d, f = %s gives counts %s).'], ...
+                    obj.n, mat2str(obj.f, 3), mat2str(counts));
+            end
             mu_b = obj.expand_block(obj.mu_tilde_relative);
             sg_b = obj.expand_block(obj.sigma_tilde_relative);
             if ~isequal(size(mu_b), [C C]) || any(~isfinite(mu_b(:))) || ...
@@ -1145,10 +1182,11 @@ classdef SRNNCellTypePairs < handle
 
         function build_network(obj)
             rng(obj.rng_seeds(1));
-            % RMTBlocks rather than RMTCellTypes: it indexes the statistics by
-            % BOTH postsynaptic (row) and presynaptic (column) type, so E->E can
-            % differ from E->I, and it supplies R and lambda_O. RMTCellTypes
-            % applied the tildes raw with no normalization and had neither.
+            % RMTBlocks indexes the statistics by BOTH postsynaptic (row) and
+            % presynaptic (column) type, so E->E can differ from E->I, and it
+            % supplies R and lambda_O. (It replaced RMTCellTypes, which applied
+            % the tildes raw with no normalization and had neither; that class
+            % was deleted 2026-09-02.)
             % g_mu / g_sigma stay at 1 -- level_of_chaos is applied to the
             % assembled W below, because rescale_by_abscissa divides by the
             % abscissa BEFORE that multiply.
@@ -1171,9 +1209,9 @@ classdef SRNNCellTypePairs < handle
             % setter here that can touch the RNG, via update_sparsity.
             rmt.set_types(obj.f, obj.mu_tilde, obj.sigma_tilde);
             rmt.zrs_mode = obj.zrs_mode;
-            % RMTBlocks returns a DENSE matrix where RMTCellTypes returned a
-            % sparse one. Restore sparse storage: this class is built for sparse
-            % connectivity and its state indexing assumes it.
+            % RMTBlocks returns a DENSE matrix. Restore sparse storage: this
+            % class is built for sparse connectivity and its state indexing
+            % assumes it.
             W_raw = sparse(rmt.W);
             if obj.rescale_by_abscissa
                 abscissa = max(real(eig(full(W_raw))));
