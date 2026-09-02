@@ -327,7 +327,7 @@ switch name
         % (Until 2026-08-23 this was TWO statistically identical types named
         % 'A'/'B', purely because SRNNCellTypePairs could not build a one-type
         % model -- build_network configured RMTBlocks piecemeal where set_types
-        % is required to change D. That is fixed; see singleCellTypeRefactor.md.
+        % is required to change D. That is fixed.
         % W is BIT-IDENTICAL across that change, which was not expected: the two
         % types had identical zero-mean statistics, so the per-block scaling was
         % uniform and the underlying draw never depended on how it was
@@ -464,7 +464,7 @@ switch name
         % neuron" above "n 500". The result showed none of the mechanisms -- the
         % no-adaptation column was network chaos and the STD columns were
         % silent with b ~ 1. Naming the network as a preset is what stops that
-        % recurring; see singleCellTypeRefactor.md section 3c.
+        % recurring.
         %
         % NOISE IS DELIBERATELY KEPT (sigma_u_noise = 0.025, exactly the
         % paper's). On one neuron there is no population averaging, so the

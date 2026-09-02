@@ -25,7 +25,7 @@ function out = fig_introductory_concepts(cfg)
 % ONE CELL TYPE, named 'all': a single undifferentiated population, which is
 % what this network is. (It was two statistically identical types named A and B
 % until 2026-08-23, only because SRNNCellTypePairs could not build a one-type
-% model. See singleCellTypeRefactor.md.)
+% model.)
 %
 % See also: srnn_param_preset, build_from_preset, fig_energy_landscape
 

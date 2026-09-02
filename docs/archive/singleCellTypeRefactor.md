@@ -1,5 +1,29 @@
 # Single-cell-type support in `SRNNCellTypePairs`
 
+> ## ⚠ ARCHIVED — this refactor is COMPLETE. Do not treat it as a plan.
+>
+> **Status: implemented 2026-08-23** (`refactorRunAll` @ `0134e9b`). The
+> `build_network` fix landed, `srnn_adaptation_conditions` took its cell-type
+> count argument, and the three `C = 1` presets are live: `sompolinsky_pairs`,
+> `single_neuron_stf`, `single_neuron_dualStd`. Every §6 verification came back
+> ANSWERED, `W` was bit-identical at `C = 2`, and the regression is frozen in
+> `scripts/tests/test_pairs_single_celltype.m`.
+>
+> **One conclusion here is a standing design rule, and it is easy to misread as
+> a bug** — §4, "What this does NOT unlock". `f_E` and the four
+> `mu_*_relative` block aliases deliberately **error** at `C = 1`
+> (`SRNNCellTypePairs:NotTwoTypes`), because the fraction excitatory and the
+> four blocks are meaningless with one cell type. The boundary is **`C = 1` for
+> figures, `C >= 2` for sweeps**, and those errors are what enforce it. Do not
+> "fix" them, and do not teach the sweep scripts to select axes conditionally.
+> That rule now lives in `CLAUDE.md`, which is the maintained statement of it.
+>
+> **This file is kept as a record of the reasoning, not as a description of the
+> code.** It is archived, not maintained; its `src/` paths predate the
+> 2026-09-02 reorganization. Nothing here should be acted on.
+>
+> Archived 2026-09-02.
+
 What it takes to make `n_cellTypes = 1` work, and what it lets us delete.
 
 Investigated 2026-08-22 and re-probed 2026-08-23 on `refactorRunAll`. **Every

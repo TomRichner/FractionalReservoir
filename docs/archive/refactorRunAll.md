@@ -1,5 +1,29 @@
 # refactorRunAll — investigation notes
 
+> ## ⚠ ARCHIVED — this refactor is COMPLETE. Do not treat it as a plan.
+>
+> **Status: all eight stages landed 2026-08-22.** §7 ("Still open") reads
+> "Nothing"; §7c carries the commit table mapping each stage to what it landed.
+> The two entry points this file proposed exist and are live:
+> `run_all_paper_analyses()` and `make_all_paper_figures()` in `scripts/paper/`.
+>
+> **This file is kept as a record of the reasoning and the wrong turns, not as a
+> description of the code.** It is archived, not maintained. Much of what it
+> says about the tree was already superseded by the 2026-09-02 reorganization:
+> paths like `scripts/run_all_analyses/`, `scripts/memory_capacity/` and
+> `scripts/presentations/Stability_Manuscript/` no longer exist, and the figure
+> inventory's ✅/❌ data-availability column describes August, not now.
+>
+> For what the code IS, read `CLAUDE.md` and `README.md`. For what changed and
+> why, read the commit messages. Nothing here should be acted on.
+>
+> Two live follow-ups raised in this file are tracked elsewhere and are the only
+> parts still open: the memory-capacity port off `SRNNModel2` (§6 Q2, tracked in
+> `CLAUDE.md` and `UserNotes.md`) and whether STF should scale STD depletion
+> (§6 Q4, parked in `UserNotes.md`).
+>
+> Archived 2026-09-02.
+
 Branch: `refactorRunAll`. Written 2026-08-20.
 
 Goal (from the request): **two entry points**, working backwards from the paper

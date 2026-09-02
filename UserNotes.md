@@ -14,6 +14,68 @@ and session that wrote it. Newest first.
 
 ---
 
+## Use `C` for the cell-type count everywhere, and stop calling it `D`
+
+| | |
+|---|---|
+| Noted | 2026-09-02 · `refactorRunAll` @ `e4a03e5` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Raised by | TR, after asking whether `C` and `D` were the same quantity |
+| Status | **Recorded, not implemented.** Naming only; no behaviour changes. |
+
+### The two names
+
+They are the same number, and equal by construction:
+
+| symbol | layer | property |
+|---|---|---|
+| `C` | model | `SRNNCellTypePairs.n_cellTypes` |
+| `D` | connectivity | `RMTBlocks.n_types`, defined as `numel(f)` |
+
+`SRNNCellTypePairs.build_network` sets one from the other in a single call —
+`rmt.set_types(obj.f, obj.mu_tilde, obj.sigma_tilde)` — and `obj.f` is the
+`1 x C` fractions row, so `D = C` always. No configuration makes them differ.
+
+Neither is a MATLAB identifier. `C` lives only in comments and CLAUDE.md; `D`
+lives only in `RMTBlocks` comments and error messages. So this is a comment and
+documentation change, not a rename of any property.
+
+### Why `D` is the one to drop
+
+`D` is **overloaded inside `RMTBlocks` itself**, from two legitimate sources:
+
+- `RMTBlocks.m:26` — "Harris Eq. (6) writes `W = S o (A*D + M)` with `D`
+  diagonal." Here `D` is Harris's **diagonal Dale sign matrix**, `n x n`.
+- `RMTBlocks.m:5` — "full `D x D` block statistics". Here `D` is the **type
+  count**, `C`.
+
+Also at `RMTBlocks.m:241` and `:247` in the Dale sense. One file, one letter,
+two meanings, and the Dale one is the paper's notation — so it is the count
+that should give way.
+
+### What the change is
+
+1. In `RMTBlocks` comments and error messages, replace the count-`D` with `C`
+   (or spell it `n_types`, which is the actual property). Leave the four
+   Dale-matrix `D`s alone; they quote Harris and are correct.
+2. Same substitution in CLAUDE.md, which currently uses `C` in the
+   `SRNNCellTypePairs` section and `D` in the `RMTBlocks` sentence describing
+   the same quantity.
+3. The still-unwritten `RMTBlocks` doc should be written in `C` from the start,
+   with one sentence noting that Harris's `D` is a different object.
+
+### Cost, and the one thing to be careful of
+
+Small — 79 lines in `RMTBlocks.m` contain the letter `D`, but the great
+majority are unrelated words, so this is a read-and-judge pass over comments,
+not a `sed`. **Do not blanket-substitute**: the Dale-matrix occurrences must
+survive, and `set_types`' error messages mention both the dimension and the
+paper's form.
+
+Worth doing when the `RMTBlocks` doc is written, so the doc and the comments
+agree from day one rather than being reconciled later.
+
+---
+
 ## `tau_a` should be the independent property and `n_a` Dependent on it, not both settable
 
 | | |
@@ -246,7 +308,7 @@ the parent preset `celltype_pairs_Sc0p2_noise0p025`, which makes `[.,1]` and
 >    variant A was building the paper's whole `n = 500` recurrent network for a
 >    figure captioned "one unconnected neuron", because `paper_config` handed it
 >    `cfg.preset_name`. That is what the new `single_neuron_dualStd` preset
->    fixes. See `singleCellTypeRefactor.md` §3c.
+>    fixes. See `docs/archive/singleCellTypeRefactor.md` §3c.
 >
 > The workarounds described at the end of this entry are **gone**:
 > `sompolinsky_pairs` is now one type named `'all'`, and `single_neuron_stf` is
@@ -482,7 +544,7 @@ should be restored?
 | | |
 |---|---|
 | Noted | 2026-08-21 · `refactorRunAll` @ `22a91ee` · R5611351 · Claude Code (Opus 5), session e22d2fab |
-| **Superseded** | 2026-08-21, same session. TR reversed the parking decision: the STF figure **is** being rebuilt as part of `refactorRunAll`, on `SRNNCellTypePairs` behind a new preset matching the old parameters. See `refactorRunAll.md` §6. |
+| **Superseded** | 2026-08-21, same session. TR reversed the parking decision: the STF figure **is** being rebuilt as part of `refactorRunAll`, on `SRNNCellTypePairs` behind a new preset matching the old parameters. See `docs/archive/refactorRunAll.md` §6. |
 
 > **This entry is now history, not a to-do.** It is kept because the archaeology below
 > (which commit holds the last version, why it cannot be restored verbatim) is still

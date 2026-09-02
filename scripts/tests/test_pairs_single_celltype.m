@@ -23,8 +23,7 @@
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths has run.
 %
-% See also: SRNNCellTypePairs, RMTBlocks/set_types, srnn_adaptation_conditions,
-%           singleCellTypeRefactor.md
+% See also: SRNNCellTypePairs, RMTBlocks/set_types, srnn_adaptation_conditions
 
 all_passed = true;
 
