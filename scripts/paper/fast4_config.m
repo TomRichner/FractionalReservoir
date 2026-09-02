@@ -12,11 +12,21 @@ function cfg = fast4_config(opts)
 %                every sweep does roughly half the work.
 %   run_mode     'fast' -- the smoke test. Minutes, not hours: coarse grids,
 %                short trajectories, rk4 or sra1 rather than ode45.
-%   fig_root     figs/fast_4   } both STABLE and overwritten every run, so a
-%   output_dir   data/fast_4   } smoke test leaves one directory rather than a
-%                                pile of dated ones. This is the opposite
-%                                choice from the paper, where a run is a dated
-%                                artefact and must never be overwritten.
+%   fig_root     figs/fast_4   } both FIXED, so a smoke test leaves one
+%   output_dir   data/fast_4   } directory rather than a pile of dated ones --
+%                                the opposite choice from the paper, where a run
+%                                is a dated artefact.
+%
+% THE TWO ROOTS BEHAVE DIFFERENTLY ON A RERUN, which is not obvious and is worth
+% knowing before you run this twice:
+%
+%   figs/fast_4   overwritten. save_figure_stable deletes <out_dir>/<tag>* before
+%                 saving, so each entry's directory holds only the current set.
+%   data/fast_4   ACCUMULATES. Every sub-analysis appends its own timestamped
+%                 folder, so a second run adds a parallel set beside the first,
+%                 while run_manifest and provenance at the top level are
+%                 replaced. run_all_paper_analyses warns when it finds the
+%                 directory occupied; delete it first for a clean run.
 %
 % WHY A SEPARATE FILE rather than paper_config('run_mode', 'fast', ...). Because
 % the point is that it cannot collide with the paper's output. Both roots are

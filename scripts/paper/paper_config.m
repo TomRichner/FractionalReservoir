@@ -54,19 +54,29 @@ arguments
     % a commit, and both are recorded in the manifest written at the root; the
     % final set is force-added at submission.
     opts.fig_root    (1,:) char = 'figs/paper'
-    % WHERE THE COMPUTE LANDS -- the data-side twin of fig_root, with the same
-    % two modes and the same empty-means-dated convention:
+    % WHERE THE COMPUTE LANDS -- the data-side twin of fig_root:
     %
     %   empty (default)  run_all_analyses creates data/param_space/run_all_<dt>/,
-    %                    so successive runs never overwrite each other. This is
-    %                    what the paper wants: a run is a dated artefact.
-    %   set              a STABLE directory, reused and overwritten. For a
-    %                    smoke test or a side experiment, where a pile of dated
-    %                    folders is noise rather than history.
+    %                    so successive runs never collide. This is what the
+    %                    paper wants: a run is a dated artefact.
+    %   set              a FIXED directory, for a smoke test or side experiment
+    %                    where a pile of dated folders is noise rather than
+    %                    history.
     %
-    % A relative path resolves against the project root. Note the asymmetry with
-    % run_dir above, which is the READ side (which finished run the figures are
-    % built from); this is the WRITE side.
+    % NOT "overwritten", which is what this comment first claimed. A reused
+    % directory ACCUMULATES: every sub-analysis appends its own timestamped
+    % folder (ParamSpaceAnalysis2 builds <prefix>_<note>_nLevs_<N>_<dt>), so a
+    % second run adds a parallel set beside the first -- while run_manifest,
+    % provenance and parameters.md at the top level ARE replaced. Mixed, and
+    % worth knowing: run_all_paper_analyses warns when the directory is already
+    % occupied. Delete it first for a clean run.
+    %
+    % A relative path resolves against the project root.
+    %
+    % READ SIDE vs WRITE SIDE. run_dir above says which finished run the FIGURES
+    % are built from; this says where the ANALYSES write. When run_dir is empty
+    % and this is set, make_all_paper_figures reads from here -- a config that
+    % named where it wrote should not have to guess where to read.
     opts.output_dir  (1,:) char = ''
 end
 

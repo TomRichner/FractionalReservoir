@@ -47,8 +47,25 @@ setup_paths();
 %% Resolve the run once
 % Figures that read no run directory (the analytic ones) ignore this; passing it
 % to them is harmless and keeps the call uniform.
+%
+% PRECEDENCE: cfg.run_dir (an explicit choice) beats cfg.output_dir (where this
+% config's own analyses wrote) beats searching by preset.
+%
+% The middle rung exists because searching cannot find a config that writes
+% outside the paper's convention. resolve_run_dir globs data/param_space for
+% run_all_*, so a config with output_dir = 'data/fast_4' wrote somewhere the
+% search will never look -- it failed with NoMatchingRun and listed every
+% preset in data/param_space, none of them this one. A config that named where
+% it wrote should not then have to guess where to read.
+want_run_dir = cfg.run_dir;
+if isempty(want_run_dir) && ~isempty(cfg.output_dir)
+    want_run_dir = cfg.output_dir;
+    if ~is_absolute_path(want_run_dir)
+        want_run_dir = fullfile(fileparts(which('setup_paths')), want_run_dir);
+    end
+end
 try
-    run_dir = resolve_run_dir('run_dir', cfg.run_dir, 'preset_name', cfg.preset_name);
+    run_dir = resolve_run_dir('run_dir', want_run_dir, 'preset_name', cfg.preset_name);
     fprintf('Run directory: %s\n', run_dir);
 catch ME
     warning('make_all_paper_figures:NoRun', ...

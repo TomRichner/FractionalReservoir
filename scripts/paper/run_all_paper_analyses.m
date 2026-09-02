@@ -67,7 +67,8 @@ else
     if ~is_absolute_path(out_dir)
         out_dir = fullfile(fileparts(which('setup_paths')), out_dir);
     end
-    fprintf('  output   : %s  (stable, overwritten)\n', out_dir);
+    fprintf('  output   : %s  (reused)\n', out_dir);
+    warn_if_occupied(out_dir);
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir);
 end
 
@@ -134,6 +135,45 @@ fprintf('Next: make_all_paper_figures(paper_config(''run_dir'', run_dir))\n');
 end
 
 %% ------------------------------------------------------------------------
+function warn_if_occupied(out_dir)
+% A reused output_dir ACCUMULATES; it does not overwrite.
+%
+% Each sub-analysis appends its own timestamped folder --
+% ParamSpaceAnalysis2 builds <folder_prefix>_<note>_nLevs_<N>_<dt> and cd's
+% into it -- so a second run into the same directory adds a parallel set
+% beside the first. What DOES get overwritten is the top level: run_manifest,
+% git_provenance and parameters.md all describe the newest run, in a directory
+% that now holds several.
+%
+% That matters on the figure side. Figures glob param_space_*,
+% 1D_sensitivity_* and tau_sensitivity_* inside the run directory;
+% fig_sfa_EOC_allStd warns and takes the newest, but fig_sensitivity_medians
+% matches folders by PARAMETER NAME and would find two per parameter.
+%
+% So: say so, name what is there, and let the user decide. Deleting data
+% because a config asked for a stable path is not this function's call.
+if ~isfolder(out_dir); return; end
+patterns = {'param_space_*', '1D_sensitivity_*', 'tau_sensitivity_*'};
+found = {};
+for k = 1:numel(patterns)
+    d = dir(fullfile(out_dir, patterns{k}));
+    d = d([d.isdir]);
+    if ~isempty(d)
+        found{end+1} = sprintf('%s (%d)', patterns{k}, numel(d)); %#ok<AGROW>
+    end
+end
+if isempty(found); return; end
+warning('run_all_paper_analyses:OutputDirOccupied', ...
+    ['Output directory already holds sweep results:\n' ...
+     '  %s\n' ...
+     '  existing: %s\n' ...
+     'This run ADDS a parallel set rather than replacing them, and overwrites\n' ...
+     'run_manifest/provenance at the top level. Figures that match a sweep\n' ...
+     'folder by parameter name may then find more than one.\n' ...
+     'Delete or move the directory first for a clean run.'], ...
+    out_dir, strjoin(found, ', '));
+end
+
 function tf = is_absolute_path(p)
 % Absolute on either platform: a leading separator, or a Windows drive letter.
 % Deliberately NOT isfolder(): whether a relative path happens to exist under
