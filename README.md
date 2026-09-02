@@ -87,7 +87,12 @@ lives in `src/`, grouped by layer.
 
 The two model classes are **duck-typed siblings, not a hierarchy**:
 `SRNNModel2` (two hardwired E/I populations) and `SRNNCellTypePairs` (C named
-cell types with per-route synapses, which is what the paper uses). They share no
-implementation, so a change to one is not a change to the other.
+cell types with per-route synapses). They share no implementation, so a change
+to one is not a change to the other.
+
+**Everything the paper runs is `SRNNCellTypePairs`**, including memory capacity:
+`SRNN_ESN_reservoir` subclasses it, having been re-parented off `SRNNModel2` on
+2026-09-02. `SRNNModel2` is still exercised by tests but no longer appears in
+the paper pipeline.
 
 `CLAUDE.md` carries the working conventions in more detail.
