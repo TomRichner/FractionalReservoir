@@ -54,6 +54,20 @@ arguments
     % a commit, and both are recorded in the manifest written at the root; the
     % final set is force-added at submission.
     opts.fig_root    (1,:) char = 'figs/paper'
+    % WHERE THE COMPUTE LANDS -- the data-side twin of fig_root, with the same
+    % two modes and the same empty-means-dated convention:
+    %
+    %   empty (default)  run_all_analyses creates data/param_space/run_all_<dt>/,
+    %                    so successive runs never overwrite each other. This is
+    %                    what the paper wants: a run is a dated artefact.
+    %   set              a STABLE directory, reused and overwritten. For a
+    %                    smoke test or a side experiment, where a pile of dated
+    %                    folders is noise rather than history.
+    %
+    % A relative path resolves against the project root. Note the asymmetry with
+    % run_dir above, which is the READ side (which finished run the figures are
+    % built from); this is the WRITE side.
+    opts.output_dir  (1,:) char = ''
 end
 
 cfg = struct();
@@ -61,6 +75,7 @@ cfg.preset_name = opts.preset_name;
 cfg.run_mode    = opts.run_mode;
 cfg.run_dir     = opts.run_dir;
 cfg.fig_root    = opts.fig_root;
+cfg.output_dir  = opts.output_dir;
 
 % Presets for the figures that are deliberately different networks.
 cfg.mc_preset          = 'mc_esn';              % SRNN_ESN_reservoir; see below

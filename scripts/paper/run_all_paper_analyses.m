@@ -56,7 +56,20 @@ fprintf('========================================================\n');
 t_all = tic;
 
 %% 1. The sweep pipeline -- creates the run directory and its manifest
-run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode);
+% cfg.output_dir empty (the paper's case) means "make your own dated folder",
+% which is what run_all_analyses does with an empty output_dir. A relative path
+% resolves against the project root, so a config can say 'data/fast_4' without
+% caring what the cwd is -- same rule as fig_root in make_all_paper_figures.
+if isempty(cfg.output_dir)
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode);
+else
+    out_dir = cfg.output_dir;
+    if ~is_absolute_path(out_dir)
+        out_dir = fullfile(fileparts(which('setup_paths')), out_dir);
+    end
+    fprintf('  output   : %s  (stable, overwritten)\n', out_dir);
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir);
+end
 
 results = struct('stage', {}, 'ok', {}, 'minutes', {}, 'detail', {}, 'err', {});
 results = record(results, 'sweeps', true, toc(t_all)/60, run_dir, '');
@@ -121,6 +134,15 @@ fprintf('Next: make_all_paper_figures(paper_config(''run_dir'', run_dir))\n');
 end
 
 %% ------------------------------------------------------------------------
+function tf = is_absolute_path(p)
+% Absolute on either platform: a leading separator, or a Windows drive letter.
+% Deliberately NOT isfolder(): whether a relative path happens to exist under
+% the current directory must not decide where output lands. Same helper, and
+% the same reasoning, as in make_all_paper_figures.
+tf = startsWith(p, filesep) || startsWith(p, '/') || ...
+     ~isempty(regexp(p, '^[A-Za-z]:[\\/]', 'once'));
+end
+
 function results = record(results, stage, ok, minutes, detail, err)
 if ~ischar(detail); detail = ''; end
 results(end+1) = struct('stage', stage, 'ok', ok, 'minutes', minutes, ...
