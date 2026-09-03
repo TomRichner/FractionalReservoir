@@ -105,6 +105,52 @@ for s = shared
 end
 all_passed = check('the 4 shared regimes are identical across both sets', same) && all_passed;
 
+%% The 'single_multi' regime set
+fprintf('\n-- the 3-regime set --\n');
+% None / one timescale each / many timescales each. The whole point is that the
+% only thing varying is HOW MANY timescales carry the adaptation, so the checks
+% here are about counts and about the two shared regimes still matching.
+three = srnn_adaptation_conditions('SRNNCellTypePairs', ...
+    'synapse_config', dual, 'regimes', 'single_multi');
+got3 = cellfun(@(c) c.name, three, 'UniformOutput', false);
+all_passed = check('3 regimes in the intended order', ...
+    isequal(got3, {'no_adaptation','sfa1_std1','sfa_and_std'})) && all_passed;
+
+all_passed = check('SFA timescale counts are [0 1 3]', ...
+    isequal(cellfun(@(c) numel(c.tau_a{1}), three), [0 1 3])) && all_passed;
+all_passed = check('STD timescale counts are [0 1 2]', ...
+    isequal(cellfun(@(c) std_count(c.synapse_config), three), [0 1 2])) && all_passed;
+
+% BOTH mechanisms present together in both adapting regimes -- that is what
+% separates this set from 'timescales', where the _only regimes isolate them.
+all_passed = check('both adapting regimes carry SFA *and* STD', ...
+    numel(three{2}.tau_a{1}) > 0 && std_count(three{2}.synapse_config) > 0 && ...
+    numel(three{3}.tau_a{1}) > 0 && std_count(three{3}.synapse_config) > 0) && all_passed;
+
+% sfa1_std1's single timescales must be DERIVED from the multi ones, not written
+% out, so retuning the network cannot leave it describing an older one.
+all_passed = check('sfa1_std1 takes the FIRST tau_a and the FIRST STD pair', ...
+    isequal(three{2}.tau_a{1}, three{3}.tau_a{1}(1)) && ...
+    isequal(three{2}.synapse_config.E.E.std.tau_rec, ...
+            three{3}.synapse_config.E.E.std.tau_rec(1))) && all_passed;
+
+% The two shared names must mean exactly what they mean elsewhere, or a
+% 3-condition run is not comparable with the 4- and 7-condition ones.
+same3 = true;
+for s = {'no_adaptation','sfa_and_std'}
+    a = three{strcmp(got3, s{1})};
+    b = seven{strcmp(got, s{1})};
+    same3 = same3 && isequal(a, b);
+end
+all_passed = check('the 2 shared regimes are identical to the 7-regime set', same3) ...
+    && all_passed;
+
+% Every regime needs a display title or a figure legend falls back to the raw
+% snake_case name in one panel while reading properly in another.
+titles3 = srnn_condition_titles();
+all_passed = check('every 3-regime name has a display title', ...
+    all(cellfun(@(n) isKey(titles3, n), got3))) && all_passed;
+
 %% SRNNModel2 still speaks counts, deliberately
 fprintf('\n-- SRNNModel2 branch is untouched --\n');
 m2 = srnn_adaptation_conditions('SRNNModel2');
@@ -189,7 +235,8 @@ function names = preset_names()
 % The presets this refactor keeps working. Deliberately explicit rather than
 % enumerated from srnn_param_preset, so a preset that quietly stops being
 % covered shows up as an edit here.
-names = {'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', ...
+names = {'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond', ...
+         'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', ...
          'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond', 'bursting_pairs', ...
          'sompolinsky_pairs', 'single_neuron_stf', 'single_neuron_dualStd', ...
          'mc_pairs_dualStd', 'default', 'overconnected'};

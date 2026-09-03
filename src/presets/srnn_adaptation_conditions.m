@@ -2,10 +2,11 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 % SRNN_ADAPTATION_CONDITIONS The four adaptation regimes, per model class.
 %
 % Returns a cell array of condition structs for ParamSpaceAnalysis2.set_conditions.
-% The four NAMES are the same whichever class is being swept -- no_adaptation,
-% sfa_only, std_only, sfa_and_std -- so every downstream consumer keyed on the
-% name keeps working, including the condition_titles maps inside
-% ParamSpaceAnalysis2's plotters. What differs is how each regime is spelled:
+% A regime NAME means the same thing whichever model class is being swept and
+% whichever regime SET it came from -- no_adaptation and sfa_and_std are
+% identical in all three sets -- so every downstream consumer keyed on the name
+% keeps working, including srnn_condition_titles and the plotters inside
+% ParamSpaceAnalysis2. What differs is how each regime is spelled:
 %
 %   SRNNModel2         n_a_E / n_b_E counts. n_b_E = 1 depresses EVERY outgoing
 %                      excitatory synapse; there is no way to say "E->E only".
@@ -73,7 +74,7 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 %
 % SFA always lands on the FIRST cell type; every other type gets none.
 %
-% THE TWO REGIME SETS
+% THE THREE REGIME SETS
 %
 %   'standard'    4 regimes: none, SFA, STD, SFA+STD. The paper's original set.
 %   'timescales'  7 regimes, adding a one-timescale variant of each mechanism
@@ -92,6 +93,33 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 %                 multi-timescale, and the two combined regimes go STD-1 then
 %                 STD-all. That order is the column order of every sweep figure.
 %
+%   'single_multi'  3 regimes: NO adaptation, adaptation on ONE timescale, and
+%                 adaptation on MANY -- with both mechanisms always present
+%                 together:
+%
+%                   no_adaptation    -            -
+%                   sfa1_std1        1 tau_a      1 STD timescale
+%                   sfa_and_std      K tau_a      all STD timescales
+%
+%                 THE CONTRAST IS TIMESCALE COUNT, AND ONLY THAT. Every regime
+%                 has SFA and STD in the same proportion; what changes is how
+%                 many timescales carry each. Isolating SFA from STD -- which is
+%                 what 'timescales' does with its _only regimes -- is a separate
+%                 and, per TR after discussion with his PI, more complicated
+%                 question, headed for a later paper.
+%
+%                 sfa1_std1 is NEW here: 'timescales' has sfa3_std1 (many SFA
+%                 timescales, one STD) but no one-of-each regime, because it was
+%                 built to vary the mechanisms independently rather than to hold
+%                 them matched.
+%
+%                 sfa_and_std is REUSED rather than renamed to sfa3_std2, even
+%                 though the latter would be the accurate name under the
+%                 sfa<K>_std<M> convention. Sharing the name is what keeps a
+%                 3-regime run comparable with the 4- and 7-regime ones: the
+%                 regime is identical in all three, so it should be called the
+%                 same thing and land in the same column.
+%
 % This is only meaningful because c is the TOTAL adaptation budget, divided by
 % the number of timescales in use. Before that, sfa_only_oneTS would have had one
 % third the adaptation of sfa_only and the comparison would have confounded
@@ -107,7 +135,8 @@ arguments
     opts.synapse_config = []
     opts.sfa_timescales (1,:) double {mustBePositive} = srnn_sfa_timescales(3)
     opts.n_cell_types (1,1) double {mustBeInteger, mustBePositive} = 2
-    opts.regimes (1,:) char {mustBeMember(opts.regimes, {'standard','timescales'})} = 'standard'
+    opts.regimes (1,:) char ...
+        {mustBeMember(opts.regimes, {'standard','timescales','single_multi'})} = 'standard'
 end
 
 synapse_config = opts.synapse_config;
@@ -191,6 +220,18 @@ switch model_class
                     struct('name','std_only_oneTS', 'tau_a',{no_taus},  'synapse_config',sc1), ...
                     struct('name','std_only',       'tau_a',{no_taus},  'synapse_config',sc), ...
                     struct('name','sfa3_std1',      'tau_a',{sfa_taus}, 'synapse_config',sc1), ...
+                    struct('name','sfa_and_std',    'tau_a',{sfa_taus}, 'synapse_config',sc) ...
+                    };
+            case 'single_multi'
+                % None / one timescale each / many timescales each. Built from
+                % exactly the same pieces the other sets use -- one_tau and the
+                % first-timescale routes for the single case, the full ladder and
+                % the full routes for the multi case -- so the regimes cannot
+                % describe a different network from their neighbours.
+                sc1 = first_timescale_routes(sc);
+                conds = { ...
+                    struct('name','no_adaptation',  'tau_a',{no_taus},  'synapse_config',no_synapses), ...
+                    struct('name','sfa1_std1',      'tau_a',{one_tau},  'synapse_config',sc1), ...
                     struct('name','sfa_and_std',    'tau_a',{sfa_taus}, 'synapse_config',sc) ...
                     };
         end

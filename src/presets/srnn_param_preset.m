@@ -246,6 +246,76 @@ switch name
         std_routes.I.I.std = dual_std;
         regimes = 'timescales';
 
+    case 'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond'
+        % THE PAPER'S NETWORK, three adaptation regimes: none / one timescale /
+        % many. Copied from celltype_pairs_Sc0p2_noise0p025_dualStd_7cond.
+        % Changed:  regimes  'timescales' -> 'single_multi'
+        % Derived presets: none.
+        %
+        % THE NETWORK IS IDENTICAL to the 4- and 7-condition presets -- same n,
+        % connectivity, nonlinearity, noise, c and depression timescales. Only
+        % the regime SET differs, and no_adaptation and sfa_and_std mean exactly
+        % the same thing in all three, so a 3-condition run is directly
+        % comparable with the exploratory 7-condition ones.
+        %
+        % WHY THREE, AND WHY THESE THREE (TR, 2026-09-03, after discussing the
+        % manuscript with his PI). The 7-regime set separates SFA from STD --
+        % sfa_only, std_only and their one-timescale variants -- which turned out
+        % to be too complicated a story for this paper and is headed for a later
+        % one. The interesting contrast is NO adaptation vs adaptation on ONE
+        % timescale vs adaptation on MANY, with both mechanisms always present
+        % together:
+        %
+        %   no_adaptation   -                      -
+        %   sfa1_std1       1 tau_a (0.25 s)       1 STD pair (2 / 0.25 s)
+        %   sfa_and_std     3 tau_a (0.25-10 s)    2 STD pairs
+        %
+        % So the axis is TIMESCALE COUNT and only that: every regime with
+        % adaptation has SFA and STD in the same proportion.
+        %
+        % THIS COMPARISON IS ONLY CLEAN BECAUSE c IS THE TOTAL SFA BUDGET. The
+        % model divides c by the number of timescales in use, so one-timescale
+        % SFA adapts exactly as hard IN TOTAL as three-timescale SFA and the
+        % contrast is structure, not strength. Depression is deliberately NOT
+        % normalized that way -- it enters as a product, each b rests at 1, so
+        % two timescales genuinely depress harder than one. The single/multi
+        % contrast therefore holds SFA strength fixed while STD strength grows
+        % with its timescale count, which is the intended asymmetry rather than
+        % an oversight: see Equations_stability_paper.md.
+        %
+        % COST: 3 regimes against 7 is 57% less compute at every sweep stage.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    500, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [5.5 -5.5; 5.5 -5.5], ...   % multiples of F, (post <- pre)
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % operative: mu_S_c is empty
+            'mu_S_c',               [], ...
+            'sigma_S_c',            [], ...
+            'c',                    [0.5, 0], ...       % TOTAL SFA budget, E only
+            'input_config',         pairs_input_config(0.0), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              500, ...
+            'F_ref_indegree',       100, ...
+            'sigma_u_noise',        0.025);
+
+        % sfa1_std1 takes its route from these by keeping the FIRST
+        % tau_rec/tau_rel pair, so it cannot describe an older network.
+        std_routes = struct();
+        dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        std_routes.E.E.std = dual_std;
+        std_routes.E.I.std = dual_std;
+        std_routes.I.E.std = dual_std;
+        std_routes.I.I.std = dual_std;
+        regimes = 'single_multi';
+
     % ====================================================================
     %  FIGURE PRESETS. Each exists because one manuscript figure is
     %  DELIBERATELY a different network from the paper's operating point,
@@ -602,6 +672,7 @@ function names = srnn_param_preset_names()
 % The valid preset names, kept next to the switch above so they stay in sync.
 % Retired names are NOT here: they are a separate list with their own error.
 names = {'default', 'overconnected', ...
+    'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond', ...
     'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', ...
     'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond', ...
     ... % figure presets -- networks that are deliberately not the paper's

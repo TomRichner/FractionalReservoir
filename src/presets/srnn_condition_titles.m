@@ -20,9 +20,19 @@ function titles = srnn_condition_titles()
 % See also: srnn_adaptation_conditions, manuscript_style,
 %           ParamSpaceAnalysis2/plot_sensitivity
 
+% sfa1_std1 belongs to the 'single_multi' set: SFA and STD both present, one
+% timescale each. Read against its neighbours, "1 \tau each" is what
+% distinguishes it from sfa3_std1, which has one STD timescale but the full SFA
+% ladder.
+%
+% NOTE the 'single_multi' set's story is "none vs one timescale vs many", so a
+% figure using it may want its legend to read "Single Timescale" / "Multi
+% Timescale" instead. That would mean retitling sfa_and_std, which the 4- and
+% 7-regime sets share -- so it is a deliberate decision, not a local tweak, and
+% the accurate-and-consistent titles are what live here until it is made.
 titles = containers.Map( ...
     {'no_adaptation', 'sfa_only_oneTS', 'sfa_only', 'std_only_oneTS', ...
-     'std_only', 'sfa3_std1', 'sfa_and_std'}, ...
+     'std_only', 'sfa1_std1', 'sfa3_std1', 'sfa_and_std'}, ...
     {'No Adaptation', 'SFA (1 \tau)', 'SFA Only', 'STD (1 \tau)', ...
-     'STD Only', 'SFA + STD (1 \tau)', 'SFA + STD'});
+     'STD Only', 'SFA + STD (1 \tau each)', 'SFA + STD (1 \tau)', 'SFA + STD'});
 end
