@@ -56,8 +56,8 @@ function cfg = fast4_config(opts)
 arguments
     opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond'
     opts.run_mode    (1,:) char = 'fast'
-    opts.run_dir     (1,:) char = 'data/fast_4'
-    opts.fig_root    (1,:) char = 'figs/fast_4'
+    opts.run_dir     (1,:) char = 'data/fast_4_test'
+    opts.fig_root    (1,:) char = 'figs/fast_4_test'
 end
 
 cfg = paper_config( ...
