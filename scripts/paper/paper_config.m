@@ -82,6 +82,30 @@ arguments
     % saving), while run_dir must be empty. Figures are cheap and regenerable;
     % a run is hours of compute and is not silently mixed with another.
     opts.fig_root    (1,:) char = 'figs/paper'
+    % WHETHER FIGURES APPEAR ON SCREEN WHILE A RUN IS IN PROGRESS. Off by
+    % default, for both entry points, because a new figure window RAISES ITSELF
+    % AND TAKES KEYBOARD FOCUS -- so a run that draws a few dozen of them makes
+    % the machine unusable for as long as it lasts, which for 'production' is
+    % hours.
+    %
+    % Off costs nothing: every figure is still built, still saved, and still
+    % written to fig_root in every format. The only thing suppressed is the
+    % window, and a saved .fig reopens visible.
+    %
+    % Turn it ON when you are debugging ONE figure and want to watch it appear.
+    %
+    % HOW IT IS APPLIED. Both entry points hold a with_graphics_defaults
+    % onCleanup setting DefaultFigureVisible for the length of the run, so the
+    % session's own default is restored afterwards -- including on the error
+    % path. make_all_paper_figures also passes it as each figure's `visible`
+    % argument, which is the knob the fig_* contract already had; the root
+    % default is what additionally covers the sweep plots inside
+    % run_all_paper_analyses, which have no such argument.
+    %
+    % (Note the fig_* `visible` argument alone was NOT enough, and had in fact
+    % never worked end to end: save_some_figs_to_folder_2 wrapped every export
+    % in figure(i), which raises and un-hides. See its comment.)
+    opts.visible_figures (1,1) logical = false
 end
 
 cfg = struct();
@@ -89,6 +113,7 @@ cfg.preset_name = opts.preset_name;
 cfg.run_mode    = opts.run_mode;
 cfg.run_dir     = opts.run_dir;
 cfg.fig_root    = opts.fig_root;
+cfg.visible_figures = opts.visible_figures;
 
 % Presets for the figures that are deliberately different networks.
 % Memory capacity. Still its own preset -- the MC network is deliberately not

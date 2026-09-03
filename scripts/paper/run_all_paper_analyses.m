@@ -49,6 +49,24 @@ end
 setup_paths();
 if ~isstruct(cfg); error('run_all_paper_analyses:BadConfig', 'cfg must be a struct.'); end
 
+% KEEP THE SWEEP PLOTS OFF SCREEN unless asked otherwise (cfg.visible_figures,
+% default false). The sub-analyses plot and save at the end of each stage, and
+% each new window raises itself and takes keyboard focus -- so an unattended run
+% repeatedly interrupts whatever else is being done on the machine. The figures
+% are still drawn and still saved; only the window is suppressed.
+%
+% Unlike the figure entry point, there is no per-figure `visible` argument to
+% pass here: run_all_analyses' sub-analyses call psa.plot_sensitivity and friends
+% directly. The graphics-root default is what reaches them.
+%
+% with_graphics_defaults returns an onCleanup, so the session's own setting comes
+% back when this returns -- including if a stage throws past the wrapper. Held in
+% a variable that stays in scope for the whole function; do not clear it.
+visible_figures = isfield(cfg, 'visible_figures') && cfg.visible_figures;
+if ~visible_figures
+    fig_visibility = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
+end
+
 fprintf('\n========================================================\n');
 fprintf('PAPER ANALYSES\n');
 fprintf('  preset   : %s\n', cfg.preset_name);

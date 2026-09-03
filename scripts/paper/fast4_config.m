@@ -58,11 +58,16 @@ arguments
     opts.run_mode    (1,:) char = 'fast'
     opts.run_dir     (1,:) char = 'data/fast_4_test'
     opts.fig_root    (1,:) char = 'figs/fast_4_test'
+    % Off, like paper_config's own default: figures are built and saved but do
+    % not pop up and steal focus. Especially wanted here -- a smoke test is the
+    % run you are most likely to start and then carry on working through.
+    opts.visible_figures (1,1) logical = false
 end
 
 cfg = paper_config( ...
     'preset_name', opts.preset_name, ...
     'run_mode',    opts.run_mode, ...
     'run_dir',     opts.run_dir, ...
-    'fig_root',    opts.fig_root);
+    'fig_root',    opts.fig_root, ...
+    'visible_figures', opts.visible_figures);
 end

@@ -42,23 +42,48 @@ end
 % and rebuilding the same figure from the same saved data exports fine. So it is
 % neither a stale handle in this function nor a broken renderer nor anything
 % about the data. Until it is diagnosed, warn and carry on.
+% SAVING MUST NOT RAISE OR UNHIDE A FIGURE. exportgraphics needs a graphics
+% object, and fig_vec holds figure NUMBERS, so this used to bridge the gap with
+% figure(i). That is not a cast: figure(f) brings f above every other window,
+% takes keyboard focus, and sets Visible = 'on'. Three consequences, all real:
+%
+%   - a batch run stole focus once per figure per format, so the machine could
+%     not be used while it ran;
+%   - it silently DEFEATED the 'visible', false that make_all_paper_figures
+%     passes to every figure -- they were built hidden and then shown here;
+%   - if i was not an existing figure number, figure(i) CREATED an empty one and
+%     exported that, writing a blank file rather than reporting the mistake.
+%
+% findobj resolves the number to the handle without touching visibility or
+% stacking order. An unmatched number now errors into the catch below and is
+% reported, which is the behaviour the blank-file case should always have had.
 failed = {};
 for i=fig_vec
     try
-        set(i,'PaperPositionMode','auto')
+        fh = findobj(groot, 'Type', 'figure', 'Number', i);
+        if isempty(fh)
+            error('save_some_figs_to_folder_2:NoSuchFigure', ...
+                'No open figure numbered %d.', i);
+        end
+        fh = fh(1);
+        set(fh,'PaperPositionMode','auto')
         if any(strcmpi(fig_type,'fig'))
-            saveas(i, fullfile(save_folder, [save_name '_f_' num2str(i)]), 'fig');
+            saveas(fh, fullfile(save_folder, [save_name '_f_' num2str(i)]), 'fig');
         end
         if any(strcmpi(fig_type,'png'))
-            exportgraphics(figure(i), fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']), 'Resolution', 600)
+            exportgraphics(fh, fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']), 'Resolution', 600)
         end
         if any(strcmpi(fig_type,'svg'))
-            set(gcf, 'Renderer', 'painters');
-            exportgraphics(figure(i), fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']), 'BackgroundColor', 'none', 'ContentType', 'vector');
+            % Was set(gcf, ...), which targeted whatever figure happened to be
+            % current rather than fh. It worked only by accident: the png branch
+            % above had just raised fh with figure(i), making it current. With
+            % the raise gone that accident goes too, so the target is now named.
+            set(fh, 'Renderer', 'painters');
+            exportgraphics(fh, fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']), 'BackgroundColor', 'none', 'ContentType', 'vector');
         end
         if any(strcmpi(fig_type, 'pdf'))
             % Append to PDF report
-            exportgraphics(figure(i), pdf_file, 'Append', true, 'ContentType', 'vector');
+            exportgraphics(fh, pdf_file, 'Append', true, 'ContentType', 'vector');
         end
     catch save_err
         failed{end+1} = sprintf('%d (%s)', i, save_err.identifier); %#ok<AGROW>

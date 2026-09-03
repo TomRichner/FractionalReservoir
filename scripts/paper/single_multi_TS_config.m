@@ -65,11 +65,15 @@ arguments
     opts.run_mode    (1,:) char = 'fast'
     opts.run_dir     (1,:) char = 'data/single_multi_TS'
     opts.fig_root    (1,:) char = 'figs/single_multi_TS'
+    % Off, like paper_config's own default: figures are built and saved but do
+    % not pop up and steal focus.
+    opts.visible_figures (1,1) logical = false
 end
 
 cfg = paper_config( ...
     'preset_name', opts.preset_name, ...
     'run_mode',    opts.run_mode, ...
     'run_dir',     opts.run_dir, ...
-    'fig_root',    opts.fig_root);
+    'fig_root',    opts.fig_root, ...
+    'visible_figures', opts.visible_figures);
 end

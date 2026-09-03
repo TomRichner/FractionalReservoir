@@ -99,6 +99,24 @@ end
 if ~isfolder(fig_root); mkdir(fig_root); end
 fprintf('Figure root:   %s  (%s)\n', fig_root, root_mode);
 
+%% Keep the figures off screen unless asked otherwise
+% cfg.visible_figures, default false. Each entry is passed `visible` below --
+% that is the knob the fig_* contract already has -- but BOTH are needed:
+%
+%   the per-figure argument   covers the figure each fig_* creates itself
+%   the root default          covers everything else drawn during the pass --
+%                             the prep figures the replot_* helpers create and
+%                             do not return, and any plotting primitive that
+%                             calls figure() without asking
+%
+% with_graphics_defaults returns an onCleanup, so the session's own setting is
+% restored when this function returns, including on the error path. It must stay
+% in scope for the whole pass; do not clear it.
+visible_figures = isfield(cfg, 'visible_figures') && cfg.visible_figures;
+if ~visible_figures
+    fig_visibility = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
+end
+
 figs = cfg.figures;
 n = numel(figs);
 
@@ -117,7 +135,7 @@ for k = 1:n
     t0 = tic;
     try
         args = [{'run_dir', run_dir, 'out_dir', fullfile(fig_root, f.name), ...
-                 'save', true, 'visible', false}, f.args];
+                 'save', true, 'visible', visible_figures}, f.args];
         out  = call_figure(f.fn, args);
 
         n_files = numel(out.files);
