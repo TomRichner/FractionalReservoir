@@ -11,9 +11,11 @@
 % example that hardcodes the numbers instead would drift away from the sweeps
 % the moment any of them changed.
 %
-%   srnn_param_preset      the physics -- n, connectivity, nonlinearity, noise
+%   srnn_param_preset      the physics -- n, connectivity, nonlinearity, noise --
+%                          AND the adaptation conditions, its third output. It
+%                          used to delegate those to srnn_adaptation_conditions;
+%                          each preset now states its own regimes outright.
 %   analysis_run_config    the cost/fidelity knobs -- fs, T_range, integrator
-%   srnn_adaptation_conditions   which adaptation regime -- n_a, synapse_config
 %
 % They are combined here in the same precedence ParamSpaceAnalysis2 uses in
 % run_single_job: preset defaults first, run-mode timings over them, condition
@@ -21,7 +23,7 @@
 % and changing the sweep changes this too.
 %
 % See also: test_SRNN2_defaults, srnn_param_preset, analysis_run_config,
-%           srnn_adaptation_conditions, run_sensitivity_analysis
+%           run_sensitivity_analysis
 
 close all; clear; clc;
 

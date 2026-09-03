@@ -40,7 +40,7 @@ function values = log_ladder(lo, hi, n)
 % once inside log10() for the rest, so retuning the fast end would have missed
 % one. Here the n = 1 case IS lo, derived rather than restated.
 %
-% See also: logspace, srnn_param_preset, srnn_adaptation_conditions
+% See also: logspace, srnn_param_preset
 
 arguments
     lo (1,1) double {mustBePositive, mustBeFinite}

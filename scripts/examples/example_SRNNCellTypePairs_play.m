@@ -34,10 +34,12 @@
 %   srnn_param_preset            the physics -- n, connectivity, nonlinearity,
 %                                noise, and the STD routes
 %   analysis_run_config          the cost/fidelity knobs -- fs, T_range, solver
-%   srnn_adaptation_conditions   the adaptation regime -- n_a, synapse_config
+%                                -- AND the adaptation conditions, its third
+%                                output, now that each preset states its own
+%                                regimes rather than delegating them.
 %
 % See also: example_SRNNCellTypePairs_from_preset, srnn_param_preset,
-%           analysis_run_config, srnn_adaptation_conditions
+%           analysis_run_config, srnn_condition_titles
 
 close all; clear; clc;
 

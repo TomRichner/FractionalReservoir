@@ -17,7 +17,7 @@ function titles = srnn_condition_titles()
 % Callers should still guard with isKey() where a run may carry conditions this
 % does not know about -- a saved run directory can name anything.
 %
-% See also: srnn_adaptation_conditions, manuscript_style,
+% See also: srnn_param_preset, validate_preset_conditions, manuscript_style,
 %           ParamSpaceAnalysis2/plot_sensitivity
 
 % TWO TITLE VOCABULARIES, on purpose.

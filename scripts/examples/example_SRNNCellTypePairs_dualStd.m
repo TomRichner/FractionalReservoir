@@ -21,12 +21,14 @@
 % precedence ParamSpaceAnalysis2.run_single_job uses:
 %
 %   srnn_param_preset            the physics -- n, connectivity, nonlinearity,
-%                                noise, and the STD routes
+%                                noise, the STD routes -- AND the adaptation
+%                                conditions, its third output. Each preset now
+%                                states its own regimes rather than delegating
+%                                to the deleted srnn_adaptation_conditions.
 %   analysis_run_config          the cost/fidelity knobs -- fs, T_range, solver
-%   srnn_adaptation_conditions   the adaptation regime -- n_a, synapse_config
 %
 % See also: example_SRNNCellTypePairs_from_preset, srnn_param_preset,
-%           analysis_run_config, srnn_adaptation_conditions
+%           analysis_run_config
 
 close all; clear; clc;
 

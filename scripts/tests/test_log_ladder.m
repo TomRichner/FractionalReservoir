@@ -14,7 +14,7 @@
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths has run.
 %
-% See also: log_ladder, srnn_param_preset, srnn_adaptation_conditions
+% See also: log_ladder, srnn_param_preset
 
 all_passed = true;
 fprintf('\n=== test_log_ladder ===\n');

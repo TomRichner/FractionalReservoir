@@ -32,7 +32,7 @@ function mat_file = run_memory_capacity(opts)
 % different model class.
 %
 % See also: SRNN_ESN_reservoir, plot_memory_capacity, replot_memory_capacity,
-%           srnn_param_preset, srnn_adaptation_conditions, verify_shared_build
+%           srnn_param_preset, verify_shared_build
 
 arguments
     opts.preset_name            (1,:) char    = 'mc_pairs_dualStd'
@@ -85,7 +85,7 @@ timestamp = datestr(now, 'yyyymmdd_HHMMSS'); %#ok<TNOW1,DATST>
 run_tag = sprintf('MC_%s_%s_trials%d', cfg.input_type, timestamp, cfg.n_trials);
 
 %% Conditions
-% From srnn_adaptation_conditions, via the preset, rather than hardcoded here.
+% From the preset, which states its conditions itself, rather than hardcoded here.
 % They used to be four literal {'n_a_E', 0, 'n_b_E', 0} pairs, which was a
 % second definition of the four regimes and could drift from the sweeps'.
 %

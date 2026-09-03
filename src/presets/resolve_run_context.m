@@ -65,7 +65,7 @@ function ctx = resolve_run_context(analysis, opts)
 %                     scalar ALIAS onto a 1 x C row on the other, so the axis
 %                     name differs even though the quantity does not.
 %
-% See also: analysis_run_config, srnn_param_preset, srnn_adaptation_conditions,
+% See also: analysis_run_config, srnn_param_preset, validate_preset_conditions,
 %           merge_struct, run_all_analyses
 
 arguments

@@ -15,10 +15,31 @@ function [d, model_class, conditions] = srnn_param_preset(name)
 % 'celltype_pairs' is meaningless to SRNNModel2 -- so a preset that did not carry
 % its class would only fail later, inside validate_model_defaults.
 %
-% The third is srnn_adaptation_conditions(model_class) unless the preset needs
-% different depression routes. Those timescales are physics and would belong in
-% the struct above, except that synapse_config can only reach the model through
-% a condition -- so the preset passes them to srnn_adaptation_conditions instead.
+% The third is the ADAPTATION REGIMES, written out in full by each case. They
+% used to come from srnn_adaptation_conditions, which turned a regime-set NAME
+% ('standard' / 'timescales' / 'single_multi') into condition structs. Two
+% reasons that is gone:
+%
+%   * You could not read a preset and know what it did. The case stated the
+%     network in full but delegated the experiment, so understanding it meant
+%     opening another file, finding the right case, and tracing its locals.
+%   * It COUPLED presets that should be independent. Only two of ten named a
+%     regime set; the other eight inherited 'standard' by default, so editing
+%     that one case silently changed eight networks' experiments.
+%
+% A condition is a plain struct of model-property overrides plus a 'name'.
+% ParamSpaceAnalysis2.run_single_job appends every field except 'name' as a
+% constructor argument, after model_defaults and before the grid parameters, so
+% precedence is model_defaults < condition < grid by last-write-wins.
+%
+% Note struct('tau_a', {row}) needs the DOUBLE BRACE: struct() given a bare cell
+% builds one struct per cell entry, so the single-brace form silently produces a
+% struct ARRAY rather than a condition. validate_preset_conditions catches it.
+%
+% TITLES ARE NOT HERE. srnn_condition_titles maps a condition name to its display
+% text, which is what lets a saved run be retitled without recomputing it; a
+% title carried in the condition would be frozen into the run directory. The
+% validator requires every condition name to have an entry there.
 %
 % EVERY CASE IS SELF-CONTAINED. A preset states its own model_class, its own
 % complete override struct, and its own std_routes -- nothing is inherited from
@@ -44,8 +65,8 @@ function [d, model_class, conditions] = srnn_param_preset(name)
 %     knobs owned by run_mode, again via analysis_run_config. A preset that set
 %     them would silently redefine what 'fast' and 'production' mean.
 %   * n_a_E / n_a_I / n_b_E / n_b_I -- owned by the adaptation conditions, as
-%     are their SRNNCellTypePairs counterparts n_a and synapse_config. See
-%     srnn_adaptation_conditions.
+%     are their SRNNCellTypePairs counterparts tau_a and synapse_config. They
+%     appear in the `conditions` cell of each case, never in its `d` struct.
 %
 % The nonlinearity is named data (`activation` plus S_a/S_c), not a function
 % handle, so a preset cannot end up with a handle whose captured constants
@@ -58,54 +79,41 @@ function [d, model_class, conditions] = srnn_param_preset(name)
 % PSA per swept parameter, a preset carrying all three makes each 1-D sweep hold
 % the other two at this operating point rather than at class defaults.
 %
-% See also: analysis_run_config, merge_struct, srnn_adaptation_conditions,
-%           ParamSpaceAnalysis2, SRNNModel2, SRNNCellTypePairs
+% See also: analysis_run_config, merge_struct, validate_preset_conditions,
+%           srnn_condition_titles, ParamSpaceAnalysis2, SRNNModel2,
+%           SRNNCellTypePairs
 
 arguments
     name (1,:) char
 end
 
-% No default model_class. Every case names its own, so a new SRNNCellTypePairs
-% preset cannot silently inherit 'SRNNModel2' and fail much later inside
-% validate_model_defaults with a wall of "not a property" messages.
-std_routes     = [];    % [] = whatever srnn_adaptation_conditions defaults to
-sfa_timescales = []; %#ok<NASGU> -- a SENTINEL, and checkcode is right that every
-                        % case currently overwrites it. That is the point: it
-                        % exists so a case that FORGETS reaches the isempty()
-                        % guard after the switch and gets an error naming the
-                        % preset, instead of MATLAB's "Unrecognized function or
-                        % variable 'sfa_timescales'".
-                        % EVERY case must set this; see that check.
-                        % The adaptation timescales the SFA conditions switch on,
-                        % in seconds, normally log_ladder(lo, hi, K).
-                        %
-                        % NO SHARED DEFAULT, deliberately. This used to be a call
-                        % to srnn_sfa_timescales(3), so a preset that said nothing
-                        % inherited the paper's ladder. Timescales are PHYSICS,
-                        % and physics belongs in the preset that describes the
-                        % network -- every other physics value here is restated
-                        % per case, including the depression timescales, which
-                        % are the direct analogue. Three different ladders
-                        % already existed in the repo, so the shared default was
-                        % never the single source it looked like.
-                        %
-                        % tau_a itself must NOT appear in the `d` struct below:
-                        % it is condition-owned, exactly like synapse_config, and
-                        % a preset carrying it would be silently overridden by
-                        % whichever condition is applied (and warned about by
-                        % validate_model_defaults).
-regimes        = 'standard';
-                        % 'standard' = the four original regimes.
-                        % 'timescales' adds one-timescale variants, for a preset
-                        % that exists to compare timescale STRUCTURE. Costs 75%
-                        % more compute per sweep, so it is opt-in.
+% NO SHARED STATE ABOVE THE SWITCH, deliberately. Every case sets model_class, d
+% and conditions outright, so nothing a case does depends on a default declared
+% here. There used to be three such defaults -- std_routes, sfa_timescales and a
+% `regimes` name -- and the last of them was the coupling this file was
+% restructured to remove: eight of ten presets inherited regimes = 'standard'
+% without saying so, so editing that one case silently changed eight networks'
+% experiments.
+%
+% tau_a and synapse_config must NOT appear in the `d` struct of any case: they
+% are condition-owned, so a preset carrying them would be overridden by whichever
+% condition is applied, and warned about by validate_model_defaults.
 
 switch name
     case 'default'
         % Everything at SRNNModel2's class defaults.
         model_class = 'SRNNModel2';
         d = struct();
-        sfa_timescales = log_ladder(0.25, 10, 3);
+
+        % ADAPTATION REGIMES. SRNNModel2 speaks COUNTS -- set n_a_E and the class
+        % auto-fills tau_a_E as log_ladder(0.25, 10, n_a_E) -- where
+        % SRNNCellTypePairs states the timescales themselves. n_b_E = 1 depresses
+        % every OUTGOING excitatory synapse; this class cannot say "E->E only".
+        conditions = { ...
+            struct('name','no_adaptation', 'n_a_E',0, 'n_b_E',0), ...
+            struct('name','sfa_only',      'n_a_E',3, 'n_b_E',0), ...
+            struct('name','std_only',      'n_a_E',0, 'n_b_E',1), ...
+            struct('name','sfa_and_std',   'n_a_E',3, 'n_b_E',1) };
 
     case 'overconnected'
         % The parameter set from scripts/tests/test_SRNN2_defaults_overconnected.m:
@@ -126,7 +134,14 @@ switch name
             'c_E',                 1.0, ...   % TOTAL budget (was 1/3, hand-divided by n_a_E=3)
             'mu_E_tilde_relative',  3, ...   % class default
             'mu_I_tilde_relative', -6);      % class default -4; doubled, half as many I neurons
-        sfa_timescales = log_ladder(0.25, 10, 3);
+
+        % Three SFA timescales, auto-filled by the class from the count. See the
+        % 'default' case for why this class takes counts rather than timescales.
+        conditions = { ...
+            struct('name','no_adaptation', 'n_a_E',0, 'n_b_E',0), ...
+            struct('name','sfa_only',      'n_a_E',3, 'n_b_E',0), ...
+            struct('name','std_only',      'n_a_E',0, 'n_b_E',1), ...
+            struct('name','sfa_and_std',   'n_a_E',3, 'n_b_E',1) };
 
     case retired_presets()
         % THE EXPLORATORY celltype_pairs_* FAMILY, RETIRED 2026-08-25.
@@ -197,15 +212,28 @@ switch name
             'F_ref_indegree',       100, ...
             'sigma_u_noise',        0.025);
 
-        % SFA on the standard ladder: 3 timescales spanning 0.25 s to 10 s.
-        sfa_timescales = log_ladder(0.25, 10, 3);
+        % ADAPTATION REGIMES -- FOUR: none, SFA, STD, both.
+        %
+        % SFA on the standard ladder: 3 timescales spanning 0.25 s to 10 s, on
+        % the FIRST cell type (E) only. c is the TOTAL budget and the model
+        % divides by the timescale count, so the number of timescales changes
+        % the structure of adaptation without changing its strength.
+        taus    = log_ladder(0.25, 10, 3);
+        sfa_off = {zeros(1,0), zeros(1,0)};   % tau_a: no SFA on either type
+        sfa_on  = {taus,       zeros(1,0)};   % tau_a: SFA on E, none on I
 
-        std_routes = struct();
+        % Dual-timescale depression on ALL FOUR routes.
         dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
-        std_routes.E.E.std = dual_std;
-        std_routes.E.I.std = dual_std;
-        std_routes.I.E.std = dual_std;
-        std_routes.I.I.std = dual_std;
+        std_on  = struct();
+        std_on.E.E.std = dual_std;   std_on.E.I.std = dual_std;
+        std_on.I.E.std = dual_std;   std_on.I.I.std = dual_std;
+        std_off = struct();                   % no routes: no b states are created
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa_only',      'tau_a',{sfa_on},  'synapse_config',std_off), ...
+            struct('name','std_only',      'tau_a',{sfa_off}, 'synapse_config',std_on), ...
+            struct('name','sfa_and_std',   'tau_a',{sfa_on},  'synapse_config',std_on) };
 
     case 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
         % THE PAPER'S NETWORK, seven adaptation regimes. THE MAIN PRESET.
@@ -256,20 +284,42 @@ switch name
             'F_ref_indegree',       100, ...
             'sigma_u_noise',        0.025);
 
-        % SFA on the standard ladder: 3 timescales spanning 0.25 s to 10 s.
-        % sfa_only_oneTS takes the FIRST of these, so the fast end is what the
-        % one-timescale SFA regime runs.
-        sfa_timescales = log_ladder(0.25, 10, 3);
+        % ADAPTATION REGIMES -- SEVEN. Each mechanism appears at one timescale
+        % and at many, so timescale STRUCTURE varies independently of strength.
+        %
+        % SFA on the standard ladder, on the FIRST cell type (E) only. The
+        % one-timescale variant takes the FIRST entry -- 0.25 s, the fast end.
+        taus     = log_ladder(0.25, 10, 3);
+        sfa_off  = {zeros(1,0), zeros(1,0)};   % tau_a: no SFA on either type
+        sfa_one  = {taus(1),    zeros(1,0)};   % tau_a: one timescale, E only
+        sfa_all  = {taus,       zeros(1,0)};   % tau_a: all three, E only
 
-        % The one-timescale regimes take their route from these by keeping the
-        % FIRST tau_rec/tau_rel pair, so they cannot describe an older network.
-        std_routes = struct();
-        dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
-        std_routes.E.E.std = dual_std;
-        std_routes.E.I.std = dual_std;
-        std_routes.I.E.std = dual_std;
-        std_routes.I.I.std = dual_std;
-        regimes = 'timescales';
+        % Dual-timescale depression on all four routes, and the one-timescale
+        % version DERIVED from it by keeping the first tau_rec/tau_rel pair --
+        % derived, not restated, so retuning the depression cannot leave the
+        % _oneTS regimes describing an older network.
+        dual_std   = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        single_std = struct('tau_rec', dual_std.tau_rec(1), ...
+                            'tau_rel', dual_std.tau_rel(1));
+        std_all = struct();
+        std_all.E.E.std = dual_std;     std_all.E.I.std = dual_std;
+        std_all.I.E.std = dual_std;     std_all.I.I.std = dual_std;
+        std_one = struct();
+        std_one.E.E.std = single_std;   std_one.E.I.std = single_std;
+        std_one.I.E.std = single_std;   std_one.I.I.std = single_std;
+        std_off = struct();                    % no routes
+
+        % Ordered so each mechanism goes one-timescale then multi-timescale, and
+        % the combined regimes go STD-1 then STD-all. This is the column order of
+        % every sweep figure.
+        conditions = { ...
+            struct('name','no_adaptation',  'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa_only_oneTS', 'tau_a',{sfa_one}, 'synapse_config',std_off), ...
+            struct('name','sfa_only',       'tau_a',{sfa_all}, 'synapse_config',std_off), ...
+            struct('name','std_only_oneTS', 'tau_a',{sfa_off}, 'synapse_config',std_one), ...
+            struct('name','std_only',       'tau_a',{sfa_off}, 'synapse_config',std_all), ...
+            struct('name','sfa3_std1',      'tau_a',{sfa_all}, 'synapse_config',std_one), ...
+            struct('name','sfa_and_std',    'tau_a',{sfa_all}, 'synapse_config',std_all) };
 
     case 'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond'
         % THE PAPER'S NETWORK, three adaptation regimes: none / one timescale /
@@ -340,20 +390,43 @@ switch name
             'F_ref_indegree',       100, ...
             'sigma_u_noise',        0.025);
 
-        % SFA on the standard ladder: 3 timescales spanning 0.25 s to 10 s.
-        % sfa1_std1 takes the FIRST of these -- 0.25 s, the fast end -- which is
-        % the whole content of the single-timescale regime.
-        sfa_timescales = log_ladder(0.25, 10, 3);
+        % ADAPTATION REGIMES -- THREE: none, one timescale each, many each.
+        % Both mechanisms are always present together; the only thing varying is
+        % HOW MANY timescales carry them. Isolating SFA from STD is what the
+        % 7-condition preset does, and is a separate question.
+        %
+        % SFA on the standard ladder, E only; the single-timescale regime takes
+        % the FIRST entry -- 0.25 s, the fast end.
+        taus     = log_ladder(0.25, 10, 3);
+        sfa_off  = {zeros(1,0), zeros(1,0)};   % tau_a: no SFA on either type
+        sfa_one  = {taus(1),    zeros(1,0)};   % tau_a: one timescale, E only
+        sfa_all  = {taus,       zeros(1,0)};   % tau_a: all three, E only
 
-        % sfa1_std1 takes its route from these by keeping the FIRST
-        % tau_rec/tau_rel pair, so it cannot describe an older network.
-        std_routes = struct();
-        dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
-        std_routes.E.E.std = dual_std;
-        std_routes.E.I.std = dual_std;
-        std_routes.I.E.std = dual_std;
-        std_routes.I.I.std = dual_std;
-        regimes = 'single_multi';
+        % Dual-timescale depression on all four routes, with the single-timescale
+        % version DERIVED from it rather than restated, so retuning the
+        % depression cannot leave sfa1_std1 describing an older network.
+        dual_std   = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        single_std = struct('tau_rec', dual_std.tau_rec(1), ...
+                            'tau_rel', dual_std.tau_rel(1));
+        std_all = struct();
+        std_all.E.E.std = dual_std;     std_all.E.I.std = dual_std;
+        std_all.I.E.std = dual_std;     std_all.I.I.std = dual_std;
+        std_one = struct();
+        std_one.E.E.std = single_std;   std_one.E.I.std = single_std;
+        std_one.I.E.std = single_std;   std_one.I.I.std = single_std;
+        std_off = struct();                    % no routes
+
+        % sfa3_std2 is PHYSICALLY IDENTICAL to the 4- and 7-condition presets'
+        % sfa_and_std -- the full ladder and the full routes. It carries its own
+        % name because here the timescale COUNT is the whole content of the
+        % comparison, and because srnn_condition_titles keys on the name: this is
+        % what lets this set read "Multiple-Timescale Adaptation" while the other
+        % sets keep calling their copy "SFA + STD". A human lining up a 3- and a
+        % 7-condition run has to know they are the same regime.
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
+            struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
 
     % ====================================================================
     %  FIGURE PRESETS. Each exists because one manuscript figure is
@@ -409,17 +482,27 @@ switch name
             'S_c',                  0.5, ...
             'tau_d',                0.1, ...
             'c',                    [0.5, 0]);          % TOTAL SFA budget, E only
-        % The paper's standard ladder, as in the source script.
-        sfa_timescales = log_ladder(0.25, 10, 3);
+        % ADAPTATION REGIMES -- four. The paper's standard ladder, as in the
+        % source script, on the FIRST cell type (E) only.
+        taus    = log_ladder(0.25, 10, 3);
+        sfa_off = {zeros(1,0), zeros(1,0)};
+        sfa_on  = {taus,       zeros(1,0)};
 
-        % STD on E->E only. SRNNModel2's n_b_E = 1 depresses every OUTGOING
+        % STD on E->E and E->I. SRNNModel2's n_b_E = 1 depresses every OUTGOING
         % excitatory synapse, i.e. E->E and E->I alike; the source script had
-        % n_b_I = 0, so I synapses did not depress. E->E and E->I with the same
-        % constants is the faithful translation.
-        std_routes = struct();
+        % n_b_I = 0, so I synapses did not depress. Naming both E routes and
+        % neither I route is the faithful translation.
         bursting_std = struct('tau_rec', 1, 'tau_rel', 0.25);
-        std_routes.E.E.std = bursting_std;
-        std_routes.E.I.std = bursting_std;
+        std_on  = struct();
+        std_on.E.E.std = bursting_std;
+        std_on.E.I.std = bursting_std;
+        std_off = struct();                   % no routes
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa_only',      'tau_a',{sfa_on},  'synapse_config',std_off), ...
+            struct('name','std_only',      'tau_a',{sfa_off}, 'synapse_config',std_on), ...
+            struct('name','sfa_and_std',   'tau_a',{sfa_on},  'synapse_config',std_on) };
 
     case 'sompolinsky_pairs'
         % The Sompolinsky-Crisanti-Sommers (1988) reproduction behind Figure 1
@@ -468,13 +551,25 @@ switch name
             'tau_d',                1.0, ...
             'c',                    0, ...            % no SFA
             'x0_std',               1.0);             % visible relaxation in the stable panel
-        % Stated for completeness only: c = 0, so no condition here adapts
-        % whatever timescales it is handed. The standard ladder keeps the value
-        % honest rather than arbitrary.
-        sfa_timescales = log_ladder(0.25, 10, 3);
+        % ADAPTATION REGIMES -- four by name, TWO by physics. This network has
+        % c = 0 and no synaptic routes at all, so nothing here actually adapts:
+        % std_only is identical to no_adaptation, and sfa_and_std to sfa_only.
+        % That is correct for a bare random network and is what the figure wants
+        % -- the four names are kept so the condition-keyed plotters and the
+        % run-directory layout match every other preset. The timescales are
+        % stated for completeness; c = 0 means they never take effect.
+        %
+        % ONE cell type, so the tau_a rows have ONE entry, not two.
+        taus    = log_ladder(0.25, 10, 3);
+        sfa_off = {zeros(1,0)};
+        sfa_on  = {taus};
+        no_syn  = struct();                   % no routes; this network has none
 
-        % No synapses depress or facilitate: this is the bare random network.
-        std_routes = struct();
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',no_syn), ...
+            struct('name','sfa_only',      'tau_a',{sfa_on},  'synapse_config',no_syn), ...
+            struct('name','std_only',      'tau_a',{sfa_off}, 'synapse_config',no_syn), ...
+            struct('name','sfa_and_std',   'tau_a',{sfa_on},  'synapse_config',no_syn) };
 
     case 'single_neuron_stf'
         % The SFA / STD / STF single-neuron methods figure
@@ -549,12 +644,25 @@ switch name
         % ONE exaggerated 3 s timescale, not a ladder -- so log_ladder is not
         % what this wants. The figure shows a single unconnected neuron, and a
         % slow constant is what makes the rate decay legible on one trace.
-        sfa_timescales = 3;
-        % Both mechanisms on the E->E route. The figure switches them on and off
-        % per column; these are the timescales it switches ON.
-        std_routes = struct();
-        std_routes.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.3);
-        std_routes.E.E.stf = struct('tau_dec', 6, 'tau_fac', 2.5, 'G', 1/0.35);
+        %
+        % ONE cell type, so the tau_a rows have ONE entry.
+        sfa_off = {zeros(1,0)};
+        sfa_on  = {3};
+
+        % BOTH mechanisms live on the one E->E route, so the STD regimes below
+        % switch on depression AND facilitation together -- this preset's route
+        % carries an stf block where every other preset's carries only std. The
+        % figure is about all three mechanisms; it switches them per column.
+        syn_on = struct();
+        syn_on.E.E.std = struct('tau_rec', 2, 'tau_rel', 0.3);
+        syn_on.E.E.stf = struct('tau_dec', 6, 'tau_fac', 2.5, 'G', 1/0.35);
+        syn_off = struct();                   % no routes
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',syn_off), ...
+            struct('name','sfa_only',      'tau_a',{sfa_on},  'synapse_config',syn_off), ...
+            struct('name','std_only',      'tau_a',{sfa_off}, 'synapse_config',syn_on), ...
+            struct('name','sfa_and_std',   'tau_a',{sfa_on},  'synapse_config',syn_on) };
 
     case 'single_neuron_dualStd'
         % The SFA / STD single-neuron methods figure (fig_adaptation_methods
@@ -614,13 +722,25 @@ switch name
             'c',                    0.5, ...    % TOTAL SFA budget
             'x0_std',               0, ...      % deterministic x(0) = 0
             'sigma_u_noise',        0.025);
+        % ADAPTATION REGIMES -- four, the columns of the figure.
+        %
         % All three of the paper's SFA timescales -- unlike single_neuron_stf,
         % which exaggerates a single one so the decay is legible on one trace.
-        sfa_timescales = log_ladder(0.25, 10, 3);
+        % ONE cell type, so the tau_a rows have ONE entry.
+        taus    = log_ladder(0.25, 10, 3);
+        sfa_off = {zeros(1,0)};
+        sfa_on  = {taus};
 
         % The paper's dual depression, on the one route this network has.
-        std_routes = struct();
-        std_routes.E.E.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        std_on  = struct();
+        std_on.E.E.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        std_off = struct();                   % no routes
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa_only',      'tau_a',{sfa_on},  'synapse_config',std_off), ...
+            struct('name','std_only',      'tau_a',{sfa_off}, 'synapse_config',std_on), ...
+            struct('name','sfa_and_std',   'tau_a',{sfa_on},  'synapse_config',std_on) };
 
     case 'mc_pairs_dualStd'
         % The memory-capacity network, on SRNNCellTypePairs.
@@ -671,18 +791,30 @@ switch name
             'std_zero_floor',       false, ...
             'sigma_u_noise',        0);
 
+        % ADAPTATION REGIMES -- four, the conditions memory capacity is measured
+        % under.
+        %
         % A DIFFERENT LADDER from the paper's 0.25-10: this one starts at 0.1 s,
         % carried over from mc_esn. Presets state their own timescales precisely
         % so a second ladder like this is visible here rather than hidden behind
         % a shared default that only ever described the first one.
-        sfa_timescales = log_ladder(0.1, 10, 3);
+        taus    = log_ladder(0.1, 10, 3);
+        sfa_off = {zeros(1,0), zeros(1,0)};
+        sfa_on  = {taus,       zeros(1,0)};   % SFA on E only
 
-        std_routes = struct();
+        % Dual depression on ALL FOUR routes -- see the note above on why the
+        % 'synaptic' readout needs every outgoing route of a type to match.
         mc_dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
-        std_routes.E.E.std = mc_dual_std;
-        std_routes.E.I.std = mc_dual_std;
-        std_routes.I.E.std = mc_dual_std;
-        std_routes.I.I.std = mc_dual_std;
+        std_on  = struct();
+        std_on.E.E.std = mc_dual_std;   std_on.E.I.std = mc_dual_std;
+        std_on.I.E.std = mc_dual_std;   std_on.I.I.std = mc_dual_std;
+        std_off = struct();                   % no routes
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa_only',      'tau_a',{sfa_on},  'synapse_config',std_off), ...
+            struct('name','std_only',      'tau_a',{sfa_off}, 'synapse_config',std_on), ...
+            struct('name','sfa_and_std',   'tau_a',{sfa_on},  'synapse_config',std_on) };
 
     otherwise
         error('srnn_param_preset:UnknownPreset', ...
@@ -690,35 +822,20 @@ switch name
             name, strjoin(srnn_param_preset_names(), ', '));
 end
 
-% std_routes stays [] for a preset that wants the default routes;
-% srnn_adaptation_conditions reads [] as "use your own default", so the default
-% lives in exactly one place rather than being restated here.
-%
-% The cell-type count comes from n_cellTypes, which every SRNNCellTypePairs
-% preset states explicitly, and NOT from numel(d.f): the 'default' preset has no
-% f field at all, so that would throw. SRNNModel2 presets have no n_cellTypes
-% and take the 2 that class is fixed at.
-if isfield(d, 'n_cellTypes')
-    n_cell_types = d.n_cellTypes;
-else
-    n_cell_types = 2;
+% A case that forgets its conditions fails HERE, with its own name, rather than
+% returning an undefined variable's error from MATLAB. Every case sets them.
+if ~exist('conditions', 'var')
+    error('srnn_param_preset:NoConditions', ...
+        ['Preset ''%s'' does not set conditions. Every preset states its own ' ...
+         'adaptation regimes in full -- see any case above -- because they are ' ...
+         'part of what the preset IS, not a set looked up elsewhere.'], name);
 end
 
-% Every case states its own ladder, so a new preset that forgets fails HERE with
-% its own name rather than silently adopting whatever the last shared default
-% happened to be. That silent adoption is the failure this replaced: presets
-% inherited log_ladder(0.25, 10, 3) without saying so, while two of them already
-% used different ladders.
-if isempty(sfa_timescales)
-    error('srnn_param_preset:NoSfaTimescales', ...
-        ['Preset ''%s'' does not set sfa_timescales. Every preset states its ' ...
-         'own adaptation timescales -- normally log_ladder(lo, hi, K) -- ' ...
-         'because they are physics and physics lives in the preset.'], name);
-end
-
-conditions = srnn_adaptation_conditions(model_class, ...
-    'synapse_config', std_routes, 'sfa_timescales', sfa_timescales, ...
-    'n_cell_types', n_cell_types, 'regimes', regimes);
+% Checked here so a malformed set fails in THIS file, at edit time, rather than
+% inside a parfor worker mid-sweep -- which is where a bad condition field
+% surfaced before, since ParamSpaceAnalysis2 validates model_defaults and grid
+% axes up front but leaves condition fields to the model constructor.
+validate_preset_conditions(conditions, model_class, name);
 end
 
 function names = retired_presets()

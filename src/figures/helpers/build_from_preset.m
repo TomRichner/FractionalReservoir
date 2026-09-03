@@ -36,7 +36,7 @@ function [model, info] = build_from_preset(preset_name, condition_name, varargin
 %    built from the preset ALONE has no adaptation at all. Naming a condition is
 %    not optional decoration.
 %
-% See also: srnn_param_preset, srnn_adaptation_conditions, struct2namevalue
+% See also: srnn_param_preset, struct2namevalue
 
 arguments
     preset_name    (1,:) char

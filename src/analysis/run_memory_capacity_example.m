@@ -97,7 +97,7 @@ base_args = [ ...
      'T_test',     round(T_test_sec  * fs), ...
      'd_max',      round(d_max_sec   * fs)}];
 
-% From the preset, via srnn_adaptation_conditions -- the same four the ensemble
+% From the preset, which states them itself -- the same four the ensemble
 % run uses, under the project's snake_case names. srnn_condition_titles supplies
 % display text at plot time.
 condition_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);

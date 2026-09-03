@@ -29,7 +29,7 @@ function md_path = write_run_parameters_md(run_dir)
 % end of run_all_analyses where a failure must not obscure finished compute.
 %
 % See also: run_all_analyses, srnn_param_preset, analysis_run_config,
-%           srnn_adaptation_conditions, ParamSpaceAnalysis2
+%           validate_preset_conditions, ParamSpaceAnalysis2
 
 arguments
     run_dir (1,:) char

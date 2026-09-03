@@ -10,7 +10,7 @@
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths has run.
 %
-% See also: SRNNCellTypePairs, log_ladder, srnn_adaptation_conditions
+% See also: SRNNCellTypePairs, log_ladder, srnn_param_preset
 
 all_passed = true;
 
@@ -68,7 +68,9 @@ all_passed = check('a negative timescale is rejected', ...
 
 %% Conditions no longer carry n_a at all
 fprintf('\n-- conditions --\n');
-cond = srnn_adaptation_conditions('SRNNCellTypePairs');
+% From a preset, since srnn_adaptation_conditions is gone: presets state their
+% own conditions, so that is where the shape of a condition is now decided.
+[~, ~, cond] = srnn_param_preset('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond');
 all_passed = check('no condition sets n_a', ...
     ~any(cellfun(@(c) isfield(c, 'n_a'), cond))) && all_passed;
 all_passed = check('every condition sets tau_a', ...

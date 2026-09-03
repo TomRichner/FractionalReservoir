@@ -33,7 +33,7 @@ function out = fig_STD_steady_state(cfg)
 % synapse_config can only reach the model through a condition, so that is where
 % a preset puts its depression routes -- never in the model_defaults struct.
 %
-% See also: fig_SFA_steady_state, srnn_param_preset, srnn_adaptation_conditions
+% See also: fig_SFA_steady_state, srnn_param_preset
 
 arguments
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'

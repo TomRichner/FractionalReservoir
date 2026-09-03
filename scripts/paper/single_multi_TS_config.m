@@ -58,7 +58,7 @@ function cfg = single_multi_TS_config(opts)
 % this, not a reason not to.
 %
 % See also: paper_config, fast4_config, single_multi_TS_run,
-%           srnn_adaptation_conditions, srnn_param_preset
+%           srnn_condition_titles, srnn_param_preset
 
 arguments
     opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond'
