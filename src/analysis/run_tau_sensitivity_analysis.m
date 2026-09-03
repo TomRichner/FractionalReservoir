@@ -9,10 +9,44 @@ function out_dir = run_tau_sensitivity_analysis(ctx)
 %
 % ctx comes from resolve_run_context('tau_sensitivity', ...).
 %
+% WHY ONE CONDITION, AND WHAT THAT COSTS -- three limitations that are all the
+% same underlying fact: a VECTOR grid parameter is configured once per PSA,
+% while the number of SFA timescales is a property of each CONDITION.
+%
+%   1. n_elements IS PER-SWEEP, NOT PER-CONDITION. add_vector_parameter takes a
+%      single n_elements for the whole run, so a sweep spanning regimes with
+%      DIFFERENT timescale counts -- comparing one-timescale against
+%      three-timescale adaptation while varying tau, say -- is not expressible.
+%      That is why this filters to sfa_and_std rather than sweeping the whole
+%      condition set.
+%
+%   2. THE GRID OVERRIDES THE CONDITION, silently. Precedence in run_single_job
+%      is model_defaults < condition < grid, and tau_a_E's setter writes
+%      tau_a{1} outright. So running this against a multi-condition set would
+%      hand no_adaptation a three-element tau_a and collapse every regime into
+%      the same one, with nothing reporting it. The single-condition filter is
+%      what prevents that, not a check.
+%
+%   3. n_elements = 3 IS COUPLED BY HAND to the condition's ladder (see the
+%      comment at the add_vector_parameter call). Nothing verifies the two
+%      agree. Since presets now state their own log_ladder(lo, hi, K), a preset
+%      retuned to K = 2 would leave this sweep imposing three timescales on a
+%      two-timescale regime -- and c/K keeps the TOTAL adaptation right, so even
+%      the firing rates would look plausible. If you change a preset's ladder,
+%      change n_elements below to match.
+%
+% A FOURTH, currently unreachable: with vary_element = 'first' AND
+% n_elements = 1, ParamSpaceAnalysis2 builds the vector with
+% logspace(start, end, 1), which returns END -- the fixed value -- so the swept
+% axis would have no effect and every grid point would be identical. This sweep
+% uses 'last', where logspace returns the varied value and the behaviour is
+% correct. log_ladder is the fix if that configuration is ever wanted.
+%
 % WAS A SCRIPT reading the master_* base-workspace protocol; see
 % resolve_run_context.
 %
-% See also: resolve_run_context, ParamSpaceAnalysis2, run_all_analyses
+% See also: resolve_run_context, ParamSpaceAnalysis2, run_all_analyses,
+%           log_ladder, srnn_param_preset
 
 arguments
     ctx struct = resolve_run_context('tau_sensitivity')
