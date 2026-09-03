@@ -14,6 +14,96 @@ and session that wrote it. Newest first.
 
 ---
 
+## Presets should write out their conditions, not name a regime set
+
+| | |
+|---|---|
+| Noted | 2026-09-03 · `refactorRunAll` @ `f570cf3` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Raised by | TR, after tracing where `sfa1_std1` and `sfa3_std2` are actually defined for the 3-condition preset |
+| Status | **Recorded, not implemented.** Architecture; no science changes. Separable from the `log_ladder` work. |
+
+### How it works now
+
+Every `srnn_param_preset` case sets five locals — `d`, `model_class`,
+`std_routes`, `sfa_timescales`, `regimes` — and then **one** call at the bottom
+of the file (`srnn_param_preset.m:657`) expands them:
+
+```matlab
+conditions = srnn_adaptation_conditions(model_class, ...
+    'synapse_config', std_routes, 'sfa_timescales', sfa_timescales, ...
+    'n_cell_types', n_cell_types, 'regimes', regimes);
+```
+
+So a preset never names its conditions. It names a regime **set**
+(`'standard'` / `'timescales'` / `'single_multi'`), and
+`srnn_adaptation_conditions` turns that into the named structs. Answering "what
+is `sfa1_std1`?" means reading the preset for the ladder and routes, then the
+other file for how they are combined — four hops.
+
+### What is genuinely good about it, and must survive any change
+
+- **The one-timescale regimes are DERIVED.** `first_timescale_routes(sc)` keeps
+  each route's first `tau_rec`/`tau_rel` pair, so retuning a preset's depression
+  updates its `_oneTS` regimes automatically. Written out per preset, that
+  derivation would be duplicated and would drift — which is the exact failure
+  this repo keeps paying for.
+- **A regime name means one thing everywhere.** `no_adaptation` is identical
+  across all three sets, and `sfa3_std2` is asserted byte-identical to
+  `sfa_and_std`. Two commits (`6201b2f`, `f570cf3`) went out of their way to
+  keep that true.
+
+### What is awkward
+
+- **The physics is split across two files.** The preset owns the ingredients
+  (routes, ladder); the other file owns the recipes.
+- **Three locals exist only to feed one call.** `std_routes`, `sfa_timescales`
+  and `regimes` are not network physics in the `d` sense — they are arguments to
+  a factory that happens to live at the bottom of the file.
+- **It creates a trap the structure does not enforce.** `tau_a` and
+  `synapse_config` must NOT appear in `d`: they are condition-owned, and a
+  preset carrying them would be silently overridden by whichever condition is
+  applied. That is documented at `srnn_param_preset.m:77-81`, but it is a rule
+  you have to know rather than one the shape prevents.
+
+### The alternative TR wants
+
+One helper builds ONE condition; the preset composes them, so it reads
+self-contained:
+
+```matlab
+conditions = { ...
+    adaptation_regime('no_adaptation'), ...
+    adaptation_regime('sfa1_std1', 'tau_a', log_ladder(0.25, 10, 1), 'std', std_1), ...
+    adaptation_regime('sfa3_std2', 'tau_a', log_ladder(0.25, 10, 3), 'std', std_2) };
+```
+
+Physics stays in the preset, boilerplate stays shared. This is the same
+independence argument that decided the `log_ladder` change: presets should
+restate rather than inherit, because a preset is where a network is described.
+
+### What it costs, and the question to answer first
+
+- **All ten presets get rewritten**, plus the regime-set machinery deleted or
+  reduced to condition builders.
+- **"`sfa_only` means the same thing everywhere" becomes a CONVENTION rather
+  than a mechanism.** Today it is guaranteed by construction. After, it is
+  guaranteed by whoever writes the next preset — so the guarantee should move
+  into a test that compares regimes of the same name across every preset.
+- **The `_oneTS` derivation has to keep working.** If a preset writes out
+  `std_1` by hand, it can drift from `std_2`. The builder should derive it
+  (`first_timescale_routes`) rather than let the preset restate it — otherwise
+  this trades one duplication for a worse one.
+
+That last point is the real design question: how much does the preset spell out,
+and how much does the builder still derive? Composing from
+`log_ladder(0.25, 10, 1)` and a derived `std_1` is probably the line — the
+preset states the ENDPOINTS and the COUNT, the builder handles the shapes.
+
+Related: [[use-c-for-cell-type-count]] is the other naming/structure cleanup
+waiting on a deliberate pass.
+
+---
+
 ## CLAUDE.md leaves the impression that the paper's STD is on E→E and I→I; it is on all four routes
 
 | | |
