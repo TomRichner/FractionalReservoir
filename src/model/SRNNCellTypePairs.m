@@ -897,7 +897,7 @@ classdef SRNNCellTypePairs < handle
             % auto-filled from a count: the count is now derived from it, and
             % inventing timescales from an integer is what this refactor
             % removed. A caller that wants the standard ladder asks for it by
-            % name -- srnn_sfa_timescales(K) -- which is also what every
+            % name -- log_ladder(0.25, 10, K) -- which is also what every
             % adaptation condition does.
             %
             % A numeric tau_a is accepted for the C = 1 convenience of writing

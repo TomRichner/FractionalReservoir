@@ -10,17 +10,17 @@
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths has run.
 %
-% See also: SRNNCellTypePairs, srnn_sfa_timescales, srnn_adaptation_conditions
+% See also: SRNNCellTypePairs, log_ladder, srnn_adaptation_conditions
 
 all_passed = true;
 
 %% n_a tracks tau_a
 fprintf('\n-- n_a is derived from tau_a --\n');
-m = pairs_model({srnn_sfa_timescales(3), zeros(1,0)});
+m = pairs_model({log_ladder(0.25, 10, 3), zeros(1,0)});
 all_passed = check('n_a = [3 0] from a 3-element ladder', ...
     isequal(m.n_a, [3 0])) && all_passed;
 
-m2 = pairs_model({srnn_sfa_timescales(2), srnn_sfa_timescales(1)});
+m2 = pairs_model({log_ladder(0.25, 10, 2), log_ladder(0.25, 10, 1)});
 all_passed = check('n_a = [2 1] from [2-ladder, 1-ladder]', ...
     isequal(m2.n_a, [2 1])) && all_passed;
 
@@ -60,7 +60,7 @@ fprintf('\n-- validation --\n');
 all_passed = check('a non-cell tau_a is rejected', ...
     throws_id(@() pairs_model(3), 'SRNNCellTypePairs:InvalidParams')) && all_passed;
 all_passed = check('a wrong-length tau_a is rejected', ...
-    throws_id(@() pairs_model({srnn_sfa_timescales(3)}), ...
+    throws_id(@() pairs_model({log_ladder(0.25, 10, 3)}), ...
               'SRNNCellTypePairs:InvalidParams')) && all_passed;
 all_passed = check('a negative timescale is rejected', ...
     throws_id(@() pairs_model({[-1 2], zeros(1,0)}), ...

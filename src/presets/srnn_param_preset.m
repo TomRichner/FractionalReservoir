@@ -69,10 +69,25 @@ end
 % preset cannot silently inherit 'SRNNModel2' and fail much later inside
 % validate_model_defaults with a wall of "not a property" messages.
 std_routes     = [];    % [] = whatever srnn_adaptation_conditions defaults to
-sfa_timescales = srnn_sfa_timescales(3);
+sfa_timescales = []; %#ok<NASGU> -- a SENTINEL, and checkcode is right that every
+                        % case currently overwrites it. That is the point: it
+                        % exists so a case that FORGETS reaches the isempty()
+                        % guard after the switch and gets an error naming the
+                        % preset, instead of MATLAB's "Unrecognized function or
+                        % variable 'sfa_timescales'".
+                        % EVERY case must set this; see that check.
                         % The adaptation timescales the SFA conditions switch on,
-                        % in seconds. Override for a preset that adapts on
-                        % something other than the paper's standard ladder.
+                        % in seconds, normally log_ladder(lo, hi, K).
+                        %
+                        % NO SHARED DEFAULT, deliberately. This used to be a call
+                        % to srnn_sfa_timescales(3), so a preset that said nothing
+                        % inherited the paper's ladder. Timescales are PHYSICS,
+                        % and physics belongs in the preset that describes the
+                        % network -- every other physics value here is restated
+                        % per case, including the depression timescales, which
+                        % are the direct analogue. Three different ladders
+                        % already existed in the repo, so the shared default was
+                        % never the single source it looked like.
                         %
                         % tau_a itself must NOT appear in the `d` struct below:
                         % it is condition-owned, exactly like synapse_config, and
@@ -90,6 +105,7 @@ switch name
         % Everything at SRNNModel2's class defaults.
         model_class = 'SRNNModel2';
         d = struct();
+        sfa_timescales = log_ladder(0.25, 10, 3);
 
     case 'overconnected'
         % The parameter set from scripts/tests/test_SRNN2_defaults_overconnected.m:
@@ -110,6 +126,7 @@ switch name
             'c_E',                 1.0, ...   % TOTAL budget (was 1/3, hand-divided by n_a_E=3)
             'mu_E_tilde_relative',  3, ...   % class default
             'mu_I_tilde_relative', -6);      % class default -4; doubled, half as many I neurons
+        sfa_timescales = log_ladder(0.25, 10, 3);
 
     case retired_presets()
         % THE EXPLORATORY celltype_pairs_* FAMILY, RETIRED 2026-08-25.
@@ -180,6 +197,9 @@ switch name
             'F_ref_indegree',       100, ...
             'sigma_u_noise',        0.025);
 
+        % SFA on the standard ladder: 3 timescales spanning 0.25 s to 10 s.
+        sfa_timescales = log_ladder(0.25, 10, 3);
+
         std_routes = struct();
         dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
         std_routes.E.E.std = dual_std;
@@ -235,6 +255,11 @@ switch name
             'F_ref_n',              500, ...
             'F_ref_indegree',       100, ...
             'sigma_u_noise',        0.025);
+
+        % SFA on the standard ladder: 3 timescales spanning 0.25 s to 10 s.
+        % sfa_only_oneTS takes the FIRST of these, so the fast end is what the
+        % one-timescale SFA regime runs.
+        sfa_timescales = log_ladder(0.25, 10, 3);
 
         % The one-timescale regimes take their route from these by keeping the
         % FIRST tau_rec/tau_rel pair, so they cannot describe an older network.
@@ -315,6 +340,11 @@ switch name
             'F_ref_indegree',       100, ...
             'sigma_u_noise',        0.025);
 
+        % SFA on the standard ladder: 3 timescales spanning 0.25 s to 10 s.
+        % sfa1_std1 takes the FIRST of these -- 0.25 s, the fast end -- which is
+        % the whole content of the single-timescale regime.
+        sfa_timescales = log_ladder(0.25, 10, 3);
+
         % sfa1_std1 takes its route from these by keeping the FIRST
         % tau_rec/tau_rel pair, so it cannot describe an older network.
         std_routes = struct();
@@ -379,6 +409,9 @@ switch name
             'S_c',                  0.5, ...
             'tau_d',                0.1, ...
             'c',                    [0.5, 0]);          % TOTAL SFA budget, E only
+        % The paper's standard ladder, as in the source script.
+        sfa_timescales = log_ladder(0.25, 10, 3);
+
         % STD on E->E only. SRNNModel2's n_b_E = 1 depresses every OUTGOING
         % excitatory synapse, i.e. E->E and E->I alike; the source script had
         % n_b_I = 0, so I synapses did not depress. E->E and E->I with the same
@@ -435,6 +468,11 @@ switch name
             'tau_d',                1.0, ...
             'c',                    0, ...            % no SFA
             'x0_std',               1.0);             % visible relaxation in the stable panel
+        % Stated for completeness only: c = 0, so no condition here adapts
+        % whatever timescales it is handed. The standard ladder keeps the value
+        % honest rather than arbitrary.
+        sfa_timescales = log_ladder(0.25, 10, 3);
+
         % No synapses depress or facilitate: this is the bare random network.
         std_routes = struct();
 
@@ -508,6 +546,9 @@ switch name
         % condition can say that. Carrying it in the preset is what used to make
         % build_from_preset('single_neuron_stf','no_adaptation') fail outright
         % with "tau_a{1} must contain n_a(1) positive values".
+        % ONE exaggerated 3 s timescale, not a ladder -- so log_ladder is not
+        % what this wants. The figure shows a single unconnected neuron, and a
+        % slow constant is what makes the rate decay legible on one trace.
         sfa_timescales = 3;
         % Both mechanisms on the E->E route. The figure switches them on and off
         % per column; these are the timescales it switches ON.
@@ -573,6 +614,10 @@ switch name
             'c',                    0.5, ...    % TOTAL SFA budget
             'x0_std',               0, ...      % deterministic x(0) = 0
             'sigma_u_noise',        0.025);
+        % All three of the paper's SFA timescales -- unlike single_neuron_stf,
+        % which exaggerates a single one so the decay is legible on one trace.
+        sfa_timescales = log_ladder(0.25, 10, 3);
+
         % The paper's dual depression, on the one route this network has.
         std_routes = struct();
         std_routes.E.E.std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
@@ -626,7 +671,11 @@ switch name
             'std_zero_floor',       false, ...
             'sigma_u_noise',        0);
 
-        sfa_timescales = logspace(log10(0.1), log10(10), 3);
+        % A DIFFERENT LADDER from the paper's 0.25-10: this one starts at 0.1 s,
+        % carried over from mc_esn. Presets state their own timescales precisely
+        % so a second ladder like this is visible here rather than hidden behind
+        % a shared default that only ever described the first one.
+        sfa_timescales = log_ladder(0.1, 10, 3);
 
         std_routes = struct();
         mc_dual_std = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
@@ -654,6 +703,19 @@ if isfield(d, 'n_cellTypes')
 else
     n_cell_types = 2;
 end
+
+% Every case states its own ladder, so a new preset that forgets fails HERE with
+% its own name rather than silently adopting whatever the last shared default
+% happened to be. That silent adoption is the failure this replaced: presets
+% inherited log_ladder(0.25, 10, 3) without saying so, while two of them already
+% used different ladders.
+if isempty(sfa_timescales)
+    error('srnn_param_preset:NoSfaTimescales', ...
+        ['Preset ''%s'' does not set sfa_timescales. Every preset states its ' ...
+         'own adaptation timescales -- normally log_ladder(lo, hi, K) -- ' ...
+         'because they are physics and physics lives in the preset.'], name);
+end
+
 conditions = srnn_adaptation_conditions(model_class, ...
     'synapse_config', std_routes, 'sfa_timescales', sfa_timescales, ...
     'n_cell_types', n_cell_types, 'regimes', regimes);

@@ -35,7 +35,7 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 
 % The optional SFA_TIMESCALES are the adaptation timescales the SFA regimes
 % switch on, as a plain vector in seconds. It defaults to the standard ladder
-% srnn_sfa_timescales(3), which is the paper's operating point. It exists for the
+% log_ladder(0.25, 10, 3), which is the paper's operating point. It exists for the
 % single-neuron METHODS figures, which show one exaggerated timescale so the rate
 % decay is legible on a single trace.
 %
@@ -138,7 +138,10 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 arguments
     model_class (1,:) char
     opts.synapse_config = []
-    opts.sfa_timescales (1,:) double {mustBePositive} = srnn_sfa_timescales(3)
+    % A default for DIRECT callers (tests, exploratory scripts). Presets always
+    % pass their own -- srnn_param_preset errors if a case does not set one --
+    % so this is never what a pipeline run uses.
+    opts.sfa_timescales (1,:) double {mustBePositive} = log_ladder(0.25, 10, 3)
     opts.n_cell_types (1,1) double {mustBeInteger, mustBePositive} = 2
     opts.regimes (1,:) char ...
         {mustBeMember(opts.regimes, {'standard','timescales','single_multi'})} = 'standard'

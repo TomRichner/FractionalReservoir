@@ -28,7 +28,7 @@ function out = fig_SFA_steady_state(cfg)
 % it. tau_a is condition-owned rather than a preset field, so it is read off a
 % BUILT model.
 %
-% THE SINGLE-TIMESCALE CASE uses tau(1). srnn_sfa_timescales(1) returns exactly
+% THE SINGLE-TIMESCALE CASE uses tau(1). log_ladder(0.25, 10, 1) returns exactly
 % that fast end, where the auto-fill this replaced -- logspace(a, b, 1) -- would
 % have returned 10^b, the SLOW end, making the comparison a statement about the
 % slow tail rather than about the count.

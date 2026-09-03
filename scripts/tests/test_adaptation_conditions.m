@@ -15,24 +15,13 @@
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths has run.
 %
-% See also: srnn_sfa_timescales, srnn_adaptation_conditions, srnn_param_preset
+% See also: log_ladder, srnn_adaptation_conditions, srnn_param_preset
 
 all_passed = true;
 
-%% The ladder helper
-fprintf('\n-- srnn_sfa_timescales --\n');
-all_passed = check('K=3 is the standard ladder', ...
-    isequal(srnn_sfa_timescales(3), logspace(log10(0.25), log10(10), 3))) && all_passed;
-all_passed = check('K=1 is the FAST end (0.25)', ...
-    isequal(srnn_sfa_timescales(1), 0.25)) && all_passed;
-% The trap itself. If MATLAB ever changed this, the special case would be dead
-% code and the reader should be told rather than left guessing.
-all_passed = check('logspace(a,b,1) really does return the SLOW end', ...
-    abs(logspace(log10(0.25), log10(10), 1) - 10) < 1e-12) && all_passed;
-all_passed = check('K=0 is a 1x0 row, not []', ...
-    isequal(size(srnn_sfa_timescales(0)), [1 0])) && all_passed;
-all_passed = check('K=2 spans the same endpoints', ...
-    isequal(srnn_sfa_timescales(2), [0.25 10])) && all_passed;
+% The ladder helper itself is tested in test_log_ladder -- it is generic
+% numerics in src/util/, not conditions logic, and should fail independently.
+% What matters HERE is that the conditions carry the timescales they were given.
 
 %% Pairs conditions carry tau_a, and it agrees with n_a
 fprintf('\n-- SRNNCellTypePairs conditions --\n');
@@ -44,15 +33,15 @@ all_passed = check('every condition carries tau_a', ...
 all_passed = check('no condition carries n_a', ...
     ~any(cellfun(@(c) isfield(c, 'n_a'), cond))) && all_passed;
 all_passed = check('SFA conditions carry the ladder', ...
-    isequal(cond{2}.tau_a{1}, srnn_sfa_timescales(3)) && ...
-    isequal(cond{4}.tau_a{1}, srnn_sfa_timescales(3))) && all_passed;
+    isequal(cond{2}.tau_a{1}, log_ladder(0.25, 10, 3)) && ...
+    isequal(cond{4}.tau_a{1}, log_ladder(0.25, 10, 3))) && all_passed;
 all_passed = check('non-SFA conditions carry empty timescales', ...
     isempty(cond{1}.tau_a{1}) && isempty(cond{3}.tau_a{1})) && all_passed;
 all_passed = check('SFA is on the FIRST type only', ...
     all(cellfun(@(c) all(cellfun(@isempty, c.tau_a(2:end))), cond))) && all_passed;
 
 % A single-timescale request must reach the model as 0.25, not 10.
-one = srnn_adaptation_conditions('SRNNCellTypePairs', 'sfa_timescales', srnn_sfa_timescales(1));
+one = srnn_adaptation_conditions('SRNNCellTypePairs', 'sfa_timescales', log_ladder(0.25, 10, 1));
 all_passed = check('one-timescale conditions carry 0.25', ...
     isequal(one{2}.tau_a{1}, 0.25) && numel(one{2}.tau_a{1}) == 1) && all_passed;
 
@@ -173,7 +162,7 @@ all_passed = check('carries n_a_E / n_b_E, not tau_a', ...
                      ~isfield(c,'tau_a'), m2))) && all_passed;
 all_passed = check('SFA count derives from the timescale vector', ...
     isequal(m2{2}.n_a_E, 3) && isequal(m2{4}.n_a_E, 3)) && all_passed;
-m2one = srnn_adaptation_conditions('SRNNModel2', 'sfa_timescales', srnn_sfa_timescales(1));
+m2one = srnn_adaptation_conditions('SRNNModel2', 'sfa_timescales', log_ladder(0.25, 10, 1));
 all_passed = check('a 1-element vector gives n_a_E = 1', ...
     isequal(m2one{2}.n_a_E, 1)) && all_passed;
 

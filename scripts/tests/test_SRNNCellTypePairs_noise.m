@@ -75,8 +75,8 @@ all_passed = check('the stationary variance of x matches sigma_x_raw^2*tau_d/2',
 
 %% Noise drives only x
 % n_a is nonzero here so there are adaptation states to leave alone.
-a = pairs('sigma_u_noise', 0, 'ode_solver', 'euler', 'tau_a', {srnn_sfa_timescales(2), srnn_sfa_timescales(1), srnn_sfa_timescales(1)});
-b = pairs('sigma_u_noise', 0.5, 'ode_solver', 'euler', 'tau_a', {srnn_sfa_timescales(2), srnn_sfa_timescales(1), srnn_sfa_timescales(1)});
+a = pairs('sigma_u_noise', 0, 'ode_solver', 'euler', 'tau_a', {log_ladder(0.25, 10, 2), log_ladder(0.25, 10, 1), log_ladder(0.25, 10, 1)});
+b = pairs('sigma_u_noise', 0.5, 'ode_solver', 'euler', 'tau_a', {log_ladder(0.25, 10, 2), log_ladder(0.25, 10, 1), log_ladder(0.25, 10, 1)});
 a.build(); evalc('a.run();');
 b.build(); evalc('b.run();');
 xb = a.cached_params.state_layout.x;
@@ -149,7 +149,7 @@ function p = pairs(varargin)
 defaults = {'n', 24, 'indegree', 12, 'n_cellTypes', 3, ...
     'cell_type_names', {'A', 'B', 'C'}, 'f', [0.4 0.35 0.25], ...
     'mu_tilde_relative', [3 -4 -2], 'sigma_tilde_relative', [1 1 1], ...
-    'tau_a', {srnn_sfa_timescales(2), srnn_sfa_timescales(1), []}, 'T_range', [0 3], 'fs', 200, ...
+    'tau_a', {log_ladder(0.25, 10, 2), log_ladder(0.25, 10, 1), []}, 'T_range', [0 3], 'fs', 200, ...
     'lya_method', 'none', 'store_full_state', true};
 p = SRNNPairsTestAccess(defaults{:}, varargin{:});
 end
