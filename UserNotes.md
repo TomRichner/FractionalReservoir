@@ -14,13 +14,26 @@ and session that wrote it. Newest first.
 
 ---
 
-## Presets should write out their conditions, not name a regime set
+## Move to COMPOSED CONDITIONS: each preset composes its own regimes
 
 | | |
 |---|---|
 | Noted | 2026-09-03 · `refactorRunAll` @ `f570cf3` · R5611351 · Claude Code (Opus 5), session e22d2fab |
 | Raised by | TR, after tracing where `sfa1_std1` and `sfa3_std2` are actually defined for the 3-condition preset |
-| Status | **Recorded, not implemented.** Architecture; no science changes. Separable from the `log_ladder` work. |
+| Status | **DECIDED, not implemented.** TR wants composed conditions. Architecture only; no science changes. Separable from the `log_ladder` work, which does not depend on it. |
+
+### The name
+
+**Composed conditions**, against what we have now — **named regime sets**.
+
+Worth fixing the vocabulary, because the codebase already uses two words for
+this and they are not synonyms. `srnn_adaptation_conditions` returns
+**conditions**: the structs `ParamSpaceAnalysis2.set_conditions` consumes and
+`run_single_job` expands into constructor arguments. Its documentation calls
+them **regimes**: the scientific idea ("the four adaptation regimes"). So a
+builder makes one *regime*, and a preset composes several into its *conditions*
+list. "Composed conditions" names what the preset ends up with and how it got
+there.
 
 ### How it works now
 
@@ -65,9 +78,9 @@ other file for how they are combined — four hops.
   applied. That is documented at `srnn_param_preset.m:77-81`, but it is a rule
   you have to know rather than one the shape prevents.
 
-### The alternative TR wants
+### Composed conditions — the target
 
-One helper builds ONE condition; the preset composes them, so it reads
+One builder makes ONE regime; the preset composes them, so it reads
 self-contained:
 
 ```matlab
@@ -81,10 +94,22 @@ Physics stays in the preset, boilerplate stays shared. This is the same
 independence argument that decided the `log_ladder` change: presets should
 restate rather than inherit, because a preset is where a network is described.
 
+It also closes the trap above by construction rather than by comment. Today a
+preset must know not to put `tau_a` in `d`; under composed conditions `tau_a` is
+an argument to `adaptation_regime`, which is the only place it can go, so there
+is no wrong place to put it.
+
+**It sits BETWEEN the two obvious options**, which is the point. Naming a regime
+set (today) hides the physics in another file; writing out raw condition structs
+per preset would duplicate the derivations and the boilerplate. A builder per
+regime keeps the shapes shared while the preset states the values.
+
 ### What it costs, and the question to answer first
 
 - **All ten presets get rewritten**, plus the regime-set machinery deleted or
-  reduced to condition builders.
+  reduced to condition builders. `srnn_adaptation_conditions` either becomes
+  `adaptation_regime` (one regime, not a set) or keeps a thin compatibility
+  surface for `SRNNModel2`, whose conditions still speak counts.
 - **"`sfa_only` means the same thing everywhere" becomes a CONVENTION rather
   than a mechanism.** Today it is guaranteed by construction. After, it is
   guaranteed by whoever writes the next preset — so the guarantee should move
