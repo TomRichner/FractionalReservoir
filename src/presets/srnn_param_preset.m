@@ -254,9 +254,15 @@ switch name
         %
         % THE NETWORK IS IDENTICAL to the 4- and 7-condition presets -- same n,
         % connectivity, nonlinearity, noise, c and depression timescales. Only
-        % the regime SET differs, and no_adaptation and sfa_and_std mean exactly
-        % the same thing in all three, so a 3-condition run is directly
-        % comparable with the exploratory 7-condition ones.
+        % the regime SET differs, so a 3-condition run is directly comparable
+        % with the exploratory 7-condition ones.
+        %
+        % ONE CAVEAT ON THAT COMPARISON, and it is a naming one, not a physics
+        % one: this set calls the full-adaptation regime sfa3_std2 where the
+        % other sets call it sfa_and_std. The two are byte-identical -- see
+        % srnn_adaptation_conditions -- but a human lining up two run
+        % directories has to know that. Only no_adaptation shares its name
+        % across all three sets.
         %
         % WHY THREE, AND WHY THESE THREE (TR, 2026-09-03, after discussing the
         % manuscript with his PI). The 7-regime set separates SFA from STD --
@@ -268,10 +274,13 @@ switch name
         %
         %   no_adaptation   -                      -
         %   sfa1_std1       1 tau_a (0.25 s)       1 STD pair (2 / 0.25 s)
-        %   sfa_and_std     3 tau_a (0.25-10 s)    2 STD pairs
+        %   sfa3_std2       3 tau_a (0.25-10 s)    2 STD pairs
         %
         % So the axis is TIMESCALE COUNT and only that: every regime with
-        % adaptation has SFA and STD in the same proportion.
+        % adaptation has SFA and STD in the same proportion. The names state the
+        % counts because the counts are the content, and that is what lets the
+        % figures read "Single-Timescale Adaptation" against
+        % "Multiple-Timescale Adaptation" rather than "SFA + STD" twice.
         %
         % THIS COMPARISON IS ONLY CLEAN BECAUSE c IS THE TOTAL SFA BUDGET. The
         % model divides c by the number of timescales in use, so one-timescale

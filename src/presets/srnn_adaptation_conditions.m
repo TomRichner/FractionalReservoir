@@ -2,11 +2,15 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 % SRNN_ADAPTATION_CONDITIONS The four adaptation regimes, per model class.
 %
 % Returns a cell array of condition structs for ParamSpaceAnalysis2.set_conditions.
-% A regime NAME means the same thing whichever model class is being swept and
-% whichever regime SET it came from -- no_adaptation and sfa_and_std are
+% A regime NAME means one thing wherever it appears -- no_adaptation is
 % identical in all three sets -- so every downstream consumer keyed on the name
 % keeps working, including srnn_condition_titles and the plotters inside
 % ParamSpaceAnalysis2. What differs is how each regime is spelled:
+%
+% ONE REGIME CARRIES TWO NAMES, deliberately: sfa3_std2 in 'single_multi' is
+% byte-identical to sfa_and_std in the other two sets. The physics is defined
+% once and labelled twice, so the two can be titled differently. See the
+% 'single_multi' case for why, and for what it costs.
 %
 %   SRNNModel2         n_a_E / n_b_E counts. n_b_E = 1 depresses EVERY outgoing
 %                      excitatory synapse; there is no way to say "E->E only".
@@ -99,7 +103,7 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 %
 %                   no_adaptation    -            -
 %                   sfa1_std1        1 tau_a      1 STD timescale
-%                   sfa_and_std      K tau_a      all STD timescales
+%                   sfa3_std2        K tau_a      all STD timescales
 %
 %                 THE CONTRAST IS TIMESCALE COUNT, AND ONLY THAT. Every regime
 %                 has SFA and STD in the same proportion; what changes is how
@@ -108,17 +112,18 @@ function conds = srnn_adaptation_conditions(model_class, opts)
 %                 and, per TR after discussion with his PI, more complicated
 %                 question, headed for a later paper.
 %
-%                 sfa1_std1 is NEW here: 'timescales' has sfa3_std1 (many SFA
+%                 BOTH NAMES ARE NEW HERE. 'timescales' has sfa3_std1 (many SFA
 %                 timescales, one STD) but no one-of-each regime, because it was
 %                 built to vary the mechanisms independently rather than to hold
 %                 them matched.
 %
-%                 sfa_and_std is REUSED rather than renamed to sfa3_std2, even
-%                 though the latter would be the accurate name under the
-%                 sfa<K>_std<M> convention. Sharing the name is what keeps a
-%                 3-regime run comparable with the 4- and 7-regime ones: the
-%                 regime is identical in all three, so it should be called the
-%                 same thing and land in the same column.
+%                 sfa3_std2 IS sfa_and_std -- byte-identical, built from the
+%                 same locals -- under a name that states the timescale counts,
+%                 because in this set the counts are the whole content. It is a
+%                 second NAME for one regime, not a second regime; see the
+%                 comment at the case itself. That is what lets this set read
+%                 "Multiple-Timescale Adaptation" while the 4- and 7-regime sets
+%                 keep calling their copy "SFA + STD".
 %
 % This is only meaningful because c is the TOTAL adaptation budget, divided by
 % the number of timescales in use. Before that, sfa_only_oneTS would have had one
@@ -228,11 +233,31 @@ switch model_class
                 % first-timescale routes for the single case, the full ladder and
                 % the full routes for the multi case -- so the regimes cannot
                 % describe a different network from their neighbours.
+                %
+                % sfa3_std2 IS sfa_and_std, PHYSICALLY IDENTICAL. Both are
+                % {sfa_taus} with the full routes sc -- the same two locals,
+                % computed once above -- so the duplication is a NAME, not a
+                % value, and the two cannot drift apart. Read that line and the
+                % 'timescales' one together: they are the same struct.
+                %
+                % It carries its own name because in THIS set the timescale
+                % COUNT is the whole content of the comparison, so a name that
+                % states the counts is the accurate one; sfa_and_std comes from
+                % the 4-regime set, where it only ever meant "both mechanisms
+                % on". The separate name is also what lets this set title the
+                % regime "Multiple-Timescale Adaptation" without retitling
+                % sfa_and_std for the sets that still use it.
+                %
+                % CONSEQUENCE, and the reason this comment exists: a saved
+                % 3-regime run and a saved 7-regime run call the same physics by
+                % different names. Nothing in code pools or matches runs by
+                % condition name, so nothing breaks -- but a human comparing two
+                % run directories has to know they are the same regime.
                 sc1 = first_timescale_routes(sc);
                 conds = { ...
                     struct('name','no_adaptation',  'tau_a',{no_taus},  'synapse_config',no_synapses), ...
                     struct('name','sfa1_std1',      'tau_a',{one_tau},  'synapse_config',sc1), ...
-                    struct('name','sfa_and_std',    'tau_a',{sfa_taus}, 'synapse_config',sc) ...
+                    struct('name','sfa3_std2',      'tau_a',{sfa_taus}, 'synapse_config',sc) ...
                     };
         end
 

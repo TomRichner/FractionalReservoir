@@ -18,7 +18,7 @@
 %
 %   no_adaptation   -                      -
 %   sfa1_std1       1 tau_a (0.25 s)       1 STD pair (2 / 0.25 s)
-%   sfa_and_std     3 tau_a (0.25-10 s)    2 STD pairs
+%   sfa3_std2       3 tau_a (0.25-10 s)    2 STD pairs
 %
 % The contrast is TIMESCALE COUNT and only that, which is clean only because c
 % is the total SFA budget divided by the number of timescales in use -- so
@@ -29,9 +29,10 @@
 %
 % NOT THE PAPER'S CONFIG YET. paper_config still names the 7-condition preset,
 % and running this changes nothing about that. The network is IDENTICAL to the
-% 4- and 7-condition presets -- only the regime set differs -- and
-% no_adaptation and sfa_and_std mean the same thing in all three, so results
-% here are directly comparable with the exploratory seven-condition runs.
+% 4- and 7-condition presets -- only the regime set differs -- so results here
+% are directly comparable with the exploratory seven-condition runs. The one
+% thing to know when lining two runs up: sfa3_std2 here IS sfa_and_std there,
+% byte-identical, named differently so each set can title its own comparison.
 %
 % IT CANNOT TOUCH THE PAPER'S OUTPUT. Both roots are named in the config, so
 % nothing here writes into figs/paper or a dated run directory.

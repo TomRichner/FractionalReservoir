@@ -20,19 +20,31 @@ function titles = srnn_condition_titles()
 % See also: srnn_adaptation_conditions, manuscript_style,
 %           ParamSpaceAnalysis2/plot_sensitivity
 
-% sfa1_std1 belongs to the 'single_multi' set: SFA and STD both present, one
-% timescale each. Read against its neighbours, "1 \tau each" is what
-% distinguishes it from sfa3_std1, which has one STD timescale but the full SFA
-% ladder.
+% TWO TITLE VOCABULARIES, on purpose.
 %
-% NOTE the 'single_multi' set's story is "none vs one timescale vs many", so a
-% figure using it may want its legend to read "Single Timescale" / "Multi
-% Timescale" instead. That would mean retitling sfa_and_std, which the 4- and
-% 7-regime sets share -- so it is a deliberate decision, not a local tweak, and
-% the accurate-and-consistent titles are what live here until it is made.
+% The 4- and 7-regime sets name MECHANISMS -- "SFA Only", "STD Only",
+% "SFA + STD" -- because those sets exist to separate SFA from STD.
+%
+% The 'single_multi' set names TIMESCALE STRUCTURE -- "Single-Timescale
+% Adaptation" against "Multiple-Timescale Adaptation" -- because there the
+% mechanisms are always present together and the only thing varying is how many
+% timescales carry them. That is the comparison the paper is built on.
+%
+% This is why sfa3_std2 exists as a separate name for physics identical to
+% sfa_and_std: one regime, two labels, so each set can say what its own
+% comparison is about. sfa_and_std keeps "SFA + STD" for the sets that still
+% use it.
+%
+% THE SINGLE_MULTI TITLES ARE ~3x LONGER than the mechanism ones (28 characters
+% against 9). ParamSpaceAnalysis2's plotters set them as panel titles at
+% FontSize 14 in figures sized 300 px per condition, where they fit but not by
+% much. TR is aware and will handle any clipping in post; do NOT shorten these
+% or adjust a figure to accommodate them.
 titles = containers.Map( ...
     {'no_adaptation', 'sfa_only_oneTS', 'sfa_only', 'std_only_oneTS', ...
-     'std_only', 'sfa1_std1', 'sfa3_std1', 'sfa_and_std'}, ...
+     'std_only', 'sfa3_std1', 'sfa_and_std', ...
+     'sfa1_std1', 'sfa3_std2'}, ...
     {'No Adaptation', 'SFA (1 \tau)', 'SFA Only', 'STD (1 \tau)', ...
-     'STD Only', 'SFA + STD (1 \tau each)', 'SFA + STD (1 \tau)', 'SFA + STD'});
+     'STD Only', 'SFA + STD (1 \tau)', 'SFA + STD', ...
+     'Single-Timescale Adaptation', 'Multiple-Timescale Adaptation'});
 end

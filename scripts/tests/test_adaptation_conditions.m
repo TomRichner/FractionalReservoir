@@ -114,7 +114,7 @@ three = srnn_adaptation_conditions('SRNNCellTypePairs', ...
     'synapse_config', dual, 'regimes', 'single_multi');
 got3 = cellfun(@(c) c.name, three, 'UniformOutput', false);
 all_passed = check('3 regimes in the intended order', ...
-    isequal(got3, {'no_adaptation','sfa1_std1','sfa_and_std'})) && all_passed;
+    isequal(got3, {'no_adaptation','sfa1_std1','sfa3_std2'})) && all_passed;
 
 all_passed = check('SFA timescale counts are [0 1 3]', ...
     isequal(cellfun(@(c) numel(c.tau_a{1}), three), [0 1 3])) && all_passed;
@@ -134,16 +134,30 @@ all_passed = check('sfa1_std1 takes the FIRST tau_a and the FIRST STD pair', ...
     isequal(three{2}.synapse_config.E.E.std.tau_rec, ...
             three{3}.synapse_config.E.E.std.tau_rec(1))) && all_passed;
 
-% The two shared names must mean exactly what they mean elsewhere, or a
-% 3-condition run is not comparable with the 4- and 7-condition ones.
-same3 = true;
-for s = {'no_adaptation','sfa_and_std'}
-    a = three{strcmp(got3, s{1})};
-    b = seven{strcmp(got, s{1})};
-    same3 = same3 && isequal(a, b);
-end
-all_passed = check('the 2 shared regimes are identical to the 7-regime set', same3) ...
-    && all_passed;
+% no_adaptation is the one name shared across all three sets, and it must still
+% mean the same thing.
+all_passed = check('no_adaptation is identical to the 7-regime set', ...
+    isequal(three{strcmp(got3, 'no_adaptation')}, ...
+            seven{strcmp(got, 'no_adaptation')})) && all_passed;
+
+% sfa3_std2 is a second NAME for sfa_and_std, not a second regime. If these ever
+% stop matching, one of the two switch cases has been edited in isolation and
+% the "identical physics, different label" claim in both files is a lie.
+a = three{strcmp(got3, 'sfa3_std2')};
+b = seven{strcmp(got, 'sfa_and_std')};
+all_passed = check('sfa3_std2 is byte-identical to sfa_and_std apart from the name', ...
+    isequal(rmfield(a, 'name'), rmfield(b, 'name'))) && all_passed;
+all_passed = check('...and they really do carry different names', ...
+    ~strcmp(a.name, b.name)) && all_passed;
+
+% Different titles is the whole reason the second name exists.
+t3 = srnn_condition_titles();
+all_passed = check('the two names get DIFFERENT display titles', ...
+    ~strcmp(t3('sfa3_std2'), t3('sfa_and_std'))) && all_passed;
+all_passed = check(sprintf('sfa1_std1 -> "%s"', t3('sfa1_std1')), ...
+    strcmp(t3('sfa1_std1'), 'Single-Timescale Adaptation')) && all_passed;
+all_passed = check(sprintf('sfa3_std2 -> "%s"', t3('sfa3_std2')), ...
+    strcmp(t3('sfa3_std2'), 'Multiple-Timescale Adaptation')) && all_passed;
 
 % Every regime needs a display title or a figure legend falls back to the raw
 % snake_case name in one panel while reading properly in another.

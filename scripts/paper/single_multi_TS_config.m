@@ -10,7 +10,7 @@ function cfg = single_multi_TS_config(opts)
 %
 %   no_adaptation   -                      -
 %   sfa1_std1       1 tau_a (0.25 s)       1 STD pair (2 / 0.25 s)
-%   sfa_and_std     3 tau_a (0.25-10 s)    2 STD pairs
+%   sfa3_std2       3 tau_a (0.25-10 s)    2 STD pairs
 %
 % The 7-condition set separates the mechanisms -- sfa_only, std_only and their
 % one-timescale variants -- which is a more complicated story than this paper
@@ -23,8 +23,10 @@ function cfg = single_multi_TS_config(opts)
 %
 %   preset_name  celltype_pairs_Sc0p2_noise0p025_dualStd_3cond -- the SAME
 %                network as the 4- and 7-condition presets, differing only in
-%                which regimes are swept. no_adaptation and sfa_and_std are
-%                identical across all three, so runs stay comparable.
+%                which regimes are swept, so runs stay comparable. Note this
+%                set names the full-adaptation regime sfa3_std2 where the others
+%                call it sfa_and_std; identical physics, different label, so
+%                each set can title its own comparison.
 %   run_mode     'fast' FOR NOW. This is the knob to change when the comparison
 %                is worth real compute -- 'medium' for readable numbers,
 %                'production' for the paper. Editing this line is the whole
