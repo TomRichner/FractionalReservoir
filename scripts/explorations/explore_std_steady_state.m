@@ -219,13 +219,17 @@ set(ax2, 'XTick', [0 1], 'YTick', [0 round(zoom_ymax, 3)]);
 
 % --- 3. step response ---
 ax3 = nexttile(tl); hold(ax3, 'on');
-% The drive, scaled onto the output axis purely as a visual reference for WHEN
-% each step is on -- its height is not a value on this axis, so it is drawn
-% faint and excluded from the legend's reading.
+% The drive at TRUE SCALE, sharing the output's axis. This was briefly plotted
+% rescaled to fill the panel, which made the steps read as 0.3/0.6/1.2 -- the
+% rates were right and only the reference trace was stretched, but it invited
+% exactly the misreading it got, and it threw away the reason to draw r(t) at
+% all: because b = 1 at rest, the onset of each step delivers very nearly the
+% FULL r, so theta rises to meet the drive and then collapses away from it. The
+% small visible shortfall at each onset is incomplete recovery during off_s.
+% Same units, same axis, no scale factor.
 ss = arrayfun(@(rk) rk * prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
-y_max = max([theta_t, ss]) * 1.25;
-plot(ax3, t, r_t / max(r_t) * y_max * 0.97, '-', 'LineWidth', 1, ...
-    'Color', [0.85 0.85 0.85]);
+y_max = max([theta_t, r_t, ss]) * 1.12;
+plot(ax3, t, r_t, '-', 'LineWidth', 1, 'Color', [0.82 0.82 0.82]);
 % Each plateau's asymptote -- the SAME number panel 2 plots at that rate.
 for k = 1:numel(ss)
     plot(ax3, [0 t(end)], [ss(k) ss(k)], ':', 'LineWidth', 1, 'Color', identity_color);
@@ -240,7 +244,7 @@ ylabel(ax3, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ..
     'FontSize', label_fs);
 title(ax3, 'Step response', 'FontWeight', 'normal', 'FontSize', title_fs);
 xlim(ax3, [0 t(end)]); ylim(ax3, [0 y_max]);
-legend(ax3, {'rate (scaled)', 'steady state'}, 'Box', 'off', 'FontSize', 10, ...
+legend(ax3, {'rate  r(t)', 'steady state'}, 'Box', 'off', 'FontSize', 10, ...
     'Location', 'northwest');
 
 %% ---- Outputs -------------------------------------------------------------
