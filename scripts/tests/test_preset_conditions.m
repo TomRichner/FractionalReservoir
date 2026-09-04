@@ -119,12 +119,16 @@ all_passed = check('no_adaptation is identical across the 3- and 7-cond presets'
     isequaln(three{strcmp(got3, 'no_adaptation')}, ...
              seven{strcmp(got7, 'no_adaptation')})) && all_passed;
 
-% Titles are STRUCTURAL now, so they can be shared across presets without lying.
+% Titles are mostly structural, with these two deliberate exceptions: they are
+% the 3-condition preset's adapting regimes, i.e. the paper's comparison, so they
+% are titled in the manuscript's words rather than by their counts.
 t = srnn_condition_titles();
 all_passed = check(sprintf('sfa1_std1 -> "%s"', t('sfa1_std1')), ...
-    strcmp(t('sfa1_std1'), 'SFA 1\tau + STD 1\tau')) && all_passed;
+    strcmp(t('sfa1_std1'), 'Single-Timescale Adaptation')) && all_passed;
 all_passed = check(sprintf('sfa3_std2 -> "%s"', t('sfa3_std2')), ...
-    strcmp(t('sfa3_std2'), 'SFA 3\tau + STD 2\tau')) && all_passed;
+    strcmp(t('sfa3_std2'), 'Multiple-Timescale Adaptation')) && all_passed;
+all_passed = check('the two adapting regimes are titled differently', ...
+    ~strcmp(t('sfa1_std1'), t('sfa3_std2'))) && all_passed;
 % Legacy names stay in the map, or a figure regenerated from a run saved before
 % the rename falls back to raw snake_case panel titles.
 all_passed = check('legacy names still resolve to titles', ...

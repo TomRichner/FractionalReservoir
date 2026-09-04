@@ -27,15 +27,21 @@ function titles = srnn_condition_titles()
 % run directories could carry the same condition folder name and different
 % physics, and nothing caught it.
 %
-% Titles are therefore STRUCTURAL now. That is a deliberate loss: the
-% 3-condition preset used to title its regimes "Single-Timescale Adaptation" and
-% "Multiple-Timescale Adaptation", which reads better but could only work while
-% those regimes had names no other preset used. 'SFA 1\tau + STD 1\tau' against
-% 'SFA 3\tau + STD 2\tau' states the same contrast and stays true in the
-% 7-condition set, where both regimes also appear. Retitle here if the
-% manuscript wants different words -- that is what keeping this map keyed by
-% NAME, rather than putting a title inside each condition, is for: a saved run
-% can be retitled without recomputing it.
+% Titles are MOSTLY structural -- 'SFA 3\tau + STD 1\tau' and so on -- with two
+% deliberate exceptions. sfa1_std1 and sfa3_std2 are the 3-condition preset's
+% adapting regimes, i.e. the paper's actual comparison, and are titled
+% "Single-Timescale Adaptation" and "Multiple-Timescale Adaptation" because that
+% is the claim being made; the counts are how it is implemented, not what it
+% means.
+%
+% That those two words survive a rename is the point of keeping this map keyed by
+% NAME rather than putting a title inside each condition: the wording changed
+% here, in one file, without touching a preset, a condition, or a saved run. A
+% title frozen into a run directory at compute time could not have moved at all.
+%
+% The cost, accepted: sfa3_std2 also appears in the 7-condition preset, next to
+% sfa3_std1, so that sheet mixes these words with a structural label. The
+% 7-condition set is exploratory and not in the paper.
 %
 % See also: srnn_param_preset, validate_preset_conditions, manuscript_style,
 %           ParamSpaceAnalysis2/plot_sensitivity
@@ -46,9 +52,17 @@ current = { ...
     'sfa3_std0',        'SFA 3\tau'; ...
     'sfa0_std1',        'STD 1\tau'; ...
     'sfa0_std2',        'STD 2\tau'; ...
-    'sfa1_std1',        'SFA 1\tau + STD 1\tau'; ...
+    ... % THE PAPER'S COMPARISON, and titled in its own words rather than
+    ... % structurally: these two are the 3-condition preset's adapting regimes,
+    ... % and the manuscript's point is single vs multiple timescales, not the
+    ... % counts themselves. TR's decision.
+    ... %
+    ... % They also appear in the 7-condition preset, where sfa3_std2 sits beside
+    ... % sfa3_std1 -- so that sheet mixes these words with a structural label.
+    ... % Accepted: the 7-condition set is exploratory and not in the paper.
+    'sfa1_std1',        'Single-Timescale Adaptation'; ...
     'sfa3_std1',        'SFA 3\tau + STD 1\tau'; ...
-    'sfa3_std2',        'SFA 3\tau + STD 2\tau'; ...
+    'sfa3_std2',        'Multiple-Timescale Adaptation'; ...
     ... % single_neuron_stf only -- the one preset with facilitation. Without the
     ... % suffix its regimes would be sfa0_std1 and sfa1_std1, and sfa1_std1 is
     ... % already the 3-condition preset's SFA+STD with NO facilitation.
