@@ -286,7 +286,9 @@ whatever workspace called them, via `exist(...,'var')` — 37 such sites. You co
 not tell what a sub-script needed without grepping; a variable left behind by one
 run silently applied to the next (`run_overnight_queue.m` then existed *only* to
 scrub them, as its own header admitted — it has since been rewritten as a proper
-function taking a queue of `{preset, run_mode}` jobs, and is live); and the
+function taking a queue of `paper_config`-shaped cfg structs or config-function
+handles, running **both** entry points per entry with a pre-flight that fails on a
+bad mode, a bad preset or a non-empty `run_dir` before any compute, and is live); and the
 sub-scripts had to skip their own
 `clear`/`clc` when `master_output_dir` was set, leaking "am I being orchestrated?"
 into their cleanup logic. All three problems are properties of shared mutable
@@ -330,7 +332,7 @@ anything.
 - `scripts/examples/` — exploratory scripts. Nineteen of them, thirteen having moved out of `tests/` where they had accumulated; several are stale, and reviewing them is tracked follow-up work.
 - `scripts/tests/` — 39 `test_*.m` verification scripts plus the two `*TestAccess` helper classes, `make_preset_golden.m` (a fixture generator, not a test) and `fixtures/`. Run them from the editor or via the matlab MCP `run_matlab_file` tool.
 
-  **`fixtures/golden_preset_outputs.mat` is force-added to git** (`*.mat` is gitignored). It freezes every `srnn_param_preset` output — 10 presets, 42 conditions, plus the retired/unknown error identifiers — captured *before* the conditions refactor, and `test_preset_golden` compares against it with no exclusions. If that test fails, fix the code, not the fixture: `make_preset_golden` refuses to overwrite an existing one, so regenerating means deleting the `.mat` deliberately and saying in the commit message why the expected values moved.
+  **`fixtures/golden_preset_outputs.mat` is force-added to git** (`*.mat` is gitignored). It freezes every `srnn_param_preset` output — 12 presets, 46 conditions, plus the retired/unknown error identifiers — first captured *before* the conditions refactor and regenerated on 2026-09-04 when the two `mu8p25` presets were added, and `test_preset_golden` compares against it with no exclusions. Note the unknown-name error *message* is frozen too, and it embeds the valid-preset list, so **adding a preset legitimately fails this test** until the fixture is regenerated. If that test fails, fix the code, not the fixture: `make_preset_golden` refuses to overwrite an existing one, so regenerating means deleting the `.mat` deliberately and saying in the commit message why the expected values moved.
 
 ### Figure conventions
 
