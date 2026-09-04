@@ -1,409 +1,150 @@
-function out = explore_std_steady_state(opts)
-% EXPLORE_STD_STEADY_STATE Multi-timescale STD for a chosen (tau_rec, tau_rel).
+% Multi-timescale STD: steady state and step response. Edit the block below.
 %
-%   out = EXPLORE_STD_STEADY_STATE()                        % the preset's values
-%   out = EXPLORE_STD_STEADY_STATE('tau_rec', [2 4], 'tau_rel', [0.5 1.0])
-%   out = EXPLORE_STD_STEADY_STATE('tau_rel', 1, 'tau_rec', 2)   % single timescale
+%   b_m(r) = 1/(1 + r/rho_m),  rho_m = tau_rel_m/tau_rec_m,  theta = r*prod(b)
 %
-% Three panels for one set of depression timescales:
-%
-%   1. prod(b) against rate  -- the steady-state gain.
-%   2. prod(b)*r against rate -- what the recurrent sum actually receives, with
-%      the peak marked and the identity line y = r for the undepressed synapse.
-%   3. The STEP RESPONSE: rate held at each of step_rates for on_s seconds,
-%      separated by off_s seconds at zero, with the synaptic output plotted
-%      against TIME.
-%
-% Panels 2 and 3 are the same quantity seen two ways, and reading them together
-% is the point: the dashed line each plateau in panel 3 settles onto is exactly
-% the value panel 2 reports at that rate. Panel 3 adds what panel 2 cannot show
-% -- the TRANSIENT. At the onset of a step from a rested synapse b = 1, so the
-% output jumps to the full r before depression pulls it down, which means the
-% peak transient grows with r even where the steady state SHRINKS with r.
-%
-% WHY THIS IS AN EXPLORATION AND NOT A FIGURE. src/figures/fig_STD_steady_state
-% draws panels 1 and 2 from whatever the PRESET carries and is what the paper
-% ships. This takes the timescales as arguments so they can be varied without
-% touching a preset -- editing the preset is a physics change that invalidates
-% the frozen fixtures (test_preset_golden, test_c_over_K) and should be done
-% deliberately, not while exploring.
-%
-% THE STEADY STATE DEPENDS ONLY ON THE RATIO rho = tau_rel/tau_rec:
-%
-%   b_m(r) = 1/(1 + r/rho_m),   theta(r) = r * prod_m b_m(r)
-%
-% The absolute timescales set how FAST b gets there -- panel 3 -- and nothing
-% about where. For two timescales the peak has a closed form:
-%
-%   r_peak     = sqrt(rho_1 * rho_2)                  (the GEOMETRIC MEAN)
-%   theta_peak = rho_1*rho_2 / (sqrt(rho_1) + sqrt(rho_2))^2
-%
-% so separating the ratios lowers the peak WITHOUT MOVING IT, and
-% theta_peak <= r_peak/4 always, with equality only when rho_1 == rho_2. More
-% generally, K equal ratios give theta_peak = r_peak*(1 - 1/K)^K, which is 1/4
-% at K = 2 and approaches 1/e. A SINGLE timescale has no peak at all: theta
-% rises monotonically to rho. The turnover is a multi-timescale phenomenon.
-%
-% Note the defaults have rho = [0.125 0.125] -- the paper preset's two
-% timescales differ in SPEED (tau_rec 2 s vs 4 s) but share a ratio, so they are
-% indistinguishable in panels 1 and 2 and differ only in panel 3.
-%
-% Depends on nothing in src/, so it runs in a cold session.
-%
-% See also: fig_STD_steady_state, srnn_param_preset
+% Only the RATIO rho sets the steady state; the absolute taus set the speed.
+% K equal ratios: r_peak = rho/(K-1), theta_peak = r_peak*(1-1/K)^K. K=1 has no
+% peak. Two timescales: r_peak = sqrt(rho1*rho2), independent of their spread.
 
-arguments
-    % A THREE-TIMESCALE LADDER with a common ratio. tau_rel names the ladder;
-    % tau_rec is derived from it below so that rho = tau_rel/tau_rec is the same
-    % for every timescale, which is the configuration that maximises both the
-    % peak height and the peak-to-theta(1) contrast at any given peak position.
-    %
-    % Note this is NOT the paper preset any more: that is two timescales at
-    % rec_per_rel = 8, i.e. tau_rec = [2 4], tau_rel = [0.25 0.5].
-    opts.tau_rel     (1,:) double  = [0.25 0.5 1]
-    % Empty means "derive from tau_rel", resolved after this block. It CANNOT be
-    % defaulted as 4*opts.tau_rel here: MATLAB rejects a name-value argument
-    % whose default references another name-value argument, with
-    % MATLAB:functionValidation:NamedArgumentInDefault. (Positional arguments may
-    % do this; opts. ones may not.) zeros(1,0) rather than [], because [] is 0x0
-    % and would fail the (1,:) size check before the body ever runs.
-    opts.tau_rec     (1,:) double  = zeros(1, 0)
-    % tau_rec = rec_per_rel * tau_rel, so rho = 1/rec_per_rel on every timescale.
-    % 4 gives rho = 0.25; 8 gives the preset's rho = 0.125 and tau_rec = [2 4 8].
-    % Ignored when tau_rec is given explicitly.
-    opts.rec_per_rel (1,1) double  = 4
-    opts.step_rates  (1,:) double  = [0.25 0.5 1]
-    opts.on_s        (1,1) double  = 5
-    % A SYMMETRIC 5 s on / 5 s off protocol, TR's choice, and the price is worth
-    % knowing: 5 s is not long enough for the slowest tau_rec to recover. At
-    % tau_rec = 4 s, b returns to only 1 - exp(-5/4) = 71.3% between steps, so
-    % each step starts MORE DEPRESSED than the last and its plateau sits below
-    % the true asymptote for that rate. The grey steady-state levels are drawn
-    % from the closed form, so that shortfall is visible as a gap rather than
-    % hidden -- and the gap is a property of the protocol, not of the rate.
-    % Raise off_s (15 s gives 97.6%) to separate the steps properly.
-    % out.recovery_frac reports the realised figure.
-    opts.off_s       (1,1) double  = 5
-    opts.settle_s    (1,1) double  = 5
-    opts.fs          (1,1) double  = 1000
-    opts.save        (1,1) logical = false
-    opts.out_dir     (1,:) char    = ''
-end
+%% ---- parameters -----------------------------------------------------------
+tau_rel    = [0.25 0.5 1];
+tau_rec    = 4 * tau_rel;
+step_rates = [0.25 0.5 1];
+on_s       = 5;
+off_s      = 5;      % < ~4*max(tau_rec) and steps start already depressed
+settle_s   = 5;
+fs         = 1000;
 
-tau_rel = opts.tau_rel(:)';
-% Derive tau_rec from tau_rel when it was not given, which is the tie the
-% arguments block cannot express. Doing it here also means an explicit tau_rec
-% still wins, so the two-argument form keeps working unchanged.
-if isempty(opts.tau_rec)
-    if opts.rec_per_rel <= 0
-        error('explore_std_steady_state:NonPositiveRatio', ...
-            'rec_per_rel must be positive (got %g).', opts.rec_per_rel);
-    end
-    tau_rec = opts.rec_per_rel * tau_rel;
-else
-    tau_rec = opts.tau_rec(:)';
-end
-if numel(tau_rec) ~= numel(tau_rel)
-    error('explore_std_steady_state:LengthMismatch', ...
-        'tau_rec and tau_rel must have the same number of timescales (got %d and %d).', ...
-        numel(tau_rec), numel(tau_rel));
-end
-if any(tau_rec <= 0) || any(tau_rel <= 0)
-    error('explore_std_steady_state:NonPositiveTau', ...
-        'All tau_rec and tau_rel must be positive.');
-end
-K   = numel(tau_rec);
-rho = tau_rel ./ tau_rec;          % the ONLY combination the steady state sees
-
-%% ---- Steady state ---------------------------------------------------------
+%% ---- steady state ---------------------------------------------------------
+rho    = tau_rel ./ tau_rec;
+K      = numel(rho);
 r      = linspace(0, 1, 4000);
-b_each = 1 ./ (1 + (1 ./ rho(:)) * r);      % rows = timescale
+b_each = 1 ./ (1 + (1 ./ rho(:)) * r);
 b_prod = prod(b_each, 1);
 theta  = b_prod .* r;
-theta_single = b_each(1, :) .* r;
 
-% Peak found on a fine grid so it is right for any K, then cross-checked against
-% the closed form when K == 2. A mismatch there means the algebra in the header
-% has stopped describing the code.
-r_fine     = linspace(0, 1, 400000);
-th_fine    = r_fine .* prod(1 ./ (1 + (1 ./ rho(:)) * r_fine), 1);
-[theta_peak, ip] = max(th_fine);
-r_peak     = r_fine(ip);
-has_peak   = ip < numel(r_fine);            % K == 1 is monotone: no turnover
-if K == 2
-    r_peak_exact     = sqrt(prod(rho));
-    theta_peak_exact = prod(rho) / sum(sqrt(rho))^2;
-else
-    r_peak_exact = NaN; theta_peak_exact = NaN;
-end
+rf  = linspace(0, 1, 4e5);
+thf = rf .* prod(1 ./ (1 + (1 ./ rho(:)) * rf), 1);
+[theta_peak, ip] = max(thf);
+r_peak   = rf(ip);
+has_peak = ip < numel(rf);
 
-%% ---- Step response, integrated EXACTLY ------------------------------------
-% r(t) is piecewise constant, and on a segment of constant r the ODE
-%   db/dt = (1 - b)/tau_rec - b*r/tau_rel
-% is linear with time constant tau_eff = 1/(1/tau_rec + r/tau_rel) and fixed
-% point b_inf = tau_eff/tau_rec. So each segment is one exponential, evaluated
-% in closed form -- no integrator, no tolerance, and the plateaus are exactly
-% the steady state panel 2 plots rather than approximately it.
-seg_rate = [0, reshape([opts.step_rates; zeros(1, numel(opts.step_rates))], 1, [])];
-seg_dur  = [opts.settle_s, repmat([opts.on_s, opts.off_s], 1, numel(opts.step_rates))];
-
-dt = 1 / opts.fs;
-t  = []; r_t = []; b_t = zeros(K, 0);
-b0 = ones(K, 1);                            % rested synapse
-t0 = 0;
+%% ---- step response (exact: r is piecewise constant, so each segment is one
+%%      exponential with tau_eff = 1/(1/tau_rec + r/tau_rel)) -----------------
+seg_rate = [0, reshape([step_rates; zeros(1, numel(step_rates))], 1, [])];
+seg_dur  = [settle_s, repmat([on_s, off_s], 1, numel(step_rates))];
+dt = 1 / fs;
+t = []; r_t = []; b_t = zeros(K, 0); b0 = ones(K, 1); t0 = 0;
 for s = 1:numel(seg_rate)
-    ts   = (dt : dt : seg_dur(s));
-    rs   = seg_rate(s);
-    teff = 1 ./ (1 ./ tau_rec(:) + rs ./ tau_rel(:));
+    ts   = dt : dt : seg_dur(s);
+    teff = 1 ./ (1 ./ tau_rec(:) + seg_rate(s) ./ tau_rel(:));
     binf = teff ./ tau_rec(:);
     bs   = binf + (b0 - binf) .* exp(-ts ./ teff);
-    t    = [t,   t0 + ts];                  %#ok<AGROW>
-    r_t  = [r_t, rs * ones(1, numel(ts))];  %#ok<AGROW>
-    b_t  = [b_t, bs];                       %#ok<AGROW>
-    b0   = bs(:, end);
-    t0   = t0 + seg_dur(s);
+    t    = [t, t0 + ts];                            %#ok<AGROW>
+    r_t  = [r_t, seg_rate(s) * ones(1, numel(ts))]; %#ok<AGROW>
+    b_t  = [b_t, bs];                               %#ok<AGROW>
+    b0   = bs(:, end);  t0 = t0 + seg_dur(s);
 end
-theta_t = prod(b_t, 1) .* r_t;
+theta_t   = prod(b_t, 1) .* r_t;
+b_prod_t  = prod(b_t, 1);
+seg_start = cumsum([0, seg_dur]);
+ss_theta  = arrayfun(@(x) x * prod(1 ./ (1 + x ./ rho)), step_rates);
+ss_b      = arrayfun(@(x)     prod(1 ./ (1 + x ./ rho)), step_rates);
 
-% How far b actually recovers in one off period, from fully depressed. The
-% slowest timescale is the binding one.
-recovery_frac = 1 - exp(-opts.off_s / max(tau_rec));
-
-%% ---- Report --------------------------------------------------------------
-fprintf('\n--- STD steady state, %d timescale(s) ---\n', K);
-fprintf('  tau_rec = [%s]\n', strjoin(compose('%g', tau_rec), ' '));
-fprintf('  tau_rel = [%s]\n', strjoin(compose('%g', tau_rel), ' '));
-fprintf('  rho = tau_rel/tau_rec = [%s]\n', strjoin(compose('%.4f', rho), ' '));
-if K == 2 && abs(rho(1) - rho(2)) < 1e-12
-    fprintf('  NOTE: both ratios equal -- the timescales are indistinguishable\n');
-    fprintf('        in panels 1-2 and differ only in the transients of panel 3.\n');
-end
+%% ---- report ---------------------------------------------------------------
+fprintf('\ntau_rec = [%s]   tau_rel = [%s]\n', ...
+    strjoin(compose('%g', tau_rec), ' '), strjoin(compose('%g', tau_rel), ' '));
+fprintf('rho = [%s]   K = %d\n', strjoin(compose('%.4g', rho), ' '), K);
 if has_peak
-    fprintf('  r_peak     = %.4f', r_peak);
-    if K == 2; fprintf('   (closed form %.4f)', r_peak_exact); end
-    fprintf('\n  theta_peak = %.5f', theta_peak);
-    if K == 2; fprintf('   (closed form %.5f)', theta_peak_exact); end
-    fprintf('\n  theta_peak/r_peak = %.4f   ((1-1/K)^K = %.4f)\n', ...
-        theta_peak / r_peak, (1 - 1/K)^K);
+    fprintf('r_peak = %.4g   theta_peak = %.4g   ratio = %.4g\n', ...
+        r_peak, theta_peak, theta_peak / r_peak);
+    fprintf('theta_peak/theta(1) = %.3f\n', theta_peak / theta(end));
 else
-    fprintf('  NO PEAK: a single timescale is monotone, saturating at rho = %.4f\n', rho(1));
+    fprintf('no peak (K = 1): theta rises monotonically to rho = %.4g\n', rho(1));
 end
-fprintf('  recovery between steps: %.1f%% (off_s = %g s, slowest tau_rec = %g s)\n', ...
-    100 * recovery_frac, opts.off_s, max(tau_rec));
-fprintf('  steady-state theta at each step rate:\n');
-for k = 1:numel(opts.step_rates)
-    rk = opts.step_rates(k);
-    fprintf('     r = %.3f  ->  theta = %.5f   (onset transient reaches %.3f)\n', ...
-        rk, rk * prod(1 ./ (1 + rk ./ rho)), rk);
-end
-fprintf('\n');
+fprintf('recovery between steps = %.1f%%\n', 100 * (1 - exp(-off_s / max(tau_rec))));
 
-%% ---- Figure --------------------------------------------------------------
-prod_color     = [0.85 0.325 0.098];
-single_color   = [0.5 0.5 0.5];
-identity_color = [0.55 0.80 0.55];
-tick_fs = 12; label_fs = 14; title_fs = 15; lw = 2;
+%% ---- figure ---------------------------------------------------------------
+c_prod = [0.85 0.325 0.098];
+c_one  = [0.5 0.5 0.5];
+c_id   = [0.55 0.80 0.55];
+fs_t = 12; fs_l = 14; lw = 2;
 
-% 3x2. Top row: the two STEADY-STATE panels, which share an x axis (rate, 0 to
-% 1) and belong side by side. Rows 2 and 3: the two STEP RESPONSES, each
-% spanning the full width because they are in TIME and 62 s of protocol is badly
-% cramped in half a figure.
-%
-% The grid is the argument the figure makes. Each column of the top row has its
-% step response directly below it -- depression left, synaptic output right --
-% so a steady-state curve and its transient can be read against each other, and
-% the two rows differ only in whether the rate axis is swept or stepped.
-fig_size = [900, 900];
+sz  = [900 900];
 scr = get(groot, 'ScreenSize');
-fig = figure('Color', 'white', ...
-    'Position', [scr(1:2) + max((scr(3:4) - fig_size)/2, 0), fig_size]);
-tl = tiledlayout(fig, 3, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-title(tl, sprintf('\\tau_{rec} = [%s] s,   \\tau_{rel} = [%s] s,   \\rho = [%s]', ...
+fig = figure('Color', 'white', 'Position', [scr(1:2) + max((scr(3:4)-sz)/2, 0), sz]);
+tl  = tiledlayout(fig, 3, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+title(tl, sprintf('\\tau_{rec} = [%s],  \\tau_{rel} = [%s],  \\rho = [%s]', ...
     strjoin(compose('%g', tau_rec), ' '), strjoin(compose('%g', tau_rel), ' '), ...
-    strjoin(compose('%.3g', rho), ' ')), 'FontSize', title_fs);
+    strjoin(compose('%.3g', rho), ' ')), 'FontSize', 15);
 
-% --- 1. prod(b) vs r ---
+% 1: prod(b) vs r
 ax1 = nexttile(tl); hold(ax1, 'on');
-plot(ax1, r, b_each(1, :), '--', 'LineWidth', 1, 'Color', single_color);
-plot(ax1, r, b_prod, 'LineWidth', lw, 'Color', prod_color);
-hold(ax1, 'off'); box(ax1, 'off'); set(ax1, 'FontSize', tick_fs);
-xlabel(ax1, 'firing rate  r', 'FontSize', label_fs);
-ylabel(ax1, 'depression  $\prod_k b_k$', 'Interpreter', 'latex', 'FontSize', label_fs);
-title(ax1, 'Steady-state depression', 'FontWeight', 'normal', 'FontSize', title_fs);
-xlim(ax1, [0 1]); ylim(ax1, [0 1]); set(ax1, 'XTick', [0 1], 'YTick', [0 1]);
-legend(ax1, {'single $b_k$', '$\prod_k b_k$'}, 'Interpreter', 'latex', ...
-    'Box', 'off', 'FontSize', 11, 'Location', 'northeast');
+plot(ax1, r, b_each(1,:), '--', 'LineWidth', 1, 'Color', c_one);
+plot(ax1, r, b_prod, 'LineWidth', lw, 'Color', c_prod);
+box(ax1,'off'); set(ax1,'FontSize',fs_t,'XTick',[0 1],'YTick',[0 1]);
+xlim(ax1,[0 1]); ylim(ax1,[0 1]);
+xlabel(ax1,'firing rate  r','FontSize',fs_l);
+ylabel(ax1,'depression  $\prod_k b_k$','Interpreter','latex','FontSize',fs_l);
+title(ax1,'Steady-state depression','FontWeight','normal','FontSize',15);
+legend(ax1,{'single $b_k$','$\prod_k b_k$'},'Interpreter','latex','Box','off', ...
+    'FontSize',10,'Location','northeast');
 
-% --- 2. prod(b)*r vs r ---
-% Zoomed like the paper figure's 'zoom' variant: at full scale the curves sit in
-% the bottom tenth and the turnover -- the point of the panel -- is invisible.
-% The 1:1 aspect is therefore dropped, so no angle here means anything.
-zoom_ymax = max([theta_single, theta]) * 1.15;
+% 2: prod(b)*r vs r
+ymax2 = max([b_each(1,:).*r, theta]) * 1.15;
 ax2 = nexttile(tl); hold(ax2, 'on');
-h2_id     = plot(ax2, [0 1], [0 1], '-', 'LineWidth', 1, 'Color', identity_color);
-h2_single = plot(ax2, r, theta_single, '--', 'LineWidth', 1, 'Color', single_color);
-h2_prod   = plot(ax2, r, theta, 'LineWidth', lw, 'Color', prod_color);
+h_id  = plot(ax2, [0 1], [0 1], '-', 'LineWidth', 1, 'Color', c_id);
+h_one = plot(ax2, r, b_each(1,:).*r, '--', 'LineWidth', 1, 'Color', c_one);
+h_pr  = plot(ax2, r, theta, 'LineWidth', lw, 'Color', c_prod);
 if has_peak
     plot(ax2, r_peak, theta_peak, 'o', 'MarkerSize', 6, ...
-        'MarkerFaceColor', prod_color, 'MarkerEdgeColor', 'none');
-    % Both coordinates of the peak, not just where it is. The HEIGHT is the
-    % quantity the panel exists to bound -- the most any rate can deliver
-    % through this synapse -- and reading it off a y axis whose only ticks are
-    % 0 and the limit is guesswork.
-    % Just the pair. The axis labels already say what the coordinates ARE, so
-    % naming them again in the annotation was noise; a marked point next to
-    % "(0.125, 0.03125)" reads as an (x, y) without being told.
-    %
-    % Two decimals, TR's call -- the exact values are printed at the console and
-    % returned in out.r_peak / out.theta_peak, so the annotation only has to
-    % locate the point, not report it to full precision. Note this renders the
-    % height as 0.03 on the default timescales.
-    %
-    % Plain text, no markup: the earlier version wrote \prod, which MATLAB's tex
-    % interpreter does not have -- it warned and rendered the markup raw, so it
-    % needed the latex interpreter to work at all.
-    text(ax2, r_peak, theta_peak, ...
-        sprintf('  (%.2f, %.2f)', r_peak, theta_peak), ...
-        'FontSize', 11, 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left');
+        'MarkerFaceColor', c_prod, 'MarkerEdgeColor', 'none');
+    text(ax2, r_peak, theta_peak, sprintf('  (%.2f, %.2f)', r_peak, theta_peak), ...
+        'FontSize', 11, 'VerticalAlignment','bottom','HorizontalAlignment','left');
 end
-hold(ax2, 'off'); box(ax2, 'off'); set(ax2, 'FontSize', tick_fs);
-xlabel(ax2, 'firing rate  r', 'FontSize', label_fs);
-ylabel(ax2, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ...
-    'FontSize', label_fs);
-title(ax2, 'Steady-state synaptic output', 'FontWeight', 'normal', 'FontSize', title_fs);
-xlim(ax2, [0 1]); ylim(ax2, [0 zoom_ymax]);
-set(ax2, 'XTick', [0 1], 'YTick', [0 round(zoom_ymax, 3)]);
-% southeast: the identity line exits the top-left almost at once and the single
-% b_k curve climbs across the upper right, so the free space is BELOW the
-% turned-over product curve. Handles named for the same reason as panel 3 --
-% the peak marker is plotted after these and would otherwise take a slot.
-legend(ax2, [h2_id, h2_single, h2_prod], ...
-    {'undepressed  $y = r$', 'single $b_k \cdot r$', '$\prod_k b_k \cdot r$'}, ...
-    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
+box(ax2,'off'); set(ax2,'FontSize',fs_t,'XTick',[0 1],'YTick',[0 round(ymax2,3)]);
+xlim(ax2,[0 1]); ylim(ax2,[0 ymax2]);
+xlabel(ax2,'firing rate  r','FontSize',fs_l);
+ylabel(ax2,'synaptic output  $\prod_k b_k \cdot r$','Interpreter','latex','FontSize',fs_l);
+title(ax2,'Steady-state synaptic output','FontWeight','normal','FontSize',15);
+legend(ax2,[h_id h_one h_pr], ...
+    {'undepressed  $y = r$','single $b_k \cdot r$','$\prod_k b_k \cdot r$'}, ...
+    'Interpreter','latex','Box','off','FontSize',10,'Location','southeast');
 
-% --- 3. step response ---
-% BOTTOM row, though it is built first. Tile numbers are given explicitly, so
-% code order and visual order differ here: depression is drawn second but placed
-% above, because it is the factor and this is the product. Keeping the code
-% order means seg_start and the shared quantities stay defined before use.
-ax3 = nexttile(tl, 5, [1 2]); hold(ax3, 'on');
-% The drive at TRUE SCALE, sharing the output's axis, and GREEN to match the
-% y = x line in panel 2 -- deliberately, because they are the same quantity.
-% That line is the UNDEPRESSED synapse (b == 1, so output == r), and r(t) here
-% is what this synapse would deliver with no depression. Same meaning, same
-% colour, in both panels.
-%
-% It was briefly plotted rescaled to fill the panel, which made the steps read
-% as 0.3/0.6/1.2 -- the rates were right and only the reference trace was
-% stretched, but it invited exactly the misreading it got, and threw away the
-% reason to draw r(t) at all: because b = 1 at rest, each onset delivers very
-% nearly the FULL r, so theta rises to meet the drive and then collapses away
-% from it. The small shortfall at each onset is incomplete recovery during
-% off_s. Same units, same axis, no scale factor.
-ss = arrayfun(@(rk) rk * prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
-y_max = max([theta_t, r_t, ss]) * 1.12;
-h_rate = plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
-% Each plateau's asymptote -- the SAME number panel 2 plots at that rate --
-% drawn ONLY across its own step. Spanning the full width implied the level
-% meant something during the off periods, where the rate is zero and the true
-% asymptote is theta = 0; it also let three lines for three different rates run
-% side by side with nothing tying each to its step.
-% Grey, so the green in this panel means one thing only: the undepressed
-% reference. Unlabelled -- the legend says what the level IS, and the value can
-% be read off the axis; annotating each with its number crowded the panel to
-% report three figures already printed at the console and plotted in panel 2.
-seg_start = cumsum([0, seg_dur]);
-h_ss = gobjects(1, numel(ss));
-for k = 1:numel(ss)
-    on_span = seg_start([2*k, 2*k + 1]);      % segment 2k is the k-th step
-    h_ss(k) = plot(ax3, on_span, [ss(k) ss(k)], '-', 'LineWidth', 1.5, ...
-        'Color', single_color);
+% 3 (tiles 3-4): depression step response
+ax3 = nexttile(tl, 3, [1 2]); hold(ax3, 'on');
+h3r = plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', c_id);
+for k = 1:numel(ss_b)
+    h3s = plot(ax3, seg_start([2*k 2*k+1]), ss_b([k k]), '-', ...
+        'LineWidth', 1.5, 'Color', c_one);
 end
-% ONE timescale acting alone, on the same drive -- grey dashed, as in panels 1
-% and 2, so the gap to the solid curve reads as the cost of the SECOND
-% timescale rather than as depression in general. Its b_1 is the first row of
-% the same exact integration, so this is the identical protocol with K = 1.
-h_single = plot(ax3, t, b_t(1, :) .* r_t, '--', 'LineWidth', 1, 'Color', single_color);
-h_theta  = plot(ax3, t, theta_t, 'LineWidth', lw, 'Color', prod_color);
-hold(ax3, 'off'); box(ax3, 'off'); set(ax3, 'FontSize', tick_fs);
-xlabel(ax3, 'time (s)', 'FontSize', label_fs);
-ylabel(ax3, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ...
-    'FontSize', label_fs);
-title(ax3, 'Step response: synaptic output', 'FontWeight', 'normal', 'FontSize', title_fs);
-xlim(ax3, [0 t(end)]); ylim(ax3, [0 y_max]);
-% Handles named explicitly: three steady-state segments sit between the drive
-% and the traces, so a legend given only labels would attach them to the wrong
-% lines.
-legend(ax3, [h_rate, h_ss(1), h_single, h_theta], ...
-    {'rate  $r(t)$', 'steady state', 'single $b_k \cdot r$', ...
+h3o = plot(ax3, t, b_t(1,:), '--', 'LineWidth', 1, 'Color', c_one);
+h3p = plot(ax3, t, b_prod_t, 'LineWidth', lw, 'Color', c_prod);
+box(ax3,'off'); set(ax3,'FontSize',fs_t); xlim(ax3,[0 t(end)]); ylim(ax3,[0 1.05]);
+xlabel(ax3,'time (s)','FontSize',fs_l);
+ylabel(ax3,'depression  $\prod_k b_k$','Interpreter','latex','FontSize',fs_l);
+title(ax3,'Step response: depression','FontWeight','normal','FontSize',15);
+legend(ax3,[h3r h3s h3o h3p], ...
+    {'rate  $r(t)$','steady state','single $b_k$','depression  $\prod_k b_k$'}, ...
+    'Interpreter','latex','Box','off','FontSize',10,'Location','southeast');
+
+% 4 (tiles 5-6): synaptic output step response
+ax4 = nexttile(tl, 5, [1 2]); hold(ax4, 'on');
+h4r = plot(ax4, t, r_t, '-', 'LineWidth', 1.5, 'Color', c_id);
+for k = 1:numel(ss_theta)
+    h4s = plot(ax4, seg_start([2*k 2*k+1]), ss_theta([k k]), '-', ...
+        'LineWidth', 1.5, 'Color', c_one);
+end
+h4o = plot(ax4, t, b_t(1,:).*r_t, '--', 'LineWidth', 1, 'Color', c_one);
+h4p = plot(ax4, t, theta_t, 'LineWidth', lw, 'Color', c_prod);
+box(ax4,'off'); set(ax4,'FontSize',fs_t);
+xlim(ax4,[0 t(end)]); ylim(ax4,[0 max([theta_t r_t])*1.12]);
+xlabel(ax4,'time (s)','FontSize',fs_l);
+ylabel(ax4,'synaptic output  $\prod_k b_k \cdot r$','Interpreter','latex','FontSize',fs_l);
+title(ax4,'Step response: synaptic output','FontWeight','normal','FontSize',15);
+legend(ax4,[h4r h4s h4o h4p], ...
+    {'rate  $r(t)$','steady state','single $b_k \cdot r$', ...
      'synaptic output  $\prod_k b_k \cdot r$'}, ...
-    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'northeast');
+    'Interpreter','latex','Box','off','FontSize',10,'Location','northeast');
 
-% --- 4. step response, DEPRESSION ---
-% The same protocol and the same exact integration, one factor of r removed:
-% this is prod(b) itself rather than prod(b)*r. Worth its own panel because the
-% two disagree in shape -- prod(b) falls MONOTONICALLY with rate (harder drive
-% always depresses more) while prod(b)*r turns over, so the non-monotonicity
-% belongs to the product with r, not to depression.
-%
-% MIDDLE row, so the figure reads factor-then-product downwards: depression,
-% then depression times rate. It also puts each step response directly under the
-% steady-state panel of the same quantity -- depression above depression on the
-% left, output above output on the right.
-b_prod_t   = prod(b_t, 1);
-b_ss_level = arrayfun(@(rk) prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
-
-ax4 = nexttile(tl, 3, [1 2]); hold(ax4, 'on');
-h4_rate = plot(ax4, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
-h4_ss = gobjects(1, numel(b_ss_level));
-for k = 1:numel(b_ss_level)
-    on_span = seg_start([2*k, 2*k + 1]);
-    h4_ss(k) = plot(ax4, on_span, b_ss_level([k k]), '-', 'LineWidth', 1.5, ...
-        'Color', single_color);
-end
-h4_single = plot(ax4, t, b_t(1, :), '--', 'LineWidth', 1, 'Color', single_color);
-h4_prod   = plot(ax4, t, b_prod_t, 'LineWidth', lw, 'Color', prod_color);
-hold(ax4, 'off'); box(ax4, 'off'); set(ax4, 'FontSize', tick_fs);
-xlabel(ax4, 'time (s)', 'FontSize', label_fs);
-ylabel(ax4, 'depression  $\prod_k b_k$', 'Interpreter', 'latex', 'FontSize', label_fs);
-title(ax4, 'Step response: depression', 'FontWeight', 'normal', 'FontSize', title_fs);
-xlim(ax4, [0 t(end)]); ylim(ax4, [0 1.05]);
-% southeast: b sits near 1 for most of the record and dips only during steps, so
-% the free space is low and late -- after the last step, where r is 0 and b is
-% recovering toward the top of the panel.
-legend(ax4, [h4_rate, h4_ss(1), h4_single, h4_prod], ...
-    {'rate  $r(t)$', 'steady state', 'single $b_k$', 'depression  $\prod_k b_k$'}, ...
-    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
-
-% One time axis for both step panels, so zooming or panning either keeps them
-% aligned -- they are the same protocol and must stay comparable by eye.
-linkaxes([ax3, ax4], 'x');
-
-%% ---- Outputs -------------------------------------------------------------
-out = struct('fig', fig, 'rho', rho, 'r_peak', r_peak, 'theta_peak', theta_peak, ...
-    'has_peak', has_peak, 'r_peak_exact', r_peak_exact, ...
-    'theta_peak_exact', theta_peak_exact, 'recovery_frac', recovery_frac, ...
-    't', t, 'r_t', r_t, 'b_t', b_t, 'theta_t', theta_t, ...
-    'r', r, 'b_prod', b_prod, 'theta', theta, 'files', {{}});
-
-if opts.save
-    out_dir = opts.out_dir;
-    if isempty(out_dir)
-        out_dir = fullfile(fileparts(mfilename('fullpath')), 'output');
-    end
-    if ~isfolder(out_dir); mkdir(out_dir); end
-    tag = sprintf('STD_rec_%s_rel_%s', ...
-        strjoin(compose('%g', tau_rec), '_'), strjoin(compose('%g', tau_rel), '_'));
-    tag = strrep(tag, '.', 'p');
-    for ext = {'png', 'fig'}
-        f = fullfile(out_dir, [tag '.' ext{1}]);
-        if strcmp(ext{1}, 'png')
-            exportgraphics(fig, f, 'Resolution', 300);
-        else
-            savefig(fig, f);
-        end
-        out.files{end+1} = f;
-    end
-    fprintf('Saved: %s\n', strjoin(out.files, '\n       '));
-end
-end
+linkaxes([ax3 ax4], 'x');
