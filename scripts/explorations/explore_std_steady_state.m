@@ -7,8 +7,8 @@
 % peak. Two timescales: r_peak = sqrt(rho1*rho2), independent of their spread.
 
 %% ---- parameters -----------------------------------------------------------
-tau_rel    = [0.25 1];
-tau_rec    = 4 * tau_rel;
+tau_rel    = [0.25 0.5 1];
+tau_rec    = [4 4 4].* tau_rel;
 step_rates = [0.125 0.52 0.5 1.0];
 on_s       = 5;
 off_s      = 10;      % < ~4*max(tau_rec) and steps start already depressed
