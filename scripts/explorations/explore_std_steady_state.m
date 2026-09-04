@@ -58,13 +58,17 @@ arguments
     opts.tau_rel     (1,:) double  = [0.25 0.5]
     opts.step_rates  (1,:) double  = [0.25 0.5 1]
     opts.on_s        (1,1) double  = 5
-    % Long enough for the SLOWEST tau_rec to recover between steps: at the
-    % default 15 s and tau_rec = 4 s, b returns to 1 - exp(-15/4) = 97.6%. Too
-    % short and each step starts more depressed than the last, which reads as a
-    % property of the rate rather than of the protocol. The realised recovery is
-    % returned in out.recovery_frac -- check it after changing tau_rec.
-    opts.off_s       (1,1) double  = 15
-    opts.settle_s    (1,1) double  = 2
+    % A SYMMETRIC 5 s on / 5 s off protocol, TR's choice, and the price is worth
+    % knowing: 5 s is not long enough for the slowest tau_rec to recover. At
+    % tau_rec = 4 s, b returns to only 1 - exp(-5/4) = 71.3% between steps, so
+    % each step starts MORE DEPRESSED than the last and its plateau sits below
+    % the true asymptote for that rate. The grey steady-state levels are drawn
+    % from the closed form, so that shortfall is visible as a gap rather than
+    % hidden -- and the gap is a property of the protocol, not of the rate.
+    % Raise off_s (15 s gives 97.6%) to separate the steps properly.
+    % out.recovery_frac reports the realised figure.
+    opts.off_s       (1,1) double  = 5
+    opts.settle_s    (1,1) double  = 5
     opts.fs          (1,1) double  = 1000
     opts.save        (1,1) logical = false
     opts.out_dir     (1,:) char    = ''
