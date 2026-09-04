@@ -223,17 +223,21 @@ if has_peak
     % quantity the panel exists to bound -- the most any rate can deliver
     % through this synapse -- and reading it off a y axis whose only ticks are
     % 0 and the limit is guesswork.
-    % LATEX, not tex: MATLAB's tex interpreter has no \prod and warns
-    % "String scalar or character vector must have valid interpreter syntax",
-    % then renders the markup raw.
+    % Just the pair. The axis labels already say what the coordinates ARE, so
+    % naming them again in the annotation was noise; a marked point next to
+    % "(0.125, 0.03125)" reads as an (x, y) without being told.
     %
-    % %g, not %f: %.4f prints the exact peak 0.03125 as 0.0312, because printf
-    % rounds a half to even. %g keeps the value instead of silently truncating
-    % the one number the label exists to state.
+    % Two decimals, TR's call -- the exact values are printed at the console and
+    % returned in out.r_peak / out.theta_peak, so the annotation only has to
+    % locate the point, not report it to full precision. Note this renders the
+    % height as 0.03 on the default timescales.
+    %
+    % Plain text, no markup: the earlier version wrote \prod, which MATLAB's tex
+    % interpreter does not have -- it warned and rendered the markup raw, so it
+    % needed the latex interpreter to work at all.
     text(ax2, r_peak, theta_peak, ...
-        sprintf('  $(r = %.3g,\\; r\\prod_k b_k = %.4g)$', r_peak, theta_peak), ...
-        'Interpreter', 'latex', 'FontSize', 11, ...
-        'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left');
+        sprintf('  (%.2f, %.2f)', r_peak, theta_peak), ...
+        'FontSize', 11, 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left');
 end
 hold(ax2, 'off'); box(ax2, 'off'); set(ax2, 'FontSize', tick_fs);
 xlabel(ax2, 'firing rate  r', 'FontSize', label_fs);
