@@ -180,9 +180,12 @@ if has_f_variation
 end
 
 %% Create figure
-condition_titles = containers.Map(...
-    {'no_adaptation', 'sfa_only', 'std_only', 'sfa_and_std'}, ...
-    {'No Adaptation', 'SFA Only', 'STD Only', 'SFA + STD'});
+% One source, shared with every other condition-keyed plot. This was a private
+% four-entry copy that knew only the pre-2026-09-03 names, so a run using the
+% sfaX_stdY names got raw snake_case panel titles here while reading correctly
+% everywhere else -- exactly the drift srnn_condition_titles exists to prevent.
+% It carries the legacy names too, so older runs still title properly.
+condition_titles = srnn_condition_titles();
 
 fig = figure('Name', 'Mean Local LLE by Step', ...
     'Position', [100, 100, 300 * num_conditions, 300]);

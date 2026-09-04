@@ -52,9 +52,14 @@ st           = manuscript_style();
 % Pull the depression timescales out of the preset's own STD routes. They live
 % on the conditions, not on the model_defaults struct: synapse_config can only
 % reach the model through a condition, so that is where a preset puts them.
+% The most-adapted regime, resolved rather than named: which condition carries
+% the full route set differs by preset (sfa3_std2 here, sfa3_std1 for a
+% single-timescale network). Matching a literal name found nothing on the
+% 3-condition preset, and `conditions{[]}` then failed with a comma-separated
+% list error rather than anything that named the cause.
 [~, ~, conditions] = srnn_param_preset(cfg.preset_name);
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
-sc = conditions{strcmp(cond_names, 'sfa_and_std')}.synapse_config;
+sc = conditions{strcmp(cond_names, full_adaptation_condition(conditions))}.synapse_config;
 route = sc.E.E.std;                 % uniform across all four routes in this preset
 tau_rec = route.tau_rec(:)';
 tau_rel = route.tau_rel(:)';

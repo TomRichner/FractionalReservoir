@@ -17,34 +17,60 @@ function titles = srnn_condition_titles()
 % Callers should still guard with isKey() where a run may carry conditions this
 % does not know about -- a saved run directory can name anything.
 %
+% NAMES STATE THE ADAPTATION STRUCTURE (2026-09-03). A condition is
+% 'no_adaptation' or 'sfaX_stdY', X and Y being the number of SFA and depression
+% timescales actually in use, plus '_stfZ' where facilitation is on. Before that
+% the names were mechanism-based -- sfa_only, std_only, sfa_and_std -- and
+% 'sfa_and_std' meant FOUR different things across the ten presets: 3 SFA + 2
+% STD in the paper's networks, 3 + 1 in bursting_pairs and both SRNNModel2
+% presets, 3 + 0 in sompolinsky_pairs, and 1 + 1 + STF in single_neuron_stf. Two
+% run directories could carry the same condition folder name and different
+% physics, and nothing caught it.
+%
+% Titles are therefore STRUCTURAL now. That is a deliberate loss: the
+% 3-condition preset used to title its regimes "Single-Timescale Adaptation" and
+% "Multiple-Timescale Adaptation", which reads better but could only work while
+% those regimes had names no other preset used. 'SFA 1\tau + STD 1\tau' against
+% 'SFA 3\tau + STD 2\tau' states the same contrast and stays true in the
+% 7-condition set, where both regimes also appear. Retitle here if the
+% manuscript wants different words -- that is what keeping this map keyed by
+% NAME, rather than putting a title inside each condition, is for: a saved run
+% can be retitled without recomputing it.
+%
 % See also: srnn_param_preset, validate_preset_conditions, manuscript_style,
 %           ParamSpaceAnalysis2/plot_sensitivity
 
-% TWO TITLE VOCABULARIES, on purpose.
+current = { ...
+    'no_adaptation',    'No Adaptation'; ...
+    'sfa1_std0',        'SFA 1\tau'; ...
+    'sfa3_std0',        'SFA 3\tau'; ...
+    'sfa0_std1',        'STD 1\tau'; ...
+    'sfa0_std2',        'STD 2\tau'; ...
+    'sfa1_std1',        'SFA 1\tau + STD 1\tau'; ...
+    'sfa3_std1',        'SFA 3\tau + STD 1\tau'; ...
+    'sfa3_std2',        'SFA 3\tau + STD 2\tau'; ...
+    ... % single_neuron_stf only -- the one preset with facilitation. Without the
+    ... % suffix its regimes would be sfa0_std1 and sfa1_std1, and sfa1_std1 is
+    ... % already the 3-condition preset's SFA+STD with NO facilitation.
+    'sfa0_std1_stf1',   'STD 1\tau + STF'; ...
+    'sfa1_std1_stf1',   'SFA 1\tau + STD 1\tau + STF'};
+
+% LEGACY KEYS, for run directories saved before the rename. Their condition
+% subfolders are still named this way, so a figure regenerated from an old run
+% would otherwise fall back to raw snake_case in its panel titles. Kept
+% deliberately and indefinitely: they cost one row each and old runs are the
+% only record of experiments that are expensive to repeat.
 %
-% The 4- and 7-regime sets name MECHANISMS -- "SFA Only", "STD Only",
-% "SFA + STD" -- because those sets exist to separate SFA from STD.
-%
-% The 'single_multi' set names TIMESCALE STRUCTURE -- "Single-Timescale
-% Adaptation" against "Multiple-Timescale Adaptation" -- because there the
-% mechanisms are always present together and the only thing varying is how many
-% timescales carry them. That is the comparison the paper is built on.
-%
-% This is why sfa3_std2 exists as a separate name for physics identical to
-% sfa_and_std: one regime, two labels, so each set can say what its own
-% comparison is about. sfa_and_std keeps "SFA + STD" for the sets that still
-% use it.
-%
-% THE SINGLE_MULTI TITLES ARE ~3x LONGER than the mechanism ones (28 characters
-% against 9). ParamSpaceAnalysis2's plotters set them as panel titles at
-% FontSize 14 in figures sized 300 px per condition, where they fit but not by
-% much. TR is aware and will handle any clipping in post; do NOT shorten these
-% or adjust a figure to accommodate them.
-titles = containers.Map( ...
-    {'no_adaptation', 'sfa_only_oneTS', 'sfa_only', 'std_only_oneTS', ...
-     'std_only', 'sfa3_std1', 'sfa_and_std', ...
-     'sfa1_std1', 'sfa3_std2'}, ...
-    {'No Adaptation', 'SFA (1 \tau)', 'SFA Only', 'STD (1 \tau)', ...
-     'STD Only', 'SFA + STD (1 \tau)', 'SFA + STD', ...
-     'Single-Timescale Adaptation', 'Multiple-Timescale Adaptation'});
+% Note these names are AMBIGUOUS -- that is why they were replaced -- so the
+% titles below are the ones they carried at the time, not a claim about how many
+% timescales any particular old run actually used.
+legacy = { ...
+    'sfa_only',         'SFA Only'; ...
+    'std_only',         'STD Only'; ...
+    'sfa_and_std',      'SFA + STD'; ...
+    'sfa_only_oneTS',   'SFA (1 \tau)'; ...
+    'std_only_oneTS',   'STD (1 \tau)'};
+
+all_rows = [current; legacy];
+titles = containers.Map(all_rows(:, 1), all_rows(:, 2));
 end

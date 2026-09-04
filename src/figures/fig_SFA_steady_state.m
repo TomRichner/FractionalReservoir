@@ -162,9 +162,10 @@ function [tau_a, c_budget, n_a] = sfa_from_preset(preset_name)
 % reading the figure's own printout during the smoke test.
 %
 % tau_a still has to come off a BUILT model rather than the preset: it is
-% condition-owned, so it reaches the model through the sfa_and_std condition and
-% is not in the preset struct at all.
-model = build_from_preset(preset_name, 'sfa_and_std');
+% condition-owned, so it reaches the model through the most-adapted condition
+% and is not in the preset struct at all. Which condition that IS depends on the
+% preset -- sfa3_std2 here, sfa3_std1 elsewhere -- so it is resolved, not named.
+model = build_from_preset(preset_name);
 
 if isprop(model, 'tau_a')            % SRNNCellTypePairs: 1 x C cell
     tau_a    = model.tau_a{1};

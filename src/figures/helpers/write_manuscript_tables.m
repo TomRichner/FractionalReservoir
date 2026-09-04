@@ -63,7 +63,10 @@ end
 out_dir = ensure_dir(out_dir);
 
 [preset, model_class, conditions] = srnn_param_preset(cfg.preset_name);
-model = build_from_preset(cfg.preset_name, 'sfa_and_std');
+% Empty -> the preset's most-adapted regime, whatever it is called. The tables
+% document the fullest configuration, and which condition that is varies by
+% preset since names now state their timescale counts.
+model = build_from_preset(cfg.preset_name, '');
 M = model_facts(model, model_class, preset);
 
 paths = {};

@@ -122,7 +122,7 @@ fprintf('\n-- condition row lengths --\n');
 [~, ~, c2] = srnn_param_preset('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond');
 all_passed = check('C = 2 gives 2-element tau_a rows', ...
     all(cellfun(@(c) numel(c.tau_a) == 2, c2))) && all_passed;
-all_passed = check('C = 2 sfa_only is still [3 0]', ...
+all_passed = check('C = 2 sfa3_std0 is still [3 0]', ...
     isequal(cellfun(@numel, c2{2}.tau_a), [3 0])) && all_passed;
 
 %% The C = 1 presets
@@ -169,7 +169,11 @@ function W = preset_W(preset_name, extra)
 % build() is chatty; the checksum is all we want here, so evalc swallows it.
 % The argument list is assembled OUTSIDE the evalc string -- the alternative
 % interpolates preset_name into code, which the Code Analyzer cannot see through.
-args = [{preset_name, 'sfa_and_std'}, extra, ...
+% '' -> the preset's most-adapted condition, whatever it is called. This table
+% spans presets whose full regime is sfa3_std2, sfa3_std1, sfa3_std0 and
+% sfa1_std1_stf1, so no literal works for all of them. W does not depend on the
+% condition anyway -- the checksums below are unaffected by which one is chosen.
+args = [{preset_name, ''}, extra, ...
         {'lya_method', 'none', 'T_range', [0 1], 'rng_seeds', [42 42]}]; %#ok<NASGU>
 evalc('m = build_from_preset(args{:});');
 W = full(m.W);

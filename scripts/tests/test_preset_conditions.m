@@ -55,8 +55,8 @@ fprintf('\n-- the 7-regime preset --\n');
 got7 = name_of(seven);
 % ORDER MATTERS: it is the column order of every sweep figure.
 all_passed = check('7 regimes in the intended order', ...
-    isequal(got7, {'no_adaptation','sfa_only_oneTS','sfa_only','std_only_oneTS', ...
-                   'std_only','sfa3_std1','sfa_and_std'})) && all_passed;
+    isequal(got7, {'no_adaptation','sfa1_std0','sfa3_std0','sfa0_std1', ...
+                   'sfa0_std2','sfa3_std1','sfa3_std2'})) && all_passed;
 all_passed = check('SFA timescale counts are [0 1 3 0 0 3 3]', ...
     isequal(cellfun(@(c) numel(c.tau_a{1}), seven), [0 1 3 0 0 3 3])) && all_passed;
 all_passed = check('STD timescale counts are [0 0 0 1 2 1 2]', ...
@@ -78,7 +78,7 @@ all_passed = check('sfa_only_oneTS takes the FIRST tau_a', ...
 fprintf('\n-- shared regime names agree across presets --\n');
 got4 = name_of(four);
 same = true; differing = {};
-for s = {'no_adaptation','sfa_only','std_only','sfa_and_std'}
+for s = {'no_adaptation','sfa3_std0','sfa0_std2','sfa3_std2'}
     a = four{strcmp(got4, s{1})};
     b = seven{strcmp(got7, s{1})};
     if ~isequaln(a, b); same = false; differing{end+1} = s{1}; end %#ok<SAGROW>
@@ -106,27 +106,31 @@ all_passed = check('sfa1_std1 takes the FIRST tau_a and the FIRST STD pair', ...
     isequal(three{2}.synapse_config.E.E.std.tau_rec, ...
             three{3}.synapse_config.E.E.std.tau_rec(1))) && all_passed;
 
-% sfa3_std2 is a second NAME for sfa_and_std, not a second regime. The two now
-% live in different preset cases, so if they stop matching, one was edited in
-% isolation and the "identical physics, different label" claim is a lie.
-a = three{strcmp(got3, 'sfa3_std2')};
-b = seven{strcmp(got7, 'sfa_and_std')};
-all_passed = check('sfa3_std2 is identical to sfa_and_std apart from the name', ...
-    isequaln(rmfield(a, 'name'), rmfield(b, 'name'))) && all_passed;
-all_passed = check('...and they really do carry different names', ...
-    ~strcmp(a.name, b.name)) && all_passed;
+% ONE NAME, ONE REGIME, ACROSS PRESETS. sfa3_std2 used to be an alias invented so
+% the 3-condition set could title its full regime differently from the 7-condition
+% set's sfa_and_std. Now both presets simply call it sfa3_std2, and the two must be
+% the same struct -- that is the invariant the whole naming scheme buys, and the
+% one the old mechanism names could not express (sfa_and_std meant four different
+% things across the ten presets).
+all_passed = check('sfa3_std2 is identical in the 3- and 7-cond presets', ...
+    isequaln(three{strcmp(got3, 'sfa3_std2')}, ...
+             seven{strcmp(got7, 'sfa3_std2')})) && all_passed;
 all_passed = check('no_adaptation is identical across the 3- and 7-cond presets', ...
     isequaln(three{strcmp(got3, 'no_adaptation')}, ...
              seven{strcmp(got7, 'no_adaptation')})) && all_passed;
 
-% Different titles is the whole reason the second name exists.
+% Titles are STRUCTURAL now, so they can be shared across presets without lying.
 t = srnn_condition_titles();
-all_passed = check('the two names get DIFFERENT display titles', ...
-    ~strcmp(t('sfa3_std2'), t('sfa_and_std'))) && all_passed;
 all_passed = check(sprintf('sfa1_std1 -> "%s"', t('sfa1_std1')), ...
-    strcmp(t('sfa1_std1'), 'Single-Timescale Adaptation')) && all_passed;
+    strcmp(t('sfa1_std1'), 'SFA 1\tau + STD 1\tau')) && all_passed;
 all_passed = check(sprintf('sfa3_std2 -> "%s"', t('sfa3_std2')), ...
-    strcmp(t('sfa3_std2'), 'Multiple-Timescale Adaptation')) && all_passed;
+    strcmp(t('sfa3_std2'), 'SFA 3\tau + STD 2\tau')) && all_passed;
+% Legacy names stay in the map, or a figure regenerated from a run saved before
+% the rename falls back to raw snake_case panel titles.
+all_passed = check('legacy names still resolve to titles', ...
+    all(cellfun(@(n) isKey(t, n), ...
+        {'sfa_only','std_only','sfa_and_std','sfa_only_oneTS','std_only_oneTS'}))) ...
+    && all_passed;
 
 %% SRNNModel2 still speaks counts, deliberately
 fprintf('\n-- SRNNModel2 presets speak counts --\n');
@@ -175,6 +179,41 @@ all_passed = rejects('a Dependent, read-only property', ...
 bad = three; bad{2}.name = 'not_a_titled_regime';
 all_passed = rejects('a name with no display title', ...
     @() validate_preset_conditions(bad, cls, 'p'), 'NoTitle') && all_passed;
+
+%% Names that claim timescale counts must tell the truth
+% NOT "every condition must be named sfaX_stdY" -- conditions are general, and a
+% preset comparing level_of_chaos or S_c would rightly use other names. This
+% checks only names that OPT IN by matching the pattern, so the convention stays
+% a convention. That is also why it lives here rather than in
+% validate_preset_conditions, which stays free of any domain knowledge.
+%
+% The counts are what full_adaptation_condition sorts on, so a lying name would
+% silently send the figures to the wrong regime.
+fprintf('\n-- sfaX_stdY names match the actual timescale counts --\n');
+liars = {};
+for nm = preset_names()
+    [~, cls, cnd] = srnn_param_preset(nm{1});
+    for j = 1:numel(cnd)
+        [claim, actual] = name_vs_counts(cnd{j}, cls);
+        if isempty(claim); continue; end        % not a conforming name; skipped
+        if ~isequal(claim, actual)
+            liars{end+1} = sprintf('%s/%s claims [%s] but carries [%s]', ...
+                nm{1}, cnd{j}.name, num2str(claim), num2str(actual)); %#ok<SAGROW>
+        end
+    end
+end
+all_passed = check('every sfaX_stdY name matches its condition', isempty(liars)) ...
+    && all_passed;
+if ~isempty(liars); fprintf(2, '     %s\n', strjoin(liars, '\n     ')); end
+
+% The check must actually fire, or it is decoration. Take a real condition and
+% rename it to claim counts it does not have.
+[~, cls_p, cnd_p] = srnn_param_preset('celltype_pairs_Sc0p2_noise0p025_dualStd_3cond');
+mis = cnd_p{2};                       % genuinely sfa1_std1
+mis.name = 'sfa3_std2';               % now a lie
+[claim_m, actual_m] = name_vs_counts(mis, cls_p);
+all_passed = check('a deliberately mis-named condition is caught', ...
+    ~isequal(claim_m, actual_m)) && all_passed;
 
 %% No preset may carry tau_a: it is condition-owned
 fprintf('\n-- presets do not carry tau_a --\n');
@@ -252,6 +291,48 @@ if isprop(m, 'n_a') && isprop(m, 'tau_a')
     assert(isequal(m.n_a, cellfun(@numel, m.tau_a)), ...
         '%s/%s: n_a disagrees with numel(tau_a).', preset_name, cond_name);
 end
+end
+
+function [claim, actual] = name_vs_counts(cond, model_class)
+% What a sfaX_stdY[_stfZ] name CLAIMS, and what the condition actually carries,
+% as [n_sfa n_std n_stf]. claim is [] for a name that does not match the pattern,
+% which is how non-conforming names opt out of the check entirely.
+% Two exact patterns, not one with an optional trailing group: MATLAB's regexp
+% does not return a token for a trailing optional group even when it matches, so
+% '_stf1' silently parsed as zero. This test caught that bug in
+% full_adaptation_condition, which had the same defect.
+claim = []; actual = [];
+t3 = regexp(cond.name, '^sfa(\d+)_std(\d+)_stf(\d+)$', 'tokens', 'once');
+t2 = regexp(cond.name, '^sfa(\d+)_std(\d+)$', 'tokens', 'once');
+if ~isempty(t3)
+    claim = cellfun(@str2double, t3);
+elseif ~isempty(t2)
+    claim = [cellfun(@str2double, t2), 0];
+else
+    return
+end
+
+if strcmp(model_class, 'SRNNModel2')
+    % This class speaks COUNTS directly, and has no facilitation.
+    actual = [cond.n_a_E, cond.n_b_E, 0];
+    return
+end
+
+n_sfa = numel(cond.tau_a{1});
+n_std = 0; n_stf = 0;
+sc = cond.synapse_config;
+if isstruct(sc) && ~isempty(fieldnames(sc))
+    pre = fieldnames(sc);
+    for a = 1:numel(pre)
+        post = fieldnames(sc.(pre{a}));
+        for b = 1:numel(post)
+            r = sc.(pre{a}).(post{b});
+            if isfield(r, 'std'); n_std = max(n_std, numel(r.std.tau_rec)); end
+            if isfield(r, 'stf'); n_stf = max(n_stf, numel(r.stf.tau_fac)); end
+        end
+    end
+end
+actual = [n_sfa, n_std, n_stf];
 end
 
 function n = std_count(sc)

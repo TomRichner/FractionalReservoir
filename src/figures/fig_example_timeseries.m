@@ -20,7 +20,11 @@ function out = fig_example_timeseries(cfg)
 arguments
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
-    cfg.condition   (1,:) char    = 'sfa_and_std'
+    % '' -> the preset's most-adapted regime, resolved by build_from_preset.
+    % This was the literal 'sfa_and_std', which the 3-condition preset does not
+    % have -- the figure failed with NoSuchCondition the first time that preset
+    % ran the full pipeline. Name a condition explicitly to plot a different one.
+    cfg.condition   (1,:) char    = ''
     cfg.rng_seeds   (1,2) double  = [1 2]
     cfg.T_range     (1,2) double  = [0 20]
     cfg.save        (1,1) logical = true

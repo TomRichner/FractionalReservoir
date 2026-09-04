@@ -26,27 +26,33 @@ all_passed = true;
 fprintf('\n-- physics unchanged (frozen at cbcf637) --\n');
 % preset, n/indegree override, then one {condition, sum, norm} row per condition.
 F = {
+ ... % CONDITION NAMES were relabelled 2026-09-03 (sfa_only -> sfa3_std0 etc.)
+ ... % when they became structural. The CHECKSUMS below are untouched: they were
+ ... % captured by running pre-change code at cbcf637 and the rename moved no
+ ... % physics, which was proved separately by comparing every condition against
+ ... % the pre-rename golden fixture with the name field stripped. If any value
+ ... % here has to change, the rename broke something -- do not update it.
  'celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', {'n',60,'indegree',20}, {
     'no_adaptation',  5348.42091008, 141.460065715
-    'sfa_only',       7714.98224774, 131.342709836
-    'std_only',       42887.9484524, 162.324200553
-    'sfa_and_std',    48209.9685713, 170.875882894 }
+    'sfa3_std0',      7714.98224774, 131.342709836
+    'sfa0_std2',      42887.9484524, 162.324200553
+    'sfa3_std2',      48209.9685713, 170.875882894 }
  'bursting_pairs', {}, {
     'no_adaptation',  56036.7024234, 429.243870676
-    'sfa_only',       68236.1842781, 427.942567427
-    'std_only',       20783.9501838, 127.513762718
-    'sfa_and_std',    23035.5604914, 131.024526697 }
+    'sfa3_std0',      68236.1842781, 427.942567427
+    'sfa0_std1',      20783.9501838, 127.513762718
+    'sfa3_std1',      23035.5604914, 131.024526697 }
  'sompolinsky_pairs', {'n',60,'indegree',60}, {
     'no_adaptation',  2360.92676217, 129.267097157
-    'sfa_only',       4205.09901870, 152.628453945 }
+    'sfa3_std0',      4205.09901870, 152.628453945 }
  'single_neuron_stf', {}, {
-    'sfa_only',       93.9903825304, 5.55519680910
-    'sfa_and_std',    647.781482404, 24.0779561777 }
+    'sfa1_std0',      93.9903825304, 5.55519680910
+    'sfa1_std1_stf1', 647.781482404, 24.0779561777 }
  'single_neuron_dualStd', {}, {
     'no_adaptation',  175.026795357, 9.43683102318
-    'sfa_only',       320.505680170, 10.9637823696
-    'std_only',       424.368611267, 15.0522656270
-    'sfa_and_std',    598.034634373, 16.6784274754 }
+    'sfa3_std0',      320.505680170, 10.9637823696
+    'sfa0_std2',      424.368611267, 15.0522656270
+    'sfa3_std2',      598.034634373, 16.6784274754 }
  ... % The 'mc_esn' row was REMOVED 2026-09-02 with the preset itself, when
  ... % SRNN_ESN_reservoir was re-parented onto SRNNCellTypePairs. Its
  ... % replacement mc_pairs_dualStd is deliberately NOT given a row here: every
@@ -58,11 +64,11 @@ F = {
  ... % rebuilt.
  'overconnected', {'n',60,'indegree',40}, {
     'no_adaptation',  22173.2222384, 201.624718596
-    'sfa_only',       21175.5140168, 170.518918800
-    'sfa_and_std',    12513.0287070, 139.328370148 }
+    'sfa3_std0',      21175.5140168, 170.518918800
+    'sfa3_std1',      12513.0287070, 139.328370148 }
  'default', {'n',60,'indegree',20}, {
     'no_adaptation',  18377.7826083, 193.598106256
-    'sfa_and_std',    14846.3717166, 132.179501549 }
+    'sfa3_std1',      14846.3717166, 132.179501549 }
 };
 for i = 1:size(F,1)
     rows = F{i,3};
@@ -83,8 +89,10 @@ end
 fprintf('\n-- total adaptation budget is independent of K --\n');
 budget = nan(1,3);
 for K = 1:3
+    % '' -> the preset's most-adapted condition. tau_a is overridden right
+    % below anyway; what this needs is a condition with SFA and STD switched on.
     m = build_from_preset('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond', ...
-        'sfa_and_std', 'tau_a', {log_ladder(0.25, 10, K), zeros(1,0)}, ...
+        '', 'tau_a', {log_ladder(0.25, 10, K), zeros(1,0)}, ...
 'n', 8, 'indegree', 4, 'lya_method','none', 'T_range',[0 1]);
     p = m.get_params();
     budget(K) = p.c_eff(1) * K;      % (c/K)*sum(a) at steady state, where sum(a) = K*r

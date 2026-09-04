@@ -51,7 +51,12 @@ function model = check_sensitivity_sim(opts)
 arguments
     opts.psa_dir               (1,:) char   = ''
     opts.target_level_of_chaos (1,1) double = 2.0
-    opts.target_condition      (1,:) char   = 'sfa_and_std'
+    % '' -> the most-adapted condition of whatever run is loaded, resolved by
+    % full_adaptation_condition. Naming a literal here only worked while every
+    % preset used the same name for that regime; they no longer do. A saved run
+    % from before the rename still works -- the fallback below tries the old
+    % 'sfa_and_std' when no name matches the sfaX_stdY pattern.
+    opts.target_condition      (1,:) char   = ''
     opts.target_rep            (1,1) double = 1
     opts.sim_T_range           (1,2) double = [0, 60]
     opts.overrides             (1,1) struct = struct()
@@ -87,6 +92,17 @@ assert(~isempty(psa.all_configs), ...
 fprintf('Model class: %s\n', psa.model_class);
 
 cond_names = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
+if isempty(opts.target_condition)
+    % The run's most-adapted regime. Falls back to the pre-rename name so a
+    % saved run of any age can be reloaded.
+    try
+        opts.target_condition = full_adaptation_condition(psa.conditions);
+    catch
+        opts.target_condition = 'sfa_and_std';
+    end
+    fprintf('Condition: %s (most adapted; pass target_condition to override)\n', ...
+        opts.target_condition);
+end
 ci = find(strcmp(cond_names, opts.target_condition), 1);
 assert(~isempty(ci), 'Condition ''%s'' not found. Available: %s.', ...
     opts.target_condition, strjoin(cond_names, ', '));

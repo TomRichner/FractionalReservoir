@@ -3,7 +3,8 @@ function [model, info] = build_from_preset(preset_name, condition_name, varargin
 %
 %   model = BUILD_FROM_PRESET('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond')
 %   model = BUILD_FROM_PRESET(p, 'sfa_only')
-%   model = BUILD_FROM_PRESET(p, 'sfa_and_std', 'n', 50, 'T_range', [0 20])
+%   model = BUILD_FROM_PRESET(p)                  % most-adapted regime
+%   model = BUILD_FROM_PRESET(p, 'sfa3_std2', 'n', 50, 'T_range', [0 20])
 %
 % Trailing name-value pairs are applied LAST, so they win over both the preset
 % and the condition -- the same precedence run_single_job uses for a swept
@@ -40,13 +41,21 @@ function [model, info] = build_from_preset(preset_name, condition_name, varargin
 
 arguments
     preset_name    (1,:) char
-    condition_name (1,:) char = 'sfa_and_std'
+    % '' -> this preset's most-adapted regime, resolved below. It used to
+    % default to the literal 'sfa_and_std', which was only ever right for
+    % presets that happened to use that name; the 3-condition preset does not,
+    % and four figures failed with NoSuchCondition the first time it was run.
+    condition_name (1,:) char = ''
 end
 arguments (Repeating)
     varargin
 end
 
 [preset, model_class, conditions] = srnn_param_preset(preset_name);
+
+if isempty(condition_name)
+    condition_name = full_adaptation_condition(conditions);
+end
 
 names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 ci = find(strcmp(names, condition_name), 1);

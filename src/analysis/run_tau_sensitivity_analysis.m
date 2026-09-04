@@ -68,31 +68,18 @@ note = 'tau_timescales';
 % runs exactly the regime the other analyses do. Whichever class is in play it
 % gives E three SFA timescales, which is what n_elements = 3 below is coupled to.
 %
-% TWO ACCEPTED NAMES, because presets name that regime for their own comparison:
-% the 4- and 7-condition presets call it 'sfa_and_std' ("both mechanisms on"),
-% while the 3-condition preset calls it 'sfa3_std2', stating the timescale counts
-% because in that set the counts ARE the comparison. The two are physically
-% identical -- same tau_a row, same routes -- and test_preset_conditions asserts
-% that they stay so. Matching on one name only is what made
-% single_multi_TS_run fail here with "No condition named 'sfa_and_std'".
-%
-% Preference order, not condition order, so the choice is deterministic if a
-% future preset ever carries both.
-accepted   = {'sfa_and_std', 'sfa3_std2'};
+% RESOLVED, NOT NAMED. Condition names state their adaptation structure, so the
+% full-adaptation regime is called sfa3_std2 in the paper's presets, sfa3_std1
+% where depression has a single timescale, and sfa1_std1_stf1 in the facilitation
+% preset. No literal covers those, which is what made single_multi_TS_run fail
+% here with "No condition named 'sfa_and_std'" -- twice, since a two-name list
+% was only a wider guess. full_adaptation_condition errors if nothing conforms
+% rather than falling back to a positional guess.
 cond_names = cellfun(@(c) c.name, ctx.conditions, 'UniformOutput', false);
-idx = [];
-for k = 1:numel(accepted)
-    hit = find(strcmp(cond_names, accepted{k}), 1);
-    if ~isempty(hit); idx = hit; break; end
-end
-if isempty(idx)
-    error('run_tau_sensitivity_analysis:NoFullAdaptation', ...
-        ['No full-adaptation condition in the preset''s condition set: found ' ...
-         '%s, expected one named %s. This sweep is defined on that regime.'], ...
-        strjoin(cond_names, ', '), strjoin(accepted, ' or '));
-end
-condition = ctx.conditions(idx);
-fprintf('Condition: %s (the full-adaptation regime)\n', cond_names{idx});
+full_name  = full_adaptation_condition(ctx.conditions);
+idx        = find(strcmp(cond_names, full_name), 1);
+condition  = ctx.conditions(idx);
+fprintf('Condition: %s (the full-adaptation regime)\n', full_name);
 
 %% tau_a_E(end) sweep -- vector parameter
 fprintf('\n========================================\n');
