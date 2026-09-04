@@ -173,11 +173,16 @@ single_color   = [0.5 0.5 0.5];
 identity_color = [0.55 0.80 0.55];
 tick_fs = 12; label_fs = 14; title_fs = 15; lw = 2;
 
-fig_size = [1180, 340];
+% 2x2 with the step response spanning the bottom row. The two steady-state
+% panels share an x axis (rate, 0 to 1) and belong side by side; the step
+% response is in TIME and is the odd one out, so it reads better given the full
+% width than squeezed into a third of it -- its 62 s of protocol were badly
+% cramped in a 1x3.
+fig_size = [860, 660];
 scr = get(groot, 'ScreenSize');
 fig = figure('Color', 'white', ...
     'Position', [scr(1:2) + max((scr(3:4) - fig_size)/2, 0), fig_size]);
-tl = tiledlayout(fig, 1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+tl = tiledlayout(fig, 2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 title(tl, sprintf('\\tau_{rec} = [%s] s,   \\tau_{rel} = [%s] s,   \\rho = [%s]', ...
     strjoin(compose('%g', tau_rec), ' '), strjoin(compose('%g', tau_rel), ' '), ...
     strjoin(compose('%.3g', rho), ' ')), 'FontSize', title_fs);
@@ -225,7 +230,7 @@ legend(ax2, [h2_id, h2_single, h2_prod], ...
     'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
 
 % --- 3. step response ---
-ax3 = nexttile(tl); hold(ax3, 'on');
+ax3 = nexttile(tl, 3, [1 2]); hold(ax3, 'on');   % bottom row, both columns
 % The drive at TRUE SCALE, sharing the output's axis, and GREEN to match the
 % y = x line in panel 2 -- deliberately, because they are the same quantity.
 % That line is the UNDEPRESSED synapse (b == 1, so output == r), and r(t) here
