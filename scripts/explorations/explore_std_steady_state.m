@@ -53,9 +53,25 @@ function out = explore_std_steady_state(opts)
 % See also: fig_STD_steady_state, srnn_param_preset
 
 arguments
-    % Defaults are celltype_pairs_..._dualStd_*'s E->E route.
-    opts.tau_rec     (1,:) double  = [2 4]
-    opts.tau_rel     (1,:) double  = [0.25 0.5]
+    % A THREE-TIMESCALE LADDER with a common ratio. tau_rel names the ladder;
+    % tau_rec is derived from it below so that rho = tau_rel/tau_rec is the same
+    % for every timescale, which is the configuration that maximises both the
+    % peak height and the peak-to-theta(1) contrast at any given peak position.
+    %
+    % Note this is NOT the paper preset any more: that is two timescales at
+    % rec_per_rel = 8, i.e. tau_rec = [2 4], tau_rel = [0.25 0.5].
+    opts.tau_rel     (1,:) double  = [0.25 0.5 1]
+    % Empty means "derive from tau_rel", resolved after this block. It CANNOT be
+    % defaulted as 4*opts.tau_rel here: MATLAB rejects a name-value argument
+    % whose default references another name-value argument, with
+    % MATLAB:functionValidation:NamedArgumentInDefault. (Positional arguments may
+    % do this; opts. ones may not.) zeros(1,0) rather than [], because [] is 0x0
+    % and would fail the (1,:) size check before the body ever runs.
+    opts.tau_rec     (1,:) double  = zeros(1, 0)
+    % tau_rec = rec_per_rel * tau_rel, so rho = 1/rec_per_rel on every timescale.
+    % 4 gives rho = 0.25; 8 gives the preset's rho = 0.125 and tau_rec = [2 4 8].
+    % Ignored when tau_rec is given explicitly.
+    opts.rec_per_rel (1,1) double  = 4
     opts.step_rates  (1,:) double  = [0.25 0.5 1]
     opts.on_s        (1,1) double  = 5
     % A SYMMETRIC 5 s on / 5 s off protocol, TR's choice, and the price is worth
@@ -74,8 +90,19 @@ arguments
     opts.out_dir     (1,:) char    = ''
 end
 
-tau_rec = opts.tau_rec(:)';
 tau_rel = opts.tau_rel(:)';
+% Derive tau_rec from tau_rel when it was not given, which is the tie the
+% arguments block cannot express. Doing it here also means an explicit tau_rec
+% still wins, so the two-argument form keeps working unchanged.
+if isempty(opts.tau_rec)
+    if opts.rec_per_rel <= 0
+        error('explore_std_steady_state:NonPositiveRatio', ...
+            'rec_per_rel must be positive (got %g).', opts.rec_per_rel);
+    end
+    tau_rec = opts.rec_per_rel * tau_rel;
+else
+    tau_rec = opts.tau_rec(:)';
+end
 if numel(tau_rec) ~= numel(tau_rel)
     error('explore_std_steady_state:LengthMismatch', ...
         'tau_rec and tau_rel must have the same number of timescales (got %d and %d).', ...
