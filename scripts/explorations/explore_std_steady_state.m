@@ -230,12 +230,18 @@ ax3 = nexttile(tl); hold(ax3, 'on');
 ss = arrayfun(@(rk) rk * prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
 y_max = max([theta_t, r_t, ss]) * 1.12;
 plot(ax3, t, r_t, '-', 'LineWidth', 1, 'Color', [0.82 0.82 0.82]);
-% Each plateau's asymptote -- the SAME number panel 2 plots at that rate.
+% Each plateau's asymptote -- the SAME number panel 2 plots at that rate --
+% drawn ONLY across its own step. Spanning the full width implied the level
+% meant something during the off periods, where the rate is zero and the true
+% asymptote is theta = 0; it also let three lines for three different rates run
+% side by side with nothing tying each to its step.
+seg_start = cumsum([0, seg_dur]);
 for k = 1:numel(ss)
-    plot(ax3, [0 t(end)], [ss(k) ss(k)], ':', 'LineWidth', 1, 'Color', identity_color);
-    text(ax3, t(end), ss(k), sprintf(' r=%.2g ', opts.step_rates(k)), ...
-        'FontSize', 10, 'Color', [0.3 0.5 0.3], ...
-        'VerticalAlignment', 'middle', 'HorizontalAlignment', 'right');
+    on_span = seg_start([2*k, 2*k + 1]);      % segment 2k is the k-th step
+    plot(ax3, on_span, [ss(k) ss(k)], '-', 'LineWidth', 1.5, 'Color', identity_color);
+    text(ax3, on_span(2), ss(k), sprintf(' r=%.2g', opts.step_rates(k)), ...
+        'FontSize', 10, 'Color', [0.25 0.45 0.25], ...
+        'VerticalAlignment', 'middle', 'HorizontalAlignment', 'left');
 end
 plot(ax3, t, theta_t, 'LineWidth', lw, 'Color', prod_color);
 hold(ax3, 'off'); box(ax3, 'off'); set(ax3, 'FontSize', tick_fs);
