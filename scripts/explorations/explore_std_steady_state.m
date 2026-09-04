@@ -200,9 +200,9 @@ legend(ax1, {'single $b_k$', '$\prod_k b_k$'}, 'Interpreter', 'latex', ...
 % The 1:1 aspect is therefore dropped, so no angle here means anything.
 zoom_ymax = max([theta_single, theta]) * 1.15;
 ax2 = nexttile(tl); hold(ax2, 'on');
-plot(ax2, [0 1], [0 1], '-', 'LineWidth', 1, 'Color', identity_color);
-plot(ax2, r, theta_single, '--', 'LineWidth', 1, 'Color', single_color);
-plot(ax2, r, theta, 'LineWidth', lw, 'Color', prod_color);
+h2_id     = plot(ax2, [0 1], [0 1], '-', 'LineWidth', 1, 'Color', identity_color);
+h2_single = plot(ax2, r, theta_single, '--', 'LineWidth', 1, 'Color', single_color);
+h2_prod   = plot(ax2, r, theta, 'LineWidth', lw, 'Color', prod_color);
 if has_peak
     plot(ax2, r_peak, theta_peak, 'o', 'MarkerSize', 6, ...
         'MarkerFaceColor', prod_color, 'MarkerEdgeColor', 'none');
@@ -216,6 +216,13 @@ ylabel(ax2, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ..
 title(ax2, 'Delivered output', 'FontWeight', 'normal', 'FontSize', title_fs);
 xlim(ax2, [0 1]); ylim(ax2, [0 zoom_ymax]);
 set(ax2, 'XTick', [0 1], 'YTick', [0 round(zoom_ymax, 3)]);
+% southeast: the identity line exits the top-left almost at once and the single
+% b_k curve climbs across the upper right, so the free space is BELOW the
+% turned-over product curve. Handles named for the same reason as panel 3 --
+% the peak marker is plotted after these and would otherwise take a slot.
+legend(ax2, [h2_id, h2_single, h2_prod], ...
+    {'undepressed  $y = r$', 'single $b_k \cdot r$', '$\prod_k b_k \cdot r$'}, ...
+    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
 
 % --- 3. step response ---
 ax3 = nexttile(tl); hold(ax3, 'on');
@@ -234,34 +241,42 @@ ax3 = nexttile(tl); hold(ax3, 'on');
 % off_s. Same units, same axis, no scale factor.
 ss = arrayfun(@(rk) rk * prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
 y_max = max([theta_t, r_t, ss]) * 1.12;
-plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
+h_rate = plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
 % Each plateau's asymptote -- the SAME number panel 2 plots at that rate --
 % drawn ONLY across its own step. Spanning the full width implied the level
 % meant something during the off periods, where the rate is zero and the true
 % asymptote is theta = 0; it also let three lines for three different rates run
 % side by side with nothing tying each to its step.
 % Grey, so the green in this panel means one thing only: the undepressed
-% reference. The label gives the LEVEL rather than the rate -- which rate a step
-% is at is already legible from the green trace directly above it, whereas the
-% asymptote is the number worth reading off, and is the same value panel 2
-% reports at that rate.
+% reference. Unlabelled -- the legend says what the level IS, and the value can
+% be read off the axis; annotating each with its number crowded the panel to
+% report three figures already printed at the console and plotted in panel 2.
 seg_start = cumsum([0, seg_dur]);
+h_ss = gobjects(1, numel(ss));
 for k = 1:numel(ss)
     on_span = seg_start([2*k, 2*k + 1]);      % segment 2k is the k-th step
-    plot(ax3, on_span, [ss(k) ss(k)], '-', 'LineWidth', 1.5, 'Color', single_color);
-    text(ax3, on_span(2), ss(k), sprintf('  steady st. = %.4f', ss(k)), ...
-        'FontSize', 10, 'Color', single_color, ...
-        'VerticalAlignment', 'middle', 'HorizontalAlignment', 'left');
+    h_ss(k) = plot(ax3, on_span, [ss(k) ss(k)], '-', 'LineWidth', 1.5, ...
+        'Color', single_color);
 end
-plot(ax3, t, theta_t, 'LineWidth', lw, 'Color', prod_color);
+% ONE timescale acting alone, on the same drive -- grey dashed, as in panels 1
+% and 2, so the gap to the solid curve reads as the cost of the SECOND
+% timescale rather than as depression in general. Its b_1 is the first row of
+% the same exact integration, so this is the identical protocol with K = 1.
+h_single = plot(ax3, t, b_t(1, :) .* r_t, '--', 'LineWidth', 1, 'Color', single_color);
+h_theta  = plot(ax3, t, theta_t, 'LineWidth', lw, 'Color', prod_color);
 hold(ax3, 'off'); box(ax3, 'off'); set(ax3, 'FontSize', tick_fs);
 xlabel(ax3, 'time (s)', 'FontSize', label_fs);
 ylabel(ax3, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ...
     'FontSize', label_fs);
 title(ax3, 'Step response', 'FontWeight', 'normal', 'FontSize', title_fs);
 xlim(ax3, [0 t(end)]); ylim(ax3, [0 y_max]);
-legend(ax3, {'rate  r(t)', 'steady state'}, 'Box', 'off', 'FontSize', 10, ...
-    'Location', 'northwest');
+% Handles named explicitly: three steady-state segments sit between the drive
+% and the traces, so a legend given only labels would attach them to the wrong
+% lines.
+legend(ax3, [h_rate, h_ss(1), h_single, h_theta], ...
+    {'rate  $r(t)$', 'steady state', 'single $b_k \cdot r$', ...
+     'synaptic output  $\prod_k b_k \cdot r$'}, ...
+    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'northeast');
 
 %% ---- Outputs -------------------------------------------------------------
 out = struct('fig', fig, 'rho', rho, 'r_peak', r_peak, 'theta_peak', theta_peak, ...
