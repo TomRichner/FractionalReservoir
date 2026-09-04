@@ -1,28 +1,40 @@
 function out = fig_STD_steady_state(cfg)
-% FIG_STD_STEADY_STATE Multi-timescale STD steady state, and what it costs.
+% FIG_STD_STEADY_STATE Multi-timescale STD: steady state and step response.
 %
 %   out = FIG_STD_STEADY_STATE()
 %   out = FIG_STD_STEADY_STATE('preset_name', p)
 %
-% Conceptual, ANALYTIC (no simulation). Setting db/dt = 0 in
+% Conceptual, ANALYTIC apart from the step response, which is integrated in
+% closed form. Setting db/dt = 0 in
 %     db_k/dt = (1 - b_k)/tau_rec_k - b_k*r/tau_rel_k
-% gives b_k(r) = 1/(1 + r*tau_rec_k/tau_rel_k); the synapse multiplies the
-% timescales, so it sees prod_k b_k(r).
+% gives b_k(r) = 1/(1 + r/rho_k) with rho_k = tau_rel_k/tau_rec_k, and the
+% synapse multiplies the timescales, so it sees prod_k b_k(r).
 %
-%   Left  : prod(b) against r, with one component b_k dashed for reference.
-%   Right : prod(b)*r -- what the recurrent sum actually receives -- again with
-%           one component dashed, and a faint identity line y = r marking the
-%           UNDEPRESSED synapse. The vertical gap to a curve is what depression
-%           costs at that rate.
+% Four panels, in a 3x2 grid:
 %
-% TWO VERSIONS are written, differing ONLY in the right panel's y range. The
-% full-scale one keeps equal pixel scaling on both axes, so the identity line is
-% a literal 45 degrees and a vertical distance can be compared against a
-% horizontal one by eye -- honest, but both curves sit in the bottom tenth of
-% the panel. The zoom drops the 1:1 aspect deliberately (it cannot survive a y
-% range that much shorter than x without squashing the panel to a sliver, so no
-% cross-axis angle there means anything) and buys the turnover, which is the
-% point of the panel and is nearly invisible at full scale.
+%   1. prod(b) against rate           -- steady-state gain.
+%   2. prod(b)*r against rate         -- what the recurrent sum receives, with
+%      the peak marked and R = theta_peak/theta(1) at the right-hand end.
+%   3. prod(b) against TIME           -- step response of depression.
+%   4. prod(b)*r against TIME         -- step response of synaptic output.
+%
+% Reading the columns together is the point. The grey level each plateau in
+% rows 2-3 settles onto is exactly the value the panel above it reports at that
+% rate; what the step panels add is the TRANSIENT. From a rested synapse b = 1,
+% so each onset delivers very nearly the full r before depression pulls it down
+% -- the onset grows with r even where the STEADY STATE SHRINKS with r.
+%
+% THE STEADY STATE DEPENDS ONLY ON THE RATIO rho. The absolute timescales set
+% how fast b gets there (rows 2-3) and nothing about where (row 1). For K equal
+% ratios, r_peak = rho/(K-1) and theta_peak = r_peak*(1 - 1/K)^K; for two
+% timescales r_peak = sqrt(rho_1*rho_2), independent of their separation. A
+% SINGLE timescale has no peak at all -- theta rises monotonically to rho -- so
+% the turnover is a multi-timescale phenomenon, not a stronger version of the
+% same thing.
+%
+% R = theta_peak/theta(1) is (1+rho_1)(1+rho_2)/(sqrt(rho_1)+sqrt(rho_2))^2 at
+% K = 2, in which the product rho_1*rho_2 cancels. It is unbounded, grows as rho
+% falls, and at fixed geometric mean is largest when the ratios are EQUAL.
 %
 % CONTRAST WITH SFA (fig_SFA_steady_state): SFA enters as a SUM, so splitting c
 % as a budget makes the timescale count invisible at steady state. STD enters as
@@ -33,12 +45,26 @@ function out = fig_STD_steady_state(cfg)
 % synapse_config can only reach the model through a condition, so that is where
 % a preset puts its depression routes -- never in the model_defaults struct.
 %
-% See also: fig_SFA_steady_state, srnn_param_preset
+% Was two figures (a full-scale 'square' variant with daspect [1 1 1] and a
+% zoomed one) showing panels 1-2 only. It is now ONE figure carrying the step
+% responses as well, so it writes 3 files rather than 6.
+%
+% See also: fig_SFA_steady_state, srnn_param_preset,
+%           scripts/explorations/explore_std_steady_state
 
 arguments
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.route_pre   (1,:) char    = 'E'
     cfg.route_post  (1,:) char    = 'E'
+    cfg.step_rates  (1,:) double  = [0.25 0.5 1]
+    cfg.on_s        (1,1) double  = 5
+    % Long enough for the slowest tau_rec to recover between steps, so the steps
+    % read as independent responses rather than as accumulating depression. At
+    % tau_rec = 4 s this gives 1 - exp(-15/4) = 98%; the realised figure is
+    % reported in out.recovery_frac.
+    cfg.off_s       (1,1) double  = 15
+    cfg.settle_s    (1,1) double  = 5
+    cfg.fs          (1,1) double  = 1000
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
@@ -46,170 +72,187 @@ arguments
 end
 
 setup_paths();
-out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
-st           = manuscript_style();
+out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
+st      = manuscript_style();
 
 % Pull the depression timescales out of the preset's own STD routes. They live
 % on the conditions, not on the model_defaults struct: synapse_config can only
 % reach the model through a condition, so that is where a preset puts them.
 % The most-adapted regime, resolved rather than named: which condition carries
 % the full route set differs by preset (sfa3_std2 here, sfa3_std1 for a
-% single-timescale network). Matching a literal name found nothing on the
-% 3-condition preset, and `conditions{[]}` then failed with a comma-separated
-% list error rather than anything that named the cause.
+% single-timescale network).
 [~, ~, conditions] = srnn_param_preset(cfg.preset_name);
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 sc = conditions{strcmp(cond_names, full_adaptation_condition(conditions))}.synapse_config;
-route = sc.E.E.std;                 % uniform across all four routes in this preset
+% route_pre/route_post were declared but ignored -- the route was hardwired to
+% E.E. Honoured now; the defaults reproduce the previous behaviour exactly.
+if ~isfield(sc, cfg.route_pre) || ~isfield(sc.(cfg.route_pre), cfg.route_post) ...
+        || ~isfield(sc.(cfg.route_pre).(cfg.route_post), 'std')
+    error('fig_STD_steady_state:NoSuchRoute', ...
+        'Preset ''%s'' has no STD on route %s->%s.', ...
+        cfg.preset_name, cfg.route_pre, cfg.route_post);
+end
+route   = sc.(cfg.route_pre).(cfg.route_post).std;
 tau_rec = route.tau_rec(:)';
 tau_rel = route.tau_rel(:)';
-ratio = tau_rec ./ tau_rel;         % the only combination that sets the steady state
+rho     = tau_rel ./ tau_rec;       % the only combination that sets the steady state
+K       = numel(rho);
 
-r = linspace(0, 1, 400);            % rate, over the full range of the nonlinearity
-
-% b_k(r) for each timescale, then their product. rows = timescale, cols = r.
-b_each = 1 ./ (1 + ratio(:) * r);
+%% ---- Steady state ---------------------------------------------------------
+r      = linspace(0, 1, 4000);      % rate, over the full range of the nonlinearity
+b_each = 1 ./ (1 + (1 ./ rho(:)) * r);
 b_prod = prod(b_each, 1);
+theta  = b_prod .* r;
+theta_single = b_each(1, :) .* r;
 
-tick_fs  = st.tick_fs;
-label_fs = st.label_fs;
-title_fs = 16;    % panel titles
-lw       = st.line_lw;
+rf  = linspace(0, 1, 4e5);
+thf = rf .* prod(1 ./ (1 + (1 ./ rho(:)) * rf), 1);
+[theta_peak, ip] = max(thf);
+r_peak   = rf(ip);
+has_peak = ip < numel(rf);          % K == 1 is monotone: no turnover
 
+%% ---- Step response, integrated exactly ------------------------------------
+% r(t) is piecewise constant, and on a segment of constant r the ODE is linear
+% with time constant tau_eff = 1/(1/tau_rec + r/tau_rel) and fixed point
+% tau_eff/tau_rec. Each segment is therefore one exponential in closed form, so
+% the plateaus are exactly the steady state of the panels above rather than
+% approximately it.
+seg_rate = [0, reshape([cfg.step_rates; zeros(1, numel(cfg.step_rates))], 1, [])];
+seg_dur  = [cfg.settle_s, repmat([cfg.on_s, cfg.off_s], 1, numel(cfg.step_rates))];
+dt = 1 / cfg.fs;
+t = []; r_t = []; b_t = zeros(K, 0); b0 = ones(K, 1); t0 = 0;
+for s = 1:numel(seg_rate)
+    ts   = dt : dt : seg_dur(s);
+    teff = 1 ./ (1 ./ tau_rec(:) + seg_rate(s) ./ tau_rel(:));
+    binf = teff ./ tau_rec(:);
+    bs   = binf + (b0 - binf) .* exp(-ts ./ teff);
+    t    = [t, t0 + ts];                            %#ok<AGROW>
+    r_t  = [r_t, seg_rate(s) * ones(1, numel(ts))]; %#ok<AGROW>
+    b_t  = [b_t, bs];                               %#ok<AGROW>
+    b0   = bs(:, end);  t0 = t0 + seg_dur(s);
+end
+b_prod_t  = prod(b_t, 1);
+theta_t   = b_prod_t .* r_t;
+seg_start = cumsum([0, seg_dur]);
+ss_b      = arrayfun(@(x)     prod(1 ./ (1 + x ./ rho)), cfg.step_rates);
+ss_theta  = arrayfun(@(x) x * prod(1 ./ (1 + x ./ rho)), cfg.step_rates);
+recovery_frac = 1 - exp(-cfg.off_s / max(tau_rec));
+
+%% ---- Figure ---------------------------------------------------------------
 prod_color     = [0.85 0.325 0.098];   % warm, matching the E colour used elsewhere
 single_color   = [0.5 0.5 0.5];
-identity_color = [0.55 0.80 0.55];     % faint green: y = r, the undepressed synapse
+% Green is the UNDEPRESSED reference in every panel: y = r in row 1, and r(t)
+% itself in the step panels, which is what this synapse would deliver at b = 1.
+identity_color = [0.55 0.80 0.55];
+tick_fs = st.tick_fs; label_fs = st.label_fs; title_fs = 15; lw = st.line_lw;
 
-%% ---- Derived quantities ---------------------------------------------------
-output = b_prod .* r;
-output_single = b_each(1, :) .* r;
-[peak_val, peak_idx] = max(output);
-r_peak = r(peak_idx);
-
-% The zoomed version's ceiling: just above the largest value a SINGLE b_k ever
-% delivers, which on this preset is its value at r = 1 (b_k*r rises
-% monotonically to the asymptote tau_rel/tau_rec, so the right edge is the max).
-% Rounded up to the next hundredth so the tick is a round number rather than
-% 0.1111..., and so the curve does not touch the top of the axes.
-zoom_ymax = ceil(max(output_single) * 100) / 100;
-
-%% ---- Figures --------------------------------------------------------------
-% TWO VERSIONS of the same figure, differing only in the right panel's y range:
-%
-%   'square' : y over [0, 1] with daspect [1 1 1]. The identity line y = r is a
-%              literal 45 degrees and a vertical distance can be compared
-%              against a horizontal one by eye. Honest but small: both curves
-%              sit in the bottom tenth of the panel.
-%   'zoom'   : y over [0, zoom_ymax], filling the panel with the curves
-%              themselves. The 1:1 aspect ratio is DELIBERATELY DROPPED here --
-%              it cannot survive a y range 9x shorter than x's without squashing
-%              the panel to a sliver, so the identity line is no longer 45
-%              degrees and no cross-axis angle in this version means anything.
-%              What it buys is the turnover, which is the point of the panel and
-%              is nearly invisible at full scale.
-%
-% Size copied from Fig_FI_curve so the two figures match, but the POSITION is
-% computed rather than copied: that script hardcodes x = 4429, a second-monitor
-% coordinate from the machine it was written on, which lands the window
-% off-screen on a single 1920-wide display and looks like the figure never
-% opened. Centre it on whatever screen is actually attached.
-variants = {'square', 'zoom'};
-fig_size = [623, 322];
+% Size computed rather than copied: the older version hardcoded a second-monitor
+% x coordinate that landed the window off-screen on a single display.
+fig_size = [900, 900];
 scr = get(groot, 'ScreenSize');
-figs = gobjects(1, numel(variants));
+fig = figure('Color', 'white', ...
+    'Position', [scr(1:2) + max((scr(3:4) - fig_size)/2, 0), fig_size]);
+tl = tiledlayout(fig, 3, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+title(tl, sprintf('\\tau_{rec} = [%s] s,   \\tau_{rel} = [%s] s,   \\rho = [%s]', ...
+    strjoin(compose('%g', tau_rec), ' '), strjoin(compose('%g', tau_rel), ' '), ...
+    strjoin(compose('%.3g', rho), ' ')), 'FontSize', title_fs);
 
-for v = 1:numel(variants)
-is_zoom = strcmp(variants{v}, 'zoom');
-
-% Offset each window so the second does not land exactly on the first.
-fig_pos = [scr(1:2) + max((scr(3:4) - fig_size)/2, 0) + (v - 1)*[40, -40], fig_size];
-fig = figure('Color', 'white', 'Position', fig_pos);
-figs(v) = fig;
-tl  = tiledlayout(fig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-%% Left panel: prod(b) vs r --------------------------------------------------
-% Identical in both versions: prod(b) is a gain, already bounded by [0, 1], so
-% there is nothing to zoom into.
+% --- 1: steady-state depression ---
 ax1 = nexttile(tl); hold(ax1, 'on');
-% One component b_k, thin and dashed, so the gap to the product reads as the
-% cost of the SECOND timescale rather than as depression in general. Both
-% timescales share tau_rec/tau_rel here, so the components coincide -- drawing
-% one is drawing both (the code plots b_1).
 plot(ax1, r, b_each(1, :), '--', 'LineWidth', 1, 'Color', single_color);
 plot(ax1, r, b_prod, 'LineWidth', lw, 'Color', prod_color);
-hold(ax1, 'off');
-box(ax1, 'off');
-set(ax1, 'FontSize', tick_fs);
+box(ax1, 'off'); set(ax1, 'FontSize', tick_fs, 'XTick', [0 1], 'YTick', [0 1]);
+xlim(ax1, [0 1]); ylim(ax1, [0 1]);
 xlabel(ax1, 'firing rate  r', 'FontSize', label_fs);
-ylabel(ax1, 'depression  $\prod_k b_k$', 'Interpreter', 'latex', ...
-    'FontSize', label_fs);
+ylabel(ax1, 'depression  $\prod_k b_k$', 'Interpreter', 'latex', 'FontSize', label_fs);
 title(ax1, 'Steady-state depression', 'FontWeight', 'normal', 'FontSize', title_fs);
-xlim(ax1, [0, 1]); ylim(ax1, [0, 1]);
-set(ax1, 'XTick', [0, 1], 'YTick', [0, 1]);
 legend(ax1, {'single $b_k$', '$\prod_k b_k$'}, 'Interpreter', 'latex', ...
-    'Box', 'off', 'FontSize', 12, 'Location', 'northeast');
+    'Box', 'off', 'FontSize', 10, 'Location', 'northeast');
 
-%% Right panel: prod(b)*r vs r -----------------------------------------------
+% --- 2: steady-state synaptic output ---
+% Zoomed: at full scale both curves sit in the bottom tenth of the panel and the
+% turnover, which is the point, is invisible. The 1:1 aspect the old 'square'
+% variant used is therefore dropped, so no angle here means anything.
+ymax2 = max([theta_single, theta]) * 1.15;
 ax2 = nexttile(tl); hold(ax2, 'on');
-% Identity first, so it sits UNDER the data. y = r is the undepressed synapse
-% (b == 1): the vertical gap down to each curve is exactly what depression costs
-% at that rate. In the zoomed version it leaves the top of the panel almost
-% immediately -- that steep exit IS the depression, seen edge-on.
-plot(ax2, [0, 1], [0, 1], '-', 'LineWidth', 1, 'Color', identity_color);
-% Same pairing as the left panel: one timescale dashed, the product solid. The
-% two curves differ in KIND here, not just in scale -- a single b_k rises
-% monotonically toward its asymptote 1/(tau_rec/tau_rel), so more rate always
-% delivers more, whereas the product turns over.
-plot(ax2, r, output_single, '--', 'LineWidth', 1, 'Color', single_color);
-plot(ax2, r, output, 'LineWidth', lw, 'Color', prod_color);
-plot(ax2, r_peak, peak_val, 'o', 'MarkerSize', 6, ...
-    'MarkerFaceColor', prod_color, 'MarkerEdgeColor', 'none');
-hold(ax2, 'off');
+h_id  = plot(ax2, [0 1], [0 1], '-', 'LineWidth', 1, 'Color', identity_color);
+h_one = plot(ax2, r, theta_single, '--', 'LineWidth', 1, 'Color', single_color);
+h_pr  = plot(ax2, r, theta, 'LineWidth', lw, 'Color', prod_color);
+if has_peak
+    plot(ax2, r_peak, theta_peak, 'o', 'MarkerSize', 6, ...
+        'MarkerFaceColor', prod_color, 'MarkerEdgeColor', 'none');
+    text(ax2, r_peak, theta_peak, sprintf('  (%.2f, %.2f)', r_peak, theta_peak), ...
+        'FontSize', 11, 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left');
+    plot(ax2, 1, theta(end), 'o', 'MarkerSize', 5, ...
+        'MarkerFaceColor', prod_color, 'MarkerEdgeColor', 'none');
+    text(ax2, 1, theta(end), sprintf('R = %.2f  ', theta_peak / theta(end)), ...
+        'FontSize', 11, 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+end
 box(ax2, 'off');
-set(ax2, 'FontSize', tick_fs);
+set(ax2, 'FontSize', tick_fs, 'XTick', [0 1], 'YTick', [0 round(ymax2, 3)]);
+xlim(ax2, [0 1]); ylim(ax2, [0 ymax2]);
 xlabel(ax2, 'firing rate  r', 'FontSize', label_fs);
 ylabel(ax2, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ...
     'FontSize', label_fs);
-title(ax2, 'Delivered output', 'FontWeight', 'normal', 'FontSize', title_fs);
-xlim(ax2, [0, 1]);
-if is_zoom
-    % No daspect: see the header comment above. The y tick is zoom_ymax rather
-    % than 1, which is the one number a reader must notice to avoid reading this
-    % panel as if it were the square one.
-    ylim(ax2, [0, zoom_ymax]);
-    set(ax2, 'XTick', [0, 1], 'YTick', [0, zoom_ymax]);
-else
-    % Equal pixel scaling on both axes, which forces y to share x's [0, 1]
-    % range: the curves then sit low in a square panel, which is the honest
-    % picture -- at every rate the depressed synapse delivers a small fraction
-    % of what an undepressed one would.
-    ylim(ax2, [0, 1]);
-    daspect(ax2, [1 1 1]);
-    set(ax2, 'XTick', [0, 1], 'YTick', [0, 1]);
+title(ax2, 'Steady-state synaptic output', 'FontWeight', 'normal', 'FontSize', title_fs);
+legend(ax2, [h_id h_one h_pr], ...
+    {'undepressed  $y = r$', 'single $b_k \cdot r$', '$\prod_k b_k \cdot r$'}, ...
+    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
+
+% --- 3 (tiles 3-4): step response, depression ---
+% Handles are named for the legends: three steady-state segments sit between the
+% drive and the traces, so a legend given only labels attaches them wrongly.
+ax3 = nexttile(tl, 3, [1 2]); hold(ax3, 'on');
+h3r = plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
+h3s = gobjects(1, numel(ss_b));
+for k = 1:numel(ss_b)
+    h3s(k) = plot(ax3, seg_start([2*k 2*k+1]), ss_b([k k]), '-', ...
+        'LineWidth', 1.5, 'Color', single_color);
 end
+h3o = plot(ax3, t, b_t(1, :), '--', 'LineWidth', 1, 'Color', single_color);
+h3p = plot(ax3, t, b_prod_t, 'LineWidth', lw, 'Color', prod_color);
+box(ax3, 'off'); set(ax3, 'FontSize', tick_fs);
+xlim(ax3, [0 t(end)]); ylim(ax3, [0 1.05]);
+xlabel(ax3, 'time (s)', 'FontSize', label_fs);
+ylabel(ax3, 'depression  $\prod_k b_k$', 'Interpreter', 'latex', 'FontSize', label_fs);
+title(ax3, 'Step response: depression', 'FontWeight', 'normal', 'FontSize', title_fs);
+legend(ax3, [h3r h3s(1) h3o h3p], ...
+    {'rate  $r(t)$', 'steady state', 'single $b_k$', 'depression  $\prod_k b_k$'}, ...
+    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
 
-% Mark where the output peaks -- past this rate the synapse delivers less.
-% Above-right of the marker: there is headroom there in the square version
-% (the title is far off at y = 1) and in the zoomed one (the peak sits below
-% the single-b_k curve it is being contrasted with).
-text(ax2, r_peak, peak_val, sprintf('  r = %.2f', r_peak), ...
-    'FontSize', 12, 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left');
-
+% --- 4 (tiles 5-6): step response, synaptic output ---
+ax4 = nexttile(tl, 5, [1 2]); hold(ax4, 'on');
+h4r = plot(ax4, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
+h4s = gobjects(1, numel(ss_theta));
+for k = 1:numel(ss_theta)
+    h4s(k) = plot(ax4, seg_start([2*k 2*k+1]), ss_theta([k k]), '-', ...
+        'LineWidth', 1.5, 'Color', single_color);
 end
+h4o = plot(ax4, t, b_t(1, :) .* r_t, '--', 'LineWidth', 1, 'Color', single_color);
+h4p = plot(ax4, t, theta_t, 'LineWidth', lw, 'Color', prod_color);
+box(ax4, 'off'); set(ax4, 'FontSize', tick_fs);
+xlim(ax4, [0 t(end)]); ylim(ax4, [0 max([theta_t, r_t]) * 1.12]);
+xlabel(ax4, 'time (s)', 'FontSize', label_fs);
+ylabel(ax4, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ...
+    'FontSize', label_fs);
+title(ax4, 'Step response: synaptic output', 'FontWeight', 'normal', 'FontSize', title_fs);
+legend(ax4, [h4r h4s(1) h4o h4p], ...
+    {'rate  $r(t)$', 'steady state', 'single $b_k \cdot r$', ...
+     'synaptic output  $\prod_k b_k \cdot r$'}, ...
+    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'northeast');
 
-%% ---- Save (stable filenames) ----------------------------------------------
+% One time axis for both step panels: same protocol, only useful compared.
+linkaxes([ax3, ax4], 'x');
 
-if ~cfg.visible; set(figs, 'Visible', 'off'); end
+%% ---- Save -----------------------------------------------------------------
+if ~cfg.visible; set(fig, 'Visible', 'off'); end
 
-%% --- Save -------------------------------------------------------------------
-fig_tag_base = 'Fig_STD_steady_state';
-fig_tags = {fig_tag_base, [fig_tag_base '_zoom']};
-out = struct('figs', figs, 'files', {{}}, 'source', ['preset: ' cfg.preset_name]);
+fig_tag = 'Fig_STD_steady_state';
+out = struct('figs', fig, 'files', {{}}, 'source', ['preset: ' cfg.preset_name], ...
+    'rho', rho, 'r_peak', r_peak, 'theta_peak', theta_peak, 'has_peak', has_peak, ...
+    'R', theta_peak / theta(end), 'recovery_frac', recovery_frac);
 if cfg.save
-    for v = 1:numel(figs)
-        save_figure_stable(out_dir, fig_tags{v}, figs(v));
-        out.files = [out.files, existing_outputs(out_dir, fig_tags{v})];
-    end
-
+    save_figure_stable(out_dir, fig_tag, fig);
+    out.files = existing_outputs(out_dir, fig_tag);
 end
 end
