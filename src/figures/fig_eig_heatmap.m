@@ -26,16 +26,16 @@ end
 
 setup_paths();
 out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
-project_root = fileparts(which('setup_paths'));
 st           = manuscript_style(); %#ok<NASGU>
 
-% Search the RUN first, then the standalone location. This used to load a
-% hardcoded .mat sitting beside this file, with run_dir marked "unused" -- so on
-% 2026-08-26 it plotted Aug 22 data while every other figure used the Aug 25
-% sweep, and nothing said so.
-data_file = resolve_data_file(cfg.data_file, ...
-    {fullfile(cfg.run_dir, 'eig_heatmap'), ...
-     fullfile(project_root, 'data', 'eig_heatmap')}, ...
+% INSIDE THE RUN DIRECTORY ONLY. This used to load a hardcoded .mat sitting
+% beside this file, with run_dir marked "unused" -- so on 2026-08-26 it plotted
+% Aug 22 data while every other figure used the Aug 25 sweep, and nothing said
+% so. The fix added the run directory but KEPT a data/eig_heatmap fallback, which
+% is the same failure one step further out; that tier is now gone. Pass the
+% standalone location AS run_dir, or pass data_file directly.
+data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
+    {fullfile(cfg.run_dir, 'eig_heatmap')}, ...
     'eig_heatmap_data.mat', ...
     'Run run_eig_heatmap first');
 D = load(data_file);

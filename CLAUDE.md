@@ -257,7 +257,22 @@ Its fields:
 
 - `output_dir` — the shared run directory. Empty means "let `ParamSpaceAnalysis2` create its own dated folder", which is what a standalone run wants.
 
-**The invariant that generalizes: an analysis function defaults its output into `data/`, never next to its own `.m`.** Standalone runs are supported and useful — that is how one stage gets regenerated without a 3-hour sweep — but where they *land* matters. `run_all_analyses`, `run_memory_capacity`, `run_dc_lle_analysis` and `ParamSpaceAnalysis2` all obey this. `run_eig_heatmap` and `run_memory_capacity_example` did not (they defaulted to `this_dir`, being inside figure folders), and the result was a real bug: each dropped a `.mat` beside its `.m`, the matching figure read only that path, and on 2026-08-26 two figures plotted four-day-old data while the other sixteen used the run they were handed — with every provenance file claiming the same commit. **The smell is `this_dir` in an *output* path**; `this_dir` for locating a sibling *asset* is fine. On the reading side, resolve data with `_common/resolve_data_file.m` (run directory first, then `data/`, then error naming everywhere looked) rather than a single hardcoded path.
+**The invariant that generalizes: an analysis function defaults its output into `data/`, never next to its own `.m`.** Standalone runs are supported and useful — that is how one stage gets regenerated without a 3-hour sweep — but where they *land* matters. `run_all_analyses`, `run_memory_capacity`, `run_dc_lle_analysis` and `ParamSpaceAnalysis2` all obey this. `run_eig_heatmap` and `run_memory_capacity_example` did not (they defaulted to `this_dir`, being inside figure folders), and the result was a real bug: each dropped a `.mat` beside its `.m`, the matching figure read only that path, and on 2026-08-26 two figures plotted four-day-old data while the other sixteen used the run they were handed — with every provenance file claiming the same commit. **The smell is `this_dir` in an *output* path**; `this_dir` for locating a sibling *asset* is fine. On the reading side, resolve data with `src/figures/helpers/resolve_data_file.m`.
+
+  **A FIGURE READS ONE RUN DIRECTORY, OR ERRORS. There is no fallback.** `resolve_data_file(explicit, run_dir, searched, pattern, hint)` takes `run_dir` as its own argument, requires it to be non-empty and to exist, and **enforces that every search directory lies inside it** — so the fallback cannot be reintroduced by a later edit.
+
+  It used to search the run directory and *then* `data/<stage>/`, which is the same 2026-08-26 bug one step further out, and it duly recurred: on 2026-09-03 a `single_multi_TS` run lost its `memory_capacity` stage to an unsupported run mode, so `fig_memory_capacity` fell through to `data/memory_capacity/`, plotted a `.mat` from 2026-08-22 — a different network — and reported **success** with three files written. The manifest recorded nothing wrong. (The tier also held exactly one file in the entire repo, the stale one; `data/mc_example`, `data/dc_lle` and the `paper_ready/` subfolder never existed at all.)
+
+  **Removing it cost no capability**, which is why it is a deletion rather than a warning: `<root>/data/memory_capacity` is just `<run_dir>/memory_capacity` with `run_dir = <root>/data`. So a standalone analysis is still plottable — by *saying so*:
+
+  ```matlab
+  fig_memory_capacity('run_dir', fullfile(project_root, 'data'))   % standalone output
+  fig_memory_capacity('mat_file', '/path/to/one_results.mat')      % one specific file
+  ```
+
+  Same directory as before; the difference is that the caller chose it. `test_resolve_data_file` asserts a run whose stage produced nothing errors rather than borrowing a neighbour's, that an empty `run_dir` errors (it previously searched a *relative* path against the cwd — `fullfile('', 'x')` is `'x'`, so the old "drop empty entries" guard never fired), and that an outside search directory is refused.
+
+  Related but **not** the same pattern, and deliberately left alone: `resolve_run_dir` picks the newest run matching a preset when `cfg.run_dir` is empty, and `check_sensitivity_sim` finds the newest sensitivity run when `psa_dir` is empty. Both are single-tier, both print or error rather than falling back, and both search *because no run was named* — never *outside a run they were handed*. `fig_sfa_EOC_allStd` and `fig_dc_lle` pick the newest of several stage folders **inside** one run, which is also fine.
 - `save_figs` — a **logical**. (The old `master_save_figs` had a third value, `'follow_scripts_save_figs'`, meaning "let each sub-script use its own local flag". There are no local flags any more, so it had nothing left to mean.)
 - `model_class` + `conditions` + `preset_defaults` — all three from **one** `srnn_param_preset` call, which is what stops a Pairs preset being swept with `SRNNModel2`-shaped conditions.
 - `integer_params` — `{'n','indegree'}`, not the class default (which lists `SRNNModel2`'s adaptation counts, meaningless on Pairs).
@@ -313,7 +328,7 @@ anything.
 - `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
 - `scripts/paper/` — the two entry points, `paper_config.m` and `reproduce_paper_run.m`. **Start here.**
 - `scripts/examples/` — exploratory scripts. Nineteen of them, thirteen having moved out of `tests/` where they had accumulated; several are stale, and reviewing them is tracked follow-up work.
-- `scripts/tests/` — 38 `test_*.m` verification scripts plus the two `*TestAccess` helper classes, `make_preset_golden.m` (a fixture generator, not a test) and `fixtures/`. Run them from the editor or via the matlab MCP `run_matlab_file` tool.
+- `scripts/tests/` — 39 `test_*.m` verification scripts plus the two `*TestAccess` helper classes, `make_preset_golden.m` (a fixture generator, not a test) and `fixtures/`. Run them from the editor or via the matlab MCP `run_matlab_file` tool.
 
   **`fixtures/golden_preset_outputs.mat` is force-added to git** (`*.mat` is gitignored). It freezes every `srnn_param_preset` output — 10 presets, 42 conditions, plus the retired/unknown error identifiers — captured *before* the conditions refactor, and `test_preset_golden` compares against it with no exclusions. If that test fails, fix the code, not the fixture: `make_preset_golden` refuses to overwrite an existing one, so regenerating means deleting the `.mat` deliberately and saying in the commit message why the expected values moved.
 

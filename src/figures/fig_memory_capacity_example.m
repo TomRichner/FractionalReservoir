@@ -26,15 +26,16 @@ end
 
 setup_paths();
 out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
-project_root = fileparts(which('setup_paths'));
 
 %% Load precomputed results
-% Search the RUN first, then the standalone location. This used to load a
-% hardcoded .mat beside this file, with run_dir marked "unused" -- so on
-% 2026-08-26 it plotted Aug 22 data while the sweep it was handed was Aug 25.
-data_file = resolve_data_file(cfg.data_file, ...
-    {fullfile(cfg.run_dir, 'mc_example'), ...
-     fullfile(project_root, 'data', 'mc_example')}, ...
+% INSIDE THE RUN DIRECTORY ONLY. This used to load a hardcoded .mat beside this
+% file, with run_dir marked "unused" -- so on 2026-08-26 it plotted Aug 22 data
+% while the sweep it was handed was Aug 25. The fix added the run directory but
+% KEPT a data/mc_example fallback, which is the same failure one step further
+% out; that tier is now gone. Pass the standalone location AS run_dir, or pass
+% data_file directly.
+data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
+    {fullfile(cfg.run_dir, 'mc_example')}, ...
     'mc_example_data.mat', ...
     'Run run_memory_capacity_example first');
 S = load(data_file);

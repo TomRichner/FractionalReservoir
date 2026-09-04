@@ -62,9 +62,9 @@ function cfg = single_multi_TS_config(opts)
 
 arguments
     opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond'
-    opts.run_mode    (1,:) char = 'fast'
-    opts.run_dir     (1,:) char = 'data/single_multi_TS'
-    opts.fig_root    (1,:) char = 'figs/single_multi_TS'
+    opts.run_mode    (1,:) char = 'medium'
+    opts.run_dir     (1,:) char = 'data/single_multi_TS_medium'
+    opts.fig_root    (1,:) char = 'figs/single_multi_TS_medium'
     % Off, like paper_config's own default: figures are built and saved but do
     % not pop up and steal focus.
     opts.visible_figures (1,1) logical = false

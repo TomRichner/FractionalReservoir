@@ -31,16 +31,16 @@ end
 
 setup_paths();
 out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
-project_root = fileparts(which('setup_paths'));
 
-% Shared with fig_eig_heatmap and fig_memory_capacity_example. This figure's own
-% local resolver was the model those two were fixed to match; it is now one
-% implementation rather than three copies. The extra paper_ready/ entry is
-% specific to memory capacity.
-mat_file = resolve_data_file(cfg.mat_file, ...
-    {fullfile(cfg.run_dir, 'memory_capacity'), ...
-     fullfile(project_root, 'data', 'memory_capacity'), ...
-     fullfile(project_root, 'data', 'memory_capacity', 'paper_ready')}, ...
+% INSIDE THE RUN DIRECTORY ONLY. This used to fall back to
+% data/memory_capacity/ and then to a paper_ready/ subfolder that has never
+% existed. On 2026-09-03 that fallback made this figure plot a .mat from
+% 2026-08-22 -- a different network -- and report success, because the run's
+% memory_capacity stage had failed and left nothing. To plot a standalone
+% analysis, pass its location AS run_dir (fullfile(project_root, 'data')), or
+% pass mat_file directly.
+mat_file = resolve_data_file(cfg.mat_file, cfg.run_dir, ...
+    {fullfile(cfg.run_dir, 'memory_capacity')}, ...
     '*_results.mat', ...
     'Run run_memory_capacity first');
 fprintf('[fig_memory_capacity] source: %s\n', mat_file);

@@ -36,15 +36,17 @@ end
 
 setup_paths();
 out_dir      = default_out_dir(cfg.out_dir, mfilename('fullpath'));
-project_root = fileparts(which('setup_paths'));
 st           = manuscript_style();
 
-% The RUN first, then the standalone location -- the convention every figure
-% follows since two of them plotted four-day-old data from a sibling .mat.
-% run_dc_lle_analysis writes into <run_dir>/dc_lle/dc_lle_nSeeds_*/.
-data_file = resolve_data_file(cfg.data_file, ...
-    [run_dir_candidates(cfg.run_dir), ...
-     dir_candidates(fullfile(project_root, 'data', 'dc_lle'))], ...
+% INSIDE THE RUN DIRECTORY ONLY. run_dc_lle_analysis writes into
+% <run_dir>/dc_lle/dc_lle_nSeeds_*/, so there is a level of nesting to walk, but
+% the walk never leaves the run. The data/dc_lle fallback that used to follow it
+% is gone: a figure that reaches outside the run it was handed cannot notice it
+% is plotting a different experiment, which is exactly what happened to
+% fig_memory_capacity on 2026-09-03. Pass the standalone location AS run_dir, or
+% pass data_file directly.
+data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
+    run_dir_candidates(cfg.run_dir), ...
     'dc_lle_results.mat', ...
     'Run run_dc_lle_analysis first');
 D = load(data_file);
@@ -115,7 +117,8 @@ end
 function c = run_dir_candidates(run_dir)
 % Every dc_lle_nSeeds_* folder under <run_dir>/dc_lle, newest first.
 % run_dc_lle_analysis timestamps its own subfolder, so the run directory holds a
-% level of nesting that resolve_data_file does not search on its own.
+% level of nesting that resolve_data_file does not search on its own. All of it
+% is inside run_dir, which resolve_data_file now enforces.
 c = {};
 if isempty(run_dir); return; end
 c = dir_candidates(fullfile(run_dir, 'dc_lle'));
