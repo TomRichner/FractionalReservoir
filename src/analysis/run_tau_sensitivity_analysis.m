@@ -17,8 +17,11 @@ function out_dir = run_tau_sensitivity_analysis(ctx)
 %      single n_elements for the whole run, so a sweep spanning regimes with
 %      DIFFERENT timescale counts -- comparing one-timescale against
 %      three-timescale adaptation while varying tau, say -- is not expressible.
-%      That is why this filters to sfa_and_std rather than sweeping the whole
-%      condition set.
+%      That is why this filters to the full-adaptation regime rather than
+%      sweeping the whole condition set. The regime is matched by NAME, and
+%      presets use two: 'sfa_and_std' (4- and 7-condition) and 'sfa3_std2'
+%      (3-condition), identical physics under names chosen for each set's own
+%      comparison. Both are accepted; see the lookup below.
 %
 %   2. THE GRID OVERRIDES THE CONDITION, silently. Precedence in run_single_job
 %      is model_defaults < condition < grid, and tau_a_E's setter writes
@@ -29,11 +32,15 @@ function out_dir = run_tau_sensitivity_analysis(ctx)
 %
 %   3. n_elements = 3 IS COUPLED BY HAND to the condition's ladder (see the
 %      comment at the add_vector_parameter call). Nothing verifies the two
-%      agree. Since presets now state their own log_ladder(lo, hi, K), a preset
-%      retuned to K = 2 would leave this sweep imposing three timescales on a
-%      two-timescale regime -- and c/K keeps the TOTAL adaptation right, so even
-%      the firing rates would look plausible. If you change a preset's ladder,
-%      change n_elements below to match.
+%      agree. Since each preset now states its conditions in full -- writing
+%      log_ladder(lo, hi, K) into its own case -- a preset retuned to K = 2
+%      would leave this sweep imposing three timescales on a two-timescale
+%      regime, and c/K keeps the TOTAL adaptation right, so even the firing
+%      rates would look plausible. All three dualStd presets currently use
+%      K = 3, so the value is correct today. If you change a preset's ladder,
+%      change n_elements below to match. (Deriving it from the condition --
+%      numel(condition{1}.tau_a{1}) -- would remove the coupling entirely and
+%      is the obvious fix if this bites.)
 %
 % A FOURTH, currently unreachable: with vary_element = 'first' AND
 % n_elements = 1, ParamSpaceAnalysis2 builds the vector with
@@ -56,18 +63,36 @@ setup_paths();
 
 note = 'tau_timescales';
 
-% Condition: SFA + STD, taken from the shared four-regime set rather than
-% respelled here, so this sweep uses exactly the regime the other analyses call
-% 'sfa_and_std'. Whichever class is in play, it gives E three SFA timescales --
-% which is what n_elements = 3 below is coupled to.
-is_sfa_and_std = cellfun(@(c) strcmp(c.name, 'sfa_and_std'), ctx.conditions);
-if ~any(is_sfa_and_std)
-    error('run_tau_sensitivity_analysis:NoSfaAndStd', ...
-        ['No condition named ''sfa_and_std'' in the preset''s condition set ' ...
-         '(found: %s). This sweep is defined on that regime.'], ...
-        strjoin(cellfun(@(c) c.name, ctx.conditions, 'UniformOutput', false), ', '));
+% Condition: the FULL-ADAPTATION regime -- all SFA timescales and all depression
+% timescales -- taken from the preset rather than respelled here, so this sweep
+% runs exactly the regime the other analyses do. Whichever class is in play it
+% gives E three SFA timescales, which is what n_elements = 3 below is coupled to.
+%
+% TWO ACCEPTED NAMES, because presets name that regime for their own comparison:
+% the 4- and 7-condition presets call it 'sfa_and_std' ("both mechanisms on"),
+% while the 3-condition preset calls it 'sfa3_std2', stating the timescale counts
+% because in that set the counts ARE the comparison. The two are physically
+% identical -- same tau_a row, same routes -- and test_preset_conditions asserts
+% that they stay so. Matching on one name only is what made
+% single_multi_TS_run fail here with "No condition named 'sfa_and_std'".
+%
+% Preference order, not condition order, so the choice is deterministic if a
+% future preset ever carries both.
+accepted   = {'sfa_and_std', 'sfa3_std2'};
+cond_names = cellfun(@(c) c.name, ctx.conditions, 'UniformOutput', false);
+idx = [];
+for k = 1:numel(accepted)
+    hit = find(strcmp(cond_names, accepted{k}), 1);
+    if ~isempty(hit); idx = hit; break; end
 end
-condition = ctx.conditions(is_sfa_and_std);
+if isempty(idx)
+    error('run_tau_sensitivity_analysis:NoFullAdaptation', ...
+        ['No full-adaptation condition in the preset''s condition set: found ' ...
+         '%s, expected one named %s. This sweep is defined on that regime.'], ...
+        strjoin(cond_names, ', '), strjoin(accepted, ' or '));
+end
+condition = ctx.conditions(idx);
+fprintf('Condition: %s (the full-adaptation regime)\n', cond_names{idx});
 
 %% tau_a_E(end) sweep -- vector parameter
 fprintf('\n========================================\n');
