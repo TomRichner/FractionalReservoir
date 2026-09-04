@@ -173,16 +173,20 @@ single_color   = [0.5 0.5 0.5];
 identity_color = [0.55 0.80 0.55];
 tick_fs = 12; label_fs = 14; title_fs = 15; lw = 2;
 
-% 2x2 with the step response spanning the bottom row. The two steady-state
-% panels share an x axis (rate, 0 to 1) and belong side by side; the step
-% response is in TIME and is the odd one out, so it reads better given the full
-% width than squeezed into a third of it -- its 62 s of protocol were badly
-% cramped in a 1x3.
-fig_size = [860, 660];
+% 3x2. Top row: the two STEADY-STATE panels, which share an x axis (rate, 0 to
+% 1) and belong side by side. Rows 2 and 3: the two STEP RESPONSES, each
+% spanning the full width because they are in TIME and 62 s of protocol is badly
+% cramped in half a figure.
+%
+% The grid is the argument the figure makes. Each column of the top row has its
+% step response directly below it -- depression left, synaptic output right --
+% so a steady-state curve and its transient can be read against each other, and
+% the two rows differ only in whether the rate axis is swept or stepped.
+fig_size = [900, 900];
 scr = get(groot, 'ScreenSize');
 fig = figure('Color', 'white', ...
     'Position', [scr(1:2) + max((scr(3:4) - fig_size)/2, 0), fig_size]);
-tl = tiledlayout(fig, 2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+tl = tiledlayout(fig, 3, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 title(tl, sprintf('\\tau_{rec} = [%s] s,   \\tau_{rel} = [%s] s,   \\rho = [%s]', ...
     strjoin(compose('%g', tau_rec), ' '), strjoin(compose('%g', tau_rel), ' '), ...
     strjoin(compose('%.3g', rho), ' ')), 'FontSize', title_fs);
@@ -218,7 +222,7 @@ hold(ax2, 'off'); box(ax2, 'off'); set(ax2, 'FontSize', tick_fs);
 xlabel(ax2, 'firing rate  r', 'FontSize', label_fs);
 ylabel(ax2, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ...
     'FontSize', label_fs);
-title(ax2, 'Delivered output', 'FontWeight', 'normal', 'FontSize', title_fs);
+title(ax2, 'Steady-state synaptic output', 'FontWeight', 'normal', 'FontSize', title_fs);
 xlim(ax2, [0 1]); ylim(ax2, [0 zoom_ymax]);
 set(ax2, 'XTick', [0 1], 'YTick', [0 round(zoom_ymax, 3)]);
 % southeast: the identity line exits the top-left almost at once and the single
@@ -230,7 +234,7 @@ legend(ax2, [h2_id, h2_single, h2_prod], ...
     'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
 
 % --- 3. step response ---
-ax3 = nexttile(tl, 3, [1 2]); hold(ax3, 'on');   % bottom row, both columns
+ax3 = nexttile(tl, 3, [1 2]); hold(ax3, 'on');   % middle row, both columns
 % The drive at TRUE SCALE, sharing the output's axis, and GREEN to match the
 % y = x line in panel 2 -- deliberately, because they are the same quantity.
 % That line is the UNDEPRESSED synapse (b == 1, so output == r), and r(t) here
@@ -273,7 +277,7 @@ hold(ax3, 'off'); box(ax3, 'off'); set(ax3, 'FontSize', tick_fs);
 xlabel(ax3, 'time (s)', 'FontSize', label_fs);
 ylabel(ax3, 'synaptic output  $\prod_k b_k \cdot r$', 'Interpreter', 'latex', ...
     'FontSize', label_fs);
-title(ax3, 'Step response', 'FontWeight', 'normal', 'FontSize', title_fs);
+title(ax3, 'Step response: synaptic output', 'FontWeight', 'normal', 'FontSize', title_fs);
 xlim(ax3, [0 t(end)]); ylim(ax3, [0 y_max]);
 % Handles named explicitly: three steady-state segments sit between the drive
 % and the traces, so a legend given only labels would attach them to the wrong
@@ -282,6 +286,41 @@ legend(ax3, [h_rate, h_ss(1), h_single, h_theta], ...
     {'rate  $r(t)$', 'steady state', 'single $b_k \cdot r$', ...
      'synaptic output  $\prod_k b_k \cdot r$'}, ...
     'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'northeast');
+
+% --- 4. step response, DEPRESSION ---
+% The same protocol and the same exact integration as panel 3, one factor of r
+% removed: this is prod(b) itself rather than prod(b)*r. Worth its own panel
+% because the two disagree in shape -- prod(b) falls MONOTONICALLY with rate
+% (harder drive always depresses more) while prod(b)*r turns over, so the
+% non-monotonicity above belongs to the product with r, not to depression.
+b_prod_t   = prod(b_t, 1);
+b_ss_level = arrayfun(@(rk) prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
+
+ax4 = nexttile(tl, 5, [1 2]); hold(ax4, 'on');    % bottom row, both columns
+h4_rate = plot(ax4, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
+h4_ss = gobjects(1, numel(b_ss_level));
+for k = 1:numel(b_ss_level)
+    on_span = seg_start([2*k, 2*k + 1]);
+    h4_ss(k) = plot(ax4, on_span, b_ss_level([k k]), '-', 'LineWidth', 1.5, ...
+        'Color', single_color);
+end
+h4_single = plot(ax4, t, b_t(1, :), '--', 'LineWidth', 1, 'Color', single_color);
+h4_prod   = plot(ax4, t, b_prod_t, 'LineWidth', lw, 'Color', prod_color);
+hold(ax4, 'off'); box(ax4, 'off'); set(ax4, 'FontSize', tick_fs);
+xlabel(ax4, 'time (s)', 'FontSize', label_fs);
+ylabel(ax4, 'depression  $\prod_k b_k$', 'Interpreter', 'latex', 'FontSize', label_fs);
+title(ax4, 'Step response: depression', 'FontWeight', 'normal', 'FontSize', title_fs);
+xlim(ax4, [0 t(end)]); ylim(ax4, [0 1.05]);
+% southeast: b sits near 1 for most of the record and dips only during steps, so
+% the free space is low and late -- after the last step, where r is 0 and b is
+% recovering toward the top of the panel.
+legend(ax4, [h4_rate, h4_ss(1), h4_single, h4_prod], ...
+    {'rate  $r(t)$', 'steady state', 'single $b_k$', 'depression  $\prod_k b_k$'}, ...
+    'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
+
+% One time axis for both step panels, so zooming or panning either keeps them
+% aligned -- they are the same protocol and must stay comparable by eye.
+linkaxes([ax3, ax4], 'x');
 
 %% ---- Outputs -------------------------------------------------------------
 out = struct('fig', fig, 'rho', rho, 'r_peak', r_peak, 'theta_peak', theta_peak, ...
