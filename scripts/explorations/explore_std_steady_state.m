@@ -219,28 +219,38 @@ set(ax2, 'XTick', [0 1], 'YTick', [0 round(zoom_ymax, 3)]);
 
 % --- 3. step response ---
 ax3 = nexttile(tl); hold(ax3, 'on');
-% The drive at TRUE SCALE, sharing the output's axis. This was briefly plotted
-% rescaled to fill the panel, which made the steps read as 0.3/0.6/1.2 -- the
-% rates were right and only the reference trace was stretched, but it invited
-% exactly the misreading it got, and it threw away the reason to draw r(t) at
-% all: because b = 1 at rest, the onset of each step delivers very nearly the
-% FULL r, so theta rises to meet the drive and then collapses away from it. The
-% small visible shortfall at each onset is incomplete recovery during off_s.
-% Same units, same axis, no scale factor.
+% The drive at TRUE SCALE, sharing the output's axis, and GREEN to match the
+% y = x line in panel 2 -- deliberately, because they are the same quantity.
+% That line is the UNDEPRESSED synapse (b == 1, so output == r), and r(t) here
+% is what this synapse would deliver with no depression. Same meaning, same
+% colour, in both panels.
+%
+% It was briefly plotted rescaled to fill the panel, which made the steps read
+% as 0.3/0.6/1.2 -- the rates were right and only the reference trace was
+% stretched, but it invited exactly the misreading it got, and threw away the
+% reason to draw r(t) at all: because b = 1 at rest, each onset delivers very
+% nearly the FULL r, so theta rises to meet the drive and then collapses away
+% from it. The small shortfall at each onset is incomplete recovery during
+% off_s. Same units, same axis, no scale factor.
 ss = arrayfun(@(rk) rk * prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
 y_max = max([theta_t, r_t, ss]) * 1.12;
-plot(ax3, t, r_t, '-', 'LineWidth', 1, 'Color', [0.82 0.82 0.82]);
+plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
 % Each plateau's asymptote -- the SAME number panel 2 plots at that rate --
 % drawn ONLY across its own step. Spanning the full width implied the level
 % meant something during the off periods, where the rate is zero and the true
 % asymptote is theta = 0; it also let three lines for three different rates run
 % side by side with nothing tying each to its step.
+% Grey, so the green in this panel means one thing only: the undepressed
+% reference. The label gives the LEVEL rather than the rate -- which rate a step
+% is at is already legible from the green trace directly above it, whereas the
+% asymptote is the number worth reading off, and is the same value panel 2
+% reports at that rate.
 seg_start = cumsum([0, seg_dur]);
 for k = 1:numel(ss)
     on_span = seg_start([2*k, 2*k + 1]);      % segment 2k is the k-th step
-    plot(ax3, on_span, [ss(k) ss(k)], '-', 'LineWidth', 1.5, 'Color', identity_color);
-    text(ax3, on_span(2), ss(k), sprintf(' r=%.2g', opts.step_rates(k)), ...
-        'FontSize', 10, 'Color', [0.25 0.45 0.25], ...
+    plot(ax3, on_span, [ss(k) ss(k)], '-', 'LineWidth', 1.5, 'Color', single_color);
+    text(ax3, on_span(2), ss(k), sprintf('  steady st. = %.4f', ss(k)), ...
+        'FontSize', 10, 'Color', single_color, ...
         'VerticalAlignment', 'middle', 'HorizontalAlignment', 'left');
 end
 plot(ax3, t, theta_t, 'LineWidth', lw, 'Color', prod_color);
