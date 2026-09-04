@@ -7,11 +7,11 @@
 % peak. Two timescales: r_peak = sqrt(rho1*rho2), independent of their spread.
 
 %% ---- parameters -----------------------------------------------------------
-tau_rel    = [0.25 0.5 1];
+tau_rel    = [0.25 1];
 tau_rec    = 4 * tau_rel;
-step_rates = [0.25 0.5 1];
+step_rates = [0.125 0.52 0.5 1.0];
 on_s       = 5;
-off_s      = 5;      % < ~4*max(tau_rec) and steps start already depressed
+off_s      = 10;      % < ~4*max(tau_rec) and steps start already depressed
 settle_s   = 5;
 fs         = 1000;
 
@@ -101,6 +101,10 @@ if has_peak
         'MarkerFaceColor', c_prod, 'MarkerEdgeColor', 'none');
     text(ax2, r_peak, theta_peak, sprintf('  (%.2f, %.2f)', r_peak, theta_peak), ...
         'FontSize', 11, 'VerticalAlignment','bottom','HorizontalAlignment','left');
+    plot(ax2, 1, theta(end), 'o', 'MarkerSize', 5, ...
+        'MarkerFaceColor', c_prod, 'MarkerEdgeColor', 'none');
+    text(ax2, 1, theta(end), sprintf('R = %.2f  ', theta_peak / theta(end)), ...
+        'FontSize', 11, 'VerticalAlignment','bottom','HorizontalAlignment','right');
 end
 box(ax2,'off'); set(ax2,'FontSize',fs_t,'XTick',[0 1],'YTick',[0 round(ymax2,3)]);
 xlim(ax2,[0 1]); ylim(ax2,[0 ymax2]);
@@ -144,7 +148,7 @@ ylabel(ax4,'synaptic output  $\prod_k b_k \cdot r$','Interpreter','latex','FontS
 title(ax4,'Step response: synaptic output','FontWeight','normal','FontSize',15);
 legend(ax4,[h4r h4s h4o h4p], ...
     {'rate  $r(t)$','steady state','single $b_k \cdot r$', ...
-     'synaptic output  $\prod_k b_k \cdot r$'}, ...
+    'synaptic output  $\prod_k b_k \cdot r$'}, ...
     'Interpreter','latex','Box','off','FontSize',10,'Location','northeast');
 
 linkaxes([ax3 ax4], 'x');
