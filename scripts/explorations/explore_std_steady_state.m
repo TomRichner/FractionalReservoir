@@ -219,7 +219,20 @@ h2_prod   = plot(ax2, r, theta, 'LineWidth', lw, 'Color', prod_color);
 if has_peak
     plot(ax2, r_peak, theta_peak, 'o', 'MarkerSize', 6, ...
         'MarkerFaceColor', prod_color, 'MarkerEdgeColor', 'none');
-    text(ax2, r_peak, theta_peak, sprintf('  r = %.3f', r_peak), 'FontSize', 11, ...
+    % Both coordinates of the peak, not just where it is. The HEIGHT is the
+    % quantity the panel exists to bound -- the most any rate can deliver
+    % through this synapse -- and reading it off a y axis whose only ticks are
+    % 0 and the limit is guesswork.
+    % LATEX, not tex: MATLAB's tex interpreter has no \prod and warns
+    % "String scalar or character vector must have valid interpreter syntax",
+    % then renders the markup raw.
+    %
+    % %g, not %f: %.4f prints the exact peak 0.03125 as 0.0312, because printf
+    % rounds a half to even. %g keeps the value instead of silently truncating
+    % the one number the label exists to state.
+    text(ax2, r_peak, theta_peak, ...
+        sprintf('  $(r = %.3g,\\; r\\prod_k b_k = %.4g)$', r_peak, theta_peak), ...
+        'Interpreter', 'latex', 'FontSize', 11, ...
         'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left');
 end
 hold(ax2, 'off'); box(ax2, 'off'); set(ax2, 'FontSize', tick_fs);
