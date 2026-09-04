@@ -14,6 +14,74 @@ and session that wrote it. Newest first.
 
 ---
 
+## Simplify where analyses and figures read and write
+
+| | |
+|---|---|
+| Noted | 2026-09-04 · `refactorRunAll` @ `d2b95cb` · R5611351 · Claude Code (Opus 5), session e22d2fab |
+| Raised by | TR, after the `data/` fallback was removed from `resolve_data_file` |
+| Status | **NOT DECIDED.** A direction, not a design. TR wants to come back to it. |
+
+### What TR said
+
+> I think the remaining data location saving options are still too complicated.
+> We need there to be a way to run a single analysis and a way to run a single
+> figure making function. But we do not need to have so much flexibility and
+> complication.
+
+Two requirements, and nothing more:
+
+1. run **one analysis** on its own;
+2. run **one figure function** on its own.
+
+Everything beyond that is surface area to be argued for, not assumed.
+
+### What the surface looks like today
+
+Removing the `data/` fallback (`d2b95cb`) closed the dangerous part — a figure
+can no longer reach outside the run directory it was handed. What it did not do
+is reduce the number of ways a location gets chosen. Reading a figure's data can
+still go through any of:
+
+| | |
+|---|---|
+| `cfg.mat_file` / `cfg.data_file` | an explicit file |
+| `cfg.run_dir` | a run directory, searched for the stage subfolder |
+| `cfg.run_dir` left empty | `resolve_run_dir` picks the newest run matching the preset |
+| `cfg.out_dir` | where the figure writes, separately |
+
+and writing an analysis's output through `output_dir` / `out_dir`, which each
+default into `data/<stage>/` when empty. So "run one analysis, then plot it"
+currently means knowing that the analysis defaulted to `data/<stage>/`, and then
+passing `'run_dir', fullfile(project_root, 'data')` — which works, and which
+nobody would guess.
+
+### The shape worth considering
+
+A standalone analysis could write into a **run-directory-shaped** location of its
+own (a dated folder holding `<stage>/`), so that plotting it is the same
+operation as plotting a pipeline run: one `run_dir`, no special case, and the
+`data/<stage>/` convention disappears rather than being worked around. That would
+let `run_dir` be the *only* way to name data, with the explicit-file argument
+kept as a genuine escape hatch.
+
+Not proposed as work. It is the direction that would make the two requirements
+above the whole story.
+
+### Constraints any future design has to keep
+
+- **A figure reads ONE run.** This is the property `d2b95cb` bought, after the
+  same bug appeared twice (2026-08-26, 2026-09-03) and the second time produced a
+  figure from twelve-day-old data that reported success. Whatever replaces the
+  current arrangement must not reintroduce a second place to look.
+- **`this_dir` must never appear in an output path.** That is what put a `.mat`
+  beside a figure's `.m` and started the whole sequence.
+- **Standalone runs must stay possible.** They are how one stage is regenerated
+  without a 3-hour sweep; the complaint is about the number of knobs, not about
+  the capability.
+
+---
+
 ## Move to COMPOSED CONDITIONS: each preset composes its own regimes
 
 | | |
