@@ -2,9 +2,13 @@ function [] = save_some_figs_to_folder_2(save_folder, save_name, fig_vec, fig_ty
 
 if not(exist(save_folder,'dir'))
     mkdir(save_folder)
-else
-    warning('folder already exists')
 end
+% There was a warning('folder already exists') here. Saving into an existing
+% folder is the NORMAL case -- every figure that writes more than one file hits
+% it, and every rerun into a stable fig_root hits it for all of them -- so it
+% fired dozens of times per run and said nothing. Its cost was not the noise
+% itself but what the noise buried: a real warning in that output had no chance
+% of being noticed.
 
 if isempty(fig_vec)
     figHandles = findobj('Type', 'figure')
