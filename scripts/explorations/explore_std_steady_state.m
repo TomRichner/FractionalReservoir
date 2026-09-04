@@ -234,7 +234,11 @@ legend(ax2, [h2_id, h2_single, h2_prod], ...
     'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'southeast');
 
 % --- 3. step response ---
-ax3 = nexttile(tl, 3, [1 2]); hold(ax3, 'on');   % middle row, both columns
+% BOTTOM row, though it is built first. Tile numbers are given explicitly, so
+% code order and visual order differ here: depression is drawn second but placed
+% above, because it is the factor and this is the product. Keeping the code
+% order means seg_start and the shared quantities stay defined before use.
+ax3 = nexttile(tl, 5, [1 2]); hold(ax3, 'on');
 % The drive at TRUE SCALE, sharing the output's axis, and GREEN to match the
 % y = x line in panel 2 -- deliberately, because they are the same quantity.
 % That line is the UNDEPRESSED synapse (b == 1, so output == r), and r(t) here
@@ -288,15 +292,20 @@ legend(ax3, [h_rate, h_ss(1), h_single, h_theta], ...
     'Interpreter', 'latex', 'Box', 'off', 'FontSize', 10, 'Location', 'northeast');
 
 % --- 4. step response, DEPRESSION ---
-% The same protocol and the same exact integration as panel 3, one factor of r
-% removed: this is prod(b) itself rather than prod(b)*r. Worth its own panel
-% because the two disagree in shape -- prod(b) falls MONOTONICALLY with rate
-% (harder drive always depresses more) while prod(b)*r turns over, so the
-% non-monotonicity above belongs to the product with r, not to depression.
+% The same protocol and the same exact integration, one factor of r removed:
+% this is prod(b) itself rather than prod(b)*r. Worth its own panel because the
+% two disagree in shape -- prod(b) falls MONOTONICALLY with rate (harder drive
+% always depresses more) while prod(b)*r turns over, so the non-monotonicity
+% belongs to the product with r, not to depression.
+%
+% MIDDLE row, so the figure reads factor-then-product downwards: depression,
+% then depression times rate. It also puts each step response directly under the
+% steady-state panel of the same quantity -- depression above depression on the
+% left, output above output on the right.
 b_prod_t   = prod(b_t, 1);
 b_ss_level = arrayfun(@(rk) prod(1 ./ (1 + rk ./ rho)), opts.step_rates);
 
-ax4 = nexttile(tl, 5, [1 2]); hold(ax4, 'on');    % bottom row, both columns
+ax4 = nexttile(tl, 3, [1 2]); hold(ax4, 'on');
 h4_rate = plot(ax4, t, r_t, '-', 'LineWidth', 1.5, 'Color', identity_color);
 h4_ss = gobjects(1, numel(b_ss_level));
 for k = 1:numel(b_ss_level)
