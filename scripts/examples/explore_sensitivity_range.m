@@ -4,7 +4,7 @@ function [out_dir, summary] = explore_sensitivity_range(opts)
 %   explore_sensitivity_range()                       % the defaults below
 %   explore_sensitivity_range('param', 'n', 'range', [50 2000])
 %   explore_sensitivity_range('param', 'f_E', 'range', [0.1 0.9], ...
-%                             'run_mode', 'fast2')
+%                             'run_mode', 'fast')
 %   [d, s] = explore_sensitivity_range('run_mode', 'medium');
 %
 % WHAT THIS IS FOR. run_sensitivity_analysis hardcodes the seven axes the paper
@@ -38,7 +38,7 @@ function [out_dir, summary] = explore_sensitivity_range(opts)
 %
 % COST is n_levels x n_reps x n_conditions simulations, printed before it starts.
 % 'medium' is 11 x 15 x 4 = 660 on a 4-regime preset, 1155 on a 7-regime one.
-% Use 'fast' or 'fast2' to scout first.
+% Use 'fast' to scout first.
 %
 % See also: run_sensitivity_analysis, resolve_run_context, analysis_run_config,
 %           srnn_param_preset, ParamSpaceAnalysis2/plot_sensitivity

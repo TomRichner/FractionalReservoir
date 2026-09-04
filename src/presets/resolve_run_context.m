@@ -42,8 +42,8 @@ function ctx = resolve_run_context(analysis, opts)
 %                   MODEL CLASS they are written for, and the ADAPTATION
 %                   CONDITIONS -- a preset with its own depression routes can
 %                   only express them through a condition.
-%   run_mode        analysis_run_config mode ('fast' | 'fast2' | 'medium' |
-%                   'medium2' | 'production').
+%   run_mode        analysis_run_config mode; see run_mode_names() for the
+%                   canonical list ('fast' | 'medium' | 'medium2' | 'production').
 %   output_dir      shared run directory. '' means "let ParamSpaceAnalysis2
 %                   create its own dated folder", which is what a standalone
 %                   run wants.

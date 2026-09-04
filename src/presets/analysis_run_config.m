@@ -22,20 +22,23 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 %   cfg.sde_solver    - the stochastic scheme this cell would use
 %   cfg.is_stochastic - whether preset_defaults asked for noise
 %
-% Modes:
+% Modes -- the canonical list is run_mode_names(), which every later stage
+% validates against too:
 %   'fast'       - few levels/reps, fs=200, short T_range; finishes quickly
-%   'fast2'      - 'fast' with twice the reps on the 1-D sensitivity sweeps and
-%                  twice the T_range on those and on param_space. The reps buy
-%                  the spread WITHIN a level, which at 3 reps is too thin to
-%                  read; the longer window buys an LLE that is less of a
-%                  transient. tau_sensitivity is untouched, so it is still
-%                  exactly 'fast'. Cheaper than the extra LEVELS that separate
-%                  'fast' from 'medium'.
 %   'medium'     - roughly halfway; for a usable but not publication-size run
 %   'medium2'    - between medium and production, at fs=800, for overnight
 %                  STOCHASTIC runs. See the note below on why its sweep sizes
 %                  sit nearer medium than the true midpoint.
 %   'production' - full-size sweeps at fs=400 (for real results)
+%
+% 'fast2' WAS REMOVED 2026-09-03 (TR). It was 'fast' with 6 reps rather than 3 on
+% the 1-D sweeps and twice the T_range there and on param_space, leaving
+% tau_sensitivity identical -- a narrow enough difference that carrying a fifth
+% mode for it was not worth the cost. That cost was real: three later stages
+% (memory capacity, mc_example, eig_heatmap) never implemented it, so a
+% single_multi_TS run at 'fast2' completed its sweeps and then lost those three
+% stages, with one figure silently falling back to twelve-day-old data and
+% reporting success. Use 'fast'; if the extra reps are wanted, raise them here.
 %
 % ON 'medium2' AND fs=800. Doubling fs is free relative to medium *per
 % simulated second*: SRA1 takes two drift evaluations per step against rk4's
@@ -45,15 +48,16 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 % run cannot use an adaptive solver at all.
 %
 % Its levels and reps are NOT the medium/production midpoint. Measured against
-% a completed fast2 run (19.7 min), medium alone is already ~9 h and production
-% ~80 h, so the true midpoint is a multi-day job. medium2 is sized to finish
+% a completed 'fast2' run (19.7 min -- that mode has since been removed; see
+% above), medium alone is already ~9 h and production ~80 h, so the true
+% midpoint is a multi-day job. medium2 is sized to finish
 % overnight (~9 h) and therefore sits nearer medium: more levels than medium on
 % the 1-D sweeps, fewer reps, a longer window, and the finer step.
 %
 % DETERMINISTIC AND STOCHASTIC SOLVERS. Every cell names two integrators, and
 % which one is used depends on the PRESET rather than on the run mode:
 %
-%   deterministic   rk4 for fast / fast2 / medium, ode45 for production
+%   deterministic   rk4 for fast / medium / medium2, ode45 for production
 %   stochastic      sra1 everywhere
 %
 % This exists because the two knobs stopped being orthogonal. sigma_u_noise is
@@ -82,7 +86,7 @@ arguments
     preset_defaults struct = struct()
 end
 
-valid_modes = {'fast', 'fast2', 'medium', 'medium2', 'production'};
+valid_modes = run_mode_names();   % ONE list, shared with every later stage
 if ~ismember(run_mode, valid_modes)
     error('analysis_run_config:badMode', ...
         'Unknown run_mode ''%s'' (expected %s).', ...
@@ -96,13 +100,6 @@ switch analysis
             case 'fast'
                 % fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3).
                 cfg = pack(4,  3,  'rk4',   200, [0, 10], [5, 10]);
-            case 'fast2'
-                % fast2 differs from fast here in two ways: 6 reps rather than
-                % 3, and twice the T_range. The LLE window is doubled with it,
-                % so it stays the same FRACTION of the run (the second half) --
-                % a longer simulation with the old [5,10] window would have
-                % measured the same transient from further away.
-                cfg = pack(4,  6,  'rk4',   200, [0, 20], [10, 20]);
             case 'medium'
                 cfg = pack(11, 15, 'rk4',   400, [0, 20], [10, 20]);
             case 'medium2'
@@ -127,10 +124,9 @@ switch analysis
         % medium/production use the longer T_range and the class-default LLE
         % window rather than an explicit short one.
         switch run_mode
-            case {'fast', 'fast2'}
+            case 'fast'
                 % NOTE: this window is far shorter than the swept tau, so long-tau
                 % LLE reflects a transient -- accepted for fast qualitative runs.
-                % fast2 doubles reps on the 1-D sweeps above only, not here.
                 cfg = pack(7,  7,  'rk4',   200, [0, 20], [10, 20]);
             case 'medium'
                 % rk4 rather than ode45, so the deterministic column reads the
@@ -162,11 +158,6 @@ switch analysis
         switch run_mode
             case 'fast'
                 cfg = pack(3, [], 'rk4',   200, [0, 20], [10, 20]);
-                cfg.n_grid_points = 27;
-            case 'fast2'
-                % No reps axis here, so the only fast2 difference is the doubled
-                % T_range (and the LLE window doubled with it).
-                cfg = pack(3, [], 'rk4',   200, [0, 40], [20, 40]);
                 cfg.n_grid_points = 27;
             case 'medium'
                 cfg = pack(4, [], 'rk4',   400, [0, 20], [10, 20]);

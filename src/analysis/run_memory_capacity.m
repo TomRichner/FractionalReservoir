@@ -341,15 +341,27 @@ switch run_mode
         % UNDER-DETERMINED and the MC values are not meaningful. Ridge
         % regularization keeps it from blowing up. Do not read results from it.
         cfg = pack(4, 10, 60, 30, 5, 200, 500, 200);
-    case 'medium'
+    case {'medium', 'medium2'}
         % N_train = 300/0.3 = 1000 > 300 features: well posed, usable numbers.
+        %
+        % medium2 runs at medium effort here. It differs from medium only in
+        % SWEEP dimensions -- more grid levels, fewer reps, a finer fs for the
+        % stochastic integrator -- and memory capacity has no grid and no reps.
+        % Collapsing is what run_dc_lle_analysis already does, and is honest:
+        % there is nothing for the extra fidelity to buy. Give it its own cell if
+        % that stops being true.
         cfg = pack(15, 10, 300, 90, 10, 1000, 2000, 200);
     case 'production'
         % The paper's settings. N_train = 600/0.3 = 2000 hold-samples.
         cfg = pack(30, 10, 600, 150, 15, 2000, 10000, 200);
     otherwise
+        % Every name in run_mode_names() must be handled above; test_run_modes
+        % asserts it. Reaching here means a mode was added to the sweeps and this
+        % table was not taught about it -- which is how a 'fast2' run lost this
+        % stage entirely, after the sweeps had already completed.
         error('run_memory_capacity:badMode', ...
-            'Unknown run_mode ''%s'' (expected fast, medium or production).', run_mode);
+            'Unknown run_mode ''%s'' (expected %s).', ...
+            run_mode, strjoin(run_mode_names(), ', '));
 end
 
 cfg.ode_solver = select_solver(cfg, preset_defaults, ode_solver_override);

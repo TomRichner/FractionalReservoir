@@ -49,6 +49,31 @@ end
 setup_paths();
 if ~isstruct(cfg); error('run_all_paper_analyses:BadConfig', 'cfg must be a struct.'); end
 
+%% PREFLIGHT: the run mode must be one every stage understands
+% Checked HERE, before anything simulates, because the failure it guards was
+% silent and expensive. Stage 1 validated run_mode itself, so a mode it accepted
+% started hours of sweeps -- and stages 2-5 then hit their own switch statements,
+% threw "Unknown run_mode", and were reported as FAILED rows far down a long log.
+% On 2026-09-03 single_multi_TS ran that way at 'fast2': the sweeps finished,
+% memory capacity / mc_example / eig_heatmap produced nothing, and
+% fig_memory_capacity then fell back to a twelve-day-old .mat and reported
+% SUCCESS. The stale figure was indistinguishable from a good one.
+%
+% run_mode_names() is now the single list every stage validates against, and
+% test_run_modes asserts each stage really accepts every name in it. This check
+% is the cheap front line: it costs microseconds and fails before the output
+% directory is created.
+valid_modes = run_mode_names();
+if ~ismember(cfg.run_mode, valid_modes)
+    error('run_all_paper_analyses:BadRunMode', ...
+        ['run_mode ''%s'' is not one of: %s.\n\n' ...
+         'Checked before any compute starts: a mode that only SOME stages ' ...
+         'understand used to run the sweeps to completion and then lose the\n' ...
+         'later stages one by one. (''fast2'' was removed 2026-09-03 for ' ...
+         'exactly that reason -- use ''fast''.)'], ...
+        cfg.run_mode, strjoin(valid_modes, ', '));
+end
+
 % KEEP THE SWEEP PLOTS OFF SCREEN unless asked otherwise (cfg.visible_figures,
 % default false). The sub-analyses plot and save at the end of each stage, and
 % each new window raises itself and takes keyboard focus -- so an unattended run

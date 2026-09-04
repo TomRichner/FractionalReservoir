@@ -52,13 +52,19 @@ end
 % Protocol settings. Deliberately a SEPARATE, smaller table from
 % run_memory_capacity's: this is one trial for a qualitative figure, so it does
 % not need that function's trial count, bootstrap or permutation machinery.
+% medium2 runs at medium effort: it differs from medium only in sweep dimensions,
+% and this is a single trial with no sweep. Same collapse as run_memory_capacity.
 switch opts.run_mode
-    case 'fast',       T_train_sec = 60;  T_test_sec = 30;  d_max_sec = 5;
-    case 'medium',     T_train_sec = 300; T_test_sec = 90;  d_max_sec = 10;
-    case 'production', T_train_sec = 600; T_test_sec = 150; d_max_sec = 15;
+    case 'fast',                T_train_sec = 60;  T_test_sec = 30;  d_max_sec = 5;
+    case {'medium', 'medium2'}, T_train_sec = 300; T_test_sec = 90;  d_max_sec = 10;
+    case 'production',          T_train_sec = 600; T_test_sec = 150; d_max_sec = 15;
     otherwise
+        % Every name in run_mode_names() must be handled above; test_run_modes
+        % asserts it. Reaching here means a mode was added to the sweeps and this
+        % stage was not taught about it -- which is how a 'fast2' run lost it.
         error('run_memory_capacity_example:badMode', ...
-            'Unknown run_mode ''%s''.', opts.run_mode);
+            'Unknown run_mode ''%s'' (expected %s).', ...
+            opts.run_mode, strjoin(run_mode_names(), ', '));
 end
 fs         = 200;
 T_wash_sec = 10;

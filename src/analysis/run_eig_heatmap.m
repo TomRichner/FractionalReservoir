@@ -68,12 +68,20 @@ if ~isfolder(out_dir); mkdir(out_dir); end
 % resolution of the occupancy density. n is NOT reduced in fast mode: the
 % eigenvalue cloud's shape depends on network size, so shrinking it would change
 % the thing being measured rather than just measuring it less well.
+% medium2 runs at medium effort: it differs from medium only in sweep dimensions
+% (levels, reps, fs for the stochastic integrator), and this stage has no sweep.
+% Same collapse as run_memory_capacity and run_dc_lle_analysis.
 switch cfg.run_mode
-    case 'fast',       T_range = [0 40];  n_samples = 40;   fs = 200;
-    case 'medium',     T_range = [0 100]; n_samples = 150;  fs = 400;
-    case 'production', T_range = [0 200]; n_samples = 300;  fs = 400;
+    case 'fast',                   T_range = [0 40];  n_samples = 40;   fs = 200;
+    case {'medium', 'medium2'},    T_range = [0 100]; n_samples = 150;  fs = 400;
+    case 'production',             T_range = [0 200]; n_samples = 300;  fs = 400;
     otherwise
-        error('run_eig_heatmap:badMode', 'Unknown run_mode ''%s''.', cfg.run_mode);
+        % Every name in run_mode_names() must be handled above; test_run_modes
+        % asserts it. Reaching here means a mode was added to the sweeps and this
+        % stage was not taught about it -- which is how a 'fast2' run lost it.
+        error('run_eig_heatmap:badMode', ...
+            'Unknown run_mode ''%s'' (expected %s).', ...
+            cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
 if cfg.n_samples > 0; n_samples = cfg.n_samples; end
 

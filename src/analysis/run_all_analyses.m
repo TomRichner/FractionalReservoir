@@ -17,8 +17,8 @@ function run_dir = run_all_analyses(preset_name, run_mode, opts)
 % INPUTS
 %   preset_name  which network to simulate. See srnn_param_preset.
 %                Carries the model class and the adaptation conditions too.
-%   run_mode     how much compute to spend: 'fast' | 'fast2' | 'medium' |
-%                'medium2' | 'production'. See analysis_run_config.m for the
+%   run_mode     how much compute to spend: 'fast' | 'medium' | 'medium2' |
+%                'production' (run_mode_names). See analysis_run_config.m for the
 %                per-analysis numbers. 'fast' is the smoke test.
 %   save_figs    write extra figure formats alongside each sweep (default true).
 %   output_dir   override the dated directory (default: create one).

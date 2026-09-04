@@ -266,16 +266,18 @@ function cfg = dc_lle_run_config(run_mode, preset_defaults, ode_solver_override)
 % indegree = 4, and 7 conditions per seed instead of 1. 25/38/50 seeds would
 % have made even 'fast' an hour.
 switch run_mode
-    case {'fast', 'fast2'}
+    case 'fast'
         cfg = pack(5);
     case {'medium', 'medium2'}
         cfg = pack(15);
     case 'production'
         cfg = pack(30);
     otherwise
+        % Every name in run_mode_names() must be handled above; test_run_modes
+        % asserts it.
         error('run_dc_lle_analysis:badMode', ...
-            ['Unknown run_mode ''%s'' (expected ''fast'', ''fast2'', ' ...
-             '''medium'', ''medium2'' or ''production'').'], run_mode);
+            'Unknown run_mode ''%s'' (expected %s).', ...
+            run_mode, strjoin(run_mode_names(), ', '));
 end
 
 cfg.ode_solver = select_solver(cfg, preset_defaults, ode_solver_override);

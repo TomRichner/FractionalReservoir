@@ -86,7 +86,7 @@ all_passed = check('preset activation evaluates as piecewise(S_a, S_c)', ...
 
 %% analysis_run_config covers every analysis x mode and rejects bad input
 analyses = {'sensitivity', 'tau_sensitivity', 'param_space'};
-modes = {'fast', 'fast2', 'medium', 'medium2', 'production'};
+modes = run_mode_names();   % the canonical list; 'fast2' was removed 2026-09-03
 cfg_ok = true;
 for i = 1:numel(analyses)
     for j = 1:numel(modes)
@@ -133,15 +133,15 @@ all_passed = check('sde_solver/is_stochastic never leak into cfg.model', ...
 
 % The noise preset must actually reach that path end to end.
 [dn, mcn] = srnn_param_preset('celltype_pairs_Sc0p2_noise0p025_dualStd_4cond');
-cfg_n = analysis_run_config('sensitivity', 'fast2', dn);
-all_passed = check('the noise preset selects sra1 at fast2', ...
+cfg_n = analysis_run_config('sensitivity', 'fast', dn);
+all_passed = check('the noise preset selects sra1 at fast', ...
     strcmp(cfg_n.model.ode_solver, 'sra1') && strcmp(mcn, 'SRNNCellTypePairs')) && all_passed;
 % ...and its merged model_defaults are what PSA will actually accept.
 psa_n = ParamSpaceAnalysis2('verbose', false);
 psa_n.model_class = mcn;
 psa_n.model_defaults = merge_struct(dn, cfg_n.model);
 [threw, err] = capture_error(@() psa_n.validate_model_defaults());
-all_passed = check('noise preset + fast2 config validates as model_defaults', ...
+all_passed = check('noise preset + fast config validates as model_defaults', ...
     ~threw) && all_passed;
 if threw; fprintf('      %s\n', err.message); end
 [threw, ~] = capture_error(@() psa_n.validate_noise_settings());
