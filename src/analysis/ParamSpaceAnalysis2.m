@@ -122,9 +122,14 @@ classdef ParamSpaceAnalysis2 < handle
 
             % Set default output directory
             if isempty(obj.output_dir)
-                % Default to 'data/param_space' in the project root
-                src_path = fileparts(mfilename('fullpath'));
-                project_root = fileparts(src_path);
+                % Default to 'data/param_space' in the project root. Located
+                % via setup_paths, not by walking up from this file: that was
+                % fileparts(fileparts(mfilename)), which was the root while this
+                % class lived at src/ and became src/ itself once 2a608e3 moved
+                % it into src/analysis/ -- so every run that left output_dir
+                % empty wrote into src/data for a week without anyone noticing,
+                % because the pipeline always passes output_dir explicitly.
+                project_root = fileparts(which('setup_paths'));
                 obj.output_dir = fullfile(project_root, 'data', 'param_space');
             end
         end
