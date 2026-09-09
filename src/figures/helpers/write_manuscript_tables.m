@@ -5,9 +5,14 @@ function paths = write_manuscript_tables(cfg)
 %   paths = WRITE_MANUSCRIPT_TABLES('preset_name', p)
 %   paths = WRITE_MANUSCRIPT_TABLES('out_dir', d)
 %
-% Writes two files DIRECTLY into out_dir:
-%   equation_table.md         equations + parameter table
-%   adaptation_conditions.md  the regimes, as they run
+% Writes four files DIRECTLY into out_dir:
+%   equation_table.md               equations + parameter table, annotated
+%   adaptation_conditions.md        the regimes as they run, annotated
+%   parameters_table.md             the parameter table ALONE
+%   adaptation_conditions_table.md  the conditions table ALONE
+% The bare pair carry no title, provenance banner or prose -- they are for
+% pasting into a manuscript -- and share their row writers with the annotated
+% pair, so the two versions of a table cannot disagree.
 %
 % THESE ARE PIPELINE OUTPUT, not documentation checked into the tree. They are
 % rebuilt from a live model on every run, describe one preset, and are
@@ -72,6 +77,9 @@ M = model_facts(model, model_class, preset);
 paths = {};
 paths{end+1} = write_equation_table(out_dir, cfg.preset_name, M);
 paths{end+1} = write_conditions_table(out_dir, cfg.preset_name, conditions, M);
+% The same two tables with nothing around them, for pasting into a manuscript.
+paths{end+1} = write_param_table_bare(out_dir, M);
+paths{end+1} = write_conditions_table_bare(out_dir, conditions, M);
 
 if cfg.verbose
     fprintf('[manuscript tables] preset %s (%s)\n', cfg.preset_name, model_class);
@@ -304,18 +312,32 @@ fprintf(fid, ['with $(\\tilde{\\mu}, \\tilde{\\sigma})$ indexed by ' ...
     '**(postsynaptic, presynaptic)** cell type, and given as multiples of ' ...
     '$F = 1/\\sqrt{n\\,\\alpha(2-\\alpha)}$.\n\n']);
 
+fprintf(fid, '## Parameters as run\n\n');
 write_param_rows(fid, M);
 end
 
 %% ------------------------------------------------------------------------
-% write_parameter_table lived here and wrote fig_equations/parameter_table.md by
-% calling write_param_rows into a file of its own. Its output was identical
-% row-for-row to the section write_equation_table already emits, so the only
-% thing it added was a second copy to keep in sync. Removed 2026-08-27 with the
-% fig_equations/ folder. write_param_rows stays -- it is what equation_table.md
-% uses.
+% A bare parameter table existed before, as fig_equations/parameter_table.md,
+% and was removed on 2026-08-27 as a second copy of the section
+% equation_table.md already carries. It is back (TR, 2026-09-09) for a
+% different reason: a manuscript wants the TABLE ALONE, with none of the
+% title, provenance banner or prose around it. Both files draw their rows from
+% write_param_rows, so there is still only one place the table is spelled out.
+function p = write_param_table_bare(dir_out, M)
+% The parameter table and nothing else -- no title, no provenance, no heading
+% -- for dropping straight into a manuscript. Shares write_param_rows with
+% equation_table.md's "Parameters as run" section, so the two cannot disagree.
+p = fullfile(dir_out, 'parameters_table.md');
+fid = fopen(p, 'w');
+if fid < 0; error('write_manuscript_tables:CannotOpen', 'Could not open %s', p); end
+c = onCleanup(@() fclose(fid)); %#ok<NASGU>
+write_param_rows(fid, M);
+end
+
 function write_param_rows(fid, M)
-fprintf(fid, '## Parameters as run\n\n');
+% Header row and one row per parameter; the only place the table is spelled
+% out. The "## Parameters as run" heading is the annotated caller's, so this
+% can also be written bare.
 fprintf(fid, '| Symbol | Name | Value | Units |\n|---|---|---|---|\n');
 
 row(fid, '$n$',          'Network size',              M.n,        'neurons');
@@ -375,7 +397,22 @@ c = onCleanup(@() fclose(fid)); %#ok<NASGU>
 fprintf(fid, ['Every sweep runs each grid point under all %d regimes, on the ' ...
     '**same network** (the weight seed is shared), so the comparison is ' ...
     'paired.\n\n'], numel(conditions));
+write_conditions_rows(fid, conditions, M);
+end
 
+function p = write_conditions_table_bare(dir_out, conditions, M)
+% The same table and nothing else -- no title, no provenance, no prose -- for
+% dropping straight into a manuscript. Shares write_conditions_rows with the
+% annotated file, so the two cannot disagree.
+p = fullfile(dir_out, 'adaptation_conditions_table.md');
+fid = fopen(p, 'w');
+if fid < 0; error('write_manuscript_tables:CannotOpen', 'Could not open %s', p); end
+c = onCleanup(@() fclose(fid)); %#ok<NASGU>
+write_conditions_rows(fid, conditions, M);
+end
+
+function write_conditions_rows(fid, conditions, M)
+% Header row and one row per regime; the only place the table is spelled out.
 if M.is_pairs
     fprintf(fid, ['| Condition | SFA timescales $\\tau_a$ (s) | Depressing routes ' ...
         '| Facilitating routes |\n']);
