@@ -82,23 +82,33 @@ std_hue  = [0.337 0.706 0.914];
 both_hue = [0.800 0.475 0.655];
 lighten  = @(c) c + 0.45 * (1 - c);
 
-% Hue by MECHANISM, lightness by how many timescales carry it: the lighter shade
-% is the one-timescale variant of the same hue. Keys are the sfaX_stdY names;
-% the pre-2026-09-03 names are kept below so a figure regenerated from an older
-% run still gets its colours instead of throwing NoKey.
+% Keys are the sfaX_stdY names; the pre-2026-09-03 names are kept below so a
+% figure regenerated from an older run still gets its colours instead of
+% throwing NoKey.
 %
-% sfa1_std1 and sfa3_std1 share a shade. They never appear in the same figure --
-% one belongs to the 3-condition set, the other to the 7-condition set -- and
-% within each set the contrast that matters (against sfa3_std2) is preserved.
+% THE PAPER'S TWO ADAPTING REGIMES GET THE TWO SATURATED HUES (TR, 2026-09-09):
+% sfa1_std1 orange, sfa3_std2 sky blue. In the 3-condition figures that is
+% black / orange / blue -- three fully distinct colours for the single-vs-multi
+% comparison, rather than one purple at two lightnesses.
+%
+% THE COST, accepted: hue no longer says which MECHANISM a regime carries. It
+% used to -- SFA orange, STD blue, both purple, the one-timescale variant
+% lighter -- and the 4- and 7-condition sheets relied on that. In those sheets
+% sfa3_std2 now shares sky blue with sfa0_std2, and sfa1_std1 shares orange with
+% sfa3_std0. Those sets are exploratory and not in the paper; the paper's
+% comparison is what these two rows are tuned for.
+%
+% sfa3_std1 keeps the old scheme (light purple) and is the one row still
+% following it; sfa3_std3 keeps purple.
 cond_colors = { ...
     'no_adaptation',    [0 0 0]; ...
     'sfa1_std0',        lighten(sfa_hue); ...
     'sfa3_std0',        sfa_hue; ...
     'sfa0_std1',        lighten(std_hue); ...
     'sfa0_std2',        std_hue; ...
-    'sfa1_std1',        lighten(both_hue); ...
+    'sfa1_std1',        sfa_hue; ...          % the paper's single-timescale regime
     'sfa3_std1',        lighten(both_hue); ...
-    'sfa3_std2',        both_hue; ...
+    'sfa3_std2',        std_hue; ...          % the paper's multi-timescale regime
     'sfa3_std3',        both_hue; ...
     'sfa0_std1_stf1',   lighten(std_hue); ...
     'sfa1_std1_stf1',   lighten(both_hue); ...
