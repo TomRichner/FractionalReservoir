@@ -57,7 +57,7 @@ setup_paths();
 if ~strcmp(model_class, 'SRNNCellTypePairs')
     error('run_memory_capacity:BadModelClass', ...
         ['Preset ''%s'' is written for %s, but SRNN_ESN_reservoir now ' ...
-         'subclasses SRNNCellTypePairs and cannot take its parameters.'], ...
+        'subclasses SRNNCellTypePairs and cannot take its parameters.'], ...
         opts.preset_name, model_class);
 end
 cfg = mc_run_config(opts.run_mode, preset, opts.ode_solver);
@@ -108,15 +108,15 @@ n_cond = numel(condition_names);
 base_args_template = [ ...
     namevalue(preset), ...
     {'fs',             fs, ...
-     'ode_solver',     cfg.ode_solver, ...
-     'input_type',     cfg.input_type, ...
-     'u_f_cutoff',     cfg.u_f_cutoff, ...
-     'u_alpha',        cfg.u_alpha, ...
-     'T_hold',         cfg.T_hold, ...
-     'T_wash',         T_wash, ...
-     'T_train',        T_train, ...
-     'T_test',         T_test, ...
-     'd_max',          d_max}];
+    'ode_solver',     cfg.ode_solver, ...
+    'input_type',     cfg.input_type, ...
+    'u_f_cutoff',     cfg.u_f_cutoff, ...
+    'u_alpha',        cfg.u_alpha, ...
+    'T_hold',         cfg.T_hold, ...
+    'T_wash',         T_wash, ...
+    'T_train',        T_train, ...
+    'T_test',         T_test, ...
+    'd_max',          d_max}];
 
 %% Delay grid + preallocation
 % Sized up front so R2_trials is fully allocated before the parfor (a sliced
@@ -229,10 +229,13 @@ stats = struct();
 for p = 1:size(pairs,1)
     x = MC_trials(:, pairs(p,1));
     y = MC_trials(:, pairs(p,2));
-    [pval, diff_mean] = paired_signflip_permutation_pvalue(x, y, cfg.n_perm);
+    [pval, diff_mean, n_patterns, is_exact] = paired_signflip_permutation_pvalue( ...
+        x, y, cfg.n_perm_max, cfg.perm_exact_max_N);
     stats(p).pair       = pair_labels{p};
     stats(p).mean_diff  = diff_mean;
     stats(p).p_perm     = pval;
+    stats(p).n_patterns = n_patterns;   % sign patterns evaluated
+    stats(p).exact      = is_exact;     % true: all 2^N enumerated, p is exact
     stats(p).cohens_dz  = paired_cohens_dz(x, y);
 end
 
@@ -281,7 +284,8 @@ s.u_f_cutoff = cfg.u_f_cutoff;  s.u_alpha = cfg.u_alpha;
 s.readout_signal = readout_signal;
 s.n_trials = n_trials;
 s.R2_threshold_for_horizon = R2_thresh;
-s.n_boot = cfg.n_boot;  s.n_perm = cfg.n_perm;
+s.n_boot = cfg.n_boot;
+s.n_perm_max = cfg.n_perm_max;  s.perm_exact_max_N = cfg.perm_exact_max_N;
 s.seed_net_base = cfg.seed_net_base;  s.seed_stim_base = cfg.seed_stim_base;
 results_all.settings = s;
 
@@ -307,7 +311,7 @@ save(mat_file, 'results_all', '-v7.3');
 % Compact CSV for total MC and horizon
 T = array2table([MC_trials H_trials], 'VariableNames', ...
     [strcat('MC_', matlab.lang.makeValidName(condition_names)), ...
-     strcat('H_',  matlab.lang.makeValidName(condition_names))]);
+    strcat('H_',  matlab.lang.makeValidName(condition_names))]);
 T.seed_net  = seed_net(:);
 T.seed_stim = seed_stim(:);
 T = movevars(T, {'seed_net','seed_stim'}, 'Before', 1);
@@ -342,57 +346,44 @@ function cfg = mc_run_config(run_mode, preset_defaults, ode_solver_override)
 % a run-mode setting, so the one place they meet has to see both.
 if nargin < 2; preset_defaults = struct(); end
 if nargin < 3; ode_solver_override = ''; end
-% Each mode names its settings in full. These were eight positional arguments
-% to a pack() helper, readable only by counting against a signature 65 lines
-% away. The values are unchanged.
+% THE MODES DIFFER IN n_trials AND NOTHING ELSE (TR, 2026-09-09). Trials are
+% what buy statistical power, and they are the cost: one trial is one full
+% simulation per condition. Everything else -- the durations, the delay
+% horizon, the resampling counts -- is the same in every mode, because none of
+% it is worth trading away:
 %
-% The number that decides whether MC means anything is T_train_sec: the ridge
-% readout is fit on N_train = T_train_sec / T_hold hold-samples (T_hold = 0.3 s
-% below) and needs more of them than it has features, which is the preset's n
-% -- 300 for mc_pairs_dualStd, 500 for the paper's celltype_pairs presets.
+%   T_train_sec  decides whether MC means anything at all. The ridge readout is
+%                fit on N_train = T_train_sec / T_hold hold-samples and needs
+%                more of them than it has features, which is the preset's n --
+%                300 for mc_pairs_dualStd, 500 for the paper's celltype_pairs
+%                presets. 600 s gives 2000, well posed for both. It used to be
+%                60 s at 'fast' (200 samples: UNDER-DETERMINED for every
+%                preset) and 300 s at 'medium' (1000: only 2x n = 500).
+%   d_max_sec    caps the horizon that can be measured. Observed STD horizons
+%                are 5.5-5.7 s, so the old 5 s at 'fast' CLIPPED them; 15 s
+%                everywhere costs only a few more delays scored.
+%   n_boot, n_perm  are resampling of the n_trials numbers already in hand --
+%                milliseconds at any value -- so they are protocol constants
+%                below, not knobs. See with_protocol_constants.
+%
+% What n_trials cannot be rescued from: the sign-flip test has 2^n outcomes,
+% so at 5 trials the smallest two-sided p is 2/32 = 0.0625 and NOTHING can
+% reach 0.05 at 'fast'. That is a property of five trials, stated honestly by
+% the exact enumeration in paired_signflip_permutation_pvalue rather than
+% blurred by random draws.
 cfg = struct();
 switch run_mode
     case 'fast'
-        % Smoke test: the plumbing, not the numbers. N_train = 60/0.3 = 200 is
-        % below n for EVERY preset, so the readout is UNDER-DETERMINED and the
-        % MC values are not meaningful; ridge regularization keeps it from
-        % blowing up. Do not read results from it.
-        cfg.n_trials    = 4;      % paired trials (one network seed + one stimulus seed each)
-        cfg.T_wash_sec  = 10;     % washout before anything is recorded
-        cfg.T_train_sec = 60;     % readout training window -> 200 hold-samples
-        cfg.T_test_sec  = 30;     % readout test window
-        cfg.d_max_sec   = 5;      % longest delay scored
-        cfg.n_boot      = 200;    % bootstrap resamples for the CIs
-        cfg.n_perm      = 500;    % sign-flip permutations for the paired tests
-        cfg.fs          = 200;    % Hz
+        cfg.n_trials = 5;       % plumbing check; p cannot go below 0.0625
     case {'medium', 'medium2'}
-        % N_train = 300/0.3 = 1000, above n = 300 by 3.3x and n = 500 by 2x:
-        % well posed, usable numbers.
-        %
         % medium2 runs at medium effort here. It differs from medium only in
         % SWEEP dimensions -- more grid levels, fewer reps, a finer fs for the
         % stochastic integrator -- and memory capacity has no grid and no reps.
         % Collapsing is what run_dc_lle_analysis already does, and is honest:
-        % there is nothing for the extra fidelity to buy. Give it its own cell if
-        % that stops being true.
-        cfg.n_trials    = 15;
-        cfg.T_wash_sec  = 10;
-        cfg.T_train_sec = 300;    % -> 1000 hold-samples
-        cfg.T_test_sec  = 90;
-        cfg.d_max_sec   = 10;
-        cfg.n_boot      = 1000;
-        cfg.n_perm      = 2000;
-        cfg.fs          = 200;
+        % there is nothing for the extra fidelity to buy.
+        cfg.n_trials = 15;
     case 'production'
-        % The paper's settings. N_train = 600/0.3 = 2000 hold-samples.
-        cfg.n_trials    = 30;
-        cfg.T_wash_sec  = 10;
-        cfg.T_train_sec = 600;    % -> 2000 hold-samples
-        cfg.T_test_sec  = 150;
-        cfg.d_max_sec   = 15;
-        cfg.n_boot      = 2000;
-        cfg.n_perm      = 10000;
-        cfg.fs          = 200;
+        cfg.n_trials = 30;      % the paper's setting
     otherwise
         % Every name in run_mode_names() must be handled above; test_run_modes
         % asserts it. Reaching here means a mode was added to the sweeps and this
@@ -402,6 +393,13 @@ switch run_mode
             'Unknown run_mode ''%s'' (expected %s).', ...
             run_mode, strjoin(run_mode_names(), ', '));
 end
+
+% The experiment, identical in every mode. Seconds and Hz.
+cfg.T_wash_sec  = 10;     % washout before anything is recorded
+cfg.T_train_sec = 600;    % readout training window -> 2000 hold-samples
+cfg.T_test_sec  = 150;    % readout test window
+cfg.d_max_sec   = 15;     % longest delay scored
+cfg.fs          = 200;
 
 cfg = with_protocol_constants(cfg);
 cfg.ode_solver = select_solver(cfg, preset_defaults, ode_solver_override);
@@ -452,6 +450,22 @@ function cfg = with_protocol_constants(cfg)
 % autocorrelation inflation that white input produces.
 cfg.input_type     = 'sample_hold';
 cfg.T_hold         = 0.3;      % s; sets the MC delay increment
+% Resampling counts. Both are Monte Carlo over the n_trials numbers already in
+% hand and cost milliseconds, so there is no reason for a mode to skimp.
+%
+% n_boot is NOT tied to n_trials: the draws needed to pin down a 2.5% tail are
+% a property of the quantile, not of N, and ~2000 is right at any N. (With 5
+% trials there are only 126 distinct resamples, so most draws repeat -- harmless.
+% Too FEW draws is what hurts: at 200 the CI edges wander between reruns.)
+%
+% The permutation test IS tied to n_trials, through 2^N. When 2^N is at most
+% 2^perm_exact_max_N, every sign pattern is enumerated and the p-value is exact
+% and deterministic -- no rand, identical on every rerun. Above that, n_perm_max
+% random patterns. At N = 20 the enumeration is 1M x 20 doubles (170 MB, 0.2 s);
+% N = 22 would be 740 MB, which is why there is a cap.
+cfg.n_boot           = 2000;
+cfg.n_perm_max       = 10000;  % Monte Carlo draws when 2^N exceeds the cap
+cfg.perm_exact_max_N = 20;     % enumerate exactly up to 2^20 patterns
 cfg.u_f_cutoff     = 5;        % only used by 'bandlimited'
 cfg.u_alpha        = 1;        % only used by 'one_over_f'
 % The two integrators this run mode would use, deterministic and stochastic.
@@ -478,7 +492,7 @@ for i = 1:numel(f); nv{2*i-1} = f{i}; nv{2*i} = s.(f{i}); end
 end
 
 function write_summary_txt(path, run_tag, s, condition_names, MC_mean, MC_sem, ...
-        MC_ci, H_mean, H_sem, H_ci, stats)
+    MC_ci, H_mean, H_sem, H_ci, stats)
 fid = fopen(path, 'w');
 cleanup = onCleanup(@() fclose(fid));   %#ok<*NASGU> closes fid on any exit path
 fprintf(fid, 'Run: %s\n', run_tag);
@@ -498,8 +512,10 @@ for i = 1:numel(condition_names)
 end
 fprintf(fid, '\nPaired permutation tests (sign-flip) on Total MC:\n');
 for p = 1:numel(stats)
-    fprintf(fid, '  %s: mean diff = %.3f | p_perm = %.4g | Cohen''s dz = %.3f\n', ...
-        stats(p).pair, stats(p).mean_diff, stats(p).p_perm, stats(p).cohens_dz);
+    if stats(p).exact; how = 'exact'; else; how = 'Monte Carlo'; end
+    fprintf(fid, '  %s: mean diff = %.3f | p_perm = %.4g (%s, %d patterns) | Cohen''s dz = %.3f\n', ...
+        stats(p).pair, stats(p).mean_diff, stats(p).p_perm, how, stats(p).n_patterns, ...
+        stats(p).cohens_dz);
 end
 end
 
@@ -527,19 +543,42 @@ ci.lo = reshape(quantile(boot_means, alpha/2,   1), [C, D]);
 ci.hi = reshape(quantile(boot_means, 1-alpha/2, 1), [C, D]);
 end
 
-function [pval, mean_diff] = paired_signflip_permutation_pvalue(x, y, n_perm)
+function [pval, mean_diff, n_patterns, is_exact] = ...
+        paired_signflip_permutation_pvalue(x, y, n_perm_max, exact_max_N)
 % Paired permutation test via sign flips on the differences. H0: mean(x-y) = 0.
+% Two-sided.
+%
+% EXACT when it can be. There are only 2^N sign patterns, so for N up to
+% exact_max_N every one is enumerated and the p-value is exact and
+% deterministic -- the same number on every rerun, with no rand involved.
+% Before this it always drew n_perm random patterns, which at N = 5 meant 500
+% draws from a space of 32 (mostly repeats) and at N = 15 a p-value that moved
+% by +/-0.025 between reruns of the SAME data. Above the cap, Monte Carlo with
+% n_perm_max draws, as before. The cap is memory: the pattern matrix is
+% 2^N x N doubles, 170 MB at N = 20 and 740 MB at N = 22.
+%
+% The exact p includes the observed pattern itself (it is one of the 2^N), so
+% the smallest possible value is 2/2^N two-sided -- 0.0625 at N = 5.
 d = x(:) - y(:);
 d = d(~isnan(d));
 mean_diff = mean(d);
 N = numel(d);
-if N == 0; pval = NaN; return; end
-perm_stats = zeros(n_perm, 1);
-for r = 1:n_perm
-    sgn = 2*(rand(N,1) > 0.5) - 1;
-    perm_stats(r) = mean(sgn .* d);
+if N == 0; pval = NaN; n_patterns = 0; is_exact = false; return; end
+if N <= exact_max_N
+    n_patterns = 2^N;
+    S = 2 * (dec2bin(0:n_patterns-1, N) - '0') - 1;    % every +/-1 pattern
+    perm_stats = S * d / N;
+    is_exact = true;
+else
+    n_patterns = n_perm_max;
+    S = 2 * (rand(n_patterns, N) > 0.5) - 1;
+    perm_stats = S * d / N;
+    is_exact = false;
 end
-pval = mean(abs(perm_stats) >= abs(mean_diff));   % two-sided
+% A tolerance on the comparison, so the observed pattern and its mirror image
+% always count: with exact arithmetic they tie |mean_diff| exactly, and a
+% floating-point sum in a different order could otherwise drop one of them.
+pval = mean(abs(perm_stats) >= abs(mean_diff) - 1e-12);
 end
 
 function dz = paired_cohens_dz(x, y)
