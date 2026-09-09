@@ -214,9 +214,17 @@ R2_mean = squeeze(mean(R2_trials, 1, 'omitnan'));            % [cond x d]
 R2_ci   = bootstrap_mean_ci_3d(R2_trials, cfg.n_boot, 0.05); % lo/hi [cond x d]
 
 %% Paired statistical tests (total MC)
-pairs = [1 2; 1 3; 1 4; 2 3; 2 4; 3 4];
-pair_labels = {'Baseline vs SFA', 'Baseline vs STD', 'Baseline vs SFA+STD', ...
-               'SFA vs STD', 'SFA vs SFA+STD', 'STD vs SFA+STD'};
+% Every pair of conditions, however many the preset has. This was a literal
+% four-condition matrix with mechanism labels ('Baseline vs SFA', ...), which
+% indexed past the end on a three-condition preset -- the first time memory
+% capacity was pointed at the paper's own network (2026-09-09) it died here --
+% and whose labels had been wrong since the regime rename regardless. For four
+% conditions nchoosek gives the same six pairs in the same order, so existing
+% runs are unchanged except that each pair is now named by its conditions.
+pairs = nchoosek(1:n_cond, 2);
+pair_labels = arrayfun(@(p) sprintf('%s vs %s', ...
+    condition_names{pairs(p,1)}, condition_names{pairs(p,2)}), ...
+    1:size(pairs,1), 'UniformOutput', false);
 stats = struct();
 for p = 1:size(pairs,1)
     x = MC_trials(:, pairs(p,1));
