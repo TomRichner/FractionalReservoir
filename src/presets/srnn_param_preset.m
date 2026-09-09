@@ -487,19 +487,25 @@ switch name
         % As ..._dualStd_3cond_mu8p25 but with THREE depression timescales
         % rather than two, on a ladder with a common ratio (TR, 2026-09-04).
         % Changed:  tau_rel  [0.25 0.5]  ->  [0.25 0.5 1]
-        %           tau_rec  [2 4]       ->  4 * tau_rel = [1 2 4]
+        %           tau_rec  [2 4]       ->  8 * tau_rel = [2 4 8]
         %           full regime  sfa3_std2  ->  sfa3_std3
         %
-        % NOTE THE RATIO CHANGES TOO. The steady state of depression depends
-        % only on rho = tau_rel/tau_rec: 0.125 in every other paper preset,
-        % 0.25 here on every timescale. So this differs from the dualStd_3cond
-        % network in both the timescale COUNT and the depression STRENGTH per
-        % timescale (each b rests at 1/(1 + 4r) rather than 1/(1 + 8r)). With
-        % three equal ratios r_peak = rho/2 = 0.125 -- the same peak position as
-        % the two-timescale preset, by coincidence of the two changes.
+        % THE RATIO IS HELD AT rho = tau_rel/tau_rec = 0.125, the same as every
+        % other paper preset, so the ONLY difference from dualStd_3cond_mu8p25
+        % is the third depression timescale. In particular sfa1_std1, derived
+        % from the first pair, is (2, 0.25) -- byte-identical to the control in
+        % the two-timescale presets, which is what makes the two runs a
+        % single-variable comparison.
         %
-        % sfa1_std1 derives from the FIRST pair as usual: tau_rec 1, tau_rel
-        % 0.25, so its single timescale is also at rho = 0.25.
+        % This was 8 -> 4 (tau_rec = [1 2 4], rho = 0.25) in its first run on
+        % 2026-09-04. That moved rho on EVERY timescale, including the derived
+        % single-timescale control, so sfa1_std1 differed between the two
+        % experiments (b at 1/(1+4r) against 1/(1+8r)) and the "single
+        % timescale" columns of the two sensitivity sheets disagreed where they
+        % should have matched. TR chose to hold rho and rerun (2026-09-08).
+        %
+        % With three equal ratios r_peak = rho/2 = 0.0625 (the two-timescale
+        % network peaks at 0.125) and the slowest recovery is 8 s.
         model_class = 'SRNNCellTypePairs';
         d = struct( ...
             'n',                    500, ...
@@ -528,7 +534,7 @@ switch name
         sfa_all  = {taus,       zeros(1,0)};
 
         tau_rel    = [0.25 0.5 1];
-        triple_std = struct('tau_rec', 4 * tau_rel, 'tau_rel', tau_rel);
+        triple_std = struct('tau_rec', 8 * tau_rel, 'tau_rel', tau_rel);   % rho = 0.125
         single_std = struct('tau_rec', triple_std.tau_rec(1), ...
                             'tau_rel', triple_std.tau_rel(1));
         std_all = struct();

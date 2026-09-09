@@ -238,6 +238,41 @@ end
 % while its no_adaptation / std_only conditions set n_a = 0, so those two
 % combinations threw "tau_a{1} must contain n_a(1) positive values" -- the figure
 % only worked because it truncated tau_a by hand.
+%% A regime name is ONE struct across the paper's network presets
+% The celltype_pairs_Sc0p2_* presets are variants of one network (they differ in
+% mu, in which regimes are swept, in the depression ladder) and are meant to be
+% compared condition for condition. That only works if a shared name is the
+% same struct everywhere -- which is what the names-don't-lie check above cannot
+% see: sfa1_std1 with tau_rec = 1 and with tau_rec = 2 both have one SFA and one
+% STD timescale.
+%
+% This is the check that was missing on 2026-09-04, when the tripleStd preset
+% derived sfa1_std1 from a ladder at rho = 0.25 and the "single timescale"
+% columns of two sensitivity sheets disagreed where they should have matched.
+% Scoped to the paper presets: the figure presets (bursting, single-neuron,
+% sompolinsky) are deliberately different networks with their own ladders.
+fprintf('\n-- a regime name is one struct across the paper presets --\n');
+paper_presets = names(startsWith(names, 'celltype_pairs_Sc0p2'));
+seen = containers.Map();            % name -> {first preset, its condition}
+clash = {};
+for k = 1:numel(paper_presets)
+    [~, ~, cnd] = srnn_param_preset(paper_presets{k});
+    for j = 1:numel(cnd)
+        nm = cnd{j}.name;
+        if isKey(seen, nm)
+            ref = seen(nm);
+            if ~isequaln(ref{2}, cnd{j})
+                clash{end+1} = sprintf('%s differs: %s vs %s', nm, ref{1}, paper_presets{k}); %#ok<SAGROW>
+            end
+        else
+            seen(nm) = {paper_presets{k}, cnd{j}};
+        end
+    end
+end
+all_passed = check(sprintf('%d regime names, each one struct across %d paper presets', ...
+    seen.Count, numel(paper_presets)), isempty(clash)) && all_passed;
+if ~isempty(clash); fprintf(2, '     %s\n', clash{:}); end
+
 fprintf('\n-- every preset builds every one of its conditions --\n');
 for k = 1:numel(names)
     [~, ~, cnd] = srnn_param_preset(names{k});

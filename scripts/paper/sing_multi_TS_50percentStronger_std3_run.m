@@ -10,8 +10,8 @@
 %   fig_root  figs/sing_multi_TS_50percentStronger_std3
 %
 % Same network as sing_multi_TS_50percentStronger_run, with depression on three
-% timescales (sfa3_std3) rather than two; the two runs differ in that and in
-% the depression ratio rho (0.25 here, 0.125 there).
+% timescales (sfa3_std3) rather than two. That is the ONLY difference: rho is
+% 0.125 in both, so their sfa1_std1 controls are identical.
 %
 % RERUNNING REQUIRES DELETING data/sing_multi_TS_50percentStronger_std3 FIRST.
 %

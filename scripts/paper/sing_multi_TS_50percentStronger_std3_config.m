@@ -7,9 +7,10 @@ function cfg = sing_multi_TS_50percentStronger_std3_config(opts)
 % sing_multi_TS_50percentStronger_config with the preset swapped for
 % celltype_pairs_Sc0p2_noise0p025_tripleStd_3cond_mu8p25: the same mu x1.5
 % network, but depression on THREE timescales (tau_rel [0.25 0.5 1], tau_rec
-% 4*tau_rel) rather than two, so the full regime is sfa3_std3. Note the
-% depression ratio rho = tau_rel/tau_rec is 0.25 here against 0.125 in the
-% two-timescale presets -- see the preset for what that changes.
+% 8*tau_rel = [2 4 8]) rather than two, so the full regime is sfa3_std3. The
+% ratio rho = tau_rel/tau_rec is 0.125 as everywhere else, so sfa1_std1 is
+% identical to the two-timescale run's and the ONLY difference between the two
+% is the third depression timescale.
 %
 % Both roots are fixed and named for this experiment. Delete data/... before
 % rerunning: run_all_paper_analyses refuses a run directory that is not absent
