@@ -1,4 +1,4 @@
-function path = write_figure_report(fig_root)
+function path = write_figure_report(fig_root, opts)
 % WRITE_FIGURE_REPORT One scrollable sheet of every PNG a figure run produced.
 %
 %   path = WRITE_FIGURE_REPORT(fig_root)   % writes <fig_root>/report.md
@@ -26,12 +26,22 @@ function path = write_figure_report(fig_root)
 % ordering code below: scrolling the report and scrolling the tree agree, so a
 % figure seen here can be found there without searching. See natural_order.
 %
-% Not called by make_all_paper_figures -- run it yourself against a fig_root.
+% make_all_paper_figures calls it last, after the manifest, with 'pdf', true,
+% so every figure run ends with report.md and report.pdf at its root. It can
+% also be run by hand against any fig_root.
+%
+% THE PDF is pandoc + lualatex, run through system(). It is OPTIONAL and
+% TOLERANT: if pandoc is not on the path or the build fails, a warning names
+% the reason and the .md is still written -- a missing PDF must never fail a
+% figure run. The -f markdown+gfm_auto_identifiers flag matters: pandoc's
+% default heading anchors drop a leading digit, so a section such as
+% 1D_sensitivity_... (in a data/ report) would get a dead contents link.
 %
 % See also: write_figure_manifest, make_all_paper_figures, existing_outputs
 
 arguments
     fig_root (1,:) char
+    opts.pdf (1,1) logical = false
 end
 
 if ~isfolder(fig_root)
@@ -72,6 +82,41 @@ fprintf(fid, ['\n> Regenerate with `write_figure_report(''%s'')`. `figs/` is ' .
     'gitignored; this report references the images in place rather than ' ...
     'copying them, so it is only ever as current as its generation stamp ' ...
     'above.\n'], fig_root);
+clear closer                                  % flush report.md before pandoc reads it
+
+if opts.pdf
+    build_pdf(fig_root);
+end
+end
+
+%% ------------------------------------------------------------------------
+function build_pdf(fig_root)
+% pandoc -> lualatex, from inside fig_root so the relative image links resolve.
+% Warns rather than errors on every failure path: no pandoc, no LaTeX engine,
+% a LaTeX error. The .md is the deliverable; the PDF is a convenience.
+[st, ~] = system('pandoc --version');
+if st ~= 0
+    warning('write_figure_report:NoPandoc', ...
+        'pandoc not found on the path; report.md written, report.pdf skipped.');
+    return
+end
+cmd = sprintf(['cd /d "%s" && pandoc report.md -f markdown+gfm_auto_identifiers ' ...
+    '-o report.pdf --pdf-engine=lualatex -V geometry:margin=1.5cm ' ...
+    '-V colorlinks=true -V linkcolor=blue -V urlcolor=blue'], fig_root);
+if ~ispc
+    cmd = strrep(cmd, 'cd /d ', 'cd ');
+end
+[st, out] = system(cmd);
+pdf = fullfile(fig_root, 'report.pdf');
+if st ~= 0 || ~isfile(pdf)
+    % MiKTeX prints a "not checked for updates" nag on stderr on every run;
+    % it is not the failure, so show the tail of the real output instead.
+    tail = strtrim(out(max(1, end-600):end));
+    warning('write_figure_report:PdfFailed', ...
+        'pandoc exited %d; report.md written, report.pdf not built.\n%s', st, tail);
+else
+    fprintf('[figure report] %s\n', pdf);
+end
 end
 
 %% ------------------------------------------------------------------------

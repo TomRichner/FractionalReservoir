@@ -193,6 +193,19 @@ catch ME
         'Could not write the manifest: %s', ME.message);
 end
 
+%% The scrollable report, last
+% report.md links every PNG under fig_root in explorer order, and report.pdf is
+% pandoc's render of it. AFTER the manifest, because the report echoes the
+% manifest's provenance rows. Its own try/catch: it reads what is on disk and
+% can only describe the run, so a failure here must not change the result
+% count above -- and the PDF step already degrades to a warning on its own.
+try
+    write_figure_report(fig_root, 'pdf', true);
+catch ME
+    warning('make_all_paper_figures:ReportFailed', ...
+        'Could not write the figure report: %s', ME.message);
+end
+
 %% Summary
 n_ok    = sum([results.ok]);
 n_paper = sum([results.in_paper]);
