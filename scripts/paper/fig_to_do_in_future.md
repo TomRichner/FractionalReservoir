@@ -13,3 +13,14 @@
 - make separate folders per run+config
 
 - config.m files need to be independent
+
+- time series example should show 1 synaptic output per neuron if all have same STD routes
+
+- time series should show depression for for all if all have same STD routes
+
+- time series should show a subset of neurons
+
+- time series should show local lya
+
+- local lya density histogram over time
+
