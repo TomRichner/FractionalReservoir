@@ -60,16 +60,11 @@ function fig3 = plot_memory_capacity_combined(results_all, out_dir)
         'DefaultTextInterpreter',   'none', ...
         'DefaultLegendInterpreter', 'none'); %#ok<NASGU>
 
-    % Okabe-Ito colorblind-safe qualitative palette. Reddish-purple (instead of
-    % bluish-green) keeps all four hues well separated -- sky-blue and bluish-
-    % green were too similar -- and avoids green entirely.
-    colors = [0.000 0.000 0.000;   % Baseline: black           #000000
-              0.902 0.624 0.000;   % SFA:      orange          #E69F00
-              0.337 0.706 0.914;   % STD:      sky blue        #56B4E9
-              0.800 0.475 0.655];  % SFA+STD:  reddish purple  #CC79A7
-    if size(colors,1) < n_cond
-        colors = lines(n_cond);   % fallback if more conditions than palette rows
-    end
+    % Colours by condition NAME from manuscript_style -- the Okabe-Ito hues live
+    % there now, one per regime, so this figure cannot disagree with the rest
+    % of the manuscript. This was a positional copy of the same four hues in
+    % mc_pairs_dualStd's regime order, wrong for any other preset.
+    colors = mc_condition_colors(results_all.conditions);
 
     xpos = 1:n_cond;
 

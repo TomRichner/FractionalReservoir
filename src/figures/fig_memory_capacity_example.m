@@ -1,13 +1,21 @@
 function out = fig_memory_capacity_example(cfg)
-% FIG_MEMORY_CAPACITY_EXAMPLE Example memory capacity, one network, 4 conditions.
+% FIG_MEMORY_CAPACITY_EXAMPLE Example memory capacity, one network, all regimes.
 %
 %   out = FIG_MEMORY_CAPACITY_EXAMPLE()
 %   out = FIG_MEMORY_CAPACITY_EXAMPLE('data_file', f)
 %
-% (a) cumulative memory capacity against delay, all four conditions.
-% (b) per-delay R^2, all four conditions.
+% (a) cumulative memory capacity against delay, every condition in the run.
+% (b) per-delay R^2, every condition.
 % Below: input reconstruction (target against trained readout) at a few delays
-% for the SFA+STD condition, each panel titled with its delay and R^2.
+% for the MOST-ADAPTED condition, each panel titled with its delay and R^2.
+%
+% NOTHING HERE ASSUMES HOW MANY CONDITIONS THERE ARE OR WHAT THEY ARE CALLED.
+% Colours and legend labels are looked up by condition NAME from
+% manuscript_style, and the reconstructed regime is resolved with
+% full_adaptation_condition. Until 2026-09-09 this file hard-coded four
+% conditions in mc_pairs_dualStd's order -- recon_cond = 4, a positional
+% palette, labels only when n_cond == 4 -- and the first run of memory capacity
+% on a three-condition paper preset died here with "Index must not exceed 3".
 %
 % TWO-STEP, no re-simulation at plot time: run_memory_capacity_example runs the
 % protocol and saves mc_example_data.mat (gitignored); this renders it, so the
@@ -52,27 +60,25 @@ n_cond          = numel(condition_names);
 st = manuscript_style();
 style_cleanup = with_manuscript_defaults(); %#ok<NASGU>
 
-% Okabe-Ito colorblind-safe palette (same as the combined MC figure):
-%   Baseline black, SFA orange, STD sky blue, SFA+STD reddish purple.
-% Condition colours come from manuscript_style, keyed BY NAME, so this figure
-% and the ensemble MC figure cannot drift apart on them.
-colors = [st.condition_color('Baseline');
-          st.condition_color('SFA');
-          st.condition_color('STD');
-          st.condition_color('SFA+STD')];
-if size(colors,1) < n_cond
-    colors = lines(n_cond);
-end
+% Colours by condition NAME, shared with the ensemble MC figure and every other
+% manuscript figure, so a regime is one colour everywhere.
+colors = mc_condition_colors(condition_names);
 
-% Short condition labels for the legend (match the combined figure).
-if n_cond == 4
-    display_names = {'Baseline', 'SFA', 'STD', 'SFA+STD'};
-else
-    display_names = condition_names;
+% Short legend labels by name, with the raw key as the fallback a saved run
+% directory can always need.
+display_names = condition_names;
+for i = 1:n_cond
+    if isKey(st.condition_short, condition_names{i})
+        display_names{i} = st.condition_short(condition_names{i});
+    end
 end
 
 xmax_s       = 7.5;             % (a)/(b) delay-axis limit (s)
-recon_cond   = 4;               % reconstruct the SFA+STD condition
+% Reconstruct the MOST-ADAPTED regime, whichever of the run's conditions that
+% is -- sfa3_std2 on the paper presets, sfa3_std3 on tripleStd, and so on.
+recon_name = full_adaptation_condition( ...
+    cellfun(@(n) struct('name', n), condition_names, 'UniformOutput', false));
+recon_cond = find(strcmp(condition_names, recon_name), 1);
 recon_delays = [1, 5, 10, 15];  % hold-delay indices to show (labeled in seconds): 0.3, 1.5, 3.0, 4.5 s at T_hold=0.3
 recon_ylim   = [-0.6, 0.6];     % shared y-limits across all reconstruction panels
 line_w       = 2;               % (a)/(b) curve width (matches the reference figure)
@@ -113,7 +119,8 @@ lp = lgd.Position;
 lgd.Position = [lp(1) + 0.02, lp(2) + 0.03, lp(3), lp(4)];
 hold off;
 
-% Reconstruction rows (SFA+STD): target u(t-d) vs trained readout, delay in s.
+% Reconstruction rows (most-adapted regime): target u(t-d) vs trained readout,
+% delay in s.
 % The x-axis (time) is hidden on every row -- a 15 s scale bar on the bottom row
 % conveys the timescale instead.
 mcr        = results{recon_cond};

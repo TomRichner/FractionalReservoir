@@ -57,15 +57,12 @@ function [fig1, fig2] = plot_memory_capacity(results_all, out_dir)
         'DefaultTextInterpreter',   'none', ...
         'DefaultLegendInterpreter', 'none'); %#ok<NASGU>
 
-    % Colors (edit here to restyle). Black / blue / green / red; the light CI
-    % fill alpha (below) keeps overlapping bands from muddying.
-    colors = [0.00 0.00 0.00;   % Baseline: black
-              0.00 0.45 0.74;   % SFA:      blue
-              0.20 0.60 0.20;   % STD:      green
-              0.84 0.15 0.16];  % SFA+STD:  red
-    if size(colors,1) < n_cond
-        colors = lines(n_cond);   % fallback if more conditions than palette rows
-    end
+    % Colours by condition NAME from manuscript_style, so a regime is one colour
+    % in every figure. This was a positional black/blue/green/red palette in
+    % mc_pairs_dualStd's regime order, which coloured any other preset's
+    % conditions wrongly and did not match the manuscript's palette anyway. The
+    % light CI fill alpha (below) keeps overlapping bands from muddying.
+    colors = mc_condition_colors(results_all.conditions);
 
     xpos = 1:n_cond;
 

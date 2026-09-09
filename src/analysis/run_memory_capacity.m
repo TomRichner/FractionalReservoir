@@ -1,15 +1,15 @@
 function mat_file = run_memory_capacity(opts)
-% RUN_MEMORY_CAPACITY Paired-trial memory-capacity experiment across 4 regimes.
+% RUN_MEMORY_CAPACITY Paired-trial memory-capacity experiment across regimes.
 %
 %   mat_file = RUN_MEMORY_CAPACITY()
 %   mat_file = RUN_MEMORY_CAPACITY('run_mode', 'fast')
 %   mat_file = RUN_MEMORY_CAPACITY('run_mode', 'production', 'output_dir', d)
 %
-% Compares Baseline / SFA / STD / SFA+STD on their ability to reconstruct a
-% delayed input from a linear readout, and returns the path of the saved
-% <run_tag>_results.mat.
+% Compares the preset's adaptation regimes -- however many it states -- on
+% their ability to reconstruct a delayed input from a linear readout, and
+% returns the path of the saved <run_tag>_results.mat.
 %
-% FAIRNESS. Within a trial all four conditions share the same (W, W_in, u(t)) --
+% FAIRNESS. Within a trial every condition shares the same (W, W_in, u(t)) --
 % same seeds, and only the adaptation counts differ -- so the comparison is
 % paired. verify_shared_build asserts that invariant once, structurally, on the
 % first seed pair. Trials differ only by seed, so parfor is order-independent.
