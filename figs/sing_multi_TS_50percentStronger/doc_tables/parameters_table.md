@@ -1,0 +1,28 @@
+| Symbol | Name | Value | Units |
+|---|---|---|---|
+| $n$ | Network size | 500 | neurons |
+| $\alpha$ | Connection probability | 0.2 | -- |
+| indegree | Expected in-degree | 100 | synapses |
+| $f$ | Fraction per cell type | `[0.5 0.5]` | -- |
+| $\tau_d$ | Dendritic time constant | 0.1 | s |
+| $g$ | Synaptic gain | 1 | -- |
+| $\tilde{\mu}$ | Weight means (post, pre) | `[8.25 -8.25;8.25 -8.25]` | multiples of $F$ |
+| $\tilde{\sigma}$ | Weight std devs (post, pre) | `[1.5 1.5;1.5 1.5]` | multiples of $F$ |
+| $\phi$ | Nonlinearity | `piecewise` | -- |
+| $S_c$ | Nonlinearity setpoint | 0.2 | -- |
+| $S_a$ | Piecewise slope parameter | 0.8 | -- |
+| $K$ | SFA timescales per type | `[3 0]` | -- |
+| $\tau_a$ (E) | SFA time constants | `[0.25 1.581 10]` | s |
+| $c$ | SFA coupling per type | `[0.5 0]` | -- |
+| $\tau_{rec}$ (E to E) | STD recovery | `[2 4]` | s |
+| $\tau_{rel}$ (E to E) | STD release | `[0.25 0.5]` | s |
+| $\tau_{rec}$ (E to I) | STD recovery | `[2 4]` | s |
+| $\tau_{rel}$ (E to I) | STD release | `[0.25 0.5]` | s |
+| $\tau_{rec}$ (I to E) | STD recovery | `[2 4]` | s |
+| $\tau_{rel}$ (I to E) | STD release | `[0.25 0.5]` | s |
+| $\tau_{rec}$ (I to I) | STD recovery | `[2 4]` | s |
+| $\tau_{rel}$ (I to I) | STD release | `[0.25 0.5]` | s |
+| $\sigma_u$ | Input-referred noise | 0.025 | input units |
+| $\sigma_x$ | Stationary std of $x$ | 0.0559017 | -- |
+| $f_s$ | Sample rate | 400 | Hz |
+
