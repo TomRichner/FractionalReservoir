@@ -16,10 +16,10 @@ function cfg = single_multi_TS_independent_config()
 % substantive difference from the paper_config lineage, where MC has its own
 % smaller network. Consequences worth knowing:
 %   - n = 500 rather than 300, so the readout has 500 features. MC is well
-%     posed only while N_train = T_train/T_hold exceeds that; at 'medium'
-%     that is 300/0.3 = 1000 hold-samples, fine, but at 'fast' it is 200 and
-%     the readout is UNDERDETERMINED. Do not read MC numbers from a 'fast' run
-%     of this config. T_train is mc_run_config's per-mode table, not a cfg knob.
+%     posed while N_train = T_train/T_hold exceeds that; mc_run_config uses
+%     T_train = 600 s in EVERY mode (2000 hold-samples), so it is well posed at
+%     'fast' too. What 'fast' cannot buy is statistical power: 5 trials give a
+%     sign-flip test 32 outcomes, so no paired p can go below 0.0625.
 %   - MC runs the preset's own conditions, so its four-regime sheet becomes the
 %     three-regime one every other figure shows.
 %   - The 'synaptic' readout requires all of a presynaptic type's routes to
@@ -39,13 +39,17 @@ function cfg = single_multi_TS_independent_config()
 cfg = struct();
 
 %% The experiment
-% The paper's 3-condition network with mean connectivity 50% stronger on all
-% four routes (mu_tilde_relative 8.25). Regimes: no_adaptation / sfa1_std1 /
-% sfa3_std2. To run the baseline network instead, name
-% 'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond' here and change the two
-% roots below so the runs do not collide.
-cfg.preset_name = 'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond_mu8p25';
-cfg.run_mode    = 'medium';
+% The mu x1.5 3-condition network (mu_tilde_relative 8.25) with two further
+% changes, TR 2026-09-09: SFA on BOTH cell types (c = [0.5 0.5], the same
+% ladder on I as on E), and a per-neuron setpoint, S_c_i = 0.2 + 0.1*randn.
+% Regimes: no_adaptation / sfa1_std1 / sfa3_std2 -- same names as the other
+% paper presets, but the adapting ones carry I-SFA here, so they are not the
+% same physics. See the preset.
+%
+% 'fast': 5 MC trials and the sweeps' smallest grids. Well posed throughout
+% (see the MC note above) but no paired MC test can reach p < 0.05.
+cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25';
+cfg.run_mode    = 'fast';
 
 %% Where things land -- both fixed, so this cannot touch any other run
 cfg.run_dir  = 'data/single_multi_TS_independent';   % analyses write, figures read
