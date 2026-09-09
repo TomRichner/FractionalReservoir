@@ -9,3 +9,7 @@
 - memory capacity needs to be redone
 
 - make the jacobian density plot use f(x) = log(1+log(1+x))
+
+- make separate folders per run+config
+
+- config.m files need to be independent
