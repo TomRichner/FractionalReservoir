@@ -342,15 +342,32 @@ function cfg = mc_run_config(run_mode, preset_defaults, ode_solver_override)
 % a run-mode setting, so the one place they meet has to see both.
 if nargin < 2; preset_defaults = struct(); end
 if nargin < 3; ode_solver_override = ''; end
+% Each mode names its settings in full. These were eight positional arguments
+% to a pack() helper, readable only by counting against a signature 65 lines
+% away. The values are unchanged.
+%
+% The number that decides whether MC means anything is T_train_sec: the ridge
+% readout is fit on N_train = T_train_sec / T_hold hold-samples (T_hold = 0.3 s
+% below) and needs more of them than it has features, which is the preset's n
+% -- 300 for mc_pairs_dualStd, 500 for the paper's celltype_pairs presets.
+cfg = struct();
 switch run_mode
     case 'fast'
-        % Smoke test: the plumbing, not the numbers. N_train = 60/0.3 = 200
-        % hold-samples against n = 300 features, so the readout is
-        % UNDER-DETERMINED and the MC values are not meaningful. Ridge
-        % regularization keeps it from blowing up. Do not read results from it.
-        cfg = pack(4, 10, 60, 30, 5, 200, 500, 200);
+        % Smoke test: the plumbing, not the numbers. N_train = 60/0.3 = 200 is
+        % below n for EVERY preset, so the readout is UNDER-DETERMINED and the
+        % MC values are not meaningful; ridge regularization keeps it from
+        % blowing up. Do not read results from it.
+        cfg.n_trials    = 4;      % paired trials (one network seed + one stimulus seed each)
+        cfg.T_wash_sec  = 10;     % washout before anything is recorded
+        cfg.T_train_sec = 60;     % readout training window -> 200 hold-samples
+        cfg.T_test_sec  = 30;     % readout test window
+        cfg.d_max_sec   = 5;      % longest delay scored
+        cfg.n_boot      = 200;    % bootstrap resamples for the CIs
+        cfg.n_perm      = 500;    % sign-flip permutations for the paired tests
+        cfg.fs          = 200;    % Hz
     case {'medium', 'medium2'}
-        % N_train = 300/0.3 = 1000 > 300 features: well posed, usable numbers.
+        % N_train = 300/0.3 = 1000, above n = 300 by 3.3x and n = 500 by 2x:
+        % well posed, usable numbers.
         %
         % medium2 runs at medium effort here. It differs from medium only in
         % SWEEP dimensions -- more grid levels, fewer reps, a finer fs for the
@@ -358,10 +375,24 @@ switch run_mode
         % Collapsing is what run_dc_lle_analysis already does, and is honest:
         % there is nothing for the extra fidelity to buy. Give it its own cell if
         % that stops being true.
-        cfg = pack(15, 10, 300, 90, 10, 1000, 2000, 200);
+        cfg.n_trials    = 15;
+        cfg.T_wash_sec  = 10;
+        cfg.T_train_sec = 300;    % -> 1000 hold-samples
+        cfg.T_test_sec  = 90;
+        cfg.d_max_sec   = 10;
+        cfg.n_boot      = 1000;
+        cfg.n_perm      = 2000;
+        cfg.fs          = 200;
     case 'production'
         % The paper's settings. N_train = 600/0.3 = 2000 hold-samples.
-        cfg = pack(30, 10, 600, 150, 15, 2000, 10000, 200);
+        cfg.n_trials    = 30;
+        cfg.T_wash_sec  = 10;
+        cfg.T_train_sec = 600;    % -> 2000 hold-samples
+        cfg.T_test_sec  = 150;
+        cfg.d_max_sec   = 15;
+        cfg.n_boot      = 2000;
+        cfg.n_perm      = 10000;
+        cfg.fs          = 200;
     otherwise
         % Every name in run_mode_names() must be handled above; test_run_modes
         % asserts it. Reaching here means a mode was added to the sweeps and this
@@ -372,6 +403,7 @@ switch run_mode
             run_mode, strjoin(run_mode_names(), ', '));
 end
 
+cfg = with_protocol_constants(cfg);
 cfg.ode_solver = select_solver(cfg, preset_defaults, ode_solver_override);
 end
 
@@ -413,18 +445,7 @@ end
 check_noise_settings(sigma, solver, 'run_memory_capacity');
 end
 
-function cfg = pack(n_trials, T_wash_sec, T_train_sec, T_test_sec, d_max_sec, ...
-        n_boot, n_perm, fs)
-cfg = struct();
-cfg.n_trials    = n_trials;
-cfg.T_wash_sec  = T_wash_sec;
-cfg.T_train_sec = T_train_sec;
-cfg.T_test_sec  = T_test_sec;
-cfg.d_max_sec   = d_max_sec;
-cfg.n_boot      = n_boot;
-cfg.n_perm      = n_perm;
-cfg.fs          = fs;
-
+function cfg = with_protocol_constants(cfg)
 % Protocol constants -- identical in every mode, so they are not knobs.
 % sample_hold: i.i.d. values held for T_hold, so MC is measured in HOLD UNITS.
 % That is the fair choice for a low-pass reservoir and is free of the
