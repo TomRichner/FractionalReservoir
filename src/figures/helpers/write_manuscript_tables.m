@@ -73,6 +73,9 @@ out_dir = ensure_dir(out_dir);
 % preset since names now state their timescale counts.
 model = build_from_preset(cfg.preset_name, '');
 M = model_facts(model, model_class, preset);
+% The regime the model above was built under, for the provenance banner. This
+% was the literal 'sfa_and_std' for a week after that name stopped existing.
+M.condition = full_adaptation_condition(conditions);
 
 paths = {};
 paths{end+1} = write_equation_table(out_dir, cfg.preset_name, M);
@@ -98,6 +101,15 @@ M.tau_d       = model.tau_d;
 M.activation  = model.activation;
 M.S_a         = model.S_a;
 M.S_c         = model.S_c;
+% Per-neuron setpoint spread, one entry per cell type; zeros when unset. On
+% Pairs build() fills sigma_S_c in as zeros(1, C); SRNNModel2 keeps E and I
+% scalars. mu_S_c empty means the draw is centred on S_c.
+if strcmp(model_class, 'SRNNCellTypePairs')
+    M.sigma_S_c = get_or(model, 'sigma_S_c', []);
+else
+    M.sigma_S_c = [get_or(model, 'sigma_S_c_E', 0), get_or(model, 'sigma_S_c_I', 0)];
+end
+if isempty(M.sigma_S_c); M.sigma_S_c = 0; end
 M.level_of_chaos = model.level_of_chaos;
 M.fs          = model.fs;
 M.sigma_u_noise = get_or(model, 'sigma_u_noise', 0);
@@ -176,92 +188,89 @@ c = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
 fprintf(fid, '## System equations\n\n');
 
-% The synaptic factor, spelled for what THIS preset actually has, built once and
-% used twice: inline in the dendritic equation, and again as the definition of
-% theta below. Writing it out in the dx equation rather than hiding it behind a
-% symbol means the equation states the model without a forward reference; theta
-% is then a NAME for that product, not a placeholder the reader must resolve.
-factor_parts = {};
-if M.n_b_max == 1; factor_parts{end+1} = 'b_j'; end
-if M.n_b_max > 1;  factor_parts{end+1} = sprintf('\\prod_{m=1}^{%d} b_{jm}', M.n_b_max); end
-if M.any_stf && M.n_g_max == 1; factor_parts{end+1} = 'g_j'; end
-if M.any_stf && M.n_g_max > 1
-    factor_parts{end+1} = sprintf('\\prod_{n=1}^{%d} g_{jn}', M.n_g_max);
-end
-if isempty(factor_parts)
-    theta_rhs = 'r_j';
+% ONE ALIGNED BLOCK, IN THE ORDER AND NOTATION OF THE CANONICAL FILE
+% docs/EquationsParametersDocs/Equations_stability_paper.md: dx with theta_j on
+% the right-hand side, then theta, r, a and b. Timescale counts are the SYMBOLS
+% M and K, not this preset's numbers -- the numbers are in the parameter table
+% as the M and K rows. (Until 2026-09-10 the product was spelled out inline in
+% the dx equation with numeric limits, and theta was named only afterwards;
+% TR asked for the six equations to match the paper's statement.)
+%
+% What still tracks the preset: the noise term is present only for a stochastic
+% preset, the b equation only when there is depression, and facilitation adds
+% its factor and equation only when a route carries STF.
+theta_factors = {};
+if M.n_b_max > 0; theta_factors{end+1} = '\prod_{m=1}^{M} b_{im}'; end
+if M.any_stf;     theta_factors{end+1} = '\prod_{n=1}^{n_f} g_{in}'; end
+% Spelled exactly as the canonical file spells it -- r_{i} and plain spaces --
+% so the generated block can be diffed against it.
+if isempty(theta_factors)
+    theta_rhs = 'r_{i}';
 else
-    % '\\,' not '\,' in the DELIMITER: strjoin unescapes its delimiter, so a
-    % literal '\,' raises "Escape sequence '\,' is invalid" and silently emits a
-    % bare comma, turning the LaTeX thin-space into "r_j , \prod b". The
-    % concatenated prefix below is not passed through strjoin and so takes '\,'
-    % directly.
-    theta_rhs = ['r_j \, ' strjoin(factor_parts, ' \\, ')];
+    theta_rhs = ['r_{i} ' strjoin(theta_factors, ' ')];
 end
 
-% The dendritic equation's FORM depends on whether the preset is stochastic.
 if M.has_noise
-    fprintf(fid, ['$$\n\\mathrm{d}x_i = \\frac{-x_i + u_i + ' ...
-        '\\sum_j w_{ij}\\, %s}{\\tau_d}\\,\\mathrm{d}t ' ...
-        '+ \\frac{\\sigma_u}{\\tau_d}\\,\\mathrm{d}W_i\n$$\n\n'], theta_rhs);
+    dx_line = ['dx_i &= \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \theta_j}' ...
+        '{\tau_d}\, dt \;+\; \frac{\sigma_u}{\tau_d}\, dW_i'];
+else
+    dx_line = ['\frac{dx_i}{dt} &= \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, ' ...
+        '\theta_j}{\tau_d}'];
+end
+eqs = { ...
+    dx_line, ...
+    ['\theta_i &= ' theta_rhs], ...
+    'r_i &= \phi\left( x_i - a_{0_i} - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right)', ...
+    '\frac{da_{ik}}{dt} &= \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K'};
+if M.n_b_max > 0
+    eqs{end+1} = ['\frac{db_{im}}{dt} &= \frac{1-b_{im}}{\tau_{rec_m}} - ' ...
+        '\frac{b_{im}\, r_i}{\tau_{rel_m}}, \qquad m = 1, \dots, M'];
+end
+if M.any_stf
+    eqs{end+1} = ['\frac{dg_{in}}{dt} &= \frac{1-g_{in}}{\tau_{dec_n}} + ' ...
+        '\frac{(G - g_{in})\, r_i}{\tau_{fac_n}}, \qquad n = 1, \dots, n_f'];
+end
+% Lines are DATA to %s, so single backslashes; the '\\[8pt]' row separator is
+% in the format string and so is doubled. Note '\\[8pt]' after every line but
+% the last, exactly as the canonical block.
+fprintf(fid, '$$\n\\begin{aligned}\n%s\n\\end{aligned}\n$$\n\n', ...
+    strjoin(eqs, ' \\\\[8pt]\n'));
+
+if M.has_noise
     fprintf(fid, ['Additive Wiener noise enters **only** $x$, which keeps the ' ...
         'diffusion constant: Ito and Stratonovich coincide, the Milstein term ' ...
         'vanishes, the variational equation is untouched, and the noise ' ...
         'cancels in Benettin''s trajectory difference. $\\sigma_u$ is ' ...
         'input-referred, so it is comparable to the stimulus amplitude.\n\n']);
-else
-    fprintf(fid, ['$$\n\\frac{\\mathrm{d}x_i}{\\mathrm{d}t} = ' ...
-        '\\frac{-x_i + u_i + \\sum_j w_{ij}\\, %s}{\\tau_d}\n$$\n\n'], theta_rhs);
 end
 
 % a_{0_i} is the setpoint (the property S_c), subtracted here so phi is the
 % zero-centred function. The code passes the centre into phi instead
 % (piecewiseSigmoid(x, S_a, S_c)); the two agree because a translation commutes,
-% phi_{S_c}(z) = phi_0(z - S_c). Keeping it out of phi is what lets the
-% nonlinearity be swapped for a plain logistic or tanh without each one carrying
-% its own shift parameter.
-%
-% c/K, not c: the model normalises the adaptation sum by its timescale count, so
-% c is the TOTAL adaptation budget and the steady state is c*r whatever K is.
-fprintf(fid, ['$$\nr_i = \\phi\\!\\left( x_i - a_{0_i} - \\frac{c}{K} ' ...
-    '\\sum_{k=1}^{K} a_{ik} \\right)\n$$\n\n']);
+% phi_{S_c}(z) = phi_0(z - S_c).
+if any(M.sigma_S_c(:) > 0)
+    setpoint_note = sprintf(['drawn per neuron as $a_{0_i} = %s + \\sigma_{S_c}' ...
+        '\\,\\xi_i$, $\\xi_i \\sim \\mathcal{N}(0,1)$, with $\\sigma_{S_c}$ = %s ' ...
+        'per cell type'], fmt(M.S_c), fmt(M.sigma_S_c));
+else
+    setpoint_note = sprintf('%s for every neuron here', fmt(M.S_c));
+end
 fprintf(fid, ['$\\phi$ is centred on zero; $a_{0_i}$ is the **setpoint** ' ...
-    '(`S_c`, %s here), per neuron when `mu_S_c` / `sigma_S_c` are set.\n\n'], ...
-    fmt(M.S_c));
+    '(`S_c`), %s. $K$ is the number of SFA timescales and $M$ the number of ' ...
+    'depression timescales; their values for this preset are in the parameter ' ...
+    'table below.\n\n'], setpoint_note);
 fprintf(fid, ['The rate $r_i$ is the **pre-depression** output of the ' ...
     'nonlinearity. Depression and facilitation enter presynaptically, as ' ...
     'factors multiplying $r_j$ inside the recurrent sum, so both mechanisms are ' ...
     'driven by the raw rate $r_i$ and not by the depressed output.\n\n']);
 
-fprintf(fid, '$$\n\\frac{\\mathrm{d}a_{ik}}{\\mathrm{d}t} = \\frac{-a_{ik} + r_i}{\\tau_{a_k}}\n$$\n\n');
-
-if M.n_b_max > 0
-    % tau_{rec_m}, not tau_{rec,m}: the timescale index is part of the subscript
-    % name, matching how the parameter table and the canonical doc write it.
-    fprintf(fid, ['$$\n\\frac{\\mathrm{d}b_{im}}{\\mathrm{d}t} = ' ...
-        '\\frac{1-b_{im}}{\\tau_{rec_m}} - ' ...
-        '\\frac{b_{im}\\, r_i}{\\tau_{rel_m}}%s\n$$\n\n'], range_qual('m', M.n_b_max));
-end
-if M.any_stf
-    % Same subscript convention as the STD equation above: the timescale index
-    % is part of the subscript name, and the state carries it.
-    fprintf(fid, ['$$\n\\frac{\\mathrm{d}g_{in}}{\\mathrm{d}t} = ' ...
-        '\\frac{1-g_{in}}{\\tau_{dec_n}} + ' ...
-        '\\frac{(G - g_{in})\\, r_i}{\\tau_{fac_n}}%s\n$$\n\n'], ...
-        range_qual('n', M.n_g_max));
-end
-
-% Name the product built above. theta is the SYNAPTIC OUTPUT -- the rate after
-% depression, i.e. what the recurrent sum transmits -- and matches the notation
-% in docs/EquationsParametersDocs/Equations_stability_paper.md.
-fprintf(fid, '$$\n\\theta_j = %s\n$$\n\n', theta_rhs);
 if M.any_stf
     after = 'after depression and facilitation';
 else
     after = 'after depression';
 end
-fprintf(fid, ['$\\theta_j$ is the **synaptic output**: the presynaptic rate ' ...
-    '%s, and the quantity the recurrent sum above transmits.\n\n'], after);
+fprintf(fid, ['$\\theta_i$ is the **synaptic output**: the rate ' ...
+    '%s, and the quantity the recurrent sum transmits.\n\n'], after);
 if M.n_b_max > 1
     % Quote the actual depth this preset reaches. The ratio tau_rec/tau_rel is
     % the ONLY combination that sets the steady state, so it is what the numbers
@@ -356,6 +365,8 @@ row(fid, '$\tilde{\sigma}$', 'Weight std devs (post, pre)', M.sigma, 'multiples 
 row(fid, '$\phi$',      'Nonlinearity',              M.activation, '--');
 if ~strcmp(M.activation, 'tanh')
     row(fid, '$S_c$',    'Nonlinearity setpoint',     M.S_c,      '--');
+    % Per-neuron spread of the setpoint, one entry per cell type; 0 = shared.
+    row(fid, '$\sigma_{S_c}$', 'Setpoint std per cell type', M.sigma_S_c, '--');
 end
 if strcmp(M.activation, 'piecewise')
     row(fid, '$S_a$',    'Piecewise slope parameter', M.S_a,      '--');
@@ -368,6 +379,9 @@ for t = 1:numel(M.types)
     end
 end
 row(fid, '$c$',          'SFA coupling per type',     M.c,        '--');
+% M as in the equations: depression timescales. Uniform across routes in every
+% preset so far; if a preset ever differs by route, this is the widest one.
+row(fid, '$M$',          'STD timescales',            M.n_b_max,  '--');
 for k = 1:numel(M.routes)
     r = M.routes(k);
     if ~isempty(r.tau_rec)
@@ -438,16 +452,6 @@ else
 end
 end
 
-function s = range_qual(idx, n)
-% ", \qquad m = 1,...,M" -- but nothing at all when there is one timescale,
-% where "m = 1,\dots,1" is noise rather than information.
-if n <= 1
-    s = '';
-else
-    s = sprintf(', \\qquad %s = 1,\\dots,%d', idx, n);
-end
-end
-
 function s = tau_a_str(cd_)
 % A condition's SFA timescales, as a readable list. Conditions carry tau_a as a
 % 1 x C cell; SFA is on the first cell type, and an empty row means none.
@@ -498,9 +502,9 @@ end
 fprintf(fid, '# %s\n\n', title);
 fprintf(fid, '**Preset:** `%s`  ·  **Model class:** `%s`\n\n', preset_name, M.model_class);
 fprintf(fid, ['> GENERATED by `write_manuscript_tables` from a model BUILT from ' ...
-    'that preset under the `sfa_and_std` condition. Do not edit by hand -- ' ...
+    'that preset under the `%s` condition. Do not edit by hand -- ' ...
     'every value here is read off the object, so it cannot disagree with what ' ...
-    'the sweeps ran. Regenerate after changing the preset.\n\n']);
+    'the sweeps ran. Regenerate after changing the preset.\n\n'], M.condition);
 fprintf(fid, '_Generated %s._\n\n', char(datetime('now')));
 end
 
