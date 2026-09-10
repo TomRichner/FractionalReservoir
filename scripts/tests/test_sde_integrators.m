@@ -52,7 +52,8 @@ all_passed = check('sigma = 0 with a noise struct matches no noise struct', ...
 
 %% Measured strong convergence order
 % Reference: SRA1 on the finest grid. Coarse runs use the SAME Brownian path,
-% rebuilt exactly by combining adjacent fine increments (see coarsen_noise).
+% rebuilt exactly by combining adjacent fine increments (see
+% src/model/integrators/coarsen_noise.m, shared with run_numerics_verification).
 T_conv = 0.25;
 fs_fine = 51200;
 sigma = 1.5;                 % large enough that noise error, not drift, dominates
@@ -232,32 +233,6 @@ fprintf('========================================\n');
 function nz = make_noise(xi1, xi2, t0, fs, sigma, idx)
 nz = struct('xi1', xi1, 'xi2', xi2, 't0', t0, 'fs', fs, ...
     'sigma', sigma, 'idx', idx);
-end
-
-function [xi1_c, xi2_c] = coarsen_noise(xi1, xi2, h, m)
-% Rebuild the SAME Brownian path on a step m times coarser.
-%
-% Increments simply add: dW_c = sum of the m fine increments. The second
-% integral does not -- over two consecutive fine steps,
-%   I_c = I_a + h*dW_a + I_b
-% because the second sub-interval's area is measured from a base that has
-% already risen by dW_a. Applying that pairwise, log2(m) times, is exact.
-% The pair is then converted back to unit-variance normals by inverting the
-% Kloeden-Platen identity I = (H/2)*(dW + dZ/sqrt(3)).
-    assert(mod(log2(m), 1) == 0, 'coarsen_noise expects m to be a power of 2');
-    dW = sqrt(h) * xi1;
-    I10 = (h / 2) * (dW + sqrt(h) * xi2 / sqrt(3));
-    hc = h;
-    while size(dW, 2) > size(xi1, 2) / m
-        a = 1:2:size(dW, 2);
-        b = 2:2:size(dW, 2);
-        I10 = I10(:, a) + hc * dW(:, a) + I10(:, b);
-        dW = dW(:, a) + dW(:, b);
-        hc = 2 * hc;
-    end
-    H = hc;
-    xi1_c = dW / sqrt(H);
-    xi2_c = sqrt(3) * (2 * I10 / H - dW) / sqrt(H);
 end
 
 function Y = ref_rk2(f, t, y0, node)
