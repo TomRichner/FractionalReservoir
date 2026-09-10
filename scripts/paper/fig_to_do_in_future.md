@@ -8,7 +8,7 @@
 
 - memory capacity needs to be redone
 
-- make the jacobian density plot use f(x) = log(1+log(1+x))
+- make the jacobian density plot use f(x) = log(1+log(1+x)) (doing now)
 
 - make separate folders per run+config
 
@@ -27,3 +27,5 @@
 - Eliminate SRNNModel2.m
 
 - Eigenvalue density plot for different imbalanced networks or networks with E only SFA
+
+- Verify precision of SRA1 vs ODE45 in noise-free (and maybe with-noise?) simulations and the similarity of LLE.  make a supplemental figure based on a 3 example time series plots with the base preset in the three conditions of the preset.  
