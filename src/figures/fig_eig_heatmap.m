@@ -3,12 +3,20 @@ function out = fig_eig_heatmap(cfg)
 %
 %   out = FIG_EIG_HEATMAP()
 %   out = FIG_EIG_HEATMAP('data_file', f)
+%   out = FIG_EIG_HEATMAP('density_scale', 'loglog')
 %
 % A Gaussian-smoothed 2-D DENSITY over the complex plane for each of the four
 % adaptation regimes -- an "occupancy" heatmap showing how much time the
 % instantaneous Jacobian's eigenvalues spend in each region, and in particular
 % to the RIGHT of the imaginary axis (Re > 0, locally unstable). Panels share
 % axis limits and one log-density colorbar.
+%
+% density_scale picks the colour transform of the smoothed density D:
+%   'log'    -> log10(1 + D)               (default; the original figure)
+%   'loglog' -> log10(1 + log10(1 + D))    (compresses the peaks further, so the
+%                                           sparse outer eigenvalue cloud reads)
+% The transform is applied HERE and the helper is handed plain values, so the
+% shared plotter in src/plotting/ stays untouched.
 %
 % PLOTTING HALF ONLY. run_eig_heatmap does the sampling and writes
 % eig_heatmap_data.mat, so the look can be iterated without re-simulating.
@@ -22,6 +30,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''    % the run whose eig_heatmap data to plot
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+    cfg.density_scale (1,:) char {mustBeMember(cfg.density_scale, {'log', 'loglog'})} = 'log'
 end
 
 setup_paths();
@@ -49,6 +58,15 @@ n_cond           = numel(condition_titles);
 grid_res   = 250;     % heatmap bins per axis
 sigma_bins = 1.25;    % Gaussian smoothing width (bins)
 keep_frac  = 0.999;   % fraction of eigenvalue density to keep inside the window
+
+switch cfg.density_scale
+    case 'log'
+        scale_fn = @(D) log10(1 + D);
+        cb_label = 'log_{10}(1 + eigenvalue density)';
+    case 'loglog'
+        scale_fn = @(D) log10(1 + log10(1 + D));
+        cb_label = 'log_{10}(1 + log_{10}(1 + eigenvalue density))';
+end
 
 
 %% ---- Global, square, density-trimmed limits (shared for comparability) -----
@@ -81,7 +99,8 @@ cmax = 0;
 for i = 1:n_cond
     D_by_cond{i} = compute_eigenvalue_density( ...
         evals_by_cond{i}, re_edges, im_edges, sigma_bins);
-    cmax = max(cmax, max(log10(1 + D_by_cond{i}(:))));  % shared log-density max
+    D_by_cond{i} = scale_fn(D_by_cond{i});               % colour transform, see density_scale
+    cmax = max(cmax, max(D_by_cond{i}(:)));              % shared scaled-density max
 end
 clim = [0, cmax];
 
@@ -105,7 +124,7 @@ ax_panels = gobjects(n_cond, 1);
 for i = 1:n_cond
     ax_panels(i) = nexttile(tl);
     plot_eigenvalue_heatmap_helper( ...
-        ax_panels(i), D_by_cond{i}, re_edges, im_edges, clim, true);
+        ax_panels(i), D_by_cond{i}, re_edges, im_edges, clim, false);  % already scaled above
     title(ax_panels(i), condition_titles{i}, 'FontWeight', 'normal', 'FontSize', 14);
 
     % Finite-time (Benettin) LLE over the last lle_window seconds, top-left.
@@ -117,7 +136,7 @@ end
 % Single shared colorbar for the whole layout (all panels share clim + colormap).
 cb = colorbar(ax_panels(end));
 cb.Layout.Tile = 'east';
-cb.Label.String = 'log_{10}(1 + eigenvalue density)';
+cb.Label.String = cb_label;
 
 title(tl, {'Jacobian eigenvalue occupancy across adaptation regimes', ...
     sprintf('LLE = finite-time Benettin exponent over the last %g s', lle_window)}, ...
