@@ -110,7 +110,11 @@ F = add(F, 'fig_sfa_EOC_allStd',              @fig_sfa_EOC_allStd,              
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_memory_capacity',             @fig_memory_capacity,             true, {});
 F = add(F, 'fig_memory_capacity_example',     @fig_memory_capacity_example,     true, {});
-F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 false, {});
+% Double-log colour scale, log10(1 + log10(1 + density)), TR 2026-09-10: the
+% single log leaves the dense core saturated and the sparse outer cloud
+% invisible on this network. The figure's default stays 'log'.
+F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 false, ...
+        {'density_scale', 'loglog'});
 F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
 % The generated equation and conditions tables, an ordinary entry so its
 % failures count in the headline number.
