@@ -116,6 +116,13 @@ F = add(F, 'fig_memory_capacity_example',     @fig_memory_capacity_example,     
 F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 false, ...
         {'density_scale', 'loglog'});
 F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
+% Numerical-method verification, TR 2026-09-10: SRA1 reshot against a 1e-10
+% ode45 reference and against itself on a shared Brownian path, and Benettin
+% vs QR on a reduced network. Two entries so each variant has its own folder.
+F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       false, ...
+        {'variant', 'solver'});
+F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       false, ...
+        {'variant', 'lya_method'});
 % The generated equation and conditions tables, an ordinary entry so its
 % failures count in the headline number.
 F = add(F, 'doc_tables',                      @fig_doc_tables,                  true, ...
