@@ -24,3 +24,6 @@
 
 - local lya density histogram over time
 
+- Eliminate SRNNModel2.m
+
+- Eigenvalue density plot for different imbalanced networks or networks with E only SFA
