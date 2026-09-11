@@ -42,7 +42,7 @@
 
 - could we go to a single cell type model (but with a dale's law weight matrix)?  this would reduce the std routes and possibly clean up the number of eignevalues in the jacobian.  results should be the same.  might make the tau_a sweep work without modification.  Is single cell type supported?  We ran into that during a refactor previously.
 
-- quiet down the printing to command line to reduce filling of context thorugh matlab mcp server.  add a verbose flag to the cfg which default to fals.
+- quiet down the printing to the command line so it stops filling the agent's context through the MATLAB MCP server.  Now priority 0 in the ranked list below: a three-level `verbose` setting (`verbose` / `minimal` / `near-none`), `minimal` by default.
 
 ## Additional items from the Manuscript5 planning audit
 
@@ -91,6 +91,20 @@ This is a handoff for work on the Results of `StochasticPlasticDynamicalSystemPa
 The authoritative equations for the MATLAB model are `docs/EquationsParametersDocs/Equations_stability_paper_v2.md`: raw firing rate drives both SFA and STD, recurrent output is firing rate multiplied by the product of all active depression variables, SFA includes the fixed offset, and facilitation is not used.  The present paper preset is `celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25`.  It has 500 neurons, equal E and I populations, SFA on both cell types, two-timescale STD on all four connection routes in the multiple-timescale condition, heterogeneous neuronal setpoints, and additive dendritic noise.  Do not silently substitute an older E-only-SFA preset, `SRNNModel2`, or the separate hand-tuned bursting configuration for the reference model.
 
 This order is dependency-aware.  Do not spend substantial compute polishing or rerunning downstream analyses until the model-defining decision in priority 1 is frozen.  For every final run, save a compact provenance artifact with the source commit, resolved preset and overrides, run mode, seeds, completed and failed trials, input run, summary statistics, and output paths.  A PNG without the data and configuration that produced it is not a completed result.
+
+### 0. Give the whole code base a three-level `verbose` setting, defaulting to the AI-friendly level
+
+**Why this comes before everything else.** Every analysis and figure in this list will be run, watched and debugged through the MATLAB MCP server, and everything MATLAB prints to the command window comes back into the agent's context verbatim.  The model classes print on every build and run ("W created: spectral radius…", "SRNNCellTypePairs built successfully", "Integration complete in…", "Largest Lyapunov Exponent…"), `ParamSpaceAnalysis2` prints per job, and a sweep or a 25-seed ensemble multiplies that by hundreds.  The result is context filled with chatter, more frequent compaction, and an agent that cannot see the few lines that matter.  `run_numerics_verification` had to wrap every `build()` and `run()` in `evalc` to be usable at all; that is a workaround at one call site, not a fix.  Doing this first makes every later priority cheaper to run and to supervise.
+
+**What is wanted.** One setting, set in the config (`paper_config` and every `*_config.m`), threaded to every model class, analysis driver, stage and figure, and respected by all of them.  Three levels:
+
+* `verbose` — everything that prints today.  For a human at the prompt, and for debugging one run.
+* `minimal` — **the default.** The optimal level for an agent supervising a run over MCP: one line per stage or major step (what started, what finished, how long, where it wrote), one line per failure with identifier and message, the final summary table, and nothing per model, per job, per seed or per grid point.  Progress on long loops as a single line every N jobs or every few minutes, not per iteration.
+* `near-none` — an even sparser level for long development cycles, to postpone compaction as far as possible: only errors and the final one-line outcome of each entry point (run directory, figure count, minutes).  No progress lines at all.
+
+**Work required.** Add a `verbose` property to `SRNNModel2`, `SRNNCellTypePairs` (inherited by `SRNN_ESN_reservoir` and `SRNNNumericsProbe`), and `ParamSpaceAnalysis2`; route every `fprintf`/`disp` in the classes, the integrators, the stages under `src/analysis/`, the two entry points and the figure helpers through one small helper that checks the level, so the decision is made in one place.  Carry the level in `cfg` and in the `ctx` struct `resolve_run_context` builds, so a stage never reads it from anywhere else.  Workers must respect it too (the level travels with the model or `ctx` into `parfor`).  Remove the `evalc` wrappers in `run_numerics_verification` and elsewhere once the classes are quiet by default.  Keep warnings and errors untouched at every level: quiet means fewer lines, never hidden failures.
+
+**Definition of done.** With the default level, a full `run_all_paper_analyses` + `make_all_paper_figures` at `'fast'` returns a command-window transcript short enough to read in one screen per stage; `verbose` reproduces today's output; `near-none` prints only the final lines; `test_run_modes` and the model tests still pass; and CLAUDE.md states the three levels and that `minimal` is the default.
 
 ### 1. Freeze the one-timescale versus multiple-timescale comparison, especially STD normalization
 
