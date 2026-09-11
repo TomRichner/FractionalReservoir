@@ -35,3 +35,5 @@
 - only tau_a_E was swept for the tau sensitivity analysis.  it should be both E and I for runs in which both E and I have SFA.  We need to fix this.  Can this be done considering how the param space analysis class works? 
 
 - could we go to a single cell type model (but with a dale's law weight matrix)?  this would reduce the std routes and possibly clean up the number of eignevalues in the jacobian.  results should be the same.  might make the tau_a sweep work without modification.  Is single cell type supported?  We ran into that during a refactor previously. 
+
+- quiet down the printing to command line to reduce filling of context thorugh matlab mcp server.  add a verbose flag to the cfg which default to fals.  
