@@ -74,7 +74,9 @@ function mat_file = run_numerics_verification(cfg)
 % PARALLEL. The three blocks per condition are parfor loops over trials (L
 % over trial x integrator). Every job builds its own model inside the worker
 % from the preset and the seed; nothing is shared but the settings struct.
-% n_workers defaults to min(12, cores), leaving headroom on a 14-core box;
+% An existing pool is used as is (secure one first with wait_for_parpool,
+% which polls the network licence for a free seat); otherwise n_workers,
+% default min(12, cores), leaving headroom on a 14-core box;
 % per-worker memory peaks at about 1.5 GB (an ode45 run holding 20 s of 4000
 % states, or a reshoot holding the reference rows plus a 12800 Hz noise
 % tensor), so 12 workers fit in 64 GB. Worker output is interleaved.
@@ -113,8 +115,6 @@ arguments
     cfg.n_trials_reshoot (1,1) double  = 0     % 0 -> per run_mode
     cfg.n_trials_lle     (1,1) double  = 0     % 0 -> per run_mode
     cfg.n_workers        (1,1) double  = 0     % 0 -> min(12, cores)
-    cfg.license_wait_s   (1,1) double  = 4 * 3600   % how long to wait for a PCT licence seat before going serial
-    cfg.license_poll_s   (1,1) double  = 20         % seconds between licence checks
 end
 
 setup_paths();
@@ -185,7 +185,7 @@ fprintf('  L: Benettin LLE, ode45 vs sra1 @ %d Hz, T = %g s                     
 fprintf('  C: Benettin vs QR, n = %d, T = %s                              x %d trials\n', ...
     n_small, mat2str(T_small), n_lle);
 
-pool = ensure_pool(cfg.n_workers, cfg.license_wait_s, cfg.license_poll_s);
+pool = ensure_pool(cfg.n_workers);
 fprintf('  parallel pool: %d workers\n', pool.NumWorkers);
 
 t_stage = tic;
@@ -256,79 +256,27 @@ fprintf('\nSaved: %s  (%.1f min)\n', mat_file, settings.minutes);
 end
 
 %% ------------------------------------------------------------------------
-function pool = ensure_pool(n_workers, wait_s, poll_s)
-% A pool with n_workers (default min(12, cores)); reuse one of the right size.
-%
-% The Parallel Computing Toolbox is a 15-seat network licence here, and on
-% 2026-09-11 every seat was taken (none by us). A pool needs ONE seat, for the
-% client, not one per worker. So: ask the licence server how many seats are
-% free (scripts/tools/pct_licenses.ps1, whose exit code is the free count),
-% and while it says none, wait poll_s and ask again, for up to wait_s. When a
-% seat is free -- or the script cannot answer -- try parpool; a failed attempt
-% (someone else got the seat first) just goes back to polling. Past wait_s,
-% warn and return a stand-in with NumWorkers = 1: the parfor loops then run
-% serially, which is slow but correct.
+function pool = ensure_pool(n_workers)
+% Use the pool that is up, whatever its size (secure one first with
+% wait_for_parpool, which polls the network licence); otherwise try to start
+% one with n_workers (default min(12, cores)). If that fails -- no toolbox,
+% or the 15-seat licence fully checked out -- warn and return a stand-in with
+% NumWorkers = 1: the parfor loops below then run serially, slow but correct.
+pool = gcp('nocreate');
+if ~isempty(pool)
+    return
+end
 if n_workers <= 0
     n_workers = min(12, feature('numcores'));
 end
-pool = gcp('nocreate');
-if ~isempty(pool) && pool.NumWorkers == n_workers
-    return
-end
-if ~isempty(pool); delete(pool); end
-
-% The licence polling below shells out to lmutil at a path on ONE machine and
-% ties up a workstation for hours; it is only meant to run there (TR,
-% 2026-09-11). Anywhere else, stop rather than guess.
-host = getenv('COMPUTERNAME');
-if ~strcmpi(host, 'R5456622')
-    error('run_numerics_verification:WrongHost', ...
-        ['This stage''s parallel-pool and licence handling is written for ' ...
-         'R5456622; this is %s. Run it there, or edit ensure_pool.'], host);
-end
-
-t_wait = tic;
-n_polls = 0;
-while true
-    free = pct_free_seats();
-    if isnan(free) || free > 0
-        try
-            pool = parpool(parallel.defaultProfile, n_workers);
-            return
-        catch ME
-            last_err = ME.message;
-        end
-    else
-        last_err = sprintf('licence server reports 0 free seats');
-    end
-    if toc(t_wait) > wait_s
-        warning('run_numerics_verification:NoPool', ...
-            ['No parallel pool after %.0f min (%s). Running the trial loops ' ...
-             'SERIALLY; expect roughly n_workers times the wall time.'], ...
-            toc(t_wait) / 60, strtok(last_err, newline));
-        pool = struct('NumWorkers', 1);
-        return
-    end
-    n_polls = n_polls + 1;
-    if n_polls == 1 || mod(n_polls, 15) == 0
-        fprintf('  [pool] waiting for a PCT licence seat (%s); polling every %d s, %.0f min so far\n', ...
-            strtok(last_err, newline), poll_s, toc(t_wait) / 60);
-    end
-    pause(poll_s);
-end
-end
-
-function free = pct_free_seats()
-% Free Parallel Computing Toolbox seats on the network licence, or NaN if the
-% question cannot be answered (not Windows, script or lmutil missing).
-free = NaN;
-if ~ispc; return; end
-script = fullfile(fileparts(which('setup_paths')), 'scripts', 'tools', 'pct_licenses.ps1');
-if ~isfile(script); return; end
-[status, ~] = system(sprintf( ...
-    'powershell -NoProfile -ExecutionPolicy Bypass -File "%s" -Quiet', script));
-if status >= 0 && status < 200      % the script exits with the free count; 254/255 are its errors
-    free = status;
+try
+    pool = parpool(parallel.defaultProfile, n_workers);
+catch ME
+    warning('run_numerics_verification:NoPool', ...
+        ['Could not start a parallel pool (%s). Running the trial loops ' ...
+         'SERIALLY; expect roughly n_workers times the wall time. ' ...
+         'Secure a pool first with wait_for_parpool.'], strtok(ME.message, newline));
+    pool = struct('NumWorkers', 1);
 end
 end
 

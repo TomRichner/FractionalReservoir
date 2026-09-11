@@ -1,6 +1,9 @@
 % NUMERICS_VERIFICATION_TRIALS_RUN Run the numerics stage on many seeds, in parallel, and its figures.
 %
-%   Open this file and press Run. setup_paths is called on the first line.
+%   Secure a pool first -- wait_for_parpool(12) polls the network licence for
+%   a free Parallel Computing Toolbox seat and holds it -- then open this file
+%   and press Run. setup_paths is called on the first line. Without a pool the
+%   stage warns and runs serially, about twelve times slower.
 %
 % Every setting comes from numerics_verification_trials_config(). The stage
 % is called directly (run_all_paper_analyses would also run the sweeps), with

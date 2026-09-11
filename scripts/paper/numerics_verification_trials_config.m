@@ -2,7 +2,8 @@ function cfg = numerics_verification_trials_config()
 % NUMERICS_VERIFICATION_TRIALS_CONFIG The numerics stage at 'medium' with five network seeds.
 %
 %   cfg = numerics_verification_trials_config();
-%   numerics_verification_trials_run       % stage (~40 min on 12 workers), then three figures
+%   wait_for_parpool(12);                  % first: poll the licence, hold a seat
+%   numerics_verification_trials_run       % then: stage (~40 min on 12 workers), three figures
 %
 % The ensemble version of numerics_verification_test_med_config. Every
 % sub-experiment (noise-free reshoot, noisy reshoot on a shared Brownian
