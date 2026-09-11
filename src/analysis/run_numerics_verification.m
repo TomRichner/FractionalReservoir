@@ -394,6 +394,15 @@ end
 function probe = build_probe(preset_name, condition_name, varargin)
 % build_from_preset's twin that instantiates SRNNNumericsProbe. Same
 % precedence: preset < condition < overrides, ode_solver among the overrides.
+%
+% PIN THE GENERATOR. The class seeds every draw with rng(seed), which sets the
+% seed but keeps whatever generator is current -- and that differs: the client
+% defaults to 'twister', parallel workers to 'threefry' (checked 2026-09-11).
+% So a job on a worker built a DIFFERENT network for the same rng_seeds than
+% a job on the client, and this stage's first parallel run did not reproduce
+% its serial numbers. Setting twister here makes a seed mean the same network
+% wherever the job runs, and matches every client-side run and report.
+rng(0, 'twister');
 [preset, ~, conditions] = srnn_param_preset(preset_name);
 names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 cond  = rmfield(conditions{strcmp(names, condition_name)}, 'name');
