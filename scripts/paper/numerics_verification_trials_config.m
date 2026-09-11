@@ -2,8 +2,8 @@ function cfg = numerics_verification_trials_config()
 % NUMERICS_VERIFICATION_TRIALS_CONFIG The numerics stage at 'medium' with five network seeds.
 %
 %   cfg = numerics_verification_trials_config();
-%   wait_for_parpool(12);                  % first: poll the licence, hold a seat
-%   numerics_verification_trials_run       % then: stage (~40 min on 12 workers), three figures
+%   wait_for_parpool(13);                  % first: poll the licence, hold a seat
+%   numerics_verification_trials_run       % then: stage (~45 min on 13 workers), three figures
 %
 % The ensemble version of numerics_verification_test_med_config. Every
 % sub-experiment (noise-free reshoot, noisy reshoot on a shared Brownian
@@ -28,7 +28,7 @@ cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8
 cfg.run_mode    = 'medium';
 cfg.n_trials_reshoot = 5;      % A and B, passed to the stage by the _run script
 cfg.n_trials_lle     = 25;     % L and C
-cfg.n_workers        = 12;     % of 14 cores; ~1.5 GB per worker peak, see the stage header
+cfg.n_workers        = 13;     % of 14 cores: 25 LLE seeds go in two batches, not three; ~1.5 GB per worker
 
 cfg.run_dir  = 'data/numerics_verification_trials';  % the stage writes <run_dir>/numerics_verification
 cfg.fig_root = 'figs/numerics_verification_trials';  % overwritten in place

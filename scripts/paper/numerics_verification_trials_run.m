@@ -1,6 +1,6 @@
 % NUMERICS_VERIFICATION_TRIALS_RUN Run the numerics stage on many seeds, in parallel, and its figures.
 %
-%   Secure a pool first -- wait_for_parpool(12) polls the network licence for
+%   Secure a pool first -- wait_for_parpool(13) polls the network licence for
 %   a free Parallel Computing Toolbox seat and holds it -- then open this file
 %   and press Run. setup_paths is called on the first line. Without a pool the
 %   stage warns and runs serially, about twelve times slower.
@@ -11,7 +11,7 @@
 % registry.
 %
 %   preset    celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25
-%   run_mode  medium, 5 reshoot / 25 LLE seeds, 12 workers  (roughly 40 min)
+%   run_mode  medium, 5 reshoot / 25 LLE seeds, 13 workers  (roughly 45 min)
 %   run_dir   data/numerics_verification_trials
 %   fig_root  figs/numerics_verification_trials
 %
