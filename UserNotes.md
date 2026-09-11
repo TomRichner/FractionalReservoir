@@ -13,6 +13,71 @@ Each entry is stamped with the date, branch @ commit, hostname, and the agent
 and session that wrote it. Newest first.
 
 ---
+## KNOWN BUG: a seed builds a different network on a parallel worker than on the client
+
+| | |
+|---|---|
+| Noted | 2026-09-11 · `main` @ `366dbe6` · R5611351 · Claude Code (Fable 5.1), session 90c5825b |
+| Raised by | TR, on being shown the cause of a non-reproducing parallel run |
+| Status | **KNOWN BUG, not fixed.** The fix is in shared model code and changes every sweep's networks; TR to decide when. |
+
+### What happens
+
+Both model classes seed every random draw with `rng(seed)` -- the weight
+matrix (`rng_seeds(1)`), the stimulus amplitudes and initial state
+(`rng_seeds(2)`), the per-neuron setpoints and the noise tensor (derived from
+`rng_seeds(1)`). `rng(seed)` sets the seed but **keeps whatever generator is
+current**, and that differs by where the code runs:
+
+* the MATLAB client defaults to `twister`;
+* every Parallel Computing Toolbox worker defaults to `threefry`
+  (`parfevalOnAll(@() getfield(rng(), 'Type'), 1)` on all 13 workers, 2026-09-11).
+
+So the same `rng_seeds` produce a different W, stimulus, x0, setpoints and
+noise path on a worker than on the client. "Seed k" does not name one
+network across the pipeline.
+
+### How it was found
+
+`run_numerics_verification`'s first parallel run did not reproduce its own
+serial numbers: for seed [1 2] the reshoot error came out 4.06e-5 instead of
+4.65e-5, the ode45 Benettin LLE 4.07 instead of 3.64, and the reduced network
+had a different exponent altogether. Pinning `rng(0, 'twister')` inside each
+worker job (commit `c8f3eee`) restored every number to the printed digit.
+That stage is now immune; nothing else is.
+
+### What it affects, and what it does not
+
+* **`ParamSpaceAnalysis2` sweeps** (sensitivity, tau, parameter space),
+  **memory capacity** and the **eigenvalue heatmap** all build their networks
+  inside `parfor`, so they use `threefry`. Within a sweep this is consistent
+  and reproducible: every worker gives the same sequence for a seed, and the
+  shared-W-across-conditions guarantee at a grid point holds. The statistics
+  are unaffected; both generators are sound and a rep is just a random network.
+* **Every figure that builds a network on the client** (`build_from_preset`,
+  e.g. `fig_example_timeseries`, `fig_SFA_steady_state`, the numerics
+  reports before `c8f3eee`) uses `twister`. Such a figure is **not** showing
+  the sweep's rep of the same seed, whatever its caption implies.
+* **A serial sweep** (`use_parallel = false`) builds different networks from
+  the parallel run and cannot reproduce a specific parallel result.
+* **The frozen W checksums** in `test_pairs_single_celltype` were computed on
+  the client and guard the client-side networks, not the ones the sweeps ran.
+
+### The fix
+
+Replace `rng(seed)` with `rng(seed, 'twister')` at each seeding site in
+`SRNNModel2` and `SRNNCellTypePairs` (about six sites: W, stimulus/x0,
+setpoints, noise, in each class), and do the same for the `rng(stream_state)`
+restores, which already carry the generator type in the state struct.
+Client-side results and the frozen checksums are unchanged, because the client
+already uses `twister`. **Sweep results change**: every network in every
+future sweep is a different (statistically equivalent) draw from today's. So
+it should land before a full pipeline run, not in the middle of one, and the
+run that follows it is the first whose figures and sweeps agree on what a seed
+means.
+
+---
+
 
 ## Simplify where analyses and figures read and write
 
