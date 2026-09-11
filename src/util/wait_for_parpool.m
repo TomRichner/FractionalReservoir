@@ -27,7 +27,7 @@ arguments
     n_workers       (1,1) double = 0            % 0 -> min(12, cores)
     opts.poll_s     (1,1) double = 20           % seconds between licence checks
     opts.max_wait_s (1,1) double = Inf          % give up (error) after this long
-    opts.host       (1,:) char   = 'R5456622'   % the workstation this is written for
+    opts.host       (1,:) char   = 'R5611351'   % the workstation this is written for
     opts.verbose    (1,1) logical = true
 end
 
