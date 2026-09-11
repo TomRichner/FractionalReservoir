@@ -112,7 +112,7 @@ for i = 1:n_cond
     if i == 1; ylabel(ax, 'x, two neurons', 'FontSize', st.label_fs); end
     ttl = {R(i).title, sprintf('%s: ode45 %+.3f, SRA1 %+.3f', st.label_lle, L.ode45.LLE, L.sra1.LLE)};
     if ~isempty(SM)
-        ttl{end+1} = sprintf('%d trials: ode45 %+.2f\\pm%.2f, SRA1 %+.2f\\pm%.2f', SM(i).n_trials, ...
+        ttl{end+1} = sprintf('%d trials: ode45 %+.2f\\pm%.2f, SRA1 %+.2f\\pm%.2f', SM(i).n_trials_lle, ...
             mean(SM(i).lle_ode45), std(SM(i).lle_ode45), mean(SM(i).lle_sra1), std(SM(i).lle_sra1));
     end
     title(ax, ttl, 'FontWeight', 'normal', 'FontSize', st.title_fs);
@@ -212,7 +212,7 @@ for i = 1:n_cond
     ttl = {R(i).title, sprintf('Benettin %+.4f   QR \\lambda_1 %+.4f', LLE_b, LLE_q)};
     if ~isempty(SM)
         d = abs(SM(i).qr_benettin - SM(i).qr_lambda1);
-        ttl{end+1} = sprintf('%d trials: |\\Delta\\lambda_1| = %.3f\\pm%.3f', SM(i).n_trials, mean(d), std(d));
+        ttl{end+1} = sprintf('%d trials: |\\Delta\\lambda_1| = %.3f\\pm%.3f', SM(i).n_trials_lle, mean(d), std(d));
     end
     title(ax, ttl, 'FontWeight', 'normal', 'FontSize', st.title_fs);
     if i == 1; legend(ax, 'Location', 'best', 'FontSize', st.tick_fs - 2); end
@@ -268,26 +268,39 @@ function [R1, SM] = trial_view(R)
 % Present a trials-layout result as the pre-trials flat layout (trial 1 for
 % every trace), plus the per-condition summaries. A flat .mat from before the
 % trial dimension passes through with SM = [].
-if ~isfield(R, 'trials')
-    R1 = R; SM = [];
-    return
-end
 R1 = struct('name', {R.name}, 'title', {R.title}, 'free', [], 'noisy', [], 'lle', [], 'qr', []);
-for i = 1:numel(R)
-    t = R(i).trials(1);
-    R1(i).free  = t.free;
-    R1(i).noisy = t.noisy;
-    R1(i).lle   = t.lle;
-    R1(i).qr    = t.qr;
+if isfield(R, 'reshoot')                     % current layout: reshoot / lle / qr arrays
+    for i = 1:numel(R)
+        R1(i).free  = R(i).reshoot(1).free;
+        R1(i).noisy = R(i).reshoot(1).noisy;
+        R1(i).lle   = R(i).lle(1);
+        R1(i).qr    = R(i).qr(1);
+    end
+    SM = [R.summary];
+elseif isfield(R, 'trials')                  % 2026-09-11 morning layout: one trial count
+    for i = 1:numel(R)
+        t = R(i).trials(1);
+        R1(i).free  = t.free;
+        R1(i).noisy = t.noisy;
+        R1(i).lle   = t.lle;
+        R1(i).qr    = t.qr;
+    end
+    SM = [R.summary];
+    for i = 1:numel(SM)
+        SM(i).n_trials_lle     = SM(i).n_trials;
+        SM(i).n_trials_reshoot = SM(i).n_trials;
+    end
+else                                         % flat single-seed layout
+    R1 = R; SM = [];
 end
-SM = [R.summary];
 end
 
 function fig = plot_ensemble(R, SM, S, st, n_cond, visible)
 % Paired per-trial comparisons. Each point is one network seed.
 fig = figure('Position', [100, 40, 520 * n_cond, 1150], 'Visible', onoff(visible));
 tl  = tiledlayout(fig, 3, n_cond, 'TileSpacing', 'loose', 'Padding', 'compact');
-n_tr = SM(1).n_trials;
+n_lle = SM(1).n_trials_lle;
+n_rs  = SM(1).n_trials_reshoot;
 
 for i = 1:n_cond
     col = cond_color(st, R(i).name, i);
@@ -316,7 +329,7 @@ for i = 1:n_cond
     % Row 3: reshoot error and slope per trial at the paper's rate
     ax = nexttile(tl, 2 * n_cond + i);
     hold(ax, 'on');
-    k = 1:n_tr;
+    k = 1:n_rs;
     plot(ax, k, M.err_free_paper, 'o-', 'Color', col, 'MarkerFaceColor', col, 'LineWidth', st.line_lw, ...
         'DisplayName', sprintf('noise-free, slope %.2f\\pm%.2f', mean(M.slope_free), std(M.slope_free)));
     if all(isfinite(M.err_noisy_paper))
@@ -326,7 +339,7 @@ for i = 1:n_cond
     end
     hold(ax, 'off');
     set(ax, 'YScale', 'log', 'FontSize', st.tick_fs, 'XTick', k);
-    xlim(ax, [0.5, n_tr + 0.5]);
+    xlim(ax, [0.5, n_rs + 0.5]);
     xlabel(ax, 'trial (network seed)', 'FontSize', st.label_fs);
     if i == 1
         ylabel(ax, sprintf('rms |error| over %g s at %d Hz', S.seg_long, M.fs_paper), 'FontSize', st.label_fs);
@@ -335,7 +348,8 @@ for i = 1:n_cond
     legend(ax, 'Location', 'best', 'FontSize', st.tick_fs - 2);
 end
 
-title(tl, {sprintf('Per-trial comparisons, %d network seeds (%s)', n_tr, S.preset_name), ...
+title(tl, {sprintf('Per-trial comparisons: %d seeds for the LLE rows, %d for the reshoot row (%s)', ...
+    n_lle, n_rs, S.preset_name), ...
     'each point is one seed (labelled by trial); dashed line is identity'}, ...
     'FontWeight', 'bold', 'Interpreter', 'none');
 end

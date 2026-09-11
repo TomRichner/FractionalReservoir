@@ -5,9 +5,9 @@ function mat_file = run_numerics_verification(cfg)
 %   mat_file = RUN_NUMERICS_VERIFICATION('preset_name', p, 'run_mode', 'fast', ...
 %                                        'out_dir', d)
 %
-% The COMPUTE half of two supplemental figures (fig_numerics_verification,
-% variants 'solver' and 'lya_method'). Three sub-experiments, run for every
-% adaptation regime the preset states, all from the same network seed:
+% The COMPUTE half of three supplemental figures (fig_numerics_verification,
+% variants 'solver', 'lya_method' and 'ensemble'). Four sub-experiments, run for
+% every adaptation regime the preset states, on several network seeds each:
 %
 %   A. NOISE-FREE RESHOOT, full-size network. A reference trajectory is
 %      integrated with ode45 at RelTol = AbsTol = ref_tol (1e-10). Then, for
@@ -57,14 +57,29 @@ function mat_file = run_numerics_verification(cfg)
 %      methods run on the same fiducial trajectory (same seeds); the largest
 %      QR exponent should match the Benettin LLE.
 %
-% TRIALS. Every sub-experiment is repeated n_trials times (per run mode, or the
-% n_trials argument), each trial a new network: rng_seeds = [k, k+1], which
-% draws W, the stimulus, the initial state and the per-neuron setpoints. Within
-% a trial all sub-experiments share that network. The finite-time LLE of an
-% intermittent regime scatters by +-0.2 over 10 s from one trajectory to the
-% next with EITHER integrator (see the 2026-09-10 reports), so a single-trial
-% integrator comparison cannot distinguish bias from scatter; the paired
-% per-trial values in results(i).summary can.
+% TRIALS, AND WHICH SUB-EXPERIMENTS GET HOW MANY. Each trial is a new network:
+% rng_seeds = [k, k+1], which draws W, the stimulus, the initial state and the
+% per-neuron setpoints. Two counts:
+%
+%   n_trials_reshoot  for A and B. The reshoot error is a local quantity with
+%                     hundreds of restarts per trial; it varied by ~30%
+%                     between seeds and needs only a handful.
+%   n_trials_lle      for L and C. The 10 s finite-time LLE of the intermittent
+%                     single-timescale regime scatters by +-0.2 from one
+%                     trajectory to the next with EITHER integrator (2026-09-10
+%                     reports), so a single seed cannot separate integrator
+%                     bias from scatter. Paired per-trial values over 25-30
+%                     seeds can: bias is a consistent sign, scatter is not.
+%
+% PARALLEL. The three blocks per condition are parfor loops over trials (L
+% over trial x integrator). Every job builds its own model inside the worker
+% from the preset and the seed; nothing is shared but the settings struct.
+% An existing pool is used as is (secure one first with wait_for_parpool,
+% which polls the network licence for a free seat); otherwise n_workers,
+% default min(12, cores), leaving headroom on a 14-core box;
+% per-worker memory peaks at about 1.5 GB (an ode45 run holding 20 s of 4000
+% states, or a reshoot holding the reference rows plus a 12800 Hz noise
+% tensor), so 12 workers fit in 64 GB. Worker output is interleaved.
 %
 % Every model is an SRNNNumericsProbe -- SRNNCellTypePairs with the noise
 % tensor injectable and a public segment integrator, nothing else. The
@@ -84,7 +99,9 @@ function mat_file = run_numerics_verification(cfg)
 % the window is [T/3 + 0.3, 2T/3 - 0.01] and every run in a sub-experiment
 % shares T_range.
 %
-% Output: <out_dir>/numerics_verification_data.mat. A standalone run lands in
+% Output: <out_dir>/numerics_verification_data.mat with results(i).reshoot
+% (1 x n_trials_reshoot), results(i).lle and results(i).qr (1 x n_trials_lle)
+% and results(i).summary (per-trial scalars). A standalone run lands in
 % <root>/data/numerics_verification; the pipeline passes
 % <run_dir>/numerics_verification (run_all_paper_analyses).
 %
@@ -92,10 +109,12 @@ function mat_file = run_numerics_verification(cfg)
 %           sde_fixed_step, test_benettin_vs_qr, run_eig_heatmap
 
 arguments
-    cfg.preset_name (1,:) char    = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'
-    cfg.run_mode    (1,:) char    = 'production'
-    cfg.out_dir     (1,:) char    = ''
-    cfg.n_trials    (1,1) double  = 0     % 0 -> per run_mode; each trial is a new network seed
+    cfg.preset_name      (1,:) char    = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'
+    cfg.run_mode         (1,:) char    = 'production'
+    cfg.out_dir          (1,:) char    = ''
+    cfg.n_trials_reshoot (1,1) double  = 0     % 0 -> per run_mode
+    cfg.n_trials_lle     (1,1) double  = 0     % 0 -> per run_mode
+    cfg.n_workers        (1,1) double  = 0     % 0 -> min(12, cores)
 end
 
 setup_paths();
@@ -105,27 +124,37 @@ setup_paths();
 % every mode in run_mode_names().
 switch cfg.run_mode
     case 'fast'
-        T_free = 6;   T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_trials = 1;
+        T_free = 6;   T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_reshoot = 1;  n_lle = 2;
     case {'medium', 'medium2'}
-        T_free = 12;  T_lle = 20;  T_noisy = 4.5;  n_small = 40;  T_small = [-10, 10]; max_restarts = 800;  n_trials = 3;
+        T_free = 12;  T_lle = 20;  T_noisy = 4.5;  n_small = 40;  T_small = [-10, 10]; max_restarts = 800;  n_reshoot = 5;  n_lle = 25;
     case 'production'
-        T_free = 20;  T_lle = 40;  T_noisy = 4.5;  n_small = 60;  T_small = [-10, 20]; max_restarts = 1500; n_trials = 5;
+        T_free = 20;  T_lle = 40;  T_noisy = 4.5;  n_small = 60;  T_small = [-10, 20]; max_restarts = 1500; n_reshoot = 5;  n_lle = 30;
     otherwise
         error('run_numerics_verification:badMode', ...
             'Unknown run_mode ''%s'' (expected %s).', ...
             cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
-if cfg.n_trials > 0; n_trials = cfg.n_trials; end
-fs_ladder    = [400, 800, 1600];     % the paper runs at 400; the rest test convergence
-fs_top       = max(fs_ladder);
-fs_noisy_ref = 8 * fs_top;           % 12800: the noisy reference grid
-ref_tol      = 1e-10;                % ode45 RelTol = AbsTol for the noise-free reference
-seg_long     = 0.02;                 % s; = Benettin's default lya_dt
-seg_short    = 2;                    % steps; the shortest span sde_fixed_step accepts
-fs_lle       = 400;                  % the paper's rate, for L
-lya_small_warmup = -T_small(1);      % iterate from T_small(1), accumulate from 0
-win_free  = [T_free  / 3 + 0.3, 2 * T_free  / 3 - 0.01];   % inside the stim-on third, see header
-win_noisy = [T_noisy / 3 + 0.3, 2 * T_noisy / 3 - 0.01];
+if cfg.n_trials_reshoot > 0; n_reshoot = cfg.n_trials_reshoot; end
+if cfg.n_trials_lle     > 0; n_lle     = cfg.n_trials_lle;     end
+
+P = struct();                        % everything a worker needs, broadcast once
+P.preset_name  = cfg.preset_name;
+P.fs_ladder    = [400, 800, 1600];   % the paper runs at 400; the rest test convergence
+P.fs_top       = max(P.fs_ladder);
+P.fs_noisy_ref = 8 * P.fs_top;       % 12800: the noisy reference grid
+P.ref_tol      = 1e-10;              % ode45 RelTol = AbsTol for the noise-free reference
+P.seg_long     = 0.02;               % s; = Benettin's default lya_dt
+P.seg_short    = 2;                  % steps; the shortest span sde_fixed_step accepts
+P.fs_lle       = 400;                % the paper's rate, for L
+P.T_free       = T_free;
+P.T_noisy      = T_noisy;
+P.T_lle        = T_lle;
+P.n_small      = n_small;
+P.T_small      = T_small;
+P.lya_small_warmup = -T_small(1);    % iterate from T_small(1), accumulate from 0
+P.max_restarts = max_restarts;
+P.win_free  = [T_free  / 3 + 0.3, 2 * T_free  / 3 - 0.01];   % inside the stim-on third, see header
+P.win_noisy = [T_noisy / 3 + 0.3, 2 * T_noisy / 3 - 0.01];
 
 if isempty(cfg.out_dir)
     out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'numerics_verification');
@@ -143,161 +172,80 @@ end
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 titles     = cellfun(@(n) pretty(n), cond_names, 'UniformOutput', false);
 n_cond     = numel(cond_names);
-sigma_preset = 0;
-if isfield(preset, 'sigma_u_noise'); sigma_preset = preset.sigma_u_noise; end
+P.sigma_preset = 0;
+if isfield(preset, 'sigma_u_noise'); P.sigma_preset = preset.sigma_u_noise; end
 
 fprintf('[numerics_verification] preset=%s run_mode=%s\n', cfg.preset_name, cfg.run_mode);
-fprintf('  A: noise-free reshoot, ode45 @ %g vs sra1 @ fs %s, T = %g s\n', ...
-    ref_tol, mat2str(fs_ladder), T_free);
-fprintf('  B: noisy reshoot, sra1 @ %d vs sra1 @ fs %s on one path, T = %g s\n', ...
-    fs_noisy_ref, mat2str(fs_ladder), T_noisy);
-fprintf('  L: Benettin LLE, ode45 vs sra1 @ %d Hz, T = %g s\n', fs_lle, T_lle);
-fprintf('  C: Benettin vs QR, n = %d, T = %s\n', n_small, mat2str(T_small));
+fprintf('  A: noise-free reshoot, ode45 @ %g vs sra1 @ fs %s, T = %g s      x %d trials\n', ...
+    P.ref_tol, mat2str(P.fs_ladder), T_free, n_reshoot);
+fprintf('  B: noisy reshoot, sra1 @ %d vs sra1 @ fs %s on one path, T = %g s  x %d trials\n', ...
+    P.fs_noisy_ref, mat2str(P.fs_ladder), T_noisy, n_reshoot);
+fprintf('  L: Benettin LLE, ode45 vs sra1 @ %d Hz, T = %g s                     x %d trials\n', ...
+    P.fs_lle, T_lle, n_lle);
+fprintf('  C: Benettin vs QR, n = %d, T = %s                              x %d trials\n', ...
+    n_small, mat2str(T_small), n_lle);
+
+pool = ensure_pool(cfg.n_workers);
+fprintf('  parallel pool: %d workers\n', pool.NumWorkers);
 
 t_stage = tic;
-res = struct('name', cond_names, 'title', titles, 'trials', [], 'summary', []);
+res = struct('name', cond_names, 'title', titles, 'reshoot', [], 'lle', [], 'qr', [], 'summary', []);
 
 for i = 1:n_cond
     cname = cond_names{i};
     fprintf('\n=== %d/%d %s ===\n', i, n_cond, titles{i});
 
-    trials = cell(1, n_trials);
-    for k = 1:n_trials
-        seeds = [k, k + 1];                 % one network per trial, shared by all sub-experiments
-        trial = struct('seeds', seeds, 'free', [], 'noisy', [], 'lle', [], 'qr', []);
-        fprintf('  -- trial %d/%d, rng_seeds %s --\n', k, n_trials, mat2str(seeds));
-
-        %% A. noise-free reshoot ------------------------------------------------
-        fprintf('  [A] ode45 reference at %d Hz, tol %g ...', fs_top, ref_tol);
-        t0 = tic;
-        ref = build_probe(cfg.preset_name, cname, 'rng_seeds', seeds, ...
-            'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', fs_top, ...
-            'T_range', [0, T_free], 'lya_method', 'none');
-        ref.ode_opts = odeset('RelTol', ref_tol, 'AbsTol', ref_tol, 'MaxStep', 1 / fs_top);
-        [t_ref, S_ref] = integrate_reference(ref, 1, win_free);
-        S_free_end = S_ref(end, :)';           % settled state; seeds the noisy reference
-        layout = ref.cached_params.state_layout;
-        blocks = state_blocks(layout);
-        fprintf(' %.0f s\n', toc(t0));
-
-        free = cell(1, numel(fs_ladder));
-        for j = 1:numel(fs_ladder)
-            fs = fs_ladder(j);
-            m  = fs_top / fs;
-            probe = build_probe(cfg.preset_name, cname, 'rng_seeds', seeds, ...
-                'sigma_u_noise', 0, 'ode_solver', 'sra1', 'fs', fs, ...
-                'T_range', [0, T_free], 'lya_method', 'none');
-            probe.arm_noise();                 % no-op at sigma = 0; keeps the call shape uniform
-            free{j} = reshoot(probe, t_ref(1:m:end), S_ref(1:m:end, :), ...
-                blocks, seg_short, seg_long, max_restarts);
-            fprintf('  [A] sra1 @ %4d Hz: |err| over %g s = %.3e (x %.2e, a %.2e, b %.2e)\n', ...
-                fs, seg_long, free{j}.err_long_total_rms, free{j}.err_long_rms);
-        end
-        trial.free = [free{:}];
-
-        %% L. LLE agreement, free-running ---------------------------------------
-        lle = struct();
-        for solver = {'ode45', 'sra1'}
-            s = solver{1};
-            fprintf('  [L] Benettin with %s ...', s);
-            t0 = tic;
-            model = build_probe(cfg.preset_name, cname, 'rng_seeds', seeds, ...
-                'sigma_u_noise', 0, 'ode_solver', s, 'fs', fs_lle, ...
-                'T_range', [0, T_lle], 'lya_method', 'benettin', ...
-                'lya_T_interval', [T_lle / 2, T_lle], 'plot_deci', 4);
-            if strcmp(s, 'ode45')
-                model.ode_opts = odeset('RelTol', ref_tol, 'AbsTol', ref_tol, 'MaxStep', 1 / fs_lle);
-            end
-            evalc('model.run();');
-            pd = model.plot_data;
-            E  = model.cell_type_names{1};
-            lle.(s) = struct('LLE', model.lya_results.LLE, ...
-                't_lya', model.lya_results.t_lya, 'local_lya', model.lya_results.local_lya, ...
-                't', pd.t, 'x_examples', pd.x.(E)(1:min(3, end), :), ...
-                'mean_rate', mean(pd.r.(E)(:)));
-            fprintf(' LLE = %+.4f (%.0f s)\n', lle.(s).LLE, toc(t0));
-        end
-        trial.lle = lle;
-
-        %% B. noisy reshoot -----------------------------------------------------
-        if sigma_preset > 0
-            fprintf('  [B] sra1 reference at %d Hz on the seeded path ...', fs_noisy_ref);
-            t0 = tic;
-            ref = build_probe(cfg.preset_name, cname, 'rng_seeds', seeds, ...
-                'ode_solver', 'sra1', 'fs', fs_noisy_ref, ...
-                'T_range', [0, T_noisy], 'lya_method', 'none');
-            ref.arm_noise();                                   % seeded draw at 12800 Hz
-            nz_fine = ref.consumed_noise;
-            [t_ref, S_ref] = integrate_reference(ref, fs_noisy_ref / fs_top, win_noisy, S_free_end);
-            ref.disarm_noise();
-            fprintf(' %.0f s\n', toc(t0));
-
-            noisy = cell(1, numel(fs_ladder));
-            for j = 1:numel(fs_ladder)
-                fs = fs_ladder(j);
-                m  = fs_noisy_ref / fs;
-                [xi1_c, xi2_c] = coarsen_noise(nz_fine.xi1, nz_fine.xi2, 1 / fs_noisy_ref, m);
-                probe = build_probe(cfg.preset_name, cname, 'rng_seeds', seeds, ...
-                    'ode_solver', 'sra1', 'fs', fs, ...
-                    'T_range', [0, T_noisy], 'lya_method', 'none');
-                probe.set_noise(struct('xi1', xi1_c, 'xi2', xi2_c, 't0', 0, 'fs', fs, ...
-                    'sigma', 0, 'idx', []));                   % sigma/idx filled by the probe
-                probe.arm_noise();
-                step = fs_top / fs;
-                noisy{j} = reshoot(probe, t_ref(1:step:end), S_ref(1:step:end, :), ...
-                    blocks, seg_short, seg_long, max_restarts);
-                probe.disarm_noise();
-                fprintf('  [B] sra1 @ %4d Hz: |err| over %g s = %.3e (x %.2e, a %.2e, b %.2e)\n', ...
-                    fs, seg_long, noisy{j}.err_long_total_rms, noisy{j}.err_long_rms);
-            end
-            clear nz_fine xi1_c xi2_c
-            trial.noisy = [noisy{:}];
-        else
-            fprintf('  [B] skipped: preset is deterministic (sigma_u_noise = 0)\n');
-        end
-
-        %% C. Benettin vs QR on the reduced network ------------------------------
-        qrc = struct('n', n_small, 'T_range', T_small);
-        for method = {'benettin', 'qr'}
-            mth = method{1};
-            fprintf('  [C] %s on n = %d ...', mth, n_small);
-            t0 = tic;
-            model = build_probe(cfg.preset_name, cname, 'rng_seeds', seeds, ...
-                'n', n_small, 'indegree', max(2, round(0.2 * n_small)), ...
-                'F_tracks_network', true, ...
-                'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', fs_lle, ...
-                'T_range', T_small, 'lya_method', mth, ...
-                'lya_T_interval', [0, T_small(2)], 'lya_warmup', lya_small_warmup);
-            evalc('model.run();');
-            r = model.lya_results;
-            if strcmp(mth, 'benettin')
-                qrc.benettin = struct('LLE', r.LLE, 't_lya', r.t_lya, 'local_lya', r.local_lya);
-                fprintf(' LLE = %+.4f (%.0f s)\n', r.LLE, toc(t0));
-            else
-                qrc.qr = struct('LE_spectrum', r.LE_spectrum, 't_lya', r.t_lya, ...
-                    'local_LE_spectrum_t', r.local_LE_spectrum_t, ...
-                    'N_sys_eqs', model.N_sys_eqs);
-                fprintf(' largest = %+.4f of %d (%.0f s)\n', r.LE_spectrum(1), ...
-                    numel(r.LE_spectrum), toc(t0));
-            end
-        end
-        trial.qr = qrc;
-        trials{k} = trial;
+    %% A + B. reshoot, one trial per worker -------------------------------
+    t0 = tic;
+    fprintf('  [A/B] reshoot on %d seed(s) ...\n', n_reshoot);
+    R = cell(1, n_reshoot);
+    parfor k = 1:n_reshoot
+        R{k} = reshoot_trial(P, cname, [k, k + 1]);
     end
-    res(i).trials  = [trials{:}];
-    res(i).summary = summarise(res(i).trials, fs_lle);
+    res(i).reshoot = [R{:}];
+    fprintf('  [A/B] done in %.0f s\n', toc(t0));
+
+    %% L. LLE agreement, trial x integrator, one job per worker ---------------
+    t0 = tic;
+    fprintf('  [L] Benettin ode45 vs sra1 on %d seed(s) ...\n', n_lle);
+    solvers = {'ode45', 'sra1'};
+    J = cell(1, 2 * n_lle);
+    parfor j = 1:2 * n_lle
+        k = ceil(j / 2);
+        s = solvers{2 - mod(j, 2)};        % j odd -> ode45, even -> sra1
+        J{j} = lle_trial(P, cname, [k, k + 1], s);
+    end
+    L = cell(1, n_lle);
+    for k = 1:n_lle
+        L{k} = struct('seeds', [k, k + 1], 'ode45', J{2 * k - 1}, 'sra1', J{2 * k});
+    end
+    res(i).lle = [L{:}];
+    fprintf('  [L] done in %.0f s\n', toc(t0));
+
+    %% C. Benettin vs QR on the reduced network, one trial per worker --------
+    t0 = tic;
+    fprintf('  [C] Benettin vs QR on n = %d, %d seed(s) ...\n', n_small, n_lle);
+    Q = cell(1, n_lle);
+    parfor k = 1:n_lle
+        Q{k} = qr_trial(P, cname, [k, k + 1]);
+    end
+    res(i).qr = [Q{:}];
+    fprintf('  [C] done in %.0f s\n', toc(t0));
+
+    res(i).summary = summarise(res(i).reshoot, res(i).lle, res(i).qr, P.fs_lle);
     print_summary(res(i).summary, titles{i});
 end
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
-    'model_class', model_class, 'n', preset.n, 'sigma_u_noise', sigma_preset, ...
-    'fs_ladder', fs_ladder, 'fs_noisy_ref', fs_noisy_ref, 'ref_tol', ref_tol, ...
-    'seg_long', seg_long, 'seg_short_steps', seg_short, ...
-    'T_free', T_free, 'win_free', win_free, ...
-    'T_noisy', T_noisy, 'win_noisy', win_noisy, ...
-    'T_lle', T_lle, 'fs_lle', fs_lle, ...
-    'n_small', n_small, 'T_small', T_small, 'lya_small_warmup', lya_small_warmup, ...
-    'max_restarts', max_restarts, 'block_names', {{'x', 'a', 'b'}}, 'n_trials', n_trials, ...
+    'model_class', model_class, 'n', preset.n, 'sigma_u_noise', P.sigma_preset, ...
+    'fs_ladder', P.fs_ladder, 'fs_noisy_ref', P.fs_noisy_ref, 'ref_tol', P.ref_tol, ...
+    'seg_long', P.seg_long, 'seg_short_steps', P.seg_short, ...
+    'T_free', T_free, 'win_free', P.win_free, ...
+    'T_noisy', T_noisy, 'win_noisy', P.win_noisy, ...
+    'T_lle', T_lle, 'fs_lle', P.fs_lle, ...
+    'n_small', n_small, 'T_small', T_small, 'lya_small_warmup', P.lya_small_warmup, ...
+    'max_restarts', max_restarts, 'block_names', {{'x', 'a', 'b'}}, ...
+    'n_trials_reshoot', n_reshoot, 'n_trials_lle', n_lle, 'n_workers', pool.NumWorkers, ...
     'minutes', toc(t_stage) / 60);
 
 condition_titles = titles;  % saved name
@@ -308,9 +256,153 @@ fprintf('\nSaved: %s  (%.1f min)\n', mat_file, settings.minutes);
 end
 
 %% ------------------------------------------------------------------------
+function pool = ensure_pool(n_workers)
+% Use the pool that is up, whatever its size (secure one first with
+% wait_for_parpool, which polls the network licence); otherwise try to start
+% one with n_workers (default min(12, cores)). If that fails -- no toolbox,
+% or the 15-seat licence fully checked out -- warn and return a stand-in with
+% NumWorkers = 1: the parfor loops below then run serially, slow but correct.
+pool = gcp('nocreate');
+if ~isempty(pool)
+    return
+end
+if n_workers <= 0
+    n_workers = min(12, feature('numcores'));
+end
+try
+    pool = parpool(parallel.defaultProfile, n_workers);
+catch ME
+    warning('run_numerics_verification:NoPool', ...
+        ['Could not start a parallel pool (%s). Running the trial loops ' ...
+         'SERIALLY; expect roughly n_workers times the wall time. ' ...
+         'Secure a pool first with wait_for_parpool.'], strtok(ME.message, newline));
+    pool = struct('NumWorkers', 1);
+end
+end
+
+function T = reshoot_trial(P, cname, seeds)
+% Sub-experiments A and B on one network. Returns seeds / free / noisy.
+T = struct('seeds', seeds, 'free', [], 'noisy', []);
+
+% A. noise-free: ode45 reference at the top of the ladder
+ref = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+    'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', P.fs_top, ...
+    'T_range', [0, P.T_free], 'lya_method', 'none');
+ref.ode_opts = odeset('RelTol', P.ref_tol, 'AbsTol', P.ref_tol, 'MaxStep', 1 / P.fs_top);
+[t_ref, S_ref] = integrate_reference(ref, 1, P.win_free);
+S_free_end = S_ref(end, :)';           % settled state; seeds the noisy reference
+blocks = state_blocks(ref.cached_params.state_layout);
+
+free = cell(1, numel(P.fs_ladder));
+for j = 1:numel(P.fs_ladder)
+    fs = P.fs_ladder(j);
+    m  = P.fs_top / fs;
+    probe = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+        'sigma_u_noise', 0, 'ode_solver', 'sra1', 'fs', fs, ...
+        'T_range', [0, P.T_free], 'lya_method', 'none');
+    probe.arm_noise();                 % no-op at sigma = 0; keeps the call shape uniform
+    free{j} = reshoot(probe, t_ref(1:m:end), S_ref(1:m:end, :), ...
+        blocks, P.seg_short, P.seg_long, P.max_restarts);
+end
+T.free = [free{:}];
+fprintf('    [A] seeds %s: sra1 @ %d Hz |err| over %g s = %.3e, slope %.2f\n', ...
+    mat2str(seeds), P.fs_lle, P.seg_long, ...
+    T.free([T.free.fs] == P.fs_lle).err_long_total_rms, ...
+    fit_slope([T.free.fs], [T.free.err_long_total_rms]));
+
+% B. noisy: sra1 reference on the seeded path, coarser runs on the same path
+if P.sigma_preset > 0
+    ref = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+        'ode_solver', 'sra1', 'fs', P.fs_noisy_ref, ...
+        'T_range', [0, P.T_noisy], 'lya_method', 'none');
+    ref.arm_noise();                                   % seeded draw at 12800 Hz
+    nz_fine = ref.consumed_noise;
+    [t_ref, S_ref] = integrate_reference(ref, P.fs_noisy_ref / P.fs_top, P.win_noisy, S_free_end);
+    ref.disarm_noise();
+
+    noisy = cell(1, numel(P.fs_ladder));
+    for j = 1:numel(P.fs_ladder)
+        fs = P.fs_ladder(j);
+        m  = P.fs_noisy_ref / fs;
+        [xi1_c, xi2_c] = coarsen_noise(nz_fine.xi1, nz_fine.xi2, 1 / P.fs_noisy_ref, m);
+        probe = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+            'ode_solver', 'sra1', 'fs', fs, ...
+            'T_range', [0, P.T_noisy], 'lya_method', 'none');
+        probe.set_noise(struct('xi1', xi1_c, 'xi2', xi2_c, 't0', 0, 'fs', fs, ...
+            'sigma', 0, 'idx', []));                   % sigma/idx filled by the probe
+        probe.arm_noise();
+        step = P.fs_top / fs;
+        noisy{j} = reshoot(probe, t_ref(1:step:end), S_ref(1:step:end, :), ...
+            blocks, P.seg_short, P.seg_long, P.max_restarts);
+        probe.disarm_noise();
+    end
+    T.noisy = [noisy{:}];
+    fprintf('    [B] seeds %s: sra1 @ %d Hz |err| over %g s = %.3e, slope %.2f\n', ...
+        mat2str(seeds), P.fs_lle, P.seg_long, ...
+        T.noisy([T.noisy.fs] == P.fs_lle).err_long_total_rms, ...
+        fit_slope([T.noisy.fs], [T.noisy.err_long_total_rms]));
+end
+end
+
+function out = lle_trial(P, cname, seeds, solver)
+% Sub-experiment L for one network and one integrator.
+model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+    'sigma_u_noise', 0, 'ode_solver', solver, 'fs', P.fs_lle, ...
+    'T_range', [0, P.T_lle], 'lya_method', 'benettin', ...
+    'lya_T_interval', [P.T_lle / 2, P.T_lle], 'plot_deci', 4);
+if strcmp(solver, 'ode45')
+    model.ode_opts = odeset('RelTol', P.ref_tol, 'AbsTol', P.ref_tol, 'MaxStep', 1 / P.fs_lle);
+end
+t0 = tic;
+evalc('model.run();');
+pd = model.plot_data;
+E  = model.cell_type_names{1};
+out = struct('LLE', model.lya_results.LLE, ...
+    't_lya', model.lya_results.t_lya, 'local_lya', model.lya_results.local_lya, ...
+    't', pd.t, 'x_examples', pd.x.(E)(1:min(3, end), :), ...
+    'mean_rate', mean(pd.r.(E)(:)), 'seconds', toc(t0));
+fprintf('    [L] seeds %s %-5s: LLE = %+.4f (%.0f s)\n', mat2str(seeds), solver, out.LLE, out.seconds);
+end
+
+function Q = qr_trial(P, cname, seeds)
+% Sub-experiment C for one reduced network: Benettin then QR on the same
+% fiducial trajectory.
+Q = struct('seeds', seeds, 'n', P.n_small, 'T_range', P.T_small, 'benettin', [], 'qr', []);
+for method = {'benettin', 'qr'}
+    mth = method{1};
+    model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+        'n', P.n_small, 'indegree', max(2, round(0.2 * P.n_small)), ...
+        'F_tracks_network', true, ...
+        'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', P.fs_lle, ...
+        'T_range', P.T_small, 'lya_method', mth, ...
+        'lya_T_interval', [0, P.T_small(2)], 'lya_warmup', P.lya_small_warmup);
+    t0 = tic;
+    evalc('model.run();');
+    r = model.lya_results;
+    if strcmp(mth, 'benettin')
+        Q.benettin = struct('LLE', r.LLE, 't_lya', r.t_lya, 'local_lya', r.local_lya, 'seconds', toc(t0));
+    else
+        Q.qr = struct('LE_spectrum', r.LE_spectrum, 't_lya', r.t_lya, ...
+            'local_LE_spectrum_t', r.local_LE_spectrum_t, ...
+            'N_sys_eqs', model.N_sys_eqs, 'seconds', toc(t0));
+    end
+end
+fprintf('    [C] seeds %s: Benettin %+.4f, QR %+.4f of %d (%.0f s)\n', mat2str(seeds), ...
+    Q.benettin.LLE, Q.qr.LE_spectrum(1), numel(Q.qr.LE_spectrum), Q.qr.seconds);
+end
+
 function probe = build_probe(preset_name, condition_name, varargin)
 % build_from_preset's twin that instantiates SRNNNumericsProbe. Same
 % precedence: preset < condition < overrides, ode_solver among the overrides.
+%
+% PIN THE GENERATOR. The class seeds every draw with rng(seed), which sets the
+% seed but keeps whatever generator is current -- and that differs: the client
+% defaults to 'twister', parallel workers to 'threefry' (checked 2026-09-11).
+% So a job on a worker built a DIFFERENT network for the same rng_seeds than
+% a job on the client, and this stage's first parallel run did not reproduce
+% its serial numbers. Setting twister here makes a seed mean the same network
+% wherever the job runs, and matches every client-side run and report.
+rng(0, 'twister');
 [preset, ~, conditions] = srnn_param_preset(preset_name);
 names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 cond  = rmfield(conditions{strcmp(names, condition_name)}, 'name');
@@ -413,24 +505,27 @@ else
 end
 end
 
-function S = summarise(trials, fs_lle)
-% Per-trial scalars, one row per trial, for the ensemble figure and the report.
-n = numel(trials);
-S = struct('n_trials', n, 'seeds', vertcat(trials.seeds));
-S.lle_ode45   = arrayfun(@(t) t.lle.ode45.LLE, trials);
-S.lle_sra1    = arrayfun(@(t) t.lle.sra1.LLE, trials);
-S.qr_benettin = arrayfun(@(t) t.qr.benettin.LLE, trials);
-S.qr_lambda1  = arrayfun(@(t) t.qr.qr.LE_spectrum(1), trials);
-j = find([trials(1).free.fs] == fs_lle, 1); if isempty(j); j = 1; end
-S.fs_paper        = trials(1).free(j).fs;
-S.err_free_paper  = arrayfun(@(t) t.free(j).err_long_total_rms, trials);
-S.slope_free      = arrayfun(@(t) fit_slope([t.free.fs], [t.free.err_long_total_rms]), trials);
-if ~isempty(trials(1).noisy)
-    S.err_noisy_paper = arrayfun(@(t) t.noisy(j).err_long_total_rms, trials);
-    S.slope_noisy     = arrayfun(@(t) fit_slope([t.noisy.fs], [t.noisy.err_long_total_rms]), trials);
+
+function S = summarise(reshoot, lle, qr, fs_lle)
+% Per-trial scalars for the ensemble figure and the report. LLE and QR rows
+% are indexed by the n_trials_lle seeds; reshoot rows by the n_trials_reshoot
+% seeds (the first n_trials_reshoot of the same sequence).
+S = struct('n_trials_lle', numel(lle), 'n_trials_reshoot', numel(reshoot), ...
+    'seeds_lle', vertcat(lle.seeds), 'seeds_reshoot', vertcat(reshoot.seeds));
+S.lle_ode45   = arrayfun(@(t) t.ode45.LLE, lle);
+S.lle_sra1    = arrayfun(@(t) t.sra1.LLE, lle);
+S.qr_benettin = arrayfun(@(t) t.benettin.LLE, qr);
+S.qr_lambda1  = arrayfun(@(t) t.qr.LE_spectrum(1), qr);
+j = find([reshoot(1).free.fs] == fs_lle, 1); if isempty(j); j = 1; end
+S.fs_paper        = reshoot(1).free(j).fs;
+S.err_free_paper  = arrayfun(@(t) t.free(j).err_long_total_rms, reshoot);
+S.slope_free      = arrayfun(@(t) fit_slope([t.free.fs], [t.free.err_long_total_rms]), reshoot);
+if ~isempty(reshoot(1).noisy)
+    S.err_noisy_paper = arrayfun(@(t) t.noisy(j).err_long_total_rms, reshoot);
+    S.slope_noisy     = arrayfun(@(t) fit_slope([t.noisy.fs], [t.noisy.err_long_total_rms]), reshoot);
 else
-    S.err_noisy_paper = nan(1, n);
-    S.slope_noisy     = nan(1, n);
+    S.err_noisy_paper = nan(1, numel(reshoot));
+    S.slope_noisy     = nan(1, numel(reshoot));
 end
 end
 
@@ -440,13 +535,17 @@ p = c(1);
 end
 
 function print_summary(S, title)
-fprintf('\n  summary for %s over %d trial(s):\n', title, S.n_trials);
-fprintf('    LLE ode45 : %s\n', mat2str(S.lle_ode45, 4));
-fprintf('    LLE sra1  : %s\n', mat2str(S.lle_sra1, 4));
-fprintf('    QR net    : Benettin %s | QR %s\n', mat2str(S.qr_benettin, 4), mat2str(S.qr_lambda1, 4));
-fprintf('    reshoot @ %d Hz: free %s (slopes %s)\n', S.fs_paper, ...
-    mat2str(S.err_free_paper, 3), mat2str(S.slope_free, 3));
+d  = S.lle_sra1 - S.lle_ode45;
+dq = S.qr_lambda1 - S.qr_benettin;
+fprintf('\n  summary for %s:\n', title);
+fprintf('    LLE over %d seeds: ode45 %+.3f +- %.3f | sra1 %+.3f +- %.3f | paired sra1-ode45 %+.3f +- %.3f\n', ...
+    S.n_trials_lle, mean(S.lle_ode45), std(S.lle_ode45), mean(S.lle_sra1), std(S.lle_sra1), mean(d), std(d));
+fprintf('    reduced net over %d seeds: Benettin %+.3f +- %.3f | QR %+.3f +- %.3f | paired QR-Benettin %+.4f +- %.4f\n', ...
+    S.n_trials_lle, mean(S.qr_benettin), std(S.qr_benettin), mean(S.qr_lambda1), std(S.qr_lambda1), mean(dq), std(dq));
+fprintf('    reshoot @ %d Hz over %d seeds: free %.2e +- %.1e (slope %.2f +- %.2f)\n', S.fs_paper, ...
+    S.n_trials_reshoot, mean(S.err_free_paper), std(S.err_free_paper), mean(S.slope_free), std(S.slope_free));
 if all(isfinite(S.err_noisy_paper))
-    fprintf('                     noisy %s (slopes %s)\n', mat2str(S.err_noisy_paper, 3), mat2str(S.slope_noisy, 3));
+    fprintf('                                  noisy %.2e +- %.1e (slope %.2f +- %.2f)\n', ...
+        mean(S.err_noisy_paper), std(S.err_noisy_paper), mean(S.slope_noisy), std(S.slope_noisy));
 end
 end

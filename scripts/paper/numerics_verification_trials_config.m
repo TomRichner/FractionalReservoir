@@ -2,12 +2,15 @@ function cfg = numerics_verification_trials_config()
 % NUMERICS_VERIFICATION_TRIALS_CONFIG The numerics stage at 'medium' with five network seeds.
 %
 %   cfg = numerics_verification_trials_config();
-%   numerics_verification_trials_run       % stage (~1.5-2 h), then three figures
+%   wait_for_parpool(13);                  % first: poll the licence, hold a seat
+%   numerics_verification_trials_run       % then: stage (~45 min on 13 workers), three figures
 %
 % The ensemble version of numerics_verification_test_med_config. Every
 % sub-experiment (noise-free reshoot, noisy reshoot on a shared Brownian
 % path, Benettin LLE with ode45 vs SRA1, Benettin vs QR on the reduced
-% network) is repeated on cfg.n_trials networks, rng_seeds = [k, k+1]. The
+% network) is repeated on several networks, rng_seeds = [k, k+1]: five for the
+% reshoot experiments, whose error is a local quantity with hundreds of
+% restarts per seed, and twenty-five for the two Lyapunov comparisons. The
 % point is the finite-time scatter of the LLE in the intermittent
 % single-timescale regime (about +-0.2 over 10 s with either integrator), which
 % a single seed cannot separate from integrator bias and a paired ensemble can.
@@ -23,7 +26,9 @@ cfg = struct();
 
 cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25';
 cfg.run_mode    = 'medium';
-cfg.n_trials    = 5;                                 % passed to the stage by the _run script
+cfg.n_trials_reshoot = 5;      % A and B, passed to the stage by the _run script
+cfg.n_trials_lle     = 25;     % L and C
+cfg.n_workers        = 13;     % of 14 cores: 25 LLE seeds go in two batches, not three; ~1.5 GB per worker
 
 cfg.run_dir  = 'data/numerics_verification_trials';  % the stage writes <run_dir>/numerics_verification
 cfg.fig_root = 'figs/numerics_verification_trials';  % overwritten in place

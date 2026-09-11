@@ -42,6 +42,8 @@
 
 - could we go to a single cell type model (but with a dale's law weight matrix)?  this would reduce the std routes and possibly clean up the number of eignevalues in the jacobian.  results should be the same.  might make the tau_a sweep work without modification.  Is single cell type supported?  We ran into that during a refactor previously.
 
+- quiet down the printing to command line to reduce filling of context thorugh matlab mcp server.  add a verbose flag to the cfg which default to fals.
+
 ## Additional items from the Manuscript5 planning audit
 
 - rebuild the introductory Sompolinsky figure as one MATLAB figure with eigenspectra above their corresponding stable, near-boundary, and chaotic state trajectories.  This is a small conceptual figure for the Introduction, not a new result, and the Sompolinsky network has no E/I cell types
