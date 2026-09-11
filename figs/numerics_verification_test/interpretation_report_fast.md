@@ -1,12 +1,19 @@
 # Numerical-method verification: interpretation report ('fast' run)
 
 Run: `numerics_verification_test_run` at run mode `fast`, 2026-09-10.
+
 Preset: `celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25`
+
 (n = 500, 4000 state variables, piecewise activation, sigma_u = 0.025,
 three adaptation regimes). Data: `data/numerics_verification_test/numerics_verification/numerics_verification_data.mat`.
 Figures: `fig_numerics_solver/Fig_numerics_solver.png`, `fig_numerics_lya_method/Fig_numerics_lya_method.png`.
-Code: `src/analysis/run_numerics_verification.m`, `src/figures/fig_numerics_verification.m`,
-`src/analysis/SRNNNumericsProbe.m`, `src/model/integrators/coarsen_noise.m`.
+
+Code:
+
+* `src/analysis/run_numerics_verification.m`
+* `src/figures/fig_numerics_verification.m`
+* `src/analysis/SRNNNumericsProbe.m`
+* `src/model/integrators/coarsen_noise.m`
 
 ## 1. Questions
 

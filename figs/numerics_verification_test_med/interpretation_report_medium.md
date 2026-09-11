@@ -1,7 +1,9 @@
 # Numerical-method verification: interpretation report ('medium' run)
 
 Run: `numerics_verification_test_med_run` at run mode `medium`, 2026-09-10, 17 min.
+
 Preset: `celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25`
+
 (n = 500, 4000 state variables, piecewise activation, sigma_u = 0.025,
 three adaptation regimes). Data: `data/numerics_verification_test_med/numerics_verification/numerics_verification_data.mat`.
 Figures: `fig_numerics_solver/Fig_numerics_solver.png`, `fig_numerics_lya_method/Fig_numerics_lya_method.png`.
