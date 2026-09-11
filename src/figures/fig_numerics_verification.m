@@ -25,11 +25,17 @@ function out = fig_numerics_verification(cfg)
 %                 exponents as a band with Benettin's local exponent on top
 %                 (the overlay from test_benettin_vs_qr). Row 2: the sorted QR
 %                 spectrum with Benettin's LLE as a line through lambda_1.
+%   'ensemble'    Paired per-trial comparisons, one point per network seed:
+%                 Benettin LLE with ode45 vs with SRA1 (full network),
+%                 Benettin vs QR (reduced network), and the reshooting error
+%                 per trial. Needs a run with the trial dimension (2026-09-11
+%                 onward); the other two variants draw trial 1 and put the
+%                 cross-trial mean and sd in their titles.
 %
 % See also: run_numerics_verification, resolve_data_file, test_benettin_vs_qr
 
 arguments
-    cfg.variant     (1,:) char {mustBeMember(cfg.variant, {'solver', 'lya_method'})} = 'solver'
+    cfg.variant     (1,:) char {mustBeMember(cfg.variant, {'solver', 'lya_method', 'ensemble'})} = 'solver'
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
@@ -48,17 +54,24 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
     'numerics_verification_data.mat', ...
     'Run run_numerics_verification first');
 D = load(data_file);
-R = D.results;
 S = D.settings;
+[R, SM] = trial_view(D.results);   % traces from trial 1; SM = per-condition summaries or []
 n_cond = numel(R);
 
 switch cfg.variant
     case 'solver'
         fig_tag = 'Fig_numerics_solver';
-        fig = plot_solver(R, S, st, n_cond, cfg.visible);
+        fig = plot_solver(R, SM, S, st, n_cond, cfg.visible);
     case 'lya_method'
         fig_tag = 'Fig_numerics_lya_method';
-        fig = plot_lya_method(R, S, st, n_cond, cfg.visible, cfg.n_qr_show);
+        fig = plot_lya_method(R, SM, S, st, n_cond, cfg.visible, cfg.n_qr_show);
+    case 'ensemble'
+        fig_tag = 'Fig_numerics_ensemble';
+        if isempty(SM)
+            error('fig_numerics_verification:NoTrials', ...
+                'The ensemble variant needs a run with per-trial summaries (results.trials).');
+        end
+        fig = plot_ensemble(R, SM, S, st, n_cond, cfg.visible);
 end
 
 out = struct('figs', fig, 'files', {{}}, 'source', data_file);
@@ -69,7 +82,7 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function fig = plot_solver(R, S, st, n_cond, visible)
+function fig = plot_solver(R, SM, S, st, n_cond, visible)
 fig = figure('Position', [100, 80, 430 * n_cond, 900], 'Visible', onoff(visible));
 tl  = tiledlayout(fig, 3, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
 blocks = S.block_names;
@@ -97,9 +110,12 @@ for i = 1:n_cond
     set(ax, 'YTick', [], 'FontSize', st.tick_fs);
     xlabel(ax, 'time (s)', 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, 'x, two neurons', 'FontSize', st.label_fs); end
-    title(ax, {R(i).title, sprintf('%s: ode45 %+.3f, SRA1 %+.3f', ...
-        st.label_lle, L.ode45.LLE, L.sra1.LLE)}, 'FontWeight', 'normal', ...
-        'FontSize', st.title_fs);
+    ttl = {R(i).title, sprintf('%s: ode45 %+.3f, SRA1 %+.3f', st.label_lle, L.ode45.LLE, L.sra1.LLE)};
+    if ~isempty(SM)
+        ttl{end+1} = sprintf('%d trials: ode45 %+.2f\\pm%.2f, SRA1 %+.2f\\pm%.2f', SM(i).n_trials, ...
+            mean(SM(i).lle_ode45), std(SM(i).lle_ode45), mean(SM(i).lle_sra1), std(SM(i).lle_sra1));
+    end
+    title(ax, ttl, 'FontWeight', 'normal', 'FontSize', st.title_fs);
     if i == 1
         legend(ax, {sprintf('ode45, tol %g', S.ref_tol), ...
             sprintf('SRA1, %d Hz', S.fs_lle)}, 'Location', 'best', 'FontSize', st.tick_fs - 2);
@@ -163,7 +179,7 @@ title(tl, {sprintf('Numerical precision on the n = %d network (%s)', S.n, S.pres
     'FontWeight', 'bold', 'Interpreter', 'none');
 end
 
-function fig = plot_lya_method(R, S, st, n_cond, visible, K_show)
+function fig = plot_lya_method(R, SM, S, st, n_cond, visible, K_show)
 fig = figure('Position', [100, 80, 430 * n_cond, 720], 'Visible', onoff(visible));
 tl  = tiledlayout(fig, 2, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
 
@@ -193,8 +209,12 @@ for i = 1:n_cond
     xlim(ax, [min(Q.qr.t_lya(1), Q.benettin.t_lya(1)), max(Q.qr.t_lya(end), Q.benettin.t_lya(end))]);
     xlabel(ax, 'time (s)', 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, 'local Lyapunov exponent', 'FontSize', st.label_fs); end
-    title(ax, {R(i).title, sprintf('Benettin %+.4f   QR \\lambda_1 %+.4f', LLE_b, LLE_q)}, ...
-        'FontWeight', 'normal', 'FontSize', st.title_fs);
+    ttl = {R(i).title, sprintf('Benettin %+.4f   QR \\lambda_1 %+.4f', LLE_b, LLE_q)};
+    if ~isempty(SM)
+        d = abs(SM(i).qr_benettin - SM(i).qr_lambda1);
+        ttl{end+1} = sprintf('%d trials: |\\Delta\\lambda_1| = %.3f\\pm%.3f', SM(i).n_trials, mean(d), std(d));
+    end
+    title(ax, ttl, 'FontWeight', 'normal', 'FontSize', st.title_fs);
     if i == 1; legend(ax, 'Location', 'best', 'FontSize', st.tick_fs - 2); end
 
     % Row 2: the sorted spectrum
@@ -241,4 +261,99 @@ end
 function v = vis(k)
 % Only the first neuron's pair carries legend entries.
 if k == 1; v = 'on'; else; v = 'off'; end
+end
+
+%% ------------------------------------------------------------------------
+function [R1, SM] = trial_view(R)
+% Present a trials-layout result as the pre-trials flat layout (trial 1 for
+% every trace), plus the per-condition summaries. A flat .mat from before the
+% trial dimension passes through with SM = [].
+if ~isfield(R, 'trials')
+    R1 = R; SM = [];
+    return
+end
+R1 = struct('name', {R.name}, 'title', {R.title}, 'free', [], 'noisy', [], 'lle', [], 'qr', []);
+for i = 1:numel(R)
+    t = R(i).trials(1);
+    R1(i).free  = t.free;
+    R1(i).noisy = t.noisy;
+    R1(i).lle   = t.lle;
+    R1(i).qr    = t.qr;
+end
+SM = [R.summary];
+end
+
+function fig = plot_ensemble(R, SM, S, st, n_cond, visible)
+% Paired per-trial comparisons. Each point is one network seed.
+fig = figure('Position', [100, 40, 520 * n_cond, 1150], 'Visible', onoff(visible));
+tl  = tiledlayout(fig, 3, n_cond, 'TileSpacing', 'loose', 'Padding', 'compact');
+n_tr = SM(1).n_trials;
+
+for i = 1:n_cond
+    col = cond_color(st, R(i).name, i);
+    M = SM(i);
+
+    % Row 1: Benettin LLE, ode45 vs SRA1, one point per trial
+    ax = nexttile(tl, i);
+    paired_panel(ax, M.lle_ode45, M.lle_sra1, col, st, ...
+        sprintf('Benettin %s, ode45 tol %g', st.label_lle, S.ref_tol), ...
+        sprintf('Benettin %s, SRA1 %d Hz', st.label_lle, S.fs_lle));
+    d = M.lle_sra1 - M.lle_ode45;
+    title(ax, {R(i).title, sprintf('paired SRA1 - ode45: %+.3f \\pm %.3f', mean(d), std(d)), ...
+        sprintf('seeds: ode45 %+.2f\\pm%.2f, SRA1 %+.2f\\pm%.2f', ...
+        mean(M.lle_ode45), std(M.lle_ode45), mean(M.lle_sra1), std(M.lle_sra1))}, ...
+        'FontWeight', 'normal', 'FontSize', st.title_fs - 1);
+
+    % Row 2: Benettin vs QR on the reduced network
+    ax = nexttile(tl, n_cond + i);
+    paired_panel(ax, M.qr_benettin, M.qr_lambda1, col, st, ...
+        sprintf('Benettin %s, n = %d', st.label_lle, S.n_small), ...
+        sprintf('QR \\lambda_1, n = %d', S.n_small));
+    d = M.qr_lambda1 - M.qr_benettin;
+    title(ax, {sprintf('paired QR - Benettin: %+.4f \\pm %.4f', mean(d), std(d)), ...
+        sprintf('|\\Delta| max %.4f', max(abs(d)))}, 'FontWeight', 'normal', 'FontSize', st.title_fs - 1);
+
+    % Row 3: reshoot error and slope per trial at the paper's rate
+    ax = nexttile(tl, 2 * n_cond + i);
+    hold(ax, 'on');
+    k = 1:n_tr;
+    plot(ax, k, M.err_free_paper, 'o-', 'Color', col, 'MarkerFaceColor', col, 'LineWidth', st.line_lw, ...
+        'DisplayName', sprintf('noise-free, slope %.2f\\pm%.2f', mean(M.slope_free), std(M.slope_free)));
+    if all(isfinite(M.err_noisy_paper))
+        plot(ax, k, M.err_noisy_paper, 's--', 'Color', col, 'MarkerFaceColor', 'w', 'LineWidth', st.line_lw, ...
+            'DisplayName', sprintf('noise \\sigma_u = %g, slope %.2f\\pm%.2f', S.sigma_u_noise, ...
+            mean(M.slope_noisy), std(M.slope_noisy)));
+    end
+    hold(ax, 'off');
+    set(ax, 'YScale', 'log', 'FontSize', st.tick_fs, 'XTick', k);
+    xlim(ax, [0.5, n_tr + 0.5]);
+    xlabel(ax, 'trial (network seed)', 'FontSize', st.label_fs);
+    if i == 1
+        ylabel(ax, sprintf('rms |error| over %g s at %d Hz', S.seg_long, M.fs_paper), 'FontSize', st.label_fs);
+    end
+    title(ax, 'reshooting error per trial', 'FontWeight', 'normal', 'FontSize', st.title_fs);
+    legend(ax, 'Location', 'best', 'FontSize', st.tick_fs - 2);
+end
+
+title(tl, {sprintf('Per-trial comparisons, %d network seeds (%s)', n_tr, S.preset_name), ...
+    'each point is one seed (labelled by trial); dashed line is identity'}, ...
+    'FontWeight', 'bold', 'Interpreter', 'none');
+end
+
+function paired_panel(ax, x, y, col, st, xl, yl)
+hold(ax, 'on');
+lo = min([x(:); y(:)]); hi = max([x(:); y(:)]);
+pad = 0.1 * max(hi - lo, 1e-3);
+lim = [lo - pad, hi + pad];
+plot(ax, lim, lim, '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 1);
+plot(ax, x, y, 'o', 'Color', col, 'MarkerFaceColor', col, 'MarkerSize', 7);
+for k = 1:numel(x)
+    text(ax, x(k), y(k), sprintf('  %d', k), 'FontSize', st.tick_fs - 3, 'Color', [0.3 0.3 0.3]);
+end
+hold(ax, 'off');
+axis(ax, 'square');
+xlim(ax, lim); ylim(ax, lim);
+set(ax, 'FontSize', st.tick_fs);
+xlabel(ax, xl, 'FontSize', st.label_fs);
+ylabel(ax, yl, 'FontSize', st.label_fs);
 end
