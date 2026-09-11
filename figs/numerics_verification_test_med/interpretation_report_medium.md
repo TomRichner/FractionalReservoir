@@ -189,3 +189,114 @@ The follow-up checks in section 3 are `build_from_preset(preset, 'sfa1_std1',
 'sigma_u_noise', 0, 'ode_solver', <'sra1'|'ode45'>, 'fs', <fs>, 'T_range', [0 20],
 'lya_method', 'benettin', 'lya_T_interval', [10 20], 'rng_seeds', <seeds>)` followed by
 `run()`; for the tolerance variant set `ode_opts` before `run()`.
+
+## 7. Follow-up: is the single-timescale gap an initial-condition effect, a `lya_dt` effect, or a window effect?
+
+Three controls, all Benettin on the full 500-neuron network, seed [1 2],
+noise off, 400 Hz, both integrators. Script:
+`scripts/examples/lle_finite_time_variability.m` (about 15 min).
+
+### 7.1 Same network, same stimulus, different initial conditions
+
+`x0_std` scaled by 1 + k/100, which rescales the same initial draw and
+leaves W and the stimulus untouched. 20 s runs, last 10 s accumulated:
+
+| IC scale | SRA1 400 Hz | ode45 1e-10 |
+|---|---|---|
+| 1.00 | 0.578 | 0.317 |
+| 1.01 | 0.627 | 0.592 |
+| 1.02 | 0.714 | 0.633 |
+| 1.03 | 0.332 | 0.680 |
+| 1.04 | 0.630 | 0.591 |
+| **mean** | **0.576** | **0.563** |
+
+A 1% change of the initial condition moves either integrator's 10 s
+exponent by up to 0.35. The two five-member ensembles overlap completely and
+their means agree to 0.01. The 0.317 that started the question is the low
+tail of ode45's own distribution, not a property of ode45.
+
+### 7.2 Renormalisation interval
+
+| `lya_dt` (s) | SRA1 | ode45 |
+|---|---|---|
+| 0.01 | 0.5779 | 0.3172 |
+| 0.02 | 0.5779 | 0.3174 |
+| 0.05 | 0.5780 | 0.3175 |
+| 0.10 | 0.5780 | 0.3172 |
+
+No effect to four digits for either integrator. This also disposes of the
+hypothesis that the finite Benettin perturbation crossing the piecewise
+activation's breakpoints biases the estimate: a five-fold longer interval
+changes how often that happens and changes nothing.
+
+### 7.3 Longer accumulation
+
+| window | SRA1 | ode45 |
+|---|---|---|
+| [10, 20] s | 0.578 | 0.317 |
+| [10, 40] s | 0.566 | 0.697 |
+| [10, 60] s | 0.567 | 0.659 |
+
+SRA1 is already stable at 30 s. ode45 leaves its 10 s value behind and
+settles near 0.66-0.70. The gap has reversed sign and shrunk from 0.26 to
+0.09. If the finite-time scatter shrinks as 1/sqrt(T) from about 0.2 at
+10 s, the expected scatter at 50 s is about 0.09, so the remaining gap is
+about one standard deviation.
+
+### 7.4 Interpretation
+
+The single-timescale regime is intermittent: its local exponent alternates
+between bursts of growth and quiet stretches of decay (see row 1 of the LLE
+figure and the burst train on the reduced network). A finite-time Lyapunov
+exponent on such a regime depends on which stretch of the attractor the
+trajectory visits during the window. Two runs that differ by anything at
+all, 1e-6 of integrator error or 1% of initial condition, are independent
+samples of that distribution once a few Lyapunov times have passed. The
+data say the distribution has a standard deviation near 0.15-0.2 over 10 s
+and a mean near 0.57 on this network, and that both integrators sample the
+same distribution.
+
+Consequences for the manuscript:
+
+* A single-realisation LLE in the single-timescale regime should not be
+  quoted to better than about +-0.2 over a 10 s window. The reps sweeps and
+  their medians are the right estimator, and the paper's practice of
+  reporting medians across reps is what makes the regime comparisons
+  meaningful.
+* The chaotic and stable regimes do not have this problem. Their local
+  exponents are steady, so a single 10 s window gives an exponent that is
+  integrator-independent to 4% and to four digits respectively.
+* Nothing here changes the conclusion about the integrator: SRA1 at 400 Hz
+  is second-order accurate with per-segment relative error 1e-5 to 1e-7,
+  and its ensemble-mean LLE matches a 1e-10 reference to 0.01.
+
+### 7.5 Remaining concerns
+
+1. **Ensemble means agree to 0.01 on five initial conditions; that is a
+   small sample.** The claim "same asymptotic LLE for both integrators" is
+   supported by 7.1 and by the reversal in 7.3, but a two-sided test would
+   want 20-30 initial conditions. The sweeps' reps already provide this for
+   SRA1; the ode45 half would cost about a minute per realisation.
+2. **The 50 s ode45 value (0.66) sits 0.09 above SRA1 (0.57).** This is
+   consistent with one standard deviation of finite-time scatter, but it was
+   not shown to shrink further, and a longer window with ode45 at 1e-10
+   costs about 3 s per simulated second on this network. If a reviewer asks
+   whether SRA1 underestimates the exponent in this regime, the answer
+   should come from 7.1-style ensembles, not from one long run.
+3. **Intermittency itself.** The 10 s finite-time exponent varying by a
+   factor of two on one network is a physical property of the
+   single-timescale regime worth a sentence in the manuscript, since it
+   bears on how "edge of chaos" should be read there. It has not been
+   characterised beyond these five samples.
+4. **The reduced network used for the QR comparison is not the paper's
+   network.** At n = 40 it reproduces the three regimes qualitatively (edge
+   of chaos, periodic bursting, stable) and both Lyapunov methods agree on
+   it, but that is a check of the methods, not of the 500-neuron exponents.
+   QR on the full network would need a different algorithm (a partial
+   spectrum) and is not planned.
+5. **Noise regime of SRA1.** The strong-order-1.5 term never became visible
+   at sigma_u = 0.025 because the drift error dominates. That is the
+   reassuring direction, but it means the noisy sub-experiment verifies the
+   drift, not the stochastic increment handling, on this network. The
+   stochastic handling is verified separately at large sigma in
+   `test_sde_integrators` (measured order 1.73).
