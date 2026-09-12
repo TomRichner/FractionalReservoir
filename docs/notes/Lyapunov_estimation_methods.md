@@ -176,6 +176,40 @@ non-zeros in the x-block against 16 M entries), and `compute_Jacobian_fast`
 already returns it sparse. A tangent vector costs one sparse
 matrix-vector product per stage of the integrator.
 
+**Measured (2026-09-12).** The first implementation assembled the sparse
+Jacobian at every step, and that assembly, not the product, was the cost:
+15.5 ms per call at N = 4000 (indexed assignment into a sparse matrix)
+against 0.1-2.6 ms for the product with K = 1-200. `SRNNCellTypePairs.jacobian_times`
+now applies the Jacobian blocks directly to the N × K basis without forming
+the matrix, verified equal to the assembled product to 1e-16
+(`test_jacobian_times`). Per call at N = 4000:
+
+| K | assemble + J·Y | `jacobian_times` | speed-up |
+|---|---|---|---|
+| 1 | 15.6 ms | 0.28 ms | 57× |
+| 10 | 16.0 ms | 0.64 ms | 25× |
+| 50 | 16.7 ms | 2.8 ms | 6× |
+| 200 | 18.1 ms | 11.7 ms | 1.6× |
+
+At K = 200 the matrix-free routine's dense N × K temporaries (row-block
+copies in and out of the basis, memory-bound) cost about as much as the
+assembly it avoids, so the gain flattens; the QR (O(N K²)) is still not
+the limit. On the paper's network (n = 500, 20 s run, 10 s accumulation,
+noise off; Lyapunov seconds only, trajectory excluded):
+
+| regime | N | K = 10 | K = 50 | K = 200 |
+|---|---|---|---|---|
+| no adaptation | 500 | 3 → 5 | 4 → 12 | 9 → 41 |
+| single timescale | 2000 | 29 → 7 | 32 → 18 | 44 → 80 |
+| multiple timescale | 4000 | 139 → 8 | 154 → 33 | 172 → 142 |
+
+(assembled → matrix-free). Where N is small the assembly was already
+cheap and one sparse product beats the dense block routine at large K, so
+the matrix-free path is a win for the full network at K ≤ 50 and a
+loss for small networks at K = 200. The spectra are identical in every
+cell (to 1e-13). If K ~ 200 on the full network ever matters, the next
+step is to avoid the row-block copies, not to bring the assembly back.
+
 ## 4.3 Why it also fixes the alignment problem
 
 With K vectors, the reported λ_1 is the best-aligned of K after sorting,

@@ -8,7 +8,8 @@
 % conditioning diagnostic. This is the cost/benefit input for choosing K in
 % the ensemble stage, and the first look at the full network's spectrum.
 %
-% Everything is built on the client, so 'twister' seeds; ~15-40 min.
+% Everything is built on the client, so 'twister' seeds; ~6 min with the
+% matrix-free jacobian_times (was ~15 min with the assembled Jacobian).
 % Assumes setup_paths has run.
 %
 % See also: lyapunov_topk, test_lyapunov_topk, run_numerics_verification
