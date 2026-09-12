@@ -110,6 +110,9 @@ else
     M.sigma_S_c = [get_or(model, 'sigma_S_c_E', 0), get_or(model, 'sigma_S_c_I', 0)];
 end
 if isempty(M.sigma_S_c); M.sigma_S_c = 0; end
+% Per-neuron SFA ladder spread (Pairs only; build() fills it as zeros(1, C)).
+M.tau_a_spread = get_or(model, 'tau_a_spread', 0);
+if isempty(M.tau_a_spread); M.tau_a_spread = 0; end
 M.level_of_chaos = model.level_of_chaos;
 M.fs          = model.fs;
 M.sigma_u_noise = get_or(model, 'sigma_u_noise', 0);
@@ -377,6 +380,12 @@ for t = 1:numel(M.types)
         row(fid, sprintf('$\\tau_a$ (%s)', M.types{t}), 'SFA time constants', ...
             M.tau_a{t}, 's');
     end
+end
+if any(M.tau_a_spread(:) > 0)
+    % Per-neuron ladders: log-normal spread at both ends of the ladder,
+    % geometric between (Equations_stability_paper.md). 0 = shared ladder.
+    row(fid, '$\sigma_{\tau_a}$', 'SFA ladder spread per cell type (log-normal, both ends)', ...
+        M.tau_a_spread, '--');
 end
 row(fid, '$c$',          'SFA coupling per type',     M.c,        '--');
 % M as in the equations: depression timescales. Uniform across routes in every

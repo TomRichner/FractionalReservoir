@@ -614,6 +614,77 @@ switch name
             struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
             struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
 
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
+        % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
+        % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
+        % [] -> [0.05 0.05]. Each neuron draws its own ladder from the type's
+        % nominal one, log-normally at the two ends (sigma = 0.05 in log
+        % space, so about +/-5%) with the interior rung following in log space
+        % -- "jitter the endpoints and re-run logspace". See the property
+        % header on SRNNCellTypePairs.tau_a_spread and
+        % docs/EquationsParametersDocs/Equations_stability_paper.md.
+        %
+        % WHY. With every neuron on the same ladder the stable regime's
+        % Lyapunov spectrum has ~n exponents within 0.01 of -1/tau_max, a
+        % degenerate band in which neither the exponents nor the directions
+        % are resolvable at finite time. 0.05 spreads that band by ~0.005 /s,
+        % far above the top-K estimator's 1e-4 resolution, while keeping the
+        % ladders ordered (the margin check allows up to ~0.65). Expect the
+        % stable regime's lambda_1 to move from ~-0.11 toward -1/tau of the
+        % SLOWEST drawn neuron (about -0.086 at n = 500), and to depend on
+        % the seed: it is an extreme-value statistic now.
+        %
+        % The parent preset is untouched, so every run made from it is
+        % provably unchanged; this one exists to be named by a *_config.m.
+        % Its regimes are not in the one-struct family (they carry I-SFA, as
+        % the parent's do).
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    500, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [8.25 -8.25; 8.25 -8.25], ... % 1.5 x 5.5, (post <- pre)
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % centre of the per-neuron draw
+            'mu_S_c',               [], ...      % empty: centre on S_c
+            'sigma_S_c',            [0.1 0.1], ... % per-neuron spread, both types
+            'tau_a_spread',         [0.05 0.05], ... % per-neuron SFA ladders, both types
+            'c',                    [0.5, 0.5], ...     % TOTAL SFA budget, E AND I
+            'input_config',         pairs_input_config(0.0), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              500, ...
+            'F_ref_indegree',       100, ...
+            'sigma_u_noise',        0.025);
+
+        % Same ladder on both types; the single-timescale regime takes the first
+        % entry on both. The spread applies to whatever ladder a regime carries:
+        % nothing in no_adaptation, one draw per neuron in sfa1_std1.
+        taus     = log_ladder(0.25, 10, 3);
+        sfa_off  = {zeros(1,0), zeros(1,0)};
+        sfa_one  = {taus(1),    taus(1)};
+        sfa_all  = {taus,       taus};
+
+        dual_std   = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        single_std = struct('tau_rec', dual_std.tau_rec(1), ...
+                            'tau_rel', dual_std.tau_rel(1));
+        std_all = struct();
+        std_all.E.E.std = dual_std;     std_all.E.I.std = dual_std;
+        std_all.I.E.std = dual_std;     std_all.I.I.std = dual_std;
+        std_one = struct();
+        std_one.E.E.std = single_std;   std_one.E.I.std = single_std;
+        std_one.I.E.std = single_std;   std_one.I.I.std = single_std;
+        std_off = struct();
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
+            struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
+
     % ====================================================================
     %  FIGURE PRESETS. Each exists because one manuscript figure is
     %  DELIBERATELY a different network from the paper's operating point,
@@ -1063,6 +1134,7 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond_mu8p25', ...
     'celltype_pairs_Sc0p2_noise0p025_tripleStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
     'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', ...
