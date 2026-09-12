@@ -84,6 +84,16 @@
 
 - cross-repository reminder for train-srnn: complete the MATLAB-aligned three-condition PyTorch rerun, replace the existing two-condition skip-connected figure, and consider a staged experiment that first trains an ESN-style linear readout with recurrent dynamics frozen and then continues with end-to-end recurrent training.  Preserve paired seeds, validation trajectories, AULC statistics, active parameter counts, final held-out results, and run provenance
 
+- Covairant Lyapunov Vectors to understand where chaos comes from within the system
+
+- should redo systems as a single cell type with dales W.  Would this eliminate the multiple route STD degeneracy and help top k lyapunov exponent methods? Would this be easier for the train-srnn pytorch model?
+
+- For normalizng STD, how do we do it?  by peak steady-state synaptic output at r = 0.5 or r = S_c? and compensate with a multiplicative factor?  would allow for 3 TS std
+
+- below priorities are from before implementing top-K LLE.  We should consider redoing with top-K LLE.  
+
+- We coudl also add a small amount of variance to taus so that all state variables are at least slightly non-degenerate.
+
 ## Ranked priorities for completing the paper's MATLAB results
 
 This is a handoff for work on the Results of `StochasticPlasticDynamicalSystemPaper/Manuscript5.md`.  Assume the other computer has this repository and the complete `StochasticPlasticDynamicalSystemPaper` repository available side by side.  Before changing an analysis, read the live Results outline in `Manuscript5.md`, the status distinctions in `reports/reality_manuscript_suggested.md`, the model recommendations in `reports/suggest_updates_main_matlab_model.md`, and the relevant stimulation reports in `reports/suggested_updates_bursting_model.md` and `reports/suggested_updates_cscs_reanalysis.md`.  The paper's primary comparison is deliberately simple: no adaptation versus one-timescale adaptation versus multiple-timescale adaptation, with SFA and STD present together in both adapting conditions.  Brian asked that the paper not return to a large SFA-only/STD-only factorial comparison.  Do not broaden the current Results into a mechanistic separation of SFA and STD; that question is reserved for `StochasticPlasticDynamicalSystemPaper/reports/Future_investigations.md`.
