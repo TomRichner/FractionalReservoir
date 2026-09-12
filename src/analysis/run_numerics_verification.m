@@ -49,7 +49,7 @@ function mat_file = run_numerics_verification(cfg)
 %      where the LLE is positive the two must diverge after a few Lyapunov
 %      times whatever the precision, which is why A exists.
 %
-%   C. BENETTIN vs QR on a REDUCED network built from the same preset physics
+%   C. BENETTIN vs QR vs TOP-K on a REDUCED network built from the same preset physics
 %      (n_small neurons, F_tracks_network = true so the spectral radius
 %      matches the full network). QR integrates an N x N variational system
 %      per segment and is out of the question at the preset's ~4000 states;
@@ -152,6 +152,7 @@ P.T_lle        = T_lle;
 P.n_small      = n_small;
 P.T_small      = T_small;
 P.lya_small_warmup = -T_small(1);    % iterate from T_small(1), accumulate from 0
+P.K_small      = 20;                 % top-K on the reduced network (sub-experiment C)
 P.max_restarts = max_restarts;
 P.win_free  = [T_free  / 3 + 0.3, 2 * T_free  / 3 - 0.01];   % inside the stim-on third, see header
 P.win_noisy = [T_noisy / 3 + 0.3, 2 * T_noisy / 3 - 0.01];
@@ -243,7 +244,7 @@ settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'T_free', T_free, 'win_free', P.win_free, ...
     'T_noisy', T_noisy, 'win_noisy', P.win_noisy, ...
     'T_lle', T_lle, 'fs_lle', P.fs_lle, ...
-    'n_small', n_small, 'T_small', T_small, 'lya_small_warmup', P.lya_small_warmup, ...
+    'n_small', n_small, 'T_small', T_small, 'lya_small_warmup', P.lya_small_warmup, 'K_small', P.K_small, ...
     'max_restarts', max_restarts, 'block_names', {{'x', 'a', 'b'}}, ...
     'n_trials_reshoot', n_reshoot, 'n_trials_lle', n_lle, 'n_workers', pool.NumWorkers, ...
     'minutes', toc(t_stage) / 60);
@@ -367,28 +368,38 @@ end
 function Q = qr_trial(P, cname, seeds)
 % Sub-experiment C for one reduced network: Benettin then QR on the same
 % fiducial trajectory.
-Q = struct('seeds', seeds, 'n', P.n_small, 'T_range', P.T_small, 'benettin', [], 'qr', []);
-for method = {'benettin', 'qr'}
+Q = struct('seeds', seeds, 'n', P.n_small, 'T_range', P.T_small, 'benettin', [], 'qr', [], 'topk', []);
+for method = {'benettin', 'qr', 'topk'}
     mth = method{1};
     model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
         'n', P.n_small, 'indegree', max(2, round(0.2 * P.n_small)), ...
         'F_tracks_network', true, ...
         'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', P.fs_lle, ...
-        'T_range', P.T_small, 'lya_method', mth, ...
+        'T_range', P.T_small, 'lya_method', mth, 'lya_K', P.K_small, ...
         'lya_T_interval', [0, P.T_small(2)], 'lya_warmup', P.lya_small_warmup);
     t0 = tic;
     evalc('model.run();');
     r = model.lya_results;
-    if strcmp(mth, 'benettin')
-        Q.benettin = struct('LLE', r.LLE, 't_lya', r.t_lya, 'local_lya', r.local_lya, 'seconds', toc(t0));
-    else
-        Q.qr = struct('LE_spectrum', r.LE_spectrum, 't_lya', r.t_lya, ...
-            'local_LE_spectrum_t', r.local_LE_spectrum_t, ...
-            'N_sys_eqs', model.N_sys_eqs, 'seconds', toc(t0));
+    switch mth
+        case 'benettin'
+            Q.benettin = struct('LLE', r.LLE, 't_lya', r.t_lya, 'local_lya', r.local_lya, 'seconds', toc(t0));
+        case 'qr'
+            Q.qr = struct('LE_spectrum', r.LE_spectrum, 't_lya', r.t_lya, ...
+                'local_LE_spectrum_t', r.local_LE_spectrum_t, ...
+                'N_sys_eqs', model.N_sys_eqs, 'seconds', toc(t0));
+        case 'topk'
+            % The K largest by the discrete QR method (lyapunov_topk), the
+            % third estimator: cheap enough for the full network, so this is
+            % where it gets cross-checked against the other two.
+            Q.topk = struct('LE_spectrum', r.LE_spectrum, 'LLE', r.LLE, 'K', r.K, ...
+                'h_KS', r.h_KS, 'h_KS_bits', r.h_KS_bits, 'n_positive', r.n_positive, ...
+                'D_KY', r.D_KY, 'D_KY_resolved', r.D_KY_resolved, 'cond_max', r.cond_max, ...
+                't_lya', r.t_lya, 'local_LE_spectrum_t', r.local_LE_spectrum_t, 'seconds', toc(t0));
     end
 end
-fprintf('    [C] seeds %s: Benettin %+.4f, QR %+.4f of %d (%.0f s)\n', mat2str(seeds), ...
-    Q.benettin.LLE, Q.qr.LE_spectrum(1), numel(Q.qr.LE_spectrum), Q.qr.seconds);
+fprintf('    [C] seeds %s: Benettin %+.4f, QR %+.4f of %d (%.0f s), top-%d %+.4f (%.0f s)\n', mat2str(seeds), ...
+    Q.benettin.LLE, Q.qr.LE_spectrum(1), numel(Q.qr.LE_spectrum), Q.qr.seconds, ...
+    Q.topk.K, Q.topk.LLE, Q.topk.seconds);
 end
 
 function probe = build_probe(preset_name, condition_name, varargin)
@@ -516,6 +527,10 @@ S.lle_ode45   = arrayfun(@(t) t.ode45.LLE, lle);
 S.lle_sra1    = arrayfun(@(t) t.sra1.LLE, lle);
 S.qr_benettin = arrayfun(@(t) t.benettin.LLE, qr);
 S.qr_lambda1  = arrayfun(@(t) t.qr.LE_spectrum(1), qr);
+if isfield(qr, 'topk') && ~isempty(qr(1).topk)
+    S.topk_lambda1 = arrayfun(@(t) t.topk.LLE, qr);
+    S.topk_hKS     = arrayfun(@(t) t.topk.h_KS_bits, qr);
+end
 j = find([reshoot(1).free.fs] == fs_lle, 1); if isempty(j); j = 1; end
 S.fs_paper        = reshoot(1).free(j).fs;
 S.err_free_paper  = arrayfun(@(t) t.free(j).err_long_total_rms, reshoot);
@@ -542,6 +557,11 @@ fprintf('    LLE over %d seeds: ode45 %+.3f +- %.3f | sra1 %+.3f +- %.3f | paire
     S.n_trials_lle, mean(S.lle_ode45), std(S.lle_ode45), mean(S.lle_sra1), std(S.lle_sra1), mean(d), std(d));
 fprintf('    reduced net over %d seeds: Benettin %+.3f +- %.3f | QR %+.3f +- %.3f | paired QR-Benettin %+.4f +- %.4f\n', ...
     S.n_trials_lle, mean(S.qr_benettin), std(S.qr_benettin), mean(S.qr_lambda1), std(S.qr_lambda1), mean(dq), std(dq));
+if isfield(S, 'topk_lambda1')
+    dt3 = S.topk_lambda1 - S.qr_lambda1;
+    fprintf('    reduced net top-K: lambda_1 %+.3f +- %.3f | paired topK-QR %+.4f +- %.4f | h_KS %.2f +- %.2f bit/s\n', ...
+        mean(S.topk_lambda1), std(S.topk_lambda1), mean(dt3), std(dt3), mean(S.topk_hKS), std(S.topk_hKS));
+end
 fprintf('    reshoot @ %d Hz over %d seeds: free %.2e +- %.1e (slope %.2f +- %.2f)\n', S.fs_paper, ...
     S.n_trials_reshoot, mean(S.err_free_paper), std(S.err_free_paper), mean(S.slope_free), std(S.slope_free));
 if all(isfinite(S.err_noisy_paper))

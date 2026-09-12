@@ -316,11 +316,12 @@ side; the two describe one system.
 
 # 7. Recommendations
 
-1. **Implement top-K.** Generalise `lyapunov_spectrum_qr_internal` to an
-   N × K basis propagated with a fixed-step scheme using the sparse
-   Jacobian, orthonormalising every few steps; keep `K = N` as the
-   special case. Report λ_1..λ_K, h_KS, D_KY. Choose K adaptively: grow
-   until the smallest exponent is clearly negative and settled.
+1. **Implement top-K.** *Done 2026-09-12:* `lya_method = 'topk'` with
+   `lya_K`, shared core `src/model/lyapunov/lyapunov_topk.m`, verified in
+   `scripts/tests/test_lyapunov_topk.m` (Liouville, nesting, vs 'qr', vs
+   Benettin). Reports λ_1..λ_K, h_KS, D_KY (+ resolved flag), conditioning.
+   K is still chosen by hand: grow it until the smallest exponent is
+   clearly negative and D_KY resolves.
 2. **Run it on the full network, noise on and off**, in all three regimes,
    over the sweeps' reps. That replaces the reduced-network cross-check
    with a direct measurement and closes the noisy-QR gap.

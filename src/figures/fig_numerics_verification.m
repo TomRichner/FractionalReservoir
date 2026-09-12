@@ -230,8 +230,8 @@ for i = 1:n_cond
     xlim(ax, [0, numel(spec) + 1]);
     xlabel(ax, 'exponent index', 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, 'Lyapunov exponent (1/s)', 'FontSize', st.label_fs); end
-    title(ax, sprintf('QR spectrum, %d states; |\\Delta\\lambda_1| = %.4f', ...
-        numel(spec), abs(LLE_b - LLE_q)), 'FontWeight', 'normal', 'FontSize', st.title_fs);
+    title(ax, sprintf('QR spectrum, %d exponents of %d states; |\\Delta\\lambda_1| = %.4f', ...
+        numel(spec), Q.qr.N_sys_eqs, abs(LLE_b - LLE_q)), 'FontWeight', 'normal', 'FontSize', st.title_fs);
     if i == 1
         legend(ax, {'QR spectrum', 'QR \lambda_1', 'Benettin LLE'}, ...
             'Location', 'best', 'FontSize', st.tick_fs - 2);

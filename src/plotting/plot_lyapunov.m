@@ -121,7 +121,7 @@ if strcmpi(Lya_method, 'benettin')
     hold off
     box off
 
-elseif strcmpi(Lya_method, 'qr')
+elseif isfield(lya_results, 'local_LE_spectrum_t')   % 'qr' or 'topk': a spectrum
     % Plot for QR method (full spectrum)
 
     % Plot spectrum (reverse order for plotting, then reorder handles)
@@ -134,7 +134,7 @@ elseif strcmpi(Lya_method, 'qr')
     ylabel('\lambda_1')
 
     % Add legend with final values (most positive exponents on top)
-    legend_count = min(5, lya_results.params.N_sys_eqs);
+    legend_count = min(5, size(lya_results.local_LE_spectrum_t, 2));
     legend_entries = cell(1, legend_count);
     for i = 1:legend_count
         legend_entries{i} = sprintf('\\lambda_{%d} = %.3f', i, lya_results.LE_spectrum(i));

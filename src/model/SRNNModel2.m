@@ -3979,7 +3979,7 @@ classdef SRNNModel2 < handle
                 hold off
                 box off
                 
-            elseif strcmpi(Lya_method, 'qr')
+            elseif isfield(lya_results, 'local_LE_spectrum_t')   % 'qr' or 'topk': a spectrum
                 plot_data = lya_results.local_LE_spectrum_t(:, end:-1:1);
                 line_handles = plot(lya_results.t_lya, plot_data);
                 line_handles = line_handles(end:-1:1);
@@ -3988,7 +3988,7 @@ classdef SRNNModel2 < handle
                 yline(0, '--k')
                 ylabel('\lambda_1')
                 
-                legend_count = min(5, lya_results.params.N_sys_eqs);
+                legend_count = min(5, size(lya_results.local_LE_spectrum_t, 2));
                 legend_entries = cell(1, legend_count);
                 for i = 1:legend_count
                     legend_entries{i} = sprintf('\\lambda_{%d} = %.3f', i, lya_results.LE_spectrum(i));
