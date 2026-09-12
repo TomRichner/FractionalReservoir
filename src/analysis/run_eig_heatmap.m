@@ -101,6 +101,10 @@ fprintf('[eig_heatmap] preset=%s run_mode=%s T=%g s n_samples=%d\n', ...
 n_cond        = numel(cond_names);
 evals_by_cond = cell(1, n_cond);
 lle_by_cond   = nan(1, n_cond);
+lya_by_cond   = cell(1, n_cond);
+num_abscissa_by_cond  = cell(1, n_cond);   % max eig((J + J')/2) per sampled state
+spec_abscissa_by_cond = cell(1, n_cond);   % max real eig(J) per sampled state
+J_times_by_cond       = cell(1, n_cond);
 
 for i = 1:n_cond
     fprintf('\n=== %d/%d %s ===\n', i, n_cond, titles{i});
@@ -108,38 +112,49 @@ for i = 1:n_cond
         'T_range',          T_range, ...
         'fs',               fs, ...
         'rng_seeds',        [1 2], ...      % same W across conditions
-        'lya_method',       'benettin', ...
+        'lya_method',       'topk', ...     % the sweeps' estimator (K 15, retry to 30)
+        'lya_K',            15, 'lya_K_auto', true, 'lya_K_max', 30, 'lya_dt', 0.05, ...
         'lya_T_interval',   lya_T_interval, ...
         'store_full_state', true);          % required to read S_out below
     model.run();
 
     lle_by_cond(i) = model.lya_results.LLE;
+    lya_by_cond{i} = model.lya_summary();
 
     % Sample after the LLE warmup window opens, so the transient is excluded.
     t_start = lya_T_interval(1);
     t_end   = T_range(2);
     J_times = linspace(t_start, t_end, n_samples);
-    evals_by_cond{i} = sample_eigenvalues(model, J_times, cfg.use_parallel);
-    fprintf('  LLE = %+.4f | %d eigenvalues pooled\n', ...
-        lle_by_cond(i), numel(evals_by_cond{i}));
+    [evals_by_cond{i}, num_abscissa_by_cond{i}, spec_abscissa_by_cond{i}, J_times_by_cond{i}] = ...
+        sample_eigenvalues(model, J_times, cfg.use_parallel);
+    fprintf('  LLE = %+.4f | %d eigenvalues pooled | numerical abscissa median %+.3f (spectral %+.3f)\n', ...
+        lle_by_cond(i), numel(evals_by_cond{i}), ...
+        median(num_abscissa_by_cond{i}), median(spec_abscissa_by_cond{i}));
 end
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'T_range', T_range, 'fs', fs, 'n_samples', n_samples, ...
     'lle_window', lle_window, 'lya_T_interval', lya_T_interval, ...
     'model_class', class(model), 'level_of_chaos', model.level_of_chaos, ...
-    'n', model.n, 'ode_solver', model.ode_solver);
+    'n', model.n, 'ode_solver', model.ode_solver, 'lya_method', model.lya_method);
 
 condition_titles = titles;                      %#ok<NASGU>  saved name
 mat_file = fullfile(out_dir, 'eig_heatmap_data.mat');
 save(mat_file, 'evals_by_cond', 'condition_titles', 'cond_names', ...
-    'lle_by_cond', 'lle_window', 'lya_T_interval', 'settings', '-v7.3');
+    'lle_by_cond', 'lya_by_cond', 'num_abscissa_by_cond', 'spec_abscissa_by_cond', ...
+    'J_times_by_cond', 'lle_window', 'lya_T_interval', 'settings', '-v7.3');
 fprintf('\nSaved: %s\n', mat_file);
 end
 
 %% ------------------------------------------------------------------------
-function ev_all = sample_eigenvalues(model, J_times_sec, use_parallel)
-% Pool the Jacobian eigenvalues at the requested times.
+function [ev_all, omega, alpha, t_used] = sample_eigenvalues(model, J_times_sec, use_parallel)
+% Pool the Jacobian eigenvalues at the requested times, and per state the
+% NUMERICAL ABSCISSA omega = max eig((J + J')/2) beside the SPECTRAL ABSCISSA
+% alpha = max real eig(J). omega bounds the instantaneous growth rate of a
+% perturbation (d/dt ||dS|| <= omega ||dS||), so omega > alpha is the margin
+% by which a non-normal Jacobian can amplify transiently even when every
+% eigenvalue decays (Trefethen & Embree; Hennequin et al. for the phenomenon
+% in balanced networks). omega >= alpha always.
 %
 % Resolves compute_Jacobian_fast BY CLASS NAME, so one implementation serves
 % both model classes. They do not share a state layout -- SRNNCellTypePairs
@@ -153,18 +168,26 @@ t_out  = model.t_out;
 idx = arrayfun(@(tt) find(t_out >= tt, 1, 'first'), J_times_sec, ...
     'UniformOutput', false);
 idx = unique([idx{~cellfun(@isempty, idx)}]);
+t_used = t_out(idx);
+t_used = t_used(:);
 
 n_idx = numel(idx);
 ev = cell(1, n_idx);
+omega = zeros(n_idx, 1);
+alpha = zeros(n_idx, 1);
 if use_parallel
     parfor k = 1:n_idx
-        J = feval([cls '.compute_Jacobian_fast'], S_out(idx(k), :)', params);
-        ev{k} = eig(full(J));
+        J = full(feval([cls '.compute_Jacobian_fast'], S_out(idx(k), :)', params));
+        ev{k} = eig(J);
+        alpha(k) = max(real(ev{k}));
+        omega(k) = max(eig((J + J') / 2));
     end
 else
     for k = 1:n_idx
-        J = feval([cls '.compute_Jacobian_fast'], S_out(idx(k), :)', params);
-        ev{k} = eig(full(J));
+        J = full(feval([cls '.compute_Jacobian_fast'], S_out(idx(k), :)', params));
+        ev{k} = eig(J);
+        alpha(k) = max(real(ev{k}));
+        omega(k) = max(eig((J + J') / 2));
     end
 end
 ev_all = vertcat(ev{:});

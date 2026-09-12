@@ -127,8 +127,8 @@ for i = 1:n_cond
         ax_panels(i), D_by_cond{i}, re_edges, im_edges, clim, false);  % already scaled above
     title(ax_panels(i), condition_titles{i}, 'FontWeight', 'normal', 'FontSize', 14);
 
-    % Finite-time (Benettin) LLE over the last lle_window seconds, top-left.
-    text(ax_panels(i), 0.03, 0.96, sprintf('LLE = %+.3f', lle_by_cond(i)), ...
+    % Finite-time lambda_1 over the last lle_window seconds, top-left.
+    text(ax_panels(i), 0.03, 0.96, sprintf('\\lambda_1 = %+.3f', lle_by_cond(i)), ...
         'Units', 'normalized', 'Color', 'w', 'FontSize', 12, 'FontWeight', 'bold', ...
         'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
 end
@@ -139,7 +139,7 @@ cb.Layout.Tile = 'east';
 cb.Label.String = cb_label;
 
 title(tl, {'Jacobian eigenvalue occupancy across adaptation regimes', ...
-    sprintf('LLE = finite-time Benettin exponent over the last %g s', lle_window)}, ...
+    sprintf('\\lambda_1 = finite-time largest Lyapunov exponent over the last %g s', lle_window)}, ...
     'FontWeight', 'bold');
 
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
