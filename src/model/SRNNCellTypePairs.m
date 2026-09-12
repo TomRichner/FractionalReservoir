@@ -2138,6 +2138,167 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
+        function Z = jacobian_times(S, Y, params)
+            % JACOBIAN_TIMES  Z = J(S) * Y without assembling J.
+            %
+            %   Z = SRNNCellTypePairs.jacobian_times(S, Y, params) returns the
+            %   N x K product of the Jacobian at state S with the N x K matrix
+            %   Y, by applying each block of compute_Jacobian_fast to the
+            %   matching slice of Y. It exists because assembling the sparse
+            %   Jacobian costs ~17 ms per call at N = 4000 (indexed assignment
+            %   into a sparse matrix) while the product itself costs ~1 ms, and
+            %   the top-K Lyapunov propagator (lyapunov_topk) needs one product
+            %   per integration stage, never the matrix.
+            %
+            %   CONTRACT: this must equal compute_Jacobian_fast(S, params) * Y to
+            %   round-off. scripts/tests/test_jacobian_times.m enforces it on a
+            %   network with every block live (SFA, dual STD, dual STF, both
+            %   std_zero_floor settings) and on the paper's presets. ANY CHANGE
+            %   TO compute_Jacobian_fast OR dynamics_fast MUST BE MIRRORED HERE
+            %   and that test rerun; the finite-difference check in
+            %   test_SRNNCellTypePairs verifies the assembled Jacobian, and this
+            %   routine inherits that verification only through the equality.
+            %
+            %   Block structure (rows = which derivative, cols = which state):
+            %     a_k rows : tau_inv(k) * (-Ya_k + phi' .* Ye)
+            %     b_m rows : -(1/tau_rec + r/tau_rel) .* Yb_m - b_m phi'/tau_rel .* Ye_pre
+            %     g_k rows : -(1/tau_dec + r/tau_fac) .* Yg_k + (G-g_k) phi'/tau_fac .* Ye_pre
+            %     x   rows : (-Yx + sum over routes W_block * dtheta) / tau_d
+            %   where Ye = Yx(idx) - c_eff * sum_k Ya_k is the perturbation of
+            %   the effective input x_eff, phi' the activation derivative, and
+            %   dtheta the perturbation of the synaptic output r prod(b) prod(g)
+            %   (with the zero-floor gain on the depression factor).
+            %
+            % See also: compute_Jacobian_fast, dynamics_fast, lyapunov_topk,
+            %           test_jacobian_times
+            C = params.n_cellTypes;
+            layout = params.state_layout;
+            K = size(Y, 2);
+            x = S(layout.x);
+            x_eff = x;
+            Yx = Y(layout.x, :);
+
+            a  = cell(1, C);
+            Ya = cell(1, C);          % nq x na x K slices of Y
+            Ye = cell(1, C);          % perturbation of x_eff, nq x K
+            for q = 1:C
+                idx = params.type_indices{q}; nq = params.n_per_type(q);
+                na = params.n_a(q);
+                if na > 0
+                    a{q}  = reshape(S(layout.a{q}), nq, na);
+                    Ya{q} = reshape(Y(layout.a{q}, :), nq, na, K);
+                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
+                    Ye{q} = Yx(idx, :) - params.c_eff(q) .* reshape(sum(Ya{q}, 2), nq, K);
+                else
+                    a{q}  = zeros(nq, 0);
+                    Ya{q} = zeros(nq, 0, K);
+                    Ye{q} = Yx(idx, :);
+                end
+            end
+
+            rate = params.activation_function(x_eff);
+            rate_prime = params.activation_function_derivative(x_eff);
+            Z = zeros(layout.N, K);
+
+            % a rows: da_k/dt = (r - a_k) / tau_k
+            for q = 1:C
+                na = params.n_a(q);
+                if na == 0; continue; end
+                idx = params.type_indices{q}; nq = params.n_per_type(q);
+                tau_inv = 1 ./ params.tau_a{q}(:);
+                dr = rate_prime(idx) .* Ye{q};                       % nq x K
+                Za = -Ya{q} + reshape(dr, nq, 1, K);                 % nq x na x K
+                Za = Za .* reshape(tau_inv, 1, na, 1);
+                Z(layout.a{q}, :) = reshape(Za, nq * na, K);
+            end
+
+            % b, g and x rows, per route
+            Z(layout.x, :) = -Yx ./ params.tau_d;
+            for pre = 1:C
+                pre_idx = params.type_indices{pre};
+                npre = params.n_per_type(pre);
+                pre_rate = rate(pre_idx);
+                pre_rate_prime = rate_prime(pre_idx);
+                dr_pre = pre_rate_prime .* Ye{pre};                  % npre x K
+                Ye_pre3 = reshape(Ye{pre}, npre, 1, K);
+                for post = 1:C
+                    post_idx = params.type_indices{post};
+                    nb = params.n_b_pairs(pre, post);
+                    ng = params.n_g_pairs(pre, post);
+                    row_b = layout.b{pre, post};
+                    row_g = layout.g{pre, post};
+
+                    depression = ones(npre, 1);
+                    facilitation = ones(npre, 1);
+                    dtheta_b = zeros(npre, K);
+                    dtheta_g = zeros(npre, K);
+
+                    if nb > 0
+                        b = reshape(S(row_b), npre, nb);
+                        Yb = reshape(Y(row_b, :), npre, nb, K);
+                        depression = prod(b, 2);
+                        tau_rec = params.tau_b_rec{pre, post}(:);
+                        tau_rel = params.tau_b_rel{pre, post}(:);
+                        % db_m/dt = (1 - b_m)/tau_rec_m - b_m r/tau_rel_m
+                        diag_b = -(1 ./ tau_rec)' - pre_rate * (1 ./ tau_rel)';   % npre x nb
+                        coeff_b = -(b .* pre_rate_prime) ./ tau_rel';               % npre x nb
+                        Zb = diag_b .* Yb + coeff_b .* Ye_pre3;                     % npre x nb x K
+                        Z(row_b, :) = reshape(Zb, npre * nb, K);
+                        % d prod(b) = sum_m prod_{m' ~= m} b_m' * db_m
+                        product_derivative = zeros(npre, nb);
+                        for m = 1:nb
+                            other = [1:m-1, m+1:nb];
+                            if isempty(other)
+                                product_derivative(:, m) = 1;
+                            else
+                                product_derivative(:, m) = prod(b(:, other), 2);
+                            end
+                        end
+                        gain = 1;
+                        if params.std_zero_floor
+                            p_min = prod(params.tau_b_rel{pre, post} ./ ...
+                                (params.tau_b_rec{pre, post} + params.tau_b_rel{pre, post}));
+                            gain = 1 / (1 - p_min);
+                        end
+                        dtheta_b = gain .* reshape(sum(product_derivative .* Yb, 2), npre, K);
+                    end
+
+                    if ng > 0
+                        g = reshape(S(row_g), npre, ng);
+                        Yg = reshape(Y(row_g, :), npre, ng, K);
+                        facilitation = prod(g, 2);
+                        tau_dec = params.tau_g_dec{pre, post}(:);
+                        tau_fac = params.tau_g_fac{pre, post}(:);
+                        G = params.G{pre, post}(:);
+                        % dg_k/dt = (1 - g_k)/tau_dec_k + (G_k - g_k) r/tau_fac_k
+                        diag_g = -(1 ./ tau_dec)' - pre_rate * (1 ./ tau_fac)';   % npre x ng
+                        coeff_g = ((G' - g) .* pre_rate_prime) ./ tau_fac';         % npre x ng
+                        Zg = diag_g .* Yg + coeff_g .* Ye_pre3;                     % npre x ng x K
+                        Z(row_g, :) = reshape(Zg, npre * ng, K);
+                        product_derivative = zeros(npre, ng);
+                        for k = 1:ng
+                            other = [1:k-1, k+1:ng];
+                            if isempty(other)
+                                product_derivative(:, k) = 1;
+                            else
+                                product_derivative(:, k) = prod(g(:, other), 2);
+                            end
+                        end
+                        dtheta_g = reshape(sum(product_derivative .* Yg, 2), npre, K);
+                    end
+
+                    depression_syn = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
+                        depression, params, pre, post);
+                    % theta = r * prod(g) * floor(prod(b)); d theta by the product rule
+                    dtheta = (facilitation .* depression_syn) .* dr_pre ...
+                        + (facilitation .* pre_rate) .* dtheta_b ...
+                        + (depression_syn .* pre_rate) .* dtheta_g;
+                    Z(layout.x(post_idx), :) = Z(layout.x(post_idx), :) + ...
+                        (params.W(post_idx, pre_idx) * dtheta) ./ params.tau_d;
+                end
+            end
+        end
+
         function J_array = compute_Jacobian_at_indices(S_out, sample_indices, params)
             J_array = zeros(params.N_sys_eqs, params.N_sys_eqs, numel(sample_indices));
             for k = 1:numel(sample_indices)
@@ -2577,7 +2738,8 @@ classdef SRNNCellTypePairs < handle
                 results = lyapunov_topk(S_out, t_out, fs, lya_dt, interval, lya_warmup, K, ...
                     @(S, p) SRNNCellTypePairs.compute_Jacobian_fast(S, p), params, ...
                     struct('seed', topk_seed, 'err_id_prefix', 'SRNNCellTypePairs', ...
-                           'grid_fn', @SRNNCellTypePairs.lyapunov_sample_grid));
+                           'grid_fn', @SRNNCellTypePairs.lyapunov_sample_grid, ...
+                           'jac_times', @(S, Yk, p) SRNNCellTypePairs.jacobian_times(S, Yk, p)));
                 results.params.N_sys_eqs = params.N_sys_eqs;
                 if results.D_KY_resolved
                     fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...

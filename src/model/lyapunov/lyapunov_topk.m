@@ -31,6 +31,8 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
 %     opts        struct: .seed (initial basis), .err_id_prefix (char),
 %                 .grid_fn (@(t, dt, decimation, tau, interval, warmup) ->
 %                 [idx_all, t_lya, acc_start]; the class's lyapunov_sample_grid),
+%                 .jac_times (optional, @(S, Y, params) -> J(S) * Y without
+%                 assembling J; when given, jac_fn is never called),
 %                 .verbose (logical, default false)
 %
 %   OUTPUT struct R
@@ -55,12 +57,17 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
 %     Q_final                N x K basis at the end (a warm start)
 %     lya_dt, lya_fs, seconds
 %
-%   PROPAGATION. Heun (RK2) on the fiducial grid with the Jacobian assembled
-%   from the STORED states at t_i and t_{i+1}: one sparse Jacobian per step,
-%   reused as the next step's start; no interpolants, no adaptive solver.
-%   Second order, the same order as the trajectory's own scheme (SRA1's
-%   drift is Ralston RK2). Cost per step: one Jacobian assembly plus two
-%   sparse x dense products, O(nnz(J) K); per segment: one N x K QR, O(N K^2).
+%   PROPAGATION. Heun (RK2) on the fiducial grid with the Jacobian taken at
+%   the STORED states at t_i and t_{i+1}: no interpolants, no adaptive
+%   solver. Second order, the same order as the trajectory's own scheme
+%   (SRA1's drift is Ralston RK2). Two ways to apply J, same arithmetic:
+%     * opts.jac_times given (SRNNCellTypePairs.jacobian_times): two
+%       matrix-free products J(S) Y per step, O(nnz(W) K + N K), no matrix.
+%     * otherwise (SRNNModel2): one sparse Jacobian assembled per step,
+%       reused as the next step's start, plus two sparse x dense products.
+%       At N = 4000 the ASSEMBLY (~17 ms) dominates the product (~1 ms), which
+%       is why the matrix-free path exists.
+%   Per segment: one N x K QR, O(N K^2).
 %
 %   SIGN CONVENTION. MATLAB's qr does not make diag(R) positive; the columns
 %   of Q and rows of R are flipped so it is (Geist A.6, Dieci 2.15). Without
@@ -84,6 +91,10 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
         pfx = opts.err_id_prefix;
     end
     verbose = isfield(opts, 'verbose') && opts.verbose;
+    matrix_free = isfield(opts, 'jac_times') && ~isempty(opts.jac_times);
+    if matrix_free
+        jac_times = opts.jac_times;
+    end
 
     N  = size(X, 2);
     nt = size(X, 1);
@@ -127,19 +138,28 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
         i0 = idx_all(k);
         i1 = i0 + decimation;
         if i1 > nt; break; end
-        if i0 ~= i_prev_end || isempty(J1)
-            J1 = jac_fn(X(i0, :)', params);
-        end
         Y = Q;
-        for i = i0:i1 - 1
-            J0 = J1;
-            J1 = jac_fn(X(i + 1, :)', params);
-            h  = t(i + 1) - t(i);
-            F0 = J0 * Y;
-            Yp = Y + h * F0;
-            Y  = Y + (h / 2) * (F0 + J1 * Yp);
+        if matrix_free
+            for i = i0:i1 - 1
+                h  = t(i + 1) - t(i);
+                F0 = jac_times(X(i, :)', Y, params);
+                Yp = Y + h * F0;
+                Y  = Y + (h / 2) * (F0 + jac_times(X(i + 1, :)', Yp, params));
+            end
+        else
+            if i0 ~= i_prev_end || isempty(J1)
+                J1 = jac_fn(X(i0, :)', params);
+            end
+            for i = i0:i1 - 1
+                J0 = J1;
+                J1 = jac_fn(X(i + 1, :)', params);
+                h  = t(i + 1) - t(i);
+                F0 = J0 * Y;
+                Yp = Y + h * F0;
+                Y  = Y + (h / 2) * (F0 + J1 * Yp);
+            end
+            i_prev_end = i1;
         end
-        i_prev_end = i1;
 
         if any(~isfinite(Y(:)))
             warning([pfx ':LyapunovDiverged'], ...
