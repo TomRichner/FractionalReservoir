@@ -186,6 +186,10 @@ F = add(F, 'fig_eig_heatmap',                @fig_eig_heatmap,                fa
 % whether the drive moves the Lyapunov exponent across seeds and across every
 % adaptation regime. Not in the paper, kept working and regenerated.
 F = add(F, 'fig_dc_lle',                     @fig_dc_lle,                     false, {});
+% Top-K Lyapunov measures, TR 2026-09-12: the spectrum stage's figure and the
+% numerical-vs-spectral abscissa (transient amplification) from the eig stage.
+F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
+F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    false, {});
 % The generated equation and conditions tables. An ordinary entry, not a special
 % call after the loop: as a special case its failures sat outside the headline
 % count, which is how the n_a refactor broke it while the run still reported

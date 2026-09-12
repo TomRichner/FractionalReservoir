@@ -111,6 +111,10 @@ F = add(F, 'fig_memory_capacity',             @fig_memory_capacity,             
 F = add(F, 'fig_memory_capacity_example',     @fig_memory_capacity_example,     true, {});
 F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 false, {});
 F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
+% Top-K Lyapunov measures, TR 2026-09-12: the spectrum stage's figure and the
+% numerical-vs-spectral abscissa (transient amplification) from the eig stage.
+F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
+F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    false, {});
 % The generated equation and conditions tables, an ordinary entry so its
 % failures count in the headline number.
 F = add(F, 'doc_tables',                      @fig_doc_tables,                  true, ...

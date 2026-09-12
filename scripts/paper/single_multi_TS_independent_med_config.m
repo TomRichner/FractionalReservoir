@@ -116,6 +116,10 @@ F = add(F, 'fig_memory_capacity_example',     @fig_memory_capacity_example,     
 F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 false, ...
         {'density_scale', 'loglog'});
 F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
+% Top-K Lyapunov measures, TR 2026-09-12: the spectrum stage's figure and the
+% numerical-vs-spectral abscissa (transient amplification) from the eig stage.
+F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
+F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    false, {});
 % Numerical-method verification, TR 2026-09-10: SRA1 reshot against a 1e-10
 % ode45 reference and against itself on a shared Brownian path, and Benettin
 % vs QR on a reduced network. Two entries so each variant has its own folder.
