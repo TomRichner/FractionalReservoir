@@ -223,7 +223,11 @@ classdef SRNNModel2 < handle
     
     %% Lyapunov Settings Properties
     properties
-        lya_method = 'benettin'     % Lyapunov method: 'benettin', 'qr', or 'none'
+        lya_method = 'benettin'     % Lyapunov method: 'benettin', 'qr', 'topk', or 'none'
+        % Number of exponents for lya_method = 'topk' (the K largest, by the
+        % discrete QR method on an N x K tangent basis; see lyapunov_topk).
+        % 0 means all N. Ignored by 'benettin' (always 1) and 'qr' (always N).
+        lya_K = 10
         lya_T_interval              % Time interval for Lyapunov computation
 
         % Rescaling interval (s): how far the perturbation is allowed to grow
@@ -713,7 +717,8 @@ classdef SRNNModel2 < handle
             % difference. (The QR path integrates a variational equation on a
             % 2-point span instead and always uses ode45; see below.)
             solver = resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNModel');
-            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, solver, rhs);
+            obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, solver, rhs, ...
+                obj.lya_K, obj.rng_seeds(1) + 424242);
             
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
@@ -2434,9 +2439,13 @@ classdef SRNNModel2 < handle
         % =====================================================================
         % Internalized from ConnectivityAdaptation to avoid path conflicts.
         
-        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs_func)
-            % Compute Lyapunov exponents using Benettin or QR method.
+        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs_func, lya_K, topk_seed)
+            % Compute Lyapunov exponents using the Benettin, QR or top-K method.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/compute_lyapunov_exponents.m
+            % 'topk' is the K = lya_K largest exponents by the discrete QR
+            % method on the stored trajectory (shared core lyapunov_topk).
+            if nargin < 13 || isempty(lya_K); lya_K = 10; end
+            if nargin < 14 || isempty(topk_seed); topk_seed = 424243; end
 
             lya_results = struct();
 
@@ -2447,8 +2456,24 @@ classdef SRNNModel2 < handle
             lya_dt = SRNNModel2.resolve_lya_dt(lya_dt, Lya_method, dt, 'SRNNModel');
 
             lya_fs = 1 / lya_dt;
-            
+
             switch lower(Lya_method)
+                case 'topk'
+                    K = lya_K;
+                    if K == 0; K = params.N_sys_eqs; end
+                    lya_results = lyapunov_topk(S_out, t_out, fs, lya_dt, T_interval, lya_warmup, K, ...
+                        @(S, p) SRNNModel2.compute_Jacobian_fast(S, p), params, ...
+                        struct('seed', topk_seed, 'err_id_prefix', 'SRNNModel', ...
+                               'grid_fn', @(t, d, dec, tau, iv, w) SRNNModel2.lyapunov_sample_grid(t, d, dec, tau, iv, w, 'SRNNModel')));
+                    lya_results.params.N_sys_eqs = params.N_sys_eqs;
+                    if lya_results.D_KY_resolved
+                        fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...
+                            K, lya_results.LLE, lya_results.h_KS_bits, lya_results.D_KY, lya_results.n_positive, lya_results.seconds);
+                    else
+                        fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS >= %.3f bit/s, D_KY unresolved within K (%d positive; %.1f s)\n', ...
+                            K, lya_results.LLE, lya_results.h_KS_bits, lya_results.n_positive, lya_results.seconds);
+                    end
+
                 case 'benettin'
                     fprintf('Computing largest Lyapunov exponent using Benettin''s algorithm...\n');
                     d0 = 1e-3;

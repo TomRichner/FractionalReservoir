@@ -21,5 +21,11 @@ classdef SRNNPairsTestAccess < SRNNCellTypePairs
             [idx, t_lya, acc_start] = SRNNCellTypePairs.lyapunov_sample_grid( ...
                 t, dt, deci, tau, T, warmup);
         end
+
+        function D = kaplan_yorke(lambda)
+            % The 'qr' branch's Kaplan-Yorke dimension, so test_lyapunov_topk
+            % can compare the top-K branch's D_KY against it.
+            D = SRNNCellTypePairs.compute_kaplan_yorke_dimension_internal(lambda);
+        end
     end
 end

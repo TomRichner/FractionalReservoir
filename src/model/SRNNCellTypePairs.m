@@ -145,9 +145,13 @@ classdef SRNNCellTypePairs < handle
         lya_method = 'benettin'
         lya_T_interval
         % Rescaling interval (s). Empty takes the per-method default, 0.02 for
-        % 'benettin' and 0.1 for 'qr'. Must be an integer multiple of 1/fs and
-        % at least 3/fs. See SRNNModel2.lya_dt.
+        % 'benettin' and 0.1 for 'qr' and 'topk'. Must be an integer multiple
+        % of 1/fs and at least 3/fs. See SRNNModel2.lya_dt.
         lya_dt = []
+        % Number of exponents for lya_method = 'topk' (the K largest, by the
+        % discrete QR method on an N x K tangent basis; see lyapunov_topk).
+        % 0 means all N. Ignored by 'benettin' (always 1) and 'qr' (always N).
+        lya_K = 10
         % Seconds of Lyapunov iteration before lya_T_interval(1) during which
         % the perturbation (Benettin) or basis Q (QR) aligns with the leading
         % direction without accumulating. Clamped to T_range(1) with a warning
@@ -622,7 +626,8 @@ classdef SRNNCellTypePairs < handle
                 obj.lya_method, obj.S_out, obj.t_out, 1 / obj.fs, obj.fs, ...
                 obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
                 obj.ode_opts, ...
-                resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNCellTypePairs'), rhs);
+                resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNCellTypePairs'), rhs, ...
+                obj.lya_K, obj.rng_seeds(1) + 424242);
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
@@ -2544,10 +2549,18 @@ classdef SRNNCellTypePairs < handle
     %% Lyapunov algorithms
     methods (Static, Access = protected)
         function results = compute_lyapunov_exponents_internal(method, S_out, t_out, ...
-                dt, fs, interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs)
+                dt, fs, interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs, ...
+                lya_K, topk_seed)
+            % method: 'benettin' (K = 1, finite perturbation, same integrator
+            % as the trajectory), 'qr' (full spectrum, ode45 on N^2 variational
+            % equations; the verified reference), 'topk' (the K = lya_K largest
+            % by the discrete QR method on the stored trajectory; shared core
+            % lyapunov_topk), or 'none'.
+            if nargin < 13 || isempty(lya_K); lya_K = 10; end
+            if nargin < 14 || isempty(topk_seed); topk_seed = 424243; end
             results = struct();
             switch lower(method)
-                case {'benettin', 'qr'}
+                case {'benettin', 'qr', 'topk'}
                     % handled below
                 case 'none'
                     return;
@@ -2557,6 +2570,24 @@ classdef SRNNCellTypePairs < handle
             end
 
             lya_dt = SRNNCellTypePairs.resolve_lya_dt(lya_dt, method, dt);
+
+            if strcmpi(method, 'topk')
+                K = lya_K;
+                if K == 0; K = params.N_sys_eqs; end
+                results = lyapunov_topk(S_out, t_out, fs, lya_dt, interval, lya_warmup, K, ...
+                    @(S, p) SRNNCellTypePairs.compute_Jacobian_fast(S, p), params, ...
+                    struct('seed', topk_seed, 'err_id_prefix', 'SRNNCellTypePairs', ...
+                           'grid_fn', @SRNNCellTypePairs.lyapunov_sample_grid));
+                results.params.N_sys_eqs = params.N_sys_eqs;
+                if results.D_KY_resolved
+                    fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...
+                        K, results.LLE, results.h_KS_bits, results.D_KY, results.n_positive, results.seconds);
+                else
+                    fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS >= %.3f bit/s, D_KY unresolved within K (%d positive; %.1f s)\n', ...
+                        K, results.LLE, results.h_KS_bits, results.n_positive, results.seconds);
+                end
+                return
+            end
 
             if strcmpi(method, 'benettin')
                 [LLE, local, finite, times] = SRNNCellTypePairs.benettin_algorithm_internal( ...
