@@ -925,23 +925,16 @@ classdef ParamSpaceAnalysis2 < handle
             end
             if ~iscell(pool_with); pool_with = {pool_with}; end
 
-            % Define histogram bins
-            if strcmpi(metric, 'LLE')
-                hist_range = [-1.5, 1.5];
-                n_bins = 25;
-                y_label = 'LLE (\lambda_1)';
-            elseif strcmpi(metric, 'mean_rate')
-                hist_range = [0, 1];  % Activation function caps at 1
-                n_bins = 25;
-                y_label = 'Mean Firing Rate';
-            else
-                hist_range = [-10, 10];
-                n_bins = 25;
-                y_label = metric;
-            end
+            % Histogram bins, labels and the zero line come from the one
+            % metric registry (sweep_metrics), keyed by result field name.
+            spec = sweep_metrics(metric);
+            metric = spec.field;
+            hist_range = spec.dist_range;
+            n_bins = 25;
+            y_label = spec.label;
 
             hist_bins = [linspace(hist_range(1), hist_range(2), n_bins + 1), inf];
-            if strcmpi(metric, 'LLE')
+            if spec.inf_both
                 hist_bins = [-inf, hist_bins];
             end
 
@@ -987,7 +980,7 @@ classdef ParamSpaceAnalysis2 < handle
                         'EdgeColor', 'none', 'FaceColor', [0.5 0.5 0.5]);
 
                     hold on;
-                    if strcmpi(metric, 'LLE')
+                    if spec.zero_line
                         xline(0, '--', 'Color', [0 0.7 0], 'LineWidth', 2);
                     end
                     hold off;
@@ -1053,15 +1046,11 @@ classdef ParamSpaceAnalysis2 < handle
             end
             if ~iscell(pool_with); pool_with = {pool_with}; end
 
-            % Default hist_range by metric
+            % Default hist_range, label and zero line from the metric registry.
+            spec = sweep_metrics(metric);
+            metric = spec.field;
             if isempty(hist_range)
-                if strcmpi(metric, 'LLE')
-                    hist_range = [-0.3, 0.1];
-                elseif strcmpi(metric, 'mean_rate')
-                    hist_range = [0, 1];
-                else
-                    hist_range = [-1, 1];
-                end
+                hist_range = spec.sens_range;
             end
 
             % Identify swept parameters (non-reps grid params)
@@ -1168,11 +1157,7 @@ classdef ParamSpaceAnalysis2 < handle
                     % Labels
                     xlabel(ax, x_label, 'FontSize', 14);
                     if c_idx == 1
-                        if strcmpi(metric, 'LLE')
-                            ylabel(ax, '$\lambda_1$', 'Interpreter', 'latex', 'FontSize', 18);
-                        else
-                            ylabel(ax, strrep(metric, '_', '\_'), 'FontSize', 14);
-                        end
+                        ylabel(ax, spec.label, 'Interpreter', 'tex', 'FontSize', 16);
                     end
 
                     if condition_titles.isKey(cond_name)
@@ -1232,29 +1217,25 @@ classdef ParamSpaceAnalysis2 < handle
 
             condition_titles = srnn_condition_titles();   % one source; see that file
 
-            % Metric configuration
-            metric_config = struct();
-            metric_config.lle = struct('field', 'LLE', 'label', '\lambda_1', 'range', [-2.3, 1.5], 'inf_both', true);
-            metric_config.r = struct('field', 'mean_rate', 'label', 'Mean Firing Rate', 'range', [0, 1], 'inf_both', false);
-            metric_config.br = struct('field', 'mean_synaptic_output', 'label', 'Mean Synaptic Output', 'range', [0, 1], 'inf_both', false);
-
-            % Filter to requested metrics
+            % Metric configuration from the one registry (sweep_metrics);
+            % keys or field names both work.
             metrics = {};
             metric_labels = {};
             metric_ranges = {};
             metric_inf_both = {};
+            metric_zero = {};
             for i = 1:length(metrics_to_plot)
-                key = metrics_to_plot{i};
-                if isfield(metric_config, key)
-                    cfg = metric_config.(key);
-                    metrics{end+1} = cfg.field; %#ok<AGROW>
-                    metric_labels{end+1} = cfg.label; %#ok<AGROW>
-                    metric_ranges{end+1} = cfg.range; %#ok<AGROW>
-                    metric_inf_both{end+1} = cfg.inf_both; %#ok<AGROW>
-                else
-                    warning('ParamSpaceAnalysis2:UnknownMetric', ...
-                        'Unknown metric: %s. Valid: lle, r, br', key);
+                try
+                    cfg = sweep_metrics(metrics_to_plot{i});
+                catch ME
+                    warning('ParamSpaceAnalysis2:UnknownMetric', '%s', ME.message);
+                    continue;
                 end
+                metrics{end+1} = cfg.field; %#ok<AGROW>
+                metric_labels{end+1} = cfg.label; %#ok<AGROW>
+                metric_ranges{end+1} = cfg.dist_range; %#ok<AGROW>
+                metric_inf_both{end+1} = cfg.inf_both; %#ok<AGROW>
+                metric_zero{end+1} = cfg.zero_line; %#ok<AGROW>
             end
 
             if isempty(metrics)
@@ -1348,7 +1329,7 @@ classdef ParamSpaceAnalysis2 < handle
                             'Normalize', normalize_mode, ...
                             'EdgeColor', 'none');
 
-                        if strcmpi(metric, 'LLE')
+                        if metric_zero{m_idx}
                             hold(ax, 'on');
                             xline(ax, 0, '--', 'Color', [0 0 0], 'LineWidth', 2);
                             hold(ax, 'off');
@@ -2346,6 +2327,18 @@ classdef ParamSpaceAnalysis2 < handle
             end
         end
 
+        function result = nan_lya_fields(result)
+            % NAN_LYA_FIELDS Every Lyapunov scalar set to NaN, the series empty.
+            % The successful path overwrites these; a failed job keeps them, so
+            % every result carries the same fields and the collectors' isfield
+            % && ~isnan filter is the only gate.
+            for f = SRNNCellTypePairs.lya_summary_fields()
+                result.(f{1}) = NaN;
+            end
+            result.local_rate_lead = [];
+            result.t_lya_lead = [];
+        end
+
         function result = run_single_job(job, model_defaults_local, grid_params_local, ...
                 verbose_local, store_local_lya_local, store_local_lya_dt_local, ...
                 vector_param_lookup_local, model_class_local)
@@ -2411,11 +2404,26 @@ classdef ParamSpaceAnalysis2 < handle
                 result.network_seed = job.network_seed;
                 result.run_duration = toc(run_start);
 
-                % Extract LLE
-                if ~isempty(model.lya_results) && isfield(model.lya_results, 'LLE')
-                    result.LLE = model.lya_results.LLE;
-                else
-                    result.LLE = NaN;
+                % THE LYAPUNOV MEASURES, one bundle: every scalar of
+                % model.lya_summary() (LLE, lambda_gap, n_positive, h_KS_bits,
+                % D_KY + resolved flag, K_used, the conditioning and
+                % convergence flags, the transient-divergence scalars and the
+                % leading vector's block fractions -- see
+                % SRNNCellTypePairs.lya_summary), NaN where the estimator
+                % cannot supply one, plus the leading direction's local-rate
+                % series over the accumulation window. The field list is
+                % lya_summary_fields(), also used to NaN-fill a failed job
+                % below, so the two cannot drift.
+                result = ParamSpaceAnalysis2.nan_lya_fields(result);
+                if ismethod(model, 'lya_summary')
+                    S = model.lya_summary();
+                    for f = SRNNCellTypePairs.lya_summary_fields()
+                        result.(f{1}) = S.(f{1});
+                    end
+                    result.local_rate_lead = S.local_rate_lead;
+                    result.t_lya_lead = S.t_lya_lead;
+                elseif ~isempty(model.lya_results) && isfield(model.lya_results, 'LLE')
+                    result.LLE = model.lya_results.LLE;   % SRNNModel2 (being retired)
                 end
 
                 % Extract decimated local Lyapunov time series if requested
@@ -2461,7 +2469,7 @@ classdef ParamSpaceAnalysis2 < handle
                 result.condition_name = job.condition.name;
                 result.network_seed = job.network_seed;
                 result.run_duration = toc(run_start);
-                result.LLE = NaN;
+                result = ParamSpaceAnalysis2.nan_lya_fields(result);
                 result.mean_rate = NaN;
                 result.mean_synaptic_output = NaN;
 

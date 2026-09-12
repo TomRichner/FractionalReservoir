@@ -4,7 +4,8 @@ function out = fig_EI_weights_param_space(cfg)
 %   out = FIG_EI_WEIGHTS_PARAM_SPACE()
 %   out = FIG_EI_WEIGHTS_PARAM_SPACE('run_dir', d)
 %
-% The same sheet as fig_EI_param_space, coloured by a different quantity.
+% The same sheets as fig_EI_param_space (one per registry measure, tags
+% Fig_EI_Weights_ParamSpace_<stem>), coloured by a different quantity.
 %
 % WHY IT EXISTS. fig_EI_param_space colours each network by f_E, the fraction of
 % neurons that are excitatory. That was the whole story when the only thing
@@ -95,185 +96,72 @@ color_fcn = @(psa, res) ei_weight_fraction(psa, res, cache);
 
 fprintf('[fig_EI_weights_param_space] rebuilding networks to weigh E against I...\n');
 t_rebuild = tic;
+specs = sweep_metrics();
+specs = specs([specs.in_sheets]);
 [~, ~] = load_and_make_unit_histograms(ps_dir, ...
-    'Metrics', {'lle', 'r'}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5], ...
+    'Metrics', {specs.key}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5], ...
     'ColorBy', 'E:I weight balance', 'ColorFcn', color_fcn, 'CLim', W_CLIM, ...
     'ColorLabel', 'excitatory weight fraction');
 fprintf('[fig_EI_weights_param_space] %d networks rebuilt in %.1f s\n', ...
     cache.Count, toc(t_rebuild));
 
-lle_fig = findobj(0, 'Type', 'figure', 'Name', 'LLE Unit Histogram');
-mr_fig  = findobj(0, 'Type', 'figure', 'Name', 'mean_rate Unit Histogram');
-cb_fig  = findobj(0, 'Type', 'figure', 'Name', 'f Value Colorbar');
-
-lle_ax = sort_axes_left_to_right(lle_fig);
-mr_ax  = sort_axes_left_to_right(mr_fig);
-
-%% Combined sheet: conditions across, LLE on top and mean rate below, colorbar last
-nCols = numel(lle_ax);
-nRows = 2;
-nGrid = nCols + 1;
-src   = {lle_ax, mr_ax};
-combined = figure('Color', 'w', 'Position', [100 100 350*nGrid 300*nRows]);
-cax = gobjects(nRows, nCols);
-for r = 1:nRows
-    for c = 1:nCols
-        ph = subplot(nRows, nGrid, (r-1)*nGrid + c, 'Parent', combined);
-        target_pos = get(ph, 'Position');
-        delete(ph);
-        cax(r, c) = copyobj(src{r}(c), combined);
-        set(cax(r, c), 'Position', target_pos);
+% One styled sheet per registry measure (ei_metric_sheet holds the layout
+% shared with fig_EI_param_space); the colorbar is copied for each sheet.
+opts = struct('tick_fs', st.tick_fs, 'label_fs', st.label_fs, 'title_fs', 20, ...
+    'axes_lw', 1.0, 'letter_fs', 18, 'row_shrink', 0.85, 'top_headroom', 0.06, ...
+    'title_y', 1.22, 'cb_x_shift', 0.045, 'xlabel', '', 'yticks', [], ...
+    'zero_color', [0 0.7 0], 'cb_clim', W_CLIM, ...
+    'cb_ticks', [1/11, 0.2, 1/3, 0.5, 2/3, 0.8, 10/11], ...
+    'cb_labels', {{'1:10', '1:4', '1:2', '1:1', '2:1', '4:1', '10:1'}}, ...
+    'cb_ylabel', 'E:I weight ratio');
+cb_fig = findobj(0, 'Type', 'figure', 'Name', 'f Value Colorbar');
+figs = gobjects(1, numel(specs));
+tags = cell(1, numel(specs));
+for mi = 1:numel(specs)
+    spec = specs(mi);
+    src_fig = findobj(0, 'Type', 'figure', 'Name', sprintf('%s Unit Histogram', spec.field));
+    assert(isscalar(src_fig), 'fig_EI_weights_param_space:MissingFigure', ...
+        'Expected one "%s Unit Histogram" figure, found %d.', spec.field, numel(src_fig));
+    o = opts;
+    if strcmp(spec.field, 'LLE')
+        o.xlabel = 'Growth Rate';  o.yticks = [0, 0.5];
+    elseif strcmp(spec.field, 'mean_rate')
+        o.yticks = [0, 0.3];
     end
-end
-
-cbax = gobjects(0);
-if ~isempty(cb_fig)
-    ph = subplot(nRows, nGrid, nGrid, 'Parent', combined);
-    cb_target_pos = get(ph, 'Position');
-    delete(ph);
-    src_cb = findobj(cb_fig, 'Type', 'axes');
-    cbax = copyobj(src_cb(1), combined);
-    set(cbax, 'Position', cb_target_pos);
-end
-close(lle_fig);
-close(mr_fig);
-if ~isempty(cb_fig); close(cb_fig); end
-
-%% Styling -- kept in step with fig_EI_param_space so the pair reads as a pair
-tick_fs  = st.tick_fs;
-label_fs = st.label_fs;
-title_fs     = 20;
-axes_lw      = 1.0;
-letter_fs    = 18;
-row_shrink   = 0.85;
-top_headroom = 0.06;
-title_y      = 1.22;
-lle_yticks   = [0, 0.5];
-rate_yticks  = [0, 0.3];
-for r = 1:nRows
-    for c = 1:nCols
-        ax = cax(r, c);
-        set(ax, 'FontSize', tick_fs, 'LineWidth', axes_lw);
-        set(ax.YLabel, 'FontSize', label_fs);
-        if r == 1
-            xlabel(ax, 'Growth Rate', 'FontSize', label_fs);
-            set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);
-            set(findobj(ax, 'Type', 'constantline'), 'Color', [0 0.7 0]);
-            set(ax, 'YTick', lle_yticks);
-        else
-            set(ax.XLabel, 'FontSize', label_fs);
-            title(ax, '');
-            set(ax, 'YTick', rate_yticks);
-        end
+    cb_copy = gobjects(0);
+    if isgraphics(cb_fig)
+        cb_copy = copyobj(cb_fig, 0); set(cb_copy, 'Visible', 'off');
     end
-    linkaxes(cax(r, :), 'y');
+    figs(mi) = ei_metric_sheet(src_fig, cb_copy, spec, o);
+    tags{mi} = sprintf('Fig_EI_Weights_ParamSpace_%s', spec.stem);
+    if ~cfg.visible; set(figs(mi), 'Visible', 'off'); end
 end
+if isgraphics(cb_fig); close(cb_fig); end
 
-for r = 1:nRows
-    for c = 1:nCols
-        ax = cax(r, c);
-        p  = get(ax, 'Position');
-        new_h = p(4) * row_shrink;
-        set(ax, 'Position', [p(1), p(2) + (p(4) - new_h) - top_headroom, p(3), new_h]);
-    end
-end
-for c = 1:nCols
-    t = get(cax(1, c), 'Title');
-    if ~isempty(get(t, 'String'))
-        set(t, 'Units', 'normalized', 'Position', [0.5, title_y, 0], ...
-            'VerticalAlignment', 'bottom', 'FontSize', title_fs);
-    end
-end
-cb_x_shift = 0.045;
-if isgraphics(cbax)
-    p = get(cbax, 'Position');
-    new_h = p(4) * row_shrink;
-    set(cbax, 'Position', [p(1) - cb_x_shift, p(2) + (p(4) - new_h) - top_headroom, p(3), new_h]);
-end
-
-%% Vertical dividers between condition columns
-pos = cell2mat(get(cax(:), 'Position'));
-[~, ~, col_of] = uniquetol(pos(:,1), 0.01);
-ncol      = max(col_of);
-col_left  = accumarray(col_of, pos(:,1),          [ncol 1], @mean);
-col_right = accumarray(col_of, pos(:,1)+pos(:,3), [ncol 1], @mean);
-[col_left, ord] = sort(col_left);
-col_right = col_right(ord);
-y_bot = min(pos(:,2));
-y_top = max(pos(:,2) + pos(:,4));
-x_shift = 0.012;
-for c = 1:ncol-1
-    x_div = (col_right(c) + col_left(c+1)) / 2 - x_shift;
-    annotation(combined, 'line', [x_div x_div], [y_bot y_top], ...
-        'Color', [0.6 0.6 0.6], 'LineWidth', 2);
-end
-
-letter_axes = cell(1, numel(cax));
-k = 0;
-for r = 1:nRows
-    for c = 1:nCols
-        k = k + 1;
-        letter_axes{k} = cax(r, c);
-    end
-end
-AddLetters2Plots(letter_axes, panel_letters(numel(cax)), ...
-    'FontSize', letter_fs, 'FontWeight', 'normal', 'HShift', -0.03, 'VShift', -0.06);
-
-%% Colorbar ticks as E:I ratios
-% 1:4 through 4:1 are shared with fig_EI_param_space on purpose -- they are the
-% anchor that lets the two sheets be compared -- with 1:10 and 10:1 at the ends,
-% where the bar saturates.
-if isgraphics(cbax)
-    ei_f   = [1/11,   0.2,   1/3,   0.5,   2/3,   0.8,   10/11];
-    ei_lab = {'1:10', '1:4', '1:2', '1:1', '2:1', '4:1', '10:1'};
-    ylim_cb = get(cbax, 'YLim');
-    keep = ei_f >= ylim_cb(1) - 1e-6 & ei_f <= ylim_cb(2) + 1e-6;
-    assert(all(keep), ['E:I weight colorbar lost %d tick(s): CLim is fixed at ' ...
-        '[%g %g] so every label should fit.'], sum(~keep), W_CLIM(1), W_CLIM(2));
-    set(cbax, 'YTick', ei_f(keep), 'YTickLabel', ei_lab(keep), 'FontSize', tick_fs);
-    ylabel(cbax, 'E:I weight ratio', 'FontSize', label_fs);
-end
-
-if ~cfg.visible; set(combined, 'Visible', 'off'); end
-
-%% --- Save -------------------------------------------------------------------
-fig_tag = 'Fig_EI_Weights_ParamSpace';
-out = struct('figs', combined, 'files', {{}}, 'source', ps_dir);
+out = struct('figs', figs, 'files', {{}}, 'source', ps_dir);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, combined);
-    out.files = existing_outputs(out_dir, fig_tag);
-
+    for mi = 1:numel(specs)
+        save_figure_stable(out_dir, tags{mi}, figs(mi));
+        out.files = [out.files, existing_outputs(out_dir, tags{mi})];
+    end
 end
 end
 
-%% ------------------------------------------------------------------------
 function v = ei_weight_fraction(psa, res, cache)
-% Excitatory share of total synaptic weight for the network behind one result.
-%
-% Cached on config_idx: the network is pinned by the grid position, so every
-% adaptation condition at a given point shares one rebuild.
+% The realized E:I weight balance of the network at this grid point, cached
+% per config_idx (the network is shared by every condition run at a point).
 key = res.config_idx;
 if isKey(cache, key)
     v = cache(key);
     return
 end
-
 m = psa.rebuild_model(res);
-% build() prints its spectral radius and dead-state count per call; silenced
-% here because this runs once per grid point and would otherwise bury the
-% figure's own output.
 evalc('m.build()');
-
 ti = m.type_indices;
 assert(numel(ti) >= 2, ...
     'ei_weight_fraction needs at least two cell types; got %d.', numel(ti));
-
-% Sum over PRESYNAPTIC columns: total excitatory drive vs total inhibitory
-% drive. Type 1 is E and type 2 is I by the class's own convention, which
-% SRNNCellTypePairs enforces through the f_E / mu_*_relative aliases.
 S_E = full(sum(sum(m.W(:, ti{1}))));
 S_I = full(sum(sum(m.W(:, ti{2}))));
-
 denom = abs(S_E) + abs(S_I);
 if denom == 0
     v = 0.5;   % a zero W has no balance; centre it rather than divide by zero
@@ -282,6 +170,3 @@ else
 end
 cache(key) = v; %#ok<NASGU>  handle object: this mutates the caller's map
 end
-
-
-

@@ -55,14 +55,22 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate
 
     % Per-metric plot_sensitivity args (constant across params); include n_bins
     % only when the caller provided it, else plot_sensitivity uses its default.
-    lle_args = {'metric', 'LLE', 'hist_range', lle_hist_range};
-    if ~isempty(n_bins)
-        lle_args = [lle_args, {'n_bins', n_bins}];
-    end
-
-    rate_args = {'metric', 'mean_rate'};
-    if ~isempty(rate_n_bins)
-        rate_args = [rate_args, {'n_bins', rate_n_bins}];
+    % One plot_sensitivity call per registry measure with in_sheets set
+    % (sweep_metrics). LLE keeps the caller's range; every other measure
+    % takes the registry's sens_range. n_bins applies to LLE, rate_n_bins to
+    % the rest (historical names; both default to plot_sensitivity's own).
+    specs = sweep_metrics();
+    specs = specs([specs.in_sheets]);
+    metric_args = cell(1, numel(specs));
+    for mi = 1:numel(specs)
+        args = {'metric', specs(mi).field};
+        if strcmp(specs(mi).field, 'LLE')
+            args = [args, {'hist_range', lle_hist_range}]; %#ok<AGROW>
+            if ~isempty(n_bins); args = [args, {'n_bins', n_bins}]; end %#ok<AGROW>
+        elseif ~isempty(rate_n_bins)
+            args = [args, {'n_bins', rate_n_bins}]; %#ok<AGROW>
+        end
+        metric_args{mi} = args;
     end
 
     for k = 1:length(sens_listing)
@@ -88,8 +96,9 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate
 
         psa.output_dir = replot_dir;
 
-        psa.plot_sensitivity(lle_args{:});
-        psa.plot_sensitivity(rate_args{:});
+        for mi = 1:numel(metric_args)
+            psa.plot_sensitivity(metric_args{mi}{:});
+        end
 
         fig_dir = fullfile(replot_dir, 'figures');
         save_some_figs_to_folder_2(fig_dir, ...

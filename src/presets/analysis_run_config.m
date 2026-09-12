@@ -226,5 +226,20 @@ cfg.model = struct('ode_solver', ode_solver, 'fs', fs, 'T_range', T_range);
 if ~isempty(lya_T_interval)
     cfg.model.lya_T_interval = lya_T_interval;
 end
+% THE LYAPUNOV ESTIMATOR THE SWEEPS USE (TR, 2026-09-12): the top-K discrete
+% QR method at K = 15, retried at 2K up to 30 while the Kaplan-Yorke
+% dimension is unresolved, re-orthonormalised every 0.05 s (short enough to
+% resolve transients on the dendritic timescale; the interval does not bias
+% the exponents). One run then yields lambda_1, h_KS, D_KY, n_positive, the
+% transient-divergence scalars and the leading vector -- see
+% SRNNCellTypePairs.lya_summary. Set every mode the same so run modes differ
+% only in compute. A config wanting the Benettin comparison overrides
+% cfg.model.lya_method = 'benettin' after calling this; the same seeds then
+% give the same networks and only the estimator differs.
+cfg.model.lya_method = 'topk';
+cfg.model.lya_K      = 15;
+cfg.model.lya_K_auto = true;
+cfg.model.lya_K_max  = 30;
+cfg.model.lya_dt     = 0.05;
 cfg.sde_solver = sde_solver;
 end

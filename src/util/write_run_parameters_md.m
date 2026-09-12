@@ -85,6 +85,7 @@ write_header(fid, run_name, preset_name, run_mode, model_class);
 write_provenance(fid, man, prov);
 write_preset_section(fid, rec_preset, cur_preset, cur_ok, preset_name, entries);
 write_analyses_section(fid, entries);
+caveats = [caveats, write_lyapunov_quality_section(fid, entries, run_dir)];
 write_conditions_section(fid, entries, model_class);
 caveats = [caveats, write_parameters_section(fid, entries, rec_preset, model_class)];
 write_caveats(fid, caveats);
@@ -566,6 +567,80 @@ for k = 1:numel(entries)
     end
 end
 fprintf(fid, '\n');
+end
+
+function caveats = write_lyapunov_quality_section(fid, entries, run_dir)
+% WRITE_LYAPUNOV_QUALITY_SECTION Per sweep and condition: how trustworthy the
+% top-K Lyapunov numbers are.
+%
+% Reads the per-condition result files (the psa in `entries` deliberately
+% carries no results, see load_psa) and tabulates the quality fields
+% SRNNCellTypePairs.lya_summary stores per job: the share of jobs whose
+% Kaplan-Yorke dimension resolved within K, the share whose positive part hit
+% K (h_KS then a lower bound), the K values used (the retry doubles K), the
+% worst propagator conditioning, and the median convergence drift of
+% lambda_1 over the last quarter of the window. A Benettin run shows NaN in
+% the spectrum columns and is labelled as such.
+caveats = {};
+fprintf(fid, '%s\n', '## Lyapunov quality');
+fprintf(fid, '\n');
+fprintf(fid, '%s\n', ['Per sweep and condition, from the stored per-job fields ' ...
+    '(`SRNNCellTypePairs.lya_summary`). *D_KY resolved* is the share of successful ' ...
+    'jobs whose Kaplan-Yorke sum crossed zero within K; *n+ at K* the share whose ' ...
+    'positive exponents filled K (their `h_KS` is a lower bound); *K used* the ' ...
+    'values the retry ended at; *cond max* the worst R11/RKK; *|drift|* the median ' ...
+    'change of the finite-time lambda_1 over the last quarter of the window.']);
+fprintf(fid, '\n');
+fprintf(fid, '%s\n', '| Directory | Condition | Jobs | Method | D_KY resolved | n+ at K | K used | cond max | median \|drift\| | max orth defect |');
+fprintf(fid, '%s\n', '|---|---|---|---|---|---|---|---|---|---|');
+any_row = false;
+for k = 1:numel(entries)
+    e = entries(k);
+    cond_names = cellfun(@(c) c.name, e.psa.conditions, 'UniformOutput', false);
+    for ci = 1:numel(cond_names)
+        cname = cond_names{ci};
+        mat = fullfile(run_dir, e.dir_name, cname, sprintf('param_space_results_%s.mat', cname));
+        if ~isfile(mat); continue; end
+        try
+            S = load(mat, 'results');
+        catch ME
+            caveats{end+1} = sprintf('Could not read `%s`: %s', mat, ME.message); %#ok<AGROW>
+            continue
+        end
+        R = S.results(~cellfun(@isempty, S.results));
+        R = R(cellfun(@(r) isstruct(r) && isfield(r, 'success') && r.success, R));
+        n = numel(R);
+        if n == 0 || ~isfield(R{1}, 'K_used')
+            fprintf(fid, '| `%s` | `%s` | %d | *(no Lyapunov fields)* | | | | | | |\n', e.dir_name, cname, n);
+            any_row = true;
+            continue
+        end
+        g = @(f) cellfun(@(r) r.(f), R);
+        K_used = g('K_used');
+        if all(isnan(K_used))
+            method = 'benettin';
+        else
+            method = 'topk';
+        end
+        pct = @(v) sprintf('%.0f%%', 100 * mean(v, 'omitnan'));
+        ku = unique(K_used(~isnan(K_used)));
+        if isempty(ku); ku_txt = '—'; else; ku_txt = strjoin(arrayfun(@(x) sprintf('%d', x), ku, 'UniformOutput', false), ', '); end
+        fprintf(fid, '| `%s` | `%s` | %d | %s | %s | %s | %s | %s | %s | %s |\n', ...
+            e.dir_name, cname, n, method, ...
+            pct(g('D_KY_resolved')), pct(g('n_positive_at_K')), ku_txt, ...
+            fmt_nan(max(g('cond_max')), '%.1e'), fmt_nan(median(abs(g('lambda_1_drift')), 'omitnan'), '%.3g'), ...
+            fmt_nan(max(g('orth_defect_max')), '%.1e'));
+        any_row = true;
+    end
+end
+if ~any_row
+    fprintf(fid, '%s\n', '| *(no per-condition result files found)* | | | | | | | | | |');
+end
+fprintf(fid, '\n');
+end
+
+function s = fmt_nan(v, fmt)
+if isempty(v) || all(isnan(v)); s = '—'; else; s = sprintf(fmt, v); end
 end
 
 function [solver, fs_txt, tr_txt, lya_txt] = timing_cells(e)

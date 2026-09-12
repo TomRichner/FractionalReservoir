@@ -189,8 +189,14 @@ function combine_psa_sweep(run_dirs, pattern, fig_dir, tag, lle_hist_range)
         end
         base = psas{1}; others = psas(2:end);
         base.output_dir = fig_dir;   % not used for saving here, but harmless
-        base.plot_sensitivity('metric', 'LLE', 'hist_range', lle_hist_range, 'pool_with', others);
-        base.plot_sensitivity('metric', 'mean_rate', 'pool_with', others);
+        specs = sweep_metrics();
+        for spec = specs([specs.in_sheets])
+            if strcmp(spec.field, 'LLE')
+                base.plot_sensitivity('metric', 'LLE', 'hist_range', lle_hist_range, 'pool_with', others);
+            else
+                base.plot_sensitivity('metric', spec.field, 'pool_with', others);
+            end
+        end
         name = sprintf('combined_%s_%s', tag, matlab.lang.makeValidName(ks{ki}));
         save_some_figs_to_folder_2(fig_dir, name, [], {'fig', 'png'});
         close all;
@@ -216,8 +222,10 @@ function combine_param_space(run_dirs, fig_dir)
         return;
     end
     base = psas{1}; others = psas(2:end);
-    base.plot('metric', 'LLE', 'pool_with', others);
-    base.plot('metric', 'mean_rate', 'pool_with', others);
+    specs = sweep_metrics();
+    for spec = specs([specs.in_sheets])
+        base.plot('metric', spec.field, 'pool_with', others);
+    end
     save_some_figs_to_folder_2(fig_dir, 'combined_param_space', [], {'fig', 'png'});
     close all;
     fprintf('  [param_space] pooled %d runs\n', numel(psas));

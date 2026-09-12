@@ -94,30 +94,28 @@ condition_titles = srnn_condition_titles();
 
 %% Build metric configuration based on options
 % Map short names to internal metric names and display properties
-metric_config = struct();
-metric_config.lle = struct('field', 'LLE', 'label', '\lambda_1', 'range', options.LLERange, 'inf_both', true);
-metric_config.r = struct('field', 'mean_rate', 'label', 'Mean Firing Rate', 'range', [0, 1], 'inf_both', false);
-metric_config.br = struct('field', 'mean_synaptic_output', 'label', 'Mean Synaptic Output', 'range', [0, 1], 'inf_both', false);
-
-% Filter to requested metrics
+% From the one metric registry (sweep_metrics); keys or field names both
+% work. LLERange is kept as the one caller-side override (the E:I figures set
+% it); every other range is the registry's dist_range.
 metrics = {};
 metric_labels = {};
 metric_ranges = {};
-metric_fields = {};
 metric_inf_both = {};
+metric_zero = {};
 for i = 1:length(metrics_to_plot)
-    key = metrics_to_plot{i};
-    if isfield(metric_config, key)
-        cfg = metric_config.(key);
-        metrics{end+1} = cfg.field; %#ok<AGROW>
-        metric_labels{end+1} = cfg.label; %#ok<AGROW>
-        metric_ranges{end+1} = cfg.range; %#ok<AGROW>
-        metric_fields{end+1} = cfg.field; %#ok<AGROW>
-        metric_inf_both{end+1} = cfg.inf_both; %#ok<AGROW>
-    else
-        warning('load_and_make_unit_histograms:UnknownMetric', ...
-            'Unknown metric: %s. Valid options: lle, r, br', key);
+    try
+        cfg = sweep_metrics(metrics_to_plot{i});
+    catch ME
+        warning('load_and_make_unit_histograms:UnknownMetric', '%s', ME.message);
+        continue;
     end
+    rng_ = cfg.dist_range;
+    if strcmp(cfg.field, 'LLE'); rng_ = options.LLERange; end
+    metrics{end+1} = cfg.field; %#ok<AGROW>
+    metric_labels{end+1} = cfg.label; %#ok<AGROW>
+    metric_ranges{end+1} = rng_; %#ok<AGROW>
+    metric_inf_both{end+1} = cfg.inf_both; %#ok<AGROW>
+    metric_zero{end+1} = cfg.zero_line; %#ok<AGROW>
 end
 
 if isempty(metrics)
@@ -241,8 +239,8 @@ for m_idx = 1:length(metrics)
                 'Normalize', normalize_mode, ...
                 'EdgeColor', 'none');
 
-            % Add stability reference line for LLE
-            if strcmpi(metric, 'LLE')
+            % Zero reference where the sign matters (registry)
+            if metric_zero{m_idx}
                 hold(ax, 'on');
                 xline(ax, 0, '--', 'Color', [0 0 0], 'LineWidth', 2);
                 hold(ax, 'off');

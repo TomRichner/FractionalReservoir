@@ -1,13 +1,14 @@
 function out = fig_param_space_allStd(cfg)
-% FIG_PARAM_SPACE_ALLSTD Param-space LLE and firing-rate distributions, 2 x N.
+% FIG_PARAM_SPACE_ALLSTD Param-space distributions, one 1 x N sheet per measure.
 %
 %   out = FIG_PARAM_SPACE_ALLSTD()
 %   out = FIG_PARAM_SPACE_ALLSTD('run_dir', d)
 %
-% Row 1 = LLE distributions, row 2 = mean firing-rate distributions, one column
-% per adaptation condition. No simulation is re-run: the saved param-space PSA
-% object is reloaded and its per-condition histogram axes are copied into one
-% combined figure.
+% One sheet per registry measure with in_sheets set (sweep_metrics: lambda_1,
+% mean rate, h_KS, D_KY, ...), one column per adaptation condition, tags
+% Fig_ParamSpace_<stem>. No simulation is re-run: the saved param-space PSA
+% object is reloaded and its per-condition histogram axes are copied into the
+% sheets.
 %
 % NO 'close all force'. The original opened with it, and correctly so on its own
 % terms -- replot_param_space_analysis saves ALL open figures, so a stray one
@@ -36,117 +37,86 @@ run_dir = resolve_run_dir('run_dir', cfg.run_dir, 'preset_name', cfg.preset_name
 tick_fs  = st.tick_fs;
 label_fs = st.label_fs;
 title_fs = st.title_fs;
-% Probability y ticks, one entry per row. The two rows span different ranges
-% (the LLE distributions peak near 0.8, the rate distributions near 0.4), so
-% each gets its own sparse set rather than MATLAB's automatic ticks.
-prob_yticks = {[0, 0.4, 0.8], [0, 0.2, 0.4]};
 x_shift = 0.007;   % nudge column dividers slightly left (normalized figure units)
 
-% Start from a clean slate: replot_param_space_analysis saves ALL open figures,
-% so any stray figure lingering in the session would pollute the save.
-% (no 'close all force' -- see the header note; it destroyed sibling figures)
-
-% 1) Regenerate the LLE + mean_rate distribution figures into a
-%    replot_param_space_<dt>/figures/ folder under data_root.
+% 1) Regenerate one distribution figure per registry measure with in_sheets
+%    set (sweep_metrics) into a replot_param_space_<dt>/figures/ folder.
+%    (no 'close all force' -- see the header note; it destroyed sibling figures)
 replot_dir = replot_param_space_analysis(run_dir);
+specs = sweep_metrics();
+specs = specs([specs.in_sheets]);
 
-% 2) Re-open both saved figures (invisible) and map by Name.
-lle_fig = gobjects(0);
-mr_fig  = gobjects(0);
+% 2) Re-open the saved figures (invisible) and map them by Name.
+by_name = containers.Map('KeyType', 'char', 'ValueType', 'any');
 fig_listing = dir(fullfile(replot_dir, 'figures', '*.fig'));
 for k = 1:numel(fig_listing)
     f = openfig(fullfile(fig_listing(k).folder, fig_listing(k).name), 'invisible');
-    switch get(f, 'Name')
-        case 'LLE Distribution',       lle_fig = f;
-        case 'mean_rate Distribution', mr_fig  = f;
-        otherwise,                     close(f);
+    by_name(get(f, 'Name')) = f;
+end
+
+% 3) One 1 x N sheet per measure (one column per condition), styled alike.
+figs = gobjects(1, numel(specs));
+tags = cell(1, numel(specs));
+for mi = 1:numel(specs)
+    spec = specs(mi);
+    key = sprintf('%s Distribution', spec.field);
+    if ~isKey(by_name, key)
+        error('Fig_param_space_allStd:MissingFigure', ...
+            'Expected a "%s" figure in:\n  %s', key, fullfile(replot_dir, 'figures'));
     end
-end
-if isempty(lle_fig) || isempty(mr_fig)
-    error('Fig_param_space_allStd:MissingFigure', ...
-        ['Expected both an "LLE Distribution" and a "mean_rate Distribution" ' ...
-         'figure in:\n  %s'], fullfile(replot_dir, 'figures'));
-end
-
-% Row axes, sorted left-to-right (one per condition).
-lle_ax = sort_axes_left_to_right(lle_fig);
-mr_ax  = sort_axes_left_to_right(mr_fig);
-
-% 3) Build the combined 2xN figure: row 1 = LLE, row 2 = mean rate. Copy each
-%    source axis into a subplot placeholder (same approach as
-%    assemble_sensitivity_figure).
-nCols = numel(lle_ax);
-nRows = 2;
-src   = {lle_ax, mr_ax};
-combined = figure('Color', 'w', 'Position', [100 100 350*nCols 300*nRows]);
-cax = gobjects(nRows, nCols);
-for r = 1:nRows
+    src_fig = by_name(key);
+    src_ax  = sort_axes_left_to_right(src_fig);
+    nCols   = numel(src_ax);
+    combined = figure('Color', 'w', 'Position', [100 100 350 * nCols 300]);
+    cax = gobjects(1, nCols);
     for c = 1:nCols
-        ph = subplot(nRows, nCols, (r-1)*nCols + c, 'Parent', combined);
+        ph = subplot(1, nCols, c, 'Parent', combined);
         target_pos = get(ph, 'Position');
         delete(ph);
-        cax(r, c) = copyobj(src{r}(c), combined);
-        set(cax(r, c), 'Position', target_pos);
+        cax(c) = copyobj(src_ax(c), combined);
+        set(cax(c), 'Position', target_pos);
     end
-end
-close(lle_fig);
-close(mr_fig);
+    close(src_fig);
 
-% 4) Clean up: fonts matched to the MC/sensitivity figures, condition titles
-%    only on the top row (not bold), y-axes linked within each row.
-for r = 1:nRows
     for c = 1:nCols
-        ax = cax(r, c);
+        ax = cax(c);
         set(ax, 'FontSize', tick_fs);
         set(ax.YLabel, 'FontSize', label_fs);
-        if r == 1
-            % LLE is the x-axis here (row 1 is a distribution). 'tex' so the
-            % symbol renders rather than printing the literal \lambda_1.
-            xlabel(ax, '\lambda_1', 'Interpreter', 'tex', 'FontSize', label_fs);
-            set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);  % titles, not bold
-        else
-            set(ax.XLabel, 'FontSize', label_fs);   % keep 'Mean Firing Rate'
-            title(ax, '');   % condition titles only on the top row
-        end
+        xlabel(ax, spec.label, 'Interpreter', 'tex', 'FontSize', label_fs);
+        set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);
     end
-    linkaxes(cax(r, :), 'y');   % shared probability axis within each row
-    % After linkaxes, so the shared limits don't regenerate automatic ticks.
-    set(cax(r, :), 'YTick', prob_yticks{r});
+    linkaxes(cax, 'y');
+
+    pos = cell2mat(get(cax(:), 'Position'));
+    [~, ~, col_of] = uniquetol(pos(:, 1), 0.01);
+    ncol      = max(col_of);
+    col_left  = accumarray(col_of, pos(:, 1),             [ncol 1], @mean);
+    col_right = accumarray(col_of, pos(:, 1) + pos(:, 3), [ncol 1], @mean);
+    [col_left, ord] = sort(col_left);
+    col_right = col_right(ord);
+    y_bot = min(pos(:, 2));
+    y_top = max(pos(:, 2) + pos(:, 4));
+    for c = 1:ncol - 1
+        x_div = (col_right(c) + col_left(c + 1)) / 2 - x_shift;
+        annotation(combined, 'line', [x_div x_div], [y_bot y_top], ...
+            'Color', [0.6 0.6 0.6], 'LineWidth', 1.5);
+    end
+    if ~cfg.visible; set(combined, 'Visible', 'off'); end
+    figs(mi) = combined;
+    tags{mi} = sprintf('Fig_ParamSpace_%s', spec.stem);
+end
+% Any leftover reopened figures (measures not in the sheet list) are closed.
+for k = keys(by_name)
+    if isgraphics(by_name(k{1})); close(by_name(k{1})); end
 end
 
-% 5) Vertical gray dividers between the condition columns (span both rows).
-pos = cell2mat(get(cax(:), 'Position'));          % [left bottom width height]
-[~, ~, col_of] = uniquetol(pos(:,1), 0.01);       % column index per axis (by left edge)
-ncol      = max(col_of);
-col_left  = accumarray(col_of, pos(:,1),          [ncol 1], @mean);
-col_right = accumarray(col_of, pos(:,1)+pos(:,3), [ncol 1], @mean);
-[col_left, ord] = sort(col_left);
-col_right = col_right(ord);
-y_bot = min(pos(:,2));
-y_top = max(pos(:,2) + pos(:,4));
-for c = 1:ncol-1
-    x_div = (col_right(c) + col_left(c+1)) / 2 - x_shift;
-    annotation(combined, 'line', [x_div x_div], [y_bot y_top], ...
-        'Color', [0.6 0.6 0.6], 'LineWidth', 1.5);
-end
-
-% 6) Save ONLY the combined figure, with a STABLE name.
-
-if ~cfg.visible; set(combined, 'Visible', 'off'); end
-
-%% --- Save -------------------------------------------------------------------
-fig_tag = 'Fig_ParamSpace_allStd';
-out = struct('figs', combined, 'files', {{}}, 'source', run_dir);
+% 4) Save ONLY the combined figures, with STABLE names, then drop the prep folder.
+out = struct('figs', figs, 'files', {{}}, 'source', run_dir);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, combined);
-    out.files = existing_outputs(out_dir, fig_tag);
-
-    % The prep figures exist only to build the final one; remove the whole
-    % replot folder so no extra figs are left behind in the data directory.
+    for mi = 1:numel(specs)
+        save_figure_stable(out_dir, tags{mi}, figs(mi));
+        out.files = [out.files, existing_outputs(out_dir, tags{mi})];
+    end
     if isfolder(replot_dir); rmdir(replot_dir, 's'); end
-
 end
 end
-
-
-

@@ -43,8 +43,10 @@ function replot_dir = replot_param_space_analysis(data_root)
 
         psa.output_dir = replot_dir;
 
-        psa.plot('metric', 'LLE');
-        psa.plot('metric', 'mean_rate');
+        specs = sweep_metrics();
+        for spec = specs([specs.in_sheets])
+            psa.plot('metric', spec.field);
+        end
 
         fig_dir = fullfile(replot_dir, 'figures');
         save_some_figs_to_folder_2(fig_dir, 'param_space', [], {'fig', 'png'});
