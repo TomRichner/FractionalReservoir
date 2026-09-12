@@ -110,6 +110,49 @@ generally faster.
   make a stable network look more stable; it cannot make an unstable one
   look stable.
 
+**Does breaking the degeneracy help? No (measured 2026-09-12).** The slow
+band is degenerate because every neuron of a type shares one SFA ladder.
+`tau_a_spread` (per-neuron ladders, log-normal at both ends, geometric
+between) was added partly to test whether spreading the band speeds
+alignment. `scripts/examples/tau_spread_alignment.m`, stable regime of the
+paper physics at n = 100, noise off, 70 s, finite-time λ_1 accumulated over
+[5, t] minus a 40 s-warmup top-10 reference:
+
+| spread | −1/τ_slowest | ref λ_1 | λ_1 − λ_10 | Benettin at 15 / 25 / 45 / 70 s | top-10 at 15 / 25 / 45 / 70 s |
+|---|---|---|---|---|---|
+| 0 | −0.100 | −0.109 | 0.003 | −0.040 −0.022 −0.012 −0.007 | −0.015 −0.011 −0.006 −0.004 |
+| 0.02 | −0.094 | −0.108 | 0.002 | −0.040 −0.021 −0.012 −0.007 | −0.016 −0.011 −0.007 −0.004 |
+| 0.05 | −0.085 | −0.106 | 0.003 | −0.041 −0.022 −0.012 −0.007 | −0.018 −0.013 −0.008 −0.006 |
+| 0.10 | −0.073 | −0.098 | 0.007 | −0.047 −0.027 −0.016 −0.010 | −0.040 −0.023 −0.013 −0.008 |
+
+Three things to read off it:
+
+1. **The bias is a fixed log-amplitude loss, so it decays as 1/T.** Multiply
+   each entry by its window length: Benettin gives −0.60, −0.54, −0.54,
+   −0.50 nats at spread 0, i.e. a constant ≈ −0.5, and the same constant at
+   every spread. The top-10 gives ≈ −0.28 nats at spread 0. That constant is
+   ln of the initial vector's projection onto the slow band, spent while its
+   fast components decay; the K = 10 basis starts with a larger projection
+   (best of ten), hence the smaller constant. Neither depends on the
+   spread, because the decay is governed by the gap to the STD band
+   (−0.25 /s), which the spread does not touch.
+2. **A spread makes the top-K *slower*, not faster.** At spread 0.1 the
+   top-10 constant grows to ≈ −0.55 nats: the leading direction is now one
+   specific neuron's adaptation variable, separated from the next by the
+   spacing of the two largest of n draws (~0.3 σ / τ), and the basis needs
+   ~1/(λ_1 − λ_2) to single it out. With a degenerate band there was
+   nothing to single out.
+3. **λ_1 walks toward −1/τ of the slowest neuron but does not reach it**
+   (−0.098 against −0.073 at spread 0.1 over 70 s), because that neuron's
+   adaptation direction is coupled to the rest through φ' (the ~10% shift
+   that puts the band at −0.11 rather than −0.10 in the first place), and
+   because the finite-time value is still converging.
+
+So the spread does what it was built for, making the band's exponents and
+directions distinct, and does nothing for the warm-up problem. The remedy
+for that stays as above: longer warm-up, or K > 1, whose head start is a
+larger initial projection rather than faster decay.
+
 # 3. Benettin's method (K = 1) as implemented
 
 `benettin_algorithm_internal` follows a **finite** perturbation of norm
