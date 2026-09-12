@@ -26,7 +26,7 @@ $$
 dx_i &= \frac{-x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \theta_j}{\tau_d}\, dt \;+\; \frac{\sigma_u}{\tau_d}\, dW_i \\[8pt]
 \theta_i &= r_{i} \prod_{m=1}^{M} b_{im} \\[8pt]
 r_i &= \phi\left( x_i - a_{0_i} - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right) \\[8pt]
-\frac{da_{ik}}{dt} &= \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K \\[8pt]
+\frac{da_{ik}}{dt} &= \frac{-a_{ik} + r_i}{\tau_{a,ik}}, \qquad k = 1, \dots, K \\[8pt]
 \frac{db_{im}}{dt} &= \frac{1-b_{im}}{\tau_{rec_m}} - \frac{b_{im}\, r_i}{\tau_{rel_m}}, \qquad m = 1, \dots, M
 \end{aligned}
 $$
@@ -42,8 +42,30 @@ cosmetic: the alternative framing $r_i = b_i\,\phi(\cdot)$ would make SFA
 integrate $b_i r_i$, make the STD equation depend on $b_i^2 r_i$, and put a
 factor of $b$ into the $a \to x$ and $a \to a$ Jacobian blocks.
 
+**The SFA timescales may be per neuron.** By default every neuron of a cell
+type shares the type's ladder, $\tau_{a,ik} = \tau_{a_k}$. With a nonzero
+`tau_a_spread` $\sigma_q$ (one dimensionless number per type, zero in every
+preset unless its name says otherwise) `build()` draws each neuron its own
+ladder from the nominal one:
+
+$$
+\log \tau_{a,ik} = \log \tau_{a_k} + (1 - w_k)\, \delta_i^{\mathrm{fast}} + w_k\, \delta_i^{\mathrm{slow}},
+\qquad \delta_i^{\mathrm{fast}}, \delta_i^{\mathrm{slow}} \sim \mathcal{N}(0, \sigma_q^2),
+\qquad w_k = \frac{\log \tau_{a_k} - \log \tau_{a_1}}{\log \tau_{a_K} - \log \tau_{a_1}} .
+$$
+
+The two ends of the ladder are jittered log-normally (median-preserving, so
+$\tau$ stays positive and the linear spread is proportional to $\tau$) and the
+interior rungs follow in log space at the nominal's own position; for a
+log-spaced ladder this is "jitter the endpoints and re-run logspace". It exists
+to break the degeneracy of the slow Lyapunov band (every neuron otherwise
+contributes an exponent within a few percent of $-1/\tau_{a_K}$); note that
+with a spread the leading exponent of a stable network is $-1/\tau$ of the
+*slowest drawn neuron*. The draw is seeded, saved and restored around, and
+recorded in the read-only `tau_a_matrix`. See `SRNNCellTypePairs.tau_a_spread`.
+
 **Adaptation is normalized by $K$, depression is not.** Each $a_{ik}$ relaxes to
-the rate, so $a_{ik} \to r_i$ for every timescale whatever its $\tau_{a_k}$, and
+the rate, so $a_{ik} \to r_i$ for every timescale whatever its $\tau_{a,ik}$, and
 $\sum_k a_{ik} \to K r_i$. Dividing by $K$ therefore makes the steady-state
 adaptation $c\, r_i$ exactly — independent of how many timescales carry it — so
 $c$ is the **total adaptation budget** and changing $K$ changes the timescale

@@ -59,6 +59,42 @@ classdef SRNNCellTypePairs < handle
         % not adapt. The COUNT is derived from it (see the Dependent n_a below),
         % exactly as n_b has always been numel(tau_rec) on the synapse side.
         tau_a
+
+        % PER-NEURON SPREAD OF THE SFA LADDER, one dimensionless number per
+        % cell type (1 x C; a scalar is broadcast; [] = zeros = every neuron
+        % of a type shares tau_a{q} exactly, the default). With a nonzero
+        % spread build() draws each neuron its own ladder:
+        %
+        %   log tau_ik = log tau_k + (1 - w_k) * d_i^fast + w_k * d_i^slow
+        %   d_i^fast, d_i^slow ~ N(0, tau_a_spread(q)^2), independent
+        %   w_k = (log tau_k - log tau_1) / (log tau_K - log tau_1)
+        %
+        % i.e. the two ENDS of the ladder are jittered log-normally (median-
+        % preserving, so tau stays positive and the nominal row is "the typical
+        % neuron") and the interior rungs follow in log space at the nominal's
+        % own log position. For a log_ladder nominal that is "jitter the
+        % endpoints and re-run logspace"; for any other nominal, sigma = 0
+        % reproduces it exactly. K = 1 takes the slow draw alone; K = 2 is the
+        % two endpoints. The spread is proportional to tau, so +/-10% is
+        % +/-0.025 s at 0.25 s and +/-1 s at 10 s.
+        %
+        % WHY: with every neuron on the same ladder the stable regime has ~n
+        % Lyapunov exponents within 0.01 of -1/tau_max, a degenerate band whose
+        % individual exponents and directions are not resolvable at finite
+        % time (docs/notes/Lyapunov_estimation_methods.md). A spread of a few
+        % percent breaks that degeneracy by a stated amount. Note the leading
+        % exponent then becomes -1/tau of the SLOWEST drawn neuron -- an
+        % extreme-value statistic that moves with n and with the seed.
+        %
+        % c_eff = c / K is untouched: every a_k still relaxes to r whatever its
+        % tau, so the adaptation budget is unchanged; only the timescale
+        % STRUCTURE varies. The realised ladders are tau_a_matrix (read-only).
+        tau_a_spread = []
+        % Seed for the ladder draw. Empty derives it from rng_seeds(1), so a
+        % sweep over network seeds also varies the ladders while keeping the
+        % draw off the streams that generate W and the setpoints. Pinned to
+        % 'twister' so a parallel worker draws what the client draws.
+        tau_a_seed = []
         c
         synapse_config = struct()
         std_zero_floor = false
@@ -219,6 +255,18 @@ classdef SRNNCellTypePairs < handle
         % shares the scalar S_c, which is the default and keeps every code path
         % on the scalar branch.
         S_c_vec = []
+
+        % Realised per-neuron SFA ladders, drawn by build_tau_a_matrix() from
+        % tau_a / tau_a_spread: a 1 x C cell, tau_a_matrix{q} is n_q x n_a(q)
+        % (one ROW per neuron of type q, columns in the order of tau_a{q};
+        % n_q x 0 for a type without SFA). EMPTY when every spread is zero,
+        % which keeps every downstream path on the shared-row branch and the
+        % results bit-identical to a model without this feature. The physics
+        % never reads this directly: get_params() emits params.tau_a_matrix{q}
+        % at that size in both cases (the nominal row replicated when this is
+        % empty), so dynamics_fast, compute_Jacobian_fast and jacobian_times
+        % have one code path.
+        tau_a_matrix = []
 
         % Pre-generated Wiener increments for the current run, or empty. Built
         % at the top of run(), kept alive through compute_lyapunov so Benettin
@@ -666,6 +714,21 @@ classdef SRNNCellTypePairs < handle
             params.level_of_chaos = obj.level_of_chaos;
             params.n_a = obj.n_a;
             params.tau_a = obj.tau_a;
+            % THE LADDERS THE PHYSICS READS: always n_q x n_a(q) per type -- the
+            % realised per-neuron draw when tau_a_spread > 0, else the nominal
+            % row replicated -- so the three sites that divide by tau
+            % (dynamics_fast, compute_Jacobian_fast, jacobian_times) have one
+            % code path and cannot disagree about which tau a neuron has.
+            params.tau_a_spread = obj.tau_a_spread;
+            params.tau_a_matrix = cell(1, obj.n_cellTypes);
+            for q = 1:obj.n_cellTypes
+                if ~isempty(obj.tau_a_matrix)
+                    params.tau_a_matrix{q} = obj.tau_a_matrix{q};
+                else
+                    params.tau_a_matrix{q} = repmat(reshape(obj.tau_a{q}, 1, []), ...
+                        obj.n_per_type(q), 1);
+                end
+            end
             params.c = obj.c;
             % THE ADAPTATION SCALING ACTUALLY APPLIED, computed once here so the
             % dynamics and every Jacobian block cannot drift apart. There are
@@ -898,6 +961,14 @@ classdef SRNNCellTypePairs < handle
             obj.mu_S_c = reshape(obj.mu_S_c, 1, []);
             obj.sigma_S_c = reshape(obj.sigma_S_c, 1, []);
 
+            % SFA ladder spread: same broadcasting as sigma_S_c.
+            if isempty(obj.tau_a_spread)
+                obj.tau_a_spread = zeros(1, C);
+            elseif isscalar(obj.tau_a_spread)
+                obj.tau_a_spread = repmat(obj.tau_a_spread, 1, C);
+            end
+            obj.tau_a_spread = reshape(obj.tau_a_spread, 1, []);
+
             % tau_a defaults to NO adaptation on any type. It is no longer
             % auto-filled from a count: the count is now derived from it, and
             % inventing timescales from an integer is what this refactor
@@ -1007,6 +1078,32 @@ classdef SRNNCellTypePairs < handle
                 error('SRNNCellTypePairs:InvalidParams', ...
                     ['sigma_S_c must be empty, a scalar, or a finite nonnegative ' ...
                     '1 x %d row (one standard deviation per cell type).'], C);
+            end
+            if numel(obj.tau_a_spread) ~= C || ~isnumeric(obj.tau_a_spread) || ...
+                    any(~isfinite(obj.tau_a_spread)) || any(obj.tau_a_spread < 0)
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    ['tau_a_spread must be empty, a scalar, or a finite nonnegative ' ...
+                    '1 x %d row (one log-normal spread per cell type).'], C);
+            end
+            if ~isempty(obj.tau_a_seed) && ~(isscalar(obj.tau_a_seed) && ...
+                    isnumeric(obj.tau_a_seed) && isfinite(obj.tau_a_seed))
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    'tau_a_seed must be empty or a finite scalar.');
+            end
+            % Ordering margin: the two end draws differ by spread*sqrt(2) per
+            % unit z; keep a 4-sigma margin below the ladder's end ratio so
+            % tau_a{q}(end) stays "the slowest" for every neuron.
+            for q = 1:C
+                if obj.tau_a_spread(q) > 0 && numel(obj.tau_a{q}) >= 2
+                    ratio = obj.tau_a{q}(end) / obj.tau_a{q}(1);
+                    if exp(4 * sqrt(2) * obj.tau_a_spread(q)) > ratio
+                        error('SRNNCellTypePairs:TauSpreadTooWide', ...
+                            ['tau_a_spread(%d) = %.3g is wide enough to reorder the ' ...
+                            'SFA ladder (end ratio %.3g): keep exp(4*sqrt(2)*spread) ' ...
+                            'below the ratio, i.e. spread < %.3g.'], ...
+                            q, obj.tau_a_spread(q), ratio, log(ratio) / (4 * sqrt(2)));
+                    end
+                end
             end
             if obj.has_setpoint_heterogeneity()
                 if ~isempty(obj.activation_custom)
@@ -1248,6 +1345,68 @@ classdef SRNNCellTypePairs < handle
             % Per-neuron nonlinearity setpoints. Drawn here, after W, so the
             % vector exists before build_stimulus() and get_params().
             obj.build_setpoints();
+            obj.build_tau_a_matrix();
+        end
+
+        function build_tau_a_matrix(obj)
+            % BUILD_TAU_A_MATRIX Draw the per-neuron SFA ladders tau_a_matrix
+            %
+            % See the tau_a_spread property for the rule. Leaves tau_a_matrix
+            % EMPTY when every spread is zero, so the shared-row branch is
+            % taken everywhere and results are bit-identical to before.
+            %
+            % The draw is n x 2 for ALL neurons at once and indexed by type, so
+            % type q's ladders do not depend on which other types carry a
+            % spread. Own RNG substream, saved and restored, so W, the
+            % setpoints, the stimulus and x0 are bit-identical with or without
+            % the draw; pinned to 'twister' (rng(seed) alone keeps whatever
+            % generator is current, which differs between the client and a
+            % parallel worker -- see UserNotes.md).
+            obj.tau_a_matrix = [];
+            if ~any(obj.tau_a_spread > 0 & obj.n_a > 0)
+                return;                        % nothing to spread: stay on the shared-row branch
+            end
+            seed = obj.tau_a_seed;
+            if isempty(seed)
+                seed = obj.rng_seeds(1) + 15485863;
+            end
+            stream_state = rng;
+            rng(seed, 'twister');
+            z = randn(obj.n, 2);
+            rng(stream_state);
+
+            C = obj.n_cellTypes;
+            M = cell(1, C);
+            parts = cell(1, C);
+            for q = 1:C
+                tau = reshape(obj.tau_a{q}, 1, []);
+                K = numel(tau);
+                idx = obj.type_indices{q};
+                nq = numel(idx);
+                if K == 0
+                    M{q} = zeros(nq, 0);
+                    parts{q} = sprintf('%s none', obj.cell_type_names{q});
+                    continue;
+                end
+                s = obj.tau_a_spread(q);
+                if s == 0
+                    M{q} = repmat(tau, nq, 1);     % exactly the nominal, not exp(log(tau))
+                    parts{q} = sprintf('%s spread 0', obj.cell_type_names{q});
+                    continue;
+                end
+                d_fast = s * z(idx, 1);
+                d_slow = s * z(idx, 2);
+                if K == 1
+                    w = 1;
+                else
+                    w = (log(tau) - log(tau(1))) / (log(tau(end)) - log(tau(1)));
+                end
+                M{q} = exp(log(tau) + (1 - w) .* d_fast + w .* d_slow);   % nq x K
+                parts{q} = sprintf('%s spread %.3g, slowest %.3g-%.3g s (nominal %.3g)', ...
+                    obj.cell_type_names{q}, s, min(M{q}(:, end)), max(M{q}(:, end)), tau(end));
+            end
+            obj.tau_a_matrix = M;
+            fprintf('Per-neuron SFA ladders drawn (seed %d): %s\n', seed, strjoin(parts, '; '));
         end
 
         function tf = has_setpoint_heterogeneity(obj)
@@ -1885,7 +2044,7 @@ classdef SRNNCellTypePairs < handle
             for q = 1:C
                 idx = params.type_indices{q};
                 if params.n_a(q) > 0
-                    a_derivatives{q} = ((rate(idx) - a{q}) ./ params.tau_a{q});
+                    a_derivatives{q} = ((rate(idx) - a{q}) ./ params.tau_a_matrix{q});
                 else
                     a_derivatives{q} = [];
                 end
@@ -1988,15 +2147,20 @@ classdef SRNNCellTypePairs < handle
                 row_a = layout.a{q};
 
                 if na > 0
-                    tau_inv = 1 ./ params.tau_a{q}(:);
-                    diag_block = kron(spdiags(-tau_inv, 0, na, na), speye(nq));
-                    template = sparse(tau_inv * ones(1, na));
-                    coupling = kron(template, spdiags( ...
-                        -params.c_eff(q) .* rate_prime(idx), 0, nq, nq));
+                    % Per-neuron taus: TI(i, k) = 1 / tau_ik, nq x na, and
+                    % TI(:) is timescale-major like row_a. (a_ik, a_ik) is
+                    % -1/tau_ik; (a_ik, a_ik') is -c_eff phi'_i / tau_ik for
+                    % every k' (the same column block repeated na times);
+                    % (a_ik, x_i) is phi'_i / tau_ik.
+                    TI = 1 ./ params.tau_a_matrix{q};
+                    TI_rp = TI .* rate_prime(idx);
+                    diag_block = spdiags(-TI(:), 0, nq * na, nq * na);
+                    stack = sparse((1:nq * na)', repmat((1:nq)', na, 1), ...
+                        -params.c_eff(q) .* TI_rp(:), nq * na, nq);
+                    coupling = kron(sparse(ones(1, na)), stack);
                     J(row_a, row_a) = diag_block + coupling;
-                    vals = kron(tau_inv, rate_prime(idx));
                     J(row_a, row_x) = sparse((1:numel(row_a))', ...
-                        repmat(idx(:), na, 1), vals, numel(row_a), n);
+                        repmat(idx(:), na, 1), TI_rp(:), numel(row_a), n);
                 end
             end
 
@@ -2205,10 +2369,11 @@ classdef SRNNCellTypePairs < handle
                 na = params.n_a(q);
                 if na == 0; continue; end
                 idx = params.type_indices{q}; nq = params.n_per_type(q);
-                tau_inv = 1 ./ params.tau_a{q}(:);
                 dr = rate_prime(idx) .* Ye{q};                       % nq x K
                 Za = -Ya{q} + reshape(dr, nq, 1, K);                 % nq x na x K
-                Za = Za .* reshape(tau_inv, 1, na, 1);
+                Za = Za .* (1 ./ params.tau_a_matrix{q});            % per-neuron taus, nq x na
+                % (multiply by the reciprocal, as the assembled Jacobian does,
+                % so the two paths stay bit-identical)
                 Z(layout.a{q}, :) = reshape(Za, nq * na, K);
             end
 
