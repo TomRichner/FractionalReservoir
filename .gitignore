@@ -93,3 +93,6 @@ data/param_space/*
 !data/param_space/run_all_jul_06_26_22_00/**
 
 debug.log
+
+# VS Code multi-root workspace: lists sibling repos by relative path, machine-specific
+*.code-workspace
