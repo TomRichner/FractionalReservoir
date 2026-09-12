@@ -60,6 +60,10 @@ for i = 1:n_cond
             K_max_used = max(K_max_used, numel(lam));
         end
         rows{end + 1} = summary_row(R(i).title, var, runs); %#ok<AGROW>
+        % The numbers, inside the panel (a title-line table overflowed).
+        text(ax, 0.97, 0.97 - 0.09 * (v - 1), panel_text(var, runs), 'Units', 'normalized', ...
+            'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', 'FontSize', 9, ...
+            'Color', col, 'Interpreter', 'tex');
     end
     yline(ax, 0, ':', 'Color', [0.3 0.3 0.3]);
     hold(ax, 'off');
@@ -96,9 +100,10 @@ linkaxes(ax_top, 'y');
 if numel(variants) > 1
     legend(ax_top(1), {'noise on', 'noise off'}, 'Location', 'southwest', 'FontSize', 10);
 end
-title(tl, {sprintf('Top-K Lyapunov spectrum, %s, n = %d, T = %g s, %d seed(s)', ...
+title(tl, sprintf('Top-K Lyapunov spectrum, %s, n = %d, T = %g s, %d seed(s)', ...
     strrep(D.settings.preset_name, '_', '\_'), D.settings.n, D.settings.T, D.settings.n_seeds), ...
-    strjoin(rows, '   |   ')}, 'FontWeight', 'normal', 'FontSize', 10);
+    'FontWeight', 'normal', 'FontSize', 11);
+fprintf('%s\n', rows{:});
 
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 
@@ -124,6 +129,11 @@ end
 end
 
 %% ------------------------------------------------------------------------
+function s = panel_text(var, runs)
+s = sprintf('%s: n_+ %s, h_{KS} %s, D_{KY} %s', strrep(var, '_', ' '), ...
+    mmm([runs.n_positive], '%d'), mmm([runs.h_KS_bits], '%.1f'), dky_mmm(runs));
+end
+
 function s = summary_row(title, var, runs)
 s = sprintf('%s (%s): n_+ %s, h_{KS} %s bit/s, D_{KY} %s', title, strrep(var, '_', ' '), ...
     mmm([runs.n_positive], '%d'), mmm([runs.h_KS_bits], '%.2f'), dky_mmm(runs));

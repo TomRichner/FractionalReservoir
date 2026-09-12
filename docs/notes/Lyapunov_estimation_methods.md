@@ -284,6 +284,31 @@ is the practical remedy.
   regime comparisons for this reason, and show both scale linearly with N
   while λ_1 saturates.
 
+**What the sweeps now report (2026-09-12).** Every sweep job runs top-K at
+K = 15, re-orthonormalising every 0.05 s, with the retry doubling K on the
+stored trajectory up to 30 while D_KY is unresolved (spectra nest, so the
+retry is exact). `SRNNCellTypePairs.lya_summary` returns, per run: λ_1,
+λ_1 − λ_2, n_+, h_KS (bit/s), D_KY with its resolved flag, K used, and
+three **quality flags**: n_+ = K (the positive part may be truncated; h_KS
+is then a lower bound), the propagator's worst conditioning R_11/R_KK and
+orthogonality defect, and the **drift** of the finite-time λ_1 over the last
+quarter of the accumulation window (a convergence check; the run-parameters
+report tabulates its median per sweep and condition). Two further families:
+**transient divergence** from the leading direction's local rates (fraction
+of time positive, 95th percentile of the 0.2 s finite-time exponent, mean
+positive-excursion length) and, from the eig-heatmap stage, the
+**numerical abscissa** ω(J) = max eig((J+Jᵀ)/2) beside the spectral
+abscissa α(J): ω bounds the instantaneous growth of any perturbation, ω − α
+is the non-normal margin (Trefethen & Embree; Hennequin et al. for the
+phenomenon). And the **leading vector's block fractions** (x / SFA / STD /
+STF): on the stable regime of the paper physics the leading direction is
+81-86% SFA, the mechanistic form of "the slowest SFA timescale sets λ_1".
+Caveats: D_KY inherits the Frederickson et al. reading (dimension of the
+attractor's dense core; can undercount the fractal dimension); with the
+10 s accumulation of the medium sweeps the mid-spectrum exponents at the
+D_KY crossing converge more slowly than λ_1, which is what the dedicated
+spectrum stage (40-100 s, K = 200-300, noise on and off) checks.
+
 ## 4.5 Extensivity and the reduced network
 
 Engelken et al. (2023) show the Lyapunov spectrum of rate networks is

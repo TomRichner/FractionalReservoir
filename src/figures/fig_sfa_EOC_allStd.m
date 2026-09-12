@@ -117,14 +117,73 @@ set(cf, 'Position', fig_position);
 
 if ~cfg.visible; set(cf, 'Visible', 'off'); end
 
+%% --- Second figure: WHERE the leading direction lives, vs max tau_a ----------
+% The mechanistic form of the claim above. Per level of the sweep, the median
+% over reps of the leading Lyapunov vector's norm^2 fractions in the x, SFA and
+% STD blocks (stored per job by the top-K sweeps; see
+% SRNNCellTypePairs.lya_summary). If the slowest SFA timescale sets lambda_1,
+% the SFA fraction dominates until the STD mode takes over at the knee.
+bf = gobjects(0);
+param = 'tau_a_E';
+has_blocks = isfield(psa.vector_param_lookup, param) && ...
+    ~isempty(psa.results) && any(cellfun(@(c) has_field_in(psa.results, c, 'lead_frac_sfa'), ...
+    cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false)));
+if has_blocks
+    lookup = psa.vector_param_lookup.(param);
+    x_tau  = cellfun(@(v) v(end), lookup);
+    cond_names = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
+    bf = figure('Color', 'w', 'Position', [457 300 300 * numel(cond_names), 260]);
+    blocks = {'lead_frac_sfa', 'lead_frac_std', 'lead_frac_x'};
+    block_lab = {'SFA', 'STD', 'x'};
+    block_col = [0.85 0.33 0.10; 0.00 0.45 0.74; 0.30 0.30 0.30];
+    for ci = 1:numel(cond_names)
+        ax_b = subplot(1, numel(cond_names), ci, 'Parent', bf); hold(ax_b, 'on');
+        Y = nan(numel(x_tau), numel(blocks));
+        for li = 1:numel(x_tau)
+            for bi = 1:numel(blocks)
+                v = ParamSpaceAnalysis2.collect_level_values(psa, param, li, cond_names{ci}, blocks{bi});
+                if ~isempty(v); Y(li, bi) = median(v); end
+            end
+        end
+        for bi = 1:numel(blocks)
+            plot(ax_b, x_tau, Y(:, bi), '-o', 'Color', block_col(bi, :), 'LineWidth', 2, ...
+                'MarkerFaceColor', block_col(bi, :), 'MarkerSize', 4, 'DisplayName', block_lab{bi});
+        end
+        hold(ax_b, 'off');
+        set(ax_b, 'XScale', 'log', 'FontSize', tick_fs); box(ax_b, 'off');
+        ylim(ax_b, [0 1]);
+        xlabel(ax_b, 'max $\tau_a$ (s)', 'Interpreter', 'latex', 'FontSize', label_fs);
+        if ci == 1; ylabel(ax_b, 'leading-vector fraction', 'FontSize', label_fs); end
+        if numel(cond_names) > 1
+            title(ax_b, st.condition_title(cond_names{ci}), 'FontWeight', 'normal', 'FontSize', st.title_fs);
+        end
+        if ci == 1; legend(ax_b, 'Location', 'east', 'FontSize', 10); end
+    end
+    if ~cfg.visible; set(bf, 'Visible', 'off'); end
+else
+    warning('fig_sfa_EOC_allStd:NoBlockFractions', ...
+        ['%s has no lead_frac_* fields (a Benettin-era run?); the leading-vector ' ...
+         'block-fraction figure is skipped.'], tau_dir);
+end
+
 %% --- Save -------------------------------------------------------------------
 fig_tag = 'Fig_SFA_EOC_allStd';
-out = struct('figs', cf, 'files', {{}}, 'source', tau_dir);
+out = struct('figs', [cf, bf], 'files', {{}}, 'source', tau_dir);
 if cfg.save
     save_figure_stable(out_dir, fig_tag, cf);
     out.files = existing_outputs(out_dir, fig_tag);
-
+    if isgraphics(bf)
+        save_figure_stable(out_dir, 'Fig_SFA_EOC_blocks', bf);
+        out.files = [out.files, existing_outputs(out_dir, 'Fig_SFA_EOC_blocks')];
+    end
 end
+end
+
+function tf = has_field_in(results, cond, field)
+tf = false;
+if ~isfield(results, cond); return; end
+R = results.(cond); R = R(~cellfun(@isempty, R));
+tf = ~isempty(R) && isfield(R{1}, field);
 end
 
 

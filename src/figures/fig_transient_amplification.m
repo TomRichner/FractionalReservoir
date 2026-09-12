@@ -4,9 +4,12 @@ function out = fig_transient_amplification(cfg)
 %   out = FIG_TRANSIENT_AMPLIFICATION('run_dir', d)
 %
 % Reads the eig-heatmap stage's data (run_eig_heatmap samples the Jacobian at
-% ~150 states per condition and now records, per state, the NUMERICAL
-% ABSCISSA omega = max eig((J + J')/2) and the SPECTRAL ABSCISSA
-% alpha = max real eig(J)). Two panels:
+% ~150 states per condition and records, per state, the NUMERICAL ABSCISSA
+% omega = max eig((J_xx + J_xx')/2) and the SPECTRAL ABSCISSA
+% alpha = max real eig(J_xx) of the DENDRITIC BLOCK J_xx -- the rate-network
+% Jacobian with adaptation and depression held fixed; on the full J the
+% numerical abscissa reflects the state coordinates' units, not dynamics,
+% see sample_eigenvalues in run_eig_heatmap). Two panels:
 %
 %   (a) omega(t) (solid) and alpha(t) (dashed) per condition, condition
 %       colours from manuscript_style. omega bounds the instantaneous growth
@@ -66,8 +69,8 @@ end
 yline(ax1, 0, ':', 'Color', [0.3 0.3 0.3], 'HandleVisibility', 'off');
 hold(ax1, 'off');
 xlabel(ax1, 'time (s)', 'FontSize', st.label_fs);
-ylabel(ax1, 'abscissa (1/s)', 'FontSize', st.label_fs);
-title(ax1, 'numerical (solid) and spectral (dashed) abscissa of J(t)', 'FontWeight', 'normal', 'FontSize', st.title_fs);
+ylabel(ax1, 'abscissa of J_{xx} (1/s)', 'FontSize', st.label_fs);
+title(ax1, '\omega(J_{xx}) solid, \alpha(J_{xx}) dashed', 'FontWeight', 'normal', 'FontSize', st.title_fs);
 legend(ax1, h_leg, 'Location', 'best', 'FontSize', 11);
 set(ax1, 'FontSize', st.tick_fs); box(ax1, 'off');
 
@@ -79,13 +82,13 @@ for i = 1:n_cond
     plot(ax2, [i i], q([1 5]), '-', 'Color', colors{i}, 'LineWidth', 1.2);
     patch(ax2, i + 0.25 * [-1 1 1 -1], q([2 2 4 4]), colors{i}, 'FaceAlpha', 0.35, 'EdgeColor', colors{i});
     plot(ax2, i + 0.25 * [-1 1], q([3 3]), '-', 'Color', colors{i}, 'LineWidth', 2.5);
-    text(ax2, i, q(5), sprintf('  \\lambda_1 = %+.2f', D.lle_by_cond(i)), ...
-        'Rotation', 90, 'VerticalAlignment', 'middle', 'FontSize', 10, 'Color', colors{i});
 end
 hold(ax2, 'off');
-set(ax2, 'XTick', 1:n_cond, 'XTickLabel', titles, 'FontSize', st.tick_fs);
-xlim(ax2, [0.4, n_cond + 0.9]);
-ylabel(ax2, '\omega(J) - \alpha(J)  (1/s)', 'FontSize', st.label_fs);
+short = cellfun(@(n) short_of(st, n), D.cond_names, 'UniformOutput', false);
+labels = arrayfun(@(i) sprintf('%s\\newline\\lambda_1 = %+.2f', short{i}, D.lle_by_cond(i)), 1:n_cond, 'UniformOutput', false);
+set(ax2, 'XTick', 1:n_cond, 'XTickLabel', labels, 'FontSize', st.tick_fs - 2, 'XTickLabelRotation', 0);
+xlim(ax2, [0.3, n_cond + 0.7]);
+ylabel(ax2, '\omega(J_{xx}) - \alpha(J_{xx})  (1/s)', 'FontSize', st.label_fs);
 title(ax2, 'non-normal margin per state (5-95%, IQR, median)', 'FontWeight', 'normal', 'FontSize', st.title_fs);
 box(ax2, 'off');
 
@@ -97,4 +100,8 @@ if cfg.save
     save_figure_stable(out_dir, fig_tag, fig);
     out.files = existing_outputs(out_dir, fig_tag);
 end
+end
+
+function s = short_of(st, name)
+if st.condition_short.isKey(name); s = st.condition_short(name); else; s = strrep(name, '_', ' '); end
 end
