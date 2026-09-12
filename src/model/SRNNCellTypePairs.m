@@ -188,6 +188,17 @@ classdef SRNNCellTypePairs < handle
         % discrete QR method on an N x K tangent basis; see lyapunov_topk).
         % 0 means all N. Ignored by 'benettin' (always 1) and 'qr' (always N).
         lya_K = 10
+        % RETRY ON AN UNRESOLVED DIMENSION. The Kaplan-Yorke dimension needs
+        % the cumulative sum of the spectrum to cross zero within the K
+        % exponents computed; when it does not (D_KY_resolved false) and
+        % lya_K_auto is true, compute_lyapunov doubles K on the SAME stored
+        % trajectory until it resolves or K reaches lya_K_max (capped at N).
+        % Spectra nest across K, so the retry reproduces the first exponents
+        % exactly and appends the rest. The result records K_used, retries
+        % and n_positive_at_K (the positive part may be truncated, so h_KS
+        % is then only a lower bound). Ignored when lya_K = 0 (all N).
+        lya_K_auto = true
+        lya_K_max = 30
         % Seconds of Lyapunov iteration before lya_T_interval(1) during which
         % the perturbation (Benettin) or basis Q (QR) aligns with the leading
         % direction without accumulating. Clamped to T_range(1) with a warning
@@ -675,9 +686,98 @@ classdef SRNNCellTypePairs < handle
                 obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
                 obj.ode_opts, ...
                 resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNCellTypePairs'), rhs, ...
-                obj.lya_K, obj.rng_seeds(1) + 424242);
+                obj.lya_K, obj.rng_seeds(1) + 424242, obj.lya_K_auto, obj.lya_K_max);
             if isfield(obj.lya_results, 'LLE')
                 fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
+            end
+        end
+
+        function S = lya_summary(obj)
+            % LYA_SUMMARY The scalar Lyapunov measures of the last run, one struct.
+            %
+            %   S = model.lya_summary()
+            %
+            % Every consumer that wants "the numbers" (ParamSpaceAnalysis2's
+            % per-job result, the stages, the tables) reads this rather than
+            % lya_results, so the definitions live in one place and both
+            % estimators fill the same fields -- NaN where a method cannot
+            % supply one. Fields (see lya_summary_fields for the scalar list):
+            %
+            %   LLE              lambda_1 (either method)
+            %   lambda_2, lambda_gap = lambda_1 - lambda_2   (topk / qr, K >= 2)
+            %   n_positive, h_KS_bits, D_KY, D_KY_resolved (0/1)   (topk / qr)
+            %   K_used, retries, n_positive_at_K (0/1: the positive part may be
+            %                    truncated, h_KS_bits is then a lower bound)
+            %   cond_max, orth_defect_max      the propagator's conditioning
+            %   lambda_1_drift   finite-time lambda_1 at the end of the
+            %                    accumulation window minus at three quarters
+            %                    of it: a convergence check (either method)
+            %   frac_local_positive, p95_finite_0p2s, mean_positive_excursion_s
+            %                    TRANSIENT DIVERGENCE of the leading direction
+            %                    over the accumulation window, from its local
+            %                    rate series (see transient_divergence)
+            %   lead_frac_x/_sfa/_std/_stf   norm^2 fractions of the leading
+            %                    basis vector in the x / a / b / g blocks (topk)
+            %   local_rate_lead, t_lya_lead  the leading local-rate series over
+            %                    the accumulation window (vectors, not scalars)
+            %
+            % The transient scalars use the UNFILTERED local rates, so they do
+            % not depend on filter_local_lya.
+            names = SRNNCellTypePairs.lya_summary_fields();
+            S = cell2struct(num2cell(nan(numel(names), 1)), names(:), 1);
+            S.local_rate_lead = [];
+            S.t_lya_lead = [];
+            r = obj.lya_results;
+            if isempty(r) || ~isstruct(r) || ~isfield(r, 'LLE')
+                return;
+            end
+            S.LLE = r.LLE;
+            if isfield(r, 'LE_spectrum')
+                spec = r.LE_spectrum(:);
+                if numel(spec) >= 2
+                    S.lambda_2 = spec(2);
+                    S.lambda_gap = spec(1) - spec(2);
+                end
+                if isfield(r, 'n_positive')
+                    S.n_positive = r.n_positive;
+                    S.h_KS_bits = r.h_KS_bits;
+                    S.D_KY = r.D_KY;
+                    S.D_KY_resolved = double(r.D_KY_resolved);
+                    S.cond_max = r.cond_max;
+                    S.orth_defect_max = r.orth_defect_max;
+                    S.K_used = r.K;
+                    if isfield(r, 'retries'); S.retries = r.retries; else; S.retries = 0; end
+                    S.n_positive_at_K = double(r.n_positive >= r.K);
+                end
+            end
+            % Finite-time and local series of the leading direction.
+            if isfield(r, 'finite_LE_spectrum_t')
+                finite = r.finite_LE_spectrum_t(:, 1);
+                local  = r.local_LE_spectrum_t(:, 1);
+            elseif isfield(r, 'finite_lya')
+                finite = r.finite_lya(:);
+                local  = r.local_lya(:);
+            else
+                return;
+            end
+            in_window = ~isnan(finite);
+            if any(in_window)
+                fin_win = finite(in_window);
+                k34 = max(1, round(0.75 * numel(fin_win)));
+                S.lambda_1_drift = fin_win(end) - fin_win(k34);
+                lead = local(in_window);
+                T = SRNNCellTypePairs.transient_divergence(lead, r.lya_dt, 0.2);
+                S.frac_local_positive = T.frac_positive;
+                S.p95_finite_0p2s = T.p95_finite;
+                S.mean_positive_excursion_s = T.mean_excursion_s;
+                S.local_rate_lead = lead;
+                S.t_lya_lead = r.t_lya(in_window);
+            end
+            if isfield(r, 'Q_final') && ~isempty(obj.cached_params)
+                B = SRNNCellTypePairs.leading_vector_blocks(r.Q_final(:, 1), ...
+                    obj.cached_params.state_layout);
+                S.lead_frac_x = B.x; S.lead_frac_sfa = B.sfa;
+                S.lead_frac_std = B.std; S.lead_frac_stf = B.stf;
             end
         end
 
@@ -2464,6 +2564,63 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
+        function names = lya_summary_fields()
+            % LYA_SUMMARY_FIELDS The scalar fields lya_summary returns, in order.
+            % ParamSpaceAnalysis2 copies these into every job result and fills
+            % them with NaN for a failed job, so the list lives here once.
+            names = {'LLE', 'lambda_2', 'lambda_gap', 'n_positive', 'h_KS_bits', ...
+                'D_KY', 'D_KY_resolved', 'K_used', 'retries', 'n_positive_at_K', ...
+                'cond_max', 'orth_defect_max', 'lambda_1_drift', ...
+                'frac_local_positive', 'p95_finite_0p2s', 'mean_positive_excursion_s', ...
+                'lead_frac_x', 'lead_frac_sfa', 'lead_frac_std', 'lead_frac_stf'};
+        end
+
+        function T = transient_divergence(local, dt, window_s)
+            % TRANSIENT_DIVERGENCE Summaries of a local Lyapunov-rate series.
+            %
+            %   T = transient_divergence(local, dt, window_s)
+            %
+            % local     column of per-segment rates (1/s), one per dt seconds
+            % dt        the segment length (lya_dt)
+            % window_s  the finite-time window for p95_finite (0.2 s in use)
+            %
+            % Returns frac_positive (share of segments with rate > 0), p95_finite
+            % (95th percentile of the finite-time exponent over every
+            % window_s-long run of consecutive segments -- a sliding mean of
+            % round(window_s/dt) segments; NaN if the series is shorter than one
+            % window) and mean_excursion_s (mean duration of runs of consecutive
+            % positive segments, in seconds; NaN if there are none). These are
+            % the "transient divergence" measures: how often and how strongly
+            % an asymptotically stable trajectory expands for a while.
+            local = local(:);
+            T = struct('frac_positive', NaN, 'p95_finite', NaN, 'mean_excursion_s', NaN, ...
+                'n_segments', numel(local), 'window_segments', max(1, round(window_s / dt)));
+            if isempty(local); return; end
+            pos = local > 0;
+            T.frac_positive = mean(pos);
+            w = T.window_segments;
+            if numel(local) >= w
+                fin = movmean(local, w, 'Endpoints', 'discard');
+                T.p95_finite = prctile(fin, 95);
+            end
+            d = diff([0; pos; 0]);
+            starts = find(d == 1); ends = find(d == -1);
+            if ~isempty(starts)
+                T.mean_excursion_s = mean(ends - starts) * dt;
+            end
+        end
+
+        function B = leading_vector_blocks(q, layout)
+            % LEADING_VECTOR_BLOCKS Norm^2 fractions of a tangent vector by block.
+            %   B = leading_vector_blocks(q, params.state_layout) returns
+            %   B.x, B.sfa, B.std, B.stf (summing to 1) for the dendritic, SFA
+            %   (all a), STD (all b) and STF (all g) coordinates of q.
+            q = q(:); tot = sum(q .^ 2);
+            ia = [layout.a{:}]; ib = [layout.b{:}]; ig = [layout.g{:}];
+            B = struct('x', sum(q(layout.x) .^ 2) / tot, 'sfa', sum(q(ia) .^ 2) / tot, ...
+                'std', sum(q(ib) .^ 2) / tot, 'stf', sum(q(ig) .^ 2) / tot);
+        end
+
         function J_array = compute_Jacobian_at_indices(S_out, sample_indices, params)
             J_array = zeros(params.N_sys_eqs, params.N_sys_eqs, numel(sample_indices));
             for k = 1:numel(sample_indices)
@@ -2876,14 +3033,17 @@ classdef SRNNCellTypePairs < handle
     methods (Static, Access = protected)
         function results = compute_lyapunov_exponents_internal(method, S_out, t_out, ...
                 dt, fs, interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs, ...
-                lya_K, topk_seed)
+                lya_K, topk_seed, lya_K_auto, lya_K_max)
             % method: 'benettin' (K = 1, finite perturbation, same integrator
             % as the trajectory), 'qr' (full spectrum, ode45 on N^2 variational
             % equations; the verified reference), 'topk' (the K = lya_K largest
             % by the discrete QR method on the stored trajectory; shared core
-            % lyapunov_topk), or 'none'.
+            % lyapunov_topk, retried at 2K while D_KY is unresolved when
+            % lya_K_auto, up to lya_K_max), or 'none'.
             if nargin < 13 || isempty(lya_K); lya_K = 10; end
             if nargin < 14 || isempty(topk_seed); topk_seed = 424243; end
+            if nargin < 15 || isempty(lya_K_auto); lya_K_auto = false; end
+            if nargin < 16 || isempty(lya_K_max); lya_K_max = lya_K; end
             results = struct();
             switch lower(method)
                 case {'benettin', 'qr', 'topk'}
@@ -2898,14 +3058,29 @@ classdef SRNNCellTypePairs < handle
             lya_dt = SRNNCellTypePairs.resolve_lya_dt(lya_dt, method, dt);
 
             if strcmpi(method, 'topk')
+                N = params.N_sys_eqs;
                 K = lya_K;
-                if K == 0; K = params.N_sys_eqs; end
-                results = lyapunov_topk(S_out, t_out, fs, lya_dt, interval, lya_warmup, K, ...
-                    @(S, p) SRNNCellTypePairs.compute_Jacobian_fast(S, p), params, ...
-                    struct('seed', topk_seed, 'err_id_prefix', 'SRNNCellTypePairs', ...
-                           'grid_fn', @SRNNCellTypePairs.lyapunov_sample_grid, ...
-                           'jac_times', @(S, Yk, p) SRNNCellTypePairs.jacobian_times(S, Yk, p)));
-                results.params.N_sys_eqs = params.N_sys_eqs;
+                if K == 0; K = N; end
+                K_cap = min(max(lya_K_max, K), N);
+                topk_opts = struct('seed', topk_seed, 'err_id_prefix', 'SRNNCellTypePairs', ...
+                    'grid_fn', @SRNNCellTypePairs.lyapunov_sample_grid, ...
+                    'jac_times', @(S, Yk, p) SRNNCellTypePairs.jacobian_times(S, Yk, p));
+                retries = 0;
+                while true
+                    results = lyapunov_topk(S_out, t_out, fs, lya_dt, interval, lya_warmup, K, ...
+                        @(S, p) SRNNCellTypePairs.compute_Jacobian_fast(S, p), params, topk_opts);
+                    if results.D_KY_resolved || ~lya_K_auto || lya_K == 0 || K >= K_cap
+                        break;
+                    end
+                    K_next = min(2 * K, K_cap);
+                    fprintf('Top-%d Lyapunov: D_KY unresolved within K; retrying at K = %d (cap %d)\n', ...
+                        K, K_next, K_cap);
+                    K = K_next;
+                    retries = retries + 1;
+                end
+                results.K_requested = lya_K;
+                results.retries = retries;
+                results.params.N_sys_eqs = N;
                 if results.D_KY_resolved
                     fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...
                         K, results.LLE, results.h_KS_bits, results.D_KY, results.n_positive, results.seconds);

@@ -117,7 +117,7 @@ all_passed = check('h_KS is the sum of the positive exponents, > 0 on A, bits = 
 D_qr = SRNNPairsTestAccess.kaplan_yorke(rQ.LE_spectrum);
 fprintf('  (D_KY on A: topk %.3f, qr %.3f)\n', rA.D_KY, D_qr);
 all_passed = check('D_KY on A agrees with the qr branch (within 0.2)', rA.D_KY_resolved && abs(rA.D_KY - D_qr) < 0.2) && all_passed;
-m1 = A('lya_method', 'topk', 'lya_K', 1);
+m1 = A('lya_method', 'topk', 'lya_K', 1, 'lya_K_auto', false);   % auto-retry off: this checks the flag itself
 all_passed = check('K = 1 on A: D_KY unresolved (NaN, flag false)', ~m1.lya_results.D_KY_resolved && isnan(m1.lya_results.D_KY)) && all_passed;
 all_passed = check('B: D_KY = 0 and resolved (stable)', rB.D_KY_resolved && rB.D_KY == 0 && rB.h_KS == 0) && all_passed;
 
