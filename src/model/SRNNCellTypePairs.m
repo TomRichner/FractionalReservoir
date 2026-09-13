@@ -2621,6 +2621,242 @@ classdef SRNNCellTypePairs < handle
                 'std', sum(q(ib) .^ 2) / tot, 'stf', sum(q(ig) .^ 2) / tot);
         end
 
+        function [G, info] = transient_gain(S_out, t_out, i0, params, horizon_s, opts)
+            % TRANSIENT_GAIN The x-in / x-out transient gain of the tangent flow.
+            %
+            %   [G, info] = SRNNCellTypePairs.transient_gain(S_out, t_out, i0, params, horizon_s, opts)
+            %
+            % Propagates the n dendritic unit vectors through the variational
+            % equation from the stored state S_out(i0, :) for horizon_s seconds
+            % and reads, every opts.report_dt, the n x n block Y_x(t) = P_x Phi(t)
+            % P_x' of the propagator: a unit perturbation of the dendritic
+            % states only, measured on the dendritic states only, so the
+            % measure is invariant to how a, b, g are scaled and needs no
+            % stability assumption. Three VARIANTS of Phi (opts.variant):
+            %   'frozen_x'    Phi = expm(J_xx t): the dendritic block of the
+            %                 Jacobian fixed at the sample -- the conventional
+            %                 rate-network picture with adaptation FROZEN
+            %   'frozen_full' Phi = expm(J t): the full Jacobian fixed at the
+            %                 sample -- adaptation's feedback, no drift
+            %   'active'      Phi from J(S(t)) along the stored trajectory:
+            %                 what a tangent perturbation actually does
+            % frozen_x vs frozen_full isolates adaptation's dynamic negative
+            % feedback; frozen_full vs active isolates nonstationarity.
+            %
+            % Heun on the fs grid, exactly lyapunov_topk's step, with the
+            % matrix-free jacobian_times for the two full-state variants and
+            % the dense J_xx for frozen_x. NO re-orthonormalisation: the
+            % propagator itself is wanted (a few seconds at G <= 1e4 is far from
+            % overflow). Per report time, from the SAME block Y_x:
+            %   G.worst   sigma_max(Y_x): the worst case over directions
+            %   G.noise   ||Y_x||_F / sqrt(n): the mean-square gain of an
+            %             isotropic perturbation (what the additive noise sees)
+            %   G.dir.<name>  ||Y_x v|| for each unit n-vector in opts.directions
+            %             (e.g. the E/I difference mode, the E/I sum mode, the
+            %             leading Lyapunov direction)
+            % and at the PEAK of G.worst the optimal input direction
+            % info.v_opt (top right singular vector; sign arbitrary) with
+            % info.frac_E (its norm^2 on type 1), info.participation
+            % (1 / sum v^4) and info.cos_opt.<name> = |v_opt' v| per direction.
+            %
+            % INPUTS  S_out nt x N, t_out nt x 1 on the fs grid; i0 the sample
+            % index; params from get_params (needs state_layout, W, ...);
+            % horizon_s; opts (all optional): variant (default 'active'),
+            % report_dt (0.02), directions (struct of n x 1 unit vectors),
+            % Jxx (a precomputed dense J_xx for frozen_x).
+            % OUTPUT  G.t (report grid, starts at 0), G.worst, G.noise, G.dir,
+            % info.G_max, info.t_peak, info.v_opt, info.frac_E,
+            % info.participation, info.cos_opt, info.variant, info.seconds.
+            %
+            % See also: leading_direction_at, lyapunov_topk, jacobian_times,
+            %           run_transient_gain, test_transient_gain
+            t_wall = tic;
+            if nargin < 6; opts = struct(); end
+            variant = 'active'; report_dt = 0.02; dirs = struct();
+            if isfield(opts, 'variant') && ~isempty(opts.variant);       variant   = opts.variant;    end
+            if isfield(opts, 'report_dt') && ~isempty(opts.report_dt);   report_dt = opts.report_dt;  end
+            if isfield(opts, 'directions') && ~isempty(opts.directions); dirs      = opts.directions; end
+            layout = params.state_layout;
+            n  = params.n;
+            ix = layout.x;
+            nt = size(S_out, 1);
+            dt = t_out(2) - t_out(1);
+            n_steps = round(horizon_s / dt);
+            rep     = max(1, round(report_dt / dt));
+            if ~ismember(variant, {'frozen_x', 'frozen_full', 'active'})
+                error('SRNNCellTypePairs:BadVariant', ...
+                    'opts.variant must be frozen_x, frozen_full or active; got %s.', variant);
+            end
+            if i0 < 1 || i0 > nt
+                error('SRNNCellTypePairs:BadSampleIndex', 'i0 = %d outside 1..%d.', i0, nt);
+            end
+            if strcmp(variant, 'active') && i0 + n_steps > nt
+                error('SRNNCellTypePairs:HorizonExceedsTrajectory', ...
+                    'Sample %d + %d steps runs past the stored trajectory (%d rows).', i0, n_steps, nt);
+            end
+            dnames = fieldnames(dirs);
+            for d = 1:numel(dnames)
+                v = dirs.(dnames{d});
+                if numel(v) ~= n
+                    error('SRNNCellTypePairs:BadDirection', ...
+                        'opts.directions.%s has %d elements; n = %d.', dnames{d}, numel(v), n);
+                end
+                dirs.(dnames{d}) = v(:) / norm(v);
+            end
+
+            % The propagated object and its step, per variant.
+            frozen_x = strcmp(variant, 'frozen_x');
+            if frozen_x
+                if isfield(opts, 'Jxx') && ~isempty(opts.Jxx)
+                    Jxx = opts.Jxx;
+                else
+                    J = SRNNCellTypePairs.compute_Jacobian_fast(S_out(i0, :)', params);
+                    Jxx = full(J(ix, ix));
+                end
+                Y = eye(n);
+                jt = @(~, Yk) Jxx * Yk;
+                state_at = @(~) [];
+            else
+                Y = zeros(layout.N, n);
+                Y(ix, :) = eye(n);
+                jt = @(S, Yk) SRNNCellTypePairs.jacobian_times(S, Yk, params);
+                if strcmp(variant, 'active')
+                    state_at = @(i) S_out(i, :)';
+                else
+                    S_fixed = S_out(i0, :)';
+                    state_at = @(~) S_fixed;
+                end
+            end
+
+            n_rep = floor(n_steps / rep) + 1;
+            G = struct('t', zeros(n_rep, 1), 'worst', zeros(n_rep, 1), 'noise', zeros(n_rep, 1), ...
+                'dir', struct());
+            for d = 1:numel(dnames); G.dir.(dnames{d}) = zeros(n_rep, 1); end
+            G_max = -Inf; i_peak = 1; Yx_peak = [];
+            k_rep = 0;
+            for k = 0:n_steps
+                if mod(k, rep) == 0
+                    k_rep = k_rep + 1;
+                    if frozen_x; Yx = Y; else; Yx = Y(ix, :); end
+                    s = svd(Yx);
+                    if ~isfinite(s(1))
+                        error('SRNNCellTypePairs:TransientGainDiverged', ...
+                            'Propagator not finite at t = %g (variant %s).', k * dt, variant);
+                    end
+                    G.t(k_rep)     = k * dt;
+                    G.worst(k_rep) = s(1);
+                    G.noise(k_rep) = norm(s) / sqrt(n);
+                    for d = 1:numel(dnames)
+                        G.dir.(dnames{d})(k_rep) = norm(Yx * dirs.(dnames{d}));
+                    end
+                    if s(1) > G_max
+                        G_max = s(1); i_peak = k_rep; Yx_peak = Yx;
+                    end
+                end
+                if k == n_steps; break; end
+                h  = dt;
+                S0 = state_at(i0 + k);
+                S1 = state_at(i0 + k + 1);
+                F0 = jt(S0, Y);
+                Yp = Y + h * F0;
+                Y  = Y + (h / 2) * (F0 + jt(S1, Yp));
+            end
+
+            [~, ~, V] = svd(Yx_peak);
+            v_opt = V(:, 1);
+            if sum(v_opt) < 0; v_opt = -v_opt; end   % a fixed sign convention, nothing more
+            info = struct('variant', variant, 'G_max', G_max, 't_peak', G.t(i_peak), ...
+                'i_peak', i_peak, 'v_opt', v_opt, 'participation', 1 / sum(v_opt .^ 4), ...
+                'frac_E', sum(v_opt(params.type_indices{1}) .^ 2), 'cos_opt', struct(), ...
+                'horizon_s', n_steps * dt, 'dt', dt, 'report_dt', rep * dt, 'seconds', toc(t_wall));
+            for d = 1:numel(dnames)
+                info.cos_opt.(dnames{d}) = abs(v_opt' * dirs.(dnames{d}));
+            end
+        end
+
+        function [v_x, v_full] = leading_direction_at(S_out, t_out, i0, params, warmup_s, seed)
+            % LEADING_DIRECTION_AT The leading tangent direction at a stored state.
+            %
+            %   [v_x, v_full] = SRNNCellTypePairs.leading_direction_at(S_out, t_out, i0, params, warmup_s)
+            %
+            % Propagates one random N-vector (seeded twister, default seed 0,
+            % RNG state restored) through the variational equation from
+            % warmup_s before sample i0 up to i0, renormalising every 0.05 s --
+            % the K = 1 case of lyapunov_topk's propagator, so it converges to
+            % the same direction Q_final(:, 1) does. Returns the x part,
+            % normalised to a unit n-vector (v_x), and the full unit N-vector
+            % (v_full, for leading_vector_blocks). A warm-up reaching before
+            % the start of the trajectory is clamped with a warning.
+            %
+            % See also: transient_gain, lyapunov_topk, leading_vector_blocks
+            if nargin < 6 || isempty(seed); seed = 0; end
+            layout = params.state_layout;
+            dt = t_out(2) - t_out(1);
+            n_back = round(warmup_s / dt);
+            i_start = i0 - n_back;
+            if i_start < 1
+                warning('SRNNCellTypePairs:LeadingDirectionWarmupClamped', ...
+                    'Warm-up of %g s reaches before the trajectory; using %g s.', warmup_s, (i0 - 1) * dt);
+                i_start = 1;
+            end
+            stream_state = rng;
+            rng(seed, 'twister');
+            v = randn(layout.N, 1);
+            rng(stream_state);
+            v = v / norm(v);
+            every = max(1, round(0.05 / dt));
+            jt = @(S, Yk) SRNNCellTypePairs.jacobian_times(S, Yk, params);
+            for i = i_start:i0 - 1
+                F0 = jt(S_out(i, :)', v);
+                vp = v + dt * F0;
+                v  = v + (dt / 2) * (F0 + jt(S_out(i + 1, :)', vp));
+                if mod(i - i_start + 1, every) == 0; v = v / norm(v); end
+            end
+            v_full = v / norm(v);
+            v_x = v_full(layout.x);
+            v_x = v_x / norm(v_x);
+        end
+
+        function E = excursion_samples(r, tl, min_pos, min_quiet)
+            % EXCURSION_SAMPLES Onset and quiet times of a local Lyapunov-rate series.
+            %
+            %   E = SRNNCellTypePairs.excursion_samples(local_rate, t_lya, min_pos, min_quiet)
+            %
+            % An ONSET is the start of a run of at least min_pos consecutive
+            % positive segments that is preceded by at least min_pos negative
+            % segments; a QUIET time is the midpoint of a run of at least
+            % min_quiet consecutive negative segments. Returns E.onset_t /
+            % E.onset_idx and E.quiet_t / E.quiet_idx (columns, possibly
+            % empty), plus E.n_onset, E.n_quiet. Sampling rule for the
+            % intermittency question in run_transient_gain: is the transient
+            % gain larger, and its optimal direction closer to the leading
+            % Lyapunov direction, at the network's own excursions than in
+            % its quiet stretches?
+            %
+            % See also: transient_divergence, run_transient_gain
+            r = r(:); tl = tl(:);
+            pos = r > 0;
+            d = diff([0; pos; 0]);
+            starts = find(d == 1); ends = find(d == -1) - 1;    % positive runs [starts, ends]
+            onset = zeros(0, 1);
+            for k = 1:numel(starts)
+                len = ends(k) - starts(k) + 1;
+                if len < min_pos; continue; end
+                if k == 1; pre = starts(k) - 1; else; pre = starts(k) - ends(k - 1) - 1; end
+                if pre >= min_pos; onset(end + 1, 1) = starts(k); end %#ok<AGROW>
+            end
+            dn = diff([0; ~pos; 0]);
+            qs = find(dn == 1); qe = find(dn == -1) - 1;
+            quiet = zeros(0, 1);
+            for k = 1:numel(qs)
+                if qe(k) - qs(k) + 1 >= min_quiet
+                    quiet(end + 1, 1) = round((qs(k) + qe(k)) / 2); %#ok<AGROW>
+                end
+            end
+            E = struct('onset_idx', onset, 'onset_t', tl(onset), 'quiet_idx', quiet, ...
+                'quiet_t', tl(quiet), 'n_onset', numel(onset), 'n_quiet', numel(quiet));
+        end
+
         function J_array = compute_Jacobian_at_indices(S_out, sample_indices, params)
             J_array = zeros(params.N_sys_eqs, params.N_sys_eqs, numel(sample_indices));
             for k = 1:numel(sample_indices)
