@@ -76,6 +76,13 @@ arguments
     opts.output_dir  (1,:) char = ''
     opts.save_figs   (1,1) logical = false
     opts.verbose     (1,1) logical = true
+    % Model settings a CONFIG imposes on top of preset and run mode -- the
+    % last, highest-precedence layer (preset < run mode < config). Added
+    % 2026-09-12 so a *_config.m can raise the top-K cap (lya_K_max) or swap
+    % the estimator (lya_method = 'benettin') for one run without editing
+    % analysis_run_config. Validated like any model_defaults field by
+    % ParamSpaceAnalysis2 and frozen into resolved_defaults.
+    opts.model_overrides (1,1) struct = struct()
 end
 
 ctx = struct();
@@ -104,6 +111,7 @@ else
     % ode_solver / fs / T_range / lya_T_interval, and so a whole-struct preset
     % assignment cannot clobber them.
     ctx.model_defaults = merge_struct(ctx.preset_defaults, ctx.cfg.model);
+    ctx.model_defaults = merge_struct(ctx.model_defaults, opts.model_overrides);   % config wins
 
     ctx.n_levels = ctx.cfg.n_levels;
     if isfield(ctx.cfg, 'n_reps')

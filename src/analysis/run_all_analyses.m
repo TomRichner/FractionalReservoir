@@ -48,6 +48,7 @@ arguments
     opts.output_dir   (1,:) char    = ''
     opts.assemble     (1,1) logical = true
     opts.verbose      (1,1) logical = true
+    opts.model_overrides (1,1) struct = struct()   % config-level model settings; see resolve_run_context
 end
 
 setup_paths();
@@ -94,7 +95,12 @@ save_manifest(run_dir, preset_name, preset_defaults, model_class, run_mode, ...
 %% Shared context arguments for every sub-analysis
 ctx_args = {'preset_name', preset_name, 'run_mode', run_mode, ...
             'output_dir', run_dir, 'save_figs', opts.save_figs, ...
-            'verbose', opts.verbose};
+            'verbose', opts.verbose, 'model_overrides', opts.model_overrides};
+if ~isempty(fieldnames(opts.model_overrides))
+    fprintf('Config model overrides (win over preset and run mode): %s\n\n', ...
+        strjoin(cellfun(@(f) sprintf('%s = %s', f, mat2str(opts.model_overrides.(f))), ...
+        fieldnames(opts.model_overrides), 'UniformOutput', false), ', '));
+end
 
 %% 1. Sensitivity
 fprintf('========================================\n');

@@ -110,8 +110,15 @@ t_all = tic;
 % folder", which is what run_all_analyses does with an empty output_dir. A
 % relative path resolves against the project root, so a config can say
 % 'data/fast_4' without caring what the cwd is -- same rule as fig_root.
+% cfg.model_overrides (optional struct) is the config's own layer on top of
+% preset and run mode for the SWEEPS -- e.g. struct('lya_K_max', 60). It does
+% not reach the other stages, which size themselves.
+overrides = struct();
+if isfield(cfg, 'model_overrides') && isstruct(cfg.model_overrides)
+    overrides = cfg.model_overrides;
+end
 if isempty(cfg.run_dir)
-    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode);
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'model_overrides', overrides);
 else
     out_dir = cfg.run_dir;
     if ~is_absolute_path(out_dir)
@@ -119,7 +126,8 @@ else
     end
     assert_empty_target(out_dir);
     fprintf('  output   : %s\n', out_dir);
-    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir);
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir, ...
+        'model_overrides', overrides);
 end
 
 results = struct('stage', {}, 'ok', {}, 'minutes', {}, 'detail', {}, 'err', {});
