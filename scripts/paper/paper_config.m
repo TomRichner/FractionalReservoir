@@ -190,6 +190,10 @@ F = add(F, 'fig_dc_lle',                     @fig_dc_lle,                     fa
 % numerical-vs-spectral abscissa (transient amplification) from the eig stage.
 F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
 F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    false, {});
+% Transient gain, adaptation frozen vs active, and the onset-vs-quiet contrast
+% (TR 2026-09-13): from the transient_gain stage.
+F = add(F, 'fig_transient_gain',             @fig_transient_gain,             false, {});
+F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  false, {});
 % The generated equation and conditions tables. An ordinary entry, not a special
 % call after the loop: as a special case its failures sat outside the headline
 % count, which is how the n_a refactor broke it while the run still reported

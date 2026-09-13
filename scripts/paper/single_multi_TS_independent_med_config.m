@@ -120,6 +120,10 @@ F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      
 % numerical-vs-spectral abscissa (transient amplification) from the eig stage.
 F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
 F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    false, {});
+% Transient gain, adaptation frozen vs active, and the onset-vs-quiet contrast
+% (TR 2026-09-13): from the transient_gain stage.
+F = add(F, 'fig_transient_gain',             @fig_transient_gain,             false, {});
+F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  false, {});
 % Numerical-method verification, TR 2026-09-10: SRA1 reshot against a 1e-10
 % ode45 reference and against itself on a shared Brownian path, and Benettin
 % vs QR on a reduced network. Two entries so each variant has its own folder.
