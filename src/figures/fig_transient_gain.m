@@ -109,6 +109,11 @@ title(tl, sprintf('Transient gain of a dendritic perturbation, n = %d, T = %g s,
 hdr = '| Condition | Propagator | G_max | t_peak (s) | frac_E(v_opt) | participation | cos(v_opt, v_lyap) |';
 fprintf('%s\n|---|---|---|---|---|---|---|\n', hdr);
 fprintf('%s\n', rows{:});
+% The frozen operating point against the trajectory's own rate.
+hdr2 = '| Condition | lambda_1 (trajectory) | alpha(J_xx) at state | omega(J_xx) at state | alpha(J) at state |';
+rows2 = arrayfun(@(r) op_row(r), R, 'UniformOutput', false);
+fprintf('\n%s\n|---|---|---|---|---|\n', hdr2);
+fprintf('%s\n', rows2{:});
 
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 
@@ -121,6 +126,8 @@ if cfg.save
     if fid > 0
         fprintf(fid, '%s\n|---|---|---|---|---|---|---|\n', hdr);
         fprintf(fid, '%s\n', rows{:});
+        fprintf(fid, '\n%s\n|---|---|---|---|---|\n', hdr2);
+        fprintf(fid, '%s\n', rows2{:});
         fclose(fid);
     end
 end
@@ -137,8 +144,25 @@ s = sprintf('| %s | %s | %s | %s | %s | %s | %s |', title, strrep(variant, '_', 
     mmm(g, '%.2f'), mmm(tp, '%.2f'), mmm(fe, '%.2f'), mmm(pr, '%.0f'), mmm(al, '%.2f'));
 end
 
+function s = op_row(r)
+% The frozen operating point vs the trajectory: lambda_1 of the top-K run
+% against the spectral abscissa of J_xx and of the full J at the sampled
+% states (medians over every sample of the condition; NaN-tolerant).
+smp = r.samples;
+lam = [r.trials.LLE];
+if isfield(smp, 'alpha_full')
+    ax = [smp.alpha_xx]; ox = [smp.omega_xx]; af = [smp.alpha_full];
+else
+    ax = NaN; ox = NaN; af = NaN;
+end
+s = sprintf('| %s | %s | %s | %s | %s |', r.title, mmm(lam, '%+.3f'), mmm(ax(~isnan(ax)), '%+.2f'), ...
+    mmm(ox(~isnan(ox)), '%.1f'), mmm(af(~isnan(af)), '%+.2f'));
+end
+
 function s = mmm(v, fmt)
-if isscalar(v) || max(v) == min(v)
+if isempty(v)
+    s = '-';
+elseif isscalar(v) || max(v) == min(v)
     s = sprintf(fmt, median(v));
 else
     s = sprintf([fmt ' [' fmt ', ' fmt ']'], median(v), min(v), max(v));

@@ -215,13 +215,26 @@ for s = 1:numel(t_all)
     smp = empty_sample();
     smp.t_sample = t_s; smp.kind = kinds{s}; smp.seeds = seeds; smp.local_rate_at_sample = lr_s;
     smp.lyap_block_fracs = [B.x, B.sfa, B.std, B.stf];
+    % The frozen operating point's own rates, beside lambda_1 of the trajectory:
+    % alpha_xx (the eig stage's quantity), omega_xx, and alpha_full, the
+    % spectral abscissa of the FULL J at this state -- "the trajectory is more
+    % stable than any of its states" needs this number. eigs on the sparse
+    % nonsymmetric N x N can fail to converge; then NaN, never an error.
+    J = SRNNCellTypePairs.compute_Jacobian_fast(S_out(i0, :)', params);
+    Jxx = full(J(params.state_layout.x, params.state_layout.x));
+    smp.alpha_xx = max(real(eig(Jxx)));
+    smp.omega_xx = max(eig((Jxx + Jxx') / 2));
+    try
+        ws = warning('off', 'MATLAB:eigs:NotAllEigsConverged');
+        ev = eigs(J, 6, 'largestreal', 'MaxIterations', 600, 'Display', false);
+        warning(ws);
+        smp.alpha_full = max(real(ev));       % max omits the NaN of unconverged ones
+    catch
+        smp.alpha_full = NaN;
+    end
     for v = 1:n_var
         opts = struct('variant', P.variants{v}, 'report_dt', P.report_dt, 'directions', dirs);
-        if strcmp(P.variants{v}, 'frozen_x')
-            J = SRNNCellTypePairs.compute_Jacobian_fast(S_out(i0, :)', params);
-            Jxx = full(J(params.state_layout.x, params.state_layout.x));
-            opts.Jxx = Jxx;
-        end
+        if strcmp(P.variants{v}, 'frozen_x'); opts.Jxx = Jxx; end
         [G, info] = SRNNCellTypePairs.transient_gain(S_out, t_out, i0, params, P.horizon, opts);
         if v == 1
             nt = numel(G.t);
@@ -267,7 +280,7 @@ s = struct('t_sample', NaN, 'kind', '', 'seeds', [NaN NaN], 'local_rate_at_sampl
     'G_max', nan(1, 3), 't_peak', nan(1, 3), 'align_opt_lyap', nan(1, 3), ...
     'cos_opt_ei_diff', nan(1, 3), 'cos_opt_ei_sum', nan(1, 3), ...
     'frac_E_opt', nan(1, 3), 'participation_opt', nan(1, 3), ...
-    'v_opt_active', [], 'v_opt_frozen_x', [], 'lyap_block_fracs', nan(1, 4), 'seconds', NaN);
+    'v_opt_active', [], 'v_opt_frozen_x', [], 'lyap_block_fracs', nan(1, 4), 'alpha_xx', NaN, 'omega_xx', NaN, 'alpha_full', NaN, 'seconds', NaN);
 end
 
 function t = pick_evenly(t, k)
