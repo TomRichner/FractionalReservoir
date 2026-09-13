@@ -227,7 +227,7 @@ if ~isempty(lya_T_interval)
     cfg.model.lya_T_interval = lya_T_interval;
 end
 % THE LYAPUNOV ESTIMATOR THE SWEEPS USE (TR, 2026-09-12): the top-K discrete
-% QR method at K = 15, retried at 2K up to 30 while the Kaplan-Yorke
+% QR method at K = 15, retried at 2K up to 60 while the Kaplan-Yorke
 % dimension is unresolved, re-orthonormalised every 0.05 s (short enough to
 % resolve transients on the dendritic timescale; the interval does not bias
 % the exponents). One run then yields lambda_1, h_KS, D_KY, n_positive, the
@@ -239,7 +239,7 @@ end
 cfg.model.lya_method = 'topk';
 cfg.model.lya_K      = 15;
 cfg.model.lya_K_auto = true;
-cfg.model.lya_K_max  = 30;
+cfg.model.lya_K_max  = 60;
 cfg.model.lya_dt     = 0.05;
 cfg.sde_solver = sde_solver;
 end

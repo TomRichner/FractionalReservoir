@@ -52,14 +52,6 @@ cfg = struct();
 cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25';
 cfg.run_mode    = 'medium';
 
-% THE CONFIG'S OWN MODEL LAYER for the three sweeps (preset < run mode < this):
-% the top-K retry may double K up to 60 here rather than analysis_run_config's
-% 30, so the strongly chaotic no-adaptation points resolve their Kaplan-Yorke
-% dimension (at the smoke's cap of 30 roughly a fifth of them did not). Cost is
-% bounded by one extra doubling on those jobs only. The spectrum and eig stages
-% size themselves (K = 200 at medium).
-cfg.model_overrides = struct('lya_K_max', 60);
-
 %% Where things land -- both fixed, so this cannot touch any other run
 cfg.run_dir  = 'data/topk_med';   % analyses write, figures read
 cfg.fig_root = 'figs/topk_med';   % overwritten in place

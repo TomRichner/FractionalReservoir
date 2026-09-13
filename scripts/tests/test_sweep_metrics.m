@@ -7,12 +7,12 @@
 %      mean_synaptic_output), lookup by key and by field, unknown -> error,
 %      the four sheet measures are lle / r / hks / dky.
 %   2. analysis_run_config carries the top-K settings for every analysis and
-%      mode (lya_method 'topk', K 15, auto, cap 30, lya_dt 0.05), and a
+%      mode (lya_method 'topk', K 15, auto, cap 60, lya_dt 0.05), and a
 %      config can override lya_method to 'benettin' after the fact.
 %   3. A tiny Pairs sweep (2 gain levels x 2 reps, n = 30, two conditions)
 %      through the real driver: every result carries every registry field
 %      and every lya_summary field as a scalar; LLE, h_KS_bits, D_KY,
-%      K_used, n_positive finite on successful jobs; K_used in {15, 30};
+%      K_used, n_positive finite on successful jobs; K_used in {15, 30, 60};
 %      D_KY_resolved 0/1; the leading local series present;
 %      collect_level_values works for h_KS_bits and D_KY.
 %   4. The same sweep with lya_method = 'benettin' stores NaN for the
@@ -48,10 +48,10 @@ for an = {'sensitivity', 'tau_sensitivity', 'param_space'}
     for md = run_mode_names()
         c = analysis_run_config(an{1}, md{1}, preset);
         ok = ok && strcmp(c.model.lya_method, 'topk') && c.model.lya_K == 15 && ...
-            c.model.lya_K_auto && c.model.lya_K_max == 30 && c.model.lya_dt == 0.05;
+            c.model.lya_K_auto && c.model.lya_K_max == 60 && c.model.lya_dt == 0.05;
     end
 end
-all_passed = check('every analysis x mode carries topk / K 15 / auto / cap 30 / lya_dt 0.05', ok) && all_passed;
+all_passed = check('every analysis x mode carries topk / K 15 / auto / cap 60 / lya_dt 0.05', ok) && all_passed;
 c = analysis_run_config('sensitivity', 'fast', preset); c.model.lya_method = 'benettin';
 all_passed = check('a config can override lya_method afterwards', strcmp(c.model.lya_method, 'benettin')) && all_passed;
 
@@ -74,7 +74,7 @@ all_passed = check('every result carries every registry and lya_summary field as
 fin = all(cellfun(@(r) all(isfinite([r.LLE r.h_KS_bits r.n_positive r.K_used r.mean_rate])), res));
 all_passed = check('LLE, h_KS_bits, n_positive, K_used, mean_rate finite', fin) && all_passed;
 ku = cellfun(@(r) r.K_used, res);
-all_passed = check(sprintf('K_used in {15, 30} (%s)', mat2str(unique(ku)')), all(ismember(ku, [15 30]))) && all_passed;
+all_passed = check(sprintf('K_used in {15, 30, 60} (%s)', mat2str(unique(ku)')), all(ismember(ku, [15 30 60]))) && all_passed;
 resolved = cellfun(@(r) r.D_KY_resolved, res);
 all_passed = check('D_KY_resolved is 0/1 and D_KY finite where resolved', all(ismember(resolved, [0 1])) && ...
     all(cellfun(@(r) ~r.D_KY_resolved || isfinite(r.D_KY), res))) && all_passed;

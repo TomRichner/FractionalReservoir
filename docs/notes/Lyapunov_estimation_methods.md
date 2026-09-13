@@ -286,7 +286,7 @@ is the practical remedy.
 
 **What the sweeps now report (2026-09-12).** Every sweep job runs top-K at
 K = 15, re-orthonormalising every 0.05 s, with the retry doubling K on the
-stored trajectory up to 30 while D_KY is unresolved (spectra nest, so the
+stored trajectory up to 60 while D_KY is unresolved (spectra nest, so the
 retry is exact). `SRNNCellTypePairs.lya_summary` returns, per run: λ_1,
 λ_1 − λ_2, n_+, h_KS (bit/s), D_KY with its resolved flag, K used, and
 three **quality flags**: n_+ = K (the positive part may be truncated; h_KS
