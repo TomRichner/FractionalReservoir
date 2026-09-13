@@ -146,6 +146,89 @@ item 3 is a small stage of its own and is the one that answers the
 question as posed ("how much does adaptation reduce transient
 amplification") with adaptation actually acting.
 
+## 6. Results: transient gain with adaptation frozen vs active (2026-09-13)
+
+Item 3 is built: `run_transient_gain` (stage `transient_gain`, after
+`lyapunov_spectrum`), `fig_transient_gain`, `fig_transient_gain_excursions`,
+on the statics `SRNNCellTypePairs.transient_gain`, `leading_direction_at`
+and `excursion_samples`. The stage propagates the n dendritic unit vectors
+through the tangent equation from sampled states of the noisy trajectory
+and reads the x-in / x-out block every 20 ms, with THREE propagators:
+`frozen_x` (J_xx fixed at the state), `frozen_full` (the full J fixed at
+the state) and `active` (J(S(t)) along the trajectory). Verified against
+`expm` on small networks to 2e-6 (`test_transient_gain`).
+
+### 6.1 Fast smoke, n = 500, one seed, T = 20 s, horizon 1 s
+
+Six regular states per regime (`data/transient_gain_smoke`,
+`figs/transient_gain_smoke`); G_max over the 1-s horizon, median [min, max]:
+
+| regime | λ₁ | J_xx frozen | J frozen | active | active t_peak |
+|---|---|---|---|---|---|
+| no adaptation | +4.0 | 47 000 [11 000, 540 000] | same | 1 200 [370, 4 700] | 1.0 (horizon) |
+| single-timescale | +0.44 | 11 000 [360, 89 000] | 143 [9, 520] | 30 [19, 69] | 0.87 [0.24, 1.0] |
+| multiple-timescale | −0.11 | 39 [12, 1 200] | 6.7 [5.3, 54] | 8.6 [5.0, 19] | 0.18 [0.14, 1.0] |
+
+What it says:
+
+* **Adaptation's dynamic feedback is large.** Freezing the full J instead
+  of only J_xx cuts the 1-s gain by ~80× (single-timescale) and ~6×
+  (multiple-timescale). This is the part the ω − α figure cannot show. In
+  the no-adaptation regime the two frozen propagators are identical (N = n),
+  which is the built-in sanity check.
+* **The frozen gain in an unstable regime is not a transient.** Where
+  α(J_xx) > 0 (no and single-timescale adaptation, α ≈ +7 and +6) the frozen
+  curve is e^{αt} times a non-normal prefactor and grows without bound, so
+  its "peak" is the horizon. The comparison that means something there is
+  the gain at a fixed t, or the active vs frozen curves at the same t; only
+  the multiple-timescale regime has a genuine peak (0.18 s) and decay.
+* **The active gain is the honest number**, and it tracks the regime's λ₁:
+  the no-adaptation trajectory amplifies ~e^{7} in a second along its
+  worst direction (λ₁ = +4 plus non-normal boost), single-timescale ~30,
+  multiple-timescale ~9 with a peak at 0.18 s and recovery.
+* **Active vs frozen-full is not one-signed.** At n = 500 the active gain
+  is below the frozen-full gain in the two unstable regimes and slightly
+  ABOVE it in the stable one (8.6 vs 6.7); on the 40- and 60-neuron test
+  networks the active gain also came out above the frozen ones. The drift
+  of the state through regions of stronger local expansion (the local rate
+  fluctuates around λ₁) can add more than the frozen picture allows. So
+  the frozen propagators are not bounds; report all three.
+* **Directions.** The worst-case direction at the peak has a participation
+  ratio of ~60 of 500 neurons, E fraction ~0.5, and |cos| ≤ 0.15 with the
+  leading Lyapunov direction: the direction that amplifies most over a
+  second is NOT the direction the dynamics are expanding along. The E/I
+  difference mode is the best of the named directions in every regime
+  (the balanced-amplification prediction holds), the E/I sum mode is the
+  worst (below 1 in the adapted regimes: a uniform push is damped), and the
+  noise-average gain is near 1 in the adapted regimes -- adaptation makes
+  the network's own additive noise see no amplification on average while a
+  worst-case perturbation still gains 10-30×.
+
+### 6.2 Excursion onsets vs quiet states (Next 2)
+
+In 20 s the fast smoke found 2 onsets and 0 quiets in the single-timescale
+regime and 2 onsets, 1 quiet in the multiple-timescale one -- too few for
+the contrast; the medium mode (T = 40 s, 2 seeds, up to 8 of each) is the
+first real test. What the few samples show: the onset states' active G_max
+(33 and 13) sits above the regular-state medians (30 and 8.6), and the
+optimal direction at onset has |cos| 0.02-0.16 with the leading Lyapunov
+direction. If that alignment stays low with more samples, the excursions
+are not "the network recruiting its own non-normal mode" in the
+worst-case sense; they may still be amplification along a different,
+lower-gain direction, which the `G_lyap` reading measures directly.
+
+### 6.3 Where an intermittent-but-stable network is (for Next 3)
+
+`scripts/examples/find_intermittent_stable.m` queries the medium sweep for
+jobs with λ₁ < 0, the leading local rate positive ≥ 25% of the time and
+mean excursions ≥ 0.1 s: 78 / 78 / 114 of ~1 200-1 500 successful jobs per
+regime. The strongest candidates (p95 of the 0.2-s finite-time exponent
+≈ 10-13 s⁻¹, λ₁ ≈ −0.01 to −0.1) are the multiple-timescale regime with
+`mu_IE_relative` 2.06 or `mu_EE_relative` 13.4-15.7 in the 1-D
+sensitivity sweeps (several reps each), and the single-timescale regime
+at n = 190. Those are the networks to build the stimulation-direction
+analysis on.
+
 ## References
 
 * Trefethen, L. N. & Embree, M. (2005). *Spectra and Pseudospectra*.

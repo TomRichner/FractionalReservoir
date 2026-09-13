@@ -292,3 +292,52 @@ Do this before designing Next 3.
   stage by name; **no Co-Authored-By trailer in commit messages**
   (CLAUDE.md, updated); `figs/` and `data/` gitignored; note PDFs are
   force-added.
+
+
+## 5. Addendum 2026-09-13 (after compaction): Next 1 and Next 2 built
+
+*Same session (`90c5825b-...`), same machine; commits `478052a`, `71bf5a5`
+and the docs commit after them. Working tree clean at the end.*
+
+**Built.** `SRNNCellTypePairs.transient_gain` / `leading_direction_at` /
+`excursion_samples` (+ `test_transient_gain`); stage
+`src/analysis/run_transient_gain.m` (registered after `lyapunov_spectrum`
+in `run_all_paper_analyses`, `test_run_modes`, and the figure registries
+of `paper_config`, `single_multi_TS_independent_config`, `_med_config`,
+`topk_smoke_fast_config`, `topk_med_config`); figures
+`fig_transient_gain` (`Fig_Transient_Gain`) and
+`fig_transient_gain_excursions` (`Fig_Transient_Gain_Excursions`), each
+with a `_table.md`; `test_transient_gain_stage`;
+`scripts/examples/find_intermittent_stable.m`; CLAUDE.md bullet;
+`Non_normal_amplification.md` §6 (the results, read that first).
+
+**Smoke** (`data/transient_gain_smoke`, `figs/transient_gain_smoke`, fast,
+n = 500, 1 seed, 11 min): active 1-s G_max 1 200 / 30 / 8.6 for no /
+single / multiple-timescale adaptation; freezing the full J instead of
+J_xx alone cuts the frozen gain ~80× / ~6× in the adapted regimes (the
+dynamic feedback). The frozen gain in a regime with α(J_xx) > 0 grows
+without bound, so its "peak" is the horizon -- compare at fixed t. The
+active gain is NOT bounded by the frozen ones (above them on the small
+test nets and in the stable regime at n = 500). The worst-case direction
+has |cos| ≤ 0.15 with the leading Lyapunov direction; the E/I difference
+mode is the best named direction, the E/I sum mode the worst (< 1 when
+adapted); the noise-average gain is ~1 in the adapted regimes.
+
+**Next 2 status.** The sampling works but 20 s gives 0-2 onsets/quiets per
+regime; the medium mode (T 40 s, 2 seeds, up to 8 + 8) is the first real
+contrast. `topk_med_config` now includes the stage: rerunning
+`topk_med_run` (delete `data/topk_med` first, or run the stage alone into
+`data/topk_med/transient_gain` with `run_transient_gain('run_mode',
+'medium', 'out_dir', ...)` -- about 1 h) gives it.
+
+**Next 3 prerequisite done.** `find_intermittent_stable()` over
+`data/topk_med`: 78 / 78 / 114 intermittent-but-stable jobs per regime;
+best candidates the multiple-timescale regime at `mu_IE_relative` 2.06 or
+`mu_EE_relative` 13.4-15.7 (1-D sensitivity, several reps, λ₁ ≈ −0.01 to
+−0.1, p95 finite-time exponent 10-13 s⁻¹), and single-timescale at n = 190.
+
+**Not done / raise only.** Next 3 itself (the generalised eigenproblem for
+stimulation directions and the nonlinear check); Kreiss; CLVs; a noise-off
+replicate of the transient-gain stage; a longer horizon for the 10-s SFA
+rung. Also unexplained from §1.3: noise RAISES h_KS in the no-adaptation
+regime.

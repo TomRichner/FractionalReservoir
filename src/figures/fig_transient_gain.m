@@ -51,7 +51,8 @@ v_label = containers.Map({'frozen_x', 'frozen_full', 'active'}, ...
     {'J_{xx} frozen', 'J frozen', 'active'});
 readings = {'G_worst', 'G_noise', 'G_ei_diff', 'G_ei_sum', 'G_lyap'};
 r_label  = {'worst case', 'noise avg', 'E/I diff', 'E/I sum', 'Lyapunov dir'};
-r_grey   = [0 0.25 0.45 0.6 0.75];
+r_grey   = [0 0.15 0.35 0.5 0.65];
+r_style  = {'-', '-', '--', '-.', ':'};
 i_act = find(strcmp(variants, 'active'));
 
 fig = figure('Color', 'w', 'Position', [80 80 380 * n_cond, 600]);
@@ -91,7 +92,7 @@ for i = 1:n_cond
         Gm = cell2mat(arrayfun(@(s) s.(readings{k})(i_act, :), smp(:), 'UniformOutput', false));
         if k == 1; c = col; else; c = r_grey(k) * [1 1 1]; end
         if k == 1; lw = 1.8; else; lw = 1.2; end
-        h2(k) = plot(ax2, t, median(Gm, 1), '-', 'Color', c, 'LineWidth', lw);
+        h2(k) = plot(ax2, t, median(Gm, 1), r_style{k}, 'Color', c, 'LineWidth', lw);
     end
     yline(ax2, 1, ':', 'Color', [0.3 0.3 0.3]);
     hold(ax2, 'off');
@@ -102,8 +103,8 @@ for i = 1:n_cond
     ax_bot(i) = ax2;
 end
 linkaxes(ax_top, 'y'); linkaxes(ax_bot, 'y');
-title(tl, sprintf('Transient gain, %s, n = %d, horizon %g s', ...
-    strrep(D.settings.preset_name, '_', '\_'), R(1).n, D.settings.horizon_s), ...
+title(tl, sprintf('Transient gain of a dendritic perturbation, n = %d, T = %g s, %d seed(s), horizon %g s', ...
+    R(1).n, D.settings.T, D.settings.n_seeds, D.settings.horizon_s), ...
     'FontWeight', 'normal', 'FontSize', 11);
 hdr = '| Condition | Propagator | G_max | t_peak (s) | frac_E(v_opt) | participation | cos(v_opt, v_lyap) |';
 fprintf('%s\n|---|---|---|---|---|---|---|\n', hdr);

@@ -97,20 +97,19 @@ for i = 1:n_cond
         end
         boxchart(ax2, x, y, 'BoxFaceColor', col, 'MarkerColor', col, 'BoxWidth', 0.5);
         scatter(ax2, x + 0.08 * randn(size(x)), y, 14, col, 'filled', 'MarkerFaceAlpha', 0.5);
-        set(ax2, 'XTick', 1:2, 'XTickLabel', classes, 'XLim', [0.4 2.6]);
     else
         text(ax2, 0.5, 0.5, 'no excursion samples', 'Units', 'normalized', ...
             'HorizontalAlignment', 'center', 'FontSize', 10);
     end
     hold(ax2, 'off');
-    set(ax2, 'FontSize', st.tick_fs, 'YLim', [0 1]); box(ax2, 'off');
+    set(ax2, 'FontSize', st.tick_fs, 'YLim', [0 1], 'XTick', 1:2, 'XTickLabel', classes, 'XLim', [0.4 2.6]); box(ax2, 'off');
     if i == 1; ylabel(ax2, '|cos(v_{opt}, v_{Lyap})| at peak', 'FontSize', st.label_fs); end
 
     rows{i} = table_row(R(i), S, al, i_act);
 end
 linkaxes(ax_top(isgraphics(ax_top)), 'y');
-title(tl, sprintf('Transient gain at excursion onsets vs quiet states, %s, n = %d', ...
-    strrep(D.settings.preset_name, '_', '\_'), R(1).n), 'FontWeight', 'normal', 'FontSize', 11);
+title(tl, sprintf('Active transient gain at excursion onsets vs quiet states, n = %d, T = %g s, %d seed(s)', ...
+    R(1).n, D.settings.T, D.settings.n_seeds), 'FontWeight', 'normal', 'FontSize', 11);
 hdr = '| Condition | onsets found / used | quiets found / used | G_max onset | G_max quiet | p (rank-sum) | align onset | align quiet |';
 fprintf('%s\n|---|---|---|---|---|---|---|---|\n', hdr);
 fprintf('%s\n', rows{:});
