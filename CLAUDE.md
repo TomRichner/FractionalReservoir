@@ -50,9 +50,13 @@ put a factor of `b` into the `a→x` and `a→a` Jacobian blocks. The code
 and the division makes the steady-state adaptation `c·r` exactly — independent of
 how many timescales carry it. **`c` is therefore the TOTAL adaptation budget**,
 and changing `K` changes the timescale *structure* without changing adaptation
-*strength*. Depression needs no such factor because it enters as a PRODUCT: each
-`b` rests at 1, so a second timescale squares the steady state rather than
-subdividing it, which is deliberate. Note `SRNNModel2` also has `c/K` but
+*strength*. Depression USED to have no such factor: it enters as a PRODUCT, each
+`b` rests at 1, and with both timescales at the same τ_rel/τ_rec the second
+timescale SQUARED the steady-state depression, so the one-vs-multiple comparison
+changed STD strength along with timescale count. Since 2026-09-13 the paper's
+presets match the two at r_ref = 0.25 (a route `scale`, or usage-matched τ_rel;
+see `docs/EquationsParametersDocs/Equations_stability_paper.md`, § "2026-09-13:
+STD strength matching"). Note `SRNNModel2` also has `c/K` but
 `src/model/jacobian/compute_J_eff.m` does **not** — see its header.
 
 **Facilitation exists but is unused by the paper's preset.** `SRNNCellTypePairs`
@@ -225,7 +229,7 @@ orthogonal knobs used to sit in different trees, which hid that they are a pair.
 
 - **`src/presets/srnn_param_preset.m`** — *which network*. `[d, model_class] = srnn_param_preset(name)` returns a struct of model overrides **plus the model class they are written for** (the name is only a lookup key; the struct is what reaches the model). Assign it to `psa.model_defaults` and layer tweaks on with plain field assignment. Presets carry physics **including** swept axes like `n`/`f`/`level_of_chaos` — a grid axis overrides the preset for the sweep that varies it, while sweeps holding that axis fixed use the preset's value. They must **not** carry `n_levels`/`n_reps` (not model properties), the run_mode timing knobs, or condition fields. The second output exists because the two model classes have **disjoint** parameter vocabularies, so a preset that did not carry its class would only fail later inside `validate_model_defaults`; it defaults to `'SRNNModel2'`. The third output is the **conditions**, which is how a preset states its own synapse routes.
 
-  **Which routes carry STD is a property of the PRESET, not a global default.** `celltype_pairs_Sc0p2_noise0p025_dualStd_4cond` and `_7cond` — the paper's networks — put dual-timescale STD on **all four** routes (`E→E`, `E→I`, `I→E`, `I→I`), as does `mc_pairs_dualStd`. `bursting_pairs` uses `E→E`/`E→I` only, `single_neuron_*` the one `E→E` route it has, and `sompolinsky_pairs` none at all. There is no default: each case writes its own, and the difference decides whether `SRNN_ESN_reservoir`'s `'synaptic'` readout is even defined.
+  **Which routes carry STD is a property of the PRESET, not a global default.** `celltype_pairs_Sc0p2_noise0p025_dualStd_4cond` and `_7cond` — the paper's networks — put dual-timescale STD on **all four** routes (`E→E`, `E→I`, `I→E`, `I→I`), as does `mc_pairs_dualStd`. `bursting_pairs` uses `E→E`/`E→I` only, `single_neuron_*` the one `E→E` route it has, and `sompolinsky_pairs` none at all. There is no default: each case writes its own, and the difference decides whether `SRNN_ESN_reservoir`'s `'synaptic'` readout is even defined. A route may also carry `synapse_config.<pre>.<post>.scale` (positive scalar, default 1): a weight multiplier folded into `params.W` inside `get_params` and nowhere else, so the dynamics, both Jacobians and `jacobian_times` agree by construction while the drawn `obj.W` (`plot_W`, the MC shared-build check) stays unscaled. It exists for the STD strength match: `celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25` puts `scale = 3` on the four two-timescale routes so their steady-state synaptic output equals the single-timescale routes' at r_ref = 0.25, and `..._dualStdUsage_3cond_mu8p25` is the no-scale control that matches by lengthening τ_rel instead (`test_route_scale`).
 
   **EACH PRESET STATES ITS OWN ADAPTATION REGIMES, in full, in its own `case` block** — names, `tau_a` rows and `synapse_config` written out as a literal cell array. Read the block and you know the experiment; there is no second file to consult.
 

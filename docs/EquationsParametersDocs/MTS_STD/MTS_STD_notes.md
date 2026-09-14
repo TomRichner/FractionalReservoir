@@ -232,3 +232,30 @@ The code default of `0.25` stands unopposed.)
 Varela, J. A., Sen, K., Gibson, J., Fost, J., Abbott, L. F., & Nelson, S. B. (1997).
 A quantitative description of short-term plasticity at excitatory synapses in layer 2/3 of rat
 primary visual cortex. *Journal of Neuroscience*, 17(20), 7926–7940.
+
+---
+
+## Addendum, 2026-09-13: the strength is now matched between one and two timescales
+
+The recommendation above — per-timescale $\tau_{rel}$, no conserved budget —
+stands, but the paper's one-vs-multiple-timescale comparison needed the
+*steady-state strength* of depression held equal between the two adapting
+conditions, which the unmatched preset (both timescales at $\rho = 0.125$, so the
+two-timescale product is the square of the one-timescale factor) did not do.
+TR's decision and the two presets are recorded in
+[`../Equations_stability_paper.md`](../Equations_stability_paper.md)
+(§ "2026-09-13: STD strength matching") and in
+[`../../notes/STD_strength_matching_2026-09-13.md`](../../notes/STD_strength_matching_2026-09-13.md).
+Two remarks in this file's terms:
+
+- The **usage-matched control** (`..._dualStdUsage_...`) tunes exactly the
+  quantity §"tau_rel is Varela's d_m" says is free: $\rho_u = 0.34151$ on both
+  timescales, $\tau_{rel} = [0.683, 1.366]$ s, chosen so the product equals the
+  single factor at $r_{ref} = 0.25$. It is a depression parameter change and
+  nothing else.
+- The **scaled primary** (`..._dualStdScaled_...`) leaves every depression
+  parameter as it was and multiplies the two-timescale routes' *weights* by
+  $s = 3$. That is a synaptic weight, not a depression parameter: $b$, $\theta$
+  and the ODE are untouched, and the price is a $3\times$ undepressed gain at low
+  rates. It is not the budget split this file rejects — nothing is conserved
+  across timescales — but it is also not a statement about depression.

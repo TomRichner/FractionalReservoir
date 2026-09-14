@@ -1,8 +1,8 @@
-function cfg = topk_med_config()
-% TOPK_MED_CONFIG The paper network at 'medium' with every analysis, top-K everywhere.
+function cfg = stdUsage_fast_config()
+% STDUSAGE_FAST_CONFIG The STD strength-matched (usage) network at 'fast', every analysis.
 %
-%   run_dir = run_all_paper_analyses(topk_med_config());
-%   results = make_all_paper_figures(topk_med_config());
+%   run_dir = run_all_paper_analyses(stdUsage_fast_config());
+%   results = make_all_paper_figures(stdUsage_fast_config());
 %
 % EVERY SETTING IS STATED HERE. This does not call paper_config and does not
 % inherit from any other *_config; read this file and you know the whole run.
@@ -30,10 +30,10 @@ function cfg = topk_med_config()
 % reproduction and the bursting network make points the 500-neuron recurrent
 % network cannot make. They are named explicitly below, not inherited.
 %
-% RERUNNING: delete data/topk_med first.
+% RERUNNING: delete data/stdusage_fast first.
 % run_all_paper_analyses refuses a run directory that is not absent or empty.
 %
-% See also: topk_med_run, run_all_paper_analyses,
+% See also: stdUsage_fast_run, run_all_paper_analyses,
 %           make_all_paper_figures, srnn_param_preset
 
 cfg = struct();
@@ -49,12 +49,12 @@ cfg = struct();
 % 'medium': the single_multi_TS_independent config at real compute -- 15 MC
 % trials (the sign-flip test is exact over 2^15 patterns) and the sweeps'
 % medium grids. Roughly two hours plus MC on the n = 500 network.
-cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25';
-cfg.run_mode    = 'medium';
+cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25';
+cfg.run_mode    = 'fast';
 
 %% Where things land -- both fixed, so this cannot touch any other run
-cfg.run_dir  = 'data/topk_med';   % analyses write, figures read
-cfg.fig_root = 'figs/topk_med';   % overwritten in place
+cfg.run_dir  = 'data/stdusage_fast';   % analyses write, figures read
+cfg.fig_root = 'figs/stdusage_fast';   % overwritten in place
 
 % Figures are built and saved but do not pop up: a new figure window raises
 % itself and takes keyboard focus, and a run draws dozens.

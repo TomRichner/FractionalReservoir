@@ -863,6 +863,7 @@ classdef SRNNCellTypePairs < handle
             params.tau_b_rec = pair.tau_b_rec;
             params.tau_b_rel = pair.tau_b_rel;
             params.std_zero_floor = obj.std_zero_floor;
+            params.route_scale = pair.scale;   % C x C (pre, post), 1 where unset
             params.n_g_pairs = pair.n_g;
             params.tau_g_dec = pair.tau_g_dec;
             params.tau_g_fac = pair.tau_g_fac;
@@ -879,7 +880,21 @@ classdef SRNNCellTypePairs < handle
                 obj.n, obj.n_per_type, obj.n_a, pair.n_b, pair.n_g);
             params.rng_seeds = obj.rng_seeds;
             if ~isempty(obj.W)
+                % params.W is what the dynamics, both Jacobians and jacobian_times
+                % read. The per-route scale is folded in HERE and nowhere else, so
+                % those four stay consistent by construction; obj.W (plot_W, the
+                % MC shared-build check) is the drawn matrix without it.
                 params.W = obj.W;
+                if any(pair.scale(:) ~= 1)
+                    for pre = 1:obj.n_cellTypes
+                        for post = 1:obj.n_cellTypes
+                            if pair.scale(pre, post) ~= 1
+                                params.W(obj.type_indices{post}, obj.type_indices{pre}) = ...
+                                    pair.scale(pre, post) * obj.W(obj.type_indices{post}, obj.type_indices{pre});
+                            end
+                        end
+                    end
+                end
             end
         end
 
@@ -1300,7 +1315,7 @@ classdef SRNNCellTypePairs < handle
                 'n_b', zeros(C, C), 'n_g', zeros(C, C), ...
                 'tau_b_rec', {cell(C, C)}, 'tau_b_rel', {cell(C, C)}, ...
                 'tau_g_dec', {cell(C, C)}, 'tau_g_fac', {cell(C, C)}, ...
-                'G', {cell(C, C)});
+                'G', {cell(C, C)}, 'scale', ones(C, C));
             config = obj.synapse_config;
             if isempty(config), return; end
             if ~isstruct(config) || ~isscalar(config)
@@ -1337,11 +1352,27 @@ classdef SRNNCellTypePairs < handle
                         error('SRNNCellTypePairs:InvalidSynapseConfig', ...
                             'Route %s->%s must be a scalar struct.', pre_name, post_name);
                     end
-                    unknown_mechanism = setdiff(fieldnames(route), {'std', 'stf'});
+                    unknown_mechanism = setdiff(fieldnames(route), {'std', 'stf', 'scale'});
                     if ~isempty(unknown_mechanism)
                         error('SRNNCellTypePairs:InvalidSynapseConfig', ...
                             'Unknown field on route %s->%s: %s.', ...
                             pre_name, post_name, unknown_mechanism{1});
+                    end
+
+                    % Route SCALE (2026-09-14): a positive scalar multiplying
+                    % the route's weights, W(post, pre) * scale, applied in
+                    % get_params to params.W only (obj.W stays the drawn matrix).
+                    % It exists to match the steady-state synaptic output of a
+                    % two-timescale STD route to a one-timescale one at a
+                    % reference rate; see the dualStdScaled presets. Default 1.
+                    if isfield(route, 'scale') && ~isempty(route.scale)
+                        sc = route.scale;
+                        if ~(isnumeric(sc) && isscalar(sc) && isfinite(sc) && sc > 0)
+                            error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                                'Route %s->%s scale must be a positive finite scalar.', ...
+                                pre_name, post_name);
+                        end
+                        pair.scale(pre, post) = double(sc);
                     end
 
                     if isfield(route, 'std') && ~isempty(route.std) && ...
@@ -2628,6 +2659,27 @@ classdef SRNNCellTypePairs < handle
             ia = [layout.a{:}]; ib = [layout.b{:}]; ig = [layout.g{:}];
             B = struct('x', sum(q(layout.x) .^ 2) / tot, 'sfa', sum(q(ia) .^ 2) / tot, ...
                 'std', sum(q(ib) .^ 2) / tot, 'stf', sum(q(ig) .^ 2) / tot);
+        end
+
+        function J = finite_difference_jacobian(S, params, h)
+            %FINITE_DIFFERENCE_JACOBIAN Central-difference Jacobian of dynamics_fast.
+            %
+            %   J = SRNNCellTypePairs.finite_difference_jacobian(S, params, h)
+            %
+            % Dense N x N, column k = (f(S + h e_k) - f(S - h e_k)) / 2h at t = 0.
+            % The reference compute_Jacobian_fast is checked against, in
+            % test_SRNNCellTypePairs and in run_numerics_verification's check J.
+            % params needs u_interpolant, as dynamics_fast does. O(N) RHS calls:
+            % use it on small networks only.
+            N = numel(S);
+            J = zeros(N, N);
+            for k = 1:N
+                plus = S; minus = S;
+                plus(k) = plus(k) + h;
+                minus(k) = minus(k) - h;
+                J(:, k) = (SRNNCellTypePairs.dynamics_fast(0, plus, params) - ...
+                    SRNNCellTypePairs.dynamics_fast(0, minus, params)) / (2 * h);
+            end
         end
 
         function [G, info] = transient_gain(S_out, t_out, i0, params, horizon_s, opts)

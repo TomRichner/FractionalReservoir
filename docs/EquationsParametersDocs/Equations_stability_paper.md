@@ -81,6 +81,71 @@ depression budget to conserve. (It supersedes the earlier
 `MTS_STD_product_form_assessment.md` in the same folder, which recommended
 splitting a budget across timescales — that recommendation was rejected.)
 
+### 2026-09-13: STD strength matching between one and two timescales
+
+**The problem.** The paragraph above is still how the *unmatched* preset
+(`celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25`) is
+built, and it confounds two things. With the steady state of one depression
+variable $b_m(r) = 1/(1 + r/\rho_m)$, $\rho_m = \tau_{rel,m}/\tau_{rec,m}$, and
+both timescales at $\rho = 0.125$ ($\tau_{rec} = [2, 4]$ s, $\tau_{rel} =
+[0.25, 0.5]$ s; the single-timescale routes at $(2, 0.25)$), the
+two-timescale product is the **square** of the one-timescale factor at every
+rate. Going from one timescale to two therefore changes the *number of recovery
+timescales* and the *steady-state strength* of depression at once, so the
+single-vs-multiple comparison could not attribute a difference to timescale
+count alone. SFA does not have this problem because of $c/K$.
+
+**What is matched.** The steady-state synaptic output $\theta_{ss}(r) = r
+\prod_m b_m(r)$ of a two-timescale route is made equal to that of a
+one-timescale route at one reference rate,
+
+$$ r_{ref} = 0.25, $$
+
+the median mean firing rate of the multiple-timescale condition at the default
+point of the five well-defined 1-D sweeps of the medium run `data/topk_med`
+(per sweep 0.223–0.251, pooled over 105 reps 0.237 with 5th–95th percentiles
+0.050–0.346), rounded to 0.05. At $r_{ref}$ one factor is $1/(1 +
+0.25/0.125) = 1/3$ and the unmatched product is $1/9$. Exact matching over
+every rate is impossible for an unweighted product with a different number of
+factors; the match is at $r_{ref}$ and the mismatch elsewhere is what
+`fig_STD_steady_state` draws over the occupied rates.
+
+**Variant 1, route scale (primary; TR's decision, 2026-09-13).** Preset
+`..._dualStdScaled_3cond_mu8p25`. The depression variables and $\theta_j$ are
+unchanged; the two-timescale routes carry a per-route weight scale $s$, so the
+recurrent sum a postsynaptic neuron receives is
+
+$$ \sum_j s_{q_j \to q_i}\, w_{ij}\, \theta_j, \qquad s = \frac{\theta^{(1)}_{ss}(r_{ref})}{\theta^{(2)}_{ss}(r_{ref})} = 1 + \frac{r_{ref}}{\rho} = 3 $$
+
+on all four routes of the `sfa3_std2` condition and $s = 1$ everywhere else. In
+the code this is `synapse_config.<pre>.<post>.scale`, folded into `params.W`
+inside `SRNNCellTypePairs.get_params` (the drawn `W` is untouched, so the
+shared-build check and `plot_W` still describe the drawn matrix; the
+dynamics, both Jacobians and `jacobian_times` all read `params.W`, so they
+stay consistent by construction). **Consequence on record:** because
+$b_m \to 1$ as $r \to 0$, the *undepressed* recurrent gain of the
+two-timescale condition is $3\times$ that of the other two conditions; the
+match holds at the operating point, not at low rates. TR chose this with that
+consequence stated; the second variant is the control for it.
+
+**Variant 2, usage matching (control).** Preset
+`..._dualStdUsage_3cond_mu8p25`. No scale; $\tau_{rec} = [2, 4]$ s kept, and
+the usage $\rho_u = \tau_{rel}/\tau_{rec}$ set equal on both timescales so
+that $(1 + r_{ref}/\rho_u)^2 = 1 + r_{ref}/\rho$:
+
+$$ \rho_u = \frac{r_{ref}}{\sqrt{1 + r_{ref}/\rho} - 1} = \frac{0.25}{\sqrt{3} - 1} = 0.34151, \qquad \tau_{rel} = \rho_u\, \tau_{rec} = [0.68301,\ 1.36603]\ \text{s}. $$
+
+The low-rate gain is unchanged, each timescale depresses less, and the
+depression dynamics are slower (rate $1/\tau_{rec} + r/\tau_{rel}$ per
+variable). $\tau_{rel}$ is Varela's $d_m$, so this is the tuning the product
+model itself offers.
+
+In both variants `no_adaptation` and `sfa1_std1` are identical to the unmatched
+preset's; only `sfa3_std2` differs. The full rationale, the numbers and the
+replacement manuscript text are in
+[`../notes/STD_strength_matching_2026-09-13.md`](../notes/STD_strength_matching_2026-09-13.md);
+`test_route_scale` checks the presets against the formulas above.
+
 ## Facilitation (optional)
 
 `SRNNCellTypePairs` also supports short-term facilitation, per route. The paper's

@@ -37,7 +37,7 @@ function cfg = paper_config(opts)
 % See also: run_all_paper_analyses, make_all_paper_figures, srnn_param_preset
 
 arguments
-    opts.preset_name (1,:) char = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
+    opts.preset_name (1,:) char = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25'   % STD strength-matched (TR 2026-09-13); the usage-matched control is ..._dualStdUsage_...; ..._dualStd_... is the unmatched network of data/topk_med
     % 'medium' is the default because it is what gets run: ~3 h of compute and
     % figures that are readable. 'production' is a deliberate act -- pass it
     % explicitly, paper_config('run_mode', 'production'), for the final run.
@@ -173,6 +173,10 @@ F = add(F, 'fig_adaptation_methods_stf',     @fig_adaptation_methods,         fa
 F = add(F, 'fig_SFA_steady_state',           @fig_SFA_steady_state,           false, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_STD_steady_state',           @fig_STD_steady_state,           false, ...
+        {'preset_name', cfg.preset_name});
+% STD strength matching (TR 2026-09-13): the one- vs two-timescale steady-state
+% curves matched at r_ref, with the occupied rates of the run.
+F = add(F, 'fig_STD_strength_matching',      @fig_STD_strength_matching,      true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_stim_engages_adaptation',    @fig_stim_engages_adaptation,    true, ...
         {'preset_name', cfg.bursting_preset});

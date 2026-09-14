@@ -614,6 +614,102 @@ switch name
             struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
             struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
 
+    case {'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25', ...
+          'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25'}
+        % STD STRENGTH-MATCHED variants of ..._sfaEI_..._dualStd_3cond_mu8p25
+        % (TR decision, 2026-09-13; docs/notes/STD_strength_matching_2026-09-13.md).
+        %
+        % THE PROBLEM. SFA is normalised (c/K: the steady-state adaptation is
+        % c*r whatever K is), STD was not: theta = r * prod_m b_m with both
+        % depression timescales at rho = tau_rel/tau_rec = 0.125, so the
+        % two-timescale steady state 1/(1 + r/rho)^2 is the SQUARE of the
+        % one-timescale 1/(1 + r/rho). The single-vs-multiple comparison then
+        % confounded STD strength with STD timescale count. Both variants below
+        % make the steady-state synaptic output of the two-timescale routes
+        % EQUAL to the one-timescale routes' at a reference rate
+        %
+        %     r_ref = 0.25
+        %
+        % = the median mean firing rate of the multiple-timescale condition at
+        % the default point of the five well-defined 1-D sweeps of the medium
+        % run data/topk_med (0.223-0.251 per sweep, pooled 0.237; the joint
+        % 64-point parameter-space sample, which ranges far from the default,
+        % has 0.154), rounded to 0.05. At r_ref one factor is 1/(1 + 0.25/0.125)
+        % = 1/3 and the unmatched product is 1/9.
+        %
+        % no_adaptation and sfa1_std1 are IDENTICAL to the unscaled preset's;
+        % only sfa3_std2 differs, and differently in the two variants:
+        %
+        % dualStdScaled -- the two-timescale routes keep tau_rec [2 4], tau_rel
+        %   [0.25 0.5] and gain a route SCALE s = theta_single(r_ref) /
+        %   theta_dual(r_ref) = 1 + r_ref/rho = 3, i.e. W(post, pre) * 3 on all
+        %   four routes (applied in get_params to params.W; obj.W is untouched).
+        %   Output at r_ref matches; the UNDEPRESSED (low-rate) recurrent gain
+        %   of the dual condition is 3x the other conditions'. This is the
+        %   PRIMARY variant (TR's choice, with that consequence on record).
+        %
+        % dualStdUsage -- the control: tau_rec [2 4] kept, and the usage
+        %   rho_u = tau_rel/tau_rec chosen equal on both timescales so that
+        %   (1 + r_ref/rho_u)^2 = 1 + r_ref/rho, i.e.
+        %   rho_u = r_ref / (sqrt(1 + r_ref/rho) - 1) = 0.25/(sqrt(3) - 1)
+        %   = 0.34151, tau_rel = rho_u * tau_rec = [0.68301 1.36603]. No scale;
+        %   the low-rate gain is unchanged, the depression is weaker per
+        %   timescale and its dynamics slower (rate 1/tau_rec + r/tau_rel).
+        %
+        % Everything else -- n, mu 8.25, sigma, noise, SFA on E and I, the
+        % per-neuron setpoint -- is identical to the unscaled preset.
+        % fig_STD_steady_state draws the three steady-state curves over the
+        % occupied rates so the match is visible rather than asserted.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    500, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [8.25 -8.25; 8.25 -8.25], ... % 1.5 x 5.5, (post <- pre)
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % centre of the per-neuron draw
+            'mu_S_c',               [], ...      % empty: centre on S_c
+            'sigma_S_c',            [0.1 0.1], ... % per-neuron spread, both types
+            'c',                    [0.5, 0.5], ...     % TOTAL SFA budget, E AND I
+            'input_config',         pairs_input_config(0.0), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              500, ...
+            'F_ref_indegree',       100, ...
+            'sigma_u_noise',        0.025);
+
+        taus     = log_ladder(0.25, 10, 3);
+        sfa_off  = {zeros(1,0), zeros(1,0)};
+        sfa_one  = {taus(1),    taus(1)};
+        sfa_all  = {taus,       taus};
+
+        single_std = struct('tau_rec', 2, 'tau_rel', 0.25);          % rho = 0.125
+        if endsWith(name, 'dualStdScaled_3cond_mu8p25')
+            % rho 0.125 on both timescales as before, plus the route scale
+            dual_route = struct('std', struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]), ...
+                                'scale', 3);                          % 1 + r_ref/rho
+        else
+            % equal usage rho_u = 0.34151 on both timescales, no scale
+            dual_route = struct('std', struct('tau_rec', [2 4], ...
+                                              'tau_rel', [0.68301 1.36603]));
+        end
+        std_all = struct();
+        std_all.E.E = dual_route;       std_all.E.I = dual_route;
+        std_all.I.E = dual_route;       std_all.I.I = dual_route;
+        std_one = struct();
+        std_one.E.E.std = single_std;   std_one.E.I.std = single_std;
+        std_one.I.E.std = single_std;   std_one.I.I.std = single_std;
+        std_off = struct();
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
+            struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
         % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
         % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
@@ -1134,6 +1230,8 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond_mu8p25', ...
     'celltype_pairs_Sc0p2_noise0p025_tripleStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them

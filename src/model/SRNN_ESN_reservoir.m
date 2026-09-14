@@ -997,11 +997,15 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % ROUTE_SIGNATURE The synaptic dynamics of one route, as comparable
             % data. Covers STD *and* STF: synaptic output is
             % r * prod(b) * prod(g), so a per-route g breaks the readout exactly
-            % as a per-route b does.
+            % as a per-route b does. The route scale is compared too: it is a
+            % weight, not part of theta, but two routes of one presynaptic type
+            % scaled differently would make "the synaptic output of neuron j"
+            % ambiguous again.
             sig = struct('n_b', params.n_b_pairs(pre, post), ...
                          'n_g', params.n_g_pairs(pre, post), ...
                          'tau_rec', [], 'tau_rel', [], ...
-                         'tau_dec', [], 'tau_fac', [], 'G', []);
+                         'tau_dec', [], 'tau_fac', [], 'G', [], ...
+                         'scale', params.route_scale(pre, post));
             if sig.n_b > 0
                 sig.tau_rec = params.tau_b_rec{pre, post};
                 sig.tau_rel = params.tau_b_rel{pre, post};
