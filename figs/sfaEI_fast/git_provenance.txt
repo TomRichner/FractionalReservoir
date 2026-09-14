@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\sfaEI_fast
+Captured at: 14-Sep-2026 10:11:04
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      4406b56907ed7543cdd50aa17cc6e58732ce7494
+commit_short:4406b56
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Analysis stages draw their figures invisible: DefaultFigureVisible off via with_graphics_defaults
+last_date:   2026-09-14T10:08:42-05:00
+dirty:       false
+
