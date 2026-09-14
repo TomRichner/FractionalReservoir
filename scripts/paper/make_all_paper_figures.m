@@ -102,6 +102,11 @@ else
     root_mode = 'configured';
 end
 if ~isfolder(fig_root); mkdir(fig_root); end
+% The command-window transcript of the figure pass is saved beside the
+% manifest (TR, 2026-09-14). diary is process-global; the onCleanup turns it
+% off however this function exits.
+diary(fullfile(fig_root, 'command_window.log'));
+diary_guard = onCleanup(@() diary('off')); %#ok<NASGU>
 vprintf(verbose, 'minimal', 'Figure root:   %s  (%s)\n', fig_root, root_mode);
 
 %% Keep the figures off screen unless asked otherwise
