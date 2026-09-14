@@ -1,7 +1,9 @@
 # Transient gain with adaptation frozen vs active: what the first measurement says
 
 *2026-09-13, R5611351, Claude Code session `90c5825b-...`, repo
-`FractionalReservoir`, branch `main`, HEAD `e0810e4`. Data:
+`FractionalReservoir`, branch `main`. Sections 1-6 were written after the
+fast smoke (HEAD `e0810e4`); section 7 adds the medium and 3-s-horizon runs
+the same evening. Data:
 `data/transient_gain_smoke` (fast mode: n = 500, one seed, T = 20 s, six
 regular states per regime, horizon 1 s, 11 min). Figures:
 `figs/transient_gain_smoke`. Code: `run_transient_gain`,
@@ -199,3 +201,139 @@ the onset-vs-quiet contrast is untested.
    `find_intermittent_stable` (multiple-timescale regime at
    `mu_IE_relative` 2.06 or `mu_EE_relative` 13.4-15.7; single-timescale at
    n = 190).
+## 7. Medium run and 3-s horizon (2026-09-13 evening): the picture holds, with numbers
+
+Two further runs after the smoke, both with the stage now recording α(J_xx),
+ω(J_xx) and α(J) at every sampled state (commit `f18d83f`):
+
+* **Medium** (`data/topk_med/transient_gain`, `figs/topk_med`): T = 40 s,
+  2 seeds, 12 regular + up to 8 onset + 8 quiet states per seed, horizon
+  2 s, 51 min. 24 regular states per regime.
+* **3-s horizon** (`data/transient_gain_h3`, `figs/transient_gain_h3`):
+  T = 40 s, 1 seed, 4 regular states per regime, horizon 3 s, 21 min.
+
+(The first medium attempt died after 51 min at the assembly step -- the
+per-seed sample arrays have different lengths and were concatenated
+horizontally; fixed in `43ef72e`, which also saves the raw trials before
+assembly and makes the stage test run two seeds.)
+
+### 7.1 The operating point vs the trajectory (medium, medians over 24-40 states)
+
+| regime | λ₁ (trajectory) | α(J_xx) at state | ω(J_xx) at state | α(J) at state |
+|---|---|---|---|---|
+| no adaptation | +3.35 [2.63, 4.08] | +6.0 [1.9, 10.7] | 80 | +6.0 (= α(J_xx), N = n) |
+| single-timescale | +0.48 | +5.9 [2.7, 10.0] | 80 | +1.8 [−0.3, +4.7] |
+| multiple-timescale | −0.11 | +0.7 [−0.8, +3.9] | 50 | +0.5 [−0.2, +1.9] (21 of 31 states unconverged) |
+
+Three facts in one table. (i) Adaptation's linear feedback at the operating
+point lowers the frozen growth rate from +5.9 to +1.8 s⁻¹ (single) and
+from +0.7 to +0.5 (multiple): that is what the J_xx-frozen vs J-frozen gap
+is made of. (ii) **The trajectory is more stable than any of its states**:
+α(J) at a typical state is +1.8 where λ₁ is +0.48, and +0.5 where λ₁ is
+−0.11. Without adaptation the same gap (+6.0 vs +3.35) exists and is pure
+nonstationarity; with adaptation the operating point keeps moving away
+from its own unstable directions. (iii) ω − α is ~75 s⁻¹ in every regime,
+i.e. the instantaneous non-normal margin barely changes with adaptation
+even though the finite-time gain changes by orders of magnitude -- the
+margin is the wrong number to summarise the effect with.
+
+Caveat on α(J): `eigs(J, 6, 'largestreal')` on the sparse 4000 × 4000
+often converges only some of the six; the largest converged real part is
+taken, and in the stable regime two thirds of the states returned none.
+Treat it as an estimate (the J-frozen curve's late log-slope agrees:
+~+1.5 to +2 s⁻¹ in the single-timescale regime).
+
+### 7.2 Gains (medium, horizon 2 s, 24 regular states, median [min, max])
+
+| regime | J_xx frozen | J frozen | active | active t_peak | active / e^{2λ₁} |
+|---|---|---|---|---|---|
+| no adaptation | 3×10⁶ [5×10², 10¹⁰] | same | 11 600 [650, 1.4×10⁶] | 2.0 (horizon) | 14 |
+| single-timescale | 10⁶ [10³, 4×10⁹] | 119 [4, 6×10⁴] | 48 [23, 410] | 1.94 [0.8, 2.0] | 18 |
+| multiple-timescale | 22 [5, 2×10⁴] | 4.8 [3.3, 69] | 5.0 [3.6, 12.4] | 0.14 [0.10, 1.4] | 6 |
+
+With the 3-s horizon (one seed, 4 states), the active median curve reads:
+
+| regime | peak | at 1 s | 2 s | 3 s | noise-average at 3 s |
+|---|---|---|---|---|---|
+| no adaptation | 3×10⁶ at 3 s | 820 | 23 000 | 3×10⁶ | 1.4×10⁵ |
+| single-timescale | 155 at 2.7 s | 37 | 55 | 122 | 6 |
+| multiple-timescale | 5.1 at 0.14 s | 2.5 | 1.0 | 0.50 | 0.03 |
+
+So: the frozen numbers past ~1 s are astronomically large and meaningless
+where α > 0 (the range spans seven decades because e^{αt} with α ∈ [2, 10]
+does); the active gain is what a perturbation does. In the **stable
+regime a dendritic perturbation is amplified 5× within 140 ms, is back to
+its initial size by 2 s, and is at half by 3 s**; the isotropic
+(noise-average) response is at 3% by then. The 10-s SFA rung produces no
+second rise within 3 s (there is a small shoulder near 1 s in the medium
+figure). In the single-timescale regime the active gain never peaks: it
+rides on λ₁ = +0.48 with a transient prefactor of ~20-50 that is still
+growing at 3 s; the J-frozen curve, which the smoke had at 143 at 1 s, is
+at 3.6×10⁶ by 3 s -- the frozen operating point is unstable at +1.8 s⁻¹
+and the trajectory is not.
+
+The transient prefactor active / e^{λ₁t} at 2 s is 14 / 18 / 6: the
+same ~2× reduction by adaptation as the smoke showed, against four decades
+in the frozen column. The direction readings are unchanged: participation
+~20 (no adaptation) to ~70 (adapted) neurons, E fraction ~0.5, |cos| with
+the leading Lyapunov direction 0.04-0.06 in every regime and every
+propagator; E/I difference the best named direction, E/I sum below 1 when
+adapted; noise-average ≈ 1 (single) and < 1 (multiple).
+
+### 7.3 Onsets vs quiet states (Next 2): a real but modest effect, not along the Lyapunov direction
+
+Found in 2 × 40 s: 3 / 19 / 4 onsets and 0 / 0 / 3 quiet stretches (≥ 1 s
+of negative local rate) for no / single / multiple-timescale adaptation.
+A 1-s quiet stretch does not occur in the single-timescale regime (the
+local rate is positive about half the time), so the planned onset-vs-quiet
+contrast is empty there. Post hoc, the regular states split by the local
+rate at the sample (stored) give the contrast instead:
+
+| regime | onset: n, active G_max (2 s) | regular with local rate < 0: n, G_max | rank-sum p | G along v_Lyap at the peak, onset vs contracting |
+|---|---|---|---|---|
+| single-timescale | 16, 62 [27, 200] | 13, 42 | 0.09 | 4.4 vs 3.1 |
+| multiple-timescale | 4, 8.2 [6.2, 11.0] | 24, 5.0 | 0.02 | 0.87 vs 0.72 |
+| multiple-timescale, 1-s quiets | -- | 3, 5.2 [4.6, 6.7] | 0.11 (vs onsets) | -- |
+
+Onset states carry ~1.5× more worst-case gain than contracting states,
+significant in the stable regime with 4 vs 24 states and marginal in the
+single-timescale one. But the optimal direction at an onset has |cos|
+0.04-0.05 with the leading Lyapunov direction, the same as anywhere else,
+and the gain along the Lyapunov direction itself is small (4.4 vs 62 worst
+case; 0.87, i.e. contraction, in the stable regime). So the excursions are
+NOT the network recruiting its worst-case non-normal mode. The state at an
+onset is somewhat more amplifying in every direction (a higher-gain
+operating point: more neurons on the steep part of φ, less depressed
+synapses), and the divergence itself happens along a slow,
+adaptation-dominated direction that a dendritic perturbation barely
+projects onto. The mechanistic account of intermittency is therefore
+"operating-point excursions", not "transient amplification along the
+unstable direction".
+
+### 7.4 Updated reading for the paper
+
+Everything in §4 stands; two sharpenings. First, the number to quote in
+the stable regime is now 5.0 [3.6, 12.4] at 0.14 s over 24 states and 2
+seeds, and "gone by 2 s". Second, the operating-point table (§7.1) is the
+cleanest single statement of adaptation's role: at a typical state the
+recurrent block alone is unstable at +6 s⁻¹, adaptation's feedback at that
+state brings it to +1.8 or +0.5, and the trajectory's own rate is +0.48 or
+−0.11 -- each step is a mechanism the frozen picture lacks.
+
+### 7.5 What is still open
+
+* `fig_transient_gain_excursions` should draw the post-hoc split
+  (onset vs regular-contracting) as well as onset vs 1-s quiets, and the
+  quiet threshold should be a `cfg` option (0.5 s would exist in the
+  single-timescale regime). Not done; the numbers above came from a
+  console analysis of the saved samples.
+* α(J) via `eigs` converges poorly on the stable regime's Jacobian; a
+  shift-invert or the late log-slope of the J-frozen curve would be more
+  reliable.
+* Only two seeds; production mode (3 seeds, 3-s horizon, 20 regular states)
+  is the version for the manuscript.
+* Next 3 (stimulation directions): the E/I sum mode is damped in the
+  adapted regimes and the amplifying pattern is a ~70-neuron E/I-difference
+  pattern, which supports the prior that a uniform push engages adaptation
+  without a large transient. The candidate networks are in §6 of
+  `Non_normal_amplification.md` / `find_intermittent_stable`.
