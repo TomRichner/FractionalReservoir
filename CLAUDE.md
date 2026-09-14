@@ -355,7 +355,7 @@ anything.
   % out.figs / out.files / out.source
   ```
 
-  Added 2026-09-14: `fig_STD_strength_matching`, `fig_local_vs_finite_lle`, `fig_lle_vs_rate`, `fig_eig_heatmap_imbalance`, and the `fig_example_timeseries` composite (built on `plot_local_and_finite_lle` and `SRNNCellTypePairs.routes_identical`); `paper_config` defaults to the unmatched sfaEI paper network again (TR, 2026-09-14: the STD matching stays out of the manuscript for now; `sfaEI_med_config` is the bundle with every new analysis, memory capacity noise-free on `sra1` via `cfg.mc_ode_solver`, and no matching figure).
+  Added 2026-09-14: `fig_STD_strength_matching`, `fig_local_vs_finite_lle`, `fig_lle_vs_rate`, `fig_eig_heatmap_imbalance`, and the `fig_example_timeseries` composite (built on `plot_local_and_finite_lle` and `SRNNCellTypePairs.routes_identical`); `paper_config` defaults to the unmatched sfaEI paper network again (TR, 2026-09-14: the STD matching stays out of the manuscript for now; `sfaEI_fast_config` is the bundle with every new analysis, memory capacity noise-free on `sra1` via `cfg.mc_ode_solver`, and no matching figure).
 
   **No figure calls `close all force`.** It is correct standalone — `replot_*` saves *all* open figures — but in a batch it destroys the previous entry's output before it can be verified. `make_all_paper_figures` closes each entry's returned handles once that entry has been checked, which also stops earlier figures polluting the `replot_*` prep folders.
 

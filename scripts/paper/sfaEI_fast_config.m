@@ -1,8 +1,8 @@
-function cfg = sfaEI_med_config()
-% SFAEI_MED_CONFIG The paper network (STD unmatched) at 'medium', every analysis, MC noise-free.
+function cfg = sfaEI_fast_config()
+% SFAEI_FAST_CONFIG The paper network (STD unmatched) at 'fast', every analysis, MC noise-free.
 %
-%   run_dir = run_all_paper_analyses(sfaEI_med_config());
-%   results = make_all_paper_figures(sfaEI_med_config());
+%   run_dir = run_all_paper_analyses(sfaEI_fast_config());
+%   results = make_all_paper_figures(sfaEI_fast_config());
 %
 % EVERY SETTING IS STATED HERE. This does not call paper_config and does not
 % inherit from any other *_config; read this file and you know the whole run.
@@ -30,10 +30,10 @@ function cfg = sfaEI_med_config()
 % reproduction and the bursting network make points the 500-neuron recurrent
 % network cannot make. They are named explicitly below, not inherited.
 %
-% RERUNNING: delete data/sfaEI_med first.
+% RERUNNING: delete data/sfaEI_fast first.
 % run_all_paper_analyses refuses a run directory that is not absent or empty.
 %
-% See also: sfaEI_med_run, run_all_paper_analyses,
+% See also: sfaEI_fast_run, run_all_paper_analyses,
 %           make_all_paper_figures, srnn_param_preset
 
 cfg = struct();
@@ -48,15 +48,16 @@ cfg = struct();
 % paper presets, but the adapting ones carry I-SFA here, so they are not the
 % same physics. See the preset.
 %
-% 'medium': the single_multi_TS_independent config at real compute -- 15 MC
-% trials (the sign-flip test is exact over 2^15 patterns) and the sweeps'
-% medium grids. Roughly two hours plus MC on the n = 500 network.
+% 'fast': 4 levels x 3 reps per 1-D sweep, 7 tau levels, 27 joint samples, 5 MC
+% trials (the sign-flip floor is p = 0.0625), 20-s simulations. About two hours
+% for the whole pipeline on the n = 500 network; switch run_mode to 'medium'
+% for manuscript numbers (15 MC trials, exact sign-flip over 2^15 patterns).
 cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25';
-cfg.run_mode    = 'medium';
+cfg.run_mode    = 'fast';
 
 %% Where things land -- both fixed, so this cannot touch any other run
-cfg.run_dir  = 'data/sfaEI_med';   % analyses write, figures read
-cfg.fig_root = 'figs/sfaEI_med';   % overwritten in place
+cfg.run_dir  = 'data/sfaEI_fast';   % analyses write, figures read
+cfg.fig_root = 'figs/sfaEI_fast';   % overwritten in place
 
 % Figures are built and saved but do not pop up: a new figure window raises
 % itself and takes keyboard focus, and a run draws dozens.

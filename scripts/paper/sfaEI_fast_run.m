@@ -1,16 +1,16 @@
-% SFAEI_MED_RUN The paper network (STD unmatched), medium, every analysis, MC noise-free on sra1.
+% SFAEI_FAST_RUN The paper network (STD unmatched), medium, every analysis, MC noise-free on sra1.
 %
 %   Open this file and press Run. setup_paths is called on the first line.
 %
-% Every setting comes from sfaEI_med_config(), which states
+% Every setting comes from sfaEI_fast_config(), which states
 % ALL of them itself -- it does not call paper_config. Read that one file and
 % you know the whole run.
 %
 %   preset    celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25
 %             (mu x1.5, SFA on E AND I, per-neuron S_c with sigma 0.1)
-%   run_mode  medium
-%   run_dir   data/sfaEI_med
-%   fig_root  figs/sfaEI_med
+%   run_mode  fast
+%   run_dir   data/sfaEI_fast
+%   fig_root  figs/sfaEI_fast
 %
 % Memory capacity runs on THE SAME PRESET as the sweeps here, not on the
 % separate mc_pairs_dualStd network the paper_config lineage uses. At 'medium'
@@ -19,21 +19,21 @@
 % The same experiment as single_multi_TS_independent_run at 'fast'; both roots
 % are distinct, so the two never collide.
 %
-% RERUNNING REQUIRES DELETING data/sfaEI_med FIRST.
+% RERUNNING REQUIRES DELETING data/sfaEI_fast FIRST.
 % run_all_paper_analyses refuses a run directory that is not absent or empty.
 %
-% See also: sfaEI_med_config, run_all_paper_analyses,
+% See also: sfaEI_fast_config, run_all_paper_analyses,
 %           make_all_paper_figures
 
 setup_paths();
 
-cfg = sfaEI_med_config();
+cfg = sfaEI_fast_config();
 
 run_dir = run_all_paper_analyses(cfg);
 results = make_all_paper_figures(cfg);
 
 fprintf('\n========================================================\n');
-fprintf('SINGLE vs MULTI TIMESCALE (sfaEI, medium) RUN COMPLETE\n');
+fprintf('SINGLE vs MULTI TIMESCALE (sfaEI, fast) RUN COMPLETE\n');
 fprintf('  preset  : %s (%s)\n', cfg.preset_name, cfg.run_mode);
 fprintf('  MC on   : %s\n', cfg.mc_preset);
 fprintf('  run_dir : %s\n', run_dir);

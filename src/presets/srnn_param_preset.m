@@ -742,7 +742,7 @@ switch name
         % -- a derived preset that changes one named thing about its counterpart
         % is clearer than a copy that could drift -- but a preset must NEVER
         % chain to one that belongs to another config's bundle. This one belongs
-        % to sfaEI_med_config with ..._noise0p025_dualStd_3cond_mu8p25.
+        % to sfaEI_fast_config with ..._noise0p025_dualStd_3cond_mu8p25.
         [d, model_class, conditions] = srnn_param_preset( ...
             'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25');
         d.sigma_u_noise = 0;
