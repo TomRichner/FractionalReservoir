@@ -161,8 +161,9 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 F = {};
 F = add(F, 'fig_introductory_concepts',      @fig_introductory_concepts,      true, ...
         {'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas});
-F = add(F, 'fig_energy_landscape',           @fig_energy_landscape,           false, ...
-        {'gammas', cfg.panelA_gammas});
+% fig_energy_landscape and fig_EI_param_space were dropped from the registry on
+% 2026-09-14 (TR): the manuscript uses fig_EI_weights_param_space, and the
+% landscape cartoon is not used. Both functions remain in src/figures/.
 F = add(F, 'fig_example_timeseries',         @fig_example_timeseries,         true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_FI_curve',                   @fig_FI_curve,                   true, {});
@@ -185,8 +186,6 @@ F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, 
 F = add(F, 'fig_sensitivity_medians',        @fig_sensitivity_medians,        false, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_param_space_allStd',         @fig_param_space_allStd,         true, ...
-        {'preset_name', cfg.preset_name});
-F = add(F, 'fig_EI_param_space',             @fig_EI_param_space,             true, ...
         {'preset_name', cfg.preset_name});
 % Same sheet, coloured by the balance of the WEIGHTS instead of the balance of
 % the neuron counts. Its sibling above answers "does f_E explain where a network
