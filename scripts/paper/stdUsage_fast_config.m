@@ -113,8 +113,8 @@ F = add(F, 'fig_EI_weights_param_space',      @fig_EI_weights_param_space,      
         {'preset_name', cfg.preset_name});
 % Rate vs stability (Codex sec. 4) and local vs finite-time LLE across trials
 % (Codex sec. 3), 2026-09-14: both read the sweeps of the run directory.
-F = add(F, 'fig_lle_vs_rate',                ,                true, {});
-F = add(F, 'fig_local_vs_finite_lle',        ,        true, {});
+F = add(F, 'fig_lle_vs_rate',                @fig_lle_vs_rate,                true, {});
+F = add(F, 'fig_local_vs_finite_lle',        @fig_local_vs_finite_lle,        true, {});
 F = add(F, 'fig_sfa_EOC_allStd',              @fig_sfa_EOC_allStd,              true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_memory_capacity',             @fig_memory_capacity,             true, {});
