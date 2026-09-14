@@ -4,9 +4,10 @@ function out = fig_introductory_concepts(cfg)
 %   out = FIG_INTRODUCTORY_CONCEPTS()
 %   out = FIG_INTRODUCTORY_CONCEPTS('gammas', [0.9 1.6 2.5])
 %
-% Two figures, saved into subfolders of this one:
-%   statetraces/  membrane-potential time series at three levels of gain
-%   eigenspectra/ the Jacobian eigenvalue disk at the same three gains
+% One figure (Fig_Intro_Concepts), two rows sharing the three gains column by
+% column: the Jacobian eigenvalue disk on top, membrane-potential time series
+% below. Until 2026-09-14 these were two figures in subfolders (eigenspectra/,
+% statetraces/) that the manuscript assembled by hand (TR).
 %
 % Reproduces Sompolinsky, Crisanti & Sommers (1988): three networks sharing ONE
 % underlying random weight matrix, scaled by three gains. Only the gain differs,
@@ -27,7 +28,7 @@ function out = fig_introductory_concepts(cfg)
 % until 2026-08-23, only because SRNNCellTypePairs could not build a one-type
 % model.)
 %
-% See also: srnn_param_preset, build_from_preset, fig_energy_landscape
+% See also: srnn_param_preset, build_from_preset
 
 arguments
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
@@ -95,48 +96,15 @@ tau_d = model.tau_d;
 N     = model.n;
 
 %% Plot: 1 x 3 linked time-series panels
-fig = figure('Color', 'white', 'Position', [100, 300, 1200, 320]);
-% Return value deliberately dropped -- the layout is used through nexttile, not
-% through a handle. The CALL still matters: it creates the layout those nexttile
-% calls fill.
-tiledlayout(1, n_cases, 'TileSpacing', 'compact', 'Padding', 'compact');
+%% One figure: eigenspectra on top, the time series below (TR, 2026-09-14)
+% Until 2026-09-14 these were two figures saved into subfolders
+% (eigenspectra/panelA_eigenspectrum, statetraces/panelA_bottom_traces) and
+% assembled by hand in the manuscript. One 2 x 3 layout keeps the gains
+% aligned column by column.
+fig = figure('Color', 'white', 'Position', [100, 150, 1200, 700]);
+tl  = tiledlayout(fig, 2, n_cases, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-idx  = round(linspace(1, N, n_traces));   % which neurons to show
-cols = lines(n_traces);
-ax   = gobjects(1, n_cases);
-
-for k = 1:n_cases
-    ax(k) = nexttile; hold on;
-    t = results(k).t;
-    x = results(k).x;
-    for j = 1:n_traces
-        plot(t, x(idx(j), :), 'LineWidth', 0.6, 'Color', cols(j, :));
-    end
-    box off;
-    set(ax(k), 'Color', 'none');
-    ax(k).XAxis.Visible = 'off';   % hide time axis (scale bar added instead)
-    if k == 1
-        ylabel('x (AU)');
-    end
-end
-
-linkaxes(ax, 'xy');       % shared x and y scale across the three panels
-xlim(ax(1), T_plot);
-set(ax, 'YTick', [-3, 0, 3]);
-
-% 10 s time scale bar in the lower-right of the 1st subplot
-bar_len = 10;                        % seconds
-xr = xlim(ax(1)); yr = ylim(ax(1));
-wx = xr(2) - xr(1); wy = yr(2) - yr(1);
-x_end   = xr(2) - 0.03*wx;
-x_start = x_end - bar_len;
-y_bar   = yr(1) + 0.10*wy;
-plot(ax(1), [x_start, x_end], [y_bar, y_bar], 'k', 'LineWidth', 4);
-text(ax(1), mean([x_start, x_end]), y_bar - 0.03*wy, sprintf('%d s', bar_len), ...
-    'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', 'FontSize', 10);
-hold(ax(1), 'off');
-
-%% Eigenspectrum of the Jacobian at x = 0:  J = (-I + gamma*W)/tau_d
+%% Row 1: eigenspectrum of the Jacobian at x = 0:  J = (-I + gamma*W)/tau_d
 % (tanh'(0) = 1, so the linearization uses W directly; gamma is already in W.)
 % Eigenvalues fill a disk centered at -1/tau_d with radius gamma/tau_d.
 % The vertical (Im) axis at Re = 0 is the stability boundary: once the disk
@@ -145,17 +113,13 @@ hold(ax(1), 'off');
 % Styling matches ConnectivityAdaptation/RandomMatrixTheory (RMT.plot_spectrum /
 % Fig_1_RMT_examples.m): black open-circle eigenvalues, solid black theoretical
 % radius circle, axis off with hand-drawn Re/Im axes through the origin, equal
-% aspect, common scaling, and (a)/(b)/(c) letters.
-fig2  = figure('Color', 'white', 'Position', [100, 300, 977, 380]);
-tl2   = tiledlayout(1, n_cases, 'TileSpacing', 'tight', 'Padding', 'compact'); %#ok<NASGU>
+% aspect, common scaling.
 axe   = gobjects(1, n_cases);
 theta = linspace(0, 2*pi, 200);
 xc    = -1 / tau_d;                 % common disk center (shift from -I/tau_d)
 mSize = 4;
-
-% Plot eigenvalues + theoretical radius circle (RMT style)
 for k = 1:n_cases
-    axe(k) = nexttile; hold(axe(k), 'on');
+    axe(k) = nexttile(tl, k); hold(axe(k), 'on');
     ev = eig((-eye(N) + results(k).W) / tau_d);
     Rk = results(k).gamma / tau_d;                 % theoretical radius
     unstable = real(ev) > 0;                        % right of the imaginary axis
@@ -166,7 +130,6 @@ for k = 1:n_cases
         'MarkerEdgeColor', [0.7 0 0], 'LineWidth', 0.5);
     plot(axe(k), xc + Rk*cos(theta), Rk*sin(theta), 'k-', 'LineWidth', 2);
 end
-
 % Common scaling centered on the disk center (RMT-style equal aspect)
 % margin 1.15, then zoomed out a further 20% so the Im axis/label clears the disk
 max_R = max([results.gamma]) / tau_d;
@@ -176,47 +139,66 @@ for k = 1:n_cases
     ylim(axe(k), [-common_radius, common_radius]);
     daspect(axe(k), [1 1 1]);
 end
-
 % Format axes: hide box, draw Re/Im axes through the origin (RMT style)
 for k = 1:n_cases
-    axes(axe(k)); %#ok<LAXES>
-    x_lim = xlim; y_lim = ylim;
+    x_lim = xlim(axe(k)); y_lim = ylim(axe(k));
     y_lim_axis = min(0.75*y_lim, 1.1*max_R);
-    axis off;
-    hold on;
-    h_x = plot(x_lim, [0, 0], 'k', 'LineWidth', 1.5);      % Re axis
-    h_y = plot([0, 0], y_lim_axis, 'k', 'LineWidth', 1.5); % Im axis = Re=0 stability boundary
+    axis(axe(k), 'off');
+    h_x = plot(axe(k), x_lim, [0, 0], 'k', 'LineWidth', 1.5);      % Re axis
+    h_y = plot(axe(k), [0, 0], y_lim_axis, 'k', 'LineWidth', 1.5); % Im axis = Re=0 stability boundary
     uistack([h_x, h_y], 'bottom');
-    text(x_lim(2), 0, ' Re', 'Interpreter', 'latex', ...
+    text(axe(k), x_lim(2), 0, ' Re', 'Interpreter', 'latex', ...
         'VerticalAlignment', 'middle', 'FontSize', 16);
-    text(0, y_lim_axis(2), 'Im', 'Interpreter', 'latex', ...
+    text(axe(k), 0, y_lim_axis(2), 'Im', 'Interpreter', 'latex', ...
         'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center', 'FontSize', 16);
-    xlim(x_lim); ylim(y_lim);
-    hold off;
+    xlim(axe(k), x_lim); ylim(axe(k), y_lim);
+    hold(axe(k), 'off');
 end
 
-% (a), (b), (c) letters omitted for the eigenspectrum panels
+%% Row 2: linked time-series panels
+idx  = round(linspace(1, N, n_traces));   % which neurons to show
+cols = lines(n_traces);
+ax   = gobjects(1, n_cases);
+for k = 1:n_cases
+    ax(k) = nexttile(tl, n_cases + k); hold(ax(k), 'on');
+    t = results(k).t;
+    x = results(k).x;
+    for j = 1:n_traces
+        plot(ax(k), t, x(idx(j), :), 'LineWidth', 0.6, 'Color', cols(j, :));
+    end
+    box(ax(k), 'off');
+    set(ax(k), 'Color', 'none');
+    ax(k).XAxis.Visible = 'off';   % hide time axis (scale bar added instead)
+    if k == 1
+        ylabel(ax(k), 'x (AU)');
+    end
+end
+linkaxes(ax, 'xy');       % shared x and y scale across the three panels
+xlim(ax(1), T_plot);
+set(ax, 'YTick', [-3, 0, 3]);
+% 10 s time scale bar in the lower-right of the 1st subplot
+bar_len = 10;                        % seconds
+xr = xlim(ax(1)); yr = ylim(ax(1));
+wx = xr(2) - xr(1); wy = yr(2) - yr(1);
+x_end   = xr(2) - 0.03*wx;
+x_start = x_end - bar_len;
+y_bar   = yr(1) + 0.10*wy;
+plot(ax(1), [x_start, x_end], [y_bar, y_bar], 'k', 'LineWidth', 4);
+text(ax(1), mean([x_start, x_end]), y_bar - 0.03*wy, sprintf('%d s', bar_len), ...
+    'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', 'FontSize', 10);
+for k = 1:n_cases; hold(ax(k), 'off'); end
 drawnow;
 
-if ~cfg.visible; set([fig, fig2], 'Visible', 'off'); end
+if ~cfg.visible; set(fig, 'Visible', 'off'); end
 
 %% --- Save -------------------------------------------------------------------
-% Two subfolders, matching the paths the manuscript references.
-traces_dir = fullfile(out_dir, 'statetraces');
-spec_dir   = fullfile(out_dir, 'eigenspectra');
-out = struct('figs', [fig, fig2], 'files', {{}}, ...
-             'source', ['preset: ' cfg.preset_name]);
+fig_tag = 'Fig_Intro_Concepts';
+out = struct('figs', fig, 'files', {{}}, 'source', ['preset: ' cfg.preset_name]);
 if cfg.save
-    save_figure_stable(traces_dir, 'panelA_bottom_traces', fig);
-    save_figure_stable(spec_dir,   'panelA_eigenspectrum', fig2);
-    out.files = [ ...
-        strcat('statetraces/',  existing_outputs(traces_dir, 'panelA_bottom_traces')), ...
-        strcat('eigenspectra/', existing_outputs(spec_dir,   'panelA_eigenspectrum'))];
-
-
+    save_figure_stable(out_dir, fig_tag, fig);
+    out.files = existing_outputs(out_dir, fig_tag);
 end
 end
-
 
 
 function out = ternary(cond, a, b)
