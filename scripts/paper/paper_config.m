@@ -37,7 +37,7 @@ function cfg = paper_config(opts)
 % See also: run_all_paper_analyses, make_all_paper_figures, srnn_param_preset
 
 arguments
-    opts.preset_name (1,:) char = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25'   % STD strength-matched (TR 2026-09-13); the usage-matched control is ..._dualStdUsage_...; ..._dualStd_... is the unmatched network of data/topk_med
+    opts.preset_name (1,:) char = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'   % the paper network, STD unmatched (TR 2026-09-14: the matched variants stay out of the manuscript for now; see sfaEI_med_config)
     % 'medium' is the default because it is what gets run: ~3 h of compute and
     % figures that are readable. 'production' is a deliberate act -- pass it
     % explicitly, paper_config('run_mode', 'production'), for the final run.

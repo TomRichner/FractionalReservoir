@@ -726,6 +726,27 @@ switch name
             struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
             struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
 
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0_dualStd_3cond_mu8p25'
+        % THE PAPER NETWORK WITH THE WIENER PROCESS OFF, for memory capacity
+        % (TR, 2026-09-14): identical to ..._noise0p025_... in every respect
+        % except sigma_u_noise = 0, so the reservoir's fading memory is measured
+        % on the network as characterised elsewhere in the paper, without the
+        % readout having to reconstruct the input through the network's own
+        % noise. The config names 'sra1' as the MC integrator (cfg.mc_ode_solver)
+        % so MC still runs on the paper's solver; mc_run_config would otherwise
+        % pick rk4 at sigma = 0.
+        %
+        % CHAINED, NOT COPIED. This case derives from its counterpart instead of
+        % restating the 25-line struct and the three conditions. The rule (TR,
+        % 2026-09-14): within one run/config/preset bundle presets MAY be related
+        % -- a derived preset that changes one named thing about its counterpart
+        % is clearer than a copy that could drift -- but a preset must NEVER
+        % chain to one that belongs to another config's bundle. This one belongs
+        % to sfaEI_med_config with ..._noise0p025_dualStd_3cond_mu8p25.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25');
+        d.sigma_u_noise = 0;
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
         % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
         % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
@@ -1249,6 +1270,7 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdSingleMatched_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0_dualStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
