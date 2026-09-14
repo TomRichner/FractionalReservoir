@@ -108,9 +108,9 @@ vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] %d networks rebuil
 
 % One styled sheet per registry measure (ei_metric_sheet holds the layout
 % shared with fig_EI_param_space); the colorbar is copied for each sheet.
-opts = struct('tick_fs', st.tick_fs, 'label_fs', st.label_fs, 'title_fs', 20, ...
+opts = struct('tick_fs', st.tick_fs, 'label_fs', st.label_fs, 'title_fs', 14, ...
     'axes_lw', 1.0, 'letter_fs', 18, 'row_shrink', 0.85, 'top_headroom', 0.06, ...
-    'title_y', 1.22, 'cb_x_shift', 0.045, 'xlabel', '', 'yticks', [], ...
+    'title_y', 1.08, 'cb_x_shift', 0.045, 'xlabel', '', 'yticks', [], ...
     'zero_color', [0 0.7 0], 'cb_clim', W_CLIM, ...
     'cb_ticks', [1/11, 0.2, 1/3, 0.5, 2/3, 0.8, 10/11], ...
     'cb_labels', {{'1:10', '1:4', '1:2', '1:1', '2:1', '4:1', '10:1'}}, ...
@@ -118,6 +118,14 @@ opts = struct('tick_fs', st.tick_fs, 'label_fs', st.label_fs, 'title_fs', 20, ..
 cb_fig = findobj(0, 'Type', 'figure', 'Name', 'f Value Colorbar');
 figs = gobjects(1, numel(specs));
 tags = cell(1, numel(specs));
+% Column titles keep the full condition titles; the overlap was the 20-pt font,
+% fixed by title_fs 14 (2026-09-14). The short labels were tried and mix
+% legacy keys ("SFA+STD") with full names, so the map below is an identity.
+[~, ~, preset_conditions] = srnn_param_preset(cfg.preset_name);
+cnames = cellfun(@(c) c.name, preset_conditions, 'UniformOutput', false);
+short_of = containers.Map( ...
+    cellfun(@(c) st.condition_title(c), cnames, 'UniformOutput', false), ...
+    cellfun(@(c) st.condition_title(c), cnames, 'UniformOutput', false));
 for mi = 1:numel(specs)
     spec = specs(mi);
     src_fig = findobj(0, 'Type', 'figure', 'Name', sprintf('%s Unit Histogram', spec.field));
@@ -134,6 +142,14 @@ for mi = 1:numel(specs)
         cb_copy = copyobj(cb_fig, 0); set(cb_copy, 'Visible', 'off');
     end
     figs(mi) = ei_metric_sheet(src_fig, cb_copy, spec, o);
+    for t = findobj(figs(mi), 'Type', 'text')'
+        s = get(t, 'String');
+        if ischar(s) && isKey(short_of, s); set(t, 'String', short_of(s)); end
+    end
+    for a = findobj(figs(mi), 'Type', 'axes')'
+        s = get(a.Title, 'String');
+        if ischar(s) && isKey(short_of, s); set(a.Title, 'String', short_of(s)); end
+    end
     tags{mi} = sprintf('Fig_EI_Weights_ParamSpace_%s', spec.stem);
     if ~cfg.visible; set(figs(mi), 'Visible', 'off'); end
 end

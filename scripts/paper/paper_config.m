@@ -196,11 +196,19 @@ F = add(F, 'fig_EI_param_space',             @fig_EI_param_space,             tr
 % its sibling so the pair is obvious.
 F = add(F, 'fig_EI_weights_param_space',     @fig_EI_weights_param_space,     true, ...
         {'preset_name', cfg.preset_name});
+% Rate vs stability (Codex sec. 4) and local vs finite-time LLE across trials
+% (Codex sec. 3), 2026-09-14: both read the sweeps of the run directory.
+F = add(F, 'fig_lle_vs_rate',                ,                true, {});
+F = add(F, 'fig_local_vs_finite_lle',        ,        true, {});
 F = add(F, 'fig_sfa_EOC_allStd',             @fig_sfa_EOC_allStd,             true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_memory_capacity',            @fig_memory_capacity,            true, {});
 F = add(F, 'fig_memory_capacity_example',    @fig_memory_capacity_example,    true, {});
 F = add(F, 'fig_eig_heatmap',                @fig_eig_heatmap,                false, {});
+% E:I imbalance examples (2026-09-14): rows = mu_EE x 0.5 / 1 / 1.5 on one seed,
+% columns = regimes, annotated with matched lambda_1, mean rate and B_E.
+F = add(F, 'fig_eig_heatmap_imbalance',      @fig_eig_heatmap_imbalance,      true, ...
+        {'density_scale', 'loglog'});
 % The quantitative companion to fig_stim_engages_adaptation: that one shows
 % tonic drive engaging adaptation on a single bursting network, this one asks
 % whether the drive moves the Lyapunov exponent across seeds and across every
@@ -214,6 +222,10 @@ F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    fa
 % (TR 2026-09-13): from the transient_gain stage.
 F = add(F, 'fig_transient_gain',             @fig_transient_gain,             false, {});
 F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  false, {});
+% Numerics check J (2026-09-14): analytic Jacobian vs central finite differences
+% from the numerics_verification stage, with its pre-registered threshold.
+F = add(F, 'fig_numerics_jacobian',         @fig_numerics_verification,      false, ...
+        {'variant', 'jacobian'});
 % The generated equation and conditions tables. An ordinary entry, not a special
 % call after the loop: as a special case its failures sat outside the headline
 % count, which is how the n_a refactor broke it while the run still reported

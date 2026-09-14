@@ -111,6 +111,10 @@ F = add(F, 'fig_EI_param_space',              @fig_EI_param_space,              
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_EI_weights_param_space',      @fig_EI_weights_param_space,      true, ...
         {'preset_name', cfg.preset_name});
+% Rate vs stability (Codex sec. 4) and local vs finite-time LLE across trials
+% (Codex sec. 3), 2026-09-14: both read the sweeps of the run directory.
+F = add(F, 'fig_lle_vs_rate',                ,                true, {});
+F = add(F, 'fig_local_vs_finite_lle',        ,        true, {});
 F = add(F, 'fig_sfa_EOC_allStd',              @fig_sfa_EOC_allStd,              true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_memory_capacity',             @fig_memory_capacity,             true, {});
@@ -119,6 +123,11 @@ F = add(F, 'fig_memory_capacity_example',     @fig_memory_capacity_example,     
 % single log leaves the dense core saturated and the sparse outer cloud
 % invisible on this network. The figure's default stays 'log'.
 F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 false, ...
+        {'density_scale', 'loglog'});
+% E:I imbalance examples (2026-09-14): rows = mu_EE x 0.5 / 1 / 1.5 on one seed,
+% columns = regimes, each panel annotated with its matched lambda_1, mean rate
+% and realised weight balance. From the same eig_heatmap stage.
+F = add(F, 'fig_eig_heatmap_imbalance',       @fig_eig_heatmap_imbalance,       true, ...
         {'density_scale', 'loglog'});
 F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
 % Top-K Lyapunov measures, TR 2026-09-12: the spectrum stage's figure and the
@@ -136,6 +145,10 @@ F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       
         {'variant', 'solver'});
 F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       false, ...
         {'variant', 'lya_method'});
+% Check J (2026-09-14): analytic Jacobian vs central finite differences, with
+% the pre-registered acceptance threshold.
+F = add(F, 'fig_numerics_jacobian',          @fig_numerics_verification,       false, ...
+        {'variant', 'jacobian'});
 % The generated equation and conditions tables, an ordinary entry so its
 % failures count in the headline number.
 F = add(F, 'doc_tables',                      @fig_doc_tables,                  true, ...

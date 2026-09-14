@@ -12,9 +12,15 @@ function out = fig_sensitivity_medians(cfg)
 % rather than across columns. No simulation is re-run.
 %
 % THREE CONSEQUENCES of that choice:
-%   1. NO DISTRIBUTIONS -- only the median across reps is drawn. The percentile
-%      machinery is written generally (see pcts / band_pcts) so adding an IQR
-%      band later is a two-line change.
+%   1. MEDIAN WITH AN INTERQUARTILE BAND (2026-09-14). Each condition's curve is
+%      the median across reps, shaded between the 25th and 75th percentiles;
+%      the y window of every sheet is set from the DATA (the 10th-90th
+%      percentile curves of every condition and panel, padded 10%, always
+%      including 0 where the measure has a zero line), so no median is clipped.
+%      Until 2026-09-14 the window was the registry's fixed median_ylim
+%      ([-1.75 1.75] for lambda_1) and the No Adaptation median ran off the
+%      bottom of several panels -- the sheet read as if that condition had
+%      no data there.
 %   2. SIX PARAMETERS, not seven. level_of_chaos ("Synaptic Gain") is dropped so
 %      the rest fit 2 x 3; it is the least surprising of the seven, since it
 %      simply scales W.
@@ -112,14 +118,13 @@ cond_spec  = struct( ...
     'color',   cellfun(@(n) st.condition_color(n), cond_names, 'UniformOutput', false));
 
 %% -------------------- Percentiles --------------------
-% pcts(median_col) is the curve that gets drawn. Everything downstream indexes
-% the percentile dimension, so plotting the 25th/75th later means adding them to
-% pcts and setting band_pcts to their column indices -- the shaded-band branch in
-% the plotting loop is already written, just inactive while band_pcts is empty.
-pcts       = 50;
+% pcts(median_col) is the curve that gets drawn; band_pcts the shaded IQR; the
+% 10th and 90th set each sheet's y window (see ylim_from_curves below).
+pcts       = [10 25 50 75 90];
 median_col = find(pcts == 50, 1);
 assert(~isempty(median_col), 'pcts must include 50 (the median is the plotted curve).');
-band_pcts  = [];   % e.g. [find(pcts==25) find(pcts==75)] to shade the IQR
+band_pcts  = [find(pcts == 25, 1), find(pcts == 75, 1)];   % shaded IQR
+ylim_pcts  = [find(pcts == 10, 1), find(pcts == 90, 1)];   % y window from the data
 
 %% -------------------- Styling --------------------
 tick_fs   = st.tick_fs;
@@ -127,7 +132,7 @@ label_fs  = st.label_fs;
 legend_fs = 14;
 letter_fs = 18;    % panel letters
 line_lw   = 2.5;   % opaque: four overlaid curves, so the allStd alpha would muddy them
-band_alpha = 0.15; % only used when band_pcts is non-empty
+band_alpha = 0.18; % IQR band
 
 zeroline_lw = 2;                        % green dashed lambda_1 = 0 line
 zeroline_color = [0 0.7 0];
@@ -218,14 +223,12 @@ for mi = 1:numel(metric_names)
 end
 
 %% -------------------- One figure per metric --------------------
-% Same shape as the allStd script's metric_specs. Only the ylabel, the y window,
-% the zero line and the output name differ:
-%   LLE       -> lambda_1, window kept at [-1.75 1.75] to match the allStd
-%                sheets. This run's LLEs span roughly p1 = -10 to p99 = +3.7, so
-%                some medians (No Adaptation especially) run off the bottom and
-%                are CLIPPED rather than rescaling every panel around them.
-%   mean_rate -> [0 1] by construction; zero line dropped (it would sit on the
-%                bottom axis and carry no meaning for a rate).
+% Same shape as the allStd script's metric_specs. Only the ylabel, the zero
+% line and the output name come from the registry; the y window is derived
+% from the data per sheet (ylim_from_curves), shared by the six panels so
+% the conditions read against one ruler. The registry's median_ylim is no
+% longer applied: it clipped the No Adaptation median off the bottom of the
+% lambda_1 sheet. mean_rate keeps its [0 1] ticks when they fit.
 metric_specs = struct( ...
     'name',      {specs_all.field}, ...
     'ylabel',    {specs_all.label}, ...
@@ -237,6 +240,7 @@ metric_specs = struct( ...
 made_tags = {};
 for mi = 1:numel(metric_specs)
     spec = metric_specs(mi);
+    y_window = ylim_from_curves(curves.(spec.name), panel_params, {cond_spec.name}, ylim_pcts, spec.zero_line);
 
     fh = figure('Name', sprintf('%s Sensitivity medians', spec.name), ...
         'Position', [50, 50, 1300, 680], 'Color', 'w');
@@ -247,6 +251,10 @@ for mi = 1:numel(metric_specs)
     % the right-hand column ("+100%") ends flush with the figure's right edge and
     % gets shaved off by the canvas boundary on export.
     tl = tiledlayout(fh, n_rows, n_cols, 'TileSpacing', 'loose', 'Padding', 'loose');
+    % The sheet title lives on the layout, never on a panel: a panel title
+    % collided with the x-tick labels of the row above.
+    title(tl, sprintf('%s: median and interquartile range across reps, one panel per sweep', spec.ylabel), ...
+        'Interpreter', 'tex', 'FontWeight', 'normal', 'FontSize', label_fs);
 
     ax_cell   = cell(1, numel(panel_params));
     leg_lines = gobjects(1, numel(cond_spec));
@@ -266,7 +274,7 @@ for mi = 1:numel(metric_specs)
                 'Alpha', 0.5, 'HandleVisibility', 'off');
         end
 
-        % Optional percentile band (inactive while band_pcts is empty).
+        % Interquartile band, under the medians.
         if numel(band_pcts) == 2
             for ci = 1:numel(cond_spec)
                 y = cx.y.(cond_spec(ci).name);
@@ -293,8 +301,8 @@ for mi = 1:numel(metric_specs)
 
         % --- Axes limits + ticks ------------------------------------------
         xlim(ax, [min(cx.x), max(cx.x)]);
-        ylim(ax, spec.ylim);
-        if ~isempty(spec.yticks)
+        ylim(ax, y_window);
+        if ~isempty(spec.yticks) && all(spec.yticks >= y_window(1) & spec.yticks <= y_window(2))
             set(ax, 'YTick', spec.yticks);
         end
         set(ax, 'FontSize', tick_fs);
@@ -376,3 +384,22 @@ end
 
 
 
+
+%% ------------------------------------------------------------------------
+function yl = ylim_from_curves(cm, params, conds, cols, include_zero)
+% The y window of one sheet: the extremes of the lower and upper percentile
+% curves (cols into the pcts dimension) over every panel and condition,
+% padded 10% of the span, and including 0 when the measure draws a zero line.
+lo = inf; hi = -inf;
+for pi = 1:numel(params)
+    for ci = 1:numel(conds)
+        y = cm.(params{pi}).y.(conds{ci});
+        lo = min(lo, min(y(:, cols(1)), [], 'omitnan'));
+        hi = max(hi, max(y(:, cols(2)), [], 'omitnan'));
+    end
+end
+if ~isfinite(lo) || ~isfinite(hi); yl = [-1 1]; return; end
+if include_zero; lo = min(lo, 0); hi = max(hi, 0); end
+pad = 0.1 * max(hi - lo, eps);
+yl = [lo - pad, hi + pad];
+end

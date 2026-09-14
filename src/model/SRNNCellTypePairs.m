@@ -2701,6 +2701,53 @@ classdef SRNNCellTypePairs < handle
                 'std', sum(q(ib) .^ 2) / tot, 'stf', sum(q(ig) .^ 2) / tot);
         end
 
+        function tf = routes_identical(params)
+            %ROUTES_IDENTICAL True when every route carries the same synaptic dynamics.
+            %
+            %   tf = SRNNCellTypePairs.routes_identical(params)
+            %
+            % Compares STD (n_b, tau_rec, tau_rel), STF (n_g, tau_dec, tau_fac,
+            % G) and the route scale of every route against route (1, 1), across
+            % ALL presynaptic types -- the same fields SRNN_ESN_reservoir.
+            % route_signature compares, but as a logical rather than an error
+            % and globally rather than per presynaptic type. When true, every
+            % neuron has ONE synaptic output (route 1 of its type is the same
+            % array as every other route), which is what lets a time-series
+            % figure draw one trace per neuron. Routes with no STD and no STF
+            % are identical to each other. Written for fig_example_timeseries.
+            C = params.n_cellTypes;
+            ref = SRNNCellTypePairs.route_fields(params, 1, 1);
+            tf = true;
+            for pre = 1:C
+                for post = 1:C
+                    if ~isequal(ref, SRNNCellTypePairs.route_fields(params, pre, post))
+                        tf = false;
+                        return;
+                    end
+                end
+            end
+        end
+
+        function sig = route_fields(params, pre, post)
+            % The comparable data of one route (see routes_identical).
+            sig = struct('n_b', params.n_b_pairs(pre, post), 'n_g', params.n_g_pairs(pre, post), ...
+                'tau_rec', [], 'tau_rel', [], 'tau_dec', [], 'tau_fac', [], 'G', []);
+            if isfield(params, 'route_scale')
+                sig.scale = params.route_scale(pre, post);
+            else
+                sig.scale = 1;
+            end
+            if sig.n_b > 0
+                sig.tau_rec = params.tau_b_rec{pre, post}(:)';
+                sig.tau_rel = params.tau_b_rel{pre, post}(:)';
+            end
+            if sig.n_g > 0
+                sig.tau_dec = params.tau_g_dec{pre, post}(:)';
+                sig.tau_fac = params.tau_g_fac{pre, post}(:)';
+                sig.G       = params.G{pre, post}(:)';
+            end
+        end
+
         function J = finite_difference_jacobian(S, params, h)
             %FINITE_DIFFERENCE_JACOBIAN Central-difference Jacobian of dynamics_fast.
             %
