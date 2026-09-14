@@ -1752,9 +1752,16 @@ classdef SRNNCellTypePairs < handle
                 'Synaptic output', true);
             if has_a
                 panel = panel + 1; ax_handles(panel) = nexttile;
+                % The adaptation TERM the neuron feels, (c/K) * sum_k a_ik -- what
+                % is subtracted inside the nonlinearity -- not the raw sum, so the
+                % panel is on the same footing as x (TR, 2026-09-14).
                 a_collapsed = SRNNCellTypePairs.collapse_named(p.a, obj.cell_type_names, 'sum');
+                c_eff = obj.c ./ max(1, obj.n_a);
+                for q = 1:obj.n_cellTypes
+                    a_collapsed.(obj.cell_type_names{q}) = c_eff(q) * a_collapsed.(obj.cell_type_names{q});
+                end
                 SRNNCellTypePairs.plot_named_series( ...
-                    p.t, a_collapsed, obj.cell_type_names, 'SFA (sum)', false);
+                    p.t, a_collapsed, obj.cell_type_names, 'SFA term (c/K)\Sigma a', false);
             end
             if has_b
                 panel = panel + 1; ax_handles(panel) = nexttile;
@@ -1850,11 +1857,14 @@ classdef SRNNCellTypePairs < handle
                     if isempty(p.a.(name))
                         SRNNCellTypePairs.show_empty_axis(ax, 'No SFA');
                     else
-                        values = reshape(sum(p.a.(name), 2), ...
+                        % (c/K) * sum_k a_ik, the term subtracted inside the
+                        % nonlinearity, not the raw sum (TR, 2026-09-14).
+                        c_eff_q = obj.c(q) / max(1, obj.n_a(q));
+                        values = c_eff_q * reshape(sum(p.a.(name), 2), ...
                             obj.n_per_type(q), []);
                         SRNNCellTypePairs.plot_celltype_lines(ax, p.t, values, colors(q, :));
                     end
-                    if q == 1, ylabel(ax, 'SFA (sum)'); end
+                    if q == 1, ylabel(ax, 'SFA term (c/K)\Sigma a'); end
                 end
                 if has_b
                     row = row + 1;
