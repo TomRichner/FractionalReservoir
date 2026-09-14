@@ -55,6 +55,37 @@ from r_ref. Caveat on record: per-neuron time-averaged rates are strongly
 bimodal (near 0 or saturated), so "the operating point" is the population mean
 rate, not a typical neuron's rate.
 
+## 0b. Addendum, 03:5x: the third direction keeps the result
+
+The single-matched run (`data/stdsinglematched_fast`; dual routes as
+published, single-timescale route strengthened to the dual's steady state,
+tau_rel 0.0625) had finished its sweeps and memory capacity when this was
+written (figures still running):
+
+| | unmatched (medium, 15 trials) | single-matched (fast, 5 trials) |
+|---|---|---|
+| total MC: none / single / multiple | 0.103 / 0.259 / **0.590** | 0.111 / **0.385** / **0.583** |
+| horizon (s) | 0.00 / 0.12 / 0.52 | 0.00 / 0.30 / 0.48 |
+| single vs multiple | p = 1.2e-4, d_z = -2.04 | p = 0.125 (floor 0.0625 at 5 trials), d_z = -1.05 |
+| K needed by top-K, multiple-timescale | 15 | 15 (D_KY resolved 67-100%) |
+
+So at EQUAL steady-state depression strength the multiple-timescale network
+still has the larger fading memory (0.58 vs 0.39), while the single-timescale
+network gains from the stronger depression (0.24 -> 0.39). Both mechanisms
+contribute; the timescale-count claim survives in the form "at matched
+strength, two depression timescales extend fading memory further than one",
+and the effect size is smaller than the unmatched comparison suggested. The
+multiple-timescale lambda_1 for this run is in
+`figs/stdsinglematched_fast/fig_local_vs_finite_lle/*_table.md` once the
+figure pass finishes (the sweeps' K = 15 says it is the published stable
+network). **Recommendation: make `..._dualStdSingleMatched_3cond_mu8p25` the
+paper preset** -- it changes only the single-timescale condition, keeps every
+multiple-timescale result, and answers the confound honestly -- and run it at
+medium (clone `stdUsage_med_config`). The Methods paragraph in
+`STD_strength_matching_2026-09-13.md` sec. 4 then needs its matching sentence
+turned around (the single-timescale release constant shortened to 0.0625 s so
+its steady-state output equals the two-timescale routes' at r_ref).
+
 ## 1. r_ref
 
 r_ref = 0.25 = the median mean firing rate of the multiple-timescale condition
