@@ -1112,7 +1112,8 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
             always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', ...
                            'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
-                           'noise_increments', 'verbose'};
+                           'noise_increments', 'verbose', ...
+                           'tau_a_matrix', 'tau_a_clipped'};   % derived from tau_a (2026-09-14)
 
             n_checked = 0;
             n_matched = 0;
