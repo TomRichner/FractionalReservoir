@@ -155,7 +155,8 @@ for i = 1:n_cond
     hold(ax, 'off'); box(ax, 'off'); xlim(ax, [0 T]); ylim(ax, [0 K]);
     xlabel(ax, 'time (s)', 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, sprintf('local rates > 0 (of %d)', K), 'FontSize', st.label_fs); end
-    title(ax, sprintf('median %d positive; at least one positive %.0f%% of the window', ...
+    title(ax, sprintf('median %d positive
+at least one positive %.0f%% of the window', ...
         round(median(n_pos_t(inwin))), 100 * any_pos), 'FontWeight', 'normal', 'FontSize', 9);
     set(ax, 'FontSize', st.tick_fs);
 
