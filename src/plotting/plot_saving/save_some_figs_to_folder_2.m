@@ -11,7 +11,7 @@ end
 % of being noticed.
 
 if isempty(fig_vec)
-    figHandles = findobj('Type', 'figure')
+    figHandles = findobj('Type', 'figure');   % the missing ';' printed the handle array once per save
     for i_f = 1:length(figHandles)
         fig_vec(i_f) = figHandles(i_f).Number;
     end
