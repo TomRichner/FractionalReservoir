@@ -83,7 +83,23 @@ vprintf(ctx.verbose, 'verbose', 'Condition: %s (the full-adaptation regime)\n', 
 
 %% tau_a_E(end) sweep -- vector parameter
 vprintf(ctx.verbose, 'verbose', '\n========================================\n');
-vprintf(ctx.verbose, 'verbose', '=== Tau Sensitivity: tau_a_E(end) [1, 30] ===\n');
+% WHICH TYPES ARE SWEPT (2026-09-14). The reference preset adapts E AND I with
+% the same ladder, and the manuscript's Methods say the slowest time constant
+% was varied in both. The earlier sweep moved tau_a_E only -- E's ladder -- so
+% it did not match that description. The axis is now chosen from the
+% condition: tau_a_EI (one ladder written to every type) when the condition
+% gives >= 2 types identical non-empty ladders, else tau_a_E as before. Which
+% one ran is recorded in tau_levels.md next to the resolved ladders per level.
+if strcmp(ctx.model_class, 'SRNNCellTypePairs') && iscell(condition{1}.tau_a) && ...
+        numel(condition{1}.tau_a) >= 2 && ~isempty(condition{1}.tau_a{1}) && ...
+        all(cellfun(@(r) isequal(reshape(r, 1, []), reshape(condition{1}.tau_a{1}, 1, [])), condition{1}.tau_a))
+    tau_axis = 'tau_a_EI';
+else
+    tau_axis = 'tau_a_E';
+end
+n_elements = numel(condition{1}.tau_a{1});   % derived from the condition, not hand-coupled
+vprintf(ctx.verbose, 'verbose', '=== Tau Sensitivity: %s(end) [1, 30], %d elements ===\n', tau_axis, n_elements);
+
 vprintf(ctx.verbose, 'verbose', '========================================\n');
 
 psa = ParamSpaceAnalysis2( ...
@@ -124,11 +140,11 @@ psa.set_conditions(condition);
 % takes over. The prediction to check is therefore NOT a bare -1/tau line but
 % max(-1/tau_a_E(end), STD mode) -- a knee around tau_a_E(end) ~ 1.6 s, which
 % [1, 30] brackets and [5, 60] did not reach.
-psa.add_vector_parameter('tau_a_E', ...
+psa.add_vector_parameter(tau_axis, ...
     'vary_element', 'last', ...
     'fixed_value', 0.25, ...
     'vary_range', [1, 30], ...
-    'n_elements', 3, ...
+    'n_elements', n_elements, ...
     'spacing', 'log', ...
     'level_spacing', 'linear');
 
@@ -137,6 +153,11 @@ psa.add_grid_parameter('reps', 1:ctx.n_reps);
 psa.run();
 
 copyfile([mfilename('fullpath') '.m'], psa.output_dir);
+
+% The manifest that proves which types were swept: the resolved E and I
+% ladders at every level, read back through effective_param from one
+% successful job per level, into tau_levels.mat and tau_levels.md.
+write_tau_levels(psa, tau_axis, ctx.model_class);
 
 psa.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);
 psa.plot_sensitivity('metric', 'mean_rate');
@@ -161,8 +182,45 @@ out_dir = psa.output_dir;
 % analysis.m before this commit if it is ever wanted back.
 
 %% Summary
+vprintf(ctx.verbose, 'minimal', '[tau_sensitivity] axis %s, %d elements\n', tau_axis, n_elements);
 vprintf(ctx.verbose, 'verbose', '\n========================================\n');
 vprintf(ctx.verbose, 'verbose', '=== Tau Sensitivity Analysis Complete ===\n');
 vprintf(ctx.verbose, 'minimal', '[tau_sensitivity] complete: %s\n', out_dir);
 vprintf(ctx.verbose, 'verbose', '========================================\n');
+end
+
+%% ------------------------------------------------------------------------
+function write_tau_levels(psa, tau_axis, model_class)
+% Resolve the SFA ladders that actually ran at every level, for both cell
+% types, by constructing the model each job would have built (effective_param
+% gives the swept vector; the other type's ladder comes from the condition),
+% and record them. A row per level: index, the swept vector, tau_a{1},
+% tau_a{2} (SRNNCellTypePairs) or tau_a_E (SRNNModel2).
+lookup = psa.vector_param_lookup.(tau_axis);
+n_lev  = numel(lookup);
+levels = struct('level', num2cell(1:n_lev), 'swept', reshape(lookup, 1, []), 'tau_a_E', cell(1, n_lev), 'tau_a_I', cell(1, n_lev));
+cond = psa.conditions{1};
+for k = 1:n_lev
+    args = [struct2namevalue(psa.model_defaults), struct2namevalue(rmfield(cond, 'name')), ...
+        {tau_axis, lookup{k}}];
+    m = feval(model_class, args{:});     % construction only: no build, no run
+    if strcmp(model_class, 'SRNNCellTypePairs')
+        levels(k).tau_a_E = m.tau_a{1};
+        if numel(m.tau_a) >= 2; levels(k).tau_a_I = m.tau_a{2}; end
+    else
+        levels(k).tau_a_E = m.tau_a_E;
+        levels(k).tau_a_I = [];
+    end
+end
+save(fullfile(psa.output_dir, 'tau_levels.mat'), 'levels', 'tau_axis', 'model_class');
+fid = fopen(fullfile(psa.output_dir, 'tau_levels.md'), 'w');
+if fid > 0
+    fprintf(fid, '# tau sweep levels\n\nAxis: `%s` (model %s). Condition: %s.\n\n', tau_axis, model_class, cond.name);
+    fprintf(fid, '| level | swept vector | tau_a E | tau_a I |\n|---|---|---|---|\n');
+    for k = 1:n_lev
+        fprintf(fid, '| %d | %s | %s | %s |\n', k, mat2str(levels(k).swept, 4), ...
+            mat2str(levels(k).tau_a_E, 4), mat2str(levels(k).tau_a_I, 4));
+    end
+    fclose(fid);
+end
 end

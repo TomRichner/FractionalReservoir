@@ -125,7 +125,9 @@ if ~cfg.visible; set(cf, 'Visible', 'off'); end
 % SRNNCellTypePairs.lya_summary). If the slowest SFA timescale sets lambda_1,
 % the SFA fraction dominates until the STD mode takes over at the knee.
 bf = gobjects(0);
+% The sweep's axis is tau_a_EI (E and I, 2026-09-14) or tau_a_E (older runs).
 param = 'tau_a_E';
+if isfield(psa.vector_param_lookup, 'tau_a_EI'); param = 'tau_a_EI'; end
 has_blocks = isfield(psa.vector_param_lookup, param) && ...
     ~isempty(psa.results) && any(cellfun(@(c) has_field_in(psa.results, c, 'lead_frac_sfa'), ...
     cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false)));

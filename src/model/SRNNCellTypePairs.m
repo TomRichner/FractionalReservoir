@@ -253,6 +253,12 @@ classdef SRNNCellTypePairs < handle
         %              Guarded on the first type actually being named E.
         f_E
         tau_a_E
+        %   tau_a_EI -- ONE ladder written to EVERY cell type (2026-09-14). The
+        %              paper's sfaEI presets adapt E and I with the same ladder,
+        %              and the tau sweep must move both; tau_a_E moves E only.
+        %              Reading it asserts the ladders are equal
+        %              (SRNNCellTypePairs:TauAMismatch). Two-type only.
+        tau_a_EI
         activation_function             % Built from activation + S_a/S_c
         activation_function_derivative
         sigma_x_raw                     % Raw diffusion coefficient = sigma_u_noise / tau_d
@@ -466,8 +472,42 @@ classdef SRNNCellTypePairs < handle
             obj.tau_a{1} = reshape(v, 1, []);
         end
 
+        function v = get.tau_a_EI(obj)
+            obj.assert_first_type_is_E();
+            if isempty(obj.tau_a)
+                v = [];
+                return;
+            end
+            v = reshape(obj.tau_a{1}, 1, []);
+            for q = 2:numel(obj.tau_a)
+                if ~isequal(reshape(obj.tau_a{q}, 1, []), v)
+                    error('SRNNCellTypePairs:TauAMismatch', ...
+                        ['tau_a_EI reads one shared SFA ladder, but tau_a{%d} (%s) differs ' ...
+                         'from tau_a{1} (%s). Read tau_a directly.'], q, ...
+                        mat2str(obj.tau_a{q}, 4), mat2str(v, 4));
+                end
+            end
+        end
+
+        function set.tau_a_EI(obj, v)
+            obj.assert_first_type_is_E();
+            if obj.n_cellTypes ~= 2
+                error('SRNNCellTypePairs:TwoTypeAliasOnly', ...
+                    'tau_a_EI is a two-type alias (E and I); this model has %d cell types.', ...
+                    obj.n_cellTypes);
+            end
+            % Same construction caveat as set.tau_a_E: the cell may not exist yet.
+            if ~iscell(obj.tau_a) || numel(obj.tau_a) ~= obj.n_cellTypes
+                obj.tau_a = cell(1, obj.n_cellTypes);
+            end
+            for q = 1:obj.n_cellTypes
+                obj.tau_a{q} = reshape(v, 1, []);
+            end
+        end
+
         function set.verbose(obj, v)
             obj.verbose = verbose_name(v);
+
         end
 
         function val = get.activation_function(obj)
