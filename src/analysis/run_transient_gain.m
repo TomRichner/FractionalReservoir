@@ -132,13 +132,19 @@ R = cell(n_trials, 1);
 parfor j = 1:n_trials
     R{j} = gain_trial(P, cond_names{trial_cond(j)}, [trial_seed(j), trial_seed(j) + 1]);
 end
+% The raw trials FIRST: 2026-09-13 a medium run lost 51 min of compute to a
+% concatenation error in the assembly below. Whatever happens next, this is
+% on disk.
+if ~isfolder(out_dir); mkdir(out_dir); end
+trials_file = fullfile(out_dir, 'transient_gain_trials.mat');
+save(trials_file, 'R', 'trial_cond', 'trial_seed', 'cond_names', 'P', '-v7.3');
 
 %% Assemble per condition
 res = struct('name', cond_names, 'title', titles);
 for i = 1:n_cond
     Ri = [R{trial_cond == i}];
     res(i).trials  = rmfield(Ri, 'samples');
-    res(i).samples = [Ri.samples];
+    res(i).samples = vertcat(Ri.samples);   % columns of different lengths per seed: NOT [Ri.samples]
     res(i).n_onset_found = sum([Ri.n_onset_found]);
     res(i).n_quiet_found = sum([Ri.n_quiet_found]);
     res(i).N = Ri(1).N;

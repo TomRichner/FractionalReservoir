@@ -3,7 +3,8 @@
 %
 % Checks:
 %   1. A bad run mode errors :badMode naming every mode (also in test_run_modes).
-%   2. 'fast' with n_override 60, one seed, 3 regular + up to 2 onset + 2
+%   2. 'fast' with n_override 60, TWO seeds (the assembly across seeds once
+%      failed on the real network with one-seed tests green), 3 regular + up to 2 onset + 2
 %      quiet samples, horizon 0.5 s, into a temp run directory: the .mat has
 %      results / cond_names / condition_titles / settings; every condition
 %      has trials, samples, N, n, n_onset_found, n_quiet_found; every sample
@@ -33,7 +34,7 @@ if exist(run_dir, 'dir'); rmdir(run_dir, 's'); end
 mkdir(run_dir);
 t0 = tic;
 out = evalc(['mat_file = run_transient_gain(''preset_name'', P, ''run_mode'', ''fast'', ' ...
-    '''out_dir'', fullfile(run_dir, ''transient_gain''), ''n_override'', 60, ''n_seeds'', 1, ' ...
+    '''out_dir'', fullfile(run_dir, ''transient_gain''), ''n_override'', 60, ''n_seeds'', 2,' ...
     '''n_regular'', 3, ''n_excursion'', 2, ''horizon_s'', 0.5);']);
 fprintf('  (stage ran in %.0f s)\n', toc(t0));
 all_passed = check('stage returns the .mat path and it exists', ischar(mat_file) && isfile(mat_file)) && all_passed;
@@ -72,18 +73,18 @@ for i = 1:numel(R)
     end
     n_on = nnz(strcmp({smp.kind}, 'onset')); n_qu = nnz(strcmp({smp.kind}, 'quiet'));
     counts_ok = counts_ok && n_on == sum([R(i).trials.n_onset_used]) && n_qu == sum([R(i).trials.n_quiet_used]) && ...
-        n_on <= R(i).n_onset_found && n_qu <= R(i).n_quiet_found && n_on <= 2 && n_qu <= 2 && ...
-        nnz(strcmp({smp.kind}, 'regular')) == 3;
+        n_on <= R(i).n_onset_found && n_qu <= R(i).n_quiet_found && n_on <= 4 && n_qu <= 4 && ...
+        nnz(strcmp({smp.kind}, 'regular')) == 6 && numel(R(i).trials) == 2 && isequal([R(i).trials.seeds], [1 2 2 3]);
     fprintf('  %-14s N %d, lambda_1 %+.3f, %d samples (%d onset, %d quiet; found %d / %d), G_max regular medians: %s\n', ...
         R(i).name, R(i).N, R(i).trials(1).LLE, numel(smp), n_on, n_qu, R(i).n_onset_found, R(i).n_quiet_found, ...
-        mat2str(median(cell2mat(arrayfun(@(x) x.G_max(:)', smp(strcmp({smp.kind}, 'regular'))', 'UniformOutput', false)), 1), 3));
+        mat2str(median(vertcat(smp(strcmp({smp.kind}, 'regular')).G_max), 1), 3));
 end
 all_passed = check('every sample carries the schema with 3 x n_t readings, n-vectors, fractions summing to 1', schema_ok) && all_passed;
 all_passed = check('G(0) = 1 for every variant and sample', g0) && all_passed;
 all_passed = check('worst >= noise, E/I diff, E/I sum, Lyapunov readings at every t', ord) && all_passed;
 all_passed = check('v_opt unit; alignment in [0, 1]', unit) && all_passed;
 all_passed = check('G_max = max of the curve, t_peak within the horizon', peak_ok) && all_passed;
-all_passed = check('kind counts match the trial record and the caps; 3 regular each', counts_ok) && all_passed;
+all_passed = check('kind counts match the trial record and the caps; 3 regular per seed, 2 seeds', counts_ok) && all_passed;
 all_passed = check('regular samples inside the sample window', win_ok) && all_passed;
 all_passed = check('settings record T, horizon, counts, variants, directions, minutes', ...
     D.settings.T == 20 && D.settings.horizon_s == 0.5 && D.settings.n_regular == 3 && D.settings.n_excursion == 2 && ...
