@@ -1761,7 +1761,7 @@ classdef SRNNCellTypePairs < handle
                     a_collapsed.(obj.cell_type_names{q}) = c_eff(q) * a_collapsed.(obj.cell_type_names{q});
                 end
                 SRNNCellTypePairs.plot_named_series( ...
-                    p.t, a_collapsed, obj.cell_type_names, 'SFA term (c/K)\Sigma a', false);
+                    p.t, a_collapsed, obj.cell_type_names, 'SFA (c/K)\Sigma a', false);
             end
             if has_b
                 panel = panel + 1; ax_handles(panel) = nexttile;
@@ -1864,7 +1864,7 @@ classdef SRNNCellTypePairs < handle
                             obj.n_per_type(q), []);
                         SRNNCellTypePairs.plot_celltype_lines(ax, p.t, values, colors(q, :));
                     end
-                    if q == 1, ylabel(ax, 'SFA term (c/K)\Sigma a'); end
+                    if q == 1, ylabel(ax, 'SFA (c/K)\Sigma a'); end
                 end
                 if has_b
                     row = row + 1;
