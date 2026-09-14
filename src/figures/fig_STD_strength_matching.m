@@ -165,7 +165,7 @@ title(ax3, 'C  occupied rates', 'FontWeight', 'normal', 'FontSize', st.title_fs)
 ylim(ax3, [0 25]);   % the per-neuron densities spike at 0 and 1; the interior is the point
 if ~isempty(hh); legend(ax3, hh, lab, 'Location', 'northeast', 'FontSize', 8, 'Box', 'off'); end
 set(ax3, 'FontSize', st.tick_fs);
-title(tl, sprintf('STD strength matching at r_{ref} = %.2g: %s', cfg.r_ref, strrep(cfg.preset_name, '_', '\_')), ...
+title(tl, sprintf('STD strength matching at r_{ref} = %.2g (curves: E->E route of each preset)', cfg.r_ref), ...
     'FontWeight', 'normal', 'FontSize', 10);
 
 %% Table
