@@ -24,6 +24,7 @@ function out = fig_doc_tables(cfg)
 % See also: write_manuscript_tables, make_all_paper_figures, paper_config
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.run_dir     (1,:) char    = ''    % unused; the tables describe the PRESET
     cfg.out_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
@@ -36,7 +37,7 @@ setup_paths();
 paths = write_manuscript_tables( ...
     'preset_name', cfg.preset_name, ...
     'out_dir',     cfg.out_dir, ...
-    'verbose',     false);
+    'verbose',     cfg.verbose);
 
 % File NAMES, matching what the figures return via existing_outputs, so the
 % master's "did anything land on disk" check and the manifest read alike.

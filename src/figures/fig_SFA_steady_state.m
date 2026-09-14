@@ -41,6 +41,7 @@ function out = fig_SFA_steady_state(cfg)
 % See also: fig_STD_steady_state, srnn_param_preset, manuscript_style
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
@@ -59,7 +60,7 @@ tau_1 = tau_3(1);          % the FAST component, not logspace(...,1); see header
 c_3 = c_budget / numel(tau_3);
 c_1 = c_budget / numel(tau_1);
 
-fprintf('[fig_SFA_steady_state] preset=%s  n_a=%d  tau_a=%s  budget=%.4g\n', ...
+vprintf(cfg.verbose, 'verbose', '[fig_SFA_steady_state] preset=%s  n_a=%d  tau_a=%s  budget=%.4g\n', ...
     cfg.preset_name, n_a, mat2str(tau_3, 4), c_budget);
 
 r = linspace(0, 1, 400);       % rate, over the full range of the nonlinearity

@@ -18,6 +18,10 @@ function cfg = paper_config(opts)
 % run_dir is where the analyses write and where the figures read, because it is
 % one directory seen at two stages. See their comments below.
 %
+% plus `verbose`, HOW MUCH IS PRINTED: 'verbose' | 'minimal' (default) |
+% 'near-none', one setting carried into every stage, figure, model class and
+% parfor worker (see its comment below and verbose_level).
+%
 % FIGURE PRESET OVERRIDES. Five figures are DELIBERATELY a different network
 % from the paper's operating point, and each names its own preset below. They
 % are not oversights: two single-neuron mechanism cartoons, a Sompolinsky
@@ -106,6 +110,16 @@ arguments
     % never worked end to end: save_some_figs_to_folder_2 wrapped every export
     % in figure(i), which raises and un-hides. See its comment.)
     opts.visible_figures (1,1) logical = false
+    % HOW MUCH THE RUN PRINTS. One setting for the whole code base, threaded
+    % from here through ctx / cfg into the model classes and the parfor workers:
+    %   'verbose'    everything (per model, per job, per seed) -- a human at
+    %                the prompt debugging one run;
+    %   'minimal'    THE DEFAULT: one line per stage or batch, one line per
+    %                failure, the final summary -- what an agent supervising a
+    %                run over the MATLAB MCP can read without filling its context;
+    %   'near-none'  errors and the final one-line outcome of each entry point.
+    % Warnings and errors are never gated. See verbose_level.
+    opts.verbose     (1,:) char = 'minimal'
 end
 
 cfg = struct();
@@ -114,6 +128,8 @@ cfg.run_mode    = opts.run_mode;
 cfg.run_dir     = opts.run_dir;
 cfg.fig_root    = opts.fig_root;
 cfg.visible_figures = opts.visible_figures;
+verbose_level(opts.verbose);   % a typo errors here, at config time, not inside a worker
+cfg.verbose = opts.verbose;
 
 % Presets for the figures that are deliberately different networks.
 % Memory capacity. Still its own preset -- the MC network is deliberately not

@@ -34,6 +34,7 @@ cfg.run_dir  = 'data/numerics_verification_trials';  % the stage writes <run_dir
 cfg.fig_root = 'figs/numerics_verification_trials';  % overwritten in place
 
 cfg.visible_figures = false;
+cfg.verbose = 'minimal';   % 'verbose' | 'minimal' | 'near-none' -- how much the run prints (verbose_level)
 
 % The three variants of one figure function; names are the output folders and
 % the three fig_tags are not prefixes of one another.

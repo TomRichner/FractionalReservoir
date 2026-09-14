@@ -37,6 +37,7 @@ arguments
     cfg.preset_name (1,:) char   = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'
     cfg.run_mode    (1,:) char   = 'production'
     cfg.out_dir     (1,:) char   = ''
+    cfg.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     cfg.n_seeds     (1,1) double = 0     % 0 -> per run_mode
     cfg.K           (1,1) double = 0     % 0 -> per run_mode
     cfg.n_override  (1,1) double = 0     % 0 -> the preset's n (tests use a small one)
@@ -60,6 +61,7 @@ if cfg.K > 0;       K = cfg.K; end
 
 P = struct();
 P.preset_name = cfg.preset_name;
+P.verbose     = cfg.verbose;
 P.T_range     = [0, T];
 P.lya_T_interval = [T / 2, T];
 P.lya_warmup  = T / 4;
@@ -92,11 +94,11 @@ variants = {'noise_on'};
 if cfg.noise_off_too && sigma_preset > 0; variants{end + 1} = 'noise_off'; end
 if sigma_preset == 0; variants = {'noise_off'}; end
 
-fprintf('[lyapunov_spectrum] preset=%s run_mode=%s: %d conditions x %d seeds x {%s}, T = %g s, K = %d (cap %d)\n', ...
+vprintf(cfg.verbose, 'minimal', '[lyapunov_spectrum] preset=%s run_mode=%s: %d conditions x %d seeds x {%s}, T = %g s, K = %d (cap %d)\n', ...
     cfg.preset_name, cfg.run_mode, n_cond, n_seeds, strjoin(variants, ', '), T, K, P.K_max);
 
 pool = ensure_pool(cfg.n_workers);
-fprintf('  parallel pool: %d workers\n', pool.NumWorkers);
+vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', pool.NumWorkers);
 
 t_stage = tic;
 res = struct('name', cond_names, 'title', titles);
@@ -111,7 +113,7 @@ for i = 1:n_cond
         end
         res(i).(variant) = [R{:}];
         r1 = res(i).(variant)(1);
-        fprintf('  %-14s %-9s %d seeds in %5.0f s | N = %d, K_used %d, lambda_1 %+.4f, n_pos %d, h_KS %.2f bit/s, D_KY %s\n', ...
+        vprintf(cfg.verbose, 'verbose', '  %-14s %-9s %d seeds in %5.0f s | N = %d, K_used %d, lambda_1 %+.4f, n_pos %d, h_KS %.2f bit/s, D_KY %s\n', ...
             cname, variant, n_seeds, toc(t0), r1.N, r1.K_used, r1.LLE, r1.n_positive, r1.h_KS_bits, dky_txt(r1));
     end
 end
@@ -126,11 +128,11 @@ condition_titles = titles;   % saved name
 results = res;               % saved name
 mat_file = fullfile(out_dir, 'lyapunov_spectrum_data.mat');
 save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', '-v7.3');
-fprintf('[lyapunov_spectrum] %.1f min -> %s\n', settings.minutes, mat_file);
+vprintf(cfg.verbose, 'minimal', '[lyapunov_spectrum] %.1f min -> %s\n', settings.minutes, mat_file);
 end
 
 %% ------------------------------------------------------------------------
-function r = spectrum_trial(P, cname, seeds, noise_on) %#ok<INUSL>  cname and args are used inside evalc
+function r = spectrum_trial(P, cname, seeds, noise_on)
 % One network, one variant: build, run, keep the spectrum and its quality.
 rng(0, 'twister');                   % workers default to threefry; a seed must mean one network
 args = {'rng_seeds', seeds, 'fs', P.fs, 'T_range', P.T_range, ...
@@ -145,9 +147,8 @@ if P.n_override > 0
         'F_tracks_network', true}];
 end
 t0 = tic;
-m = []; %#ok<NASGU>  assigned inside evalc
-evalc('m = build_from_preset(P.preset_name, cname, args{:});');
-evalc('m.run();');
+m = build_from_preset(P.preset_name, cname, 'verbose', P.verbose, args{:});
+m.run();
 S = m.lya_summary();
 lr = m.lya_results;
 r = S;

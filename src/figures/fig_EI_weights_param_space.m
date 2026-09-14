@@ -46,6 +46,7 @@ function out = fig_EI_weights_param_space(cfg)
 %           load_and_make_unit_histograms, resolve_run_dir
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
@@ -92,9 +93,9 @@ W_CLIM = [1/11, 10/11];
 % only on the grid POSITION (network_seed = config_idx*100 + offset), so all
 % seven adaptation conditions at one grid point share a single rebuild.
 cache = containers.Map('KeyType', 'double', 'ValueType', 'double');
-color_fcn = @(psa, res) ei_weight_fraction(psa, res, cache);
+color_fcn = @(psa, res) ei_weight_fraction(psa, res, cache, cfg.verbose);
 
-fprintf('[fig_EI_weights_param_space] rebuilding networks to weigh E against I...\n');
+vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] rebuilding networks to weigh E against I...\n');
 t_rebuild = tic;
 specs = sweep_metrics();
 specs = specs([specs.in_sheets]);
@@ -102,7 +103,7 @@ specs = specs([specs.in_sheets]);
     'Metrics', {specs.key}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5], ...
     'ColorBy', 'E:I weight balance', 'ColorFcn', color_fcn, 'CLim', W_CLIM, ...
     'ColorLabel', 'excitatory weight fraction');
-fprintf('[fig_EI_weights_param_space] %d networks rebuilt in %.1f s\n', ...
+vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] %d networks rebuilt in %.1f s\n', ...
     cache.Count, toc(t_rebuild));
 
 % One styled sheet per registry measure (ei_metric_sheet holds the layout
@@ -147,7 +148,7 @@ if cfg.save
 end
 end
 
-function v = ei_weight_fraction(psa, res, cache)
+function v = ei_weight_fraction(psa, res, cache, verbose)
 % The realized E:I weight balance of the network at this grid point, cached
 % per config_idx (the network is shared by every condition run at a point).
 key = res.config_idx;
@@ -156,7 +157,8 @@ if isKey(cache, key)
     return
 end
 m = psa.rebuild_model(res);
-evalc('m.build()');
+m.verbose = verbose;   % the model prints its build report only at 'verbose'
+m.build();
 ti = m.type_indices;
 assert(numel(ti) >= 2, ...
     'ei_weight_fraction needs at least two cell types; got %d.', numel(ti));

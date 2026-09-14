@@ -22,6 +22,7 @@ function out = fig_transient_gain_excursions(cfg)
 %           SRNNCellTypePairs.excursion_samples
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
@@ -111,8 +112,8 @@ linkaxes(ax_top(isgraphics(ax_top)), 'y');
 title(tl, sprintf('Active transient gain at excursion onsets vs quiet states, n = %d, T = %g s, %d seed(s)', ...
     R(1).n, D.settings.T, D.settings.n_seeds), 'FontWeight', 'normal', 'FontSize', 11);
 hdr = '| Condition | onsets found / used | quiets found / used | G_max onset | G_max quiet | p (rank-sum) | align onset | align quiet |';
-fprintf('%s\n|---|---|---|---|---|---|---|---|\n', hdr);
-fprintf('%s\n', rows{:});
+vprintf(cfg.verbose, 'verbose', '%s\n|---|---|---|---|---|---|---|---|\n', hdr);
+vprintf(cfg.verbose, 'verbose', '%s\n', rows{:});
 
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 

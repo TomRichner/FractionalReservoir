@@ -54,6 +54,7 @@ function out = fig_adaptation_methods(cfg)
 % See also: build_from_preset, srnn_param_preset, fig_example_timeseries
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.variant     (1,:) char {mustBeMember(cfg.variant, {'sfa_std','sfa_std_stf'})} = 'sfa_std'
     cfg.preset_name (1,:) char    = ''     % '' -> per variant
     cfg.out_dir     (1,:) char    = ''

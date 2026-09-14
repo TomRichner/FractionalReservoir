@@ -53,6 +53,7 @@ function out = fig_STD_steady_state(cfg)
 %           scripts/explorations/explore_std_steady_state
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.route_pre   (1,:) char    = 'E'
     cfg.route_post  (1,:) char    = 'E'

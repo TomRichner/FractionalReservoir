@@ -98,6 +98,11 @@ classdef SRNNCellTypePairs < handle
         c
         synapse_config = struct()
         std_zero_floor = false
+        % VERBOSE Console verbosity: 'verbose' (every build/run/Lyapunov line),
+        % 'minimal' (DEFAULT: the class prints nothing; stages and drivers print
+        % one line per step) or 'near-none'. Logical true/false also accepted.
+        % Warnings and errors are never gated. See verbose_level.
+        verbose = 'minimal'
     end
 
     properties (Dependent, SetAccess = private)
@@ -461,6 +466,10 @@ classdef SRNNCellTypePairs < handle
             obj.tau_a{1} = reshape(v, 1, []);
         end
 
+        function set.verbose(obj, v)
+            obj.verbose = verbose_name(v);
+        end
+
         function val = get.activation_function(obj)
             val = obj.build_activation(1);
         end
@@ -572,7 +581,7 @@ classdef SRNNCellTypePairs < handle
             obj.build_stimulus();
             obj.cached_params = obj.get_params();
             obj.is_built = true;
-            fprintf('SRNNCellTypePairs built successfully. Ready to run.\n');
+            vprintf(obj.verbose, 'verbose', 'SRNNCellTypePairs built successfully. Ready to run.\n');
         end
 
         function run(obj)
@@ -596,10 +605,10 @@ classdef SRNNCellTypePairs < handle
             % re-integrates segments against the same increments.
             obj.build_noise();
 
-            fprintf('Integrating SRNNCellTypePairs equations\n');
+            vprintf(obj.verbose, 'verbose', 'Integrating SRNNCellTypePairs equations\n');
             tic;
             [t_raw, S_raw] = obj.integrate(rhs, obj.t_ex, obj.S0);
-            fprintf('Integration complete in %.2f seconds.\n', toc);
+            vprintf(obj.verbose, 'verbose', 'Integration complete in %.2f seconds.\n', toc);
             if numel(t_raw) ~= numel(obj.t_ex) || ...
                     max(abs(t_raw(:) - obj.t_ex(:))) > 1e-9
                 error('SRNNCellTypePairs:TimeMismatch', ...
@@ -627,7 +636,7 @@ classdef SRNNCellTypePairs < handle
             % noise_seed, so nothing is lost.
             obj.noise_increments = [];
             obj.has_run = true;
-            fprintf('Simulation complete.\n');
+            vprintf(obj.verbose, 'verbose', 'Simulation complete.\n');
         end
 
         function [t_out, S_out] = integrate(obj, rhs, tspan, S0)
@@ -686,9 +695,9 @@ classdef SRNNCellTypePairs < handle
                 obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
                 obj.ode_opts, ...
                 resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNCellTypePairs'), rhs, ...
-                obj.lya_K, obj.rng_seeds(1) + 424242, obj.lya_K_auto, obj.lya_K_max);
+                obj.lya_K, obj.rng_seeds(1) + 424242, obj.lya_K_auto, obj.lya_K_max, obj.verbose);
             if isfield(obj.lya_results, 'LLE')
-                fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
+                vprintf(obj.verbose, 'verbose', 'Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
         end
 
@@ -1438,9 +1447,9 @@ classdef SRNNCellTypePairs < handle
                 end
             end
             eig_W = eig(full(obj.W));
-            fprintf('W created: spectral radius = %.3f, abscissa = %.3f\n', ...
+            vprintf(obj.verbose, 'verbose', 'W created: spectral radius = %.3f, abscissa = %.3f\n', ...
                 max(abs(eig_W)), max(real(eig_W)));
-            fprintf('Pair-specific dead-end states: %d\n', obj.dead_state_count);
+            vprintf(obj.verbose, 'verbose', 'Pair-specific dead-end states: %d\n', obj.dead_state_count);
 
             % Per-neuron nonlinearity setpoints. Drawn here, after W, so the
             % vector exists before build_stimulus() and get_params().
@@ -1506,7 +1515,7 @@ classdef SRNNCellTypePairs < handle
                     obj.cell_type_names{q}, s, min(M{q}(:, end)), max(M{q}(:, end)), tau(end));
             end
             obj.tau_a_matrix = M;
-            fprintf('Per-neuron SFA ladders drawn (seed %d): %s\n', seed, strjoin(parts, '; '));
+            vprintf(obj.verbose, 'verbose', 'Per-neuron SFA ladders drawn (seed %d): %s\n', seed, strjoin(parts, '; '));
         end
 
         function tf = has_setpoint_heterogeneity(obj)
@@ -1554,7 +1563,7 @@ classdef SRNNCellTypePairs < handle
             end
             obj.S_c_vec = vals;
 
-            fprintf('Per-neuron S_c drawn (seed %g): %s\n', seed, strjoin(parts, ', '));
+            vprintf(obj.verbose, 'verbose', 'Per-neuron S_c drawn (seed %g): %s\n', seed, strjoin(parts, ', '));
         end
 
         function build_stimulus(obj)
@@ -3269,7 +3278,7 @@ classdef SRNNCellTypePairs < handle
     methods (Static, Access = protected)
         function results = compute_lyapunov_exponents_internal(method, S_out, t_out, ...
                 dt, fs, interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs, ...
-                lya_K, topk_seed, lya_K_auto, lya_K_max)
+                lya_K, topk_seed, lya_K_auto, lya_K_max, verbose)
             % method: 'benettin' (K = 1, finite perturbation, same integrator
             % as the trajectory), 'qr' (full spectrum, ode45 on N^2 variational
             % equations; the verified reference), 'topk' (the K = lya_K largest
@@ -3280,6 +3289,10 @@ classdef SRNNCellTypePairs < handle
             if nargin < 14 || isempty(topk_seed); topk_seed = 424243; end
             if nargin < 15 || isempty(lya_K_auto); lya_K_auto = false; end
             if nargin < 16 || isempty(lya_K_max); lya_K_max = lya_K; end
+            % verbose: the console level (see verbose_level); the per-run lines
+            % below print only at 'verbose'. Threaded from the instance because
+            % this is a static.
+            if nargin < 17 || isempty(verbose); verbose = 'minimal'; end
             results = struct();
             switch lower(method)
                 case {'benettin', 'qr', 'topk'}
@@ -3299,6 +3312,7 @@ classdef SRNNCellTypePairs < handle
                 if K == 0; K = N; end
                 K_cap = min(max(lya_K_max, K), N);
                 topk_opts = struct('seed', topk_seed, 'err_id_prefix', 'SRNNCellTypePairs', ...
+                    'verbose', verbose_level(verbose) >= 2, ...
                     'grid_fn', @SRNNCellTypePairs.lyapunov_sample_grid, ...
                     'jac_times', @(S, Yk, p) SRNNCellTypePairs.jacobian_times(S, Yk, p));
                 retries = 0;
@@ -3309,7 +3323,7 @@ classdef SRNNCellTypePairs < handle
                         break;
                     end
                     K_next = min(2 * K, K_cap);
-                    fprintf('Top-%d Lyapunov: D_KY unresolved within K; retrying at K = %d (cap %d)\n', ...
+                    vprintf(verbose, 'verbose', 'Top-%d Lyapunov: D_KY unresolved within K; retrying at K = %d (cap %d)\n', ...
                         K, K_next, K_cap);
                     K = K_next;
                     retries = retries + 1;
@@ -3318,10 +3332,10 @@ classdef SRNNCellTypePairs < handle
                 results.retries = retries;
                 results.params.N_sys_eqs = N;
                 if results.D_KY_resolved
-                    fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...
+                    vprintf(verbose, 'verbose', 'Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...
                         K, results.LLE, results.h_KS_bits, results.D_KY, results.n_positive, results.seconds);
                 else
-                    fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS >= %.3f bit/s, D_KY unresolved within K (%d positive; %.1f s)\n', ...
+                    vprintf(verbose, 'verbose', 'Top-%d Lyapunov: lambda_1 = %+.4f, h_KS >= %.3f bit/s, D_KY unresolved within K (%d positive; %.1f s)\n', ...
                         K, results.LLE, results.h_KS_bits, results.n_positive, results.seconds);
                 end
                 return
@@ -3347,7 +3361,7 @@ classdef SRNNCellTypePairs < handle
                 results.t_lya = times;
                 results.sort_idx = order;
                 results.params.N_sys_eqs = params.N_sys_eqs;
-                fprintf('Lyapunov Dimension: %.2f\n', ...
+                vprintf(verbose, 'verbose', 'Lyapunov Dimension: %.2f\n', ...
                     SRNNCellTypePairs.compute_kaplan_yorke_dimension_internal(spectrum));
             end
             results.lya_dt = lya_dt;

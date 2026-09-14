@@ -20,6 +20,7 @@ function out = fig_lyapunov_spectrum(cfg)
 % See also: run_lyapunov_spectrum, lyapunov_topk, manuscript_style
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
@@ -103,7 +104,7 @@ end
 title(tl, sprintf('Top-K Lyapunov spectrum, %s, n = %d, T = %g s, %d seed(s)', ...
     strrep(D.settings.preset_name, '_', '\_'), D.settings.n, D.settings.T, D.settings.n_seeds), ...
     'FontWeight', 'normal', 'FontSize', 11);
-fprintf('%s\n', rows{:});
+vprintf(cfg.verbose, 'verbose', '%s\n', rows{:});
 
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 

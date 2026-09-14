@@ -112,6 +112,7 @@ arguments
     cfg.preset_name      (1,:) char    = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'
     cfg.run_mode         (1,:) char    = 'production'
     cfg.out_dir          (1,:) char    = ''
+    cfg.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     cfg.n_trials_reshoot (1,1) double  = 0     % 0 -> per run_mode
     cfg.n_trials_lle     (1,1) double  = 0     % 0 -> per run_mode
     cfg.n_workers        (1,1) double  = 0     % 0 -> min(12, cores)
@@ -139,6 +140,7 @@ if cfg.n_trials_lle     > 0; n_lle     = cfg.n_trials_lle;     end
 
 P = struct();                        % everything a worker needs, broadcast once
 P.preset_name  = cfg.preset_name;
+P.verbose      = cfg.verbose;
 P.fs_ladder    = [400, 800, 1600];   % the paper runs at 400; the rest test convergence
 P.fs_top       = max(P.fs_ladder);
 P.fs_noisy_ref = 8 * P.fs_top;       % 12800: the noisy reference grid
@@ -176,39 +178,39 @@ n_cond     = numel(cond_names);
 P.sigma_preset = 0;
 if isfield(preset, 'sigma_u_noise'); P.sigma_preset = preset.sigma_u_noise; end
 
-fprintf('[numerics_verification] preset=%s run_mode=%s\n', cfg.preset_name, cfg.run_mode);
-fprintf('  A: noise-free reshoot, ode45 @ %g vs sra1 @ fs %s, T = %g s      x %d trials\n', ...
+vprintf(cfg.verbose, 'minimal', '[numerics_verification] preset=%s run_mode=%s\n', cfg.preset_name, cfg.run_mode);
+vprintf(cfg.verbose, 'verbose', '  A: noise-free reshoot, ode45 @ %g vs sra1 @ fs %s, T = %g s      x %d trials\n', ...
     P.ref_tol, mat2str(P.fs_ladder), T_free, n_reshoot);
-fprintf('  B: noisy reshoot, sra1 @ %d vs sra1 @ fs %s on one path, T = %g s  x %d trials\n', ...
+vprintf(cfg.verbose, 'verbose', '  B: noisy reshoot, sra1 @ %d vs sra1 @ fs %s on one path, T = %g s  x %d trials\n', ...
     P.fs_noisy_ref, mat2str(P.fs_ladder), T_noisy, n_reshoot);
-fprintf('  L: Benettin LLE, ode45 vs sra1 @ %d Hz, T = %g s                     x %d trials\n', ...
+vprintf(cfg.verbose, 'verbose', '  L: Benettin LLE, ode45 vs sra1 @ %d Hz, T = %g s                     x %d trials\n', ...
     P.fs_lle, T_lle, n_lle);
-fprintf('  C: Benettin vs QR, n = %d, T = %s                              x %d trials\n', ...
+vprintf(cfg.verbose, 'verbose', '  C: Benettin vs QR, n = %d, T = %s                              x %d trials\n', ...
     n_small, mat2str(T_small), n_lle);
 
 pool = ensure_pool(cfg.n_workers);
-fprintf('  parallel pool: %d workers\n', pool.NumWorkers);
+vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', pool.NumWorkers);
 
 t_stage = tic;
 res = struct('name', cond_names, 'title', titles, 'reshoot', [], 'lle', [], 'qr', [], 'summary', []);
 
 for i = 1:n_cond
     cname = cond_names{i};
-    fprintf('\n=== %d/%d %s ===\n', i, n_cond, titles{i});
+    vprintf(cfg.verbose, 'minimal', '  [%d/%d] %s\n', i, n_cond, titles{i});
 
     %% A + B. reshoot, one trial per worker -------------------------------
     t0 = tic;
-    fprintf('  [A/B] reshoot on %d seed(s) ...\n', n_reshoot);
+    vprintf(cfg.verbose, 'verbose', '  [A/B] reshoot on %d seed(s) ...\n', n_reshoot);
     R = cell(1, n_reshoot);
     parfor k = 1:n_reshoot
         R{k} = reshoot_trial(P, cname, [k, k + 1]);
     end
     res(i).reshoot = [R{:}];
-    fprintf('  [A/B] done in %.0f s\n', toc(t0));
+    vprintf(cfg.verbose, 'verbose', '  [A/B] done in %.0f s\n', toc(t0));
 
     %% L. LLE agreement, trial x integrator, one job per worker ---------------
     t0 = tic;
-    fprintf('  [L] Benettin ode45 vs sra1 on %d seed(s) ...\n', n_lle);
+    vprintf(cfg.verbose, 'verbose', '  [L] Benettin ode45 vs sra1 on %d seed(s) ...\n', n_lle);
     solvers = {'ode45', 'sra1'};
     J = cell(1, 2 * n_lle);
     parfor j = 1:2 * n_lle
@@ -221,20 +223,20 @@ for i = 1:n_cond
         L{k} = struct('seeds', [k, k + 1], 'ode45', J{2 * k - 1}, 'sra1', J{2 * k});
     end
     res(i).lle = [L{:}];
-    fprintf('  [L] done in %.0f s\n', toc(t0));
+    vprintf(cfg.verbose, 'verbose', '  [L] done in %.0f s\n', toc(t0));
 
     %% C. Benettin vs QR on the reduced network, one trial per worker --------
     t0 = tic;
-    fprintf('  [C] Benettin vs QR on n = %d, %d seed(s) ...\n', n_small, n_lle);
+    vprintf(cfg.verbose, 'verbose', '  [C] Benettin vs QR on n = %d, %d seed(s) ...\n', n_small, n_lle);
     Q = cell(1, n_lle);
     parfor k = 1:n_lle
         Q{k} = qr_trial(P, cname, [k, k + 1]);
     end
     res(i).qr = [Q{:}];
-    fprintf('  [C] done in %.0f s\n', toc(t0));
+    vprintf(cfg.verbose, 'verbose', '  [C] done in %.0f s\n', toc(t0));
 
     res(i).summary = summarise(res(i).reshoot, res(i).lle, res(i).qr, P.fs_lle);
-    print_summary(res(i).summary, titles{i});
+    print_summary(res(i).summary, titles{i}, cfg.verbose);
 end
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
@@ -253,7 +255,7 @@ condition_titles = titles;  % saved name
 results = res;
 mat_file = fullfile(out_dir, 'numerics_verification_data.mat');
 save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', '-v7.3');
-fprintf('\nSaved: %s  (%.1f min)\n', mat_file, settings.minutes);
+vprintf(cfg.verbose, 'minimal', '[numerics_verification] %.1f min -> %s\n', settings.minutes, mat_file);
 end
 
 %% ------------------------------------------------------------------------
@@ -306,7 +308,7 @@ for j = 1:numel(P.fs_ladder)
         blocks, P.seg_short, P.seg_long, P.max_restarts);
 end
 T.free = [free{:}];
-fprintf('    [A] seeds %s: sra1 @ %d Hz |err| over %g s = %.3e, slope %.2f\n', ...
+vprintf(P.verbose, 'verbose', '    [A] seeds %s: sra1 @ %d Hz |err| over %g s = %.3e, slope %.2f\n', ...
     mat2str(seeds), P.fs_lle, P.seg_long, ...
     T.free([T.free.fs] == P.fs_lle).err_long_total_rms, ...
     fit_slope([T.free.fs], [T.free.err_long_total_rms]));
@@ -338,7 +340,7 @@ if P.sigma_preset > 0
         probe.disarm_noise();
     end
     T.noisy = [noisy{:}];
-    fprintf('    [B] seeds %s: sra1 @ %d Hz |err| over %g s = %.3e, slope %.2f\n', ...
+    vprintf(P.verbose, 'verbose', '    [B] seeds %s: sra1 @ %d Hz |err| over %g s = %.3e, slope %.2f\n', ...
         mat2str(seeds), P.fs_lle, P.seg_long, ...
         T.noisy([T.noisy.fs] == P.fs_lle).err_long_total_rms, ...
         fit_slope([T.noisy.fs], [T.noisy.err_long_total_rms]));
@@ -347,7 +349,7 @@ end
 
 function out = lle_trial(P, cname, seeds, solver)
 % Sub-experiment L for one network and one integrator.
-model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, 'verbose', P.verbose, ...
     'sigma_u_noise', 0, 'ode_solver', solver, 'fs', P.fs_lle, ...
     'T_range', [0, P.T_lle], 'lya_method', 'benettin', ...
     'lya_T_interval', [P.T_lle / 2, P.T_lle], 'plot_deci', 4);
@@ -355,14 +357,14 @@ if strcmp(solver, 'ode45')
     model.ode_opts = odeset('RelTol', P.ref_tol, 'AbsTol', P.ref_tol, 'MaxStep', 1 / P.fs_lle);
 end
 t0 = tic;
-evalc('model.run();');
+model.run();
 pd = model.plot_data;
 E  = model.cell_type_names{1};
 out = struct('LLE', model.lya_results.LLE, ...
     't_lya', model.lya_results.t_lya, 'local_lya', model.lya_results.local_lya, ...
     't', pd.t, 'x_examples', pd.x.(E)(1:min(3, end), :), ...
     'mean_rate', mean(pd.r.(E)(:)), 'seconds', toc(t0));
-fprintf('    [L] seeds %s %-5s: LLE = %+.4f (%.0f s)\n', mat2str(seeds), solver, out.LLE, out.seconds);
+vprintf(P.verbose, 'verbose', '    [L] seeds %s %-5s: LLE = %+.4f (%.0f s)\n', mat2str(seeds), solver, out.LLE, out.seconds);
 end
 
 function Q = qr_trial(P, cname, seeds)
@@ -371,14 +373,14 @@ function Q = qr_trial(P, cname, seeds)
 Q = struct('seeds', seeds, 'n', P.n_small, 'T_range', P.T_small, 'benettin', [], 'qr', [], 'topk', []);
 for method = {'benettin', 'qr', 'topk'}
     mth = method{1};
-    model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, ...
+    model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, 'verbose', P.verbose, ...
         'n', P.n_small, 'indegree', max(2, round(0.2 * P.n_small)), ...
         'F_tracks_network', true, ...
         'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', P.fs_lle, ...
         'T_range', P.T_small, 'lya_method', mth, 'lya_K', P.K_small, ...
         'lya_T_interval', [0, P.T_small(2)], 'lya_warmup', P.lya_small_warmup);
     t0 = tic;
-    evalc('model.run();');
+    model.run();
     r = model.lya_results;
     switch mth
         case 'benettin'
@@ -397,7 +399,7 @@ for method = {'benettin', 'qr', 'topk'}
                 't_lya', r.t_lya, 'local_LE_spectrum_t', r.local_LE_spectrum_t, 'seconds', toc(t0));
     end
 end
-fprintf('    [C] seeds %s: Benettin %+.4f, QR %+.4f of %d (%.0f s), top-%d %+.4f (%.0f s)\n', mat2str(seeds), ...
+vprintf(P.verbose, 'verbose', '    [C] seeds %s: Benettin %+.4f, QR %+.4f of %d (%.0f s), top-%d %+.4f (%.0f s)\n', mat2str(seeds), ...
     Q.benettin.LLE, Q.qr.LE_spectrum(1), numel(Q.qr.LE_spectrum), Q.qr.seconds, ...
     Q.topk.K, Q.topk.LLE, Q.topk.seconds);
 end
@@ -418,8 +420,8 @@ rng(0, 'twister');
 names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 cond  = rmfield(conditions{strcmp(names, condition_name)}, 'name');
 args  = [struct2namevalue(preset), struct2namevalue(cond), varargin];
-probe = SRNNNumericsProbe(args{:});
-evalc('probe.build();');
+probe = SRNNNumericsProbe(args{:});   % 'verbose' arrives in varargin from the P struct
+probe.build();
 end
 
 function [t_keep, S_keep] = integrate_reference(probe, keep_every, window, S0)
@@ -549,23 +551,23 @@ c = polyfit(log(1 ./ fs), log(err), 1);
 p = c(1);
 end
 
-function print_summary(S, title)
+function print_summary(S, title, verbose)
 d  = S.lle_sra1 - S.lle_ode45;
 dq = S.qr_lambda1 - S.qr_benettin;
-fprintf('\n  summary for %s:\n', title);
-fprintf('    LLE over %d seeds: ode45 %+.3f +- %.3f | sra1 %+.3f +- %.3f | paired sra1-ode45 %+.3f +- %.3f\n', ...
+vprintf(verbose, 'verbose', '\n  summary for %s:\n', title);
+vprintf(verbose, 'verbose', '    LLE over %d seeds: ode45 %+.3f +- %.3f | sra1 %+.3f +- %.3f | paired sra1-ode45 %+.3f +- %.3f\n', ...
     S.n_trials_lle, mean(S.lle_ode45), std(S.lle_ode45), mean(S.lle_sra1), std(S.lle_sra1), mean(d), std(d));
-fprintf('    reduced net over %d seeds: Benettin %+.3f +- %.3f | QR %+.3f +- %.3f | paired QR-Benettin %+.4f +- %.4f\n', ...
+vprintf(verbose, 'verbose', '    reduced net over %d seeds: Benettin %+.3f +- %.3f | QR %+.3f +- %.3f | paired QR-Benettin %+.4f +- %.4f\n', ...
     S.n_trials_lle, mean(S.qr_benettin), std(S.qr_benettin), mean(S.qr_lambda1), std(S.qr_lambda1), mean(dq), std(dq));
 if isfield(S, 'topk_lambda1')
     dt3 = S.topk_lambda1 - S.qr_lambda1;
-    fprintf('    reduced net top-K: lambda_1 %+.3f +- %.3f | paired topK-QR %+.4f +- %.4f | h_KS %.2f +- %.2f bit/s\n', ...
+    vprintf(verbose, 'verbose', '    reduced net top-K: lambda_1 %+.3f +- %.3f | paired topK-QR %+.4f +- %.4f | h_KS %.2f +- %.2f bit/s\n', ...
         mean(S.topk_lambda1), std(S.topk_lambda1), mean(dt3), std(dt3), mean(S.topk_hKS), std(S.topk_hKS));
 end
-fprintf('    reshoot @ %d Hz over %d seeds: free %.2e +- %.1e (slope %.2f +- %.2f)\n', S.fs_paper, ...
+vprintf(verbose, 'verbose', '    reshoot @ %d Hz over %d seeds: free %.2e +- %.1e (slope %.2f +- %.2f)\n', S.fs_paper, ...
     S.n_trials_reshoot, mean(S.err_free_paper), std(S.err_free_paper), mean(S.slope_free), std(S.slope_free));
 if all(isfinite(S.err_noisy_paper))
-    fprintf('                                  noisy %.2e +- %.1e (slope %.2f +- %.2f)\n', ...
+    vprintf(verbose, 'verbose', '                                  noisy %.2e +- %.1e (slope %.2f +- %.2f)\n', ...
         mean(S.err_noisy_paper), std(S.err_noisy_paper), mean(S.slope_noisy), std(S.slope_noisy));
 end
 end

@@ -71,6 +71,7 @@ arguments
     opts.preset_name    (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     opts.run_mode       (1,:) char    = 'production'
     opts.output_dir     (1,:) char    = ''
+    opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     opts.save_figs      (1,1) logical = false
     opts.use_parallel   (1,1) logical = true    % false for serial debugging
     % Integrator override. Empty means "decide from the preset" -- deterministic
@@ -95,10 +96,10 @@ condition_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 n_cond = numel(condition_names);
 nL     = numel(cfg.dc_levels);
 
-fprintf('[dc_lle] preset=%s  run_mode=%s\n', opts.preset_name, opts.run_mode);
-fprintf('[dc_lle] seeds=%d  conditions=%d  DC levels=%d  solver=%s  fs=%d\n', ...
+vprintf(opts.verbose, 'minimal', '[dc_lle] preset=%s  run_mode=%s\n', opts.preset_name, opts.run_mode);
+vprintf(opts.verbose, 'verbose', '[dc_lle] seeds=%d  conditions=%d  DC levels=%d  solver=%s  fs=%d\n', ...
     cfg.n_seeds, n_cond, nL, cfg.ode_solver, cfg.fs);
-fprintf('[dc_lle] conditions: %s\n', strjoin(condition_names, ', '));
+vprintf(opts.verbose, 'verbose', '[dc_lle] conditions: %s\n', strjoin(condition_names, ', '));
 
 %% The staircase stimulus -- stated in full, since assigning input_config
 %  REPLACES the struct the class built rather than merging into it.
@@ -121,7 +122,7 @@ else
 end
 out_dir = fullfile(base_dir, sprintf('dc_lle_nSeeds_%d_%s', cfg.n_seeds, dt_str));
 if ~exist(out_dir, 'dir'); mkdir(out_dir); end
-fprintf('[dc_lle] out_dir = %s\n', out_dir);
+vprintf(opts.verbose, 'verbose', '[dc_lle] out_dir = %s\n', out_dir);
 
 %% Run: parfor over SEEDS, conditions serial inside so they stay paired
 n_seeds     = cfg.n_seeds;
@@ -133,7 +134,8 @@ seed_results = cell(n_seeds, 1);
 preset_name = opts.preset_name;
 extra_args  = {'input_config', input_config, 'T_range', T_range, ...
                'fs', cfg.fs, 'ode_solver', cfg.ode_solver, ...
-               'lya_method', 'benettin', 'store_full_state', false};
+               'lya_method', 'benettin', 'store_full_state', false, ...
+               'verbose', opts.verbose};
 
 run_start = tic;
 if opts.use_parallel
@@ -147,7 +149,7 @@ else
             condition_names, extra_args, cfg.hold_dur, cfg.psd_settle, nL);
     end
 end
-fprintf('[dc_lle] %d seeds x %d conditions finished in %.1f min\n', ...
+vprintf(opts.verbose, 'minimal', '[dc_lle] %d seeds x %d conditions finished in %.1f min\n', ...
     n_seeds, n_cond, toc(run_start)/60);
 
 %% Aggregate: [n_seeds x nL x n_cond]
@@ -184,7 +186,7 @@ dc_lle_results = struct( ...
     'LLE_by_seed', LLE_by_seed, 'config', config);
 
 save(fullfile(out_dir, 'dc_lle_results.mat'), 'dc_lle_results', '-v7.3');
-fprintf('[dc_lle] saved dc_lle_results.mat\n');
+vprintf(opts.verbose, 'minimal', '[dc_lle] saved %s\n', fullfile(out_dir, 'dc_lle_results.mat'));
 copyfile([mfilename('fullpath') '.m'], out_dir);
 
 %% Plot
@@ -194,22 +196,22 @@ plot_dc_lle_summary(dc_lle_results);
 if opts.save_figs
     fig_dir = fullfile(out_dir, 'figures');
     save_some_figs_to_folder_2(fig_dir, 'dc_lle', [], {'fig', 'png'});
-    fprintf('[dc_lle] figures saved to %s\n', fig_dir);
+    vprintf(opts.verbose, 'verbose', '[dc_lle] figures saved to %s\n', fig_dir);
 end
 
 %% Summary
-fprintf('\n=== DC LLE Analysis Summary ===\n');
-fprintf('Output: %s\n', out_dir);
-fprintf('%-10s', 'DC');
-fprintf('%16s', condition_names{:}); fprintf('\n');
+vprintf(opts.verbose, 'verbose', '\n=== DC LLE Analysis Summary ===\n');
+vprintf(opts.verbose, 'verbose', 'Output: %s\n', out_dir);
+vprintf(opts.verbose, 'verbose', '%-10s', 'DC');
+vprintf(opts.verbose, 'verbose', '%16s', condition_names{:}); fprintf('\n');
 for k = 1:nL
-    fprintf('%-10.4g', cfg.dc_levels(k));
+    vprintf(opts.verbose, 'verbose', '%-10.4g', cfg.dc_levels(k));
     for c = 1:n_cond
-        fprintf('%16s', sprintf('%+.3f+/-%.3f', level_mean(k, c), level_std(k, c)));
+        vprintf(opts.verbose, 'verbose', '%16s', sprintf('%+.3f+/-%.3f', level_mean(k, c), level_std(k, c)));
     end
-    fprintf('\n');
+    vprintf(opts.verbose, 'verbose', '\n');
 end
-fprintf('Done.\n');
+vprintf(opts.verbose, 'verbose', 'Done.\n');
 end
 
 %% ======================================================================

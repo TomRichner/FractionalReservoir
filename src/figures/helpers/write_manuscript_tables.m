@@ -55,7 +55,7 @@ arguments
     % figs/ like every other output, and deliberately NOT next to this .m file,
     % which is how the pipeline's tables ended up outside its own output root.
     cfg.out_dir     (1,:) char = ''
-    cfg.verbose     (1,1) logical = true
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
 end
 
 setup_paths();
@@ -84,10 +84,8 @@ paths{end+1} = write_conditions_table(out_dir, cfg.preset_name, conditions, M);
 paths{end+1} = write_param_table_bare(out_dir, M);
 paths{end+1} = write_conditions_table_bare(out_dir, conditions, M);
 
-if cfg.verbose
-    fprintf('[manuscript tables] preset %s (%s)\n', cfg.preset_name, model_class);
-    fprintf('  %s\n', paths{:});
-end
+vprintf(cfg.verbose, 'verbose', '[manuscript tables] preset %s (%s)\n', cfg.preset_name, model_class);
+vprintf(cfg.verbose, 'verbose', '  %s\n', paths{:});
 end
 
 %% ------------------------------------------------------------------------

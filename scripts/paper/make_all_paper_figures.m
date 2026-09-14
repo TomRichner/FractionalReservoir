@@ -63,7 +63,7 @@ if ~isempty(want_run_dir) && ~is_absolute_path(want_run_dir)
 end
 try
     run_dir = resolve_run_dir('run_dir', want_run_dir, 'preset_name', cfg.preset_name);
-    fprintf('Run directory: %s\n', run_dir);
+    vprintf(verbose, 'minimal', 'Run directory: %s\n', run_dir);
 catch ME
     warning('make_all_paper_figures:NoRun', ...
         ['No run directory matched preset ''%s'':\n  %s\n' ...
@@ -97,7 +97,7 @@ else
     root_mode = 'configured';
 end
 if ~isfolder(fig_root); mkdir(fig_root); end
-fprintf('Figure root:   %s  (%s)\n', fig_root, root_mode);
+vprintf(verbose, 'minimal', 'Figure root:   %s  (%s)\n', fig_root, root_mode);
 
 %% Keep the figures off screen unless asked otherwise
 % cfg.visible_figures, default false. Each entry is passed `visible` below --
@@ -113,6 +113,10 @@ fprintf('Figure root:   %s  (%s)\n', fig_root, root_mode);
 % restored when this function returns, including on the error path. It must stay
 % in scope for the whole pass; do not clear it.
 visible_figures = isfield(cfg, 'visible_figures') && cfg.visible_figures;
+% The verbosity level, threaded into every figure as its `verbose` argument;
+% older callers' cfg structs may lack the field.
+if ~isfield(cfg, 'verbose'), cfg.verbose = 'minimal'; end
+verbose = cfg.verbose;
 if ~visible_figures
     fig_visibility = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 end
@@ -120,10 +124,9 @@ end
 figs = cfg.figures;
 n = numel(figs);
 
-fprintf('\n========================================================\n');
-fprintf('PAPER FIGURES  (%d entries, preset %s)\n', n, cfg.preset_name);
-fprintf('  start: %s\n', datetime('now'));
-fprintf('========================================================\n');
+vprintf(verbose, 'verbose', '\n========================================================\n');
+vprintf(verbose, 'minimal', 'PAPER FIGURES  (%d entries, preset %s)  start %s\n', n, cfg.preset_name, datetime('now'));
+vprintf(verbose, 'verbose', '========================================================\n');
 t_all = tic;
 
 results = struct('name', {}, 'ok', {}, 'in_paper', {}, 'n_files', {}, ...
@@ -131,11 +134,11 @@ results = struct('name', {}, 'ok', {}, 'in_paper', {}, 'n_files', {}, ...
 
 for k = 1:n
     f = figs{k};
-    fprintf('\n---- [%d/%d] %s%s\n', k, n, f.name, paper_tag(f.in_paper));
+    vprintf(verbose, 'minimal', '---- [%d/%d] %s%s\n', k, n, f.name, paper_tag(f.in_paper));
     t0 = tic;
     try
         args = [{'run_dir', run_dir, 'out_dir', fullfile(fig_root, f.name), ...
-                 'save', true, 'visible', visible_figures}, f.args];
+                 'save', true, 'visible', visible_figures, 'verbose', verbose}, f.args];
         out  = call_figure(f.fn, args);
 
         n_files = numel(out.files);
@@ -147,7 +150,7 @@ for k = 1:n
             fprintf(2, '     no files written\n');
         else
             err = '';
-            fprintf('     %d file(s): %s\n', n_files, strjoin(out.files, ', '));
+            vprintf(verbose, 'minimal', '     %d file(s): %s\n', n_files, strjoin(out.files, ', '));
         end
         results(end+1) = struct('name', f.name, 'ok', ok, 'in_paper', f.in_paper, ...
             'n_files', n_files, 'seconds', toc(t0), 'files', {out.files}, ...
@@ -175,7 +178,7 @@ end
 % because every entry has already been verified.
 stray = findobj(0, 'Type', 'figure');
 if ~isempty(stray)
-    fprintf('\n     closing %d stray prep figure(s) left by the replot helpers\n', ...
+    vprintf(verbose, 'verbose', '\n     closing %d stray prep figure(s) left by the replot helpers\n', ...
         numel(stray));
     close(stray);
 end
@@ -211,26 +214,24 @@ n_ok    = sum([results.ok]);
 n_paper = sum([results.in_paper]);
 n_paper_ok = sum([results.ok] & [results.in_paper]);
 
-fprintf('\n========================================================\n');
-fprintf('PAPER FIGURES COMPLETE in %.1f min\n', toc(t_all)/60);
-fprintf('  %d/%d succeeded   (%d/%d of the in-paper figures)\n', ...
-    n_ok, n, n_paper_ok, n_paper);
-fprintf('  output: %s\n', fig_root);
-fprintf('--------------------------------------------------------\n');
+vprintf(verbose, 'verbose', '\n========================================================\n');
+vprintf(verbose, 'near-none', 'PAPER FIGURES COMPLETE in %.1f min: %d/%d succeeded (%d/%d in-paper), output %s\n', ...
+    toc(t_all)/60, n_ok, n, n_paper_ok, n_paper, fig_root);
+vprintf(verbose, 'minimal', '--------------------------------------------------------\n');
 for k = 1:numel(results)
     r = results(k);
     if r.ok; tag = 'OK    '; else; tag = 'FAILED'; end
-    fprintf('  %s  %-32s %2d files %6.1f s%s\n', tag, r.name, r.n_files, ...
+    vprintf(verbose, 'minimal', '  %s  %-32s %2d files %6.1f s%s\n', tag, r.name, r.n_files, ...
         r.seconds, paper_tag(r.in_paper));
 end
 bad = results(~[results.ok]);
 if ~isempty(bad)
-    fprintf('--------------------------------------------------------\n');
+    vprintf(verbose, 'minimal', '--------------------------------------------------------\n');
     for k = 1:numel(bad)
         fprintf(2, '  %s: %s\n', bad(k).name, bad(k).err);
     end
 end
-fprintf('========================================================\n');
+vprintf(verbose, 'minimal', '========================================================\n');
 end
 
 %% ------------------------------------------------------------------------

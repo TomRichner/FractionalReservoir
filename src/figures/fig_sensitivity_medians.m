@@ -28,6 +28,7 @@ function out = fig_sensitivity_medians(cfg)
 %           preset_default_values, manuscript_style
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
@@ -168,7 +169,7 @@ for k = 1:numel(sens_listing)
         continue;   % e.g. level_of_chaos, which this figure omits
     end
     psa_of_param(swept{1}) = psa_k;
-    fprintf('Loaded sweep %-16s from %s\n', swept{1}, sens_listing(k).name);
+    vprintf(cfg.verbose, 'verbose', 'Loaded sweep %-16s from %s\n', swept{1}, sens_listing(k).name);
 end
 
 missing = panel_params(~cellfun(@(p) isKey(psa_of_param, p), panel_params));

@@ -79,12 +79,12 @@ cond_names = cellfun(@(c) c.name, ctx.conditions, 'UniformOutput', false);
 full_name  = full_adaptation_condition(ctx.conditions);
 idx        = find(strcmp(cond_names, full_name), 1);
 condition  = ctx.conditions(idx);
-fprintf('Condition: %s (the full-adaptation regime)\n', full_name);
+vprintf(ctx.verbose, 'verbose', 'Condition: %s (the full-adaptation regime)\n', full_name);
 
 %% tau_a_E(end) sweep -- vector parameter
-fprintf('\n========================================\n');
-fprintf('=== Tau Sensitivity: tau_a_E(end) [1, 30] ===\n');
-fprintf('========================================\n');
+vprintf(ctx.verbose, 'verbose', '\n========================================\n');
+vprintf(ctx.verbose, 'verbose', '=== Tau Sensitivity: tau_a_E(end) [1, 30] ===\n');
+vprintf(ctx.verbose, 'verbose', '========================================\n');
 
 psa = ParamSpaceAnalysis2( ...
     'n_levels', ctx.n_levels, ...
@@ -148,7 +148,7 @@ psa.plot_sensitivity('metric', 'mean_rate');
 if ctx.save_figs
     fig_dir = fullfile(psa.output_dir, 'figures');
     save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_a', [], {'fig', 'png'});
-    fprintf('Figures saved to %s\n', fig_dir);
+    vprintf(ctx.verbose, 'verbose', 'Figures saved to %s\n', fig_dir);
 end
 close all;
 
@@ -161,8 +161,8 @@ out_dir = psa.output_dir;
 % analysis.m before this commit if it is ever wanted back.
 
 %% Summary
-fprintf('\n========================================\n');
-fprintf('=== Tau Sensitivity Analysis Complete ===\n');
-fprintf('tau_a_E results: %s\n', out_dir);
-fprintf('========================================\n');
+vprintf(ctx.verbose, 'verbose', '\n========================================\n');
+vprintf(ctx.verbose, 'verbose', '=== Tau Sensitivity Analysis Complete ===\n');
+vprintf(ctx.verbose, 'minimal', '[tau_sensitivity] complete: %s\n', out_dir);
+vprintf(ctx.verbose, 'verbose', '========================================\n');
 end

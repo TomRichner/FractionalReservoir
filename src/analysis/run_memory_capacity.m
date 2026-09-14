@@ -39,7 +39,7 @@ arguments
     opts.run_mode               (1,:) char    = 'production'
     opts.output_dir             (1,:) char    = ''
     opts.save_figs              (1,1) logical = true
-    opts.verbose                (1,1) logical = true
+    opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     opts.store_internal_results (1,1) logical = false
     % Integrator override. Empty means "decide from the preset": a deterministic
     % scheme at sigma_u_noise = 0, the stochastic one above it, the same rule
@@ -68,8 +68,8 @@ T_train = round(cfg.T_train_sec * fs);
 T_test  = round(cfg.T_test_sec  * fs);
 d_max   = round(cfg.d_max_sec   * fs);
 
-fprintf('[memory_capacity] preset=%s  run_mode=%s\n', opts.preset_name, opts.run_mode);
-fprintf('[memory_capacity] trials=%d  fs=%d  T_train=%gs  T_test=%gs  d_max=%gs\n', ...
+vprintf(opts.verbose, 'minimal', '[memory_capacity] preset=%s  run_mode=%s\n', opts.preset_name, opts.run_mode);
+vprintf(opts.verbose, 'verbose', '[memory_capacity] trials=%d  fs=%d  T_train=%gs  T_test=%gs  d_max=%gs\n', ...
     cfg.n_trials, fs, cfg.T_train_sec, cfg.T_test_sec, cfg.d_max_sec);
 
 %% Output directory
@@ -144,7 +144,7 @@ readout_signal   = cfg.readout_signal;
 R2_thresh        = cfg.R2_threshold_for_horizon;
 
 %% One-time fairness check
-fprintf('\nVerifying shared build (fairness check, trial 1)...\n');
+vprintf(opts.verbose, 'verbose', '\nVerifying shared build (fairness check, trial 1)...\n');
 chk_args = [{'rng_seeds', [seed_net(1), seed_stim(1)]}, base_args_template];
 esn_chk = cell(1, n_cond);
 for i = 1:n_cond
@@ -159,10 +159,10 @@ verify_shared_build(esn_chk, {'tau_a','synapse_config'}, ...
 clear esn_chk chk_args;
 
 %% Main loop: paired trials
-fprintf('\n==== Running %d paired trials (%s input) ====\n', n_trials, cfg.input_type);
+vprintf(opts.verbose, 'verbose', '\n==== Running %d paired trials (%s input) ====\n', n_trials, cfg.input_type);
 
 parfor k = 1:n_trials
-    fprintf('--- Trial %d / %d | seeds: net=%d, stim=%d ---\n', ...
+    vprintf(opts.verbose, 'minimal', '  trial %d/%d (net %d, stim %d)\n', ...
         k, n_trials, seed_net(k), seed_stim(k));
 
     base_args = [{'rng_seeds', [seed_net(k), seed_stim(k)]}, base_args_template];
@@ -176,7 +176,7 @@ parfor k = 1:n_trials
         esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
         esn_i.build();
         [mc_i, r2_i, res_i] = esn_i.run_memory_capacity( ...
-            'store_timeseries', false, 'verbose', false, ...
+            'store_timeseries', false, 'verbose', verbose_level(opts.verbose) >= 2, ...
             'readout_signal', readout_signal);
         r2_i = r2_i(:)';
         if numel(r2_i) ~= d_max_eff
@@ -199,7 +199,7 @@ parfor k = 1:n_trials
     internal_results(k,:) = int_row;
 end
 
-fprintf('\n==== Done. Computing summary + figures... ====\n');
+vprintf(opts.verbose, 'verbose', '\n==== Done. Computing summary + figures... ====\n');
 
 %% Summary statistics
 MC_mean = mean(MC_trials, 1, 'omitnan');
@@ -325,7 +325,7 @@ if opts.save_figs
     plot_memory_capacity(results_all, out_dir);
 end
 
-fprintf('\nSaved:\n  %s\n', mat_file);
+vprintf(opts.verbose, 'minimal', '[memory_capacity] saved %s\n', mat_file);
 end
 
 %% ======================================================================

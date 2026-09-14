@@ -35,6 +35,7 @@ function out = fig_numerics_verification(cfg)
 % See also: run_numerics_verification, resolve_data_file, test_benettin_vs_qr
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.variant     (1,:) char {mustBeMember(cfg.variant, {'solver', 'lya_method', 'ensemble'})} = 'solver'
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''

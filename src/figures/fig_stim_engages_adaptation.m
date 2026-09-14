@@ -35,6 +35,7 @@ function out = fig_stim_engages_adaptation(cfg)
 % See also: srnn_param_preset, dc_staircase_stimulus, build_from_preset
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.preset_name  (1,:) char    = 'bursting_pairs'
     cfg.out_dir      (1,:) char    = ''
     cfg.rng_seeds    (1,2) double  = [42 42]

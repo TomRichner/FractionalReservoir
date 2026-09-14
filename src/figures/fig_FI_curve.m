@@ -25,6 +25,7 @@ function out = fig_FI_curve(cfg)
 % See also: fig_SFA_steady_state, fig_STD_steady_state, paper_config
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.out_dir (1,:) char    = ''
     cfg.save    (1,1) logical = true
     cfg.visible (1,1) logical = true

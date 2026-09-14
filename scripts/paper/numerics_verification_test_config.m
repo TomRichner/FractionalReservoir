@@ -32,6 +32,7 @@ cfg.run_dir  = 'data/numerics_verification_test';   % the stage writes <run_dir>
 cfg.fig_root = 'figs/numerics_verification_test';   % overwritten in place
 
 cfg.visible_figures = false;
+cfg.verbose = 'minimal';   % 'verbose' | 'minimal' | 'near-none' -- how much the run prints (verbose_level)
 
 % Only the two entries that read this stage. Names are the output folders,
 % and the two fig_tags are not prefixes of each other (save_figure_stable

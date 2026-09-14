@@ -96,12 +96,7 @@ if ~visible_figures
     fig_visibility = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 end
 
-fprintf('\n========================================================\n');
-fprintf('PAPER ANALYSES\n');
-fprintf('  preset   : %s\n', cfg.preset_name);
-fprintf('  run_mode : %s\n', cfg.run_mode);
-fprintf('  start    : %s\n', datetime('now'));
-fprintf('========================================================\n');
+vprintf(cfg.verbose, 'minimal', '[paper analyses] preset=%s run_mode=%s start=%s\n', cfg.preset_name, cfg.run_mode, datetime('now'));
 t_all = tic;
 
 %% 1. The sweep pipeline -- creates the run directory and its manifest
@@ -111,15 +106,15 @@ t_all = tic;
 % relative path resolves against the project root, so a config can say
 % 'data/fast_4' without caring what the cwd is -- same rule as fig_root.
 if isempty(cfg.run_dir)
-    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode);
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'verbose', cfg.verbose);
 else
     out_dir = cfg.run_dir;
     if ~is_absolute_path(out_dir)
         out_dir = fullfile(fileparts(which('setup_paths')), out_dir);
     end
     assert_empty_target(out_dir);
-    fprintf('  output   : %s\n', out_dir);
-    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir);
+    vprintf(cfg.verbose, 'minimal', '  output   : %s\n', out_dir);
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir, 'verbose', cfg.verbose);
 end
 
 results = struct('stage', {}, 'ok', {}, 'minutes', {}, 'detail', {}, 'err', {});
@@ -134,38 +129,36 @@ results = record(results, 'sweeps', true, toc(t_all)/60, run_dir, '');
 % and sweeps tonic DC across every adaptation condition.
 stages = { ...
     'memory_capacity', @() run_memory_capacity( ...
-        'preset_name', cfg.mc_preset, 'run_mode', cfg.run_mode, ...
+        'preset_name', cfg.mc_preset, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'output_dir', run_dir); ...
     'mc_example',      @() run_memory_capacity_example( ...
-        'preset_name', cfg.mc_preset, 'run_mode', cfg.run_mode, ...
+        'preset_name', cfg.mc_preset, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'output_dir', fullfile(run_dir, 'mc_example')); ...
     'eig_heatmap',     @() run_eig_heatmap( ...
-        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
+        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'out_dir', fullfile(run_dir, 'eig_heatmap')); ...
     'numerics',        @() run_numerics_verification( ...
-        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
+        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'out_dir', fullfile(run_dir, 'numerics_verification')); ...
     'lyapunov_spectrum', @() run_lyapunov_spectrum( ...
-        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
+        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'out_dir', fullfile(run_dir, 'lyapunov_spectrum')); ...
     'transient_gain', @() run_transient_gain( ...
-        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
+        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'out_dir', fullfile(run_dir, 'transient_gain')); ...
     'dc_lle',          @() run_dc_lle_analysis( ...
-        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
+        'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'output_dir', run_dir) };
 
 for k = 1:size(stages, 1)
     name = stages{k, 1};
-    fprintf('\n========================================\n');
-    fprintf('[%d/%d] %s\n', k, size(stages, 1), name);
-    fprintf('========================================\n');
+    vprintf(cfg.verbose, 'minimal', '[%d/%d] %s\n', k, size(stages, 1), name);
     t0 = tic;
     try
         restart_parpool();
         detail = stages{k, 2}();
         results = record(results, name, true, toc(t0)/60, detail, '');
-        fprintf('  -> %s\n', detail);
+        vprintf(cfg.verbose, 'minimal', '  -> %s\n', detail);
     catch ME
         results = record(results, name, false, toc(t0)/60, '', ME.message);
         fprintf(2, '  FAILED: %s: %s\n', ME.identifier, ME.message);
@@ -187,18 +180,14 @@ catch ME
 end
 
 %% Summary
-fprintf('\n========================================================\n');
-fprintf('PAPER ANALYSES COMPLETE in %.2f h\n', toc(t_all)/3600);
-fprintf('  run_dir: %s\n', run_dir);
-fprintf('--------------------------------------------------------\n');
+vprintf(cfg.verbose, 'near-none', '[paper analyses] complete in %.2f h -> %s\n', toc(t_all)/3600, run_dir);
 for k = 1:numel(results)
     r = results(k);
     if r.ok; tag = 'OK    '; else; tag = 'FAILED'; end
-    fprintf('  %s  %-18s %7.1f min\n', tag, r.stage, r.minutes);
+    vprintf(cfg.verbose, 'minimal', '  %s  %-18s %7.1f min\n', tag, r.stage, r.minutes);
     if ~r.ok; fprintf(2, '          %s\n', r.err); end
 end
-fprintf('========================================================\n');
-fprintf('Next: make_all_paper_figures(paper_config(''run_dir'', run_dir))\n');
+vprintf(cfg.verbose, 'verbose', 'Next: make_all_paper_figures(paper_config(''run_dir'', run_dir))\n');
 end
 
 %% ------------------------------------------------------------------------

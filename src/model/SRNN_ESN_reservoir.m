@@ -135,7 +135,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % Assign random weights centered at 0 with spread sigma_in
             obj.W_in(input_neurons) = obj.sigma_in * (rand(n_input, 1) - 0.5);
 
-            fprintf('Input weights generated: %d neurons receive input (%.1f%%)\n', ...
+            vprintf(obj.verbose, 'verbose', 'Input weights generated: %d neurons receive input (%.1f%%)\n', ...
                 n_input, 100 * n_input / obj.n);
         end
 
@@ -147,7 +147,9 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % [MC, R2_d, results] = run_memory_capacity('store_timeseries', false)
             %
             % Name-value options:
-            %   'verbose'          - print progress (default true)
+            %   'verbose'          - print progress. Default: the inherited
+            %                        verbose property at 'verbose' (see verbose_level);
+            %                        a logical or a level name overrides it
             %   'store_timeseries' - default true. Set FALSE for a lean MC-only run
             %                        that does NOT keep the full-resolution state
             %                        time series (x/a/b/r/br, u_ex) or S_out and
@@ -176,14 +178,14 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             end
 
             % Parse optional arguments
-            verbose = true;
+            verbose = verbose_level(obj.verbose) >= 2;
             store_timeseries = true;   % false => lean MC-only path (frees the
                                        % full-res states/trajectory, skips the LLE)
             readout_signal = 'rate';   % 'rate' => read out r = phi(x_eff); 'synaptic'
                                        % => read out br = b.*r (STD-depressed output)
             for i = 1:2:length(varargin)
                 switch lower(varargin{i})
-                    case 'verbose',          verbose = varargin{i+1};
+                    case 'verbose',          verbose = verbose_level(varargin{i+1}) >= 2;
                     case 'store_timeseries', store_timeseries = varargin{i+1};
                     case 'readout_signal',   readout_signal = varargin{i+1};
                 end
@@ -433,7 +435,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, params);
 
             % Integrate entire trajectory at once
-            fprintf('  Integrating ESN dynamics...\n');
+            vprintf(obj.verbose, 'verbose', '  Integrating ESN dynamics...\n');
             tic
             % Pre-generate Wiener increments (a no-op at sigma_u_noise = 0).
             % run_reservoir_esn does not go through SRNNCellTypePairs.run, so it has
@@ -442,7 +444,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             [obj.t_out, obj.S_out] = obj.integrate(rhs, obj.t_ex, obj.S0);
             obj.noise_increments = [];
             integration_time = toc;
-            fprintf('  Integration complete in %.2f seconds.\n', integration_time);
+            vprintf(obj.verbose, 'verbose', '  Integration complete in %.2f seconds.\n', integration_time);
         end
 
         function [fig_handle, ax_handles] = plot_memory_capacity(obj, varargin)
@@ -764,7 +766,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             obj.W_in = [];
             obj.u_scalar = [];
             obj.mc_results = [];
-            fprintf('ESN reservoir reset.\n');
+            vprintf(obj.verbose, 'verbose', 'ESN reservoir reset.\n');
         end
     end
 
@@ -810,7 +812,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 u_normalized = (u_filtered - min(u_filtered)) / (max(u_filtered) - min(u_filtered)) - 0.5;
                 obj.u_scalar = obj.u_offset + obj.u_scale * u_normalized;
 
-                fprintf('ESN stimulus: bandlimited input (f_cutoff = %.2f Hz)\n', f_cut);
+                vprintf(obj.verbose, 'verbose', 'ESN stimulus: bandlimited input (f_cutoff = %.2f Hz)\n', f_cut);
 
             elseif strcmpi(obj.input_type, 'one_over_f')
                 % Generate 1/f^alpha noise using Fourier filtering method
@@ -837,12 +839,12 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 u_normalized = (u_raw - min(u_raw)) / (max(u_raw) - min(u_raw)) - 0.5;
                 obj.u_scalar = obj.u_offset + obj.u_scale * u_normalized;
 
-                fprintf('ESN stimulus: 1/f^%.2f noise input\n', alpha_val);
+                vprintf(obj.verbose, 'verbose', 'ESN stimulus: 1/f^%.2f noise input\n', alpha_val);
 
             elseif strcmpi(obj.input_type, 'white')
                 obj.u_scalar = obj.u_offset + obj.u_scale * (rand(T_total, 1) - 0.5);
                 obj.hold_len = 1;
-                fprintf('ESN stimulus: white noise input\n');
+                vprintf(obj.verbose, 'verbose', 'ESN stimulus: white noise input\n');
 
             elseif strcmpi(obj.input_type, 'sample_hold')
                 % i.i.d. values held for hold_len samples (staircase). Puts input
@@ -859,7 +861,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 held_vals = obj.u_offset + obj.u_scale * (rand(n_holds, 1) - 0.5);
                 u_full = repelem(held_vals, L);
                 obj.u_scalar = u_full(1:T_total);
-                fprintf('ESN stimulus: sample-and-hold input (T_hold = %.3f s, %d samples/hold)\n', ...
+                vprintf(obj.verbose, 'verbose', 'ESN stimulus: sample-and-hold input (T_hold = %.3f s, %d samples/hold)\n', ...
                     T_hold_eff, L);
             else
                 error('SRNN_ESN_reservoir:InvalidInputType', ...
@@ -884,7 +886,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             params_init = obj.get_params();
             obj.S0 = SRNNCellTypePairs.initialize_state(params_init);
 
-            fprintf('ESN stimulus built: %d samples, %d neurons receive input\n', ...
+            vprintf(obj.verbose, 'verbose', 'ESN stimulus built: %d samples, %d neurons receive input\n', ...
                 T_total, sum(obj.W_in ~= 0));
         end
     end
@@ -1096,7 +1098,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % and that properties expected to differ DO actually differ.
 
             if numel(esn_array) < 2
-                fprintf('verify_shared_build: only 1 object, nothing to compare.\n');
+                vprintf(esn_array{1}.verbose, 'verbose', 'verify_shared_build: only 1 object, nothing to compare.\n');
                 return;
             end
 
@@ -1106,7 +1108,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
             always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', ...
                            'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
-                           'noise_increments'};
+                           'noise_increments', 'verbose'};
 
             n_checked = 0;
             n_matched = 0;
@@ -1194,12 +1196,12 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 end
             end
 
-            fprintf('verify_shared_build: %d properties checked, all matched across %d conditions.\n', ...
+            vprintf(ref.verbose, 'verbose', 'verify_shared_build: %d properties checked, all matched across %d conditions.\n', ...
                 n_checked, n_obj);
-            fprintf('  Checked: %s\n', strjoin(checked_names, ', '));
-            fprintf('  Expected to differ: %s\n', strjoin(expected_to_differ, ', '));
+            vprintf(ref.verbose, 'verbose', '  Checked: %s\n', strjoin(checked_names, ', '));
+            vprintf(ref.verbose, 'verbose', '  Expected to differ: %s\n', strjoin(expected_to_differ, ', '));
             if ~isempty(also_check_protected)
-                fprintf('  Also verified (protected): %s\n', strjoin(also_check_protected, ', '));
+                vprintf(ref.verbose, 'verbose', '  Also verified (protected): %s\n', strjoin(also_check_protected, ', '));
             end
         end
     end

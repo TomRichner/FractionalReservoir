@@ -34,7 +34,7 @@ function verify_shared_build(esn_array, expected_to_differ, also_check_protected
 % See also: SRNN_ESN_reservoir, SRNNModel2
 
     if numel(esn_array) < 2
-        fprintf('verify_shared_build: only 1 object, nothing to compare.\n');
+        vprintf(esn_array{1}.verbose, 'verbose', 'verify_shared_build: only 1 object, nothing to compare.\n');
         return;
     end
 
@@ -44,7 +44,7 @@ function verify_shared_build(esn_array, expected_to_differ, also_check_protected
 
     % Properties to always skip (run-output, complex objects, or
     % derived aggregates that legitimately differ when config differs)
-    always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', ...
+    always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', 'verbose', ...
                    'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
                    'noise_increments'};
 
@@ -144,11 +144,11 @@ function verify_shared_build(esn_array, expected_to_differ, also_check_protected
         end
     end
 
-    fprintf('verify_shared_build: %d properties checked, all matched across %d conditions.\n', ...
+    vprintf(ref.verbose, 'verbose', 'verify_shared_build: %d properties checked, all matched across %d conditions.\n', ...
         n_checked, n_obj);
-    fprintf('  Checked: %s\n', strjoin(checked_names, ', '));
-    fprintf('  Expected to differ: %s\n', strjoin(expected_to_differ, ', '));
+    vprintf(ref.verbose, 'verbose', '  Checked: %s\n', strjoin(checked_names, ', '));
+    vprintf(ref.verbose, 'verbose', '  Expected to differ: %s\n', strjoin(expected_to_differ, ', '));
     if ~isempty(also_check_protected)
-        fprintf('  Also verified (protected): %s\n', strjoin(also_check_protected, ', '));
+        vprintf(ref.verbose, 'verbose', '  Also verified (protected): %s\n', strjoin(also_check_protected, ', '));
     end
 end

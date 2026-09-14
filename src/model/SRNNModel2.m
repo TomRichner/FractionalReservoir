@@ -285,6 +285,18 @@ classdef SRNNModel2 < handle
         plot_deci                   % Decimation factor for plotting (computed from fs/plot_freq if not set)
         plot_freq = 10              % Target plotting frequency (Hz)
     end
+
+    %% Verbosity
+    properties
+        % One setting, three levels: 'verbose' (every per-build / per-run /
+        % Lyapunov line this class used to print unconditionally), 'minimal'
+        % (the default: nothing per model -- the stage or sweep driving the
+        % model reports once per stage or batch) and 'near-none'. Carried
+        % from paper_config through ctx / ParamSpaceAnalysis2 into the parfor
+        % workers as a constructor name-value. Warnings and errors are never
+        % gated. See verbose_level, vprintf.
+        verbose = 'minimal'
+    end
     
     %% RMT Dependent Properties (computed from tilde parameters)
     properties (Dependent)
@@ -644,11 +656,11 @@ classdef SRNNModel2 < handle
             obj.build_noise();
 
             % Integrate
-            fprintf('Integrating equations\n');
+            vprintf(obj.verbose, 'verbose', 'Integrating equations\n');
             tic
             [t_raw, S_raw] = obj.integrate(rhs, obj.t_ex, obj.S0);
             integration_time = toc;
-            fprintf('Integration complete in %.2f seconds.\n', integration_time);
+            vprintf(obj.verbose, 'verbose', 'Integration complete in %.2f seconds.\n', integration_time);
             
             % Verify output times match input times
             if length(t_raw) ~= length(obj.t_ex) || max(abs(t_raw - obj.t_ex)) > 1e-9
@@ -684,7 +696,7 @@ classdef SRNNModel2 < handle
             obj.noise_increments = [];
 
             obj.has_run = true;
-            fprintf('Simulation complete.\n');
+            vprintf(obj.verbose, 'verbose', 'Simulation complete.\n');
         end
         
         function compute_lyapunov(obj)
@@ -710,7 +722,7 @@ classdef SRNNModel2 < handle
             params.u_interpolant = obj.u_interpolant;
             rhs = @(t, S) SRNNModel2.dynamics_fast(t, S, params);
             
-            fprintf('Computing Lyapunov exponents using %s method\n', obj.lya_method);
+            vprintf(obj.verbose, 'verbose', 'Computing Lyapunov exponents using %s method\n', obj.lya_method);
             % Benettin re-integrates trajectory segments, so it must use the
             % same integrator as the trajectory itself -- that is what makes the
             % discretisation error common to both trajectories and cancel in the
@@ -718,10 +730,10 @@ classdef SRNNModel2 < handle
             % 2-point span instead and always uses ode45; see below.)
             solver = resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNModel');
             obj.lya_results = SRNNModel2.compute_lyapunov_exponents_internal(obj.lya_method, obj.S_out, obj.t_out, dt, obj.fs, obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, obj.ode_opts, solver, rhs, ...
-                obj.lya_K, obj.rng_seeds(1) + 424242);
+                obj.lya_K, obj.rng_seeds(1) + 424242, obj.verbose);
             
             if isfield(obj.lya_results, 'LLE')
-                fprintf('Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
+                vprintf(obj.verbose, 'verbose', 'Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
         end
         
@@ -753,6 +765,12 @@ classdef SRNNModel2 < handle
             end
         end
         
+        function set.verbose(obj, v)
+            % Accepts the three chars or a logical (true -> verbose, false ->
+            % minimal, the pre-2026-09-14 meanings); stores the canonical char.
+            obj.verbose = verbose_name(v);
+        end
+
         function [fig_handle, ax_handles] = plot(obj, varargin)
             % PLOT Generate time series plots for SRNN simulation
             %
@@ -802,7 +820,7 @@ classdef SRNNModel2 < handle
             J_times = round((J_times_sec - obj.t_out(1)) * obj.fs) + 1;
             J_times = unique(max(1, min(J_times, size(obj.S_out, 1))));
             
-            fprintf('Computing Jacobian at %d time points\n', length(J_times));
+            vprintf(obj.verbose, 'verbose', 'Computing Jacobian at %d time points\n', length(J_times));
             J_array = SRNNModel2.compute_Jacobian_at_indices(obj.S_out, J_times, params);
             
             % Compute eigenvalues
@@ -899,7 +917,7 @@ classdef SRNNModel2 < handle
             n_times = size(S_sel, 1);
             evals_by_time = cell(n_times, 1);
 
-            fprintf('Computing Jacobian eigenvalues at %d time points\n', n_times);
+            vprintf(obj.verbose, 'verbose', 'Computing Jacobian eigenvalues at %d time points\n', n_times);
 
             % Fuse Jacobian build + eig per time point (avoids the large
             % N x N x n_times J_array). Independent across i -> parfor.
@@ -1321,7 +1339,7 @@ classdef SRNNModel2 < handle
             obj.plot_data = [];
             obj.lya_results = [];
             obj.has_run = false;
-            fprintf('Results cleared.\n');
+            vprintf(obj.verbose, 'verbose', 'Results cleared.\n');
         end
         
         function reset(obj)
@@ -1340,7 +1358,7 @@ classdef SRNNModel2 < handle
             obj.S0 = [];
             obj.cached_params = [];
             obj.clear_results();
-            fprintf('Model reset. Modify parameters and call build() to reinitialize.\n');
+            vprintf(obj.verbose, 'verbose', 'Model reset. Modify parameters and call build() to reinitialize.\n');
         end
         
         function dS_dt = dynamics(obj, t, S)
@@ -1441,7 +1459,7 @@ classdef SRNNModel2 < handle
             
             % Report info
             W_eigs_scaled = eig(obj.W);
-            fprintf('W matrix created: spectral radius = %.3f, abscissa = %.3f, theoretical R = %.3f\n', ...
+            vprintf(obj.verbose, 'verbose', 'W matrix created: spectral radius = %.3f, abscissa = %.3f, theoretical R = %.3f\n', ...
                 max(abs(W_eigs_scaled)), max(real(W_eigs_scaled)), obj.R);
 
             % Optional structural check. Relevant at low indegree, where the
@@ -1449,7 +1467,7 @@ classdef SRNNModel2 < handle
             % neuron or two ends up a pure source or sink.
             if obj.check_connectivity
                 [cls, cinfo] = obj.checkConnectivityClass();
-                fprintf(['W connectivity: %s (%d SCC, largest %.0f%% of nodes; ' ...
+                vprintf(obj.verbose, 'verbose', ['W connectivity: %s (%d SCC, largest %.0f%% of nodes; ' ...
                          '%d source / %d sink; P(strong) ~ %.2f for n = %d, ' ...
                          'indegree = %g)\n'], ...
                     cls, cinfo.n_scc, 100*cinfo.largest_scc_frac, ...
@@ -1464,7 +1482,7 @@ classdef SRNNModel2 < handle
                     scc_str = sprintf('%s ... (%d more)', scc_str, ...
                         numel(cinfo.scc_sizes) - n_show);
                 end
-                fprintf('  SCC sizes: %s\n', scc_str);
+                vprintf(obj.verbose, 'verbose', '  SCC sizes: %s\n', scc_str);
             end
 
             % Per-neuron nonlinearity setpoints. Drawn here, after W, so the
@@ -1538,7 +1556,7 @@ classdef SRNNModel2 < handle
             vals(obj.I_indices) = mu_I + sigma_I * z(obj.I_indices);
             obj.S_c_vec = vals;
 
-            fprintf(['Per-neuron S_c drawn (seed %g): E %.4f +/- %.4f, ' ...
+            vprintf(obj.verbose, 'verbose', ['Per-neuron S_c drawn (seed %g): E %.4f +/- %.4f, ' ...
                 'I %.4f +/- %.4f\n'], seed, mu_E, sigma_E, mu_I, sigma_I);
         end
 
@@ -1575,7 +1593,7 @@ classdef SRNNModel2 < handle
             obj.cached_params = obj.get_params();
             
             obj.is_built = true;
-            fprintf('Model built successfully. Ready to run.\n');
+            vprintf(obj.verbose, 'verbose', 'Model built successfully. Ready to run.\n');
         end
     end
     
@@ -1798,7 +1816,7 @@ classdef SRNNModel2 < handle
             % Apply scaling
             obj.u_ex = obj.u_ex .* obj.u_ex_scale;
             
-            fprintf('External stimulus generated: %d time points, %d neurons\n', length(obj.t_ex), obj.n);
+            vprintf(obj.verbose, 'verbose', 'External stimulus generated: %d time points, %d neurons\n', length(obj.t_ex), obj.n);
         end
         
         function decimate_and_unpack(obj)
@@ -2439,13 +2457,14 @@ classdef SRNNModel2 < handle
         % =====================================================================
         % Internalized from ConnectivityAdaptation to avoid path conflicts.
         
-        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs_func, lya_K, topk_seed)
+        function lya_results = compute_lyapunov_exponents_internal(Lya_method, S_out, t_out, dt, fs, T_interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs_func, lya_K, topk_seed, verbose)
             % Compute Lyapunov exponents using the Benettin, QR or top-K method.
             % Internalized from ConnectivityAdaptation/src/algorithms/Lyapunov/compute_lyapunov_exponents.m
             % 'topk' is the K = lya_K largest exponents by the discrete QR
             % method on the stored trajectory (shared core lyapunov_topk).
             if nargin < 13 || isempty(lya_K); lya_K = 10; end
             if nargin < 14 || isempty(topk_seed); topk_seed = 424243; end
+            if nargin < 15 || isempty(verbose); verbose = 'minimal'; end
 
             lya_results = struct();
 
@@ -2463,23 +2482,23 @@ classdef SRNNModel2 < handle
                     if K == 0; K = params.N_sys_eqs; end
                     lya_results = lyapunov_topk(S_out, t_out, fs, lya_dt, T_interval, lya_warmup, K, ...
                         @(S, p) SRNNModel2.compute_Jacobian_fast(S, p), params, ...
-                        struct('seed', topk_seed, 'err_id_prefix', 'SRNNModel', ...
+                        struct('seed', topk_seed, 'err_id_prefix', 'SRNNModel', 'verbose', verbose_level(verbose) >= 2, ...
                                'grid_fn', @(t, d, dec, tau, iv, w) SRNNModel2.lyapunov_sample_grid(t, d, dec, tau, iv, w, 'SRNNModel')));
                     lya_results.params.N_sys_eqs = params.N_sys_eqs;
                     if lya_results.D_KY_resolved
-                        fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...
+                        vprintf(verbose, 'verbose', 'Top-%d Lyapunov: lambda_1 = %+.4f, h_KS = %.3f bit/s, D_KY = %.2f (%d positive; %.1f s)\n', ...
                             K, lya_results.LLE, lya_results.h_KS_bits, lya_results.D_KY, lya_results.n_positive, lya_results.seconds);
                     else
-                        fprintf('Top-%d Lyapunov: lambda_1 = %+.4f, h_KS >= %.3f bit/s, D_KY unresolved within K (%d positive; %.1f s)\n', ...
+                        vprintf(verbose, 'verbose', 'Top-%d Lyapunov: lambda_1 = %+.4f, h_KS >= %.3f bit/s, D_KY unresolved within K (%d positive; %.1f s)\n', ...
                             K, lya_results.LLE, lya_results.h_KS_bits, lya_results.n_positive, lya_results.seconds);
                     end
 
                 case 'benettin'
-                    fprintf('Computing largest Lyapunov exponent using Benettin''s algorithm...\n');
+                    vprintf(verbose, 'verbose', 'Computing largest Lyapunov exponent using Benettin''s algorithm...\n');
                     d0 = 1e-3;
-                    tic
+                    t_lya0 = tic;
                     [LLE, local_lya, finite_lya, t_lya] = SRNNModel2.benettin_algorithm_internal(S_out, t_out, dt, fs, d0, T_interval, lya_dt, lya_warmup, opts, rhs_func, ode_solver);
-                    toc
+                    vprintf(verbose, 'verbose', 'Elapsed time is %.3f seconds.\n', toc(t_lya0));
                     lya_results.LLE = LLE;
                     lya_results.local_lya = local_lya;
                     lya_results.finite_lya = finite_lya;
@@ -2488,12 +2507,12 @@ classdef SRNNModel2 < handle
                     lya_results.lya_fs = lya_fs;
                     
                 case 'qr'
-                    fprintf('Computing full Lyapunov spectrum using QR decomposition method...\n');
-                    tic
+                    vprintf(verbose, 'verbose', 'Computing full Lyapunov spectrum using QR decomposition method...\n');
+                    t_lya0 = tic;
                     jacobian_wrapper = @(tt, S, p) SRNNModel2.compute_Jacobian_fast(S, p);
                     [LE_spectrum, local_LE_spectrum_t, finite_LE_spectrum_t, t_lya] = SRNNModel2.lyapunov_spectrum_qr_internal(S_out, t_out, lya_dt, params, ode_solver, opts, jacobian_wrapper, T_interval, lya_warmup, params.N_sys_eqs, fs);
-                    toc
-                    fprintf('Lyapunov Dimension: %.2f\n', SRNNModel2.compute_kaplan_yorke_dimension_internal(LE_spectrum));
+                    vprintf(verbose, 'verbose', 'Elapsed time is %.3f seconds.\n', toc(t_lya0));
+                    vprintf(verbose, 'verbose', 'Lyapunov Dimension: %.2f\n', SRNNModel2.compute_kaplan_yorke_dimension_internal(LE_spectrum));
                     lya_results.LE_spectrum = LE_spectrum;
                     lya_results.local_LE_spectrum_t = local_LE_spectrum_t;
                     lya_results.finite_LE_spectrum_t = finite_LE_spectrum_t;
@@ -2507,7 +2526,7 @@ classdef SRNNModel2 < handle
                     lya_results.sort_idx = sort_idx;
                     lya_results.lya_dt = lya_dt;
                     lya_results.lya_fs = lya_fs;
-                    fprintf('Largest Lyapunov Exponent (sorted): %.4f\n', lya_results.LE_spectrum(1));
+                    vprintf(verbose, 'verbose', 'Largest Lyapunov Exponent (sorted): %.4f\n', lya_results.LE_spectrum(1));
                     
                 otherwise
                     error('Unknown Lyapunov method: %s', Lya_method);

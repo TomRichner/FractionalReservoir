@@ -47,13 +47,14 @@ arguments
     opts.save_figs    (1,1) logical = true
     opts.output_dir   (1,:) char    = ''
     opts.assemble     (1,1) logical = true
-    opts.verbose      (1,1) logical = true
+    opts.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
 end
 
 setup_paths();
+opts.verbose = verbose_name(opts.verbose);
 
-fprintf('=== Starting All Analyses ===\n');
-fprintf('Start time: %s\n\n', datetime('now'));
+vprintf(opts.verbose, 'verbose', '=== Starting All Analyses ===\n');
+vprintf(opts.verbose, 'verbose', 'Start time: %s\n\n', datetime('now'));
 t_start = tic;
 
 %% Output directory
@@ -72,7 +73,7 @@ end
 if ~exist(run_dir, 'dir')
     mkdir(run_dir);
 end
-fprintf('Master output directory: %s\n\n', run_dir);
+vprintf(opts.verbose, 'verbose', 'Master output directory: %s\n\n', run_dir);
 
 prov = capture_git_provenance(run_dir, project_root);
 
@@ -82,11 +83,11 @@ prov = capture_git_provenance(run_dir, project_root);
 % only so the manifest can record the class and the conditions before any
 % compute starts.
 [preset_defaults, model_class, conditions] = srnn_param_preset(preset_name);
-fprintf('Parameter preset: %s (%d override(s)) on %s\n', ...
+vprintf(opts.verbose, 'verbose', 'Parameter preset: %s (%d override(s)) on %s\n', ...
     preset_name, numel(fieldnames(preset_defaults)), model_class);
-fprintf('Conditions: %s\n', ...
+vprintf(opts.verbose, 'verbose', 'Conditions: %s\n', ...
     strjoin(cellfun(@(c) c.name, conditions, 'UniformOutput', false), ', '));
-fprintf('Run mode: %s\n\n', run_mode);
+vprintf(opts.verbose, 'verbose', 'Run mode: %s\n\n', run_mode);
 
 save_manifest(run_dir, preset_name, preset_defaults, model_class, run_mode, ...
     opts.save_figs, prov, dt_str);
@@ -97,9 +98,9 @@ ctx_args = {'preset_name', preset_name, 'run_mode', run_mode, ...
             'verbose', opts.verbose};
 
 %% 1. Sensitivity
-fprintf('========================================\n');
-fprintf('[1/3] Running Sensitivity Analysis...\n');
-fprintf('========================================\n');
+vprintf(opts.verbose, 'verbose', '========================================\n');
+vprintf(opts.verbose, 'minimal', '[1/3] Running Sensitivity Analysis...\n');
+vprintf(opts.verbose, 'verbose', '========================================\n');
 % A fresh pool before each stage. The three analyses run back to back for hours
 % against one pool otherwise; see restart_parpool for why that is worth
 % avoiding and for what is and is not established about the aug_13 failure.
@@ -120,9 +121,9 @@ run_sensitivity_analysis(resolve_run_context('sensitivity', ctx_args{:}));
 % alphabetically -- f_E, level_of_chaos, mu_EE, mu_EI, mu_IE, mu_II, n -- buries
 % both questions.
 if opts.assemble && opts.save_figs
-    fprintf('========================================\n');
-    fprintf('Assembling 1D sensitivity figures...\n');
-    fprintf('========================================\n');
+    vprintf(opts.verbose, 'verbose', '========================================\n');
+    vprintf(opts.verbose, 'verbose', 'Assembling 1D sensitivity figures...\n');
+    vprintf(opts.verbose, 'verbose', '========================================\n');
     sens_replot_dir = replot_sensitivity(run_dir);
 
     if strcmp(model_class, 'SRNNCellTypePairs')
@@ -144,16 +145,16 @@ if opts.assemble && opts.save_figs
 end
 
 %% 2. Tau sensitivity
-fprintf('========================================\n');
-fprintf('[2/3] Running Tau Sensitivity Analysis...\n');
-fprintf('========================================\n');
+vprintf(opts.verbose, 'verbose', '========================================\n');
+vprintf(opts.verbose, 'minimal', '[2/3] Running Tau Sensitivity Analysis...\n');
+vprintf(opts.verbose, 'verbose', '========================================\n');
 restart_parpool();
 run_tau_sensitivity_analysis(resolve_run_context('tau_sensitivity', ctx_args{:}));
 
 %% 3. Parameter space
-fprintf('========================================\n');
-fprintf('[3/3] Running Parameter Space Analysis...\n');
-fprintf('========================================\n');
+vprintf(opts.verbose, 'verbose', '========================================\n');
+vprintf(opts.verbose, 'minimal', '[3/3] Running Parameter Space Analysis...\n');
+vprintf(opts.verbose, 'verbose', '========================================\n');
 restart_parpool();
 run_param_space_analysis(resolve_run_context('param_space', ctx_args{:}));
 
@@ -168,19 +169,19 @@ run_param_space_analysis(resolve_run_context('param_space', ctx_args{:}));
 % completed overnight run says.
 try
     params_md = write_run_parameters_md(run_dir);
-    fprintf('Parameter record: %s\n', params_md);
+    vprintf(opts.verbose, 'verbose', 'Parameter record: %s\n', params_md);
 catch ME
     warning('run_all_analyses:ParametersMdFailed', ...
         'Could not write parameters.md: %s', ME.message);
 end
 
 %% Summary
-fprintf('========================================\n');
-fprintf('=== All Analyses Complete ===\n');
-fprintf('Total runtime: %.2f minutes\n', toc(t_start)/60);
-fprintf('End time: %s\n', datetime('now'));
-fprintf('Output: %s\n', run_dir);
-fprintf('========================================\n');
+vprintf(opts.verbose, 'verbose', '========================================\n');
+vprintf(opts.verbose, 'verbose', '=== All Analyses Complete ===\n');
+vprintf(opts.verbose, 'verbose', 'Total runtime: %.2f minutes\n', toc(t_start)/60);
+vprintf(opts.verbose, 'verbose', 'End time: %s\n', datetime('now'));
+vprintf(opts.verbose, 'verbose', 'Output: %s\n', run_dir);
+vprintf(opts.verbose, 'verbose', '========================================\n');
 end
 
 %% ------------------------------------------------------------------------

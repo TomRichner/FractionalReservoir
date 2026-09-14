@@ -29,6 +29,7 @@ function out = fig_energy_landscape(cfg)
 % See also: fig_introductory_concepts
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.gammas      (1,:) double  = [0.9, 1.6, 2.5]
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true

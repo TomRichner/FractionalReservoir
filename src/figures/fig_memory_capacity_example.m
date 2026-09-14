@@ -24,6 +24,7 @@ function out = fig_memory_capacity_example(cfg)
 % See also: run_memory_capacity_example, fig_memory_capacity, manuscript_style
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.data_file   (1,:) char    = ''    % '' -> search run_dir, then data/mc_example
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true

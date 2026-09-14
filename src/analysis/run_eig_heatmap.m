@@ -44,6 +44,7 @@ arguments
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.run_mode    (1,:) char    = 'production'
     cfg.out_dir     (1,:) char    = ''
+    cfg.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     cfg.n_samples   (1,1) double  = 0      % 0 -> per run_mode
     cfg.use_parallel (1,1) logical = true
 end
@@ -95,7 +96,7 @@ lya_T_interval = [T_range(2) - lle_window, T_range(2)];
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 titles     = cellfun(@(n) pretty(n), cond_names, 'UniformOutput', false);
 
-fprintf('[eig_heatmap] preset=%s run_mode=%s T=%g s n_samples=%d\n', ...
+vprintf(cfg.verbose, 'minimal', '[eig_heatmap] preset=%s run_mode=%s T=%g s n_samples=%d\n', ...
     cfg.preset_name, cfg.run_mode, T_range(2), n_samples);
 
 n_cond        = numel(cond_names);
@@ -107,8 +108,8 @@ spec_abscissa_by_cond = cell(1, n_cond);   % max real eig(J) per sampled state
 J_times_by_cond       = cell(1, n_cond);
 
 for i = 1:n_cond
-    fprintf('\n=== %d/%d %s ===\n', i, n_cond, titles{i});
-    model = build_from_preset(cfg.preset_name, cond_names{i}, ...
+    vprintf(cfg.verbose, 'verbose', '\n=== %d/%d %s ===\n', i, n_cond, titles{i});
+    model = build_from_preset(cfg.preset_name, cond_names{i}, 'verbose', cfg.verbose, ...
         'T_range',          T_range, ...
         'fs',               fs, ...
         'rng_seeds',        [1 2], ...      % same W across conditions
@@ -127,7 +128,7 @@ for i = 1:n_cond
     J_times = linspace(t_start, t_end, n_samples);
     [evals_by_cond{i}, num_abscissa_by_cond{i}, spec_abscissa_by_cond{i}, J_times_by_cond{i}] = ...
         sample_eigenvalues(model, J_times, cfg.use_parallel);
-    fprintf('  LLE = %+.4f | %d eigenvalues pooled | numerical abscissa median %+.3f (spectral %+.3f)\n', ...
+    vprintf(cfg.verbose, 'minimal', '  %-14s LLE = %+.4f | %d eigenvalues pooled | numerical abscissa median %+.3f (spectral %+.3f)\n', ...
         lle_by_cond(i), numel(evals_by_cond{i}), ...
         median(num_abscissa_by_cond{i}), median(spec_abscissa_by_cond{i}));
 end
@@ -143,7 +144,7 @@ mat_file = fullfile(out_dir, 'eig_heatmap_data.mat');
 save(mat_file, 'evals_by_cond', 'condition_titles', 'cond_names', ...
     'lle_by_cond', 'lya_by_cond', 'num_abscissa_by_cond', 'spec_abscissa_by_cond', ...
     'J_times_by_cond', 'lle_window', 'lya_T_interval', 'settings', '-v7.3');
-fprintf('\nSaved: %s\n', mat_file);
+vprintf(cfg.verbose, 'minimal', '[eig_heatmap] saved %s\n', mat_file);
 end
 
 %% ------------------------------------------------------------------------

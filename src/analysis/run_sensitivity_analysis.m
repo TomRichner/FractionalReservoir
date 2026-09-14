@@ -62,8 +62,8 @@ if strcmp(ctx.model_class, 'SRNNCellTypePairs')
     mu_ranges = mu_block_from_preset(ctx.preset_defaults);
     for b_idx = 1:size(mu_ranges, 1)
         params_to_sweep(end+1, :) = mu_ranges(b_idx, :); %#ok<AGROW>
-        if ctx.verbose
-            fprintf('[sensitivity] %s sweeping [%+g %+g]\n', ...
+        if verbose_level(ctx.verbose) >= 2
+            vprintf(ctx.verbose, 'verbose', '[sensitivity] %s sweeping [%+g %+g]\n', ...
                 mu_ranges{b_idx, 1}, mu_ranges{b_idx, 2}(1), mu_ranges{b_idx, 2}(2));
         end
     end
@@ -77,10 +77,10 @@ for p_idx = 1:n_params
     param_name  = params_to_sweep{p_idx, 1};
     param_range = params_to_sweep{p_idx, 2};
 
-    fprintf('\n========================================\n');
-    fprintf('=== Sensitivity: %s [%.3g, %.3g] (%d/%d) ===\n', ...
+    vprintf(ctx.verbose, 'verbose', '\n========================================\n');
+    vprintf(ctx.verbose, 'minimal', '=== Sensitivity: %s [%.3g, %.3g] (%d/%d) ===\n', ...
         param_name, param_range(1), param_range(2), p_idx, n_params);
-    fprintf('========================================\n');
+    vprintf(ctx.verbose, 'verbose', '========================================\n');
 
     psa = ParamSpaceAnalysis2( ...
         'n_levels', ctx.n_levels, ...
@@ -139,15 +139,15 @@ for p_idx = 1:n_params
         fig_dir = fullfile(psa.output_dir, 'figures');
         save_some_figs_to_folder_2(fig_dir, ...
             sprintf('sensitivity_%s', param_name), [], {'fig', 'png'});
-        fprintf('Figures saved to %s\n', fig_dir);
+        vprintf(ctx.verbose, 'verbose', 'Figures saved to %s\n', fig_dir);
     end
     close all;
 end
 
 %% Summary
-fprintf('\n=== Sensitivity Analysis Complete ===\n');
-fprintf('Parameters analyzed:\n');
+vprintf(ctx.verbose, 'verbose', '\n=== Sensitivity Analysis Complete ===\n');
+vprintf(ctx.verbose, 'verbose', 'Parameters analyzed:\n');
 for p_idx = 1:n_params
-    fprintf('  %s: %s\n', params_to_sweep{p_idx, 1}, out_dirs{p_idx});
+    vprintf(ctx.verbose, 'verbose', '  %s: %s\n', params_to_sweep{p_idx, 1}, out_dirs{p_idx});
 end
 end

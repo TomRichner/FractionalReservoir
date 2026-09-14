@@ -27,6 +27,7 @@ function out = fig_transient_gain(cfg)
 %           fig_transient_amplification, SRNNCellTypePairs.transient_gain
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
@@ -107,13 +108,13 @@ title(tl, sprintf('Transient gain of a dendritic perturbation, n = %d, T = %g s,
     R(1).n, D.settings.T, D.settings.n_seeds, D.settings.horizon_s), ...
     'FontWeight', 'normal', 'FontSize', 11);
 hdr = '| Condition | Propagator | G_max | t_peak (s) | frac_E(v_opt) | participation | cos(v_opt, v_lyap) |';
-fprintf('%s\n|---|---|---|---|---|---|---|\n', hdr);
-fprintf('%s\n', rows{:});
+vprintf(cfg.verbose, 'verbose', '%s\n|---|---|---|---|---|---|---|\n', hdr);
+vprintf(cfg.verbose, 'verbose', '%s\n', rows{:});
 % The frozen operating point against the trajectory's own rate.
 hdr2 = '| Condition | lambda_1 (trajectory) | alpha(J_xx) at state | omega(J_xx) at state | alpha(J) at state |';
 rows2 = arrayfun(@(r) op_row(r), R, 'UniformOutput', false);
-fprintf('\n%s\n|---|---|---|---|---|\n', hdr2);
-fprintf('%s\n', rows2{:});
+vprintf(cfg.verbose, 'verbose', '\n%s\n|---|---|---|---|---|\n', hdr2);
+vprintf(cfg.verbose, 'verbose', '%s\n', rows2{:});
 
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 

@@ -21,6 +21,7 @@ function out = fig_memory_capacity(cfg)
 % See also: run_memory_capacity, plot_memory_capacity, plot_memory_capacity_combined
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.mat_file    (1,:) char    = ''
     cfg.run_dir     (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
@@ -43,7 +44,7 @@ mat_file = resolve_data_file(cfg.mat_file, cfg.run_dir, ...
     {fullfile(cfg.run_dir, 'memory_capacity')}, ...
     '*_results.mat', ...
     'Run run_memory_capacity first');
-fprintf('[fig_memory_capacity] source: %s\n', mat_file);
+vprintf(cfg.verbose, 'verbose', '[fig_memory_capacity] source: %s\n', mat_file);
 
 %% Reference figures (shown, not saved)
 % Fig1 (total-MC + horizon distributions) and Fig2 (per-delay + cumulative) are

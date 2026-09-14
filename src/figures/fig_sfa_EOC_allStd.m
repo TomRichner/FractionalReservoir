@@ -19,6 +19,7 @@ function out = fig_sfa_EOC_allStd(cfg)
 % See also: resolve_run_dir, ParamSpaceAnalysis2/plot_sensitivity, paper_config
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''

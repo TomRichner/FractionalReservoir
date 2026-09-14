@@ -71,7 +71,13 @@ classdef ParamSpaceAnalysis2 < handle
         % duck-typed rather than sharing a hierarchy.
         model_class = 'SRNNModel2'  % e.g. 'SRNNModel2' | 'SRNNCellTypePairs'
         model_defaults = struct()   % Default properties of model_class
-        verbose = true              % Print progress during execution
+        % Verbosity: 'verbose' | 'minimal' (default) | 'near-none'. See verbose_level.
+        % A logical still works (true -> 'verbose', false -> 'minimal'), which is
+        % how psa_object.mat files saved before 2026-09-14 load. 'minimal' prints
+        % one line at run start, one per batch and one at the end; 'verbose' is
+        % the per-parameter, per-job output; 'near-none' start and end only.
+        % The level rides into every model built by run_single_job.
+        verbose = 'minimal'
     end
 
     %% Execution Properties
@@ -100,6 +106,11 @@ classdef ParamSpaceAnalysis2 < handle
 
     %% Constructor
     methods
+        function set.verbose(obj, v)
+            % Accept the three chars or a logical; store the canonical char.
+            obj.verbose = verbose_name(v);
+        end
+
         function obj = ParamSpaceAnalysis2(varargin)
             % PARAMSPACEANALYSIS Constructor with name-value pairs
             %
@@ -171,7 +182,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(obj.explicit_vectors, param_name)
                     obj.explicit_vectors = rmfield(obj.explicit_vectors, param_name);
                 end
-                if obj.verbose
+                if verbose_level(obj.verbose) >= 2
                     fprintf('Added grid parameter: %s, range: [%.3g, %.3g] (n_levels=%d)\n', ...
                         param_name, param_range(1), param_range(2), obj.n_levels);
                 end
@@ -182,7 +193,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(obj.param_ranges, param_name)
                     obj.param_ranges = rmfield(obj.param_ranges, param_name);
                 end
-                if obj.verbose
+                if verbose_level(obj.verbose) >= 2
                     fprintf('Added grid parameter: %s, explicit vector with %d values\n', ...
                         param_name, length(param_range));
                 end
@@ -198,7 +209,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(obj.param_ranges, param_name)
                     obj.param_ranges = rmfield(obj.param_ranges, param_name);
                 end
-                if obj.verbose
+                if verbose_level(obj.verbose) >= 2
                     fprintf('Removed grid parameter: %s\n', param_name);
                 end
             else
@@ -273,7 +284,7 @@ classdef ParamSpaceAnalysis2 < handle
                 obj.explicit_vectors = rmfield(obj.explicit_vectors, param_name);
             end
 
-            if obj.verbose
+            if verbose_level(obj.verbose) >= 2
                 fprintf('Added vector parameter: %s, vary_%s [%.3g, %.3g], %d elements, %s spacing, %s level_spacing\n', ...
                     param_name, vpc.vary_element, vpc.vary_range(1), vpc.vary_range(2), ...
                     vpc.n_elements, vpc.spacing, vpc.level_spacing);
@@ -290,7 +301,7 @@ classdef ParamSpaceAnalysis2 < handle
             %   })
 
             obj.conditions = conditions_cell;
-            if obj.verbose
+            if verbose_level(obj.verbose) >= 2
                 fprintf('Set %d custom conditions\n', length(conditions_cell));
             end
         end
@@ -413,6 +424,8 @@ classdef ParamSpaceAnalysis2 < handle
 
             excluded = ParamSpaceAnalysis2.per_job_param_names( ...
                 obj.grid_params, obj.condition_set_fields());
+            % The console verbosity is not physics: it never enters the record.
+            excluded = [excluded, {'verbose'}];
 
             model_args = {};
             default_fields = fieldnames(obj.model_defaults);
@@ -441,7 +454,7 @@ classdef ParamSpaceAnalysis2 < handle
             % value for every axis, and each sweep varies a different subset, so
             % this situation is normal. Printing it once keeps the fact visible
             % without the alarm fatigue a per-field warning would cause.
-            if ~obj.verbose; return; end
+            if verbose_level(obj.verbose) < 2; return; end
             shadowed = intersect(fieldnames(obj.model_defaults), obj.grid_params);
             if ~isempty(shadowed)
                 shadowed = sort(shadowed);
@@ -708,17 +721,20 @@ classdef ParamSpaceAnalysis2 < handle
             % saved run describes itself without a reader re-deriving it.
             obj.resolve_model_defaults();
 
-            % Print summary
-            fprintf('\n========================================\n');
-            fprintf('=== SRNN Parameter Space Analysis ===\n');
-            fprintf('========================================\n');
-            fprintf('Grid parameters: %s\n', strjoin(obj.grid_params, ', '));
-            fprintf('Levels per parameter: %d\n', obj.n_levels);
-            fprintf('Total grid combinations: %d\n', obj.num_combinations);
-            fprintf('Conditions: %s\n', strjoin(cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false), ', '));
-            fprintf('Batch size: %d\n', obj.batch_size);
-            fprintf('Output directory: %s\n', obj.output_dir);
-            fprintf('========================================\n\n');
+            % Print summary: one line at 'minimal', the banner at 'verbose'
+            vprintf(obj.verbose, 'minimal', '[psa] %s: %d combinations x %d conditions, batch %d -> %s\n', ...
+                strjoin(obj.grid_params, ','), obj.num_combinations, numel(obj.conditions), ...
+                obj.batch_size, obj.output_dir);
+            vprintf(obj.verbose, 'verbose', '\n========================================\n');
+            vprintf(obj.verbose, 'verbose', '=== SRNN Parameter Space Analysis ===\n');
+            vprintf(obj.verbose, 'verbose', '========================================\n');
+            vprintf(obj.verbose, 'verbose', 'Grid parameters: %s\n', strjoin(obj.grid_params, ', '));
+            vprintf(obj.verbose, 'verbose', 'Levels per parameter: %d\n', obj.n_levels);
+            vprintf(obj.verbose, 'verbose', 'Total grid combinations: %d\n', obj.num_combinations);
+            vprintf(obj.verbose, 'verbose', 'Conditions: %s\n', strjoin(cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false), ', '));
+            vprintf(obj.verbose, 'verbose', 'Batch size: %d\n', obj.batch_size);
+            vprintf(obj.verbose, 'verbose', 'Output directory: %s\n', obj.output_dir);
+            vprintf(obj.verbose, 'verbose', '========================================\n\n');
 
             % Create temp directory for batch results
             temp_dir = fullfile(obj.output_dir, 'temp_batches');
@@ -750,10 +766,10 @@ classdef ParamSpaceAnalysis2 < handle
             obj.consolidate(temp_dir);
 
             overall_elapsed = toc(overall_start);
-            fprintf('\n========================================\n');
-            fprintf('=== Analysis Complete ===\n');
-            fprintf('Total time: %.2f hours\n', overall_elapsed/3600);
-            fprintf('========================================\n');
+            vprintf(obj.verbose, 'verbose', '\n========================================\n');
+            vprintf(obj.verbose, 'verbose', '=== Analysis Complete ===\n');
+            vprintf(obj.verbose, 'minimal', '[psa] complete in %.2f h -> %s\n', overall_elapsed/3600, obj.output_dir);
+            vprintf(obj.verbose, 'verbose', '========================================\n');
 
             obj.has_run = true;
 
@@ -1283,7 +1299,7 @@ classdef ParamSpaceAnalysis2 < handle
             end
 
             if has_f_variation
-                fprintf('Coloring by %s value: [%.3f, %.3f]\n', color_by, f_min, f_max);
+                vprintf(obj.verbose, 'verbose', 'Coloring by %s value: [%.3f, %.3f]\n', color_by, f_min, f_max);
             end
 
             cmap_f = blue_gray_red_colormap(256);
@@ -1376,7 +1392,7 @@ classdef ParamSpaceAnalysis2 < handle
                 pbaspect(ax_cb, [0.1 1 1]);
             end
 
-            fprintf('Unit histograms generated.\n');
+            vprintf(obj.verbose, 'verbose', 'Unit histograms generated.\n');
         end
 
         function [fig, p_values] = plot_lle_by_stim_period(obj, varargin)
@@ -1696,7 +1712,7 @@ classdef ParamSpaceAnalysis2 < handle
             end
 
             % Print stats
-            fprintf('\n=== Statistical Analysis: Stim vs No-Stim ===\n');
+            vprintf(obj.verbose, 'verbose', '\n=== Statistical Analysis: Stim vs No-Stim ===\n');
             for c_idx = 1:num_conditions
                 cond_name = cond_names{c_idx};
                 means_matrix = all_means{c_idx};
@@ -1719,12 +1735,12 @@ classdef ParamSpaceAnalysis2 < handle
                     differences = stim_valid - no_stim_valid;
                     cohens_d = mean(differences) / std(differences);
 
-                    fprintf('%s (n=%d pairs):\n', display_name, n_pairs);
-                    fprintf('  p-value: %.4g, Cohen''s d: %.4f\n', p_value, cohens_d);
-                    fprintf('  Median diff (stim-nostim): %.4f\n', ...
+                    vprintf(obj.verbose, 'verbose', '%s (n=%d pairs):\n', display_name, n_pairs);
+                    vprintf(obj.verbose, 'verbose', '  p-value: %.4g, Cohen''s d: %.4f\n', p_value, cohens_d);
+                    vprintf(obj.verbose, 'verbose', '  Median diff (stim-nostim): %.4f\n', ...
                         median(stim_valid) - median(no_stim_valid));
                 else
-                    fprintf('%s: Insufficient pairs (n=%d)\n', display_name, n_pairs);
+                    vprintf(obj.verbose, 'verbose', '%s: Insufficient pairs (n=%d)\n', display_name, n_pairs);
                 end
             end
         end
@@ -1754,7 +1770,7 @@ classdef ParamSpaceAnalysis2 < handle
                 if exist(results_file, 'file')
                     loaded = load(results_file, 'results');
                     obj.results.(cond_name) = loaded.results;
-                    if obj.verbose
+                    if verbose_level(obj.verbose) >= 2
                         fprintf('Loaded %d results for condition: %s\n', ...
                             length(loaded.results), cond_name);
                     end
@@ -1814,11 +1830,11 @@ classdef ParamSpaceAnalysis2 < handle
                          'consolidating a blank object.'], obj.output_dir);
                 end
 
-                fprintf('Consolidating results from %s...\n', temp_dir);
+                vprintf(obj.verbose, 'verbose', 'Consolidating results from %s...\n', temp_dir);
             end
 
             %% Core consolidation logic
-            fprintf('\nConsolidating batch results...\n');
+            vprintf(obj.verbose, 'verbose', '\nConsolidating batch results...\n');
 
             % Batch count must match run_batched_simulation's, which batches
             % over shuffled_indices. That field is persisted by saveobj/loadobj,
@@ -1856,7 +1872,7 @@ classdef ParamSpaceAnalysis2 < handle
                         end
                     end
                 else
-                    fprintf('Warning: Batch file %d not found\n', batch_idx);
+                    vprintf(obj.verbose, 'minimal', 'Warning: Batch file %d not found\n', batch_idx);
                     all_found = false;
                 end
             end
@@ -1875,10 +1891,10 @@ classdef ParamSpaceAnalysis2 < handle
                 % grid would read a deliberate 15% subset as an 85% failure rate.
                 n_success = sum(cellfun(@(r) isstruct(r) && isfield(r, 'success') && r.success, results));
                 if n_run < obj.num_combinations
-                    fprintf('Condition %s: %d/%d successful (subset of %d grid points), saved to %s\n', ...
+                    vprintf(obj.verbose, 'verbose', 'Condition %s: %d/%d successful (subset of %d grid points), saved to %s\n', ...
                         cond_name, n_success, n_run, obj.num_combinations, save_file);
                 else
-                    fprintf('Condition %s: %d/%d successful, saved to %s\n', ...
+                    vprintf(obj.verbose, 'verbose', 'Condition %s: %d/%d successful, saved to %s\n', ...
                         cond_name, n_success, n_run, save_file);
                 end
             end
@@ -1886,16 +1902,16 @@ classdef ParamSpaceAnalysis2 < handle
             % Clean up temp directory if all successful
             if all_found
                 rmdir(temp_dir, 's');
-                fprintf('Temp directory cleaned up.\n');
+                vprintf(obj.verbose, 'verbose', 'Temp directory cleaned up.\n');
             else
-                fprintf('Temp directory retained due to missing batches.\n');
+                vprintf(obj.verbose, 'verbose', 'Temp directory retained due to missing batches.\n');
             end
 
             %% Finalize for standalone calls
             if standalone_call
                 obj.save_summary();
                 obj.has_run = true;
-                fprintf('Consolidation complete. Results available in psa.results\n');
+                vprintf(obj.verbose, 'verbose', 'Consolidation complete. Results available in psa.results\n');
             end
         end
 
@@ -2017,7 +2033,7 @@ classdef ParamSpaceAnalysis2 < handle
             % An interrupted run: the early object has the configuration, the
             % batches have whatever finished.
             if exist(fullfile(results_dir, 'temp_batches'), 'dir')
-                fprintf(['[from_dir] temp_batches/ present -- consolidating an ' ...
+                vprintf(psa.verbose, 'minimal', ['[from_dir] temp_batches/ present -- consolidating an ' ...
                     'interrupted run.\n']);
                 psa.consolidate();
                 return;
@@ -2126,7 +2142,7 @@ classdef ParamSpaceAnalysis2 < handle
             % script/config.
             ignore = {'rng_seeds', 'reps', 'store_full_state', ...
                 'store_decimated_state', 'plot_deci', 'plot_freq', ...
-                'T_plot', 'check_connectivity'};
+                'T_plot', 'check_connectivity', 'verbose'};
 
             tf = false;
             fa = setdiff(fieldnames(a), ignore);
@@ -2390,7 +2406,9 @@ classdef ParamSpaceAnalysis2 < handle
                     end
                 end
 
-                % Create and run model
+                % Create and run model. The verbosity level rides with the model so
+                % a quiet sweep builds quiet models inside the workers.
+                model_args = [model_args, {'verbose', verbose_local}];
                 model = feval(model_class_local, model_args{:});
                 model.build();
                 model.run();
@@ -2473,8 +2491,8 @@ classdef ParamSpaceAnalysis2 < handle
                 result.mean_rate = NaN;
                 result.mean_synaptic_output = NaN;
 
-                if verbose_local
-                    fprintf('  ERROR config %d: %s\n', job.config_idx, ME.message);
+                if verbose_level(verbose_local) >= 1
+                    fprintf('  ERROR config %d (%s): %s\n', job.config_idx, job.condition_name, ME.message);
                 end
             end
         end
@@ -2594,10 +2612,10 @@ classdef ParamSpaceAnalysis2 < handle
             if obj.randomize_order
                 rng('shuffle');
                 obj.shuffled_indices = randperm(obj.num_combinations);
-                fprintf('Generated %d parameter combinations (randomized order)\n', obj.num_combinations);
+                vprintf(obj.verbose, 'verbose', 'Generated %d parameter combinations (randomized order)\n', obj.num_combinations);
             else
                 obj.shuffled_indices = 1:obj.num_combinations;
-                fprintf('Generated %d parameter combinations (sequential order)\n', obj.num_combinations);
+                vprintf(obj.verbose, 'verbose', 'Generated %d parameter combinations (sequential order)\n', obj.num_combinations);
             end
 
             % Thin to a random subset, if asked. shuffled_indices is the single
@@ -2634,7 +2652,7 @@ classdef ParamSpaceAnalysis2 < handle
             n_run = min(obj.num_combinations, ...
                 max(1, ceil(obj.subset_fraction * obj.num_combinations)));
             obj.shuffled_indices = obj.shuffled_indices(1:n_run);
-            fprintf(['Subset: running %d of %d combinations (%.1f%% requested, ' ...
+            vprintf(obj.verbose, 'minimal', ['Subset: running %d of %d combinations (%.1f%% requested, ' ...
                 '%.1f%% actual); the rest stay empty.\n'], ...
                 n_run, obj.num_combinations, 100*obj.subset_fraction, ...
                 100*n_run/obj.num_combinations);
@@ -2655,18 +2673,19 @@ classdef ParamSpaceAnalysis2 < handle
             num_conditions = length(conditions_local);
 
             if n_run < obj.num_combinations
-                fprintf('Running %d of %d combinations (subset) in %d batches...\n', ...
+                vprintf(obj.verbose, 'verbose', 'Running %d of %d combinations (subset) in %d batches...\n', ...
                     n_run, obj.num_combinations, num_batches);
             else
-                fprintf('Running %d combinations in %d batches...\n', n_run, num_batches);
+                vprintf(obj.verbose, 'verbose', 'Running %d combinations in %d batches...\n', n_run, num_batches);
             end
+            batches_done = 0; batches_seconds = 0;
 
             for batch_idx = 1:num_batches
                 batch_file = fullfile(temp_dir, sprintf('batch_%d.mat', batch_idx));
 
                 % Skip if batch already completed (resume capability)
                 if exist(batch_file, 'file')
-                    fprintf('Batch %d/%d already completed. Skipping.\n', batch_idx, num_batches);
+                    vprintf(obj.verbose, 'minimal', 'Batch %d/%d already completed. Skipping.\n', batch_idx, num_batches);
                     continue;
                 end
 
@@ -2675,7 +2694,7 @@ classdef ParamSpaceAnalysis2 < handle
                 batch_indices = obj.shuffled_indices(start_idx:end_idx);
                 current_batch_size = length(batch_indices);
 
-                fprintf('\n--- Batch %d/%d (configs %d-%d) ---\n', ...
+                vprintf(obj.verbose, 'verbose', '\n--- Batch %d/%d (configs %d-%d) ---\n', ...
                     batch_idx, num_batches, start_idx, end_idx);
 
                 % Create jobs: each config runs ALL conditions with SAME network seed
@@ -2761,8 +2780,10 @@ classdef ParamSpaceAnalysis2 < handle
 
                 % Count successes
                 n_success = sum(cellfun(@(r) r.success, parallel_results));
-                fprintf('Batch %d completed in %.1f min (%d/%d successful)\n', ...
-                    batch_idx, batch_elapsed/60, n_success, total_jobs);
+                batches_done = batches_done + 1; batches_seconds = batches_seconds + batch_elapsed;
+                eta_min = (num_batches - batch_idx) * batches_seconds / batches_done / 60;
+                vprintf(obj.verbose, 'minimal', '[psa] batch %d/%d done in %.1f min (%d/%d ok), ETA %.0f min\n', ...
+                    batch_idx, num_batches, batch_elapsed/60, n_success, total_jobs, eta_min);
             end
         end
 
@@ -2824,7 +2845,7 @@ classdef ParamSpaceAnalysis2 < handle
             end
 
             save(summary_file, 'summary_data', '-v7.3');
-            fprintf('Summary saved to: %s\n', summary_file);
+            vprintf(obj.verbose, 'verbose', 'Summary saved to: %s\n', summary_file);
         end
     end
 end

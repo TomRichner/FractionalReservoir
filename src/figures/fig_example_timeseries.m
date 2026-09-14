@@ -18,6 +18,7 @@ function out = fig_example_timeseries(cfg)
 % See also: paper_config, srnn_param_preset, SRNNCellTypePairs
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.out_dir     (1,:) char    = ''
     % '' -> the preset's most-adapted regime, resolved by build_from_preset.

@@ -75,7 +75,7 @@ arguments
     opts.run_mode    (1,:) char = 'production'
     opts.output_dir  (1,:) char = ''
     opts.save_figs   (1,1) logical = false
-    opts.verbose     (1,1) logical = true
+    opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
 end
 
 ctx = struct();
@@ -84,7 +84,7 @@ ctx.run_mode    = opts.run_mode;
 ctx.preset_name = opts.preset_name;
 ctx.output_dir  = opts.output_dir;
 ctx.save_figs   = opts.save_figs;
-ctx.verbose     = opts.verbose;
+ctx.verbose     = verbose_name(opts.verbose);
 
 % The preset carries three things, not one: the overrides, the class they are
 % written for, and the conditions. Taking all three from the same call is what
@@ -122,15 +122,16 @@ else
     ctx.f_param = 'f';
 end
 
-if ctx.verbose
+if verbose_level(ctx.verbose) >= 1
     report(ctx);
 end
 end
 
 function report(ctx)
 % One line per run, naming everything that decides what the numbers mean.
+% The first line is the stage's one 'minimal' line; the rest is 'verbose'.
 if isempty(ctx.cfg)
-    fprintf('[%s] run_mode=%s, preset=%s (%s)\n', ...
+    vprintf(ctx.verbose, 'minimal', '[%s] run_mode=%s, preset=%s (%s)\n', ...
         ctx.analysis, ctx.run_mode, ctx.preset_name, ctx.model_class);
     return
 end
@@ -140,16 +141,16 @@ if isfield(ctx, 'n_reps')
 else
     reps_str = '';       % param_space has no reps axis
 end
-fprintf('[%s] run_mode=%s, preset=%s (%s), n_levels=%d%s\n', ...
+vprintf(ctx.verbose, 'minimal', '[%s] run_mode=%s, preset=%s (%s), n_levels=%d%s\n', ...
     ctx.analysis, ctx.run_mode, ctx.preset_name, ctx.model_class, ...
     ctx.n_levels, reps_str);
-fprintf('[%s] ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
+vprintf(ctx.verbose, 'verbose', '[%s] ode_solver=%s, fs=%d, T_range=[%g %g]\n', ...
     ctx.analysis, ctx.cfg.model.ode_solver, ctx.cfg.model.fs, ...
     ctx.cfg.model.T_range(1), ctx.cfg.model.T_range(2));
 if ctx.cfg.is_stochastic
     % Worth its own line: the integrator was chosen by the PRESET's noise, not
     % by the run mode, which is the one place the two knobs are not orthogonal.
-    fprintf('[%s] stochastic: sigma_u_noise=%g, integrator=%s\n', ...
+    vprintf(ctx.verbose, 'verbose', '[%s] stochastic: sigma_u_noise=%g, integrator=%s\n', ...
         ctx.analysis, ctx.preset_defaults.sigma_u_noise, ctx.cfg.model.ode_solver);
 end
 end

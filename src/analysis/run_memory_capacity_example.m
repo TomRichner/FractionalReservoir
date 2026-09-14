@@ -34,7 +34,7 @@ arguments
     opts.preset_name (1,:) char    = 'mc_pairs_dualStd'
     opts.run_mode    (1,:) char    = 'production'
     opts.output_dir  (1,:) char    = ''      % '' -> data/mc_example/
-    opts.verbose     (1,1) logical = true
+    opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     % Empty -> deterministic at sigma = 0, stochastic above it. Name one to
     % force it; 'sra1' is legal at sigma = 0. Same rule as run_memory_capacity.
     opts.ode_solver  (1,:) char    = ''
@@ -85,7 +85,7 @@ sigma_probe = 0;
 if isfield(preset, 'sigma_u_noise'); sigma_probe = preset.sigma_u_noise; end
 check_noise_settings(sigma_probe, solver, 'run_memory_capacity_example');
 
-fprintf('[mc_example] preset=%s run_mode=%s T_train=%gs d_max=%gs solver=%s\n', ...
+vprintf(opts.verbose, 'minimal', '[mc_example] preset=%s run_mode=%s T_train=%gs d_max=%gs solver=%s\n', ...
     opts.preset_name, opts.run_mode, T_train_sec, d_max_sec, solver);
 
 % Nothing stripped from the preset: on SRNNCellTypePairs tau_a is the settable
@@ -128,14 +128,14 @@ MC = zeros(1, n_cond);
 R2 = cell(1, n_cond);
 results = cell(1, n_cond);
 for i = 1:n_cond
-    fprintf('\n===== CONDITION %d/%d: %s =====\n', i, n_cond, condition_names{i});
+    vprintf(opts.verbose, 'verbose', '\n===== CONDITION %d/%d: %s =====\n', i, n_cond, condition_names{i});
     [MC(i), R2{i}, results{i}] = esn{i}.run_memory_capacity( ...
-        'readout_signal', readout_signal, 'verbose', opts.verbose);
+        'readout_signal', readout_signal, 'verbose', verbose_level(opts.verbose) >= 2);
 end
 
-fprintf('\nMemory Capacity:\n');
+vprintf(opts.verbose, 'verbose', '\nMemory Capacity:\n');
 for i = 1:n_cond
-    fprintf('  %-10s MC = %.2f\n', condition_names{i}, MC(i));
+    vprintf(opts.verbose, 'verbose', '  %-10s MC = %.2f\n', condition_names{i}, MC(i));
 end
 
 %% Save only what the figure needs
@@ -164,7 +164,7 @@ if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 mat_file = fullfile(out_dir, 'mc_example_data.mat');
 save(mat_file, 'results', 'MC', 'R2', 'delay_s', 'condition_names', ...
     'base_args', 'condition_args', 'settings');
-fprintf('\nSaved: %s\n', mat_file);
+vprintf(opts.verbose, 'minimal', '[mc_example] saved %s\n', mat_file);
 end
 
 %% ------------------------------------------------------------------------

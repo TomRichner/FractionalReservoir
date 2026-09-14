@@ -53,6 +53,7 @@ arguments
     cfg.preset_name (1,:) char   = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'
     cfg.run_mode    (1,:) char   = 'production'
     cfg.out_dir     (1,:) char   = ''
+    cfg.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     cfg.n_seeds     (1,1) double = 0     % 0 -> per run_mode
     cfg.n_regular   (1,1) double = 0     % 0 -> per run_mode
     cfg.n_excursion (1,1) double = 0     % 0 -> per run_mode (onsets AND quiets, each)
@@ -80,6 +81,7 @@ if cfg.horizon_s > 0;   horizon   = cfg.horizon_s;   end
 
 P = struct();
 P.preset_name = cfg.preset_name;
+P.verbose     = cfg.verbose;
 P.T           = T;
 P.T_range     = [0, T];
 P.lya_T_interval = [T / 2, T];
@@ -117,11 +119,11 @@ cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 titles     = cellfun(@(n) pretty(n), cond_names, 'UniformOutput', false);
 n_cond     = numel(cond_names);
 
-fprintf('[transient_gain] preset=%s run_mode=%s: %d conditions x %d seeds, T = %g s, %d regular + up to %d onset + %d quiet samples, horizon %g s, {%s}\n', ...
+vprintf(cfg.verbose, 'minimal', '[transient_gain] preset=%s run_mode=%s: %d conditions x %d seeds, T = %g s, %d regular + up to %d onset + %d quiet samples, horizon %g s, {%s}\n', ...
     cfg.preset_name, cfg.run_mode, n_cond, n_seeds, T, n_regular, n_exc, n_exc, horizon, strjoin(P.variants, ', '));
 
 pool = ensure_pool(cfg.n_workers);
-fprintf('  parallel pool: %d workers\n', pool.NumWorkers);
+vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', pool.NumWorkers);
 
 %% One parfor over every (condition, seed) trial
 [ci, si] = ndgrid(1:n_cond, 1:n_seeds);
@@ -149,7 +151,7 @@ for i = 1:n_cond
     res(i).n_quiet_found = sum([Ri.n_quiet_found]);
     res(i).N = Ri(1).N;
     res(i).n = Ri(1).n;
-    fprintf('  %-14s %d samples (%d regular, %d onset, %d quiet; found %d onsets, %d quiets) | %s\n', ...
+    vprintf(cfg.verbose, 'verbose', '  %-14s %d samples (%d regular, %d onset, %d quiet; found %d onsets, %d quiets) | %s\n', ...
         cond_names{i}, numel(res(i).samples), nnz(strcmp({res(i).samples.kind}, 'regular')), ...
         nnz(strcmp({res(i).samples.kind}, 'onset')), nnz(strcmp({res(i).samples.kind}, 'quiet')), ...
         res(i).n_onset_found, res(i).n_quiet_found, gmax_txt(res(i).samples, P.variants));
@@ -168,7 +170,7 @@ condition_titles = titles;   % saved name
 results = res;               % saved name
 mat_file = fullfile(out_dir, 'transient_gain_data.mat');
 save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', '-v7.3');
-fprintf('[transient_gain] %.1f min -> %s\n', settings.minutes, mat_file);
+vprintf(cfg.verbose, 'minimal', '[transient_gain] %.1f min -> %s\n', settings.minutes, mat_file);
 end
 
 %% ------------------------------------------------------------------------
@@ -184,9 +186,8 @@ if P.n_override > 0
         'F_tracks_network', true}];
 end
 t0 = tic;
-m = [];
-evalc('m = build_from_preset(P.preset_name, cname, args{:});');
-evalc('m.run();');
+m = build_from_preset(P.preset_name, cname, 'verbose', P.verbose, args{:});
+m.run();
 run_seconds = toc(t0);
 S = m.lya_summary();
 params = m.get_params();
@@ -276,7 +277,7 @@ r = struct('seeds', seeds, 'N', m.N_sys_eqs, 'n', n, 'LLE', S.LLE, 'K_used', S.K
     'n_onset_used', numel(t_on), 'n_quiet_used', numel(t_qu), ...
     'sigma_u_noise', m.sigma_u_noise, 'ode_solver', m.ode_solver, ...
     'run_seconds', run_seconds, 'seconds', toc(t0), 'samples', samples);
-fprintf('  %-14s seed %d: N %d, lambda_1 %+.3f, %d samples (%d onsets, %d quiets found) in %.0f s\n', ...
+vprintf(P.verbose, 'verbose', '  %-14s seed %d: N %d, lambda_1 %+.3f, %d samples (%d onsets, %d quiets found) in %.0f s\n', ...
     cname, seeds(1), r.N, r.LLE, numel(samples), n_onset_found, n_quiet_found, r.seconds);
 end
 

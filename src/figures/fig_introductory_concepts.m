@@ -30,6 +30,7 @@ function out = fig_introductory_concepts(cfg)
 % See also: srnn_param_preset, build_from_preset, fig_energy_landscape
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.preset_name (1,:) char    = 'sompolinsky_pairs'
     cfg.gammas      (1,:) double  = [0.9, 1.6, 2.5]
     cfg.out_dir     (1,:) char    = ''
@@ -57,7 +58,7 @@ results  = struct('gamma', {}, 't', {}, 'x', {}, 'LLE', {}, 'R', {}, 'W', {});
 % differs. level_of_chaos multiplies the assembled W, so R = gamma exactly.
 for k = 1:n_cases
     gamma = gammas(k);
-    fprintf('\n=== Case %d/%d : gamma = %.2f ===\n', k, n_cases, gamma);
+    vprintf(cfg.verbose, 'verbose', '\n=== Case %d/%d : gamma = %.2f ===\n', k, n_cases, gamma);
 
     % 'no_adaptation' is the right condition here: this network has none, and
     % the condition is what carries n_a and synapse_config.
@@ -76,7 +77,7 @@ for k = 1:n_cases
     model.run();
 
     LLE = model.lya_results.LLE;
-    fprintf('  R (spectral radius) = %.3f | LLE = %.4f -> %s\n', ...
+    vprintf(cfg.verbose, 'verbose', '  R (spectral radius) = %.3f | LLE = %.4f -> %s\n', ...
         model.R, LLE, ternary(LLE > 0, 'CHAOTIC', 'non-chaotic'));
 
     results(k).gamma = gamma;

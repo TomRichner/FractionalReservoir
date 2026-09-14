@@ -26,6 +26,7 @@ function out = fig_dc_lle(cfg)
 % See also: run_dc_lle_analysis, replot_dc_lle, srnn_condition_titles, confplot
 
 arguments
+    cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
     cfg.data_file   (1,:) char    = ''    % '' -> search run_dir, then data/dc_lle
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true

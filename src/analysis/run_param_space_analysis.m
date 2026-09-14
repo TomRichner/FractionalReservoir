@@ -122,7 +122,7 @@ copyfile([mfilename('fullpath') '.m'], psa.output_dir);
 
 % run() writes psa_object.mat itself -- once before batching so an interrupted
 % run stays recoverable, and again on completion.
-fprintf('PSA object saved to: %s\n', fullfile(psa.output_dir, 'psa_object.mat'));
+vprintf(ctx.verbose, 'verbose', 'PSA object saved to: %s\n', fullfile(psa.output_dir, 'psa_object.mat'));
 
 %% Plot
 % Colour by the fraction-excitatory axis. This has to be named explicitly for
@@ -134,20 +134,20 @@ psa.plot('metric', 'mean_rate', 'color_by', ctx.f_param);
 if ctx.save_figs
     fig_dir = fullfile(psa.output_dir, 'figures');
     save_some_figs_to_folder_2(fig_dir, 'param_space', [], {'fig', 'png'});
-    fprintf('Figures saved to %s\n', fig_dir);
+    vprintf(ctx.verbose, 'verbose', 'Figures saved to %s\n', fig_dir);
 end
 
 out_dir = psa.output_dir;
 
 %% Summary
-fprintf('\n=== Parameter Space Analysis Summary ===\n');
-fprintf('Output directory: %s\n', out_dir);
-fprintf('Grid parameters: %s\n', strjoin(psa.grid_params, ', '));
-fprintf('Levels per parameter: %d\n', psa.n_levels);
-fprintf('Total combinations: %d^%d = %d\n', ...
+vprintf(ctx.verbose, 'verbose', '\n=== Parameter Space Analysis Summary ===\n');
+vprintf(ctx.verbose, 'verbose', 'Output directory: %s\n', out_dir);
+vprintf(ctx.verbose, 'verbose', 'Grid parameters: %s\n', strjoin(psa.grid_params, ', '));
+vprintf(ctx.verbose, 'verbose', 'Levels per parameter: %d\n', psa.n_levels);
+vprintf(ctx.verbose, 'verbose', 'Total combinations: %d^%d = %d\n', ...
     psa.n_levels, numel(psa.grid_params), psa.n_levels^numel(psa.grid_params));
-fprintf('Simulated: %d (subset_fraction = %.4g)\n', ...
+vprintf(ctx.verbose, 'verbose', 'Simulated: %d (subset_fraction = %.4g)\n', ...
     numel(psa.shuffled_indices), psa.subset_fraction);
-fprintf('Conditions: %s\n', ...
+vprintf(ctx.verbose, 'verbose', 'Conditions: %s\n', ...
     strjoin(cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false), ', '));
 end

@@ -59,6 +59,7 @@ cfg.fig_root = 'figs/topk_smoke_fast';   % overwritten in place
 % Figures are built and saved but do not pop up: a new figure window raises
 % itself and takes keyboard focus, and a run draws dozens.
 cfg.visible_figures = false;
+cfg.verbose = 'minimal';   % 'verbose' | 'minimal' | 'near-none' -- how much the run prints (verbose_level)
 
 %% Presets per stage and figure
 cfg.mc_preset            = cfg.preset_name;         % memory capacity on THIS network
