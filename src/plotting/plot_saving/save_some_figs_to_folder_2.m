@@ -72,6 +72,10 @@ for i=fig_vec
         fh = fh(1);
         set(fh,'PaperPositionMode','auto')
         if any(strcmpi(fig_type,'fig'))
+            % A figure saved while invisible reopens invisible (openfig keeps the
+            % stored Visible), and every pipeline figure is drawn invisible. The
+            % CreateFcn runs when the .fig is opened and turns it on (2026-09-14).
+            set(fh, 'CreateFcn', 'set(gcbo, ''Visible'', ''on'')');
             saveas(fh, fullfile(save_folder, [save_name '_f_' num2str(i)]), 'fig');
         end
         if any(strcmpi(fig_type,'png'))

@@ -229,6 +229,12 @@ model = SRNNCellTypePairs('n_cellTypes', 2, ...
     'synapse_config', config);
 end
 
+% Restore the root figure default NOW. In a script the onCleanup above lives in
+% the CALLER's workspace, so run from the base workspace it never fired and
+% the session was left with DefaultFigureVisible off (2026-09-14): every
+% figure opened afterwards, including .fig files, was invisible.
+clear visibility_cleanup
+
 function assert_throws(f)
 threw = false;
 try
