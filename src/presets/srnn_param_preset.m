@@ -615,7 +615,8 @@ switch name
             struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
 
     case {'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25', ...
-          'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25'}
+          'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25', ...
+          'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdSingleMatched_3cond_mu8p25'}
         % STD STRENGTH-MATCHED variants of ..._sfaEI_..._dualStd_3cond_mu8p25
         % (TR decision, 2026-09-13; docs/notes/STD_strength_matching_2026-09-13.md).
         %
@@ -656,6 +657,17 @@ switch name
         %   the low-rate gain is unchanged, the depression is weaker per
         %   timescale and its dynamics slower (rate 1/tau_rec + r/tau_rel).
         %
+        % dualStdSingleMatched (2026-09-14, after the fast runs of the two above
+        %   both made the multiple-timescale network chaotic, lambda_1 +2.2 scaled
+        %   and +1.0 usage, and lost its memory capacity) -- the THIRD direction:
+        %   leave the two-timescale routes exactly as published (rho 0.125 on
+        %   both, no scale) and STRENGTHEN the single-timescale route to the
+        %   dual's steady state instead: 1/(1 + r_ref/rho_s) = 1/9 at r_ref gives
+        %   rho_s = r_ref/8 = 0.03125, tau_rel = rho_s * tau_rec = 0.0625. Here
+        %   sfa3_std2 is IDENTICAL to the unmatched preset and only sfa1_std1
+        %   differs, so it asks the timescale-count question without touching
+        %   the network whose results the paper reports.
+        %
         % Everything else -- n, mu 8.25, sigma, noise, SFA on E and I, the
         % per-neuron setpoint -- is identical to the unscaled preset.
         % fig_STD_steady_state draws the three steady-state curves over the
@@ -688,7 +700,11 @@ switch name
         sfa_all  = {taus,       taus};
 
         single_std = struct('tau_rec', 2, 'tau_rel', 0.25);          % rho = 0.125
-        if endsWith(name, 'dualStdScaled_3cond_mu8p25')
+        if endsWith(name, 'dualStdSingleMatched_3cond_mu8p25')
+            % dual routes as published; the single route strengthened to match
+            single_std = struct('tau_rec', 2, 'tau_rel', 0.0625);    % rho_s = r_ref/8
+            dual_route = struct('std', struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]));
+        elseif endsWith(name, 'dualStdScaled_3cond_mu8p25')
             % rho 0.125 on both timescales as before, plus the route scale
             dual_route = struct('std', struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]), ...
                                 'scale', 3);                          % 1 + r_ref/rho
@@ -1232,6 +1248,7 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdSingleMatched_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
