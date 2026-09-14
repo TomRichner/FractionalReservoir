@@ -1076,8 +1076,12 @@ classdef ParamSpaceAnalysis2 < handle
                     'No non-reps grid parameter found for sensitivity plot.');
             end
 
-            % Build histogram bins
-            hist_bins = [-inf, linspace(hist_range(1), hist_range(2), n_bins), inf];
+            % Build histogram bins: n_bins bins spanning hist_range and NOTHING
+            % outside it. Until 2026-09-14 the first and last edges were -inf and
+            % +inf, so every out-of-range value was folded into an extreme bin
+            % drawn half a step outside the range; TR wants out-of-range values
+            % simply not shown (the median line is clipped by the axes instead).
+            hist_bins = linspace(hist_range(1), hist_range(2), n_bins + 1);
 
             % Get condition info
             condition_names = cellfun(@(c) c.name, obj.conditions, 'UniformOutput', false);
@@ -1148,18 +1152,12 @@ classdef ParamSpaceAnalysis2 < handle
                         end
                     end
 
-                    % Compute y-coordinates
-                    finite_edges = hist_bins(~isinf(hist_bins));
-                    step_size = finite_edges(2) - finite_edges(1);
-                    y_coords = zeros(num_hist_bins, 1);
-                    y_coords(1) = finite_edges(1) - step_size/2;
-                    for k = 2:length(finite_edges)
-                        y_coords(k) = (finite_edges(k-1) + finite_edges(k)) / 2;
-                    end
-                    y_coords(end) = finite_edges(end) + step_size/2;
+                    % Bin centres
+                    y_coords = (hist_bins(1:end-1) + hist_bins(2:end))' / 2;
 
                     % Plot
                     imagesc(ax, x_values, y_coords, histogram_matrix);
+                    ylim(ax, hist_range);
                     hold(ax, 'on');
                     yline(ax, 0, '--', 'Color', [0 0.7 0], 'LineWidth', 4, 'Alpha', 0.5);
                     plot(ax, x_values, median_values, 'b-', 'LineWidth', 4, 'Color', [0 0 1 0.55]);
