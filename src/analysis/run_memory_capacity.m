@@ -320,6 +320,20 @@ writetable(T, fullfile(out_dir, [run_tag '_MC_Horizon.csv']));
 write_summary_txt(fullfile(out_dir, [run_tag '_summary.txt']), run_tag, s, ...
     condition_names, MC_mean, MC_sem, MC_ci, H_mean, H_sem, H_ci, stats);
 
+% Provenance (2026-09-14): a PNG without the commit, configuration, seeds
+% and completed-trial count that produced it is not a completed result.
+% capture_git_provenance writes git_provenance.txt (+ a patch when dirty)
+% into out_dir; provenance.md next to the .mat gathers everything a reader
+% needs in one place, from the same numbers the summary above used.
+if verbose_level(opts.verbose) >= 2
+    git_info = capture_git_provenance(out_dir, project_root);
+else
+    [~, git_info] = evalc('capture_git_provenance(out_dir, project_root)');
+end
+write_provenance_md(fullfile(out_dir, [run_tag '_provenance.md']), run_tag, s, git_info, ...
+    condition_names, seed_net, seed_stim, MC_trials, H_trials, MC_mean, MC_ci, H_mean, H_ci, stats, ...
+    mat_file, fullfile(out_dir, [run_tag '_MC_Horizon.csv']), fullfile(out_dir, [run_tag '_summary.txt']));
+
 %% Plot
 if opts.save_figs
     plot_memory_capacity(results_all, out_dir);
@@ -519,7 +533,65 @@ for p = 1:numel(stats)
 end
 end
 
+function write_provenance_md(path, run_tag, s, git_info, condition_names, seed_net, seed_stim, ...
+    MC_trials, H_trials, MC_mean, MC_ci, H_mean, H_ci, stats, mat_file, csv_file, summary_file)
+% One markdown record per run: commit, configuration, seeds, completion,
+% the summary statistics and the output paths. The numbers are the same
+% locals the summary .txt was written from -- nothing is recomputed.
+%
+% COMPLETION. The parfor errors out on any failed trial (a trial that
+% produced the wrong number of delays throws), so a saved run has either
+% every trial or none; completed is counted from finite MC rows anyway, so
+% a NaN that slipped through would show here as an incomplete trial.
+fid = fopen(path, 'w');
+cleanup = onCleanup(@() fclose(fid));
+n_trials = size(MC_trials, 1);
+complete = all(isfinite(MC_trials) & isfinite(H_trials), 2);
+fprintf(fid, '# Memory capacity run %s\n\n', run_tag);
+fprintf(fid, '## Source\n\n');
+fprintf(fid, '- commit: `%s` (%s%s) on branch `%s`\n', git_info.commit, git_info.commit_short, ...
+    ternary_txt(git_info.is_dirty, ', DIRTY working tree -- see working_changes.patch', ''), git_info.branch);
+fprintf(fid, '- host: %s (%s), MATLAB %s\n', git_info.hostname, git_info.platform, version('-release'));
+fprintf(fid, '- preset: `%s` (%s), run mode `%s`\n', s.preset_name, s.model_class, s.run_mode);
+fprintf(fid, '- captured: %s\n\n', char(datetime('now')));
+fprintf(fid, '## Protocol\n\n');
+fprintf(fid, '- n = %d, fs = %d Hz, integrator `%s`, sigma_u_noise = %g\n', s.n, s.fs, s.ode_solver, s.sigma_u_noise);
+fprintf(fid, '- input `%s`, T_hold = %g s (MC in hold units), T_wash = %g s, T_train = %g s, T_test = %g s, d_max = %g s (%d delays scored)\n', ...
+    s.input_type, s.T_hold, s.T_wash_sec, s.T_train_sec, s.T_test_sec, s.d_max_sec, s.d_max_eff);
+fprintf(fid, '- readout `%s`, horizon threshold R^2 > %.2f\n', s.readout_signal, s.R2_threshold_for_horizon);
+fprintf(fid, '- bootstrap %d samples; sign-flip test exact up to N = %d, else %d Monte Carlo patterns\n', ...
+    s.n_boot, s.perm_exact_max_N, s.n_perm_max);
+fprintf(fid, '- seed bases: net %d, stim %d\n\n', s.seed_net_base, s.seed_stim_base);
+fprintf(fid, '## Trials\n\n');
+fprintf(fid, 'Attempted %d, completed %d, failed %d (a failed trial aborts the run; see the header of write_provenance_md).\n\n', ...
+    n_trials, nnz(complete), nnz(~complete));
+fprintf(fid, '| trial | seed_net | seed_stim | complete |%s\n', sprintf(' MC %s |', condition_names{:}));
+fprintf(fid, '|---|---|---|---|%s\n', repmat('---|', 1, numel(condition_names)));
+for k = 1:n_trials
+    fprintf(fid, '| %d | %d | %d | %d |%s\n', k, seed_net(k), seed_stim(k), complete(k), ...
+        sprintf(' %.3f |', MC_trials(k, :)));
+end
+fprintf(fid, '\n## Summary\n\n');
+fprintf(fid, '| Condition | Total MC mean [95%% CI] | Horizon (s) mean [95%% CI] |\n|---|---|---|\n');
+for i = 1:numel(condition_names)
+    fprintf(fid, '| %s | %.3f [%.3f, %.3f] | %.3f [%.3f, %.3f] |\n', condition_names{i}, ...
+        MC_mean(i), MC_ci.lo(i), MC_ci.hi(i), H_mean(i), H_ci.lo(i), H_ci.hi(i));
+end
+fprintf(fid, '\n| Pair | mean diff | p (sign-flip) | patterns | Cohen''s d_z |\n|---|---|---|---|---|\n');
+for p = 1:numel(stats)
+    fprintf(fid, '| %s | %+.3f | %.4g | %d%s | %.3f |\n', stats(p).pair, stats(p).mean_diff, stats(p).p_perm, ...
+        stats(p).n_patterns, ternary_txt(stats(p).exact, ' (exact)', ' (Monte Carlo)'), stats(p).cohens_dz);
+end
+fprintf(fid, '\n## Outputs\n\n- `%s`\n- `%s`\n- `%s`\n- `%s`\n', mat_file, csv_file, summary_file, ...
+    fullfile(fileparts(mat_file), 'git_provenance.txt'));
+end
+
+function v = ternary_txt(c, a, b)
+if c; v = a; else; v = b; end
+end
+
 function ci = bootstrap_mean_ci(X, n_boot, alpha)
+
 % X: [N x C]. Returns ci.lo, ci.hi per column (bootstrap CI of the mean).
 [N, C] = size(X);
 boot_means = nan(n_boot, C);
