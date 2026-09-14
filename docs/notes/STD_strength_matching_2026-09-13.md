@@ -71,6 +71,33 @@ low rates, and a change in effective W scale is itself a change the paper's
 primary and asked for the usage variant as the control, so the morning
 comparison (§ 5) shows the consequence rather than arguing it.
 
+## 2b. The third direction, built after the fast runs (2026-09-14, 03:15)
+
+Both matchings above make the two-timescale routes WEAKER. Their fast runs
+(§ 5) turned the multiple-timescale network chaotic and removed its memory
+advantage, so a third preset was added that leaves the two-timescale routes
+exactly as published and instead STRENGTHENS the single-timescale route to the
+dual's steady state at r_ref:
+
+    1/(1 + r_ref/rho_s) = 1/(1 + r_ref/rho)^2 = 1/9   at r_ref = 0.25, rho = 0.125
+    rho_s   = r_ref / 8 = 0.03125
+    tau_rel = rho_s * tau_rec = 0.03125 * 2 s = 0.0625 s     (was 0.25 s)
+
+`celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdSingleMatched_3cond_mu8p25`:
+`no_adaptation` and `sfa3_std2` are byte-identical to the unmatched preset;
+only `sfa1_std1` changes (tau_rec 2 s kept, tau_rel 0.25 -> 0.0625 s, i.e. the
+usage d = 1/tau_rel quadrupled). No route scale, no model code. Consequences:
+the single route's steady state is monotone in r and saturates at rho_s, so it
+matches the dual product only at r_ref (the dual peaks near r = rho and falls);
+its relaxation rate 1/tau_rec + r/tau_rel at r_ref rises from 1.5 to 4.5 s^-1,
+so the single-timescale condition depresses both more strongly and faster than
+before. The undepressed gain is unchanged in every condition.
+
+Three matchings were therefore tried, in this order: (i) route scale s = 3 on
+the dual routes (TR's choice), (ii) equal usage rho_u = 0.342 on both dual
+timescales (the control), (iii) single route strengthened, dual as published.
+(i) and (ii) equalise by weakening the dual; (iii) by strengthening the single.
+
 ## 3. The numbers
 
 **r_ref = 0.25.** Rule: the median mean firing rate of the multiple-timescale
@@ -181,45 +208,95 @@ The parameters table rows for $\tau_{rel}$ (E to E … I to I) stay `[0.25 0.5]`
 for the primary configuration; add a row "route scale $s$ (all four routes,
 multiple-timescale condition) | STD strength match | `3` | –".
 
-## 5. Results: TO FILL after the fast runs
+## 5. Results (fast runs of all three matchings, 2026-09-14)
 
-Medians over the successful jobs of each run; the unmatched column is the
-*medium* run (`data/topk_med`, 15 reps per level, T = 20 s) and the two matched
-columns are *fast* runs (`data/stdScaled_fast`, `data/stdUsage_fast`; fewer
-reps, shorter T), so compare direction and size, not decimals.
+Near-default = the seven 1-D sweeps at the level nearest the preset default,
+pooled (21 networks per condition at fast; 105 in the medium unmatched run).
+Memory capacity: total MC over 15 s of delays, 5 paired trials at fast, 15 at
+medium. The no-adaptation row is identical physics in every column and the
+single-timescale row is identical in the scaled and usage columns; the small
+differences between the unmatched and the fast columns there are the run mode
+(fewer reps, shorter T), which is the calibration for reading the rest.
 
-| condition | measure   | unmatched (topk_med, medium) | scaled (fast) | usage (fast) |
-|-----------|-----------|------------------------------|---------------|--------------|
-| no_adaptation | λ₁    | TO FILL | (identical physics) | (identical physics) |
-| no_adaptation | mean rate | TO FILL | | |
-| sfa1_std1 | λ₁        | TO FILL | (identical physics) | (identical physics) |
-| sfa1_std1 | mean rate | TO FILL | | |
-| sfa3_std2 | λ₁        | TO FILL | TO FILL | TO FILL |
-| sfa3_std2 | mean rate | TO FILL | TO FILL | TO FILL |
-| sfa3_std2 | h_KS      | TO FILL | TO FILL | TO FILL |
-| sfa3_std2 | D_KY      | TO FILL | TO FILL | TO FILL |
+| measure | unmatched (`data/topk_med`, medium) | (i) scaled s = 3 (`data/stdscaled_fast`) | (ii) usage rho_u = 0.342 (`data/stdusage_fast`) | (iii) single strengthened (`data/stdsinglematched_fast`) |
+|---|---|---|---|---|
+| lambda_1 near default, none / single / multiple | +3.47 / +0.35 / **-0.112** | +3.65 / +0.61 / **+2.24** | +3.65 / +0.61 / **+1.01** | +3.65 / (row missing from the figure table, to check: its joint-sample median is -0.51) / **-0.118** |
+| networks with lambda_1 < 0, multiple | 105 / 105 | 0 / 21 | 0 / 21 | 15 / 21 |
+| occupied median rate, none / single / multiple | 0.483 / 0.269 / 0.230 | 0.429 / 0.215 / 0.300 | 0.429 / 0.215 / 0.276 | 0.429 / 0.211 / 0.236 |
+| K the top-K needed for the multiple-timescale jobs | 15 | 60 (D_KY resolved 0-50%) | 15-60 (39-100%) | 15 (67-100%) |
+| tau sweep, multiple-timescale, slowest tau 1 -> 30 s | -0.112 -> -0.043, all negative | +2.3 flat, all positive | +0.65 to +1.14, all positive | (figure pending; K = 15 at every level) |
+| total MC, none / single / multiple | 0.103 / 0.259 / **0.590** | 0.111 / 0.243 / **0.103** | 0.111 / 0.243 / **0.146** | 0.111 / **0.385** / **0.583** |
+| MC horizon (s) | 0.00 / 0.12 / 0.52 | 0 / 0.18 / 0 | 0 / 0.18 / 0 | 0 / 0.30 / 0.48 |
+| single vs multiple MC | p = 1.2e-4, d_z = -2.04 | p = 0.0625, d_z = +1.66 (wrong way) | p = 0.0625, d_z = +1.24 (wrong way) | p = 0.125 (floor 0.0625), d_z = -1.05 |
 
-Also to record: the new occupied median rate of `sfa3_std2` in each matched run
-(if it moves far from 0.25 the match point should be revisited once), and the
-`fig_STD_steady_state` matching table (θ_ss at r_ref and at the 5th/95th
-occupied percentiles, the maximum relative mismatch over the occupied range for
-both matchings).
+Reading. (i) and (ii): at equal steady-state depression obtained by weakening
+the dual routes, the multiple-timescale network is chaotic and has no fading
+memory; the unmatched advantage leaned on the squared depression. (iii): with
+the dual network as published and the single route brought to the same steady
+state, the multiple-timescale network keeps lambda_1 ~ -0.12 and MC ~ 0.58,
+while the single-timescale network improves (MC 0.24 -> 0.39, horizon 0.12 ->
+0.30). Both mechanisms contribute: depression strength moves the single
+condition part of the way, and two timescales at the same strength go the rest.
+The claim that survives is "at matched steady-state depression, two depression
+timescales extend fading memory further than one", with a smaller effect size
+than the unmatched comparison showed.
 
-## 6. Open questions for TR
+The occupied median rate of the multiple-timescale condition stays within
+0.23-0.30 in every variant, so r_ref = 0.25 does not need revisiting.
+`fig_STD_strength_matching` (in each run's `figs/<run>/`) has theta_ss at r_ref
+and at the occupied percentiles and the max |log ratio| over the occupied band:
+1.11 unmatched, 0.146 scaled, 0.034 usage (the single-strengthened curve can be
+drawn by passing that preset as `reference_preset`).
 
-1. **Direction.** Confirm scaling the dual condition up (s = 3) after seeing
-   § 5. The alternative that keeps every condition at the same undepressed gain
-   is the usage control; if its λ₁ ordering across the three conditions is the
-   same as the scaled run's, the choice is presentational and the scale's
-   3× low-rate gain is a caveat in the Methods; if the orderings differ, the
-   paper's claim depends on the choice and that needs a decision.
-2. **Which is primary in the manuscript.** § 4b is written with the scale as
-   primary and usage as control, per the decision. Swapping them is a
-   paragraph edit, not a rerun, since both are run.
-3. **Does the product model stay primary?** Codex's option 2 (per-timescale
-   exponents q_m with Σq_m = 1) was not taken; the Methods keep the Varela
-   product and add the match. Confirm.
-4. **r_ref after the rerun.** r_ref was set from the unmatched network. If the
-   matched network's occupied median is not ≈ 0.25, decide whether to iterate
-   once (the rule stays the same, the literal changes) or to keep 0.25 and
-   report the difference.
+h_KS and D_KY medians per condition are in each run's `parameters.md` Lyapunov
+quality table and the `Fig_Sensitivity_*_medians` sheets; they were not
+tabulated here because the K column above already carries the message.
+
+### 4d. Replacement paragraph if (iii) becomes the paper preset
+
+> **Short-term depression.** Depression enters {eq:theta} as a product of
+> resource variables, each resting at one, following the product-of-components
+> description of cortical depression [].
+> In the multiple-timescale condition the two depression variables had recovery
+> time constants of 2 and 4 s and release time constants of 0.25 and 0.5 s, so
+> that at a constant rate  settled to ## 3. The numbers/(1 + 8r) their product to
+> 10490891 + 8r)^{-2}1 A single depression variable with the same ratio would settle
+> to ## 3. The numbers/(1 + 8r) so a one-timescale condition built that way would be weaker as
+> well as structurally simpler, and the comparison between the adapting
+> conditions would not isolate the number of timescales. We therefore matched
+> the steady-state synaptic output of the single-timescale routes to that of
+> the two-timescale routes at a reference rate  = 0.25 the median mean
+> firing rate of the multiple-timescale network at the reference parameters:
+> the single depression variable kept its recovery time constant of 2 s and its
+> release time constant was shortened to 0.0625 s, for which
+> ## 3. The numbers/(1 + r_{ref}\,\tau_{rec}/\tau_{rel}) = (1 + 8 r_{ref})^{-2} = 1/91 The two
+> conditions agree at  differ away from it ({supFig:std_steady_state});
+> the multiple-timescale and no-adaptation conditions are unchanged. Where the
+> text attributes a difference between the adapting conditions to the number of
+> adaptation timescales, it refers to this strength-matched comparison.
+
+Conditions-table row for the single-timescale condition under (iii):
+1 SFA (tau_a 0.25 s) / 1 STD (tau_rel 0.0625 s, tau_rec 2 s), all four routes.
+
+## 6. Open questions for TR (updated 2026-09-14 morning)
+
+1. **Which matching is the paper's.** The fast runs settle the direction
+   question TR was asked on 2026-09-13: (i) scale-up and (ii) usage both
+   destroy the multiple-timescale result; (iii) keeps it. My recommendation is
+   (iii), `..._dualStdSingleMatched_3cond_mu8p25`, run at medium (clone
+   `stdUsage_med_config`). `paper_config` still points at (i) and should be
+   moved with one line.
+2. **What the paper claims.** Under (iii) the honest sentence is that two
+   depression timescales at matched strength extend fading memory and keep
+   lambda_1 near zero where one does not, AND that depression strength itself
+   contributes (the single condition improved when strengthened). The
+   product-of-components model stays primary; the matching is a control on the
+   single-timescale condition, which is the least disruptive option the
+   suggest_updates report recommended.
+3. **Route scale.** Keep `synapse_config.<pre>.<post>.scale` in the model (it
+   is tested and harmless at 1) or remove it now that no paper preset uses it.
+4. **Effect size.** At 5 trials the single-vs-multiple MC test cannot go below
+   p = 0.0625; the medium run of (iii) with 15 trials is what the manuscript
+   needs, and the unmatched 15-trial p of 1.2e-4 should not be quoted for the
+   matched comparison.
+
