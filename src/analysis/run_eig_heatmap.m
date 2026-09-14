@@ -32,6 +32,16 @@ function mat_file = run_eig_heatmap(cfg)
 %     class default it would fail outright with 'requires a stochastic
 %     integrator'. build_from_preset picks sra1.
 %
+% EXAMPLES (2026-09-14). Besides the reference network the stage runs a
+% prespecified set of E:I-imbalanced examples -- mu_EE_relative at 0.5x and
+% 1.5x the preset's value by default -- with the SAME seeds, and stores per
+% (example, condition) the pooled eigenvalues, lambda_1, the mean rate and the
+% realised E:I weight balance, so fig_eig_heatmap_imbalance is a defined
+% comparison annotated with matched numbers rather than a chosen seed. The
+% legacy top-level variables describe the reference example exactly as before;
+% `examples` (struct array) carries all of them. In fast mode the non-reference
+% examples run at n = 250 (a dense eig at N = 4000 costs ~30 s a state).
+%
 % Eigenvalues are computed through the CLASS's own static compute_Jacobian_fast,
 % resolved by name, so this works for either model class.
 % SRNNModel2.eigenvalue_time_series is not used: SRNNCellTypePairs has no such
@@ -47,6 +57,9 @@ arguments
     cfg.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     cfg.n_samples   (1,1) double  = 0      % 0 -> per run_mode
     cfg.use_parallel (1,1) logical = true
+    cfg.examples                   = []       % struct array (label, overrides); [] -> mu_EE x 0.5 / 1 / 1.5
+    cfg.n_override  (1,1) double  = 0        % 0 -> preset n (fast mode runs the NON-reference examples at 250)
+    cfg.n_samples_examples (1,1) double = 0  % states per non-reference example; 0 -> per run_mode (40 / 60 / 150)
 end
 
 setup_paths();
@@ -99,52 +112,162 @@ titles     = cellfun(@(n) pretty(n), cond_names, 'UniformOutput', false);
 vprintf(cfg.verbose, 'minimal', '[eig_heatmap] preset=%s run_mode=%s T=%g s n_samples=%d\n', ...
     cfg.preset_name, cfg.run_mode, T_range(2), n_samples);
 
-n_cond        = numel(cond_names);
-evals_by_cond = cell(1, n_cond);
-lle_by_cond   = nan(1, n_cond);
-lya_by_cond   = cell(1, n_cond);
-num_abscissa_by_cond  = cell(1, n_cond);   % max eig((J + J')/2) per sampled state
-spec_abscissa_by_cond = cell(1, n_cond);   % max real eig(J) per sampled state
-J_times_by_cond       = cell(1, n_cond);
+n_cond = numel(cond_names);
 
-for i = 1:n_cond
-    vprintf(cfg.verbose, 'verbose', '\n=== %d/%d %s ===\n', i, n_cond, titles{i});
-    model = build_from_preset(cfg.preset_name, cond_names{i}, 'verbose', cfg.verbose, ...
-        'T_range',          T_range, ...
-        'fs',               fs, ...
-        'rng_seeds',        [1 2], ...      % same W across conditions
-        'lya_method',       'topk', ...     % the sweeps' estimator (K 15, retry to 30)
-        'lya_K',            15, 'lya_K_auto', true, 'lya_K_max', 30, 'lya_dt', 0.05, ...
-        'lya_T_interval',   lya_T_interval, ...
-        'store_full_state', true);          % required to read S_out below
-    model.run();
-
-    lle_by_cond(i) = model.lya_results.LLE;
-    lya_by_cond{i} = model.lya_summary();
-
-    % Sample after the LLE warmup window opens, so the transient is excluded.
-    t_start = lya_T_interval(1);
-    t_end   = T_range(2);
-    J_times = linspace(t_start, t_end, n_samples);
-    [evals_by_cond{i}, num_abscissa_by_cond{i}, spec_abscissa_by_cond{i}, J_times_by_cond{i}] = ...
-        sample_eigenvalues(model, J_times, cfg.use_parallel);
-    vprintf(cfg.verbose, 'minimal', '  %-14s LLE = %+.4f | %d eigenvalues pooled | numerical abscissa median %+.3f (spectral %+.3f)\n', ...
-        lle_by_cond(i), numel(evals_by_cond{i}), ...
-        median(num_abscissa_by_cond{i}), median(spec_abscissa_by_cond{i}));
+%% The examples: the reference network plus prespecified E:I imbalances
+% (TR / Codex audit sec. 7, 2026-09-14). One interpretable block-mean
+% coordinate, mu_EE_relative, at 0.5x / 1x / 1.5x the preset's value, so the
+% Jacobian-occupancy picture is a DEFINED comparison rather than a chosen
+% seed: every example x condition shares rng_seeds [1 2], and each panel is
+% annotated with its matched finite-time lambda_1, mean rate and realised E:I
+% weight balance B_E (fig_eig_heatmap_imbalance). Pass cfg.examples to draw
+% a different set; the reference example is always run and is what the
+% legacy variables below (fig_eig_heatmap, fig_transient_amplification)
+% describe.
+examples = cfg.examples;
+if isempty(examples)
+    mu_EE_ref = preset_mu_EE(cfg.preset_name);
+    examples = struct('label', {'inhibition-dominant', 'reference', 'excitation-dominant'}, ...
+        'overrides', {struct('mu_EE_relative', 0.5 * mu_EE_ref), struct(), ...
+                      struct('mu_EE_relative', 1.5 * mu_EE_ref)});
 end
+if ~any(strcmp({examples.label}, 'reference'))
+    examples(end + 1) = struct('label', 'reference', 'overrides', struct());
+end
+n_ex = numel(examples);
+n_examples_override = cfg.n_override;
+if strcmp(cfg.run_mode, 'fast') && cfg.n_override == 0
+    n_examples_override = 250;      % a dense eig at N = 4000 is ~30 s; fast keeps the examples affordable
+end
+n_samples_ex = cfg.n_samples_examples;
+if n_samples_ex == 0
+    switch cfg.run_mode
+        case 'fast',                n_samples_ex = 40;
+        case {'medium', 'medium2'}, n_samples_ex = 60;
+        case 'production',          n_samples_ex = 150;
+    end
+end
+
+ex_out = repmat(struct('label', '', 'overrides', struct(), 'mu_tilde_relative', [], 'n', NaN, ...
+    'evals_by_cond', {cell(1, n_cond)}, 'lle_by_cond', nan(1, n_cond), ...
+    'mean_rate_by_cond', nan(1, n_cond), 'B_E_by_cond', nan(1, n_cond), ...
+    'lya_by_cond', {cell(1, n_cond)}, 'num_abscissa_by_cond', {cell(1, n_cond)}, ...
+    'spec_abscissa_by_cond', {cell(1, n_cond)}, 'J_times_by_cond', {cell(1, n_cond)}), 1, n_ex);
+model = [];
+for e = 1:n_ex
+    is_ref = strcmp(examples(e).label, 'reference');
+    if is_ref
+        n_ov = cfg.n_override; n_smp = n_samples;      % the legacy loop, unchanged
+    else
+        n_ov = n_examples_override; n_smp = n_samples_ex;
+    end
+    ex_out(e).label     = examples(e).label;
+    ex_out(e).overrides = examples(e).overrides;
+    for i = 1:n_cond
+        vprintf(cfg.verbose, 'verbose', '\n=== %s | %d/%d %s ===\n', examples(e).label, i, n_cond, titles{i});
+        r = sample_condition(cfg, cond_names{i}, examples(e).overrides, n_ov, T_range, fs, ...
+            lya_T_interval, n_smp);
+        ex_out(e).evals_by_cond{i}         = r.evals;
+        ex_out(e).lle_by_cond(i)           = r.lle;
+        ex_out(e).mean_rate_by_cond(i)     = r.mean_rate;
+        ex_out(e).B_E_by_cond(i)           = r.B_E;
+        ex_out(e).lya_by_cond{i}           = r.lya;
+        ex_out(e).num_abscissa_by_cond{i}  = r.num_abscissa;
+        ex_out(e).spec_abscissa_by_cond{i} = r.spec_abscissa;
+        ex_out(e).J_times_by_cond{i}       = r.J_times;
+        ex_out(e).mu_tilde_relative        = r.mu_tilde_relative;
+        ex_out(e).n                        = r.n;
+        model = r.model;
+        vprintf(cfg.verbose, 'minimal', '  %-20s %-14s LLE = %+.4f | <r> %.3f | B_E %.2f | %d eigenvalues | num. abscissa median %+.3f (spectral %+.3f)\n', ...
+            examples(e).label, cond_names{i}, r.lle, r.mean_rate, r.B_E, numel(r.evals), ...
+            median(r.num_abscissa), median(r.spec_abscissa));
+    end
+end
+
+% Legacy top-level variables = the reference example, exactly as before.
+i_ref = find(strcmp({ex_out.label}, 'reference'), 1);
+evals_by_cond         = ex_out(i_ref).evals_by_cond;
+lle_by_cond           = ex_out(i_ref).lle_by_cond;
+lya_by_cond           = ex_out(i_ref).lya_by_cond;
+num_abscissa_by_cond  = ex_out(i_ref).num_abscissa_by_cond;
+spec_abscissa_by_cond = ex_out(i_ref).spec_abscissa_by_cond;
+J_times_by_cond       = ex_out(i_ref).J_times_by_cond;
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'T_range', T_range, 'fs', fs, 'n_samples', n_samples, ...
     'lle_window', lle_window, 'lya_T_interval', lya_T_interval, ...
     'model_class', class(model), 'level_of_chaos', model.level_of_chaos, ...
-    'n', model.n, 'ode_solver', model.ode_solver, 'lya_method', model.lya_method);
+    'n', ex_out(i_ref).n, 'ode_solver', model.ode_solver, 'lya_method', model.lya_method, ...
+    'examples', {{ex_out.label}}, 'example_overrides', {{ex_out.overrides}}, ...
+    'n_examples_override', n_examples_override, 'n_samples_examples', n_samples_ex);
 
 condition_titles = titles;                      %#ok<NASGU>  saved name
+examples = ex_out;                              %#ok<NASGU>  saved name
 mat_file = fullfile(out_dir, 'eig_heatmap_data.mat');
 save(mat_file, 'evals_by_cond', 'condition_titles', 'cond_names', ...
     'lle_by_cond', 'lya_by_cond', 'num_abscissa_by_cond', 'spec_abscissa_by_cond', ...
-    'J_times_by_cond', 'lle_window', 'lya_T_interval', 'settings', '-v7.3');
+    'J_times_by_cond', 'lle_window', 'lya_T_interval', 'settings', 'examples', '-v7.3');
 vprintf(cfg.verbose, 'minimal', '[eig_heatmap] saved %s\n', mat_file);
+end
+
+%% ------------------------------------------------------------------------
+function r = sample_condition(cfg, cond_name, overrides, n_override, T_range, fs, lya_T_interval, n_samples)
+% One (example, condition): build on the shared seeds with the example's
+% overrides, run with the sweeps' top-K estimator, sample the Jacobian after
+% the LLE window opens, and read the mean rate and the realised E:I weight
+% balance off the same model.
+args = {'T_range', T_range, 'fs', fs, 'rng_seeds', [1 2], ...   % same W across conditions AND examples
+    'lya_method', 'topk', 'lya_K', 15, 'lya_K_auto', true, 'lya_K_max', 30, 'lya_dt', 0.05, ...
+    'lya_T_interval', lya_T_interval, 'store_full_state', true, 'verbose', cfg.verbose};
+if n_override > 0
+    args = [args, {'n', n_override, 'indegree', max(2, round(0.2 * n_override)), 'F_tracks_network', true}];
+end
+args = [args, struct2namevalue(overrides)];
+model = build_from_preset(cfg.preset_name, cond_name, args{:});
+model.run();
+
+J_times = linspace(lya_T_interval(1), T_range(2), n_samples);
+[evals, omega, alpha, t_used] = sample_eigenvalues(model, J_times, cfg.use_parallel);
+
+% Mean rate over the sampled window (the plot_data grid may be decimated).
+pd = model.plot_data;
+keep = pd.t >= lya_T_interval(1);
+names = fieldnames(pd.r);
+acc = [];
+for q = 1:numel(names)
+    v = pd.r.(names{q});
+    acc = [acc; reshape(v(:, keep), [], 1)]; %#ok<AGROW>
+end
+mean_rate = mean(acc(~isnan(acc)));
+
+r = struct('evals', evals, 'lle', model.lya_results.LLE, 'lya', model.lya_summary(), ...
+    'num_abscissa', omega, 'spec_abscissa', alpha, 'J_times', t_used, ...
+    'mean_rate', mean_rate, 'B_E', ei_weight_balance(model), ...
+    'mu_tilde_relative', model.mu_tilde_relative, 'n', model.n, 'model', model);
+end
+
+function v = ei_weight_balance(m)
+% The realised E:I weight balance of the drawn W: the excitatory share of the
+% total summed weight, |sum W_E| / (|sum W_E| + |sum W_I|). Same definition
+% as ei_weight_fraction in fig_EI_weights_param_space (kept in step by hand).
+ti = m.type_indices;
+S_E = full(sum(sum(m.W(:, ti{1}))));
+S_I = full(sum(sum(m.W(:, ti{2}))));
+denom = abs(S_E) + abs(S_I);
+if denom == 0
+    v = 0.5;
+else
+    v = abs(S_E) / denom;
+end
+end
+
+function mu = preset_mu_EE(preset_name)
+% The preset's mu_EE_relative, read through the class's own alias (index
+% (post, pre) = (1, 1); a 1 x C row is broadcast down the columns), by
+% reading the preset struct: (post, pre) = (1, 1) is E->E on both layouts.
+d = srnn_param_preset(preset_name);
+mu = d.mu_tilde_relative;
+mu = mu(1, 1);                      % (post, pre) = (E, E); a 1 x C row broadcasts, so (1) is E too
 end
 
 %% ------------------------------------------------------------------------

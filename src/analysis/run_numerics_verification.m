@@ -49,6 +49,21 @@ function mat_file = run_numerics_verification(cfg)
 %      where the LLE is positive the two must diverge after a few Lyapunov
 %      times whatever the precision, which is why A exists.
 %
+%   J. ANALYTIC JACOBIAN vs CENTRAL FINITE DIFFERENCES (added 2026-09-14) on the
+%      reduced network of C: three states from the second half of one run,
+%      compute_Jacobian_fast against SRNNCellTypePairs.finite_difference_jacobian
+%      (h = 1e-6). Dendritic rows/columns whose effective argument lies within
+%      10 h of a piecewise-activation breakpoint are excluded (the derivative
+%      jumps there, so a central difference is meaningless) and counted. The
+%      manuscript states this check was done once during validation; it is now
+%      part of every run of this stage, with the errors saved.
+%
+%   ACCEPTANCE CRITERIA are fixed in code (the `acceptance` struct below,
+%   dated 2026-09-14, written BEFORE the runs that use them) and evaluated into
+%   `verdict`, saved with the data and written to <out_dir>/numerics_verdict.md.
+%   The verdict is the point of the stage: it says, per condition and per
+%   manuscript claim, PASS / FAIL / n-a with the value and the threshold.
+%
 %   C. BENETTIN vs QR vs TOP-K on a REDUCED network built from the same preset physics
 %      (n_small neurons, F_tracks_network = true so the spectral radius
 %      matches the full network). QR integrates an N x N variational system
@@ -158,6 +173,36 @@ P.K_small      = 20;                 % top-K on the reduced network (sub-experim
 P.max_restarts = max_restarts;
 P.win_free  = [T_free  / 3 + 0.3, 2 * T_free  / 3 - 0.01];   % inside the stim-on third, see header
 P.win_noisy = [T_noisy / 3 + 0.3, 2 * T_noisy / 3 - 0.01];
+P.n_jac     = 3;                     % states per condition for check J
+P.h_jac     = 1e-6;                  % central-difference step
+P.jac_kink_margin = 10 * P.h_jac;    % exclude x rows within this of a breakpoint
+
+%% Acceptance criteria -- FIXED 2026-09-14, BEFORE ANY RUN THAT USES THEM
+% Recorded here, saved in settings.acceptance, evaluated into `verdict`. The
+% thresholds are not tuned to results: they were chosen from what the
+% integrator orders and the finite-time LLE scatter imply.
+%   A  noise-free reshoot: median order slope >= 1 (Ralston is 2; the
+%      activation's kinks lower it; below 1 the scheme is not converging).
+%   B  noisy reshoot: median slope >= 1, i.e. error ratio >= 2 per halving
+%      (strong order >= 1; SRA1 with additive noise should give ~1.5, ~2.8x).
+%      n/a when the preset carries no noise.
+%   L  paired |lambda_1(sra1) - lambda_1(ode45)|: median <= 0.05 s^-1 AND
+%      <= the across-trial std of lambda_1(ode45) (integrator bias must sit
+%      inside finite-time scatter; second clause needs >= 3 trials).
+%   C  reduced net: median |Benettin - QR lambda_1| <= 0.05 AND
+%      median |top-K - QR lambda_1| <= 0.02.
+%   J  Jacobian: max relative Frobenius error <= 1e-6 AND max top-20
+%      eigenvalue mismatch <= 1e-6 (kink rows excluded).
+acceptance = struct( ...
+    'fixed_on',        '2026-09-14', ...
+    'A_slope_free_min', 1.0, ...
+    'B_slope_noisy_min', 1.0, ...
+    'L_abs_diff_max',  0.05, ...
+    'L_within_scatter', true, ...
+    'C_benettin_qr_max', 0.05, ...
+    'C_topk_qr_max',   0.02, ...
+    'J_rel_fro_max',   1e-6, ...
+    'J_eig_err_max',   1e-6);
 
 if isempty(cfg.out_dir)
     out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'numerics_verification');
@@ -192,7 +237,7 @@ pool = ensure_pool(cfg.n_workers);
 vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', pool.NumWorkers);
 
 t_stage = tic;
-res = struct('name', cond_names, 'title', titles, 'reshoot', [], 'lle', [], 'qr', [], 'summary', []);
+res = struct('name', cond_names, 'title', titles, 'reshoot', [], 'lle', [], 'qr', [], 'jacobian', [], 'summary', []);
 
 for i = 1:n_cond
     cname = cond_names{i};
@@ -235,7 +280,13 @@ for i = 1:n_cond
     res(i).qr = [Q{:}];
     vprintf(cfg.verbose, 'verbose', '  [C] done in %.0f s\n', toc(t0));
 
-    res(i).summary = summarise(res(i).reshoot, res(i).lle, res(i).qr, P.fs_lle);
+    %% J. analytic Jacobian vs central finite differences, reduced network ---
+    t0 = tic;
+    vprintf(cfg.verbose, 'verbose', '  [J] Jacobian vs finite differences on n = %d, %d states ...\n', n_small, P.n_jac);
+    res(i).jacobian = jacobian_trial(P, cname, [1, 2]);
+    vprintf(cfg.verbose, 'verbose', '  [J] done in %.0f s\n', toc(t0));
+
+    res(i).summary = summarise(res(i).reshoot, res(i).lle, res(i).qr, res(i).jacobian, P.fs_lle);
     print_summary(res(i).summary, titles{i}, cfg.verbose);
 end
 
@@ -249,12 +300,18 @@ settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'n_small', n_small, 'T_small', T_small, 'lya_small_warmup', P.lya_small_warmup, 'K_small', P.K_small, ...
     'max_restarts', max_restarts, 'block_names', {{'x', 'a', 'b'}}, ...
     'n_trials_reshoot', n_reshoot, 'n_trials_lle', n_lle, 'n_workers', pool.NumWorkers, ...
+    'n_jac', P.n_jac, 'h_jac', P.h_jac, 'jac_kink_margin', P.jac_kink_margin, ...
+    'acceptance', acceptance, ...
     'minutes', toc(t_stage) / 60);
+
+verdict = evaluate_acceptance(res, acceptance, P.sigma_preset > 0);
+verdict_md = write_verdict(fullfile(out_dir, 'numerics_verdict.md'), verdict, res, settings);
+vprintf(cfg.verbose, 'minimal', '%s', verdict_md);
 
 condition_titles = titles;  % saved name
 results = res;
 mat_file = fullfile(out_dir, 'numerics_verification_data.mat');
-save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', '-v7.3');
+save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', 'verdict', '-v7.3');
 vprintf(cfg.verbose, 'minimal', '[numerics_verification] %.1f min -> %s\n', settings.minutes, mat_file);
 end
 
@@ -519,7 +576,7 @@ end
 end
 
 
-function S = summarise(reshoot, lle, qr, fs_lle)
+function S = summarise(reshoot, lle, qr, jac, fs_lle)
 % Per-trial scalars for the ensemble figure and the report. LLE and QR rows
 % are indexed by the n_trials_lle seeds; reshoot rows by the n_trials_reshoot
 % seeds (the first n_trials_reshoot of the same sequence).
@@ -543,6 +600,13 @@ if ~isempty(reshoot(1).noisy)
 else
     S.err_noisy_paper = nan(1, numel(reshoot));
     S.slope_noisy     = nan(1, numel(reshoot));
+end
+if ~isempty(jac)
+    S.jac_rel_fro_max   = max([jac.rel_fro_err]);
+    S.jac_eig_err_max   = max([jac.eig_err]);
+    S.jac_excluded_total = sum([jac.n_excluded]);
+else
+    S.jac_rel_fro_max = NaN; S.jac_eig_err_max = NaN; S.jac_excluded_total = NaN;
 end
 end
 
@@ -570,4 +634,168 @@ if all(isfinite(S.err_noisy_paper))
     vprintf(verbose, 'verbose', '                                  noisy %.2e +- %.1e (slope %.2f +- %.2f)\n', ...
         mean(S.err_noisy_paper), std(S.err_noisy_paper), mean(S.slope_noisy), std(S.slope_noisy));
 end
+if isfield(S, 'jac_rel_fro_max')
+    vprintf(verbose, 'verbose', '    Jacobian vs finite differences: rel Frobenius max %.2e, eig max %.2e, %d kink rows excluded\n', ...
+        S.jac_rel_fro_max, S.jac_eig_err_max, S.jac_excluded_total);
+end
+end
+
+function Jc = jacobian_trial(P, cname, seeds)
+% Sub-experiment J: analytic Jacobian against central finite differences at
+% P.n_jac states of one reduced-network run (the network of C, seeds [1 2]).
+model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, 'verbose', P.verbose, ...
+    'n', P.n_small, 'indegree', max(2, round(0.2 * P.n_small)), ...
+    'F_tracks_network', true, ...
+    'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', P.fs_lle, ...
+    'T_range', P.T_small, 'lya_method', 'none', 'store_full_state', true);
+model.run();
+params = model.get_params();
+params.u_interpolant = model.u_interpolant;
+nt = size(model.S_out, 1);
+idx = round(linspace(ceil(nt / 2), nt, P.n_jac + 1));
+idx = idx(2:end);
+N = model.N_sys_eqs;
+% Breakpoints of the effective argument x_eff = x - c_eff * sum(a) for the
+% piecewise activation: c + {a/2 - 1, -a/2, a/2, 1 - a/2} (see
+% SRNNCellTypePairs.piecewiseSigmoid). The logistic and tanh have none.
+kinks = [];
+if strcmp(model.activation, 'piecewise')
+    a2 = model.S_a / 2;
+    kinks = [a2 - 1, -a2, a2, 1 - a2];
+end
+if ~isempty(model.S_c_vec); c_vec = model.S_c_vec(:); else; c_vec = model.S_c * ones(params.n, 1); end
+layout = params.state_layout;
+Jc = repmat(struct('seeds', seeds, 'n', P.n_small, 'N', N, 't', NaN, 'h', P.h_jac, ...
+    'max_abs_err', NaN, 'rel_fro_err', NaN, 'eig_err', NaN, 'n_excluded', 0, ...
+    'excluded_rows', [], 'seconds', NaN), 1, P.n_jac);
+for k = 1:P.n_jac
+    t0 = tic;
+    S = model.S_out(idx(k), :)';
+    x = S(layout.x);
+    x_eff = x;
+    for q = 1:params.n_cellTypes
+        if params.n_a(q) > 0
+            a = reshape(S(layout.a{q}), params.n_per_type(q), params.n_a(q));
+            x_eff(params.type_indices{q}) = x_eff(params.type_indices{q}) - params.c_eff(q) .* sum(a, 2);
+        end
+    end
+    near = false(params.n, 1);
+    for kk = kinks
+        near = near | abs(x_eff - (c_vec + kk)) <= P.jac_kink_margin;
+    end
+    keep = true(N, 1);
+    keep(layout.x(near)) = false;
+    J   = full(SRNNCellTypePairs.compute_Jacobian_fast(S, params));
+    Jfd = SRNNCellTypePairs.finite_difference_jacobian(S, params, P.h_jac);
+    Jk = J(keep, keep); Jfk = Jfd(keep, keep);
+    D = Jk - Jfk;
+    ea = sort(eig(Jk), 'descend', 'ComparisonMethod', 'real');
+    ef = sort(eig(Jfk), 'descend', 'ComparisonMethod', 'real');
+    m = min(20, numel(ea));
+    Jc(k).t = model.t_out(idx(k));
+    Jc(k).max_abs_err = max(abs(D(:)));
+    Jc(k).rel_fro_err = norm(D, 'fro') / norm(Jfk, 'fro');
+    Jc(k).eig_err = max(abs(ea(1:m) - ef(1:m)));
+    Jc(k).n_excluded = nnz(near);
+    Jc(k).excluded_rows = find(near)';
+    Jc(k).seconds = toc(t0);
+end
+vprintf(P.verbose, 'verbose', '    [J] seeds %s: rel Frobenius %s, eig %s, excluded %s\n', mat2str(seeds), ...
+    mat2str([Jc.rel_fro_err], 2), mat2str([Jc.eig_err], 2), mat2str([Jc.n_excluded]));
+end
+
+function V = evaluate_acceptance(res, acc, has_noise)
+% Evaluate the pre-registered criteria per condition. pass is true / false /
+% NaN (not applicable); value and threshold are what the table shows.
+n = numel(res);
+V = struct('fixed_on', acc.fixed_on, 'conditions', {{res.name}}, 'per_condition', [], 'all_pass', false);
+per = repmat(struct('name', '', 'A', [], 'B', [], 'L', [], 'C', [], 'J', []), 1, n);
+for i = 1:n
+    S = res(i).summary;
+    per(i).name = res(i).name;
+    v = median(S.slope_free);
+    per(i).A = crit(v, sprintf('>= %.2g', acc.A_slope_free_min), v >= acc.A_slope_free_min, ...
+        'noise-free reshoot order slope (median over trials)');
+    if has_noise && all(isfinite(S.slope_noisy))
+        v = median(S.slope_noisy);
+        per(i).B = crit(v, sprintf('>= %.2g', acc.B_slope_noisy_min), v >= acc.B_slope_noisy_min, ...
+            'noisy reshoot strong-order slope (median; ratio per halving = 2^slope)');
+    else
+        per(i).B = crit(NaN, sprintf('>= %.2g', acc.B_slope_noisy_min), NaN, 'noisy reshoot: no noise in the preset');
+    end
+    d = abs(S.lle_sra1 - S.lle_ode45);
+    v = median(d);
+    ok = v <= acc.L_abs_diff_max;
+    thr = sprintf('<= %.2g', acc.L_abs_diff_max);
+    if acc.L_within_scatter && numel(d) >= 3
+        sc = std(S.lle_ode45);
+        ok = ok && v <= sc;
+        thr = sprintf('%s and <= scatter %.3g', thr, sc);
+    end
+    per(i).L = crit(v, thr, ok, 'median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network)');
+    dq = median(abs(S.qr_benettin - S.qr_lambda1));
+    if isfield(S, 'topk_lambda1'); dt = median(abs(S.topk_lambda1 - S.qr_lambda1)); else; dt = NaN; end
+    ok = dq <= acc.C_benettin_qr_max && (isnan(dt) || dt <= acc.C_topk_qr_max);
+    per(i).C = crit([dq, dt], sprintf('<= %.2g and <= %.2g', acc.C_benettin_qr_max, acc.C_topk_qr_max), ok, ...
+        'median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network)');
+    ok = S.jac_rel_fro_max <= acc.J_rel_fro_max && S.jac_eig_err_max <= acc.J_eig_err_max;
+    per(i).J = crit([S.jac_rel_fro_max, S.jac_eig_err_max], sprintf('<= %.0e and <= %.0e', acc.J_rel_fro_max, acc.J_eig_err_max), ok, ...
+        sprintf('max rel Frobenius and top-20 eigenvalue error, %d kink rows excluded', S.jac_excluded_total));
+end
+V.per_condition = per;
+p = arrayfun(@(c) [c.A.pass, c.B.pass, c.L.pass, c.C.pass, c.J.pass], per, 'UniformOutput', false);
+p = [p{:}];
+V.all_pass = all(p(~isnan(p)) == 1);
+end
+
+function c = crit(value, threshold, pass, text)
+if islogical(pass); pass = double(pass); end
+c = struct('value', value, 'threshold', threshold, 'pass', pass, 'text', text);
+end
+
+function md = write_verdict(file, V, res, settings)
+checks = {'A', 'B', 'L', 'C', 'J'};
+claims = { ...
+    'A', '400-Hz SRA1 converges to the ode45 reference under step refinement (noise-free)'; ...
+    'B', 'SRA1 converges under step refinement on one Brownian path (strong order >= 1)'; ...
+    'L', 'the Benettin LLE at 400-Hz SRA1 agrees with ode45-Benettin'; ...
+    'C', 'the Benettin LLE agrees with the QR spectrum''s lambda_1 and with top-K'; ...
+    'J', 'the analytic Jacobian matches central finite differences'};
+L = {};
+L{end+1} = sprintf('# Numerics verification verdict (%s, %s)', settings.preset_name, settings.run_mode);
+L{end+1} = '';
+L{end+1} = sprintf('Acceptance criteria fixed on %s, before the run. Trials: %d reshoot, %d LLE/QR; %d Jacobian states per condition.', ...
+    V.fixed_on, settings.n_trials_reshoot, settings.n_trials_lle, settings.n_jac);
+L{end+1} = '';
+L{end+1} = '| Condition | Check | Value | Threshold | Result | What |';
+L{end+1} = '|---|---|---|---|---|---|';
+for i = 1:numel(V.per_condition)
+    c = V.per_condition(i);
+    for k = 1:numel(checks)
+        r = c.(checks{k});
+        L{end+1} = sprintf('| %s | %s | %s | %s | %s | %s |', res(i).title, checks{k}, ...
+            mat2str(r.value, 3), r.threshold, pass_txt(r.pass), r.text); %#ok<AGROW>
+    end
+end
+L{end+1} = '';
+L{end+1} = '## Manuscript claims';
+L{end+1} = '';
+for k = 1:size(claims, 1)
+    p = arrayfun(@(c) c.(claims{k, 1}).pass, V.per_condition);
+    if all(isnan(p)); s = 'n/a'; elseif all(p(~isnan(p)) == 1); s = 'PASS'; else; s = 'FAIL'; end
+    L{end+1} = sprintf('- %s: **%s** (%s)', claims{k, 2}, s, strjoin(arrayfun(@(c) pass_txt(c.(claims{k, 1}).pass), V.per_condition, 'UniformOutput', false), ' / ')); %#ok<AGROW>
+end
+L{end+1} = '';
+if V.all_pass
+    L{end+1} = 'Every applicable criterion passed in every condition.';
+else
+    L{end+1} = 'AT LEAST ONE CRITERION FAILED: see the table. Resolve in code or reflect in the Methods before production analyses.';
+end
+md = [strjoin(L, newline), newline];
+fid = fopen(file, 'w');
+if fid > 0; fprintf(fid, '%s', md); fclose(fid); end
+end
+
+function s = pass_txt(p)
+if isnan(p); s = 'n/a'; elseif p; s = 'PASS'; else; s = 'FAIL'; end
 end

@@ -3,6 +3,13 @@ function out = fig_numerics_verification(cfg)
 %
 %   out = FIG_NUMERICS_VERIFICATION('run_dir', d, 'variant', 'solver')
 %   out = FIG_NUMERICS_VERIFICATION('run_dir', d, 'variant', 'lya_method')
+%   out = FIG_NUMERICS_VERIFICATION('run_dir', d, 'variant', 'jacobian')
+%
+% 'jacobian' (2026-09-14): per condition, the relative Frobenius error and the
+% top-20 eigenvalue mismatch between the analytic Jacobian and central finite
+% differences at each sampled state of the reduced network (check J), log y,
+% with the pre-registered acceptance thresholds as lines. Tag
+% Fig_Numerics_Jacobian; needs a run that carries results.jacobian.
 %
 % The PLOT half of run_numerics_verification; the .mat it reads is produced by
 % that stage, inside the run directory, and there is no fallback. Two
@@ -36,7 +43,7 @@ function out = fig_numerics_verification(cfg)
 
 arguments
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
-    cfg.variant     (1,:) char {mustBeMember(cfg.variant, {'solver', 'lya_method', 'ensemble'})} = 'solver'
+    cfg.variant     (1,:) char {mustBeMember(cfg.variant, {'solver', 'lya_method', 'ensemble', 'jacobian'})} = 'solver'
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
@@ -73,6 +80,13 @@ switch cfg.variant
                 'The ensemble variant needs a run with per-trial summaries (results.trials).');
         end
         fig = plot_ensemble(R, SM, S, st, n_cond, cfg.visible);
+    case 'jacobian'
+        fig_tag = 'Fig_Numerics_Jacobian';
+        if ~isfield(D.results, 'jacobian') || isempty(D.results(1).jacobian)
+            error('fig_numerics_verification:NoJacobian', ...
+                'The jacobian variant needs a run that carries results.jacobian (stage runs from 2026-09-14).');
+        end
+        fig = plot_jacobian(D.results, S, st, n_cond, cfg.visible);
 end
 
 out = struct('figs', fig, 'files', {{}}, 'source', data_file);
@@ -352,6 +366,35 @@ end
 title(tl, {sprintf('Per-trial comparisons: %d seeds for the LLE rows, %d for the reshoot row (%s)', ...
     n_lle, n_rs, S.preset_name), ...
     'each point is one seed (labelled by trial); dashed line is identity'}, ...
+    'FontWeight', 'bold', 'Interpreter', 'none');
+end
+
+function fig = plot_jacobian(R, S, st, n_cond, visible)
+% Check J: analytic vs finite-difference Jacobian, per sampled state.
+fig = figure('Position', [100, 80, 380 * n_cond, 420], 'Visible', onoff(visible));
+tl  = tiledlayout(fig, 1, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
+acc = struct('J_rel_fro_max', 1e-6, 'J_eig_err_max', 1e-6);
+if isfield(S, 'acceptance'); acc = S.acceptance; end
+for i = 1:n_cond
+    col = cond_color(st, R(i).name, i);
+    Jc = R(i).jacobian;
+    k = 1:numel(Jc);
+    ax = nexttile(tl, i); hold(ax, 'on');
+    plot(ax, k, [Jc.rel_fro_err], 'o-', 'Color', col, 'MarkerFaceColor', col, 'LineWidth', st.line_lw, ...
+        'DisplayName', 'relative Frobenius error');
+    plot(ax, k, [Jc.eig_err], 's--', 'Color', col, 'MarkerFaceColor', 'w', 'LineWidth', st.line_lw, ...
+        'DisplayName', 'top-20 eigenvalue mismatch');
+    yline(ax, acc.J_rel_fro_max, ':', 'Color', [0.3 0.3 0.3], 'DisplayName', sprintf('threshold %.0e', acc.J_rel_fro_max));
+    hold(ax, 'off');
+    set(ax, 'YScale', 'log', 'FontSize', st.tick_fs, 'XTick', k);
+    xlim(ax, [0.5, numel(Jc) + 0.5]);
+    xlabel(ax, sprintf('sampled state (n = %d, N = %d)', Jc(1).n, Jc(1).N), 'FontSize', st.label_fs);
+    if i == 1; ylabel(ax, 'error', 'FontSize', st.label_fs); end
+    title(ax, {R(i).title, sprintf('%d kink rows excluded, h = %.0e', sum([Jc.n_excluded]), Jc(1).h)}, ...
+        'FontWeight', 'normal', 'FontSize', st.title_fs);
+    legend(ax, 'Location', 'best', 'FontSize', st.tick_fs - 2);
+end
+title(tl, sprintf('Analytic Jacobian vs central finite differences (%s)', S.preset_name), ...
     'FontWeight', 'bold', 'Interpreter', 'none');
 end
 
