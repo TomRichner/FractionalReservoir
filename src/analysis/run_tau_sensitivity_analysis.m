@@ -60,6 +60,11 @@ arguments
 end
 
 setup_paths();
+% Figures this stage draws are created INVISIBLE (TR, 2026-09-14): a new figure
+% window raises itself and takes keyboard and mouse focus, and a sweep draws
+% many. They still save; with_graphics_defaults restores the root default when
+% the guard goes out of scope.
+fig_guard = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 
 note = 'tau_timescales';
 

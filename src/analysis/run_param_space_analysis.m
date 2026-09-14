@@ -28,6 +28,11 @@ arguments
 end
 
 setup_paths();
+% Figures this stage draws are created INVISIBLE (TR, 2026-09-14): a new figure
+% window raises itself and takes keyboard and mouse focus, and a sweep draws
+% many. They still save; with_graphics_defaults restores the root default when
+% the guard goes out of scope.
+fig_guard = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 
 psa = ParamSpaceAnalysis2( ...
     'n_levels', ctx.n_levels, ...   % set by run_mode (fast=3, production=5)

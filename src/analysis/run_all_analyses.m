@@ -121,6 +121,7 @@ run_sensitivity_analysis(resolve_run_context('sensitivity', ctx_args{:}));
 % alphabetically -- f_E, level_of_chaos, mu_EE, mu_EI, mu_IE, mu_II, n -- buries
 % both questions.
 if opts.assemble && opts.save_figs
+    fig_guard = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>   % replots stay off screen
     vprintf(opts.verbose, 'verbose', '========================================\n');
     vprintf(opts.verbose, 'verbose', 'Assembling 1D sensitivity figures...\n');
     vprintf(opts.verbose, 'verbose', '========================================\n');
