@@ -144,6 +144,11 @@ for k = 1:nR
     p = mcr.predictions(d);
     t_delay = mcr.t_pred(p.t_indices);
 
+    if t_delay(end) - t_delay(1) < recon_win
+        warning('fig_memory_capacity_example:ShortTrace', ...
+            'The reconstruction at delay %.1f s spans %.0f s but the panel shows %g s; run_memory_capacity_example must simulate a longer test window (T_test_sec %g s in mode ''%s'').', ...
+            delay_s(d), t_delay(end) - t_delay(1), recon_win, S.settings.T_test_sec, S.settings.run_mode);
+    end
     recon_ax(k) = nexttile(tl_c); hold on; grid off; box off;
     plot(t_delay, p.y_true, 'k-', 'LineWidth', 0.9);
     plot(t_delay, p.y_pred, '-', 'Color', colors(recon_cond, :), 'LineWidth', 1.4);

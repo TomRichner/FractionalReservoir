@@ -59,8 +59,11 @@ end
 % not need that function's trial count, bootstrap or permutation machinery.
 % medium2 runs at medium effort: it differs from medium only in sweep dimensions,
 % and this is a single trial with no sweep. Same collapse as run_memory_capacity.
+% T_test is at least 75 s in EVERY mode (TR, 2026-09-14): the figure draws
+% the first 60 s of the test window after the longest delay is dropped, so
+% a 30-s fast test window used to show half a trace.
 switch opts.run_mode
-    case 'fast',                T_train_sec = 60;  T_test_sec = 30;  d_max_sec = 5;
+    case 'fast',                T_train_sec = 120; T_test_sec = 75;  d_max_sec = 5;
     case {'medium', 'medium2'}, T_train_sec = 300; T_test_sec = 90;  d_max_sec = 10;
     case 'production',          T_train_sec = 600; T_test_sec = 150; d_max_sec = 15;
     otherwise
