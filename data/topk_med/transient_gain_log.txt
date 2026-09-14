@@ -1,0 +1,14 @@
+[transient_gain] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 run_mode=medium: 3 conditions x 2 seeds, T = 40 s, 12 regular + up to 8 onset + 8 quiet samples, horizon 2 s, {frozen_x, frozen_full, active}
+  parallel pool: 14 workers
+  no_adaptation  seed 1: N 500, lambda_1 +4.077, 12 samples (0 onsets, 0 quiets found) in 1065 s
+  no_adaptation  seed 2: N 500, lambda_1 +2.631, 15 samples (3 onsets, 0 quiets found) in 1149 s
+  sfa1_std1      seed 1: N 2000, lambda_1 +0.491, 20 samples (8 onsets, 0 quiets found) in 2426 s
+  sfa1_std1      seed 2: N 2000, lambda_1 +0.477, 20 samples (11 onsets, 0 quiets found) in 2437 s
+  sfa3_std2      seed 2: N 4000, lambda_1 -0.111, 14 samples (1 onsets, 1 quiets found) in 2621 s
+  sfa3_std2      seed 1: N 4000, lambda_1 -0.111, 17 samples (3 onsets, 2 quiets found) in 3048 s
+  no_adaptation  27 samples (24 regular, 3 onset, 0 quiet; found 3 onsets, 0 quiets) | median G_max (regular): frozen_x 3313504.78, frozen_full 3313504.78, active 11599.22
+  sfa1_std1      40 samples (24 regular, 16 onset, 0 quiet; found 19 onsets, 0 quiets) | median G_max (regular): frozen_x 1143781.39, frozen_full 119.33, active 48.02
+  sfa3_std2      31 samples (24 regular, 4 onset, 3 quiet; found 4 onsets, 3 quiets) | median G_max (regular): frozen_x 22.35, frozen_full 4.83, active 4.96
+[transient_gain] 50.8 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\topk_med\transient_gain\transient_gain_data.mat
+
+wall 50.8 min

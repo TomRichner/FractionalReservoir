@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\topk_med
+Captured at: 12-Sep-2026 19:51:42
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      3a645684a2bc6161f9de54ac716434fad9ac298f
+commit_short:3a64568
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Drop the config-level model override; the top-K cap is 60 in analysis_run_config
+last_date:   2026-09-12T19:50:32-05:00
+dirty:       false
+

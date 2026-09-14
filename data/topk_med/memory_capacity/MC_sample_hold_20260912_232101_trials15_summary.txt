@@ -1,0 +1,18 @@
+Run: MC_sample_hold_20260912_232101_trials15
+Preset: celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 | run_mode: medium
+Input: sample_hold | n=500 | fs=200 Hz | trials=15 | d_max=15.00 s
+
+Total MC (mean +/- SEM) and 95% CI:
+  no_adaptation: 0.103 +/- 0.006 | CI [0.093, 0.114]
+  sfa1_std1: 0.259 +/- 0.025 | CI [0.218, 0.313]
+  sfa3_std2: 0.590 +/- 0.039 | CI [0.515, 0.664]
+
+Horizon (R^2>0.10) (mean +/- SEM) and 95% CI:
+  no_adaptation: 0.000 +/- 0.000 s | CI [0.000, 0.000]
+  sfa1_std1: 0.120 +/- 0.049 s | CI [0.040, 0.220]
+  sfa3_std2: 0.520 +/- 0.046 s | CI [0.420, 0.600]
+
+Paired permutation tests (sign-flip) on Total MC:
+  no_adaptation vs sfa1_std1: mean diff = -0.156 | p_perm = 6.104e-05 (exact, 32768 patterns) | Cohen's dz = -1.812
+  no_adaptation vs sfa3_std2: mean diff = -0.486 | p_perm = 6.104e-05 (exact, 32768 patterns) | Cohen's dz = -3.316
+  sfa1_std1 vs sfa3_std2: mean diff = -0.331 | p_perm = 0.0001221 (exact, 32768 patterns) | Cohen's dz = -2.040
