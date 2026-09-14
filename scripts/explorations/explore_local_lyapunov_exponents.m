@@ -217,7 +217,10 @@ title(tl, sprintf('%s, seeds %s, T = %g s, window [%g %g] s, top-%d QR + Benetti
     tern(isempty(opts.input_config), '', ', input_config overridden')), ...
     'FontWeight', 'normal', 'FontSize', 10);
 
-save_figure_stable(out_dir, 'local_lyapunov_exponents', fig);
+% Table and data FIRST, figure export last: at K = 100 the figure holds ~15
+% million points and its vector export ran for many minutes before being
+% interrupted (2026-09-14), taking the table and the .mat with it. PNG and
+% .fig only -- no SVG -- for the same reason.
 fid = fopen(fullfile(out_dir, 'local_lyapunov_exponents_table.md'), 'w');
 fprintf(fid, '# Local Lyapunov exponents, %s, seeds %s, T = %g s, window [%g %g] s, K = %d%s\n\n', ...
     P, mat2str(seeds), T, T/2, T, K, tern(isempty(opts.input_config), '', ' (input_config overridden)'));
@@ -226,6 +229,15 @@ fprintf(fid, '%s\n', rows{:});
 fclose(fid);
 input_config = opts.input_config; %#ok<NASGU>  saved with the data
 save(fullfile(out_dir, 'local_lyapunov_exponents_data.mat'), 'R', 'P', 'seeds', 'T', 'K', 'input_config', '-v7.3');
+fprintf('table and data saved to %s; exporting the figure (png, fig)\n', out_dir);
+old = dir(fullfile(out_dir, 'local_lyapunov_exponents*'));
+for a = 1:numel(old)
+    if ~old(a).isdir && ~endsWith(old(a).name, {'.md', '.mat'}); delete(fullfile(out_dir, old(a).name)); end
+end
+save_some_figs_to_folder_2(out_dir, 'local_lyapunov_exponents', fig.Number, {'png', 'fig'});
+num = num2str(fig.Number);
+movefile(fullfile(out_dir, ['local_lyapunov_exponents_figure_' num '.png']), fullfile(out_dir, 'local_lyapunov_exponents.png'), 'f');
+movefile(fullfile(out_dir, ['local_lyapunov_exponents_f_' num '.fig']),      fullfile(out_dir, 'local_lyapunov_exponents.fig'), 'f');
 fprintf('saved to %s\n', out_dir);
 end
 
