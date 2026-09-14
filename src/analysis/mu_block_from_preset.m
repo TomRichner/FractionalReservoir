@@ -6,17 +6,20 @@ function [ranges, factors] = mu_block_from_preset(preset_defaults)
 % Returns an N x 2 cell {block_name, [lo hi]} covering mu_EE / mu_EI / mu_IE /
 % mu_II, and the multiplier pair the ranges were built from.
 %
-% Each block is swept from a QUARTER to TRIPLE whatever the PRESET operates at
-% rather than over fixed absolute numbers -- i.e. -75% to +200% of the default.
+% Each block is swept from HALF to 1.5x whatever the PRESET operates at rather
+% than over fixed absolute numbers -- i.e. -50% to +50% of the default (TR,
+% 2026-09-14).
 % mu_*_relative is a multiplier of F = 1/sqrt(n*alpha*(2-alpha)), so "the default
 % level" is only meaningful relative to the preset -- and mu_tilde_relative is a
 % REQUIRED constructor property with no class default to fall back on, which is
 % why this reads the preset rather than ParamSpaceAnalysis2.class_default.
 %
-% Widened from [0.5, 2.0] (-50% to +100%). Note the default does NOT sit at the
-% centre of the resulting linear axis and is not meant to: 0.25x-3x is roughly
-% symmetric in RATIO, so the preset sits about a fifth of the way along. The
-% percent ruler apply_percent_axis draws is what makes that readable.
+% History: [0.5, 2.0] until 2026-09-12, then [0.25, 3.0] (roughly symmetric in
+% RATIO, the preset a fifth of the way along the linear axis) until
+% 2026-09-14, when TR chose the +/-50% neighbourhood for the manuscript: the
+% preset sits at the centre of the linear axis and apply_percent_axis reads
+% -50% .. +50%. Runs from before that date used the wider span and cannot be
+% pooled with new ones (same_config refuses a different grid anyway).
 %
 % WAS a local subfunction of run_sensitivity_analysis, returning one block at a
 % time. Promoted to its own file -- returning all four, WITH the multipliers --
@@ -27,7 +30,7 @@ function [ranges, factors] = mu_block_from_preset(preset_defaults)
 %
 % See also: run_sensitivity_analysis, run_param_space_analysis
 
-factors = [0.25, 3.0];
+factors = [0.5, 1.5];
 block_names = {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relative'};
 
 ranges = cell(numel(block_names), 2);
