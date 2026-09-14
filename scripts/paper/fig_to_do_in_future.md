@@ -15,18 +15,24 @@
 - config.m files need to be independent
 
 - time series example should show 1 synaptic output per neuron if all have same STD routes
+  - DONE 2026-09-14: `fig_example_timeseries` is a three-column composite (one column per condition, shared seeds): x, r and synaptic output of a 10 E + 10 I subset, ONE synaptic output per neuron when every route is identical (`SRNNCellTypePairs.routes_identical`), population-mean SFA per timescale, prod(b) of the subset, and the local + accumulating finite-time lambda_1 panel (`plot_local_and_finite_lle`).
 
 - time series should show depression for for all if all have same STD routes
+  - DONE 2026-09-14: see the `fig_example_timeseries` composite above (prod(b) of the subset, route 1 when the routes are identical).
 
 - time series should show a subset of neurons
+  - DONE 2026-09-14: 10 E + 10 I (`n_show_E`, `n_show_I`).
 
 - time series should show local lya
+  - DONE 2026-09-14: bottom row of the composite, leading local rate (grey) with the accumulating finite-time lambda_1 (condition colour).
 
 - local lya density histogram over time
 
 - modify the main time-series example to show local LLE and the accumulating finite-time LLE together
+  - DONE 2026-09-14: `fig_example_timeseries` + `src/plotting/plot_local_and_finite_lle.m` (top-K or Benettin results).
 
 - compare the distribution of local LLE across time and trials with the distribution of finite-time LLE across trials; use this to test the proposed combination of transient expansion and long-interval stability in each adaptation condition
+  - DONE 2026-09-14: `fig_local_vs_finite_lle` (near-default set = the 7 sweeps at the level nearest the default, 105 jobs per condition, plus the joint sample). On data/topk_med: locally expanding 83% / 53% / 3% of the time, lambda_1 +3.47 / +0.35 / -0.112 for no / single / multiple-timescale adaptation. The stronger claim (transient expansion within long-interval stability) holds for the SINGLE-timescale regime near the boundary; the multiple-timescale regime is quietly stable.
 
 - Eliminate SRNNModel2.m
 
@@ -39,10 +45,12 @@
 - verify the benettin reshooting vs QR methods agree for SRNNCellTypePairs.m (it was done on the SRNNModel2.m).  this can also be done with the SRA1 vs ODE45 check.  
 
 - only tau_a_E was swept for the tau sensitivity analysis.  it should be both E and I for runs in which both E and I have SFA.  We need to fix this.  Can this be done considering how the param space analysis class works? 
+  - DONE 2026-09-14: `tau_a_EI` alias (writes every `tau_a{q}`, getter asserts equality); `run_tau_sensitivity_analysis` picks `tau_a_EI` vs `tau_a_E` from the condition and writes `tau_levels.md`/`.mat` (resolved E and I ladders per level) as the manifest. `test_tau_a_EI_alias`.
 
 - could we go to a single cell type model (but with a dale's law weight matrix)?  this would reduce the std routes and possibly clean up the number of eignevalues in the jacobian.  results should be the same.  might make the tau_a sweep work without modification.  Is single cell type supported?  We ran into that during a refactor previously.
 
 - quiet down the printing to the command line so it stops filling the agent's context through the MATLAB MCP server.  Now priority 0 in the ranked list below: a three-level `verbose` setting (`verbose` / `minimal` / `near-none`), `minimal` by default.
+  - DONE 2026-09-14: `verbose` | `minimal` (default) | `near-none`, `cfg.verbose` in every config, threaded to the parfor workers; `vprintf`/`verbose_level` in src/util; `test_verbose_levels`. See CLAUDE.md.
 
 ## Additional items from the Manuscript5 planning audit
 
@@ -89,6 +97,7 @@
 - should redo systems as a single cell type with dales W.  Would this eliminate the multiple route STD degeneracy and help top k lyapunov exponent methods? Would this be easier for the train-srnn pytorch model?
 
 - For normalizng STD, how do we do it?  by peak steady-state synaptic output at r = 0.5 or r = S_c? and compensate with a multiplicative factor?  would allow for 3 TS std
+  - DONE 2026-09-14 (decision TR 2026-09-13): route `scale` on the two-timescale routes (theta unchanged, W(post,pre) * s in `get_params`), s = 1 + r_ref/rho = 3 at r_ref = 0.25 = the occupied median rate of the multiple-timescale condition near the default; presets `..._dualStdScaled_3cond_mu8p25` (primary) and `..._dualStdUsage_3cond_mu8p25` (control: tau_rel lengthened, rho_u = 0.342, no scale). `fig_STD_strength_matching`; `docs/notes/STD_strength_matching_2026-09-13.md`. NOT frozen yet: TR confirms the direction in the morning.
 
 - below priorities are from before implementing top-K LLE.  We should consider redoing with top-K LLE.  
   - DONE 2026-09-12: the sweeps now run top-K (K = 15, retry to 60, lya_dt 0.05) and store h_KS, D_KY, n+, the gap, transient divergence and the leading vector's block fractions per job (`sweep_metrics`, `SRNNCellTypePairs.lya_summary`); h_KS and D_KY have their own sensitivity / param-space / E:I sheets; new stages `run_lyapunov_spectrum` (+ `fig_lyapunov_spectrum`) and the numerical abscissa in `run_eig_heatmap` (+ `fig_transient_amplification`). Benettin stays available for a comparison rerun (`cfg.model.lya_method = 'benettin'`). The full paper run has NOT been redone yet -- the priorities below still describe Benettin-era outputs, and the manuscript's image links to the mean-rate sheets change case (`Fig_Sensitivity_mean_rate_medians`) and the param-space sheet is per measure now.
@@ -106,6 +115,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 
 ### 0. Give the whole code base a three-level `verbose` setting, defaulting to the AI-friendly level
 
+**DONE 2026-09-14.** `verbose` / `minimal` (default) / `near-none`, one setting from `paper_config` and every `*_config.m` through `ctx`, the stages, `ParamSpaceAnalysis2` and both model classes into the parfor workers; the stages' `evalc` wrappers are gone; warnings and errors never gated. `test_verbose_levels` (a 2 x 2 sweep at `minimal` is three lines). Commit f5c5cac.
+
 **Why this comes before everything else.** Every analysis and figure in this list will be run, watched and debugged through the MATLAB MCP server, and everything MATLAB prints to the command window comes back into the agent's context verbatim.  The model classes print on every build and run ("W created: spectral radius…", "SRNNCellTypePairs built successfully", "Integration complete in…", "Largest Lyapunov Exponent…"), `ParamSpaceAnalysis2` prints per job, and a sweep or a 25-seed ensemble multiplies that by hundreds.  The result is context filled with chatter, more frequent compaction, and an agent that cannot see the few lines that matter.  `run_numerics_verification` had to wrap every `build()` and `run()` in `evalc` to be usable at all; that is a workaround at one call site, not a fix.  Doing this first makes every later priority cheaper to run and to supervise.
 
 **What is wanted.** One setting, set in the config (`paper_config` and every `*_config.m`), threaded to every model class, analysis driver, stage and figure, and respected by all of them.  Three levels:
@@ -120,6 +131,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 
 ### 1. Freeze the one-timescale versus multiple-timescale comparison, especially STD normalization
 
+**DONE 2026-09-14 (code and figure), NOT YET FROZEN.** Route `scale` field (`synapse_config.<pre>.<post>.scale`, folded into `params.W` only); presets `celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdScaled_3cond_mu8p25` (primary, TR's choice: scale 3 on the four dual routes) and `..._dualStdUsage_3cond_mu8p25` (control: equal usage rho_u = 0.342, no scale), both matching the single-timescale steady-state synaptic output at r_ref = 0.25; `fig_STD_strength_matching` draws the curves over the occupied rates; `docs/notes/STD_strength_matching_2026-09-13.md` carries the decision, the numbers and the replacement Methods paragraph. The matched runs are `data/stdscaled_fast` / `data/stdusage_fast` at 'fast' -- this is NOT the frozen production decision: TR must confirm the direction (scale vs usage) in the morning before any medium/production run. Note the on-record consequence: the scaled dual condition has 3x the undepressed low-rate recurrent gain.
+
 **Why this is first and how it affects the manuscript.** The main paper attributes differences among the three conditions to the temporal structure of adaptation.  SFA is already normalized: total SFA coupling is divided across its active timescales, so adding SFA timescales changes temporal structure without increasing its steady-state strength.  STD is not normalized in the same way.  The synaptic output is $r\prod_m b_m$, so adding a second depression variable changes both the number of recovery timescales and the magnitude and shape of steady-state depression.  With the current ratios, the two-timescale attenuation is approximately the square of the one-timescale attenuation.  If left unresolved, the paper can support a claim about the combined one-timescale and multiple-timescale architectures, but not a clean claim that timescale count alone caused the difference.
 
 **Work required.** Read `StochasticPlasticDynamicalSystemPaper/reports/suggest_updates_main_matlab_model.md` before changing the model.  Decide explicitly what quantity should be matched: the steady-state synaptic-output curve over the empirically occupied firing-rate range, the output at one prespecified reference rate, or a new normalized multiplicative parameterization.  The least disruptive option is to retain the biologically motivated product model as primary and add a strength-matched control; changing the model equation itself would require updating the v2 equations, Methods, presets, tests, and every downstream analysis.  Plot the one- and two-timescale steady-state synaptic-output curves together and show the network's occupied rate distribution so the match is visible rather than asserted.
@@ -127,6 +140,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 **Definition of done.** The choice and rationale are written down; the preset names make normalized and unnormalized conditions unambiguous; relevant model tests pass; the resolved parameters are saved; and the manuscript wording accurately distinguishes a timescale comparison from a combined timescale-plus-strength comparison.  Only then should the final sensitivity, timescale, memory, eigenvalue, and stimulation analyses be launched.
 
 ### 2. Finish the numerical-validity gate before the final production runs
+
+**DONE 2026-09-14 (gate built).** Fifth check J: analytic Jacobian vs central finite differences (`SRNNCellTypePairs.finite_difference_jacobian`) at 3 states per condition on the reduced network, kink rows excluded; acceptance thresholds for A/B/L/C/J fixed in code before any run and saved in `settings.acceptance`; `verdict` in the .mat and `numerics_verdict.md` with a PASS/FAIL per manuscript claim. At 'fast' L and C fail on the short windows by design (J passes at ~1e-10); judge on medium/production. `fig_numerics_verification('variant','jacobian')`, `test_numerics_verification_stage`.
 
 **Why this matters to the manuscript.** `Manuscript5.md` states that 400-Hz SRA1 is sufficiently precise, agrees with `ode45` in noise-free simulations, remains consistent under time-step refinement, and produces a Benettin LLE agreeing with a full-spectrum QR calculation on smaller networks.  The Supplemental Methods also state that the full analytic Jacobian was verified against central finite differences.  These are validation claims, not optional implementation details: every stability result depends on the integrator, shared-noise path, perturbation reshooting, and Jacobian being correct.
 
@@ -138,6 +153,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 
 ### 3. Establish the main stability result on the frozen reference model
 
+**DONE 2026-09-14 (figures; production data pending).** `fig_example_timeseries` composite with the local rate and the accumulating finite-time lambda_1 together; `fig_local_vs_finite_lle` across trials. Finding on data/topk_med near the default: locally expanding 83% / 53% / 3% of the time, lambda_1 +3.47 / +0.35 / -0.112 (no / single / multiple). The stronger claim holds for the single-timescale regime near the boundary, not for the multiple-timescale one, which is quietly stable -- keep the transient-expansion idea in the Discussion for that regime.
+
 **Manuscript connection.** This supplies the first Results subsection, currently titled “Multiple-timescale adaptation constrains dynamics near the stability boundary.”  The important quantity is the largest Lyapunov exponent measured along a changing nonlinear trajectory.  Instantaneous Jacobian eigenvalues are useful local descriptions of effective connectivity but cannot establish asymptotic stability when the Jacobian changes with state.  Keep that distinction explicit throughout the analysis and captions.
 
 **Scientific question.** Does multiple-timescale adaptation produce a reproducible dynamical regime that is slightly stable over an extended interval while still allowing transient epochs of local expansion?  The current figures show a representative finite-time LLE and Jacobian occupancy, but they do not yet establish the desired stronger claim about transient expansion versus long-interval contraction across trials.
@@ -147,6 +164,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 **Definition of done.** There is a representative trace that explains the quantities, an across-trial summary for all three conditions, prespecified analysis windows, and saved seed-level data.  The evidence must support either the narrow current claim—that longer timescales move the median LLE toward zero—or the stronger claim about transient expansion plus long-interval stability.  If it does not support the stronger claim, keep that idea in the Discussion rather than forcing the interpretation.
 
 ### 4. Complete the connectivity-robustness result and directly separate firing rate from stability
+
+**DONE 2026-09-14 (figures).** `fig_lle_vs_rate`: lambda_1 vs mean rate per condition coloured by realised E:I weight balance, running median, quiet/saturated subgroups, Spearman rho with bootstrap CI: -0.44 / -0.31 / +0.11 over 1219 networks (Pearson deliberately not used). `fig_sensitivity_medians` has the 25-75% band and data-driven y limits; the E:I weights sheet's title overlap is fixed. The 15-network rerun on the frozen preset is still to do.
 
 **Manuscript connection.** This supplies the subsection “Multiple-timescale adaptation preserves stability across changes in connectivity.”  The section has two linked messages.  First, the multiple-timescale condition should be less sensitive to changes in network structure and synaptic weights.  Second, mean firing rate and dynamical stability are related through the nonlinear operating point but are not directly correlated or interchangeable: a quiet or saturated network can be stable, and networks with similar rates can have different LLEs.  This is also why merely increasing inhibition is an incomplete description of network dynamics.
 
@@ -158,6 +177,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 
 ### 5. Correct and rerun the longest-adaptation-timescale analysis
 
+**DONE 2026-09-14 (machinery and figure).** `tau_a_EI` alias, axis chosen from the condition, `tau_levels.md` manifest proving both types were swept, and the unclipped `fig_sfa_EOC_allStd` (per-level density strip, overflow rows inside the axes, median + IQR, zero line). On data/topk_med (tau_a_E era) every rep is negative: -0.112 at 1 s rising to -0.043 at 30 s. The E+I rerun happens with the next pipeline run on the frozen preset.
+
 **Manuscript connection.** This is the direct evidence for “Long adaptation timescales tune stable networks toward the edge of chaos.”  The paper is not using this analysis to separate the causal roles of SFA and STD.  It asks a narrower question within the combined multiple-timescale architecture: whether lengthening the slowest SFA component changes proximity to the stability boundary while the rest of the condition is held fixed.
 
 **Known problems.** The earlier analysis changed the longest SFA time constant in only one cell type even though the final reference model places the same SFA ladder on E and I neurons.  The present plotting script also clips a substantial positive part of the LLE distribution, making the result appear more uniformly stable than it is.  The current manuscript Methods already describe an E-and-I sweep, so the final data must actually match that description.
@@ -168,6 +189,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 
 ### 6. Redo and audit reservoir memory capacity on the final reference preset
 
+**IN PROGRESS 2026-09-14.** Figure and provenance edits (`fig_memory_capacity`: data-driven cumulative axis, bootstrap band, paired horizons with the saved p and d_z; `run_memory_capacity` writes `provenance.md`) were made tonight; the 30-trial production run is launched last and reported in the morning note (`docs/notes/Overnight_2026-09-14_report.md`).
+
 **Manuscript connection.** This is the fixed-recurrent-weight half of “Multiple-timescale adaptation improves recurrent computation.”  It is a reservoir-computing analysis: recurrent and input weights are fixed, only a linear readout is trained, and delayed-input reconstruction measures how long the untrained dynamics retain usable information.  It is distinct from the PyTorch HalfCheetah experiment, where recurrent and dynamical parameters are trained end to end; the two analyses share a Results heading because both concern computation, not because they are the same task.
 
 **Scientific question and claim boundary.** The defensible question is whether multiple-timescale adaptation extends fading memory in networks used as drawn, without tuning each recurrent matrix to a target spectral radius or LLE.  The current experiment does not measure the amount of tuning required, so avoid claims such as “requires little tuning” unless a separate tuning comparison is performed.
@@ -177,6 +200,8 @@ This order is dependency-aware.  Do not spend substantial compute polishing or r
 **Definition of done.** All 15 paired trials completed; the source run and preset are unambiguous; uncertainty and paired statistics match the saved data; the main figure communicates per-delay performance, cumulative memory, and horizon; and the text describes an untuned fixed-reservoir comparison without conflating it with the PyTorch result.
 
 ### 7. Strengthen the Jacobian-occupancy evidence without treating it as the stability test
+
+**DONE 2026-09-14 (examples).** `run_eig_heatmap` `cfg.examples` (mu_EE x 0.5 / 1 / 1.5 by default, shared seeds, all conditions) storing eigenvalues, top-K lambda_1, mean rate and B_E per example and condition; `fig_eig_heatmap_imbalance` (rows examples x columns conditions, shared limits, loglog density, lambda_1 / <r> / B_E per panel). `test_eig_heatmap_stage`.
 
 **Manuscript connection.** Jacobian occupancy visually connects adaptation to time-varying effective connectivity.  The reference heatmap is a representative example supporting the first stability subsection.  It complements—but never replaces—the trajectory-based LLE.  Even many instantaneous spectra cannot by themselves determine the stability of the nonlinear time-varying system.
 
