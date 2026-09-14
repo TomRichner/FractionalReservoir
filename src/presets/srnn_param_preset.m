@@ -747,6 +747,27 @@ switch name
             'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25');
         d.sigma_u_noise = 0;
 
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0p025_dualStd_3cond_mu8p25'
+        % THE PAPER NETWORK WITH PER-NEURON SFA LADDERS, spread 0.25 (TR,
+        % 2026-09-14): identical to ..._noise0p025_dualStd_3cond_mu8p25 except
+        % tau_a_spread = [0.25 0.25] -- a log-normal jitter of that size at both
+        % ends of every neuron's ladder, geometric between (see the property
+        % header). Five times the 0.05 of the tauSpread0p05 preset, still below
+        % the reordering limit log(40)/(4 sqrt 2) = 0.65 for the [0.25 .. 10] s
+        % ladder. CHAINED to its counterpart under the within-bundle rule; it
+        % belongs to sfaEI_tauSpread0p25_fast_config.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25');
+        d.tau_a_spread = [0.25 0.25];
+
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0_dualStd_3cond_mu8p25'
+        % The memory-capacity twin of the preset above: Wiener process off
+        % (sigma_u_noise = 0; the config names sra1 as the MC integrator). Same
+        % bundle, same rule.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0p025_dualStd_3cond_mu8p25');
+        d.sigma_u_noise = 0;
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
         % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
         % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
@@ -1271,6 +1292,8 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdUsage_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStdSingleMatched_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0_dualStd_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0p025_dualStd_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0_dualStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
