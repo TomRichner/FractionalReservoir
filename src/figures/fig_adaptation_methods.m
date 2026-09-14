@@ -44,12 +44,12 @@ function out = fig_adaptation_methods(cfg)
 % re-derived; reading the data is both stabler and lets a column show only the
 % mechanisms it actually has.
 %
-% NOISE IS ON in the 'sfa_std' variant, because single_neuron_dualStd inherits
-% sigma_u_noise = 0.025 from the paper's preset and is taken literally (TR's
-% decision). On a single neuron there is no population averaging, so the jitter
-% is fully visible -- x_noise_std = 0.056 against a 0.5 step, about 11%. That is
-% accepted as honest about the model the paper characterises, not a defect to
-% smooth away. single_neuron_stf carries no noise, so variant B is clean.
+% NOISE IS OFF and the neuron SETTLES FIRST (TR, 2026-09-14). Both single-neuron
+% presets carry sigma_u_noise = 0 (single_neuron_dualStd had the paper's 0.025
+% until 2026-09-14, which on one neuron is an 11% jitter on a 0.5 step and
+% hid the mechanisms the cartoon is for), and the run starts at T_range(1) =
+% -15 s with zero input so that x, r, a and b are at rest before t = 0; only
+% [0, T_range(2)] is drawn. The step is at t_on..t_off in absolute time.
 %
 % See also: build_from_preset, srnn_param_preset, fig_example_timeseries
 
@@ -61,7 +61,7 @@ arguments
     cfg.step_amp    (1,1) double  = 0.5
     cfg.t_on        (1,1) double  = 5
     cfg.t_off       (1,1) double  = 15
-    cfg.T_range     (1,2) double  = [0 25]
+    cfg.T_range     (1,2) double  = [-15 25]   % negative start = settling, not drawn
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''     % unused; accepted for a uniform call
@@ -126,7 +126,7 @@ for k = 1:n_col
     model = build_from_preset(preset_name, full, ...
         'tau_a', tau_a, 'synapse_config', sc, ...
         'input_config', input_config, ...
-        'T_range', cfg.T_range, 'fs', 400, ...
+        'T_range', cfg.T_range, 'fs', 400, 'ode_solver', 'rk4', ...
         'lya_method', 'none', 'plot_deci', 1);
     model.run();
     P{k} = model.plot_data;
@@ -161,7 +161,7 @@ for rr = 1:n_row
         plot(ax(rr, cc), P{cc}.t, y, 'LineWidth', st.line_lw, 'Color', [0 0 0]);
         box(ax(rr, cc), 'off');
         set(ax(rr, cc), 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw);
-        xlim(ax(rr, cc), cfg.T_range);
+        xlim(ax(rr, cc), [max(0, cfg.T_range(1)), cfg.T_range(2)]);   % the settling time before 0 is not drawn
         if cc == 1
             ylabel(ax(rr, cc), row_label(rows{rr}), 'FontSize', st.label_fs, ...
                 'Interpreter', 'none');

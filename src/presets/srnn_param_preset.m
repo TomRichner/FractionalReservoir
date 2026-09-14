@@ -1147,12 +1147,11 @@ switch name
         % silent with b ~ 1. Naming the network as a preset is what stops that
         % recurring.
         %
-        % NOISE IS DELIBERATELY KEPT (sigma_u_noise = 0.025, exactly the
-        % paper's). On one neuron there is no population averaging, so the
-        % jitter is fully visible: x_noise_std = sigma_u/sqrt(2*tau_d) = 0.056
-        % against a 0.5 step, about 11%. That is accepted as honest about the
-        % model the paper characterises (TR's decision) rather than smoothed
-        % away.
+        % NOISE IS OFF (sigma_u_noise = 0; TR, 2026-09-14). Until then it kept
+        % the paper's 0.025, and on one neuron there is no population averaging,
+        % so the jitter was fully visible (x_noise_std = 0.056 against a 0.5
+        % step, 11%) and hid the mechanisms the cartoon exists to show. The
+        % figure also lets the neuron settle for 15 s before t = 0.
         %
         % sfa_timescales is NOT overridden: unlike single_neuron_stf this shows
         % all three of the paper's SFA timescales, at the paper's c.
@@ -1174,7 +1173,7 @@ switch name
             'tau_d',                0.1, ...
             'c',                    0.5, ...    % TOTAL SFA budget
             'x0_std',               0, ...      % deterministic x(0) = 0
-            'sigma_u_noise',        0.025);
+            'sigma_u_noise',        0);
         % ADAPTATION REGIMES -- four, the columns of the figure.
         %
         % All three of the paper's SFA timescales -- unlike single_neuron_stf,
