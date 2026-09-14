@@ -289,6 +289,10 @@ classdef SRNNCellTypePairs < handle
         % empty), so dynamics_fast, compute_Jacobian_fast and jacobian_times
         % have one code path.
         tau_a_matrix = []
+        % Per type, how many neurons' end draws were pushed apart to the
+        % minimum log-separation floor by the last build (see
+        % build_tau_a_matrix). Zeros when no spread was drawn.
+        tau_a_clipped = []
 
         % Pre-generated Wiener increments for the current run, or empty. Built
         % at the top of run(), kept alive through compute_lyapunov so Benettin
@@ -1254,21 +1258,14 @@ classdef SRNNCellTypePairs < handle
                 error('SRNNCellTypePairs:InvalidParams', ...
                     'tau_a_seed must be empty or a finite scalar.');
             end
-            % Ordering margin: the two end draws differ by spread*sqrt(2) per
-            % unit z; keep a 4-sigma margin below the ladder's end ratio so
-            % tau_a{q}(end) stays "the slowest" for every neuron.
-            for q = 1:C
-                if obj.tau_a_spread(q) > 0 && numel(obj.tau_a{q}) >= 2
-                    ratio = obj.tau_a{q}(end) / obj.tau_a{q}(1);
-                    if exp(4 * sqrt(2) * obj.tau_a_spread(q)) > ratio
-                        error('SRNNCellTypePairs:TauSpreadTooWide', ...
-                            ['tau_a_spread(%d) = %.3g is wide enough to reorder the ' ...
-                            'SFA ladder (end ratio %.3g): keep exp(4*sqrt(2)*spread) ' ...
-                            'below the ratio, i.e. spread < %.3g.'], ...
-                            q, obj.tau_a_spread(q), ratio, log(ratio) / (4 * sqrt(2)));
-                    end
-                end
-            end
+            % Ordering is enforced in build_tau_a_matrix by a minimum log-
+            % separation floor (TR, 2026-09-14), not refused here: a spread of
+            % any size builds, and neurons whose two end draws would fall
+            % closer than a quarter of the nominal log-span are pushed apart
+            % about their log-midpoint. Until 2026-09-14 this block errored
+            % TauSpreadTooWide when exp(4*sqrt(2)*spread) exceeded the end
+            % ratio, which refused spread 0.25 on the tau sweep's [0.25 1] s
+            % ladder (ratio 4, limit 0.245) while every other sweep passed.
             if obj.has_setpoint_heterogeneity()
                 if ~isempty(obj.activation_custom)
                     error('SRNNCellTypePairs:InvalidParams', ...
@@ -1543,6 +1540,7 @@ classdef SRNNCellTypePairs < handle
             % generator is current, which differs between the client and a
             % parallel worker -- see UserNotes.md).
             obj.tau_a_matrix = [];
+            obj.tau_a_clipped = zeros(1, obj.n_cellTypes);
             if ~any(obj.tau_a_spread > 0 & obj.n_a > 0)
                 return;                        % nothing to spread: stay on the shared-row branch
             end
@@ -1576,14 +1574,40 @@ classdef SRNNCellTypePairs < handle
                 end
                 d_fast = s * z(idx, 1);
                 d_slow = s * z(idx, 2);
+                n_clipped = 0;
                 if K == 1
                     w = 1;
                 else
+                    % MINIMUM LOG-SEPARATION FLOOR (TR, 2026-09-14). The two end
+                    % draws are independent, so a neuron's jittered ends can come
+                    % closer than the nominal or even cross. Every neuron keeps at
+                    % least a quarter of the nominal log-span: where
+                    % log(slow_i/fast_i) < log(slow/fast)/4 the two ends are pushed
+                    % apart SYMMETRICALLY about their log-midpoint until the gap
+                    % equals the floor. That keeps the neuron's overall speed (the
+                    % draw's midpoint), keeps tau_a{q}(end) the slowest rung of
+                    % every neuron, and keeps the interior rungs monotone because
+                    % they interpolate between the ends. At spread 0.25 on the
+                    % shortest tau-sweep ladder (ratio 4) it moves ~0.16% of
+                    % neurons; on the paper ladder (ratio 40) essentially none.
+                    % The count is kept in tau_a_clipped(q) so it is never silent.
+                    span  = log(tau(end)) - log(tau(1));
+                    floor_gap = span / 4;
+                    gap   = span + d_slow - d_fast;
+                    short = gap < floor_gap;
+                    n_clipped = nnz(short);
+                    if n_clipped > 0
+                        mid = (d_fast(short) + d_slow(short)) / 2;   % log-midpoint offset
+                        half = (floor_gap - span) / 2;                % offsets that give exactly the floor
+                        d_fast(short) = mid - half;
+                        d_slow(short) = mid + half;
+                    end
                     w = (log(tau) - log(tau(1))) / (log(tau(end)) - log(tau(1)));
                 end
+                obj.tau_a_clipped(q) = n_clipped;
                 M{q} = exp(log(tau) + (1 - w) .* d_fast + w .* d_slow);   % nq x K
-                parts{q} = sprintf('%s spread %.3g, slowest %.3g-%.3g s (nominal %.3g)', ...
-                    obj.cell_type_names{q}, s, min(M{q}(:, end)), max(M{q}(:, end)), tau(end));
+                parts{q} = sprintf('%s spread %.3g, slowest %.3g-%.3g s (nominal %.3g), %d clipped to the floor', ...
+                    obj.cell_type_names{q}, s, min(M{q}(:, end)), max(M{q}(:, end)), tau(end), n_clipped);
             end
             obj.tau_a_matrix = M;
             vprintf(obj.verbose, 'verbose', 'Per-neuron SFA ladders drawn (seed %d): %s\n', seed, strjoin(parts, '; '));

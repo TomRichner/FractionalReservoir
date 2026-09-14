@@ -20,7 +20,7 @@
 %      NON-logspaced nominal is reproduced exactly at sigma = 0 and keeps its
 %      own log positions at sigma > 0.
 %   5. K = 1 is the slow draw alone; K = 2 is the two endpoints.
-%   6. Validation: too wide a spread errors TauSpreadTooWide; just under the
+%   6. Validation: any spread builds; the minimum log-separation floor keeps every ladder ordered (clipped count recorded); just under the
 %      bound is accepted; negative / wrong-length spreads error.
 %   7. Seed control: reproducible; tau_a_seed and rng_seeds both move it;
 %      W, S0, u_ex and S_c_vec are untouched by the draw.
@@ -149,13 +149,24 @@ all_passed = check('K = 2 is the two endpoint draws', ...
     max(abs(m.tau_a_matrix{2}(:) - want2(:))) < 1e-12) && all_passed;
 
 %% 6. Validation
-bound = log(40) / (4 * sqrt(2));                       % ladder end ratio 40
-all_passed = check('a spread past the ordering margin errors TauSpreadTooWide', ...
-    throws_id(@() build_it(tiny_model('tau_a_spread', bound * 1.05)), ...
-    'SRNNCellTypePairs:TauSpreadTooWide')) && all_passed;
-all_passed = check('a spread just under the margin is accepted', ...
-    ~throws_id(@() build_it(tiny_model('tau_a_spread', bound * 0.95)), ...
-    'SRNNCellTypePairs:TauSpreadTooWide')) && all_passed;
+% The ordering floor (2026-09-14): any spread builds; every neuron keeps at
+% least a quarter of the nominal log-span between its fastest and slowest
+% rung, pushed apart symmetrically about the log-midpoint when the draw fell
+% short, and the count is recorded in tau_a_clipped.
+m_wide = tiny_model('tau_a_spread', 2.0);   % far past the old 4-sigma margin (0.65 for ratio 40)
+m_wide.build();
+Mw = m_wide.tau_a_matrix{1};
+floor_ratio = (m_wide.tau_a{1}(end) / m_wide.tau_a{1}(1))^(1/4);
+ratios = Mw(:, end) ./ Mw(:, 1);
+all_passed = check(sprintf('a huge spread builds; every ladder ordered with end ratio >= floor %.3g (min %.3g); %d of %d clipped', ...
+    floor_ratio, min(ratios), m_wide.tau_a_clipped(1), size(Mw, 1)), ...
+    all(ratios >= floor_ratio - 1e-9) && all(all(diff(log(Mw), 1, 2) > 0)) && m_wide.tau_a_clipped(1) > 0) && all_passed;
+clipped_rows = abs(ratios - floor_ratio) < 1e-9;
+all_passed = check('clipped neurons sit exactly on the floor and their count matches tau_a_clipped', ...
+    nnz(clipped_rows) == m_wide.tau_a_clipped(1)) && all_passed;
+m_mod = tiny_model('tau_a_spread', 0.1);
+m_mod.build();
+all_passed = check('a modest spread clips nothing', m_mod.tau_a_clipped(1) == 0) && all_passed;
 all_passed = check('a negative spread errors', ...
     throws_id(@() build_it(tiny_model('tau_a_spread', -0.1)), 'SRNNCellTypePairs:InvalidParams')) && all_passed;
 all_passed = check('a wrong-length spread errors', ...
