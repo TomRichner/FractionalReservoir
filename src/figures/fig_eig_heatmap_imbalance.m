@@ -101,7 +101,7 @@ for e = 1:n_ex
         cmax = max(cmax, max(Dm{e, i}(:)));
     end
 end
-clim = [0, cmax];
+clim = [0, max(cmax, 0.5)];   % the colorbar is ticked at 0, 0.25, 0.5
 
 %% ---- Figure ---------------------------------------------------------------
 fig = figure('Color', 'w', 'Position', [120, 80, 400 * n_cond + 60, 360 * n_ex]);
@@ -113,9 +113,6 @@ for e = 1:n_ex
     for i = 1:n_cond
         ax(e, i) = nexttile(tl);
         plot_eigenvalue_heatmap_helper(ax(e, i), Dm{e, i}, re_edges, im_edges, clim, false);
-        hold(ax(e, i), 'on');
-        xline(ax(e, i), 0, '-', 'Color', [0.9 0.9 0.9], 'LineWidth', 0.8);
-        hold(ax(e, i), 'off');
         if e == 1
             title(ax(e, i), titles{i}, 'FontWeight', 'normal', 'FontSize', st.title_fs);
         end
@@ -131,7 +128,7 @@ for e = 1:n_ex
         end
         text(ax(e, i), 0.03, 0.96, sprintf('\\lambda_1 = %+.3f\n\\langle r\\rangle = %.2f\nB_E = %.2f', ...
             ex(e).lle_by_cond(i), ex(e).mean_rate_by_cond(i), ex(e).B_E_by_cond(i)), ...
-            'Units', 'normalized', 'Color', 'w', 'FontSize', 10, 'FontWeight', 'bold', ...
+            'Units', 'normalized', 'Color', [0.25 0.25 0.25], 'FontSize', 10, 'FontWeight', 'bold', ...
             'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
         k = k + 1;
         rows{k} = sprintf('| %s | %s | %s | %+.4f | %.3f | %.3f | %+.3f | %+.3f | %d |', ...
@@ -144,6 +141,8 @@ end
 cb = colorbar(ax(end, end));
 cb.Layout.Tile = 'east';
 cb.Label.String = cb_label;
+cb.Ticks = [0 0.25 0.5];
+cb.Box = 'off';
 title(tl, {'Jacobian eigenvalue occupancy across E:I imbalance and adaptation regime', ...
     sprintf('one structural seed; \\lambda_1 = finite-time top-K exponent over the last %g s; \\langle r\\rangle mean rate; B_E = excitatory share of summed weight', lle_window)}, ...
     'FontWeight', 'normal', 'FontSize', 11);

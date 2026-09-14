@@ -6,7 +6,10 @@ function ax = plot_eigenvalue_heatmap_helper(ax, D, re_edges, im_edges, color_li
 %
 % Draws the smoothed density D as an image on the complex plane and overlays the
 % Re = 0 stability line. Pass the same color_limits to every panel for
-% directly-comparable color scaling.
+% directly-comparable color scaling. GRAYSCALE on a white ground (TR,
+% 2026-09-14): flipud(gray), so zero density is white and the densest bins
+% are near-black; the Re = 0 line and any annotation the caller adds are
+% dark grey. Until then the panels used parula with a white dashed line.
 %
 % Inputs:
 %   ax            - target axes
@@ -42,7 +45,8 @@ end
 imagesc(ax, re_centers, im_centers, plot_val');
 axis(ax, 'xy');
 axis(ax, 'image');
-colormap(ax, parula);
+box(ax, 'off');            % no frame around the density image (TR, 2026-09-14)
+colormap(ax, flipud(gray));
 if nargin >= 5 && ~isempty(color_limits)
     clim(ax, color_limits);
 end
@@ -50,7 +54,7 @@ end
 % Stability line at Re = 0
 hold(ax, 'on');
 yl = [im_centers(1), im_centers(end)];
-plot(ax, [0, 0], yl, 'w--', 'LineWidth', 1.25);
+plot(ax, [0, 0], yl, '--', 'Color', [0.25 0.25 0.25], 'LineWidth', 1);
 hold(ax, 'off');
 
 xlabel(ax, 'Re(\lambda)');

@@ -103,7 +103,7 @@ for i = 1:n_cond
     D_by_cond{i} = scale_fn(D_by_cond{i});               % colour transform, see density_scale
     cmax = max(cmax, max(D_by_cond{i}(:)));              % shared scaled-density max
 end
-clim = [0, cmax];
+clim = [0, max(cmax, 0.5)];   % the colorbar is ticked at 0, 0.25, 0.5
 
 %% ---- Assemble the comparison figure ---------------------------------------
 % Grid derived from the condition count, not hardcoded. This was `2, 2`, which
@@ -118,7 +118,7 @@ clim = [0, cmax];
 % instead of squeezing panels.
 n_rows = max(1, floor(sqrt(n_cond)));
 n_cols = ceil(n_cond / n_rows);
-fig = figure('Position', [200, 150, 450*n_cols, 380*n_rows]);
+fig = figure('Color', 'w', 'Position', [200, 150, 450*n_cols, 380*n_rows]);
 tl  = tiledlayout(fig, n_rows, n_cols, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 ax_panels = gobjects(n_cond, 1);
@@ -130,7 +130,7 @@ for i = 1:n_cond
 
     % Finite-time lambda_1 over the last lle_window seconds, top-left.
     text(ax_panels(i), 0.03, 0.96, sprintf('\\lambda_1 = %+.3f', lle_by_cond(i)), ...
-        'Units', 'normalized', 'Color', 'w', 'FontSize', 12, 'FontWeight', 'bold', ...
+        'Units', 'normalized', 'Color', [0.25 0.25 0.25], 'FontSize', 12, 'FontWeight', 'bold', ...
         'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
 end
 
@@ -138,6 +138,8 @@ end
 cb = colorbar(ax_panels(end));
 cb.Layout.Tile = 'east';
 cb.Label.String = cb_label;
+cb.Ticks = [0 0.25 0.5];
+cb.Box = 'off';
 
 title(tl, {'Jacobian eigenvalue occupancy across adaptation regimes', ...
     sprintf('\\lambda_1 = finite-time largest Lyapunov exponent over the last %g s', lle_window)}, ...
