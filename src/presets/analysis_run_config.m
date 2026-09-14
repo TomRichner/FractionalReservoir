@@ -154,21 +154,24 @@ switch analysis
         % n_grid_points is how many randomly-chosen points are actually
         % simulated, and run_param_space_analysis turns it into a
         % subset_fraction. See that file for what a sparse sample can and
-        % cannot support.
+        % cannot support. AT LEAST 128 POINTS IN EVERY MODE (TR, 2026-09-14):
+        % 27 (fast) and 64 (medium) were too few to read as a distribution
+        % in fig_param_space_allStd / fig_lle_vs_rate. Cost: at 'fast' the
+        % joint stage is ~5x what it was (128 x 3 conditions x 20-s runs).
         switch run_mode
             case 'fast'
                 cfg = pack(3, [], 'rk4',   200, [0, 20], [10, 20]);
-                cfg.n_grid_points = 27;
+                cfg.n_grid_points = 128;
             case 'medium'
                 cfg = pack(4, [], 'rk4',   400, [0, 20], [10, 20]);
-                cfg.n_grid_points = 64;
+                cfg.n_grid_points = 128;
             case 'medium2'
                 % 5 levels, i.e. production's, because this is the cheapest of
                 % the three stages: no reps axis, and the sample size is set
                 % here rather than growing with the axis count. ~40 min of the
                 % budget, and the n = 1000 corner is what dominates it.
                 cfg = pack(5, [], 'rk4',   800, [0, 25], [12.5, 25]);
-                cfg.n_grid_points = 125;
+                cfg.n_grid_points = 128;
             case 'production'
                 cfg = pack(5, [], 'ode45', 400, [0, 50], []);
                 % 256, not the 125 that n_levels^3 would give: 125 points over a
