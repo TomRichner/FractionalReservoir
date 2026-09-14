@@ -1,0 +1,659 @@
+>> sfaEI_fast_run
+[paper analyses] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 run_mode=fast start=14-Sep-2026 09:06:18
+  output   : C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast
+Git provenance saved: main @ ea9e756 on R5611351
+[1/3] Running Sensitivity Analysis...
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 35.7 GB
+[sensitivity] run_mode=fast, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 (SRNNCellTypePairs), n_levels=4, n_reps=3
+=== Sensitivity: n [100, 1e+03] (1/7) ===
+[psa] n,reps: 12 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_n_nLevs_4_sep_14_26_09_06
+[psa] batch 1/1 done in 1.0 min (36/36 ok), ETA 0 min
+[psa] complete in 0.02 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_n_nLevs_4_sep_14_26_09_06
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - n)
+  Figure    (1: LLE Sensitivity - n)
+
+=== Sensitivity: f_E [0.2, 0.8] (2/7) ===
+[psa] f_E,reps: 12 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_f_E_nLevs_4_sep_14_26_09_07
+[psa] batch 1/1 done in 0.5 min (36/36 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_f_E_nLevs_4_sep_14_26_09_07
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - f_E)
+  Figure    (1: LLE Sensitivity - f_E)
+
+=== Sensitivity: level_of_chaos [0.25, 2.5] (3/7) ===
+[psa] level_of_chaos,reps: 12 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_level_of_chaos_nLevs_4_sep_14_26_09_08
+[psa] batch 1/1 done in 0.8 min (36/36 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_level_of_chaos_nLevs_4_sep_14_26_09_08
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - level_of_chaos)
+  Figure    (1: LLE Sensitivity - level_of_chaos)
+
+=== Sensitivity: mu_EE_relative [2.06, 24.8] (4/7) ===
+[psa] mu_EE_relative,reps: 12 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_4_sep_14_26_09_09
+[psa] batch 1/1 done in 0.3 min (36/36 ok), ETA 0 min
+[psa] complete in 0.00 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - mu_EE_relative)
+  Figure    (1: LLE Sensitivity - mu_EE_relative)
+
+=== Sensitivity: mu_EI_relative [-24.8, -2.06] (5/7) ===
+[psa] mu_EI_relative,reps: 12 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_4_sep_14_26_09_09
+[psa] batch 1/1 done in 0.4 min (36/36 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - mu_EI_relative)
+  Figure    (1: LLE Sensitivity - mu_EI_relative)
+
+=== Sensitivity: mu_IE_relative [2.06, 24.8] (6/7) ===
+[psa] mu_IE_relative,reps: 12 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_4_sep_14_26_09_09
+[psa] batch 1/1 done in 0.7 min (36/36 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - mu_IE_relative)
+  Figure    (1: LLE Sensitivity - mu_IE_relative)
+
+=== Sensitivity: mu_II_relative [-24.8, -2.06] (7/7) ===
+[psa] mu_II_relative,reps: 12 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_II_relative_nLevs_4_sep_14_26_09_10
+[psa] batch 1/1 done in 0.9 min (36/36 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_II_relative_nLevs_4_sep_14_26_09_10
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - mu_II_relative)
+  Figure    (1: LLE Sensitivity - mu_II_relative)
+
+Replot output directory:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_f_E_nLevs_4_sep_14_26_09_07
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - f_E)
+  Figure    (3: h_KS_bits Sensitivity - f_E)
+  Figure    (2: mean_rate Sensitivity - f_E)
+  Figure    (1: LLE Sensitivity - f_E)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_level_of_chaos_nLevs_4_sep_14_26_09_08
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - level_of_chaos)
+  Figure    (3: h_KS_bits Sensitivity - level_of_chaos)
+  Figure    (2: mean_rate Sensitivity - level_of_chaos)
+  Figure    (1: LLE Sensitivity - level_of_chaos)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_EE_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_EE_relative)
+  Figure    (2: mean_rate Sensitivity - mu_EE_relative)
+  Figure    (1: LLE Sensitivity - mu_EE_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_EI_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_EI_relative)
+  Figure    (2: mean_rate Sensitivity - mu_EI_relative)
+  Figure    (1: LLE Sensitivity - mu_EI_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_IE_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_IE_relative)
+  Figure    (2: mean_rate Sensitivity - mu_IE_relative)
+  Figure    (1: LLE Sensitivity - mu_IE_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_II_relative_nLevs_4_sep_14_26_09_10
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_II_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_II_relative)
+  Figure    (2: mean_rate Sensitivity - mu_II_relative)
+  Figure    (1: LLE Sensitivity - mu_II_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_n_nLevs_4_sep_14_26_09_06
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - n)
+  Figure    (3: h_KS_bits Sensitivity - n)
+  Figure    (2: mean_rate Sensitivity - n)
+  Figure    (1: LLE Sensitivity - n)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures
+
+Done. All replots in:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11
+Combined LLE sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures\sensitivity_LLE_combined_network.{fig,png}
+Combined LLE sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_09_11\figures\sensitivity_LLE_combined_mu_blocks.{fig,png}
+[2/3] Running Tau Sensitivity Analysis...
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 34.9 GB
+[tau_sensitivity] run_mode=fast, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 (SRNNCellTypePairs), n_levels=7, n_reps=7
+[psa] tau_a_EI,reps: 49 combinations x 1 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_7_sep_14_26_09_13
+[psa] batch 1/2 done in 0.5 min (25/25 ok), ETA 1 min
+[psa] batch 2/2 done in 0.4 min (24/24 ok), ETA 0 min
+[psa] complete in 0.02 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_7_sep_14_26_09_13
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Sensitivity - tau_a_EI)
+  Figure    (1: LLE Sensitivity - tau_a_EI)
+
+[tau_sensitivity] axis tau_a_EI, 3 elements
+[tau_sensitivity] complete: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_7_sep_14_26_09_13
+[3/3] Running Parameter Space Analysis...
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 34.8 GB
+[param_space] run_mode=fast, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 (SRNNCellTypePairs), n_levels=3
+Subset: running 27 of 2187 combinations (1.2% requested, 1.2% actual); the rest stay empty.
+[psa] n,f_E,level_of_chaos,mu_EE_relative,mu_EI_relative,mu_IE_relative,mu_II_relative: 2187 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\param_space_nLevs_3_sep_14_26_09_14
+[psa] batch 1/2 done in 5.4 min (75/75 ok), ETA 5 min
+[psa] batch 2/2 done in 0.6 min (6/6 ok), ETA 0 min
+[psa] complete in 0.10 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\param_space_nLevs_3_sep_14_26_09_14
+
+figHandles = 
+
+  2×1 Figure array:
+
+  Figure    (2: mean_rate Distribution)
+  Figure    (1: LLE Distribution)
+
+Wrote C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\parameters.md
+[1/7] memory_capacity
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 34.5 GB
+[memory_capacity] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0_dualStd_3cond_mu8p25  run_mode=fast
+  trial 2/5 (net 3002, stim 4002)
+  trial 3/5 (net 3003, stim 4003)
+  trial 5/5 (net 3005, stim 4005)
+  trial 1/5 (net 3001, stim 4001)
+  trial 4/5 (net 3004, stim 4004)
+Figures saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\memory_capacity
+[memory_capacity] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\memory_capacity\MC_sample_hold_20260914_092045_trials5_results.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\memory_capacity\MC_sample_hold_20260914_092045_trials5_results.mat
+[2/7] mc_example
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 43.3 GB
+[mc_example] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0_dualStd_3cond_mu8p25 run_mode=fast T_train=60s d_max=5s solver=sra1
+[mc_example] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\mc_example\mc_example_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\mc_example\mc_example_data.mat
+[3/7] eig_heatmap
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 44.3 GB
+[eig_heatmap] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 run_mode=fast T=40 s n_samples=40
+  inhibition-dominant  no_adaptation  LLE = +1.9829 | <r> 0.056 | B_E 0.42 | 10000 eigenvalues | num. abscissa median +54.207 (spectral +2.879)
+  inhibition-dominant  sfa1_std1      LLE = -0.1892 | <r> 0.050 | B_E 0.42 | 40000 eigenvalues | num. abscissa median +33.965 (spectral +4.332)
+  inhibition-dominant  sfa3_std2      LLE = -0.1041 | <r> 0.079 | B_E 0.42 | 80000 eigenvalues | num. abscissa median +26.730 (spectral +1.947)
+  reference            no_adaptation  LLE = +3.9380 | <r> 0.433 | B_E 0.50 | 20000 eigenvalues | num. abscissa median +89.737 (spectral +7.190)
+  reference            sfa1_std1      LLE = +0.6297 | <r> 0.252 | B_E 0.50 | 80000 eigenvalues | num. abscissa median +79.477 (spectral +6.151)
+  reference            sfa3_std2      LLE = -0.1121 | <r> 0.217 | B_E 0.50 | 160000 eigenvalues | num. abscissa median +47.022 (spectral +0.273)
+  excitation-dominant  no_adaptation  LLE = -4.2269 | <r> 0.873 | B_E 0.55 | 10000 eigenvalues | num. abscissa median +40.220 (spectral -2.918)
+  excitation-dominant  sfa1_std1      LLE = -0.5258 | <r> 0.707 | B_E 0.55 | 40000 eigenvalues | num. abscissa median +23.110 (spectral +0.239)
+  excitation-dominant  sfa3_std2      LLE = -0.1120 | <r> 0.265 | B_E 0.55 | 80000 eigenvalues | num. abscissa median +28.484 (spectral +2.497)
+[eig_heatmap] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\eig_heatmap\eig_heatmap_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\eig_heatmap\eig_heatmap_data.mat
+[4/7] numerics
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 43.9 GB
+[numerics_verification] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 run_mode=fast
+  [1/3] No Adaptation
+  [2/3] Single-Timescale Adaptation
+  [3/3] Multiple-Timescale Adaptation
+# Numerics verification verdict (celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25, fast)
+
+Acceptance criteria fixed on 2026-09-14, before the run. Trials: 1 reshoot, 2 LLE/QR; 3 Jacobian states per condition.
+
+| Condition | Check | Value | Threshold | Result | What |
+|---|---|---|---|---|---|
+| No Adaptation | A | 2.01 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| No Adaptation | B | 2.01 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| No Adaptation | L | 0.108 | <= 0.05 | FAIL | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| No Adaptation | C | [0.0372 0.00608] | <= 0.05 and <= 0.02 | PASS | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| No Adaptation | J | [9.68e-11 7.48e-09] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+| Single-Timescale Adaptation | A | 2.01 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| Single-Timescale Adaptation | B | 1.98 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| Single-Timescale Adaptation | L | 0.169 | <= 0.05 | FAIL | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| Single-Timescale Adaptation | C | [0.308 0.0163] | <= 0.05 and <= 0.02 | FAIL | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| Single-Timescale Adaptation | J | [5.01e-11 4.82e-10] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+| Multiple-Timescale Adaptation | A | 2.01 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| Multiple-Timescale Adaptation | B | 1.84 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| Multiple-Timescale Adaptation | L | 0.00587 | <= 0.05 | PASS | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| Multiple-Timescale Adaptation | C | [0.00453 0.0132] | <= 0.05 and <= 0.02 | PASS | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| Multiple-Timescale Adaptation | J | [6.04e-11 8.11e-12] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+
+## Manuscript claims
+
+- 400-Hz SRA1 converges to the ode45 reference under step refinement (noise-free): **PASS** (PASS / PASS / PASS)
+- SRA1 converges under step refinement on one Brownian path (strong order >= 1): **PASS** (PASS / PASS / PASS)
+- the Benettin LLE at 400-Hz SRA1 agrees with ode45-Benettin: **FAIL** (FAIL / FAIL / PASS)
+- the Benettin LLE agrees with the QR spectrum's lambda_1 and with top-K: **FAIL** (PASS / FAIL / PASS)
+- the analytic Jacobian matches central finite differences: **PASS** (PASS / PASS / PASS)
+
+AT LEAST ONE CRITERION FAILED: see the table. Resolve in code or reflect in the Methods before production analyses.
+[numerics_verification] 7.7 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\numerics_verification\numerics_verification_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\numerics_verification\numerics_verification_data.mat
+[5/7] lyapunov_spectrum
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 43.4 GB
+[lyapunov_spectrum] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 run_mode=fast: 3 conditions x 1 seeds x {noise_on, noise_off}, T = 20 s, K = 50 (cap 100)
+[lyapunov_spectrum] 2.5 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\lyapunov_spectrum\lyapunov_spectrum_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\lyapunov_spectrum\lyapunov_spectrum_data.mat
+[6/7] transient_gain
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 42.5 GB
+[transient_gain] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 run_mode=fast: 3 conditions x 1 seeds, T = 20 s, 6 regular + up to 4 onset + 4 quiet samples, horizon 1 s, {frozen_x, frozen_full, active}
+[transient_gain] 9.9 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\transient_gain\transient_gain_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\transient_gain\transient_gain_data.mat
+[7/7] dc_lle
+[restart_parpool] shutting down existing pool (14 workers)...
+Parallel pool using the 'Processes' profile is shutting down.
+Starting parallel pool (parpool) using the 'Processes' profile ...
+Connected to parallel pool with 14 workers.
+[restart_parpool] fresh pool: 14 workers, 1 thread(s), profile 'Processes'
+[restart_parpool] client RAM available: 41.1 GB
+[dc_lle] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25  run_mode=fast
+[dc_lle] 5 seeds x 3 conditions finished in 6.3 min
+[dc_lle] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\dc_lle\dc_lle_nSeeds_5_sep_14_26_09_53\dc_lle_results.mat
+
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\dc_lle\dc_lle_nSeeds_5_sep_14_26_09_53
+Wrote C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\parameters.md
+[paper analyses] complete in 0.89 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast
+  OK      sweeps                14.2 min
+  OK      memory_capacity        5.7 min
+  OK      mc_example             1.4 min
+  OK      eig_heatmap            4.8 min
+  OK      numerics               7.9 min
+  OK      lyapunov_spectrum      2.7 min
+  OK      transient_gain        10.1 min
+  OK      dc_lle                 6.6 min
+Run directory: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast
+Figure root:   C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\sfaEI_fast  (configured)
+PAPER FIGURES  (30 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25)  start 14-Sep-2026 09:59:46
+---- [1/30] fig_introductory_concepts   [in paper]
+Warning: Vectorized content might take a long time to create, or it might contain unexpected results. Set 'ContentType' to
+'image' for better performance. Click here to not see this message again. 
+     6 file(s): statetraces/panelA_bottom_traces.png, statetraces/panelA_bottom_traces.svg, statetraces/panelA_bottom_traces.fig, eigenspectra/panelA_eigenspectrum.png, eigenspectra/panelA_eigenspectrum.svg, eigenspectra/panelA_eigenspectrum.fig
+---- [2/30] fig_energy_landscape
+     3 file(s): panelA_energy_landscape.png, panelA_energy_landscape.svg, panelA_energy_landscape.fig
+---- [3/30] fig_example_timeseries   [in paper]
+     3 file(s): fig_example_timeseries.png, fig_example_timeseries.svg, fig_example_timeseries.fig
+---- [4/30] fig_FI_curve   [in paper]
+     3 file(s): Fig_FI_curve.png, Fig_FI_curve.svg, Fig_FI_curve.fig
+---- [5/30] fig_adaptation_methods   [in paper]
+Warning: Vectorized content might take a long time to create, or it might contain unexpected results. Set 'ContentType' to
+'image' for better performance. Click here to not see this message again. 
+     3 file(s): Fig_single_neuron_SFA_STD.png, Fig_single_neuron_SFA_STD.svg, Fig_single_neuron_SFA_STD.fig
+---- [6/30] fig_adaptation_methods_stf
+Warning: Vectorized content might take a long time to create, or it might contain unexpected results. Set 'ContentType' to
+'image' for better performance. Click here to not see this message again. 
+     3 file(s): Fig_single_neuron_SFA_STD_STF.png, Fig_single_neuron_SFA_STD_STF.svg, Fig_single_neuron_SFA_STD_STF.fig
+---- [7/30] fig_SFA_steady_state
+     3 file(s): Fig_SFA_steady_state.png, Fig_SFA_steady_state.svg, Fig_SFA_steady_state.fig
+---- [8/30] fig_STD_steady_state
+     3 file(s): Fig_STD_steady_state.png, Fig_STD_steady_state.svg, Fig_STD_steady_state.fig
+---- [9/30] fig_stim_engages_adaptation   [in paper]
+     9 file(s): bursting_timeseries.png, bursting_timeseries.svg, bursting_timeseries.fig, bursting_psd.png, bursting_psd.svg, bursting_psd.fig, bursting_synchrony.png, bursting_synchrony.svg, bursting_synchrony.fig
+---- [10/30] fig_sensitivity_analysis_allStd   [in paper]
+Replot output directory:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_f_E_nLevs_4_sep_14_26_09_07
+
+figHandles = 
+
+  9×1 Figure array:
+
+  Figure    (9: D_KY Sensitivity - f_E)
+  Figure    (8: h_KS_bits Sensitivity - f_E)
+  Figure    (7: mean_rate Sensitivity - f_E)
+  Figure    (6: LLE Sensitivity - f_E)
+  Figure    (5: DC LLE: local Lyapunov vs DC level (across seeds))
+  Figure    (4)
+  Figure    (3)
+  Figure    (2: mean_rate Distribution)
+  Figure    (1: LLE Distribution)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_level_of_chaos_nLevs_4_sep_14_26_09_08
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - level_of_chaos)
+  Figure    (3: h_KS_bits Sensitivity - level_of_chaos)
+  Figure    (2: mean_rate Sensitivity - level_of_chaos)
+  Figure    (1: LLE Sensitivity - level_of_chaos)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_EE_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_EE_relative)
+  Figure    (2: mean_rate Sensitivity - mu_EE_relative)
+  Figure    (1: LLE Sensitivity - mu_EE_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_EI_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_EI_relative)
+  Figure    (2: mean_rate Sensitivity - mu_EI_relative)
+  Figure    (1: LLE Sensitivity - mu_EI_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_4_sep_14_26_09_09
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_IE_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_IE_relative)
+  Figure    (2: mean_rate Sensitivity - mu_IE_relative)
+  Figure    (1: LLE Sensitivity - mu_IE_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_mu_II_relative_nLevs_4_sep_14_26_09_10
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - mu_II_relative)
+  Figure    (3: h_KS_bits Sensitivity - mu_II_relative)
+  Figure    (2: mean_rate Sensitivity - mu_II_relative)
+  Figure    (1: LLE Sensitivity - mu_II_relative)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures
+
+Loading sensitivity from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\1D_sensitivity_sensitivity_n_nLevs_4_sep_14_26_09_06
+
+figHandles = 
+
+  4×1 Figure array:
+
+  Figure    (4: D_KY Sensitivity - n)
+  Figure    (3: h_KS_bits Sensitivity - n)
+  Figure    (2: mean_rate Sensitivity - n)
+  Figure    (1: LLE Sensitivity - n)
+
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures
+
+Done. All replots in:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02
+Combined LLE sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_LLE_combined_core.{fig,png}
+Combined LLE sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_LLE_combined_mu.{fig,png}
+Combined mean_rate sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_mean_rate_combined_core.{fig,png}
+slog fone?
+Combined mean_rate sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_mean_rate_combined_mu.{fig,png}
+Combined h_KS_bits sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_h_KS_bits_combined_core.{fig,png}
+Combined h_KS_bits sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_h_KS_bits_combined_mu.{fig,png}
+Combined D_KY sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_D_KY_combined_core.{fig,png}
+Combined D_KY sensitivity figure saved to:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_sensitivity_sep_14_26_10_02\figures\sensitivity_D_KY_combined_mu.{fig,png}
+     24 file(s): Fig_Sensitivity_LLE_core.png, Fig_Sensitivity_LLE_core.svg, Fig_Sensitivity_LLE_core.fig, Fig_Sensitivity_LLE_mu.png, Fig_Sensitivity_LLE_mu.svg, Fig_Sensitivity_LLE_mu.fig, Fig_Sensitivity_mean_rate_core.png, Fig_Sensitivity_mean_rate_core.svg, Fig_Sensitivity_mean_rate_core.fig, Fig_Sensitivity_mean_rate_mu.png, Fig_Sensitivity_mean_rate_mu.svg, Fig_Sensitivity_mean_rate_mu.fig, Fig_Sensitivity_hKS_core.png, Fig_Sensitivity_hKS_core.svg, Fig_Sensitivity_hKS_core.fig, Fig_Sensitivity_hKS_mu.png, Fig_Sensitivity_hKS_mu.svg, Fig_Sensitivity_hKS_mu.fig, Fig_Sensitivity_DKY_core.png, Fig_Sensitivity_DKY_core.svg, Fig_Sensitivity_DKY_core.fig, Fig_Sensitivity_DKY_mu.png, Fig_Sensitivity_DKY_mu.svg, Fig_Sensitivity_DKY_mu.fig
+---- [11/30] fig_sensitivity_medians
+     12 file(s): Fig_Sensitivity_LLE_medians.png, Fig_Sensitivity_LLE_medians.svg, Fig_Sensitivity_LLE_medians.fig, Fig_Sensitivity_mean_rate_medians.png, Fig_Sensitivity_mean_rate_medians.svg, Fig_Sensitivity_mean_rate_medians.fig, Fig_Sensitivity_hKS_medians.png, Fig_Sensitivity_hKS_medians.svg, Fig_Sensitivity_hKS_medians.fig, Fig_Sensitivity_DKY_medians.png, Fig_Sensitivity_DKY_medians.svg, Fig_Sensitivity_DKY_medians.fig
+---- [12/30] fig_param_space_allStd   [in paper]
+Replot output directory:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_param_space_sep_14_26_10_07
+
+Loading param_space results from:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\param_space_nLevs_3_sep_14_26_09_14
+  -> figures saved to C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_param_space_sep_14_26_10_07\figures
+
+Done. All replots in:
+  C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\replot_param_space_sep_14_26_10_07
+     12 file(s): Fig_ParamSpace_LLE.png, Fig_ParamSpace_LLE.svg, Fig_ParamSpace_LLE.fig, Fig_ParamSpace_mean_rate.png, Fig_ParamSpace_mean_rate.svg, Fig_ParamSpace_mean_rate.fig, Fig_ParamSpace_hKS.png, Fig_ParamSpace_hKS.svg, Fig_ParamSpace_hKS.fig, Fig_ParamSpace_DKY.png, Fig_ParamSpace_DKY.svg, Fig_ParamSpace_DKY.fig
+---- [13/30] fig_EI_param_space   [in paper]
+=== Loading Parameter Space Analysis for Unit Histograms ===
+Directory: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\param_space_nLevs_3_sep_14_26_09_14
+
+Coloring by f_E: CLim [0.200, 0.800], data [0.200, 0.800]
+
+Plotting LLE distribution...
+
+Plotting mean_rate distribution...
+
+Plotting h_KS_bits distribution...
+
+Plotting D_KY distribution...
+
+Done!
+     12 file(s): Fig_EI_ParamSpace_LLE.png, Fig_EI_ParamSpace_LLE.svg, Fig_EI_ParamSpace_LLE.fig, Fig_EI_ParamSpace_mean_rate.png, Fig_EI_ParamSpace_mean_rate.svg, Fig_EI_ParamSpace_mean_rate.fig, Fig_EI_ParamSpace_hKS.png, Fig_EI_ParamSpace_hKS.svg, Fig_EI_ParamSpace_hKS.fig, Fig_EI_ParamSpace_DKY.png, Fig_EI_ParamSpace_DKY.svg, Fig_EI_ParamSpace_DKY.fig
+---- [14/30] fig_EI_weights_param_space   [in paper]
+=== Loading Parameter Space Analysis for Unit Histograms ===
+Directory: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\param_space_nLevs_3_sep_14_26_09_14
+
+Warning: 9 of 81 networks fall outside CLim [0.0909091 0.909091] (data range [0.068 0.903]) and are clamped to the end
+colours. 
+> In load_and_make_unit_histograms (line 170)
+In fig_EI_weights_param_space (line 102)
+In make_all_paper_figures>call_figure (line 258)
+In make_all_paper_figures (line 145)
+In sfaEI_fast_run (line 33) 
+Coloring by E:I weight balance: CLim [0.091, 0.909], data [0.068, 0.903]
+
+Plotting LLE distribution...
+
+Plotting mean_rate distribution...
+
+Plotting h_KS_bits distribution...
+
+Plotting D_KY distribution...
+
+Done!
+     12 file(s): Fig_EI_Weights_ParamSpace_LLE.png, Fig_EI_Weights_ParamSpace_LLE.svg, Fig_EI_Weights_ParamSpace_LLE.fig, Fig_EI_Weights_ParamSpace_mean_rate.png, Fig_EI_Weights_ParamSpace_mean_rate.svg, Fig_EI_Weights_ParamSpace_mean_rate.fig, Fig_EI_Weights_ParamSpace_hKS.png, Fig_EI_Weights_ParamSpace_hKS.svg, Fig_EI_Weights_ParamSpace_hKS.fig, Fig_EI_Weights_ParamSpace_DKY.png, Fig_EI_Weights_ParamSpace_DKY.svg, Fig_EI_Weights_ParamSpace_DKY.fig
+---- [15/30] fig_lle_vs_rate   [in paper]
+     3 file(s): Fig_LLE_vs_Rate.png, Fig_LLE_vs_Rate.svg, Fig_LLE_vs_Rate.fig
+---- [16/30] fig_local_vs_finite_lle   [in paper]
+     3 file(s): Fig_Local_vs_Finite_LLE.png, Fig_Local_vs_Finite_LLE.svg, Fig_Local_vs_Finite_LLE.fig
+---- [17/30] fig_sfa_EOC_allStd   [in paper]
+     6 file(s): Fig_SFA_EOC_allStd.png, Fig_SFA_EOC_allStd.svg, Fig_SFA_EOC_allStd.fig, Fig_SFA_EOC_blocks.png, Fig_SFA_EOC_blocks.svg, Fig_SFA_EOC_blocks.fig
+---- [18/30] fig_memory_capacity   [in paper]
+     3 file(s): Fig_Memory_Capacity.png, Fig_Memory_Capacity.svg, Fig_Memory_Capacity.fig
+---- [19/30] fig_memory_capacity_example   [in paper]
+     3 file(s): Fig_MC_Example.png, Fig_MC_Example.svg, Fig_MC_Example.fig
+---- [20/30] fig_eig_heatmap
+     3 file(s): fig_eig_heatmap.png, fig_eig_heatmap.svg, fig_eig_heatmap.fig
+---- [21/30] fig_eig_heatmap_imbalance   [in paper]
+     3 file(s): Fig_Eig_Heatmap_Imbalance.png, Fig_Eig_Heatmap_Imbalance.svg, Fig_Eig_Heatmap_Imbalance.fig
+---- [22/30] fig_dc_lle
+     3 file(s): fig_dc_lle.png, fig_dc_lle.svg, fig_dc_lle.fig
+---- [23/30] fig_lyapunov_spectrum
+     3 file(s): Fig_Lyapunov_Spectrum.png, Fig_Lyapunov_Spectrum.svg, Fig_Lyapunov_Spectrum.fig
+---- [24/30] fig_transient_amplification
+     3 file(s): Fig_Transient_Amplification.png, Fig_Transient_Amplification.svg, Fig_Transient_Amplification.fig
+---- [25/30] fig_transient_gain
+     3 file(s): Fig_Transient_Gain.png, Fig_Transient_Gain.svg, Fig_Transient_Gain.fig
+---- [26/30] fig_transient_gain_excursions
+     3 file(s): Fig_Transient_Gain_Excursions.png, Fig_Transient_Gain_Excursions.svg, Fig_Transient_Gain_Excursions.fig
+---- [27/30] fig_numerics_solver
+     3 file(s): Fig_numerics_solver.png, Fig_numerics_solver.svg, Fig_numerics_solver.fig
+---- [28/30] fig_numerics_lya_method
+     3 file(s): Fig_numerics_lya_method.png, Fig_numerics_lya_method.svg, Fig_numerics_lya_method.fig
+---- [29/30] fig_numerics_jacobian
+     3 file(s): Fig_Numerics_Jacobian.png, Fig_Numerics_Jacobian.svg, Fig_Numerics_Jacobian.fig
+---- [30/30] doc_tables   [in paper]
+     4 file(s): equation_table.md, adaptation_conditions.md, parameters_table.md, adaptation_conditions_table.md
+Git provenance saved: main @ 4406b56 on R5611351
+[figure report] C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\sfaEI_fast\report.pdf
+PAPER FIGURES COMPLETE in 11.4 min: 30/30 succeeded (16/16 in-paper), output C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\sfaEI_fast
+--------------------------------------------------------
+  OK      fig_introductory_concepts         6 files   33.9 s   [in paper]
+  OK      fig_energy_landscape              3 files    2.1 s
+  OK      fig_example_timeseries            3 files   58.1 s   [in paper]
+  OK      fig_FI_curve                      3 files    2.6 s   [in paper]
+  OK      fig_adaptation_methods            3 files   10.0 s   [in paper]
+  OK      fig_adaptation_methods_stf        3 files   18.8 s
+  OK      fig_SFA_steady_state              3 files    2.1 s
+  OK      fig_STD_steady_state              3 files    6.6 s
+  OK      fig_stim_engages_adaptation       9 files   44.3 s   [in paper]
+  OK      fig_sensitivity_analysis_allStd  24 files  256.3 s   [in paper]
+  OK      fig_sensitivity_medians          12 files   22.3 s
+  OK      fig_param_space_allStd           12 files   82.9 s   [in paper]
+  OK      fig_EI_param_space               12 files   16.5 s   [in paper]
+  OK      fig_EI_weights_param_space       12 files   19.7 s   [in paper]
+  OK      fig_lle_vs_rate                   3 files   16.7 s   [in paper]
+  OK      fig_local_vs_finite_lle           3 files    5.7 s   [in paper]
+  OK      fig_sfa_EOC_allStd                6 files    2.9 s   [in paper]
+  OK      fig_memory_capacity               3 files    3.2 s   [in paper]
+  OK      fig_memory_capacity_example       3 files    3.5 s   [in paper]
+  OK      fig_eig_heatmap                   3 files    3.7 s
+  OK      fig_eig_heatmap_imbalance         3 files    8.8 s   [in paper]
+  OK      fig_dc_lle                        3 files    3.3 s
+  OK      fig_lyapunov_spectrum             3 files    6.4 s
+  OK      fig_transient_amplification       3 files    3.4 s
+  OK      fig_transient_gain                3 files    8.6 s
+  OK      fig_transient_gain_excursions     3 files    5.0 s
+  OK      fig_numerics_solver               3 files   13.0 s
+  OK      fig_numerics_lya_method           3 files    7.8 s
+  OK      fig_numerics_jacobian             3 files    5.4 s
+  OK      doc_tables                        4 files    1.1 s   [in paper]
+========================================================
+
+========================================================
+SINGLE vs MULTI TIMESCALE (sfaEI, fast) RUN COMPLETE
+  preset  : celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 (fast)
+  MC on   : celltype_pairs_sfaEI_Sc0p2sig0p1_noise0_dualStd_3cond_mu8p25
+  run_dir : C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast
+  figures : 30 of 30 succeeded
+  to rerun: delete data/sfaEI_fast first
+========================================================

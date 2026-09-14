@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_fast\memory_capacity
+Captured at: 14-Sep-2026 09:26:05
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      ea9e756a2dc2ec494739ec358dadf4d01a76f6a1
+commit_short:ea9e756
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    sfaEI bundle at fast: renamed sfaEI_fast_config/_run, run_mode 'fast', data/sfaEI_fast and figs/sfaEI_fast; the header states the fast counts and how to go to medium
+last_date:   2026-09-14T09:05:47-05:00
+dirty:       false
+
