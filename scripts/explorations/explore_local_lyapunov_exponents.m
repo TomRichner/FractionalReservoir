@@ -1,8 +1,9 @@
-function out_dir = explore_local_lyapunov_exponents(preset_name)
+function out_dir = explore_local_lyapunov_exponents(preset_name, K)
 % EXPLORE_LOCAL_LYAPUNOV_EXPONENTS How often are the local Lyapunov exponents positive?
 %
 %   explore_local_lyapunov_exponents()            % the paper preset (sfaEI_fast)
 %   explore_local_lyapunov_exponents(preset_name) % e.g. the tauSpread0p25 preset
+%   explore_local_lyapunov_exponents(preset_name, K)   % top-K, default 30
 %
 % One network (rng_seeds [1 2]) of the preset (default
 % celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25, n = 500,
@@ -26,6 +27,8 @@ function out_dir = explore_local_lyapunov_exponents(preset_name)
 %   row 3  the share of the accumulation window in which each local exponent
 %          is positive, k = 1..30 (bars), with Benettin's share as a line, and
 %          the share of time the LEADING local rate is positive in the title.
+%   row 4  how many of the K local rates are positive at each moment (a step
+%          plot), with the share of the window at which at least one is.
 % Plus, per condition, the class's own time-series summary from the Benettin
 % run (timeseries_<condition>.png): u, x, r, synaptic output, SFA, STD and the
 % local Lyapunov exponent, every neuron drawn.
@@ -43,16 +46,16 @@ function out_dir = explore_local_lyapunov_exponents(preset_name)
 
 arguments
     preset_name (1,:) char = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'
+    K           (1,1) double = 30
 end
 setup_paths();
 
 P        = preset_name;
 seeds    = [1 2];
 T        = 40;
-K        = 30;
 common   = {'rng_seeds', seeds, 'fs', 400, 'T_range', [0 T], ...
             'lya_T_interval', [T/2 T], 'lya_warmup', T/4, 'verbose', 'minimal'};
-out_dir  = fullfile(fileparts(which('setup_paths')), 'figs', 'explorations', 'local_lyapunov_exponents', P);
+out_dir  = fullfile(fileparts(which('setup_paths')), 'figs', 'explorations', 'local_lyapunov_exponents', sprintf('%s_K%d', P, K));
 if ~isfolder(out_dir); mkdir(out_dir); end
 
 [~, ~, conditions] = srnn_param_preset(P);
@@ -83,8 +86,8 @@ for i = 1:n_cond
 end
 
 %% Figure
-fig = figure('Color', 'w', 'Position', [60 60 420 * n_cond, 950]);
-tl = tiledlayout(fig, 3, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
+fig = figure('Color', 'w', 'Position', [60 60 420 * n_cond, 1200]);
+tl = tiledlayout(fig, 4, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
 tl.TileIndexing = 'columnmajor';
 rows = cell(1, n_cond);
 for i = 1:n_cond
@@ -141,6 +144,19 @@ for i = 1:n_cond
     if i == 1; ylabel(ax, 'time with local rate > 0 (%)', 'FontSize', st.label_fs); end
     title(ax, sprintf('leading local rate > 0: %.0f%% of the window', 100 * share(1)), ...
         'FontWeight', 'normal', 'FontSize', 9);
+    set(ax, 'FontSize', st.tick_fs);
+
+    % row 4: how many local exponents are positive at each moment
+    n_pos_t = sum(L > 0, 2);
+    any_pos = mean(n_pos_t(inwin) > 0);
+    ax = nexttile(tl); hold(ax, 'on');
+    stairs(ax, t, n_pos_t, '-', 'Color', col, 'LineWidth', 0.8);
+    xline(ax, T/2, ':', 'Color', [0.5 0.5 0.5]);
+    hold(ax, 'off'); box(ax, 'off'); xlim(ax, [0 T]); ylim(ax, [0 K]);
+    xlabel(ax, 'time (s)', 'FontSize', st.label_fs);
+    if i == 1; ylabel(ax, sprintf('local rates > 0 (of %d)', K), 'FontSize', st.label_fs); end
+    title(ax, sprintf('median %d positive; at least one positive %.0f%% of the window', ...
+        round(median(n_pos_t(inwin))), 100 * any_pos), 'FontWeight', 'normal', 'FontSize', 9);
     set(ax, 'FontSize', st.tick_fs);
 
     rows{i} = sprintf('| %s | %+.4f | %+.4f | %+.4f | %.0f%% | %.0f%% | %d |', ...
