@@ -1,8 +1,8 @@
-function cfg = sfaEI_tauSpread0p25_noStim_fast_config()
-% SFAEI_TAUSPREAD0P25_NOSTIM_FAST_CONFIG The paper network, SFA spread 0.25, NO external input, at 'fast', every analysis, MC noise-free.
+function cfg = sfaEI_mu5_fast_config()
+% SFAEI_MU5_FAST_CONFIG The mu = 5 network (SFA on E and I, per-neuron S_c, SFA spread 0.25, no external input) at 'fast', every analysis, MC noise-free.
 %
-%   run_dir = run_all_paper_analyses(sfaEI_tauSpread0p25_noStim_fast_config());
-%   results = make_all_paper_figures(sfaEI_tauSpread0p25_noStim_fast_config());
+%   run_dir = run_all_paper_analyses(sfaEI_mu5_fast_config());
+%   results = make_all_paper_figures(sfaEI_mu5_fast_config());
 %
 % EVERY SETTING IS STATED HERE. This does not call paper_config and does not
 % inherit from any other *_config; read this file and you know the whole run.
@@ -30,34 +30,36 @@ function cfg = sfaEI_tauSpread0p25_noStim_fast_config()
 % reproduction and the bursting network make points the 500-neuron recurrent
 % network cannot make. They are named explicitly below, not inherited.
 %
-% RERUNNING: delete data/sfaEI_tauSpread0p25_noStim_fast first.
+% RERUNNING: delete data/sfaEI_mu5_fast first.
 % run_all_paper_analyses refuses a run directory that is not absent or empty.
 %
-% See also: sfaEI_tauSpread0p25_noStim_fast_run, run_all_paper_analyses,
+% See also: sfaEI_mu5_fast_run, run_all_paper_analyses,
 %           make_all_paper_figures, srnn_param_preset
 
 cfg = struct();
 
 %% The experiment
-% The mu x1.5 3-condition network (mu_tilde_relative 8.25) with two further
-% changes, TR 2026-09-09: SFA on BOTH cell types (c = [0.5 0.5], the same
-% ladder on I as on E), and a per-neuron setpoint, S_c_i = 0.2 + 0.1*randn.
-% Regimes: no_adaptation / sfa1_std1 / sfa3_std2 (STD NOT strength-matched: TR
-% 2026-09-14 judged the matching too large a change for the manuscript now;
-% the matched bundles are stdScaled_*, stdUsage_*, stdSingleMatched_*). Same names as the other
-% paper presets, but the adapting ones carry I-SFA here, so they are not the
-% same physics. See the preset.
+% The 3-condition sfaEI network at a BASELINE mu_tilde_relative OF 5 on every
+% route (TR, 2026-09-14; the mu8p25 family was 1.5 x 5.5): SFA on BOTH cell
+% types (c = [0.5 0.5], the same ladder on I as on E), a per-neuron setpoint
+% S_c_i = 0.2 + 0.1*randn, per-neuron SFA ladders (tau_a_spread 0.25) and NO
+% external input -- the Wiener process alone drives it. Regimes:
+% no_adaptation / sfa1_std1 / sfa3_std2 (STD not strength-matched; the
+% matched bundles are stdScaled_*, stdUsage_*, stdSingleMatched_*). The mu
+% sweeps span -50% .. +50% of the preset's blocks and the joint sample is 128
+% points in every mode (both 2026-09-14). See the preset, which is written
+% out in full; its two twins below chain to it.
 %
-% 'fast': 4 levels x 3 reps per 1-D sweep, 7 tau levels, 27 joint samples, 5 MC
-% trials (the sign-flip floor is p = 0.0625), 20-s simulations. About two hours
-% for the whole pipeline on the n = 500 network; switch run_mode to 'medium'
-% for manuscript numbers (15 MC trials, exact sign-flip over 2^15 patterns).
-cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu8p25';
+% 'fast': 4 levels x 3 reps per 1-D sweep, 7 tau levels, 128 joint samples, 5 MC
+% trials (the sign-flip floor is p = 0.0625), 20-s simulations. About three
+% hours for the whole pipeline on the n = 500 network; switch run_mode to
+% 'medium' for manuscript numbers (15 MC trials, exact sign-flip over 2^15).
+cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu5';
 cfg.run_mode    = 'fast';
 
 %% Where things land -- both fixed, so this cannot touch any other run
-cfg.run_dir  = 'data/sfaEI_tauSpread0p25_noStim_fast';   % analyses write, figures read
-cfg.fig_root = 'figs/sfaEI_tauSpread0p25_noStim_fast';   % overwritten in place
+cfg.run_dir  = 'data/sfaEI_mu5_fast';   % analyses write, figures read
+cfg.fig_root = 'figs/sfaEI_mu5_fast';   % overwritten in place
 
 % Figures are built and saved but do not pop up: a new figure window raises
 % itself and takes keyboard focus, and a run draws dozens.
@@ -70,12 +72,12 @@ cfg.verbose = 'minimal';   % 'verbose' | 'minimal' | 'near-none' -- how much the
 % within-bundle chaining rule is in its case block). mc_run_config would pick
 % rk4 at sigma = 0, so the integrator is named explicitly: sra1, the same
 % solver as every other stage.
-cfg.mc_preset            = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu8p25';
+cfg.mc_preset            = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu5';
 cfg.mc_ode_solver        = 'sra1';
 % The local-Lyapunov stage (top-K local rates and local KS entropy under a
 % stimulus staircase, TR 2026-09-14) runs on the steps5s twin: a new random
 % step every 5 s, never returning to zero. Same bundle, chained preset.
-cfg.local_lyapunov_preset = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu8p25';
+cfg.local_lyapunov_preset = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu5';
 cfg.bursting_preset      = 'bursting_pairs';
 cfg.sompolinsky_preset   = 'sompolinsky_pairs';
 cfg.stf_preset           = 'single_neuron_stf';
@@ -95,8 +97,8 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 F = {};
 F = add(F, 'fig_introductory_concepts',       @fig_introductory_concepts,       true, ...
         {'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas});
-F = add(F, 'fig_energy_landscape',            @fig_energy_landscape,            false, ...
-        {'gammas', cfg.panelA_gammas});
+% fig_energy_landscape and fig_EI_param_space are not registered (TR,
+% 2026-09-14): the manuscript uses fig_EI_weights_param_space.
 F = add(F, 'fig_example_timeseries',          @fig_example_timeseries,          true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_FI_curve',                    @fig_FI_curve,                    true, {});
@@ -115,8 +117,6 @@ F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, 
 F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         false, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_param_space_allStd',          @fig_param_space_allStd,          true, ...
-        {'preset_name', cfg.preset_name});
-F = add(F, 'fig_EI_param_space',              @fig_EI_param_space,              true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_EI_weights_param_space',      @fig_EI_weights_param_space,      true, ...
         {'preset_name', cfg.preset_name});

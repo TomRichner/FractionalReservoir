@@ -24,7 +24,7 @@ function mat_file = run_local_lyapunov(cfg)
 % See also: fig_local_lyapunov, lyapunov_topk, SRNNCellTypePairs.lya_summary
 
 arguments
-    cfg.preset_name (1,:) char = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu8p25'
+    cfg.preset_name (1,:) char = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu5'
     cfg.run_mode    (1,:) char = 'production'
     cfg.out_dir     (1,:) char = ''
     cfg.verbose                 = 'minimal'
