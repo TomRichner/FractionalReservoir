@@ -8,13 +8,17 @@ function out = fig_example_timeseries(cfg)
 % W, stimulus and setpoints (rng_seeds) under EVERY adaptation condition of
 % the preset, one column per condition, rows sharing the time axis:
 %
-%   (a) dendritic state x of a subset of neurons (n_show_E E, n_show_I I)
+%   (a) dendritic state x of a subset of neurons (n_show_E E, n_show_I I;
+%       25 + 25 = 50 per condition by default, TR 2026-09-14)
 %   (b) firing rate r of the same neurons
-%   (c) synaptic output r * prod(b) * prod(g) of the same neurons -- ONE
-%       trace per neuron when every route carries the same synaptic dynamics
+%   (c) synaptic output r * prod(b) * prod(g) of the same neurons, route 1.
+%       The preset must carry the same synaptic dynamics on every route
 %       (SRNNCellTypePairs.routes_identical: route 1 is then the same array
-%       as every other route), otherwise one trace per route with a legend
-%   (d) population-mean SFA variable per timescale, per cell type
+%       as every other route); a per-route preset errors rather than
+%       drawing a fallback nobody reads at 50 neurons
+%   (d) the adaptation term (c/K) sum_k a_k of the same neurons, per neuron,
+%       coloured by cell type (was the population mean of each a_k until
+%       2026-09-14; the per-neuron term is what enters the rate)
 %   (e) depression prod(b) of the same neurons (route 1, same rule as (c))
 %   (f) the leading LOCAL expansion rate (grey) and the ACCUMULATING
 %       finite-time lambda_1 (condition colour), plot_local_and_finite_lle.
@@ -48,8 +52,8 @@ arguments
     cfg.condition   (1,:) char    = ''      % '' -> every condition of the preset
     cfg.rng_seeds   (1,2) double  = [1 2]
     cfg.T_range     (1,2) double  = [0 20]
-    cfg.n_show_E    (1,1) double  = 10
-    cfg.n_show_I    (1,1) double  = 10
+    cfg.n_show_E    (1,1) double  = 25
+    cfg.n_show_I    (1,1) double  = 25
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''      % unused; accepted for a uniform call
@@ -87,9 +91,9 @@ for i = 1:n_cond
 end
 
 %% Figure
-row_names = {'x', 'r', 'synaptic output', 'SFA  \langle a \rangle', 'depression  \Pi b', '\lambda'};
+row_names = {'x', 'r', 'synaptic output', 'SFA  (c/K)\Sigma a', 'depression  \Pi b', '\lambda'};
 n_rows = numel(row_names);
-fig = figure('Color', 'w', 'Position', [60 60 420 * n_cond + 80, 1000]);
+fig = figure('Color', 'w', 'Position', [60 40 420 * n_cond + 80, 1150]);
 tl = tiledlayout(fig, n_rows, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
 tl.TileIndexing = 'columnmajor';
 ax_all = gobjects(n_rows, n_cond);
@@ -111,7 +115,11 @@ for i = 1:n_cond
         n_show(q) = min(want, size(pd.x.(names{q}), 1));
         shades{q} = SRNNCellTypePairs.neuron_colors(tcol(q, :), max(n_show(q), 1));
     end
-    same_routes = SRNNCellTypePairs.routes_identical(params);
+    if ~SRNNCellTypePairs.routes_identical(params)
+        error('fig_example_timeseries:RoutesDiffer', ...
+            'Preset ''%s'' (%s) carries different synaptic dynamics on different routes; this figure draws route 1 per neuron and needs them identical.', ...
+            cfg.preset_name, cond_names{i});
+    end
     cond_col = st.condition_color(cond_names{i});
     ttl = cond_names{i};
     if isKey(st.condition_title, cond_names{i}), ttl = st.condition_title(cond_names{i}); end
@@ -123,7 +131,7 @@ for i = 1:n_cond
         for q = SRNNCellTypePairs.draw_order(C)
             D = pd.(field).(names{q});
             for k = 1:n_show(q)
-                plot(ax, t, D(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.7);
+                plot(ax, t, D(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.5);
             end
         end
         if row == 1
@@ -141,51 +149,30 @@ for i = 1:n_cond
     % (c) synaptic output ------------------------------------------------------
     ax = nexttile(tl); ax_all(3, i) = ax; hold(ax, 'on');
     so = pd.synaptic_output;
-    if same_routes
-        for q = SRNNCellTypePairs.draw_order(C)
-            posts = fieldnames(so.(names{q}));
-            D = so.(names{q}).(posts{1});
-            for k = 1:n_show(q)
-                plot(ax, t, D(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.7);
-            end
+    for q = SRNNCellTypePairs.draw_order(C)
+        posts = fieldnames(so.(names{q}));
+        D = so.(names{q}).(posts{1});             % route 1 == every route
+        for k = 1:n_show(q)
+            plot(ax, t, D(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.5);
         end
-    else
-        % per-route traces of the FIRST shown neuron of each type, with a legend
-        hr = gobjects(0); lab = {};
-        for q = 1:C
-            posts = fieldnames(so.(names{q}));
-            for p = 1:numel(posts)
-                D = so.(names{q}).(posts{p});
-                hr(end + 1) = plot(ax, t, D(1, :), '-', 'LineWidth', 0.8); %#ok<AGROW>
-                lab{end + 1} = sprintf('%s\\rightarrow%s', names{q}, posts{p}); %#ok<AGROW>
-            end
-        end
-        legend(ax, hr, lab, 'Location', 'northeast', 'FontSize', 8, 'Box', 'off');
-        text(ax, 0.02, 0.95, 'routes differ: neuron 1 of each type, per route', ...
-            'Units', 'normalized', 'FontSize', 8, 'VerticalAlignment', 'top');
     end
     hold(ax, 'off');
 
-    % (d) SFA population means per timescale ---------------------------------
+    % (d) adaptation term (c/K) sum_k a_k per neuron ---------------------------
     ax = nexttile(tl); ax_all(4, i) = ax; hold(ax, 'on');
-    ha = gobjects(0); lab = {};
-    for q = 1:C
-        A = pd.a.(names{q});                     % n_q x n_a x n_t
+    drew = false;
+    for q = SRNNCellTypePairs.draw_order(C)
+        A = pd.a.(names{q});                     % n_q x n_a x n_t, or []
         if isempty(A), continue; end
-        n_a = size(A, 2);
-        tau = params.tau_a{q};
-        for k = 1:n_a
-            sh = 1 - 0.6 * (k - 1) / max(n_a - 1, 1);   % darker = slower
-            colk = tcol(q, :) * sh;
-            ha(end + 1) = plot(ax, t, reshape(mean(A(:, k, :), 1), 1, []), '-', 'Color', colk, 'LineWidth', 1.2); %#ok<AGROW>
-            lab{end + 1} = sprintf('%s \\tau_a = %.3g s', names{q}, tau(k)); %#ok<AGROW>
+        Sa = params.c_eff(q) * reshape(sum(A, 2), size(A, 1), size(A, 3));   % n_q x n_t
+        for k = 1:n_show(q)
+            plot(ax, t, Sa(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.5);
         end
+        drew = true;
     end
-    if isempty(ha)
+    if ~drew
         text(ax, 0.5, 0.5, 'no SFA', 'Units', 'normalized', 'HorizontalAlignment', 'center', 'FontSize', 10);
         set(ax, 'YTick', []);
-    else
-        legend(ax, ha, lab, 'Location', 'northeast', 'FontSize', 7, 'Box', 'off', 'NumColumns', 2);
     end
     hold(ax, 'off');
 
@@ -194,16 +181,13 @@ for i = 1:n_cond
     drew = false;
     for q = SRNNCellTypePairs.draw_order(C)
         posts = fieldnames(pd.b.(names{q}));
-        for p = 1:numel(posts)
-            B = pd.b.(names{q}).(posts{p});      % n_q x n_b x n_t, or []
-            if isempty(B), continue; end
-            Pb = reshape(prod(B, 2), size(B, 1), size(B, 3));   % n_q x n_t
-            for k = 1:n_show(q)
-                plot(ax, t, Pb(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.7);
-            end
-            drew = true;
-            if same_routes, break; end           % route 1 is every route
+        B = pd.b.(names{q}).(posts{1});          % n_q x n_b x n_t, or []; route 1 == every route
+        if isempty(B), continue; end
+        Pb = reshape(prod(B, 2), size(B, 1), size(B, 3));   % n_q x n_t
+        for k = 1:n_show(q)
+            plot(ax, t, Pb(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.5);
         end
+        drew = true;
     end
     if ~drew
         text(ax, 0.5, 0.5, 'no STD', 'Units', 'normalized', 'HorizontalAlignment', 'center', 'FontSize', 10);
@@ -228,7 +212,7 @@ for row = 1:n_rows
         if i == 1, ylabel(ax, row_names{row}, 'FontSize', st.label_fs - 2); end
         if row < n_rows, set(ax, 'XTickLabel', []); end
     end
-    if n_cond > 1 && row ~= 4
+    if n_cond > 1
         linkaxes(ax_all(row, :), 'y');
     end
 end
