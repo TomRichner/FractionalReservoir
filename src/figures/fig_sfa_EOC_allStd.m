@@ -14,11 +14,12 @@ function out = fig_sfa_EOC_allStd(cfg)
 % reps' lambda_1 values are drawn as a vertical density strip (a 2-D
 % histogram, level x lambda_1, white -> dark grey), with the median as a thick
 % line inside a 25th-75th percentile band, the mean as a marker, and a black
-% lambda_1 = 0 line. The y range is the 1st-99th percentile of ALL values,
-% padded 10% and always including 0; values outside it are counted into two
-% explicit OVERFLOW rows drawn inside the axes at the top and bottom and
-% labelled with their counts, so nothing is dropped silently. Along the top,
-% each level carries n reps and the share of reps with lambda_1 > 0.
+% lambda_1 = 0 line. The y range is FIXED at [-0.35 0.05] (ticks 0, -0.1,
+% -0.2, -0.3) and the x axis is the slowest tau in seconds (ticks 0, 10, 20,
+% 30); values outside the y range are counted in the table and NOT drawn, and
+% the panel carries no title and no annotation (TR, 2026-09-14; earlier that
+% day it had two overflow rows with counts, a per-level share of reps with
+% lambda_1 > 0 along the top, and a caption, all removed).
 %
 % Until 2026-09-14 this figure restyled plot_sensitivity's panel with a fixed
 % hist_range [-0.3 0.1] and y_view [-0.25 0.05]. On the medium run the tau
@@ -75,13 +76,16 @@ tau_dir = fullfile(tau_listing.folder, tau_listing.name);
 fig_position = [457 500 420 340];
 tick_fs   = st.tick_fs;
 label_fs  = st.label_fs;
-n_bins    = 40;        % lambda_1 bins between the 1st and 99th percentile
+n_bins    = 40;        % lambda_1 bins across y_range
 clim_frac = 0.8;       % darken: cap CLim at max count * clim_frac
 % Colormap ramps white (0 counts) -> 90% black (max), not pure black, so the
 % coloured median line stays visible over the darkest cells.
 dark_cmap  = repmat(linspace(1, 0.1, 256)', 1, 3);
 median_lw  = 2.5;
 band_alpha = 0.25;
+y_range    = [-0.35 0.05];        % fixed lambda_1 window (TR, 2026-09-14); values outside are not drawn
+y_ticks    = [-0.3 -0.2 -0.1 0];
+x_ticks    = [0 10 20 30];         % slowest tau_a (s)
 
 % --- Reload the tau PSA ------------------------------------------------------
 psa = ParamSpaceAnalysis2.from_dir(tau_dir);
@@ -95,6 +99,7 @@ if ~isfield(psa.vector_param_lookup, param)
 end
 lookup = psa.vector_param_lookup.(param);
 x_tau  = cellfun(@(v) v(end), lookup);      % the slowest rung of every level
+x_tau  = x_tau(:)';
 n_lev  = numel(x_tau);
 if strcmp(param, 'tau_a_EI')
     x_label = 'slowest $\tau_a$ (E and I) (s)';
@@ -118,11 +123,10 @@ all_vals = [vals{:}];
 if isempty(all_vals)
     error('fig_sfa_EOC_allStd:NoData', 'No successful LLE values in %s.', tau_dir);
 end
-y_lo = prctile(all_vals, 1); y_hi = prctile(all_vals, 99);
-pad  = 0.1 * max(y_hi - y_lo, eps);
-y_lo = min(y_lo - pad, 0); y_hi = max(y_hi + pad, 0);
+% Fixed y range (TR, 2026-09-14): the paper's ruler for this panel. Values
+% outside it are counted in the table (n outside) and NOT drawn.
+y_lo = y_range(1); y_hi = y_range(2);
 edges = linspace(y_lo, y_hi, n_bins + 1);
-dy    = edges(2) - edges(1);
 counts   = zeros(n_bins, n_lev);
 n_above  = zeros(1, n_lev); n_below = zeros(1, n_lev);
 n_rep    = zeros(1, n_lev); n_pos   = zeros(1, n_lev);
@@ -139,66 +143,36 @@ for li = 1:n_lev
         med(li) = median(v); q1(li) = prctile(v, 25); q3(li) = prctile(v, 75); mu(li) = mean(v);
     end
 end
-% The two overflow rows are drawn as extra image rows of one bin height each.
-img = [n_below; counts; n_above];
-y_img = [y_lo - dy/2, y_hi + dy/2];        % centres of the first and last rows
+y_ctr = (edges(1:end-1) + edges(2:end)) / 2;
 
 % --- Draw --------------------------------------------------------------------
-% x is the LEVEL INDEX (the sweep spaces the slowest tau linearly over its
-% range, level_spacing 'linear'), ticked with the tau values in seconds.
+% x is the slowest tau in seconds. The sweep spaces it linearly over its range
+% (level_spacing 'linear'), so the image columns are uniform and imagesc can
+% take the tau values directly; the ticks are fixed at 0, 10, 20, 30 s.
 cf = figure('Color', 'w', 'Position', fig_position);
 ax = axes(cf); hold(ax, 'on');
-imagesc(ax, 1:n_lev, y_img, img);
+imagesc(ax, x_tau, y_ctr, counts);
 set(ax, 'YDir', 'normal');
 colormap(ax, dark_cmap);
-clim(ax, [0, max(1, max(img(:)) * clim_frac)]);
-% Overflow rows: separated from the data by thin lines and labelled.
-yline(ax, y_lo, '-', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5);
-yline(ax, y_hi, '-', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5);
-text(ax, 0.55, y_hi + dy/2, sprintf('> %.2f', y_hi), 'FontSize', 8, 'Color', [0.35 0.35 0.35], ...
-    'HorizontalAlignment', 'left', 'VerticalAlignment', 'middle');
-text(ax, 0.55, y_lo - dy/2, sprintf('< %.2f', y_lo), 'FontSize', 8, 'Color', [0.35 0.35 0.35], ...
-    'HorizontalAlignment', 'left', 'VerticalAlignment', 'middle');
-for li = 1:n_lev
-    if n_above(li) > 0
-        text(ax, li, y_hi + dy/2, sprintf('%d', n_above(li)), 'FontSize', 7, 'Color', [1 0.3 0.3], ...
-            'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', 'FontWeight', 'bold');
-    end
-    if n_below(li) > 0
-        text(ax, li, y_lo - dy/2, sprintf('%d', n_below(li)), 'FontSize', 7, 'Color', [1 0.3 0.3], ...
-            'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', 'FontWeight', 'bold');
-    end
-end
+clim(ax, [0, max(1, max(counts(:)) * clim_frac)]);
 % Zero line, band, median, mean.
 yline(ax, 0, '-', 'Color', 'k', 'LineWidth', 1.5);
 okb = isfinite(q1) & isfinite(q3);
-xi = 1:n_lev;
-fill(ax, [xi(okb), fliplr(xi(okb))], [q1(okb), fliplr(q3(okb))], cond_col, ...
+fill(ax, [x_tau(okb), fliplr(x_tau(okb))], [q1(okb), fliplr(q3(okb))], cond_col, ...
     'FaceAlpha', band_alpha, 'EdgeColor', 'none');
-plot(ax, xi, med, '-', 'Color', cond_col, 'LineWidth', median_lw);
-plot(ax, xi, mu, 'o', 'Color', cond_col, 'MarkerFaceColor', 'w', 'MarkerSize', 4, 'LineWidth', 1);
-% n reps and the share of reps above zero, along the top of the data area.
-for li = 1:n_lev
-    if n_rep(li) > 0
-        text(ax, li, y_hi - 0.02 * (y_hi - y_lo), sprintf('%.0f%%', 100 * n_pos(li) / n_rep(li)), ...
-            'FontSize', 7, 'Color', [0.2 0.2 0.2], 'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
-    end
-end
-text(ax, 0.55, y_lo + 0.03 * (y_hi - y_lo), sprintf('top row: share of reps with lambda_1 > 0 (n = %d per level)', max(n_rep)), 'FontSize', 7, 'Interpreter', 'none', ...
-    'Color', [0.2 0.2 0.2], 'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+plot(ax, x_tau, med, '-', 'Color', cond_col, 'LineWidth', median_lw);
+plot(ax, x_tau, mu, 'o', 'Color', cond_col, 'MarkerFaceColor', 'w', 'MarkerSize', 4, 'LineWidth', 1);
 hold(ax, 'off');
-xlim(ax, [0.5, n_lev + 0.5]);
-ylim(ax, [y_lo - dy, y_hi + dy]);
-set(ax, 'XTick', 1:n_lev, 'XTickLabel', arrayfun(@(v) sprintf('%.3g', v), x_tau, 'UniformOutput', false), ...
-    'FontSize', tick_fs, 'Layer', 'top');
-if n_lev > 7; set(ax, 'XTick', 1:2:n_lev, 'XTickLabel', arrayfun(@(v) sprintf('%.3g', v), x_tau(1:2:end), 'UniformOutput', false)); end
+dx = x_tau(2) - x_tau(1);
+xlim(ax, [min(0, x_tau(1) - dx/2), x_tau(end) + dx/2]);
+ylim(ax, y_range);
+set(ax, 'XTick', x_ticks, 'YTick', y_ticks, 'FontSize', tick_fs, 'Layer', 'top');
 box(ax, 'off');
 ylabel(ax, '$\lambda_1$ (1/s)', 'Interpreter', 'latex', 'FontSize', label_fs);
 xlabel(ax, x_label, 'Interpreter', 'latex', 'FontSize', label_fs);
-title(ax, sprintf('%s: all reps per level', st.condition_title(cond_use)), 'FontWeight', 'normal', 'FontSize', st.title_fs);
 
 % --- Table ---------------------------------------------------------------------
-hdr = '| level | slowest tau_a (s) | n | lambda_1 median [IQR] | mean | share > 0 | overflow above | overflow below |';
+hdr = '| level | slowest tau_a (s) | n | lambda_1 median [IQR] | mean | share > 0 | n above y range | n below y range |';
 rows = cell(1, n_lev);
 for li = 1:n_lev
     rows{li} = sprintf('| %d | %.3g | %d | %+.3f [%+.3f, %+.3f] | %+.3f | %.2f | %d | %d |', li, x_tau(li), n_rep(li), ...
