@@ -768,6 +768,37 @@ switch name
             'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0p025_dualStd_3cond_mu8p25');
         d.sigma_u_noise = 0;
 
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu8p25'
+        % THE PAPER NETWORK WITH PER-NEURON SFA LADDERS (spread 0.25) AND NO
+        % EXTERNAL INPUT (TR, 2026-09-14): only the Wiener process drives it.
+        % The paper presets' default input_config is a three-step pattern with
+        % a random step on 20% of each type during the MIDDLE THIRD of every
+        % run, which overlapped every Lyapunov window; this preset turns the
+        % steps off (no_stim_pattern all true). CHAINED to the tauSpread0p25
+        % preset under the within-bundle rule; it belongs to
+        % sfaEI_tauSpread0p25_noStim_fast_config with the two presets below.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0p025_dualStd_3cond_mu8p25');
+        d.input_config = struct('n_steps', 3, 'step_density', struct(), 'amp', 0.5, ...
+            'no_stim_pattern', true(1, 3), 'intrinsic_drive', 0, 'positive_only', false);
+
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu8p25'
+        % Memory-capacity twin of the noStim preset: Wiener process off too
+        % (the config names sra1 as the MC integrator). Same bundle.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu8p25');
+        d.sigma_u_noise = 0;
+
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu8p25'
+        % Stimulus-staircase twin of the noStim preset for run_local_lyapunov:
+        % a NEW random step every 5 s that never returns to zero -- 12 steps
+        % over the stage's fixed T = 60 s, no_stim_pattern all false, each
+        % step a fresh amp*randn on 20% of each cell type. Same bundle.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu8p25');
+        d.input_config = struct('n_steps', 12, 'step_density', struct(), 'amp', 0.5, ...
+            'no_stim_pattern', false(1, 12), 'intrinsic_drive', 0, 'positive_only', false);
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
         % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
         % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
@@ -1294,6 +1325,9 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0_dualStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0p025_dualStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noise0_dualStd_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu8p25', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu8p25', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
