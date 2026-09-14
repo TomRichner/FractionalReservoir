@@ -27,15 +27,17 @@ function out = fig_local_vs_finite_lle(cfg)
 % p95_finite_0p2s (ParamSpaceAnalysis2.run_single_job, SRNNCellTypePairs.
 % lya_summary). Failed jobs are skipped.
 %
-% Layout, 2 rows x one column per condition:
-%   row 1  near-default set: density of the local rate pooled over time and
-%          jobs (light fill) with the finite-time lambda_1 across jobs on top
-%          (dark bars, median line); zero line; shared x. The text gives the
-%          share of local-rate samples > 0, the share of jobs with lambda_1 < 0
-%          and the median lambda_1.
-%   row 2  boxcharts of frac_local_positive and mean_positive_excursion_s,
-%          near-default (condition colour) beside the joint sample (lighter),
-%          jobs with lambda_1 > 0 drawn as open markers.
+% Layout, ONE row, one column per condition (near-default set): density of
+% the local rate pooled over time and jobs (light fill) with the finite-time
+% lambda_1 across jobs on top (dark bars, median line); zero line; shared x.
+% The text gives the share of local-rate samples > 0, the share of jobs with
+% lambda_1 < 0 and the median lambda_1.
+%
+% A second row (boxcharts of frac_local_positive and
+% mean_positive_excursion_s, near-default beside the joint sample) was
+% removed on 2026-09-14 (TR): it was only about the single leading exponent,
+% and a replacement built on the top-K local rates is future work. The joint
+% sample is still read for the table.
 %
 % The table (<tag>_table.md, printed at 'verbose') gives per condition and set:
 % n jobs, lambda_1 median [IQR], share lambda_1 < 0, pooled local-rate share
@@ -73,10 +75,9 @@ if n_cond == 0
 end
 
 %% Figure
-fig = figure('Color', 'w', 'Position', [80 80 380 * n_cond, 640]);
-tl = tiledlayout(fig, 2, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
-tl.TileIndexing = 'columnmajor';
-ax_top = gobjects(1, n_cond); ax_bot = gobjects(1, n_cond);
+fig = figure('Color', 'w', 'Position', [80 80 380 * n_cond, 360]);
+tl = tiledlayout(fig, 1, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
+ax_top = gobjects(1, n_cond);
 rows = {};
 
 % One x window for the top row: the local-rate mass is wide, the finite-time
@@ -124,41 +125,13 @@ for i = 1:n_cond
     end
     ax_top(i) = ax;
 
-    ax2 = nexttile(tl); hold(ax2, 'on');
-    % Two measures side by side, near-default vs joint; x positions 1,2 / 4,5.
-    sets = {near, joint}; set_col = {col, light};
-    xpos = [1 2; 4 5];
+    % Table rows for both sets (the joint sample is no longer drawn).
+    sets = {near, joint};
     for s = 1:2
-        S = sets{s};
-        j = find(strcmp(S.cond_names, name), 1);
+        j = find(strcmp(sets{s}.cond_names, name), 1);
         if isempty(j); continue; end
-        fp  = S.fpos{j}(:);  ex = S.exc{j}(:);  ll = S.lle{j}(:);
-        ok  = isfinite(fp) & isfinite(ex);
-        fp = fp(ok); ex = ex(ok); ll = ll(ok);
-        if isempty(fp); continue; end
-        % excursion length on the right axis scale: draw both in [0, 1] by
-        % dividing the excursion by 2 s (the sweep_metrics range), labelled.
-        ex_s = min(ex / 2, 1);
-        x1 = xpos(1, s) * ones(size(fp)); x2 = xpos(2, s) * ones(size(ex_s));
-        boxchart(ax2, x1, fp, 'BoxFaceColor', set_col{s}, 'MarkerStyle', 'none', 'BoxWidth', 0.6);
-        boxchart(ax2, x2, ex_s, 'BoxFaceColor', set_col{s}, 'MarkerStyle', 'none', 'BoxWidth', 0.6);
-        jit = 0.12 * randn(size(fp));
-        pos = ll > 0;
-        scatter(ax2, x1(~pos) + jit(~pos), fp(~pos), 12, set_col{s}, 'filled', 'MarkerFaceAlpha', 0.5);
-        scatter(ax2, x1(pos) + jit(pos), fp(pos), 16, set_col{s}, 'LineWidth', 1);
-        scatter(ax2, x2(~pos) + jit(~pos), ex_s(~pos), 12, set_col{s}, 'filled', 'MarkerFaceAlpha', 0.5);
-        scatter(ax2, x2(pos) + jit(pos), ex_s(pos), 16, set_col{s}, 'LineWidth', 1);
-        rows{end + 1} = table_row(name, S.label, S, j); %#ok<AGROW>
+        rows{end + 1} = table_row(name, sets{s}.label, sets{s}, j); %#ok<AGROW>
     end
-    hold(ax2, 'off'); box(ax2, 'off');
-    set(ax2, 'FontSize', st.tick_fs, 'XLim', [0.3 5.7], 'YLim', [0 1], ...
-        'XTick', [1.5 4.5], 'XTickLabel', {'frac. time local > 0', 'mean excursion / 2 s'});
-    if i == 1
-        ylabel(ax2, 'near-default (dark) vs joint sample (light)', 'FontSize', st.label_fs - 3);
-        text(ax2, 0.03, 0.97, 'open markers: \lambda_1 > 0', 'Units', 'normalized', ...
-            'FontSize', 8, 'VerticalAlignment', 'top');
-    end
-    ax_bot(i) = ax2;
 end
 linkaxes(ax_top, 'y');
 title(tl, sprintf('Local expansion vs finite-time \\lambda_1: %d near-default networks per condition, joint sample of %d', ...
