@@ -1,4 +1,4 @@
-% SFAEI_FAST_RUN The paper network (STD unmatched), medium, every analysis, MC noise-free on sra1.
+% SFAEI_FAST_RUN The paper network (STD unmatched), fast, every analysis, MC noise-free on sra1.
 %
 %   Open this file and press Run. setup_paths is called on the first line.
 %

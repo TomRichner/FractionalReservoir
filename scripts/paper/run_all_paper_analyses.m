@@ -105,14 +105,23 @@ t_all = tic;
 % folder", which is what run_all_analyses does with an empty output_dir. A
 % relative path resolves against the project root, so a config can say
 % 'data/fast_4' without caring what the cwd is -- same rule as fig_root.
+% The command-window transcript is saved with the data (TR, 2026-09-14):
+% <run_dir>/command_window.log, via diary. With a named run_dir it starts
+% before the first stage; with an auto-named one it can only start once
+% run_all_analyses has created the directory, so the sweep stage's lines
+% are missing from that log. diary is process-global and one at a time, so
+% an onCleanup turns it off however this function exits.
 if isempty(cfg.run_dir)
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'verbose', cfg.verbose);
+    diary_guard = start_diary(fullfile(run_dir, 'command_window.log')); %#ok<NASGU>
 else
     out_dir = cfg.run_dir;
     if ~is_absolute_path(out_dir)
         out_dir = fullfile(fileparts(which('setup_paths')), out_dir);
     end
     assert_empty_target(out_dir);
+    if ~isfolder(out_dir); mkdir(out_dir); end
+    diary_guard = start_diary(fullfile(out_dir, 'command_window.log')); %#ok<NASGU>
     vprintf(cfg.verbose, 'minimal', '  output   : %s\n', out_dir);
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir, 'verbose', cfg.verbose);
 end
@@ -251,4 +260,13 @@ function results = record(results, stage, ok, minutes, detail, err)
 if ~ischar(detail); detail = ''; end
 results(end+1) = struct('stage', stage, 'ok', ok, 'minutes', minutes, ...
     'detail', detail, 'err', err);
+end
+
+function guard = start_diary(log_file)
+% Append the command-window transcript to log_file until the guard is
+% destroyed. diary is process-global and MATLAB keeps one; a caller's own
+% diary is therefore replaced for the duration and turned off afterwards.
+diary(log_file);
+fprintf('[diary] command window -> %s\n', log_file);
+guard = onCleanup(@() diary('off'));
 end
