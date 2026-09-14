@@ -44,9 +44,13 @@ function verify_shared_build(esn_array, expected_to_differ, also_check_protected
 
     % Properties to always skip (run-output, complex objects, or
     % derived aggregates that legitimately differ when config differs)
+    % tau_a_matrix and tau_a_clipped are DERIVED from tau_a (the per-neuron
+    % ladders build() draws from it and how many were pushed to the ordering
+    % floor), so they differ exactly when tau_a does; comparing them failed
+    % every memory-capacity run of a tau_a_spread preset (2026-09-14).
     always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', 'verbose', ...
                    'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
-                   'noise_increments'};
+                   'noise_increments', 'tau_a_matrix', 'tau_a_clipped'};
 
     n_checked = 0;
     n_matched = 0;
