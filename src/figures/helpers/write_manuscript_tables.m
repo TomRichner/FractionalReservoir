@@ -379,12 +379,13 @@ for t = 1:numel(M.types)
             M.tau_a{t}, 's');
     end
 end
-if any(M.tau_a_spread(:) > 0)
-    % Per-neuron ladders: log-normal spread at both ends of the ladder,
-    % geometric between (Equations_stability_paper.md). 0 = shared ladder.
-    row(fid, '$\sigma_{\tau_a}$', 'SFA ladder spread per cell type (log-normal, both ends)', ...
-        M.tau_a_spread, '--');
-end
+% Per-neuron ladders: log-normal spread at both ends of the ladder, geometric
+% between (Equations_stability_paper.md). ALWAYS printed (TR, 2026-09-14): a
+% zero row says every neuron carries the nominal ladder, which a reader of the
+% table could not otherwise tell from a preset that has no such knob.
+row(fid, '$\sigma_{\tau_a}$', ...
+    'SFA ladder spread per cell type (log-normal, both ends; 0 = every neuron has the nominal ladder)', ...
+    M.tau_a_spread, '--');
 row(fid, '$c$',          'SFA coupling per type',     M.c,        '--');
 % M as in the equations: depression timescales. Uniform across routes in every
 % preset so far; if a preset ever differs by route, this is the widest one.
