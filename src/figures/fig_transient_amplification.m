@@ -9,7 +9,9 @@ function out = fig_transient_amplification(cfg)
 % alpha = max real eig(J_xx) of the DENDRITIC BLOCK J_xx -- the rate-network
 % Jacobian with adaptation and depression held fixed; on the full J the
 % numerical abscissa reflects the state coordinates' units, not dynamics,
-% see sample_eigenvalues in run_eig_heatmap). Two panels:
+% see sample_eigenvalues in run_eig_heatmap). Two FIGURES (one panel each,
+% TR 2026-09-14; they were two tiles of one figure), tags
+% Fig_Transient_Amplification_abscissa and Fig_Transient_Amplification_margin:
 %
 %   (a) omega(t) (solid) and alpha(t) (dashed) per condition, condition
 %       colours from manuscript_style. omega bounds the instantaneous growth
@@ -54,11 +56,9 @@ n_cond = numel(D.cond_names);
 colors = cellfun(@(n) st.condition_color(n), D.cond_names, 'UniformOutput', false);
 titles = D.condition_titles;
 
-fig = figure('Color', 'w', 'Position', [100 100 1100 420]);
-tl  = tiledlayout(fig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-
 % (a) time series
-ax1 = nexttile(tl); hold(ax1, 'on');
+fig1 = figure('Color', 'w', 'Position', [100 100 600 420]);
+ax1 = axes(fig1); hold(ax1, 'on');
 h_leg = gobjects(1, n_cond);
 for i = 1:n_cond
     t = D.J_times_by_cond{i};
@@ -76,7 +76,8 @@ legend(ax1, h_leg, 'Location', 'best', 'FontSize', 11);
 set(ax1, 'FontSize', st.tick_fs); box(ax1, 'off');
 
 % (b) distributions of the non-normal margin
-ax2 = nexttile(tl); hold(ax2, 'on');
+fig2 = figure('Color', 'w', 'Position', [720 100 520 420]);
+ax2 = axes(fig2); hold(ax2, 'on');
 for i = 1:n_cond
     m = D.num_abscissa_by_cond{i} - D.spec_abscissa_by_cond{i};
     q = prctile(m, [5 25 50 75 95]);
@@ -93,13 +94,16 @@ ylabel(ax2, '\omega(J_{xx}) - \alpha(J_{xx})  (1/s)', 'FontSize', st.label_fs);
 title(ax2, 'non-normal margin per state (5-95%, IQR, median)', 'FontWeight', 'normal', 'FontSize', st.title_fs);
 box(ax2, 'off');
 
-if ~cfg.visible; set(fig, 'Visible', 'off'); end
+if ~cfg.visible; set([fig1, fig2], 'Visible', 'off'); end
 
-fig_tag = 'Fig_Transient_Amplification';
-out = struct('figs', fig, 'files', {{}}, 'source', data_file);
+tags = {'Fig_Transient_Amplification_abscissa', 'Fig_Transient_Amplification_margin'};
+figs = [fig1, fig2];
+out = struct('figs', figs, 'files', {{}}, 'source', data_file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
-    out.files = existing_outputs(out_dir, fig_tag);
+    for k = 1:2
+        save_figure_stable(out_dir, tags{k}, figs(k));
+        out.files = [out.files, existing_outputs(out_dir, tags{k})];
+    end
 end
 end
 
