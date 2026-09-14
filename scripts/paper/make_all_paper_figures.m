@@ -57,6 +57,11 @@ setup_paths();
 % fast4_config's 'data/fast_4' -- wrote somewhere the search will never find.
 % Passing it through as an explicit run_dir is what makes such a config work
 % end to end; without it the figures died with NoMatchingRun.
+% The verbosity level: needed from the first line that prints, so it is resolved
+% here, before the run directory is reported.
+if ~isfield(cfg, 'verbose'), cfg.verbose = 'minimal'; end
+verbose = cfg.verbose;
+
 want_run_dir = cfg.run_dir;
 if ~isempty(want_run_dir) && ~is_absolute_path(want_run_dir)
     want_run_dir = fullfile(fileparts(which('setup_paths')), want_run_dir);
@@ -115,8 +120,6 @@ vprintf(verbose, 'minimal', 'Figure root:   %s  (%s)\n', fig_root, root_mode);
 visible_figures = isfield(cfg, 'visible_figures') && cfg.visible_figures;
 % The verbosity level, threaded into every figure as its `verbose` argument;
 % older callers' cfg structs may lack the field.
-if ~isfield(cfg, 'verbose'), cfg.verbose = 'minimal'; end
-verbose = cfg.verbose;
 if ~visible_figures
     fig_visibility = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 end
