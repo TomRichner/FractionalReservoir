@@ -2492,7 +2492,7 @@ classdef ParamSpaceAnalysis2 < handle
                 result.mean_synaptic_output = NaN;
 
                 if verbose_level(verbose_local) >= 1
-                    fprintf('  ERROR config %d (%s): %s\n', job.config_idx, job.condition_name, ME.message);
+                    fprintf('  ERROR config %d (%s): %s\n', job.config_idx, job.condition.name, ME.message);
                 end
             end
         end
