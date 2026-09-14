@@ -1,8 +1,11 @@
-% explore_local_lyapunov_exponents.m - how often are the local Lyapunov
-% exponents of the paper's base model positive?
+function out_dir = explore_local_lyapunov_exponents(preset_name)
+% EXPLORE_LOCAL_LYAPUNOV_EXPONENTS How often are the local Lyapunov exponents positive?
 %
-% One network (rng_seeds [1 2]) of the sfaEI_fast preset
-% (celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25, n = 500,
+%   explore_local_lyapunov_exponents()            % the paper preset (sfaEI_fast)
+%   explore_local_lyapunov_exponents(preset_name) % e.g. the tauSpread0p25 preset
+%
+% One network (rng_seeds [1 2]) of the preset (default
+% celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25, n = 500,
 % noise on, SRA1) under each of its three adaptation conditions, at the
 % lyapunov_spectrum stage's MEDIUM settings: T = 40 s, fs 400, the exponents
 % accumulated over the last 20 s after a 10-s alignment, lya_dt 0.05 s.
@@ -23,28 +26,33 @@
 %   row 3  the share of the accumulation window in which each local exponent
 %          is positive, k = 1..30 (bars), with Benettin's share as a line, and
 %          the share of time the LEADING local rate is positive in the title.
+% Plus, per condition, the class's own time-series summary from the Benettin
+% run (timeseries_<condition>.png): u, x, r, synaptic output, SFA, STD and the
+% local Lyapunov exponent, every neuron drawn.
 %
 % The point: "transient expansion" is a statement about the local rates; the
 % finite-time exponents say what survives. In the multiple-timescale regime
 % the leading local rate was positive ~3% of the time at medium in the sweeps
 % (fig_local_vs_finite_lle); this shows the whole top of the spectrum.
 %
-% Output: figs/explorations/local_lyapunov_exponents/ (png, svg, fig) and a
-% markdown table of the final exponents and positive shares. ~10-15 min.
-% Assumes setup_paths has run.
+% Output: figs/explorations/local_lyapunov_exponents/<preset>/ (png, svg, fig) and
+% a markdown table of the final exponents and positive shares. ~4 min.
 %
 % See also: fig_local_vs_finite_lle, fig_lyapunov_spectrum, lyapunov_topk,
 %           SRNNCellTypePairs.lya_summary
 
+arguments
+    preset_name (1,:) char = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25'
+end
 setup_paths();
 
-P        = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25';
+P        = preset_name;
 seeds    = [1 2];
 T        = 40;
 K        = 30;
 common   = {'rng_seeds', seeds, 'fs', 400, 'T_range', [0 T], ...
             'lya_T_interval', [T/2 T], 'lya_warmup', T/4, 'verbose', 'minimal'};
-out_dir  = fullfile(fileparts(which('setup_paths')), 'figs', 'explorations', 'local_lyapunov_exponents');
+out_dir  = fullfile(fileparts(which('setup_paths')), 'figs', 'explorations', 'local_lyapunov_exponents', P);
 if ~isfolder(out_dir); mkdir(out_dir); end
 
 [~, ~, conditions] = srnn_param_preset(P);
@@ -62,6 +70,12 @@ for i = 1:n_cond
     m = build_from_preset(P, cond_names{i}, common{:}, 'lya_method', 'benettin');
     m.run();
     R(i).ben = m.lya_results;
+    % The class's own summary figure from the Benettin run: u, x, r, synaptic
+    % output, SFA, STD and the local Lyapunov exponent, every neuron drawn.
+    [fh, ~] = m.plot();
+    set(fh, 'Visible', 'off');
+    save_figure_stable(out_dir, sprintf('timeseries_%s', cond_names{i}), fh);
+    close(fh);
     R(i).seconds = toc(t0);
     fprintf('%-14s top-%d lambda_1 %+.4f, lambda_%d %+.4f | Benettin %+.4f | %.0f s\n', ...
         cond_names{i}, K, R(i).topk.LE_spectrum(1), K, R(i).topk.LE_spectrum(end), ...
