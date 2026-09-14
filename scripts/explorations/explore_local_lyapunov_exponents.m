@@ -102,7 +102,7 @@ for i = 1:n_cond
     % output, SFA, STD and the local Lyapunov exponent, every neuron drawn.
     [fh, ~] = m.plot();
     set(fh, 'Visible', 'off');
-    save_figure_stable(out_dir, sprintf('timeseries_%s', cond_names{i}), fh);
+    save_png_fig(out_dir, sprintf('timeseries_%s', cond_names{i}), fh);
     close(fh);
     R(i).seconds = toc(t0);
     fprintf('%-14s top-%d lambda_1 %+.4f, lambda_%d %+.4f | Benettin %+.4f | h_KS %.2f bit/s | %.0f s\n', ...
@@ -230,15 +230,21 @@ fclose(fid);
 input_config = opts.input_config; %#ok<NASGU>  saved with the data
 save(fullfile(out_dir, 'local_lyapunov_exponents_data.mat'), 'R', 'P', 'seeds', 'T', 'K', 'input_config', '-v7.3');
 fprintf('table and data saved to %s; exporting the figure (png, fig)\n', out_dir);
-old = dir(fullfile(out_dir, 'local_lyapunov_exponents*'));
-for a = 1:numel(old)
-    if ~old(a).isdir && ~endsWith(old(a).name, {'.md', '.mat'}); delete(fullfile(out_dir, old(a).name)); end
-end
-save_some_figs_to_folder_2(out_dir, 'local_lyapunov_exponents', fig.Number, {'png', 'fig'});
-num = num2str(fig.Number);
-movefile(fullfile(out_dir, ['local_lyapunov_exponents_figure_' num '.png']), fullfile(out_dir, 'local_lyapunov_exponents.png'), 'f');
-movefile(fullfile(out_dir, ['local_lyapunov_exponents_f_' num '.fig']),      fullfile(out_dir, 'local_lyapunov_exponents.fig'), 'f');
+save_png_fig(out_dir, 'local_lyapunov_exponents', fig);
 fprintf('saved to %s\n', out_dir);
+end
+
+function save_png_fig(out_dir, tag, fh)
+% PNG and .fig only (TR, 2026-09-14): the SVG export of these many-line figures
+% takes minutes and is never used. Overwrites <tag>.png / <tag>.fig in place.
+for ext = {'.png', '.fig'}
+    f = fullfile(out_dir, [tag ext{1}]);
+    if isfile(f); delete(f); end
+end
+save_some_figs_to_folder_2(out_dir, tag, fh.Number, {'png', 'fig'});
+num = num2str(fh.Number);
+movefile(fullfile(out_dir, [tag '_figure_' num '.png']), fullfile(out_dir, [tag '.png']), 'f');
+movefile(fullfile(out_dir, [tag '_f_' num '.fig']),      fullfile(out_dir, [tag '.fig']), 'f');
 end
 
 function s = tern(c, a, b)
