@@ -57,6 +57,7 @@ arguments
     cfg.n_seeds     (1,1) double = 0     % 0 -> per run_mode
     cfg.n_regular   (1,1) double = 0     % 0 -> per run_mode
     cfg.n_excursion (1,1) double = 0     % 0 -> per run_mode (onsets AND quiets, each)
+    cfg.duration_s  (1,1) double = 0     % 0 -> mode duration; must leave room for sample history
     cfg.horizon_s   (1,1) double = 0     % 0 -> per run_mode
     cfg.n_override  (1,1) double = 0     % 0 -> the preset's n (tests use a small one)
     cfg.n_workers   (1,1) double = 0     % 0 -> min(12, cores)
@@ -74,6 +75,7 @@ switch cfg.run_mode
         error('run_transient_gain:badMode', 'Unknown run_mode ''%s'' (expected %s).', ...
             cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
+if cfg.duration_s > 0; T = cfg.duration_s; end
 if cfg.n_seeds > 0;     n_seeds   = cfg.n_seeds;     end
 if cfg.n_regular > 0;   n_regular = cfg.n_regular;   end
 if cfg.n_excursion > 0; n_exc     = cfg.n_excursion; end
@@ -101,6 +103,8 @@ P.dir_warmup  = 5;      % s of K = 1 propagation for the leading direction
 P.variants    = {'frozen_x', 'frozen_full', 'active'};
 P.t_lo        = T / 2 + P.dir_warmup;
 P.t_hi        = T - horizon;
+assert(P.t_hi > P.t_lo,'run_transient_gain:ShortTrajectory', ...
+    'duration_s must leave room: T/2 + 5 < T - horizon_s.');
 
 if isempty(cfg.out_dir)
     out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'transient_gain');

@@ -235,6 +235,7 @@ metric_specs = struct( ...
     'zero_line', {specs_all.zero_line});
 
 made_tags = {};
+made_figs = gobjects(0);
 for mi = 1:numel(metric_specs)
     spec = metric_specs(mi);
     y_window = spec.ylim;
@@ -354,14 +355,15 @@ for mi = 1:numel(metric_specs)
     AddLetters2Plots(ax_cell, letters, ...
         'FontSize', letter_fs, 'FontWeight', 'normal', 'HShift', -0.075, 'VShift', -0.05);
 
-    save_figure_stable(out_dir, spec.fig_tag, fh);
+    made_figs(end+1) = fh; %#ok<AGROW>
+    if cfg.save, save_figure_stable(out_dir, spec.fig_tag, fh); end
     made_tags(end+1) = {spec.fig_tag}; %#ok<SAGROW>
 end
 
 % Log the git state alongside the figures so this presentation output can be
 
 %% --- Record ------------------------------------------------------------------
-out = struct('figs', gobjects(0), 'files', {{}}, 'source', run_dir);
+out = struct('figs', made_figs, 'files', {{}}, 'source', run_dir);
 if cfg.save
     for k = 1:numel(made_tags)
         out.files = [out.files, existing_outputs(out_dir, made_tags{k})];
