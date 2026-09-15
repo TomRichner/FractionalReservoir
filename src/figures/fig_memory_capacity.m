@@ -11,9 +11,9 @@ function out = fig_memory_capacity(cfg)
 %       the bottom tenth of the panel)
 %   (b) per-delay R^2 with the saved bootstrap band (summary.R2_ci95)
 %   (c) memory horizon: every paired trial as a connected grey line across the
-%       conditions, condition-coloured markers, the median as a thick bar, and
-%       the paired sign-flip p and Cohen's d_z for the adjacent pairs printed
-%       in the panel -- READ from summary.stats, never recomputed here.
+%       conditions, condition-coloured markers, the median as a thick bar,
+%       and nothing else: the paired sign-flip p and Cohen's d_z live in the
+%       table (TR, 2026-09-15), READ from summary.stats, never recomputed.
 %
 % Beside the figure, Fig_Memory_Capacity_table.md: MC and horizon mean
 % [bootstrap 95% CI] per condition, every paired test, n trials, readout
@@ -140,22 +140,9 @@ set(ax_c, 'XTick', xpos, 'XTickLabel', cond_titles);
 ylabel(ax_c, 'Memory Horizon (s)', 'FontSize', label_fs);
 y_h = max([H_trials(:); 0.1]);
 ylim(ax_c, [0, 1.35 * y_h]);
-% Adjacent pairs, matched by condition name in stats(p).pair (never by position)
-adj = [1:n_cond - 1; 2:n_cond]';
-if n_cond >= 3; adj = [adj; 1 n_cond]; end
-lines_txt = {};
-for a = 1:size(adj, 1)
-    p = find_pair(stats, cond_keys{adj(a, 1)}, cond_keys{adj(a, 2)});
-    if isempty(p); continue; end
-    lines_txt{end + 1} = sprintf('%s vs %s: p = %s, d_z = %.2f', ...
-        short_of(st, cond_keys{adj(a, 1)}), short_of(st, cond_keys{adj(a, 2)}), ...
-        p_txt(stats(p)), stats(p).cohens_dz); %#ok<AGROW>
-end
-text(ax_c, 0.03, 0.98, strjoin(lines_txt, newline), 'Units', 'normalized', ...
-    'FontSize', 9, 'VerticalAlignment', 'top', 'Interpreter', 'none');
-text(ax_c, 0.97, 0.02, sprintf('n = %d paired trials; tests on total MC', n_trials), ...
-    'Units', 'normalized', 'FontSize', 8, 'HorizontalAlignment', 'right', ...
-    'VerticalAlignment', 'bottom', 'Color', [0.3 0.3 0.3]);
+% The paired tests (sign-flip p, Cohen's d_z) and n are NOT printed on the
+% panel (TR, 2026-09-15: statistics belong in the figure's table, which the
+% report includes); they are in Fig_Memory_Capacity_table.md below.
 
 AddLetters2Plots(fig, {'(a)', '(b)', '(c)'}, 'FontSize', 18, 'FontWeight', 'normal', ...
     'HShift', -0.04, 'VShift', -0.09);
@@ -200,12 +187,6 @@ fill(ax, [x, fliplr(x)], [hi, fliplr(lo)], rgb, 'FaceAlpha', alpha_fill, ...
     'EdgeColor', 'none', 'HandleVisibility', 'off');
 end
 
-function p = find_pair(stats, a, b)
-% Index of the saved pair "a vs b" or "b vs a"; empty if absent.
-p = find(strcmp({stats.pair}, sprintf('%s vs %s', a, b)) | ...
-         strcmp({stats.pair}, sprintf('%s vs %s', b, a)), 1);
-end
-
 function s = p_txt(stat)
 if stat.p_perm < 1e-3
     s = sprintf('%.1e', stat.p_perm);
@@ -218,13 +199,3 @@ function v = tern(c, a, b)
 if c; v = a; else; v = b; end
 end
 
-function s = short_of(st, key)
-% Short label when manuscript_style has one, else the full title, else the key.
-if isKey(st.condition_short, key)
-    s = st.condition_short(key);
-elseif isKey(st.condition_title, key)
-    s = st.condition_title(key);
-else
-    s = key;
-end
-end
