@@ -83,8 +83,6 @@ for i = 1:n_cond
     share = mean(L(inwin, :) > 0, 1); share_ben = mean(bn.local_lya(bn.t_lya >= T/2) > 0);
     ax = nexttile(tl); hold(ax, 'on');
     bar(ax, 1:K, 100 * share, 'FaceColor', col, 'EdgeColor', 'none', 'FaceAlpha', 0.8);
-    yline(ax, 100 * share_ben, '--', sprintf('Benettin %.0f%%', 100 * share_ben), 'Color', 'k', ...
-        'LabelHorizontalAlignment', 'left', 'FontSize', 8);
     hold(ax, 'off'); box(ax, 'off'); xlim(ax, [0.5 K + 0.5]); ylim(ax, [0 100]);
     xlabel(ax, 'exponent index k', 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, 'time with local rate > 0 (%)', 'FontSize', st.label_fs); end
