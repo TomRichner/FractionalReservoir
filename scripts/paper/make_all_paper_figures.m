@@ -102,11 +102,12 @@ else
     root_mode = 'configured';
 end
 if ~isfolder(fig_root); mkdir(fig_root); end
-% The command-window transcript of the figure pass is saved beside the
-% manifest (TR, 2026-09-14). diary is process-global; the onCleanup turns it
-% off however this function exits.
-diary(fullfile(fig_root, 'command_window.log'));
-diary_guard = onCleanup(@() diary('off')); %#ok<NASGU>
+% The transcript of the figure pass is saved beside the manifest (TR,
+% 2026-09-14), through vlog since 2026-09-15 (diary lost everything under the
+% MATLAB MCP server; see vlog). Process-global; the onCleanup closes it
+% however this function exits.
+log_guard = vlog('open', fullfile(fig_root, 'command_window.log')); %#ok<NASGU>
+vprintf(verbose, 'minimal', '[log] transcript -> %s\n', fullfile(fig_root, 'command_window.log'));
 vprintf(verbose, 'minimal', 'Figure root:   %s  (%s)\n', fig_root, root_mode);
 
 %% Keep the figures off screen unless asked otherwise
@@ -155,7 +156,7 @@ for k = 1:n
             % A figure that returns without writing anything is a FAILURE here,
             % even though the call succeeded. See the header.
             err = 'returned no files (export may have failed silently)';
-            fprintf(2, '     no files written\n');
+            vfail('     no files written\n');
         else
             err = '';
             vprintf(verbose, 'minimal', '     %d file(s): %s\n', n_files, strjoin(out.files, ', '));
@@ -167,9 +168,9 @@ for k = 1:n
         % Close only THIS entry's handles, now that it is verified. See header.
         close_figs(out.figs);
     catch ME
-        fprintf(2, '     FAILED %s: %s\n', ME.identifier, ME.message);
+        vfail('     FAILED %s: %s\n', ME.identifier, ME.message);
         for s = 1:min(3, numel(ME.stack))
-            fprintf(2, '       at %s (line %d)\n', ME.stack(s).name, ME.stack(s).line);
+            vfail('       at %s (line %d)\n', ME.stack(s).name, ME.stack(s).line);
         end
         results(end+1) = struct('name', f.name, 'ok', false, 'in_paper', f.in_paper, ...
             'n_files', 0, 'seconds', toc(t0), 'files', {{}}, ...
@@ -236,7 +237,7 @@ bad = results(~[results.ok]);
 if ~isempty(bad)
     vprintf(verbose, 'minimal', '--------------------------------------------------------\n');
     for k = 1:numel(bad)
-        fprintf(2, '  %s: %s\n', bad(k).name, bad(k).err);
+        vfail('  %s: %s\n', bad(k).name, bad(k).err);
     end
 end
 vprintf(verbose, 'minimal', '========================================================\n');

@@ -109,12 +109,12 @@ for q = 1:n
     catch job_err
         r.minutes = toc(job_t0) / 60;
         r.err = job_err.message;
-        fprintf(2, '\n### QUEUE %d/%d FAILED after %.1f min\n', q, n, r.minutes);
-        fprintf(2, '### %s: %s\n', job_err.identifier, job_err.message);
+        vfail('\n### QUEUE %d/%d FAILED after %.1f min\n', q, n, r.minutes);
+        vfail('### %s: %s\n', job_err.identifier, job_err.message);
         for k = 1:numel(job_err.stack)
-            fprintf(2, '###   at %s (line %d)\n', job_err.stack(k).name, job_err.stack(k).line);
+            vfail('###   at %s (line %d)\n', job_err.stack(k).name, job_err.stack(k).line);
         end
-        fprintf(2, '### continuing with the rest of the queue\n');
+        vfail('### continuing with the rest of the queue\n');
     end
     results{q} = r;
     close all force;

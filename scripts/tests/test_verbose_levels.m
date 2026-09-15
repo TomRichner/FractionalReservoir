@@ -32,6 +32,19 @@ all_passed = check('verbose_name canonicalises', strcmp(verbose_name(true), 'ver
     strcmp(verbose_name(false), 'minimal') && strcmp(verbose_name('near-none'), 'near-none')) && all_passed;
 out = evalc('vprintf(''minimal'', ''verbose'', ''x\n''); vprintf(''minimal'', ''minimal'', ''y\n'');');
 all_passed = check('vprintf gates', strcmp(strtrim(out), 'y')) && all_passed;
+% The transcript log (vlog): while open, every printed vprintf line and every
+% vfail line is appended; gated-out lines are not; closing the guard stops it.
+log_file = fullfile(tempdir, 'verbose_levels_test.log');
+if isfile(log_file); delete(log_file); end
+guard = vlog('open', log_file);
+evalc('vprintf(''minimal'', ''minimal'', ''logged %d\n'', 1); vprintf(''minimal'', ''verbose'', ''hidden\n''); vfail(''failed %s\n'', ''too'');');
+clear guard
+evalc('vprintf(''minimal'', ''minimal'', ''after close\n'');');
+logged = fileread(log_file);
+all_passed = check('vlog receives vprintf and vfail lines, not gated or post-close ones', ...
+    contains(logged, 'logged 1') && contains(logged, 'failed too') && ~contains(logged, 'hidden') && ...
+    ~contains(logged, 'after close') && isempty(vlog('path'))) && all_passed;
+delete(log_file);
 
 %% 2. model
 outs = struct();

@@ -105,15 +105,18 @@ t_all = tic;
 % folder", which is what run_all_analyses does with an empty output_dir. A
 % relative path resolves against the project root, so a config can say
 % 'data/fast_4' without caring what the cwd is -- same rule as fig_root.
-% The command-window transcript is saved with the data (TR, 2026-09-14):
-% <run_dir>/command_window.log, via diary. With a named run_dir it starts
-% before the first stage; with an auto-named one it can only start once
-% run_all_analyses has created the directory, so the sweep stage's lines
-% are missing from that log. diary is process-global and one at a time, so
-% an onCleanup turns it off however this function exits.
+% The transcript is saved with the data (TR, 2026-09-14):
+% <run_dir>/command_window.log. Since 2026-09-15 it is written by vlog, the
+% sink every vprintf / vfail line is appended to, instead of diary: diary
+% only sees the command window, and a run launched through the MATLAB MCP
+% server has its output captured before diary does, so those logs came out
+% empty. With a named run_dir the log opens before the first stage; with an
+% auto-named one it can only open once run_all_analyses has created the
+% directory, so the sweep stage's lines are missing from that log. One log
+% at a time, process-global; the onCleanup closes it however this exits.
 if isempty(cfg.run_dir)
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'verbose', cfg.verbose);
-    diary_guard = start_diary(fullfile(run_dir, 'command_window.log')); %#ok<NASGU>
+    log_guard = start_log(fullfile(run_dir, 'command_window.log'), cfg.verbose); %#ok<NASGU>
 else
     out_dir = cfg.run_dir;
     if ~is_absolute_path(out_dir)
@@ -121,7 +124,7 @@ else
     end
     assert_empty_target(out_dir);
     if ~isfolder(out_dir); mkdir(out_dir); end
-    diary_guard = start_diary(fullfile(out_dir, 'command_window.log')); %#ok<NASGU>
+    log_guard = start_log(fullfile(out_dir, 'command_window.log'), cfg.verbose); %#ok<NASGU>
     vprintf(cfg.verbose, 'minimal', '  output   : %s\n', out_dir);
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir, 'verbose', cfg.verbose);
 end
@@ -178,6 +181,7 @@ for k = 1:size(stages, 1)
     name = stages{k, 1};
     vprintf(cfg.verbose, 'minimal', '[%d/%d] %s\n', k, size(stages, 1), name);
     t0 = tic;
+    lastwarn('');
     try
         restart_parpool();
         detail = stages{k, 2}();
@@ -185,12 +189,16 @@ for k = 1:size(stages, 1)
         vprintf(cfg.verbose, 'minimal', '  -> %s\n', detail);
     catch ME
         results = record(results, name, false, toc(t0)/60, '', ME.message);
-        fprintf(2, '  FAILED: %s: %s\n', ME.identifier, ME.message);
+        vfail('  FAILED: %s: %s\n', ME.identifier, ME.message);
         for s = 1:min(3, numel(ME.stack))
-            fprintf(2, '    at %s (line %d)\n', ME.stack(s).name, ME.stack(s).line);
+            vfail('    at %s (line %d)\n', ME.stack(s).name, ME.stack(s).line);
         end
-        fprintf(2, '  continuing with the remaining stages\n');
+        vfail('  continuing with the remaining stages\n');
     end
+    % MATLAB's own warnings bypass vprintf; the last one raised during the
+    % stage goes to the log (not the screen, where it was already shown).
+    [wmsg, wid] = lastwarn;
+    if ~isempty(wmsg); vlog('append', sprintf('  [last warning] %s: %s\n', wid, wmsg)); end
 end
 
 %% Refresh the human-readable record
@@ -209,7 +217,7 @@ for k = 1:numel(results)
     r = results(k);
     if r.ok; tag = 'OK    '; else; tag = 'FAILED'; end
     vprintf(cfg.verbose, 'minimal', '  %s  %-18s %7.1f min\n', tag, r.stage, r.minutes);
-    if ~r.ok; fprintf(2, '          %s\n', r.err); end
+    if ~r.ok; vfail('          %s\n', r.err); end
 end
 vprintf(cfg.verbose, 'verbose', 'Next: make_all_paper_figures(paper_config(''run_dir'', run_dir))\n');
 end
@@ -269,11 +277,10 @@ results(end+1) = struct('stage', stage, 'ok', ok, 'minutes', minutes, ...
     'detail', detail, 'err', err);
 end
 
-function guard = start_diary(log_file)
-% Append the command-window transcript to log_file until the guard is
-% destroyed. diary is process-global and MATLAB keeps one; a caller's own
-% diary is therefore replaced for the duration and turned off afterwards.
-diary(log_file);
-fprintf('[diary] command window -> %s\n', log_file);
-guard = onCleanup(@() diary('off'));
+function guard = start_log(log_file, verbose)
+% Append every vprintf / vfail line to log_file until the guard is destroyed
+% (vlog is process-global and keeps one log; a caller's own is replaced for
+% the duration and closed afterwards).
+guard = vlog('open', log_file);
+vprintf(verbose, 'minimal', '[log] transcript -> %s\n', log_file);
 end
