@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\memory_capacity
+Captured at: 15-Sep-2026 13:15:54
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      3d3529200d8d8ba4560a7d379c8c9894959a9ea6
+commit_short:3d35292
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Transcript log through vprintf (vlog), not diary: complete however MATLAB is launched (TR, 2026-09-15)
+last_date:   2026-09-15T12:43:23-05:00
+dirty:       false
+
