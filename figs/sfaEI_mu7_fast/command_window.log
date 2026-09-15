@@ -1,0 +1,93 @@
+[log] transcript -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\sfaEI_mu7_fast\command_window.log
+Figure root:   C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\sfaEI_mu7_fast  (configured)
+PAPER FIGURES  (29 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 13:52:02
+---- [1/29] fig_introductory_concepts   [in paper]
+     3 file(s): Fig_Intro_Concepts.png, Fig_Intro_Concepts.svg, Fig_Intro_Concepts.fig
+---- [2/29] fig_example_timeseries   [in paper]
+     3 file(s): fig_example_timeseries.png, fig_example_timeseries.svg, fig_example_timeseries.fig
+---- [3/29] fig_FI_curve   [in paper]
+     3 file(s): Fig_FI_curve.png, Fig_FI_curve.svg, Fig_FI_curve.fig
+---- [4/29] fig_adaptation_methods   [in paper]
+     3 file(s): Fig_single_neuron_SFA_STD.png, Fig_single_neuron_SFA_STD.svg, Fig_single_neuron_SFA_STD.fig
+---- [5/29] fig_adaptation_methods_stf
+     3 file(s): Fig_single_neuron_SFA_STD_STF.png, Fig_single_neuron_SFA_STD_STF.svg, Fig_single_neuron_SFA_STD_STF.fig
+---- [6/29] fig_SFA_steady_state
+     3 file(s): Fig_SFA_steady_state.png, Fig_SFA_steady_state.svg, Fig_SFA_steady_state.fig
+---- [7/29] fig_STD_steady_state
+     3 file(s): Fig_STD_steady_state.png, Fig_STD_steady_state.svg, Fig_STD_steady_state.fig
+---- [8/29] fig_stim_engages_adaptation   [in paper]
+     9 file(s): bursting_timeseries.png, bursting_timeseries.svg, bursting_timeseries.fig, bursting_psd.png, bursting_psd.svg, bursting_psd.fig, bursting_synchrony.png, bursting_synchrony.svg, bursting_synchrony.fig
+---- [9/29] fig_sensitivity_analysis_allStd   [in paper]
+     24 file(s): Fig_Sensitivity_LLE_core.png, Fig_Sensitivity_LLE_core.svg, Fig_Sensitivity_LLE_core.fig, Fig_Sensitivity_LLE_mu.png, Fig_Sensitivity_LLE_mu.svg, Fig_Sensitivity_LLE_mu.fig, Fig_Sensitivity_mean_rate_core.png, Fig_Sensitivity_mean_rate_core.svg, Fig_Sensitivity_mean_rate_core.fig, Fig_Sensitivity_mean_rate_mu.png, Fig_Sensitivity_mean_rate_mu.svg, Fig_Sensitivity_mean_rate_mu.fig, Fig_Sensitivity_hKS_core.png, Fig_Sensitivity_hKS_core.svg, Fig_Sensitivity_hKS_core.fig, Fig_Sensitivity_hKS_mu.png, Fig_Sensitivity_hKS_mu.svg, Fig_Sensitivity_hKS_mu.fig, Fig_Sensitivity_DKY_core.png, Fig_Sensitivity_DKY_core.svg, Fig_Sensitivity_DKY_core.fig, Fig_Sensitivity_DKY_mu.png, Fig_Sensitivity_DKY_mu.svg, Fig_Sensitivity_DKY_mu.fig
+---- [10/29] fig_sensitivity_medians
+     12 file(s): Fig_Sensitivity_LLE_medians.png, Fig_Sensitivity_LLE_medians.svg, Fig_Sensitivity_LLE_medians.fig, Fig_Sensitivity_mean_rate_medians.png, Fig_Sensitivity_mean_rate_medians.svg, Fig_Sensitivity_mean_rate_medians.fig, Fig_Sensitivity_hKS_medians.png, Fig_Sensitivity_hKS_medians.svg, Fig_Sensitivity_hKS_medians.fig, Fig_Sensitivity_DKY_medians.png, Fig_Sensitivity_DKY_medians.svg, Fig_Sensitivity_DKY_medians.fig
+---- [11/29] fig_param_space_allStd   [in paper]
+     12 file(s): Fig_ParamSpace_LLE.png, Fig_ParamSpace_LLE.svg, Fig_ParamSpace_LLE.fig, Fig_ParamSpace_mean_rate.png, Fig_ParamSpace_mean_rate.svg, Fig_ParamSpace_mean_rate.fig, Fig_ParamSpace_hKS.png, Fig_ParamSpace_hKS.svg, Fig_ParamSpace_hKS.fig, Fig_ParamSpace_DKY.png, Fig_ParamSpace_DKY.svg, Fig_ParamSpace_DKY.fig
+---- [12/29] fig_EI_weights_param_space   [in paper]
+     12 file(s): Fig_EI_Weights_ParamSpace_LLE.png, Fig_EI_Weights_ParamSpace_LLE.svg, Fig_EI_Weights_ParamSpace_LLE.fig, Fig_EI_Weights_ParamSpace_mean_rate.png, Fig_EI_Weights_ParamSpace_mean_rate.svg, Fig_EI_Weights_ParamSpace_mean_rate.fig, Fig_EI_Weights_ParamSpace_hKS.png, Fig_EI_Weights_ParamSpace_hKS.svg, Fig_EI_Weights_ParamSpace_hKS.fig, Fig_EI_Weights_ParamSpace_DKY.png, Fig_EI_Weights_ParamSpace_DKY.svg, Fig_EI_Weights_ParamSpace_DKY.fig
+---- [13/29] fig_lle_vs_rate   [in paper]
+     3 file(s): Fig_LLE_vs_Rate.png, Fig_LLE_vs_Rate.svg, Fig_LLE_vs_Rate.fig
+---- [14/29] fig_local_vs_finite_lle   [in paper]
+     3 file(s): Fig_Local_vs_Finite_LLE.png, Fig_Local_vs_Finite_LLE.svg, Fig_Local_vs_Finite_LLE.fig
+---- [15/29] fig_sfa_EOC_allStd   [in paper]
+     6 file(s): Fig_SFA_EOC_allStd.png, Fig_SFA_EOC_allStd.svg, Fig_SFA_EOC_allStd.fig, Fig_SFA_EOC_blocks.png, Fig_SFA_EOC_blocks.svg, Fig_SFA_EOC_blocks.fig
+---- [16/29] fig_memory_capacity   [in paper]
+     3 file(s): Fig_Memory_Capacity.png, Fig_Memory_Capacity.svg, Fig_Memory_Capacity.fig
+---- [17/29] fig_memory_capacity_example   [in paper]
+     3 file(s): Fig_MC_Example.png, Fig_MC_Example.svg, Fig_MC_Example.fig
+---- [18/29] fig_eig_heatmap
+     3 file(s): fig_eig_heatmap.png, fig_eig_heatmap.svg, fig_eig_heatmap.fig
+---- [19/29] fig_eig_heatmap_imbalance   [in paper]
+     3 file(s): Fig_Eig_Heatmap_Imbalance.png, Fig_Eig_Heatmap_Imbalance.svg, Fig_Eig_Heatmap_Imbalance.fig
+---- [20/29] fig_dc_lle
+     3 file(s): fig_dc_lle.png, fig_dc_lle.svg, fig_dc_lle.fig
+---- [21/29] fig_lyapunov_spectrum
+     3 file(s): Fig_Lyapunov_Spectrum.png, Fig_Lyapunov_Spectrum.svg, Fig_Lyapunov_Spectrum.fig
+---- [22/29] fig_transient_amplification
+     6 file(s): Fig_Transient_Amplification_abscissa.png, Fig_Transient_Amplification_abscissa.svg, Fig_Transient_Amplification_abscissa.fig, Fig_Transient_Amplification_margin.png, Fig_Transient_Amplification_margin.svg, Fig_Transient_Amplification_margin.fig
+---- [23/29] fig_transient_gain
+     3 file(s): Fig_Transient_Gain.png, Fig_Transient_Gain.svg, Fig_Transient_Gain.fig
+---- [24/29] fig_transient_gain_excursions
+     3 file(s): Fig_Transient_Gain_Excursions.png, Fig_Transient_Gain_Excursions.svg, Fig_Transient_Gain_Excursions.fig
+---- [25/29] fig_local_lyapunov   [in paper]
+     2 file(s): Fig_Local_Lyapunov.png, Fig_Local_Lyapunov.fig
+---- [26/29] fig_numerics_solver
+     3 file(s): Fig_numerics_solver.png, Fig_numerics_solver.svg, Fig_numerics_solver.fig
+---- [27/29] fig_numerics_lya_method
+     3 file(s): Fig_numerics_lya_method.png, Fig_numerics_lya_method.svg, Fig_numerics_lya_method.fig
+---- [28/29] fig_numerics_jacobian
+     3 file(s): Fig_Numerics_Jacobian.png, Fig_Numerics_Jacobian.svg, Fig_Numerics_Jacobian.fig
+---- [29/29] doc_tables   [in paper]
+     4 file(s): equation_table.md, adaptation_conditions.md, parameters_table.md, adaptation_conditions_table.md
+PAPER FIGURES COMPLETE in 12.2 min: 29/29 succeeded (16/16 in-paper), output C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\sfaEI_mu7_fast
+--------------------------------------------------------
+  OK      fig_introductory_concepts         3 files   32.2 s   [in paper]
+  OK      fig_example_timeseries            3 files   58.7 s   [in paper]
+  OK      fig_FI_curve                      3 files    2.5 s   [in paper]
+  OK      fig_adaptation_methods            3 files   14.1 s   [in paper]
+  OK      fig_adaptation_methods_stf        3 files   23.3 s
+  OK      fig_SFA_steady_state              3 files    2.2 s
+  OK      fig_STD_steady_state              3 files    6.5 s
+  OK      fig_stim_engages_adaptation       9 files   44.1 s   [in paper]
+  OK      fig_sensitivity_analysis_allStd  24 files  236.2 s   [in paper]
+  OK      fig_sensitivity_medians          12 files   21.5 s
+  OK      fig_param_space_allStd           12 files   79.2 s   [in paper]
+  OK      fig_EI_weights_param_space       12 files   40.4 s   [in paper]
+  OK      fig_lle_vs_rate                   3 files   41.6 s   [in paper]
+  OK      fig_local_vs_finite_lle           3 files    4.3 s   [in paper]
+  OK      fig_sfa_EOC_allStd                6 files    2.8 s   [in paper]
+  OK      fig_memory_capacity               3 files    3.2 s   [in paper]
+  OK      fig_memory_capacity_example       3 files    3.3 s   [in paper]
+  OK      fig_eig_heatmap                   3 files    3.3 s
+  OK      fig_eig_heatmap_imbalance         3 files    8.1 s   [in paper]
+  OK      fig_dc_lle                        3 files    2.8 s
+  OK      fig_lyapunov_spectrum             3 files    6.1 s
+  OK      fig_transient_amplification       6 files    3.5 s
+  OK      fig_transient_gain                3 files    8.3 s
+  OK      fig_transient_gain_excursions     3 files    4.5 s
+  OK      fig_local_lyapunov                2 files   38.3 s   [in paper]
+  OK      fig_numerics_solver               3 files   12.5 s
+  OK      fig_numerics_lya_method           3 files    7.4 s
+  OK      fig_numerics_jacobian             3 files    4.7 s
+  OK      doc_tables                        4 files    0.7 s   [in paper]
+========================================================

@@ -1,0 +1,140 @@
+[log] transcript -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\command_window.log
+  output   : C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast
+[1/3] Running Sensitivity Analysis...
+[sensitivity] run_mode=fast, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7 (SRNNCellTypePairs), n_levels=5, n_reps=5
+=== Sensitivity: n [100, 1e+03] (1/7) ===
+[psa] n,reps: 25 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_n_nLevs_5_sep_15_26_12_45
+[psa] batch 1/1 done in 1.2 min (75/75 ok), ETA 0 min
+[psa] complete in 0.02 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_n_nLevs_5_sep_15_26_12_45
+=== Sensitivity: f_E [0.2, 0.8] (2/7) ===
+[psa] f_E,reps: 25 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_f_E_nLevs_5_sep_15_26_12_46
+[psa] batch 1/1 done in 0.7 min (75/75 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_f_E_nLevs_5_sep_15_26_12_46
+=== Sensitivity: level_of_chaos [0.25, 1.75] (3/7) ===
+[psa] level_of_chaos,reps: 25 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_level_of_chaos_nLevs_5_sep_15_26_12_47
+[psa] batch 1/1 done in 0.9 min (75/75 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_level_of_chaos_nLevs_5_sep_15_26_12_47
+=== Sensitivity: mu_EE_relative [1.75, 12.2] (4/7) ===
+[psa] mu_EE_relative,reps: 25 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_5_sep_15_26_12_48
+[psa] batch 1/1 done in 0.6 min (75/75 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_5_sep_15_26_12_48
+=== Sensitivity: mu_EI_relative [-12.2, -1.75] (5/7) ===
+[psa] mu_EI_relative,reps: 25 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_5_sep_15_26_12_49
+[psa] batch 1/1 done in 0.6 min (75/75 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_5_sep_15_26_12_49
+=== Sensitivity: mu_IE_relative [1.75, 12.2] (6/7) ===
+[psa] mu_IE_relative,reps: 25 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_5_sep_15_26_12_50
+[psa] batch 1/1 done in 0.7 min (75/75 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_5_sep_15_26_12_50
+=== Sensitivity: mu_II_relative [-12.2, -1.75] (7/7) ===
+[psa] mu_II_relative,reps: 25 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_II_relative_nLevs_5_sep_15_26_12_50
+[psa] batch 1/1 done in 0.6 min (75/75 ok), ETA 0 min
+[psa] complete in 0.01 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\1D_sensitivity_sensitivity_mu_II_relative_nLevs_5_sep_15_26_12_50
+[2/3] Running Tau Sensitivity Analysis...
+[tau_sensitivity] run_mode=fast, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7 (SRNNCellTypePairs), n_levels=7, n_reps=7
+[psa] tau_a_EI,reps: 49 combinations x 1 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_7_sep_15_26_12_53
+[psa] batch 1/2 done in 0.6 min (25/25 ok), ETA 1 min
+[psa] batch 2/2 done in 0.5 min (24/24 ok), ETA 0 min
+[psa] complete in 0.02 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_7_sep_15_26_12_53
+[tau_sensitivity] axis tau_a_EI, 3 elements
+[tau_sensitivity] complete: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_7_sep_15_26_12_53
+[3/3] Running Parameter Space Analysis...
+[param_space] run_mode=fast, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7 (SRNNCellTypePairs), n_levels=3
+Subset: running 128 of 2187 combinations (5.9% requested, 5.9% actual); the rest stay empty.
+[psa] n,f_E,level_of_chaos,mu_EE_relative,mu_EI_relative,mu_IE_relative,mu_II_relative: 2187 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\param_space_nLevs_3_sep_15_26_12_54
+[psa] batch 1/6 done in 3.4 min (75/75 ok), ETA 17 min
+[psa] batch 2/6 done in 2.2 min (75/75 ok), ETA 11 min
+[psa] batch 3/6 done in 3.9 min (75/75 ok), ETA 9 min
+[psa] batch 4/6 done in 2.5 min (75/75 ok), ETA 6 min
+[psa] batch 5/6 done in 2.4 min (75/75 ok), ETA 3 min
+[psa] batch 6/6 done in 0.9 min (9/9 ok), ETA 0 min
+[psa] complete in 0.25 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\param_space_nLevs_3_sep_15_26_12_54
+[1/8] memory_capacity
+[memory_capacity] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7  run_mode=fast
+[memory_capacity] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\memory_capacity\MC_sample_hold_20260915_131030_trials5_results.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\memory_capacity\MC_sample_hold_20260915_131030_trials5_results.mat
+[2/8] mc_example
+[mc_example] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7 run_mode=fast T_train=120s d_max=5s solver=sra1
+[mc_example] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\mc_example\mc_example_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\mc_example\mc_example_data.mat
+[3/8] eig_heatmap
+[eig_heatmap] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7 run_mode=fast T=40 s n_samples=40
+  inhibition-dominant  no_adaptation  LLE = +1.5416 | <r> 0.051 | B_E 0.42 | 10000 eigenvalues | num. abscissa median +48.430 (spectral +2.173)
+  inhibition-dominant  sfa1_std1      LLE = -0.5000 | <r> 0.048 | B_E 0.42 | 40000 eigenvalues | num. abscissa median +29.334 (spectral +3.472)
+  inhibition-dominant  sfa3_std2      LLE = -0.0942 | <r> 0.085 | B_E 0.42 | 80000 eigenvalues | num. abscissa median +22.074 (spectral +0.845)
+  reference            no_adaptation  LLE = +3.0917 | <r> 0.397 | B_E 0.50 | 20000 eigenvalues | num. abscissa median +81.995 (spectral +6.495)
+  reference            sfa1_std1      LLE = +0.0960 | <r> 0.216 | B_E 0.50 | 80000 eigenvalues | num. abscissa median +75.080 (spectral +5.360)
+  reference            sfa3_std2      LLE = -0.0980 | <r> 0.213 | B_E 0.50 | 160000 eigenvalues | num. abscissa median +38.423 (spectral -0.978)
+  excitation-dominant  no_adaptation  LLE = -5.5175 | <r> 0.870 | B_E 0.55 | 10000 eigenvalues | num. abscissa median +30.705 (spectral -4.972)
+  excitation-dominant  sfa1_std1      LLE = -0.5201 | <r> 0.676 | B_E 0.55 | 40000 eigenvalues | num. abscissa median +21.155 (spectral -0.744)
+  excitation-dominant  sfa3_std2      LLE = -0.0964 | <r> 0.252 | B_E 0.55 | 80000 eigenvalues | num. abscissa median +23.651 (spectral +1.411)
+[eig_heatmap] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\eig_heatmap\eig_heatmap_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\eig_heatmap\eig_heatmap_data.mat
+[4/8] numerics
+[numerics_verification] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7 run_mode=fast
+  [1/3] No Adaptation
+  [2/3] Single-Timescale Adaptation
+  [3/3] Multiple-Timescale Adaptation
+# Numerics verification verdict (celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7, fast)
+
+Acceptance criteria fixed on 2026-09-14, before the run. Trials: 1 reshoot, 2 LLE/QR; 3 Jacobian states per condition.
+
+| Condition | Check | Value | Threshold | Result | What |
+|---|---|---|---|---|---|
+| No Adaptation | A | 2.01 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| No Adaptation | B | 1.98 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| No Adaptation | L | 0.589 | <= 0.05 | FAIL | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| No Adaptation | C | [0.0134 0.00906] | <= 0.05 and <= 0.02 | PASS | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| No Adaptation | J | [6.04e-11 1.4e-09] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+| Single-Timescale Adaptation | A | 2 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| Single-Timescale Adaptation | B | 1.9 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| Single-Timescale Adaptation | L | 0.243 | <= 0.05 | FAIL | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| Single-Timescale Adaptation | C | [0.0631 0.00723] | <= 0.05 and <= 0.02 | FAIL | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| Single-Timescale Adaptation | J | [4.42e-11 3.38e-10] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+| Multiple-Timescale Adaptation | A | 2.01 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| Multiple-Timescale Adaptation | B | 1.86 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| Multiple-Timescale Adaptation | L | 0.000502 | <= 0.05 | PASS | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| Multiple-Timescale Adaptation | C | [0.0083 0.0146] | <= 0.05 and <= 0.02 | PASS | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| Multiple-Timescale Adaptation | J | [4.85e-11 7.11e-12] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+
+## Manuscript claims
+
+- 400-Hz SRA1 converges to the ode45 reference under step refinement (noise-free): **PASS** (PASS / PASS / PASS)
+- SRA1 converges under step refinement on one Brownian path (strong order >= 1): **PASS** (PASS / PASS / PASS)
+- the Benettin LLE at 400-Hz SRA1 agrees with ode45-Benettin: **FAIL** (FAIL / FAIL / PASS)
+- the Benettin LLE agrees with the QR spectrum's lambda_1 and with top-K: **FAIL** (PASS / FAIL / PASS)
+- the analytic Jacobian matches central finite differences: **PASS** (PASS / PASS / PASS)
+
+AT LEAST ONE CRITERION FAILED: see the table. Resolve in code or reflect in the Methods before production analyses.
+[numerics_verification] 7.0 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\numerics_verification\numerics_verification_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\numerics_verification\numerics_verification_data.mat
+[5/8] lyapunov_spectrum
+[lyapunov_spectrum] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7 run_mode=fast: 3 conditions x 1 seeds x {noise_on, noise_off}, T = 20 s, K = 50 (cap 100)
+[lyapunov_spectrum] 2.5 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\lyapunov_spectrum\lyapunov_spectrum_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\lyapunov_spectrum\lyapunov_spectrum_data.mat
+[6/8] transient_gain
+[transient_gain] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7 run_mode=fast: 3 conditions x 1 seeds, T = 20 s, 6 regular + up to 4 onset + 4 quiet samples, horizon 1 s, {frozen_x, frozen_full, active}
+[transient_gain] 7.9 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\transient_gain\transient_gain_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\transient_gain\transient_gain_data.mat
+[7/8] local_lyapunov
+[local_lyapunov] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu7 run_mode=fast: 3 conditions, T = 60 s, K = 30
+  no_adaptation  top-30 lambda_1 +3.2480 | Benettin +3.2479 | h_KS 17.39 bit/s | 57 s
+  sfa1_std1      top-30 lambda_1 -0.1166 | Benettin -0.1107 | h_KS 0.00 bit/s | 70 s
+  sfa3_std2      top-30 lambda_1 -0.0832 | Benettin -0.0857 | h_KS 0.00 bit/s | 80 s
+[local_lyapunov] 3.5 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\local_lyapunov\local_lyapunov_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\local_lyapunov\local_lyapunov_data.mat
+[8/8] dc_lle
+[dc_lle] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7  run_mode=fast
+[dc_lle] 5 seeds x 3 conditions finished in 6.1 min
+[dc_lle] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\dc_lle\dc_lle_nSeeds_5_sep_15_26_13_45\dc_lle_results.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast\dc_lle\dc_lle_nSeeds_5_sep_15_26_13_45
+[paper analyses] complete in 1.11 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu7_fast
+  OK      sweeps                25.0 min
+  OK      memory_capacity        5.8 min
+  OK      mc_example             2.6 min
+  OK      eig_heatmap            5.2 min
+  OK      numerics               7.2 min
+  OK      lyapunov_spectrum      2.7 min
+  OK      transient_gain         8.1 min
+  OK      local_lyapunov         3.7 min
+  OK      dc_lle                 6.4 min
