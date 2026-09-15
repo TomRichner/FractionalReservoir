@@ -14,18 +14,22 @@ function out = fig_lle_vs_rate(cfg)
 % by the realised E:I WEIGHT balance so the inhibition axis is visible too.
 %
 % Association is reported as Spearman's rank correlation with a bootstrap 95%
-% interval, per condition. PEARSON IS DELIBERATELY NOT USED: the relation is
-% visibly nonlinear (rate saturates at 1 and floors at 0 while lambda_1 does
-% neither) and often multimodal, so a linear coefficient would misstate it. The
-% quiet (mean rate < 0.02) and saturated (> 0.9) subgroups are outlined, and
-% the table gives lambda_1's median inside each, which is where "a quiet or
-% saturated network can be stable" is read off.
+% interval, per condition, IN THE TABLE ONLY (Fig_LLE_vs_Rate_table.md; TR,
+% 2026-09-15: statistics go into the figure's table, not onto the panels).
+% PEARSON IS DELIBERATELY NOT USED: the relation is visibly nonlinear (rate
+% saturates at 1 and floors at 0 while lambda_1 does neither) and often
+% multimodal, so a linear coefficient would misstate it. The table also gives
+% lambda_1's median inside the quiet (mean rate < 0.02) and saturated (> 0.9)
+% subgroups, which is where "a quiet or saturated network can be stable" is
+% read off; the panels no longer outline those subgroups.
 %
 % Per job the fields read are LLE, mean_rate, config_idx and network_seed
 % (the last two to rebuild the network for its weight balance, cached per grid
 % point exactly as fig_EI_weights_param_space does). Failed jobs are skipped.
-% Points with |lambda_1| > 5 are clamped to the axis edge and drawn as
-% triangles so the range stays readable.
+% Every network is one plain filled circle on the blue-grey-red weight-balance
+% map (blue_gray_red_colormap); the y window is the data's within +/-5 1/s and
+% points beyond it simply fall outside the axes (no clamping, no triangles;
+% TR, 2026-09-15). The grey line under the points is the median per rate bin.
 %
 % See also: fig_EI_weights_param_space, fig_local_vs_finite_lle,
 %           sweep_metrics, ParamSpaceAnalysis2.rebuild_model
@@ -40,9 +44,9 @@ arguments
     cfg.preset_name    (1,:) char    = ''          % unused; the run records its preset
     cfg.include_sweeps (1,1) logical = true        % pool the 1D_sensitivity_* jobs too (smaller markers)
     cfg.n_boot         (1,1) double  = 1000
-    cfg.quiet_rate     (1,1) double  = 0.02
-    cfg.saturated_rate (1,1) double  = 0.9
-    cfg.lle_clamp      (1,1) double  = 5
+    cfg.quiet_rate     (1,1) double  = 0.02   % table only
+    cfg.saturated_rate (1,1) double  = 0.9    % table only
+    cfg.lle_clamp      (1,1) double  = 5      % y window bound; points are NOT clamped
 end
 
 setup_paths();
@@ -125,38 +129,24 @@ for i = 1:n_cond
     name = cond_names{i};
     y = lle.(name); x = rate.(name); c = be.(name); s = src.(name);
     ax = nexttile(tl); hold(ax, 'on');
-    clamped = abs(y) > cfg.lle_clamp;
-    yc = max(min(y, cfg.lle_clamp), -cfg.lle_clamp);
-    quiet = x < cfg.quiet_rate; sat = x > cfg.saturated_rate;
+    quiet = x < cfg.quiet_rate; sat = x > cfg.saturated_rate;   % table only
     sz = 30 * (s == 1) + 12 * (s > 1);
-    % bulk
-    plain = ~clamped & ~quiet & ~sat;
-    scatter(ax, x(plain), yc(plain), sz(plain), c(plain), 'filled', 'MarkerFaceAlpha', 0.75);
-    % subgroups outlined
-    edge = quiet | sat;
-    scatter(ax, x(edge & ~clamped), yc(edge & ~clamped), sz(edge & ~clamped) + 10, c(edge & ~clamped), ...
-        'filled', 'MarkerEdgeColor', [0.1 0.1 0.1], 'LineWidth', 1);
-    % overflow
-    up = clamped & y > 0; dn = clamped & y < 0;
-    scatter(ax, x(up), yc(up), 40, c(up), '^', 'filled', 'MarkerEdgeColor', [0.1 0.1 0.1]);
-    scatter(ax, x(dn), yc(dn), 40, c(dn), 'v', 'filled', 'MarkerEdgeColor', [0.1 0.1 0.1]);
-    % running median in rate bins
+    % running median in rate bins, drawn FIRST so it sits under the points
     bm = nan(1, numel(bin_edges) - 1); bx = bm;
     for b = 1:numel(bm)
         in = x >= bin_edges(b) & x < bin_edges(b + 1);
         if b == numel(bm); in = in | x == 1; end
-        if nnz(in) >= 3; bm(b) = median(yc(in)); bx(b) = median(x(in)); end
+        if nnz(in) >= 3; bm(b) = median(y(in)); bx(b) = median(x(in)); end
     end
-    plot(ax, bx(~isnan(bm)), bm(~isnan(bm)), '-', 'Color', [0.15 0.15 0.15], 'LineWidth', 2.2);
-    yline(ax, 0, ':', 'Color', [0 0.6 0], 'LineWidth', 1.2);
-    xline(ax, cfg.quiet_rate, ':', 'Color', [0.5 0.5 0.5]);
-    xline(ax, cfg.saturated_rate, ':', 'Color', [0.5 0.5 0.5]);
+    plot(ax, bx(~isnan(bm)), bm(~isnan(bm)), '-', 'Color', [0.8 0.8 0.8], 'LineWidth', 2.2);
+    yline(ax, 0, '--', 'Color', [0 0.6 0], 'LineWidth', 1.4);
+    % every network: a plain filled circle, no edge; out-of-window points fall off the axes
+    scatter(ax, x, y, sz, c, 'filled');
     hold(ax, 'off'); box(ax, 'off');
-    colormap(ax, ei_colormap());
+    colormap(ax, blue_gray_red_colormap());
     set(ax, 'CLim', W_CLIM, 'FontSize', st.tick_fs, 'XLim', [-0.02 1.02], 'YLim', y_lim);
-    [rho, ci] = spearman_boot(x, y, cfg.n_boot);
-    title(ax, sprintf('%s\n\\rho_S = %+.2f [%+.2f, %+.2f], n = %d', st.condition_title(name), rho, ci(1), ci(2), numel(y)), ...
-        'FontWeight', 'normal', 'FontSize', st.title_fs - 2);
+    [rho, ci] = spearman_boot(x, y, cfg.n_boot);   % table only
+    title(ax, st.condition_title(name), 'FontWeight', 'normal', 'FontSize', st.title_fs);
     xlabel(ax, st.label_rate, 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, [st.label_lle ' (1/s)'], 'FontSize', st.label_fs); end
     axs(i) = ax;
@@ -167,8 +157,8 @@ cb = colorbar(axs(end));
 cb.Ticks = cb_ticks; cb.TickLabels = cb_labels;
 cb.Label.String = 'E:I weight ratio'; cb.Label.FontSize = st.label_fs;
 cb.Layout.Tile = 'east';
-title(tl, sprintf('\\lambda_1 vs mean rate%s. Line: median per rate bin. Outlined: quiet (< %.2g) and saturated (> %.2g).', ...
-    tern(cfg.include_sweeps, ', joint sample + 1-D sweeps (small)', ', joint sample'), cfg.quiet_rate, cfg.saturated_rate), ...
+title(tl, sprintf('\\lambda_1 vs mean population rate%s; grey line: median per rate bin', ...
+    tern(cfg.include_sweeps, ', joint sample + 1-D sweeps (small)', ', joint sample')), ...
     'FontWeight', 'normal', 'FontSize', 9);
 
 hdr = '| Condition | Spearman rho [95% CI] | n | n quiet | n saturated | lambda_1 median quiet | mid | saturated |';
@@ -218,14 +208,6 @@ function s = tern(c, a, b)
 if c; s = a; else; s = b; end
 end
 
-function cm = ei_colormap()
-% A diverging blue (inhibition-dominant) to red (excitation-dominant) map,
-% white at 1:1; 256 rows.
-n = 256;
-top = [0.85 0.15 0.15]; mid = [0.96 0.96 0.96]; bot = [0.15 0.35 0.85];
-h = n / 2;
-cm = [interp1([0 1], [bot; mid], linspace(0, 1, h)'); interp1([0 1], [mid; top], linspace(0, 1, n - h)')];
-end
 
 function v = ei_weight_fraction(psa, res, cache, verbose)
 % Copied from fig_EI_weights_param_space: the realised E:I weight balance of
