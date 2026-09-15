@@ -67,14 +67,10 @@ end
 % are where the fraction-excitatory axis is most interesting. Widened to match.
 psa.add_grid_parameter('n',              [100, 1000]);   % network size
 psa.add_grid_parameter(ctx.f_param,      [0.2, 0.8]);    % fraction excitatory
-psa.add_grid_parameter('level_of_chaos', [0.25, 2.5]);   % W scaling (edge of chaos)
-% level_of_chaos widened from [0.5, 1.5] to match the 1-D sweep, which was
-% rebased on measured edge-of-chaos crossings (see run_sensitivity_analysis for
-% the numbers). The cost is real and worth knowing: this grid spends the SAME
-% number of levels over a 2.25-wide gain axis instead of a 1.0-wide one, so it
-% samples the region around gain = 1 roughly half as finely and puts more of the
-% grid deep in the chaotic regime. Accepted so the two analyses keep describing
-% the same span.
+psa.add_grid_parameter('level_of_chaos', [0.25, 1.75]);  % W scaling, -75% .. +75% (TR, 2026-09-15)
+% level_of_chaos matches the 1-D sweep's span (see run_sensitivity_analysis for
+% the history: [0.5 1.5] -> [0.25 2.5] on 2026-09-12 -> [0.25 1.75] on
+% 2026-09-15), so the two analyses keep describing the same span.
 
 % The four connectivity blocks, over the same ranges the 1-D sweeps use -- the
 % shared mu_block_from_preset is what guarantees "the same" rather than "written

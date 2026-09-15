@@ -41,22 +41,20 @@ lle_hist_range = [-2, 2];
 %% Which parameters to sweep
 % {param_name, [min, max]}. The fraction-excitatory axis is named per class --
 % see ctx.f_param.
-% level_of_chaos [0.25, 2.5] rather than [0.5, 1.5]: measured, not guessed. A
-% medium sweep of all seven regimes puts their edge-of-chaos crossings at
-%
-%   no_adaptation 0.54   sfa_only_oneTS 0.59   sfa_only 0.48
-%   std_only_oneTS 1.18  std_only 2.27
-%   sfa3_std1 0.98       sfa_and_std 2.43
-%
-% so [0.5, 1.5] bracketed only three of the seven and reported the depressing
-% regimes as flat and stable throughout -- true, but carrying no information
-% about WHERE they stop being stable. [0.25, 2.5] contains all seven, confirmed
-% by two independent sweeps at different resolutions agreeing within ~0.1 on six
-% of them. Reproduce with scripts/examples/explore_sensitivity_range.m.
+% level_of_chaos [0.25, 1.75] = -75% .. +75% of the default 1.0 (TR, 2026-09-15),
+% the same span as the four mu blocks (mu_block_from_preset), so the five
+% weight axes read on one percent ruler ('All Weights' in the figures). It was
+% [0.25, 2.5] from 2026-09-12: a medium sweep of the seven-regime preset put
+% the edge-of-chaos crossings at 0.48 .. 2.43 (no_adaptation 0.54, sfa_only
+% 0.48, std_only 2.27, sfa_and_std 2.43; scripts/examples/explore_sensitivity_range.m),
+% and [0.5, 1.5] before that bracketed only three of them. On the sfaEI
+% presets the paper now uses, the adapting regimes stay stable across the
+% whole 2.5x span, so the upper half carried no information; the trade for
+% the narrower window is finer sampling around gain = 1.
 params_to_sweep = {
     'n',              [100, 1000];
     ctx.f_param,      [0.2, 0.8];
-    'level_of_chaos', [0.25, 2.5];
+    'level_of_chaos', [0.25, 1.75];
     };
 
 % The four connectivity blocks, swept relative to the preset's own operating

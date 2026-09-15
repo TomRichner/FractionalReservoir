@@ -99,7 +99,9 @@ switch analysis
         switch run_mode
             case 'fast'
                 % fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3).
-                cfg = pack(4,  3,  'rk4',   200, [0, 10], [5, 10]);
+                % 5 levels x 5 reps (TR, 2026-09-15; was 4 x 3): 25 jobs per
+                % condition per sweep, about twice the 2026-09-14 fast sweeps.
+                cfg = pack(5,  5,  'rk4',   200, [0, 10], [5, 10]);
             case 'medium'
                 cfg = pack(11, 15, 'rk4',   400, [0, 20], [10, 20]);
             case 'medium2'
