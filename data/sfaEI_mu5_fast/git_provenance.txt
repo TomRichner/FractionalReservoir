@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\sfaEI_mu5_fast
+Captured at: 14-Sep-2026 17:56:39
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      6f2f6c2300c66c7b60927d0c998798a1a7233fd0
+commit_short:6f2f6c2
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    sfaEI_mu5_fast bundle: baseline mu_tilde_relative 5 (TR, 2026-09-14), replacing the noStim mu8p25 bundle
+last_date:   2026-09-14T17:56:33-05:00
+dirty:       false
+
