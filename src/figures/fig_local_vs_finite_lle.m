@@ -86,8 +86,9 @@ all_local = [];
 for i = 1:n_cond
     all_local = [all_local; near.local{i}(:)]; %#ok<AGROW>
 end
-x_lim = prctile(all_local(isfinite(all_local)), [1 99]);
-x_lim = [min(x_lim(1), -0.5), max(x_lim(2), 0.5)];
+% Fixed window (TR, 2026-09-15): [-2 3] 1/s with ticks at -2, 0, 2. all_local
+% is kept for the table's share > 0.
+x_lim = [-2 3];
 edges = linspace(x_lim(1), x_lim(2), 61);
 
 for i = 1:n_cond
@@ -109,20 +110,14 @@ for i = 1:n_cond
     end
     xline(ax, 0, ':', 'Color', [0.2 0.2 0.2], 'LineWidth', 1.2);
     hold(ax, 'off'); box(ax, 'off');
-    set(ax, 'FontSize', st.tick_fs, 'XLim', x_lim);
+    set(ax, 'FontSize', st.tick_fs, 'XLim', x_lim, 'XTick', [-2 0 2]);
     title(ax, st.condition_title(name), 'FontWeight', 'normal', 'FontSize', st.title_fs);
-    xlabel(ax, 'rate (1/s)', 'FontSize', st.label_fs);
+    xlabel(ax, 'Lyapunov Exponent (1/s)', 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, 'density', 'FontSize', st.label_fs); end
-    txt = sprintf(['local > 0: %.0f%% of samples\n' ...
-                   '\\lambda_1 < 0: %d of %d networks\n' ...
-                   'median \\lambda_1 = %+.3f'], ...
-        100 * mean(loc > 0), nnz(lle < 0), numel(lle), median(lle));
-    text(ax, 0.97, 0.97, txt, 'Units', 'normalized', 'FontSize', 9, ...
-        'HorizontalAlignment', 'right', 'VerticalAlignment', 'top');
-    if i == n_cond   % the last column has room on the left; the first is full of mass
-        legend(ax, {'local rate, pooled', 'finite-time \lambda_1 per network'}, ...
-            'Location', 'northwest', 'FontSize', 8, 'Box', 'off');
-    end
+    % No statistics on the panel (TR, 2026-09-15): the share of local samples
+    % > 0, the count of lambda_1 < 0 and the median are in the table.
+    legend(ax, {'local \lambda(t), pooled', 'finite-time \lambda_1 per network'}, ...
+        'Location', 'northeast', 'FontSize', 8, 'Box', 'off');
     ax_top(i) = ax;
 
     % Table rows for both sets (the joint sample is no longer drawn).
