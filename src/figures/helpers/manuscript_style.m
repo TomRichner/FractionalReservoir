@@ -77,8 +77,11 @@ s.default_mark_lw    = 2.0;
 % fig_memory_capacity_example, so a missing key throws
 % MATLAB:Containers:Map:NoKey rather than degrading. Adding a condition means
 % adding it here.
-sfa_hue  = [0.902 0.624 0.000];
-std_hue  = [0.337 0.706 0.914];
+% TR, 2026-09-15: the multi-timescale blue is Okabe-Ito BLUE (#0072B2), not the
+% sky blue (#56B4E9) used until then, which read too light on white; the
+% single-timescale orange is the same hue darkened by 20% (0.8 x #E69F00).
+sfa_hue  = 0.8 * [0.902 0.624 0.000];
+std_hue  = [0.000 0.447 0.698];
 both_hue = [0.800 0.475 0.655];
 lighten  = @(c) c + 0.45 * (1 - c);
 
@@ -151,7 +154,7 @@ s.condition_short = containers.Map(cond_short(:, 1), cond_short(:, 2));
 
 % --- Metric labels, so the axis of a given quantity reads the same everywhere.
 s.label_lle  = '\lambda_1';
-s.label_rate = 'Mean Firing Rate';
+s.label_rate = 'Mean Pop. Firing Rate';
 
 % --- Saving
 s.save_types = {'png', 'svg', 'fig'};
