@@ -80,10 +80,10 @@ row_style = containers.Map( ...
     {struct('xlabel', 'E:I neuron ratio', 'xticks', [0.2 0.5 0.8], ...
                                           'xticklabels', {{'100:400','250:250','400:100'}}), ...
      struct('xlabel', 'Network Size',     'xticks', [100 500 1000], 'xticklabels', {{}}), ...
-     struct('xlabel', '\mu_{EE}',         'xticks', [], 'xticklabels', {{}}), ...
-     struct('xlabel', '\mu_{EI}',         'xticks', [], 'xticklabels', {{}}), ...
-     struct('xlabel', '\mu_{IE}',         'xticks', [], 'xticklabels', {{}}), ...
-     struct('xlabel', '\mu_{II}',         'xticks', [], 'xticklabels', {{}})});
+     struct('xlabel', 'E\rightarrowE',    'xticks', [], 'xticklabels', {{}}), ...   % routes read PRE -> POST (TR, 2026-09-15)
+     struct('xlabel', 'I\rightarrowE',    'xticks', [], 'xticklabels', {{}}), ...   % mu_EI: post E <- pre I
+     struct('xlabel', 'E\rightarrowI',    'xticks', [], 'xticklabels', {{}}), ...   % mu_IE: post I <- pre E
+     struct('xlabel', 'I\rightarrowI',    'xticks', [], 'xticklabels', {{}})});
 
 % Axes shown as percent departure from the preset default, (value/default - 1)*100.
 % Absolute mu_tilde values mean little on their own; what the sweep varies is the
@@ -317,7 +317,7 @@ for mi = 1:numel(metric_specs)
         % units even if it is on the percent list.
         use_pct = has_default && ismember(param, pct_params) && default_value(param) ~= 0;
         if use_pct
-            apply_percent_axis(ax, default_value(param), rs.xlabel, label_fs);
+            apply_percent_axis(ax, default_value(param), rs.xlabel, label_fs, [-50 0 50]);
         else
             xlabel(ax, rs.xlabel, 'Interpreter', 'tex', 'FontSize', label_fs);
             if ~isempty(rs.xticks)

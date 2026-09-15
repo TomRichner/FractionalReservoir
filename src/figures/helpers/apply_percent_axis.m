@@ -1,4 +1,4 @@
-function apply_percent_axis(ax, d, base_label, label_fs)
+function apply_percent_axis(ax, d, base_label, label_fs, tick_pcts)
 % APPLY_PERCENT_AXIS Relabel an x-axis as percent departure from a default.
 %
 %   APPLY_PERCENT_AXIS(ax, d, base_label, label_fs)
@@ -6,7 +6,9 @@ function apply_percent_axis(ax, d, base_label, label_fs)
 % Ticks are placed at data positions d*(1 + p/100) and labelled p%, so the
 % underlying plotted data is untouched -- only the ruler changes. 0% is always
 % included, since "the preset's own network" is the reference the rest is read
-% against.
+% against. An optional fifth argument tick_pcts fixes the tick percentages
+% outright (the sensitivity sheets pass [-50 0 50], TR 2026-09-15); empty or
+% omitted keeps the automatic step search below.
 %
 % For a NEGATIVE default (the inhibitory mu blocks) increasing percent means a
 % more negative value, i.e. leftward in data coordinates. XDir is reversed there
@@ -16,6 +18,7 @@ function apply_percent_axis(ax, d, base_label, label_fs)
 % Fig_sensitivity_analysis_allStd.m so fig_sensitivity_medians can share it.
 %
 % See also: preset_default_values, mark_default_value
+    if nargin < 5; tick_pcts = []; end
     xl = xlim(ax);
     p  = sort(([xl(1), xl(2)] / d - 1) * 100);
 
@@ -43,6 +46,9 @@ function apply_percent_axis(ax, d, base_label, label_fs)
     tp = step * ceil(p(1)/step) : step : step * floor(p(2)/step);
     if ~any(tp == 0)
         tp = sort([tp, 0]);
+    end
+    if ~isempty(tick_pcts)
+        tp = sort(tick_pcts(:)');
     end
 
     % XTick must ascend in DATA coordinates whatever XDir says, so sort there
