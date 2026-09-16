@@ -96,10 +96,10 @@ switch group
         banner('Provisional external learning figure');
         notes{end+1}='The intended three-condition learning experiment is deferred. Any provided old image is provisional and does not demonstrate faster MTS learning.';
     case 8
-        raster('fig_stim_engages_adaptation/bursting_psd.png',[0 .10 .51 .80]);
-        external(cfg.human_psd_file,[.52 .10 .47 .80],sprintf('Human SOZ PSD\nunavailable on\nthis computer'));
-        banner('Model: uniform DC input                 Human: clinical 2-Hz stimulation');
-        notes{end+1}='Different systems and protocols. Human PSD is external and is never substituted from a different local model run.';
+        a=fig_main8_psd(cfg.source_fig_root);
+        fig.Position=a.figs.Position;
+        native(a.figs,[0 0 1 1]); close(a.figs);
+        sources=a.source; notes=a.notes;
     otherwise
         error('fig_grouped_main:BadGroup','Unknown main group.');
 end
@@ -111,7 +111,7 @@ else
     copy_axes(fig,flat,[0 0 1 1]);
 end
 close(fig); fig=flat;
-if ismember(group,[1 2 3])
+if ismember(group,[1 2 3 8])
     set(findall(fig,'-property','FontSize'),'FontSize',14);
     if group==2
         tt=findall(fig,'Type','axes','-regexp','Tag','dynamics_r1_c[123]');
@@ -132,7 +132,7 @@ if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
     % PNG plus editable MATLAB figure: local-rate traces make SVG needlessly large.
     drawnow;
-    if ismember(group,[1 2 3 4 5 6])
+    if ismember(group,[1 2 3 4 5 6 8])
         exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,'Padding',20);
     else
         exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200);
