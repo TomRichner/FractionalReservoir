@@ -1,5 +1,5 @@
 function out=fig_main2_dynamics(run_dir,source_fig_root)
-% FIG_MAIN2_DYNAMICS Six-row dynamics sheet; no simulation in the plotter.
+% FIG_MAIN2_DYNAMICS Seven-row dynamics sheet (input step first); no simulation in the plotter.
 % New runs use saved numeric representative_dynamics. Current mu7 archive has
 % only raster artwork: retain its trace pixels under calibrated native axes.
 % Never substitute a different network's native example or invent early LLEs.
@@ -40,16 +40,19 @@ else
         'LLE tick calibration: pixel5690.5=0,34.6 pixels per inverse second. Raster-coordinate precision is about one source pixel.']};
 end
 fig=figure('Visible','off','Color','w','Position',[40 40 1450 1200]);
-ax_all=gobjects(6,3);
-rows={'x','r','syn','sfa','std','lambda'};
-labels={{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
+% SEVEN rows, (A)-(G): the input step first, the local lambda(t) smoothed
+% by a 2-Hz low-pass, half of the saved neurons in the model's E/I colours
+% (excitatory_colormap / inhibitory_colormap in src/plotting, the palettes SRNNModel2.plot uses; TR, 2026-09-16).
+ax_all=gobjects(7,3);
+rows={'u','x','r','syn','sfa','std','lambda'};
+labels={'Input, $u_i$',{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
     {'Synaptic','output, $\theta_i$'},{'SFA','$\frac{c_i}{K}\sum_k a_{ik}$'}, ...
     {'STD','$\prod_m b_{im}$'},'$\lambda_1$'};
 titles={'No adaptation','Single-timescale adaptation','Multiple-timescale adaptation'};
 st=manuscript_style(); names={'no_adaptation','sfa1_std1','sfa3_std2'};
 for c=1:3
-    for j=1:6
-        ax=axes(fig,'Position',[.105+(c-1)*.30 .085+(6-j)*.143 .245 .105], ...
+    for j=1:7
+        ax=axes(fig,'Position',[.105+(c-1)*.30 .085+(7-j)*.1225 .245 .092], ...
             'Tag',sprintf('dynamics_r%d_c%d',j,c)); ax_all(j,c)=ax; hold(ax,'on');
         if numeric
             draw_numeric(ax,D.results(c),rows{j});
@@ -64,13 +67,14 @@ for c=1:3
                 'FontSize',14,'HorizontalAlignment','left','VerticalAlignment','top','Clipping','off');
         end
         switch j
-            case 1, ylim(ax,[-6 6]); yticks(ax,[-5 0 5]);
-            case {2,3}, ylim(ax,[0 1]); yticks(ax,[0 .5 1]);
-            case 4, ylim(ax,[0 .6]); yticks(ax,[0 .5]);
-            case 5, ylim(ax,[0 1.02]); yticks(ax,[0 .5 1]);
-            case 6, ylim(ax,[-5 5]); yticks(ax,[-5 0 5]);
+            case 1, ylim(ax,[-.05 .55]); yticks(ax,[0 .25 .5]);
+            case 2, ylim(ax,[-6 6]); yticks(ax,[-5 0 5]);
+            case {3,4}, ylim(ax,[0 1]); yticks(ax,[0 .5 1]);
+            case 5, ylim(ax,[0 .6]); yticks(ax,[0 .5]);
+            case 6, ylim(ax,[0 1.02]); yticks(ax,[0 .5 1]);
+            case 7, ylim(ax,[-5 5]); yticks(ax,[-5 0 5]);
         end
-        if j==6
+        if j==7
             yline(ax,0,'--','Color',[0 .55 0],'LineWidth',.5,'Tag','lambda_zero');
         end
         if j==1
@@ -82,27 +86,26 @@ end
 % One E/I key. Current raster shades remain original; numeric data use the
 % wider within-type color spread (no model simulation is involved).
 if numeric
-    ce=dynamics_palette(1,2); ci=dynamics_palette(2,2);
-    ce=ce(1,:); ci=ci(1,:);
+    ce=excitatory_colormap(1); ci=inhibitory_colormap(1);
 else
     tc=SRNNCellTypePairs.type_colors(2); ce=tc(1,:); ci=tc(2,:);
 end
-le=plot(ax_all(1,3),NaN,NaN,'Color',ce,'LineWidth',.5);
-li=plot(ax_all(1,3),NaN,NaN,'Color',ci,'LineWidth',.5);
-legend(ax_all(1,3),[le li],{'E','I'},'FontSize',14,'Box','off','Location','northeast');
+le=plot(ax_all(2,3),NaN,NaN,'Color',ce,'LineWidth',.5);
+li=plot(ax_all(2,3),NaN,NaN,'Color',ci,'LineWidth',.5);
+legend(ax_all(2,3),[le li],{'E','I'},'FontSize',14,'Box','off','Location','northeast');
 % Requested lower-left lambda panel, with explicit data coordinates.
-plot(ax_all(6,1),[5 15],[-4.8 -4.8],'k','LineWidth',4,'Tag','ten_second_bar');
-text(ax_all(6,1),10,-5.6,'10 seconds','FontSize',14,'HorizontalAlignment','center', ...
+plot(ax_all(7,1),[5 15],[-4.8 -4.8],'k','LineWidth',4,'Tag','ten_second_bar');
+text(ax_all(7,1),10,-5.6,'10 seconds','FontSize',14,'HorizontalAlignment','center', ...
     'VerticalAlignment','top','Clipping','off','Tag','ten_second_label');
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
 for xpos=[.3775 .6775]
     plot(sep,[xpos xpos],[.07 .945],'Color',[.88 .88 .88],'LineWidth',2.5);
 end
 uistack(sep,'bottom');
-notes{end+1}=['Numeric rendering selects half the saved neurons per type (4 saved -> 2 displayed, indices1 and4), ' ...
-    'shared across state rows, with 0.8-point neuron/local-rate lines and 1.25-point finite-LLE lines. ' ...
-    'E colors span dark red through red/coral/rose; I colors span navy through blue/cyan/teal. ' ...
-    'Current raster retains its original neuron count, shades and stroke widths; those requests await numeric data. ' ...
+notes{end+1}=['Numeric rendering draws the first half of the saved neurons of each type (25 saved -> 12 displayed), ' ...
+    'the same indices in every state row, in the model''s own E/I palettes (excitatory_colormap / inhibitory_colormap, ' ...
+    'the colours SRNNModel2.plot uses). Row (A) is the uniform input step. Row (G): the local rate is low-pass filtered at 2 Hz ' ...
+    '(2nd-order Butterworth, zero phase) for display only; the finite-time lambda_1 is unfiltered. ' ...
     'The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.'];
 out=struct('figs',fig,'files',{{}},'source',{{source}},'notes',{notes});
 end
@@ -112,9 +115,13 @@ if strcmp(field,'lambda')
         text(ax,.5,.5,'finite estimate not saved','Units','normalized','HorizontalAlignment','center','FontSize',14);
         return
     end
-    plot(ax,r.t_lya,r.local_lambda,'Color',[.6 .6 .6],'LineWidth',.8);
+    plot(ax,r.t_lya,lowpass_2hz(r.t_lya,r.local_lambda),'Color',[.6 .6 .6],'LineWidth',.8);
     plot(ax,r.t_lya,r.finite_lambda,'k','LineWidth',1.25);
     return
+end
+if strcmp(field,'u')
+    % Every neuron receives the same step; one black trace.
+    plot(ax,r.t,r.u(1,:),'k','LineWidth',1.25); return
 end
 if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std'})
     msg='no SFA'; if strcmp(field,'std'), msg='no STD'; end
@@ -124,12 +131,26 @@ Y=r.(field); counts=cellfun(@numel,r.selected); offsets=[0 cumsum(counts)];
 for q=numel(counts):-1:1
     % EVERY saved neuron, same indices for every state row (TR, 2026-09-15:
     % half of four per type was too few; the stage now saves 25 per type).
-    n=counts(q); ids=offsets(q)+(1:n); cmap=dynamics_palette(q,n);
+    % Half of the saved neurons (TR, 2026-09-16), the model's E / I colours.
+    n=max(1,round(counts(q)/2)); ids=offsets(q)+(1:n);
+    if q==1, cmap=excitatory_colormap(n); else, cmap=inhibitory_colormap(n); end
     lw=.8; if n>8, lw=.5; end
     for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',lw); end
 end
 end
+function y=lowpass_2hz(t,y)
+% Zero-phase 2nd-order Butterworth low-pass at 2 Hz over the finite samples;
+% NaNs (before the accumulation window) are left in place.
+ok=isfinite(y); if nnz(ok)<12, return; end
+fs=1/median(diff(t(ok))); if fs<=4, return; end
+[b,a]=butter(2,2/(fs/2));
+y(ok)=filtfilt(b,a,y(ok));
+end
 function draw_artwork(ax,I,row,col)
+if row==1
+    text(ax,.5,.5,'input not archived','Units','normalized','HorizontalAlignment','center','FontSize',14); return
+end
+row=row-1;   % the archived raster has six rows, x .. lambda
 % Calibrated native-axis placement of unmodified trace pixels. Original axes,
 % titles, legends and labels are outside the retained artwork except legend
 % glyphs/strokes, which are already occluded in the only surviving raster.

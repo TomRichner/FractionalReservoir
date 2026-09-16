@@ -64,7 +64,7 @@ cfg.stf_preset           = 'single_neuron_stf';
 % Noise and heterogeneity are disabled to isolate the mechanisms.
 cfg.single_neuron_preset = 'single_neuron_mu7revisedAgain';
 cfg.illustrations = true;
-cfg.illustration_step_amp = 0.5;
+cfg.illustration_step_amp = 0.25;   % TR, 2026-09-16: half the mu7revised amplitude
 cfg.local_lyapunov_K = 50; % explicit also in fast mode
 cfg.local_lyapunov_T = 40;
 cfg.local_lyapunov_step_duration_s = 5; %8 steps over40s
