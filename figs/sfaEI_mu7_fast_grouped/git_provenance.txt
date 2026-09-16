@@ -1,0 +1,30 @@
+Git provenance for run output: /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+Captured at: 15-Sep-2026 19:50:52
+
+hostname:    Thomass-MacBook-Air.local
+platform:    MACA64
+matlab:      2026a
+commit:      6e5bafcb940886d051d3a5d3d2635a7569606d05
+commit_short:6e5bafc
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Add grouped mu7 figures and independent revised analysis bundle
+last_date:   2026-09-15T18:33:40-05:00
+dirty:       true
+
+--- git status --porcelain ---
+M scripts/paper/README_mu7revised.md
+ M scripts/paper/mu7revised_config.m
+ M scripts/paper/run_all_paper_analyses.m
+ M scripts/paper/sfaEI_mu7_grouped_figures_config.m
+ M src/analysis/run_local_lyapunov.m
+ M src/analysis/run_paper_illustrations.m
+ M src/figures/fig_grouped_main.m
+?? src/figures/fig_main1_concepts.m
+?? src/figures/fig_main2_dynamics.m
+?? src/figures/fig_main3_stability.m
+
+--- untracked files (not in patch) ---
+src/figures/fig_main1_concepts.m
+src/figures/fig_main2_dynamics.m
+src/figures/fig_main3_stability.m
