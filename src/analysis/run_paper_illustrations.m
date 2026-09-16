@@ -32,7 +32,7 @@ for j=1:2
             'lya_warmup',settings.lya_warmup};
     end
     [~,~,conds]=srnn_param_preset(presets{j}); titles=srnn_condition_titles();
-    results=struct([]);
+    results=[];
     input=struct('intrinsic_drive',0,'step_time',settings.step_time, ...
         'amplitude',settings.step_amplitude,'generator',@paper_midpoint_input);
     for c=1:numel(conds)
@@ -68,7 +68,7 @@ for j=1:2
             if ~isempty(B), sb=reshape(prod(B(ix,:,:),2),numel(ix),[]); end
             r.sfa=[r.sfa;sa]; r.std=[r.std;sb];
         end
-        results(c)=r;
+        if c==1, results=r; else, results(c)=r; end   % struct([]) has no fields and cannot be indexed into
     end
     folder=fullfile(run_dir,variants{j}); if ~isfolder(folder), mkdir(folder); end
     save(fullfile(folder,[variants{j} '_data.mat']),'results','settings','-v7.3');

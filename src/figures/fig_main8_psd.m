@@ -1,51 +1,50 @@
 function out = fig_main8_psd(source_fig_root)
-% FIG_MAIN8_PSD Restyle the selected archived PSD without re-estimating it.
-% The selected mu7 archive has no native FIG or numerical PSD. Native FIGs
-% from other runs have different artwork/limits and are not substitutes.
-source=fullfile(source_fig_root,'fig_stim_engages_adaptation','bursting_psd.png');
-assert(isfile(source),'fig_main8_psd:MissingSource','Missing selected PSD archive.');
-fid=fopen(source,'rb'); guard=onCleanup(@()fclose(fid)); bytes=fread(fid,Inf,'*uint8');
-md=java.security.MessageDigest.getInstance('SHA-256'); md.update(typecast(bytes,'int8'));
-digest=reshape(dec2hex(typecast(md.digest(),'uint8'),2).',1,[]); clear guard
-assert(strcmpi(digest,'ad1408e6f780d41003c3e0c5c37f810bbc198ab48661b3f3f38a4674e8b72165'), ...
-    'fig_main8_psd:UncalibratedRaster','Calibration requires the verified mu7 PSD archive.');
-I=imread(source); cols=466:3463; rows=67:2137; C=I(rows,cols,:);
-% Remove neutral old tick/text pixels. The legend lies wholly to the left of
-% the first data frequency (0.3 Hz, source column approximately 940).
-neutral=max(C,[],3)-min(C,[],3)<5;
-for ch=1:3, plane=C(:,:,ch); plane(neutral)=255; C(:,:,ch)=plane; end
-C(:,cols<900,:)=255;
-% Fixed 60% of the original1300-by-760 canvas; repeat calls never compound.
-fig=figure('Visible','off','Color','w','Position',[40 40 780 456]);
-ax=axes(fig,'Position',[.105 .16 .38 .74],'Tag','psd_model'); hold(ax,'on');
-% A raster's spacing is uniform in log10 coordinates. Draw in those exact
-% coordinates with native exponent ticks; no digitized/interpolated PSD.
-image(ax,'XData',-1+(cols([1 end])-462)/3004*3, ...
-    'YData',-(rows([1 end])-64)/2077.5*12,'CData',C,'Tag','archived_psd_artwork');
-set(ax,'XLim',[-1 2],'YLim',[-12 0],'YDir','normal', ...
-    'XTick',-1:2,'XTickLabel',{'10^{-1}','10^{0}','10^{1}','10^{2}'}, ...
-    'YTick',[-10 -5 0],'YTickLabel',{'10^{-10}','10^{-5}','10^{0}'}, ...
-    'FontSize',14,'LineWidth',1,'Box','off');
-xlabel(ax,'frequency (Hz)','FontSize',14);
-ylabel(ax,'Power spectral density of dendritic potential, x','FontSize',14,'Interpreter','none');
-cmap=parula(6);
-h1=plot(ax,NaN,NaN,'Color',cmap(1,:),'LineWidth',2);
-h2=plot(ax,NaN,NaN,'Color',cmap(5,:),'LineWidth',2);
-legend(ax,[h1 h2],{'no-stim','stim'},'Location','northeast','Box','off','FontSize',14);
-bx=axes(fig,'Position',[.58 .16 .38 .74],'Tag','psd_human_empty', ...
-    'XTick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1], ...
-    'Box','on','LineWidth',1,'FontSize',14);
-for a=[ax bx]
-    label='(A)'; if a==bx, label='(B)'; end
-    text(a,-.10,1.06,label,'Units','normalized','FontSize',14, ...
-        'Clipping','off','VerticalAlignment','bottom','FontWeight','normal','Tag','panel_label');
+% FIG_MAIN8_PSD Model PSD panel from the CURRENT run's native bursting_psd.fig.
+%
+%   out = FIG_MAIN8_PSD(source_fig_root)
+%
+% Reads <source_fig_root>/fig_stim_engages_adaptation/bursting_psd.fig -- the
+% figure fig_stim_engages_adaptation saved earlier in the same figure pass --
+% and copies its axes (the per-level PSD curves, legend labels 'no-stim' /
+% 'stim') into panel A of a two-panel canvas; panel B is the intentionally
+% empty clinical box. No PSD is re-estimated and nothing is digitized.
+%
+% Until 2026-09-15 this read a checksummed PNG from one archived run and
+% calibrated its raster pixels into native axes; that checksum could never
+% match a figure from a new run, so the grouped figure failed on every run
+% except the one it was written against (TR: grouped figures must be built
+% from the run they accompany). The native .fig has always been saved beside
+% the PNG, so the raster path was unnecessary.
+%
+% See also: fig_stim_engages_adaptation, fig_grouped_main
+
+source = fullfile(source_fig_root, 'fig_stim_engages_adaptation', 'bursting_psd.fig');
+assert(isfile(source), 'fig_main8_psd:MissingSource', ...
+    'No native PSD figure at %s (fig_stim_engages_adaptation must run in the same pass).', source);
+src = openfig(source, 'invisible');
+guard = onCleanup(@() close(src));
+ax0 = findall(src, 'Type', 'axes');
+ax0 = ax0(arrayfun(@(a) ~isempty(findall(a, 'Type', 'line')), ax0));
+assert(isscalar(ax0), 'fig_main8_psd:BadSource', 'Expected one PSD axes in %s, found %d.', source, numel(ax0));
+
+fig = figure('Visible', 'off', 'Color', 'w', 'Position', [40 40 780 456]);
+ax  = copyobj(ax0, fig);
+set(ax, 'Position', [.105 .16 .38 .74], 'Tag', 'psd_model', 'FontSize', 14, 'LineWidth', 1, 'Box', 'off');
+title(ax, '');
+xlabel(ax, 'frequency (Hz)', 'FontSize', 14);
+ylabel(ax, 'Power spectral density of dendritic potential, x', 'FontSize', 14, 'Interpreter', 'none');
+legend(ax, 'Location', 'northeast', 'Box', 'off', 'FontSize', 14, 'Interpreter', 'none');
+
+bx = axes(fig, 'Position', [.58 .16 .38 .74], 'Tag', 'psd_human_empty', ...
+    'XTick', [], 'YTick', [], 'XLim', [0 1], 'YLim', [0 1], ...
+    'Box', 'on', 'LineWidth', 1, 'FontSize', 14);
+for a = [ax bx]
+    label = '(A)'; if a == bx, label = '(B)'; end
+    text(a, -.10, 1.06, label, 'Units', 'normalized', 'FontSize', 14, ...
+        'Clipping', 'off', 'VerticalAlignment', 'bottom', 'FontWeight', 'normal', 'Tag', 'panel_label');
 end
-notes={['Model PSD retains the selected mu7 archived trace pixels. No native FIG or numerical PSD ' ...
-    'was saved for this source; other-run FIGs are not used. Data curves remain raster; axes, labels and legend are native.'], ...
-    ['Raster calibration: 3551-by-2491 PNG; x pixels 462 to 3466 map to log10 frequency -1 to 2; ' ...
-    'y pixels 64 to 2141.5 map to log10 PSD 0 to -12. Precision is about one source pixel. ' ...
-    'Native axes use log10 coordinates and exponent tick labels to preserve uniform raster spacing exactly. ' ...
-    'Neutral annotation pixels and the old legend left of the first data frequency are removed; scientific curve pixels are unchanged.'], ...
-    'Panel B is an intentionally empty box. No patient data are shown. No titles; labels (A)/(B), 14-point fonts and axes linewidth 1.0. Fixed780-by-456 canvas is60% of the original width and height; legend is inside panel A at upper right.'};
-out=struct('figs',fig,'source',{{source}},'notes',{notes});
+notes = {['Model PSD: the native axes of ' source ' (fig_stim_engages_adaptation, this run), copied unchanged; ' ...
+    'no PSD is re-estimated.'], ...
+    'Panel B is an intentionally empty box. No patient data are shown. No titles; labels (A)/(B), 14-point fonts and axes linewidth 1.0; legend inside panel A at upper right.'};
+out = struct('figs', fig, 'source', {{source}}, 'notes', {notes});
 end
