@@ -15,7 +15,8 @@ I=imread(source); cols=466:3463; rows=67:2137; C=I(rows,cols,:);
 neutral=max(C,[],3)-min(C,[],3)<5;
 for ch=1:3, plane=C(:,:,ch); plane(neutral)=255; C(:,:,ch)=plane; end
 C(:,cols<900,:)=255;
-fig=figure('Visible','off','Color','w','Position',[40 40 1300 760]);
+% Fixed 60% of the original1300-by-760 canvas; repeat calls never compound.
+fig=figure('Visible','off','Color','w','Position',[40 40 780 456]);
 ax=axes(fig,'Position',[.105 .16 .38 .74],'Tag','psd_model'); hold(ax,'on');
 % A raster's spacing is uniform in log10 coordinates. Draw in those exact
 % coordinates with native exponent ticks; no digitized/interpolated PSD.
@@ -30,14 +31,14 @@ ylabel(ax,'Power spectral density of dendritic potential, x','FontSize',14,'Inte
 cmap=parula(6);
 h1=plot(ax,NaN,NaN,'Color',cmap(1,:),'LineWidth',2);
 h2=plot(ax,NaN,NaN,'Color',cmap(5,:),'LineWidth',2);
-legend(ax,[h1 h2],{'no-stim','stim'},'Location','southwest','Box','off','FontSize',14);
+legend(ax,[h1 h2],{'no-stim','stim'},'Location','northeast','Box','off','FontSize',14);
 bx=axes(fig,'Position',[.58 .16 .38 .74],'Tag','psd_human_empty', ...
     'XTick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1], ...
     'Box','on','LineWidth',1,'FontSize',14);
 for a=[ax bx]
     label='(A)'; if a==bx, label='(B)'; end
     text(a,-.10,1.06,label,'Units','normalized','FontSize',14, ...
-        'Clipping','off','VerticalAlignment','bottom','Tag','panel_label');
+        'Clipping','off','VerticalAlignment','bottom','FontWeight','normal','Tag','panel_label');
 end
 notes={['Model PSD retains the selected mu7 archived trace pixels. No native FIG or numerical PSD ' ...
     'was saved for this source; other-run FIGs are not used. Data curves remain raster; axes, labels and legend are native.'], ...
@@ -45,6 +46,6 @@ notes={['Model PSD retains the selected mu7 archived trace pixels. No native FIG
     'y pixels 64 to 2141.5 map to log10 PSD 0 to -12. Precision is about one source pixel. ' ...
     'Native axes use log10 coordinates and exponent tick labels to preserve uniform raster spacing exactly. ' ...
     'Neutral annotation pixels and the old legend left of the first data frequency are removed; scientific curve pixels are unchanged.'], ...
-    'Panel B is an intentionally empty box. No patient data are shown. No titles; labels (A)/(B), 14-point fonts and axes linewidth 1.0.'};
+    'Panel B is an intentionally empty box. No patient data are shown. No titles; labels (A)/(B), 14-point fonts and axes linewidth 1.0. Fixed780-by-456 canvas is60% of the original width and height; legend is inside panel A at upper right.'};
 out=struct('figs',fig,'source',{{source}},'notes',{notes});
 end
