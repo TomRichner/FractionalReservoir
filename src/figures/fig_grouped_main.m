@@ -90,6 +90,7 @@ switch group
         end
         native(a.figs(1),[0 .10 1 .31]); close(a.figs); sources{end+1}=cfg.run_dir;
         notes{end+1}='Slowest-timescale axes are both linear. LLE distribution display clipping and MC trial/statistics remain those of the source run.';
+        notes{end+1}='14-point fonts and axes linewidth 1.0. Row-major groups: (A) timescale LLE, (B) leading-vector fractions, (C) cumulative memory capacity and reconstruction, (D) memory horizon. All five scientific axes are retained; B-D use sparse y ticks.';
     case 7
         external(cfg.pytorch_file,[.03 .10 .94 .80],'PyTorch replacement experiment pending');
         banner('Provisional external learning figure');
@@ -124,13 +125,14 @@ else
 end
 if group==4, style_main4_grouped(fig); end
 if group==5, style_main5_grouped(fig); end
+if group==6, style_main6_grouped(fig); end
 tag=sprintf('Fig_Main%d_Grouped',group);
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
     % PNG plus editable MATLAB figure: local-rate traces make SVG needlessly large.
     drawnow;
-    if ismember(group,[1 2 3 4 5])
+    if ismember(group,[1 2 3 4 5 6])
         exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,'Padding',20);
     else
         exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200);
