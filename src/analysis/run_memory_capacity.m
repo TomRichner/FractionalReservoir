@@ -48,6 +48,12 @@ arguments
     % tensor as zero) and is how an MC run is made to use the same integrator as
     % the rest of the analyses even with noise off.
     opts.ode_solver             (1,:) char    = ''
+    % Parallel trials at once. 0 = from the client's available RAM at about
+    % 16 GB per trial (2026-09-16: the medium run's 15 trials on 14 workers
+    % ran out of memory -- each trial unpacks the full 760-s state series of
+    % the n = 500 network, ~5 GB of states plus their per-variable copies;
+    % fast's 5 trials had fitted). The cap is the parfor's M argument.
+    opts.max_workers            (1,1) double  = 0
 end
 
 setup_paths();
@@ -166,7 +172,13 @@ clear esn_chk chk_args;
 %% Main loop: paired trials
 vprintf(opts.verbose, 'verbose', '\n==== Running %d paired trials (%s input) ====\n', n_trials, cfg.input_type);
 
-parfor k = 1:n_trials
+max_workers = opts.max_workers;
+if max_workers <= 0
+    max_workers = mc_workers_from_memory(16);
+end
+vprintf(opts.verbose, 'minimal', '[memory_capacity] %d trials, at most %d in parallel\n', n_trials, max_workers);
+
+parfor (k = 1:n_trials, max_workers)
     vprintf(opts.verbose, 'minimal', '  trial %d/%d (net %d, stim %d)\n', ...
         k, n_trials, seed_net(k), seed_stim(k));
 
@@ -663,4 +675,25 @@ function dz = paired_cohens_dz(x, y)
 d = x(:) - y(:);
 d = d(~isnan(d));
 dz = mean(d) / std(d, 0);
+end
+
+%% ------------------------------------------------------------------------
+function m = mc_workers_from_memory(gb_per_trial)
+% How many MC trials fit side by side: available physical RAM over the
+% per-trial footprint, at least 1, at most the pool size (or the default
+% pool size when none is open). The `memory` function exists on Windows
+% only; elsewhere the pool size is used unchanged.
+pool = gcp('nocreate');
+if isempty(pool)
+    m = parcluster(parallel.defaultProfile).NumWorkers;
+else
+    m = pool.NumWorkers;
+end
+try
+    [~, sys] = memory;
+    avail_gb = sys.PhysicalMemory.Available / 2^30;
+    m = max(1, min(m, floor(avail_gb / gb_per_trial)));
+catch
+    % not Windows: no cheap RAM query; keep the pool size
+end
 end

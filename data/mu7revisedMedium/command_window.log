@@ -1,0 +1,200 @@
+[log] transcript -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\command_window.log
+  output   : C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium
+[1/3] Running Sensitivity Analysis...
+[sensitivity] run_mode=medium, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium (SRNNCellTypePairs), n_levels=11, n_reps=15
+=== Sensitivity: n [100, 1e+03] (1/7) ===
+[psa] n,reps: 165 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_n_nLevs_11_sep_16_26_01_21
+[psa] batch 1/7 done in 3.3 min (75/75 ok), ETA 20 min
+[psa] batch 2/7 done in 4.3 min (75/75 ok), ETA 19 min
+[psa] batch 3/7 done in 3.5 min (75/75 ok), ETA 15 min
+[psa] batch 4/7 done in 3.9 min (75/75 ok), ETA 11 min
+[psa] batch 5/7 done in 3.1 min (75/75 ok), ETA 7 min
+[psa] batch 6/7 done in 3.0 min (75/75 ok), ETA 4 min
+[psa] batch 7/7 done in 2.5 min (45/45 ok), ETA 0 min
+[psa] complete in 0.39 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_n_nLevs_11_sep_16_26_01_21
+=== Sensitivity: f_E [0.2, 0.8] (2/7) ===
+[psa] f_E,reps: 165 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_f_E_nLevs_11_sep_16_26_01_45
+[psa] batch 1/7 done in 2.3 min (75/75 ok), ETA 14 min
+[psa] batch 2/7 done in 2.4 min (75/75 ok), ETA 12 min
+[psa] batch 3/7 done in 2.3 min (75/75 ok), ETA 9 min
+[psa] batch 4/7 done in 2.3 min (75/75 ok), ETA 7 min
+[psa] batch 5/7 done in 2.4 min (75/75 ok), ETA 5 min
+[psa] batch 6/7 done in 2.3 min (75/75 ok), ETA 2 min
+[psa] batch 7/7 done in 1.4 min (45/45 ok), ETA 0 min
+[psa] complete in 0.26 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_f_E_nLevs_11_sep_16_26_01_45
+=== Sensitivity: level_of_chaos [0.25, 1.75] (3/7) ===
+[psa] level_of_chaos,reps: 165 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_level_of_chaos_nLevs_11_sep_16_26_02_00
+[psa] batch 1/7 done in 2.7 min (75/75 ok), ETA 16 min
+[psa] batch 2/7 done in 2.9 min (75/75 ok), ETA 14 min
+[psa] batch 3/7 done in 3.0 min (75/75 ok), ETA 11 min
+[psa] batch 4/7 done in 3.0 min (75/75 ok), ETA 9 min
+[psa] batch 5/7 done in 2.7 min (75/75 ok), ETA 6 min
+[psa] batch 6/7 done in 3.1 min (75/75 ok), ETA 3 min
+[psa] batch 7/7 done in 2.0 min (45/45 ok), ETA 0 min
+[psa] complete in 0.32 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_level_of_chaos_nLevs_11_sep_16_26_02_00
+=== Sensitivity: mu_EE_relative [1.75, 12.2] (4/7) ===
+[psa] mu_EE_relative,reps: 165 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_11_sep_16_26_02_20
+[psa] batch 1/7 done in 1.9 min (75/75 ok), ETA 11 min
+[psa] batch 2/7 done in 1.9 min (75/75 ok), ETA 10 min
+[psa] batch 3/7 done in 1.9 min (75/75 ok), ETA 8 min
+[psa] batch 4/7 done in 1.9 min (75/75 ok), ETA 6 min
+[psa] batch 5/7 done in 1.9 min (75/75 ok), ETA 4 min
+[psa] batch 6/7 done in 2.0 min (75/75 ok), ETA 2 min
+[psa] batch 7/7 done in 1.3 min (45/45 ok), ETA 0 min
+[psa] complete in 0.22 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_EE_relative_nLevs_11_sep_16_26_02_20
+=== Sensitivity: mu_EI_relative [-12.2, -1.75] (5/7) ===
+[psa] mu_EI_relative,reps: 165 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_11_sep_16_26_02_33
+[psa] batch 1/7 done in 1.9 min (75/75 ok), ETA 12 min
+[psa] batch 2/7 done in 2.0 min (75/75 ok), ETA 10 min
+[psa] batch 3/7 done in 2.0 min (75/75 ok), ETA 8 min
+[psa] batch 4/7 done in 1.9 min (75/75 ok), ETA 6 min
+[psa] batch 5/7 done in 2.0 min (75/75 ok), ETA 4 min
+[psa] batch 6/7 done in 2.0 min (75/75 ok), ETA 2 min
+[psa] batch 7/7 done in 1.2 min (45/45 ok), ETA 0 min
+[psa] complete in 0.22 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_EI_relative_nLevs_11_sep_16_26_02_33
+=== Sensitivity: mu_IE_relative [1.75, 12.2] (6/7) ===
+[psa] mu_IE_relative,reps: 165 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_11_sep_16_26_02_46
+[psa] batch 1/7 done in 2.0 min (75/75 ok), ETA 12 min
+[psa] batch 2/7 done in 2.1 min (75/75 ok), ETA 10 min
+[psa] batch 3/7 done in 2.3 min (75/75 ok), ETA 9 min
+[psa] batch 4/7 done in 2.3 min (75/75 ok), ETA 7 min
+[psa] batch 5/7 done in 2.1 min (75/75 ok), ETA 4 min
+[psa] batch 6/7 done in 2.4 min (75/75 ok), ETA 2 min
+[psa] batch 7/7 done in 1.3 min (45/45 ok), ETA 0 min
+[psa] complete in 0.24 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_IE_relative_nLevs_11_sep_16_26_02_46
+=== Sensitivity: mu_II_relative [-12.2, -1.75] (7/7) ===
+[psa] mu_II_relative,reps: 165 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_II_relative_nLevs_11_sep_16_26_03_00
+[psa] batch 1/7 done in 2.0 min (75/75 ok), ETA 12 min
+[psa] batch 2/7 done in 2.2 min (75/75 ok), ETA 10 min
+[psa] batch 3/7 done in 2.0 min (75/75 ok), ETA 8 min
+[psa] batch 4/7 done in 1.9 min (75/75 ok), ETA 6 min
+[psa] batch 5/7 done in 1.9 min (75/75 ok), ETA 4 min
+[psa] batch 6/7 done in 2.1 min (75/75 ok), ETA 2 min
+[psa] batch 7/7 done in 1.3 min (45/45 ok), ETA 0 min
+[psa] complete in 0.22 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\1D_sensitivity_sensitivity_mu_II_relative_nLevs_11_sep_16_26_03_00
+[2/3] Running Tau Sensitivity Analysis...
+[tau_sensitivity] run_mode=medium, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium (SRNNCellTypePairs), n_levels=11, n_reps=25
+[psa] tau_a_EI,reps: 275 combinations x 1 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_11_sep_16_26_03_16
+[psa] batch 1/11 done in 2.6 min (25/25 ok), ETA 26 min
+[psa] batch 2/11 done in 2.5 min (25/25 ok), ETA 23 min
+[psa] batch 3/11 done in 2.5 min (25/25 ok), ETA 20 min
+[psa] batch 4/11 done in 2.4 min (25/25 ok), ETA 17 min
+[psa] batch 5/11 done in 2.5 min (25/25 ok), ETA 15 min
+[psa] batch 6/11 done in 2.5 min (25/25 ok), ETA 12 min
+[psa] batch 7/11 done in 2.5 min (25/25 ok), ETA 10 min
+[psa] batch 8/11 done in 2.5 min (25/25 ok), ETA 7 min
+[psa] batch 9/11 done in 2.5 min (25/25 ok), ETA 5 min
+[psa] batch 10/11 done in 2.5 min (25/25 ok), ETA 2 min
+[psa] batch 11/11 done in 2.6 min (25/25 ok), ETA 0 min
+[psa] complete in 0.46 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_11_sep_16_26_03_16
+[tau_sensitivity] axis tau_a_EI, 3 elements
+[tau_sensitivity] complete: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\tau_sensitivity_tau_timescales_tau_a_EI_max_nLevs_11_sep_16_26_03_16
+[3/3] Running Parameter Space Analysis...
+[param_space] run_mode=medium, preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium (SRNNCellTypePairs), n_levels=4
+Subset: running 128 of 16384 combinations (0.8% requested, 0.8% actual); the rest stay empty.
+[psa] n,f_E,level_of_chaos,mu_EE_relative,mu_EI_relative,mu_IE_relative,mu_II_relative: 16384 combinations x 3 conditions, batch 25 -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\param_space_nLevs_4_sep_16_26_03_44
+[psa] batch 1/6 done in 5.0 min (75/75 ok), ETA 25 min
+[psa] batch 2/6 done in 5.9 min (75/75 ok), ETA 22 min
+[psa] batch 3/6 done in 6.8 min (75/75 ok), ETA 18 min
+[psa] batch 4/6 done in 2.6 min (75/75 ok), ETA 10 min
+[psa] batch 5/6 done in 5.7 min (75/75 ok), ETA 5 min
+[psa] batch 6/6 done in 0.3 min (9/9 ok), ETA 0 min
+[psa] complete in 0.44 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\param_space_nLevs_4_sep_16_26_03_44
+[1/9] memory_capacity
+[memory_capacity] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7revisedMedium  run_mode=medium
+  FAILED: MATLAB:nomem: Out of memory.
+    at SRNNCellTypePairs.unpack_and_compute_states (line 3091)
+    at SRNN_ESN_reservoir.run_memory_capacity (line 217)
+    at run_memory_capacity (line 169)
+  continuing with the remaining stages
+[2/9] mc_example
+[mc_example] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7revisedMedium run_mode=medium T_train=300s d_max=10s solver=sra1
+[mc_example] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\mc_example\mc_example_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\mc_example\mc_example_data.mat
+[3/9] eig_heatmap
+[eig_heatmap] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium run_mode=medium T=100 s n_samples=150
+  inhibition-dominant  no_adaptation  LLE = +1.1656 | <r> 0.025 | B_E 0.43 | 30000 eigenvalues | num. abscissa median +59.794 (spectral +2.317)
+  inhibition-dominant  sfa1_std1      LLE = -0.5091 | <r> 0.027 | B_E 0.43 | 120000 eigenvalues | num. abscissa median +38.737 (spectral +2.593)
+  inhibition-dominant  sfa3_std2      LLE = -0.0921 | <r> 0.040 | B_E 0.43 | 240000 eigenvalues | num. abscissa median +28.362 (spectral +0.983)
+  reference            no_adaptation  LLE = +3.5179 | <r> 0.364 | B_E 0.50 | 75000 eigenvalues | num. abscissa median +81.082 (spectral +5.987)
+  reference            sfa1_std1      LLE = +0.1591 | <r> 0.214 | B_E 0.50 | 300000 eigenvalues | num. abscissa median +74.504 (spectral +5.267)
+  reference            sfa3_std2      LLE = -0.0940 | <r> 0.212 | B_E 0.50 | 600000 eigenvalues | num. abscissa median +38.574 (spectral -0.851)
+  excitation-dominant  no_adaptation  LLE = -4.6448 | <r> 0.911 | B_E 0.55 | 30000 eigenvalues | num. abscissa median +29.787 (spectral -4.435)
+  excitation-dominant  sfa1_std1      LLE = -0.5099 | <r> 0.756 | B_E 0.55 | 120000 eigenvalues | num. abscissa median +14.280 (spectral -2.024)
+  excitation-dominant  sfa3_std2      LLE = -0.0224 | <r> 0.254 | B_E 0.55 | 240000 eigenvalues | num. abscissa median +18.642 (spectral -1.328)
+[eig_heatmap] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\eig_heatmap\eig_heatmap_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\eig_heatmap\eig_heatmap_data.mat
+[4/9] numerics
+[numerics_verification] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium run_mode=medium
+  [1/3] No Adaptation
+  [2/3] Single-Timescale Adaptation
+  [3/3] Multiple-Timescale Adaptation
+# Numerics verification verdict (celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium, medium)
+
+Acceptance criteria fixed on 2026-09-14, before the run. Trials: 5 reshoot, 25 LLE/QR; 3 Jacobian states per condition.
+
+| Condition | Check | Value | Threshold | Result | What |
+|---|---|---|---|---|---|
+| No Adaptation | A | 2.01 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| No Adaptation | B | 1.99 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| No Adaptation | L | 0.296 | <= 0.05 and <= scatter 0.6 | FAIL | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| No Adaptation | C | [0.00244 0.0023] | <= 0.05 and <= 0.02 | PASS | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| No Adaptation | J | [1.05e-10 7.48e-09] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+| Single-Timescale Adaptation | A | 2 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| Single-Timescale Adaptation | B | 1.92 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| Single-Timescale Adaptation | L | 0.0474 | <= 0.05 and <= scatter 0.161 | PASS | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| Single-Timescale Adaptation | C | [0.00654 0.0048] | <= 0.05 and <= 0.02 | PASS | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| Single-Timescale Adaptation | J | [4.91e-11 2.93e-10] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+| Multiple-Timescale Adaptation | A | 2 | >= 1 | PASS | noise-free reshoot order slope (median over trials) |
+| Multiple-Timescale Adaptation | B | 1.86 | >= 1 | PASS | noisy reshoot strong-order slope (median; ratio per halving = 2^slope) |
+| Multiple-Timescale Adaptation | L | 5.97e-07 | <= 0.05 and <= scatter 0.00771 | PASS | median |lambda_1 sra1 - lambda_1 ode45| (paired Benettin, full network) |
+| Multiple-Timescale Adaptation | C | [0.00986 0.0125] | <= 0.05 and <= 0.02 | PASS | median |Benettin - QR| and |top-K - QR| lambda_1 (reduced network) |
+| Multiple-Timescale Adaptation | J | [4.97e-11 4.96e-12] | <= 1e-06 and <= 1e-06 | PASS | max rel Frobenius and top-20 eigenvalue error, 0 kink rows excluded |
+
+## Manuscript claims
+
+- 400-Hz SRA1 converges to the ode45 reference under step refinement (noise-free): **PASS** (PASS / PASS / PASS)
+- SRA1 converges under step refinement on one Brownian path (strong order >= 1): **PASS** (PASS / PASS / PASS)
+- the Benettin LLE at 400-Hz SRA1 agrees with ode45-Benettin: **FAIL** (FAIL / PASS / PASS)
+- the Benettin LLE agrees with the QR spectrum's lambda_1 and with top-K: **PASS** (PASS / PASS / PASS)
+- the analytic Jacobian matches central finite differences: **PASS** (PASS / PASS / PASS)
+
+AT LEAST ONE CRITERION FAILED: see the table. Resolve in code or reflect in the Methods before production analyses.
+[numerics_verification] 47.0 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\numerics_verification\numerics_verification_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\numerics_verification\numerics_verification_data.mat
+[5/9] lyapunov_spectrum
+[lyapunov_spectrum] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium run_mode=medium: 3 conditions x 3 seeds x {noise_on, noise_off}, T = 40 s, K = 200 (cap 400)
+[lyapunov_spectrum] 23.6 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\lyapunov_spectrum\lyapunov_spectrum_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\lyapunov_spectrum\lyapunov_spectrum_data.mat
+[6/9] transient_gain
+[transient_gain] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium run_mode=medium: 3 conditions x 2 seeds, T = 40 s, 12 regular + up to 8 onset + 8 quiet samples, horizon 5 s, {frozen_x, frozen_full, active}
+[transient_gain] 99.6 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\transient_gain\transient_gain_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\transient_gain\transient_gain_data.mat
+[7/9] local_lyapunov
+[local_lyapunov] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu7revisedMedium run_mode=medium: 3 conditions, T = 40 s, K = 50
+  no_adaptation  top-50 lambda_1 +3.3288 | Benettin +3.3179 | h_KS 17.45 bit/s | 111 s
+  sfa1_std1      top-50 lambda_1 -0.1785 | Benettin -0.1656 | h_KS 0.00 bit/s | 137 s
+  sfa3_std2      top-50 lambda_1 -0.0787 | Benettin -0.0832 | h_KS 0.00 bit/s | 228 s
+[local_lyapunov] 7.9 min -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\local_lyapunov\local_lyapunov_data.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\local_lyapunov\local_lyapunov_data.mat
+[8/9] dc_lle
+[dc_lle] preset=celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedMedium  run_mode=medium
+[dc_lle] 15 seeds x 3 conditions finished in 24.1 min
+[dc_lle] saved C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\dc_lle\dc_lle_nSeeds_15_sep_16_26_07_56\dc_lle_results.mat
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\dc_lle\dc_lle_nSeeds_15_sep_16_26_07_56
+[9/9] paper_illustrations
+  saved representative_dynamics illustrations
+  saved single_neuron illustrations
+  -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium
+[paper analyses] complete in 7.05 h -> C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium
+  OK      sweeps               170.0 min
+  FAILED  memory_capacity       10.3 min
+          Out of memory.
+  OK      mc_example             7.2 min
+  OK      eig_heatmap           28.6 min
+  OK      numerics              47.3 min
+  OK      lyapunov_spectrum     23.9 min
+  OK      transient_gain        99.8 min
+  OK      local_lyapunov         8.2 min
+  OK      dc_lle                24.4 min
+  OK      paper_illustrations     3.0 min
