@@ -72,6 +72,7 @@ switch group
         end
         linkaxes(gain_axes,'y');
         notes{end+1}=sprintf('Active propagator only, all five directions, regular-state medians. Actual saved horizon %g s; no extrapolation. Margin and gain stages do not sample matched states.',D.settings.horizon_s);
+        notes{end+1}='Four panels in one row; 14-point fonts and axes linewidth 1.0. Condition labels/titles use manuscript colors. Margin display limits [0,100] assume the unspecified upper bound; ticks are 0,25,50,75. Gain panels retain shared logarithmic limits.';
     case 6
         a=fig_sfa_EOC_allStd('run_dir',cfg.run_dir,'preset_name',cfg.preset_name,'save',false,'visible',false);
         % Keep both axes linear: setting log on an imagesc axis would distort its bins.
@@ -122,13 +123,14 @@ else
     set(findall(fig,'Type','axes'),'FontSize',10);
 end
 if group==4, style_main4_grouped(fig); end
+if group==5, style_main5_grouped(fig); end
 tag=sprintf('Fig_Main%d_Grouped',group);
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
     % PNG plus editable MATLAB figure: local-rate traces make SVG needlessly large.
     drawnow;
-    if ismember(group,[1 2 3 4])
+    if ismember(group,[1 2 3 4 5])
         exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,'Padding',20);
     else
         exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200);
