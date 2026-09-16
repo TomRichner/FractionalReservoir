@@ -11,7 +11,7 @@ root=fileparts(which('setup_paths'));
 if ~startsWith(intro_root,'/') && isempty(regexp(intro_root,'^[A-Za-z]:','once'))
     intro_root=fullfile(root,intro_root);
 end
-fig=figure('Visible','off','Color','w','Position',[40 40 1450 1020]);
+fig=figure('Visible','off','Color','w','Position',[40 40 910 665]);
 combined=fullfile(intro_root,'Fig_Intro_Concepts.fig');
 if isfile(combined)
     old=openfig(combined,'invisible'); guard=onCleanup(@()close(old));
@@ -94,7 +94,7 @@ concept_axes(ax4,[-2.9 1],[-1.9 1.9]);
 row_labels=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1], ...
     'Visible','off','Tag','intro_row_labels');
 for j=1:3
-    row_y=[.955 .685 .34];
+    row_y=[.955 .685 .39];
     text(row_labels,.015,row_y(j),sprintf('(%c)',char('A'+j-1)), ...
         'FontSize',14,'VerticalAlignment','top','Tag',sprintf('row_label_%d',j));
 end

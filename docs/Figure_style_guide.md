@@ -8,7 +8,7 @@ Consensus from Tom's grouped-figure feedback, 2026-09-15. Give this document to 
 |---|---|
 | Fonts | **14 pt** for ticks, axis labels, legends, annotations, and panel letters. Set sizes explicitly, including MATLAB label/title multipliers. |
 | Condition headings | Full names: **No adaptation**, **Single-timescale adaptation**, **Multiple-timescale adaptation**. Color each heading with its established condition color. STA/MTA were conversational shorthand, not requested title text. |
-| Heading size | Slightly larger than body text when needed: Figures 2 and 3 use 16 pt. Allow wrapping without reducing readability. |
+| Heading size | Slightly larger than body text when needed: Figures 2 and 3 use 16 pt. Figures 2–3 require single-line full condition headings. |
 | Panel letters | Parenthesized capitals: **(A), (B), …**, in **regular weight**, not bold. Read across rows, then down. A letter may identify a related block of plots; see the mappings below. |
 | Axes | Line width **1.0 pt**. Prefer open axes without top/right borders unless a box is explicitly requested. |
 | Tick density | Use a few meaningful ticks. Do not fill small panels with redundant labels. Preserve the scientific range; figure-specific ticks are listed below. |
@@ -25,6 +25,7 @@ Use the existing condition-style/color helpers rather than defining a different 
 
 ### Figure 1 — concepts
 
+- Deterministic canvas **910×665 px**, 70% of the1300×950 creation baseline, with fonts unchanged at14 pt.
 - Three row labels: **(A), (B), (C)**. Bring the eigenvalue and example-trace rows closer together. Row B has no time scale bar or time text: the example time is arbitrary up to rescaling.
 - Bottom row, left to right: SFA-shifted sigmoids; SFA-shifted eigenvalue discs; STD-rescaled sigmoids; STD-shrunken discs.
 - SFA curves and corresponding discs share a **black → orange** ramp. More orange means a larger leftward disc shift.
@@ -36,12 +37,12 @@ Use the existing condition-style/color helpers rather than defining a different 
 
 ### Figure 2 — representative dynamics
 
-- No supertitle. Six row letters **(A)–(F)**; three full-name, condition-colored column headings. Faint gray 2.5 pt column dividers.
+- No supertitle. Six row letters **(A)–(F)**; three full-name, condition-colored, single-line16 pt column headings raised above the first-row panels. Faint gray 2.5 pt column dividers.
 - Descriptive LaTeX y labels: **Dendritic potential, x_i**; **Spike rate, r_i**; **Synaptic output, theta_i**; **SFA** plus the plotted feedback expression; **STD** plus the plotted depression expression; **lambda_1**, without units in this row. Render symbols as LaTeX, not literal underscore text.
 - Use the correct expressions from [the model equations](EquationsParametersDocs/Equations_stability_paper.md); label the quantity actually plotted.
 - Numeric plots show **half the previously displayed neurons**, selected deterministically with the same identities across rows. This is a reduction of the example subset, not half the network.
-- Per-neuron traces: width **0.5 pt**, more distinguishable reddish/bluish E/I palettes. One E/I legend in the upper-right panel only.
-- Finite leading-exponent curves: width **1.0 pt**. Row F zero line: **green, dashed, width 0.5 pt**.
+- Per-neuron traces: width **0.8 pt** (latest increase), with distinct red/coral/dark-red/rose and navy/blue/cyan/teal E/I palettes; avoid extremely pale colors. One E/I legend in the upper-right panel only.
+- Finite leading-exponent curves: width **1.25 pt**; local-rate traces0.8 pt. Row F zero line: **green, dashed, width 0.5 pt**.
 - Dendritic-potential limits **[-6, 6]**, ticks **[-5, 0, 5]**. SFA limits **[0, 0.6]**, ticks **[0, 0.5]**. Exponent limits **[-5, 5]**, ticks **[-5, 0, 5]**.
 - Hide every x axis. One scale bar in the **lower-left exponent panel**, from **t=5 to 15 s**, at **y=-4.8**; text below: **10 seconds**, 14 pt.
 - Future numeric data should start finite-exponent accumulation near zero with prior alignment; the prepared configuration accumulates from t=0 and labels its first completed segment at 0.05 s. This does not authorize extending archived estimates backward.
@@ -50,22 +51,27 @@ Use the existing condition-style/color helpers rather than defining a different 
 
 - Four row labels **(A)–(D)**. Full-name condition-colored titles above columns on **single lines**, **16 pt**; other text 14 pt. Gray column dividers.
 - Show more than eight actual input neurons; the revised plot uses **24 fixed traces per condition**.
-- Rows 3 and 4 share the display interval **[0, 60] s**. Requested future estimation uses **K=100** and accumulation **[1, 60] s**.
-- Accumulated leading-exponent limits: no adaptation **[-0.5, 4]**; both adapting conditions **[-0.5, 0.5]**.
-- Remove lambda_1 annotations from eigenvalue-density panels. Place the final accumulated value near **t=55 s** on the accumulated-exponent panel, just above or below its final value.
-- Rows 2–4: no top/right box. Rows 2–3: hide lower x-axis spine/ticks. Row 3 retains a horizontal **LLE=0** line spanning 0–60 s. Row 4 x ticks point **outward/down**.
+- Rows 3 and 4 share the display interval **[0, 60] s**. Future estimation uses **K=50**, simulation/display endpoint **40 s**, accumulation **[1,40] s**, and eight5-second input intervals with prior15-second alignment.
+- Row C includes both saved local leading rates (thin/light) and accumulated estimates (prominent), with LaTeX label **lambda_1 (s^-1)**. A shared key distinguishes them.
+- Row D has two-line label **KS Entropy rate** / **for top-K LLEs (bits/s)**, using the actual saved K (currently30, future50). This denotes a finite-K local positive-rate sum, not an established invariant KS entropy.
+- Leading-exponent display limits: no adaptation **[-0.5, 4]**; both adapting conditions **[-0.5, 0.5]**.
+- Remove lambda_1 annotations from eigenvalue-density panels. Place the final accumulated value near the end of the actual displayed window (**0.92T**) on the accumulated-exponent panel, just above or below its final value.
+- Rows 2–4: no top/right box. Rows 2–3: hide lower x-axis spine/ticks. Row 3 retains a horizontal **LLE=0** line spanning the actual saved0–T display window. Fixed limits clip local excursions; do not alter those samples. Row 4 x ticks point **outward/down**.
 - Keep local-rate, accumulated-rate, and entropy interpretations distinct. Current saved data have **K=30** and accumulated estimates over **30–60 s**; wider display axes do not change those facts.
 
 ### Figure 4 — sensitivity and rate
 
-- **(A)** labels the sensitivity block spanning rows 1–2; **(B)** labels row 3.
+- Deterministic canvas **910×808 px** (70% width,85% height of1300×950, height rounded to pixels). All axis widths1.0.
+- **(A)** sits immediately above the upper-left corner of the first sensitivity subplot and labels the block spanning rows1–2; **(B)** labels row 3.
 - Fonts 14 pt. Rows 1–2 y ticks: **[-1, 0, 1]**.
-- Shared sensitivity legend: **upper right, vertically stacked**, not a horizontal supertitle.
+- Shared sensitivity legend: **upper right, vertically stacked**, with both line swatches and label text in the corresponding condition colors, not a horizontal supertitle.
+- Row3 x ticks **[0,0.5,1]**.
 - Row 3 gray summary line: **RGB [0.5, 0.5, 0.5]**, width **2.5 pt**.
-- Ratio colorbar has no box and uses readable 14 pt text. Condition titles use condition colors.
+- Ratio colorbar has no box and uses readable14 pt text. Bottom-row condition titles use full names on **single lines**,14 pt, in their condition colors.
 
 ### Figure 5 — non-normal margin and directional gain
 
+- Deterministic canvas **1295×406 px**,70% of the1850×580 creation baseline in both dimensions, keeping fonts14 pt; never repeatedly multiply the current size.
 - **1×4** layout: margin first, then the three condition-specific active-gain panels.
 - **(A)** on subplot 1; **(B)** on subplot 2 identifies the gain block spanning subplots 2–4.
 - Fonts 14 pt, axes width 1.0. Color margin condition tick labels and gain-panel titles by condition.

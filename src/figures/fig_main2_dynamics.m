@@ -45,7 +45,7 @@ rows={'x','r','syn','sfa','std','lambda'};
 labels={{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
     {'Synaptic','output, $\theta_i$'},{'SFA','$\frac{c_i}{K}\sum_k a_{ik}$'}, ...
     {'STD','$\prod_m b_{im}$'},'$\lambda_1$'};
-titles={'No adaptation',{'Single-timescale','adaptation'},{'Multiple-timescale','adaptation'}};
+titles={'No adaptation','Single-timescale adaptation','Multiple-timescale adaptation'};
 st=manuscript_style(); names={'no_adaptation','sfa1_std1','sfa3_std2'};
 for c=1:3
     for j=1:6
@@ -73,7 +73,10 @@ for c=1:3
         if j==6
             yline(ax,0,'--','Color',[0 .55 0],'LineWidth',.5,'Tag','lambda_zero');
         end
-        if j==1, title(ax,titles{c},'FontSize',16,'FontWeight','normal','Color',st.condition_color(names{c})); end
+        if j==1
+            title(ax,titles{c},'FontSize',16,'FontWeight','normal','Color',st.condition_color(names{c}));
+            ax.Title.Units='normalized'; ax.Title.Position=[.5 1.20 0];
+        end
     end
 end
 % One E/I key. Current raster shades remain original; numeric data use the
@@ -97,8 +100,8 @@ for xpos=[.3775 .6775]
 end
 uistack(sep,'bottom');
 notes{end+1}=['Numeric rendering selects half the saved neurons per type (4 saved -> 2 displayed, indices1 and4), ' ...
-    'shared across state rows, with 0.5-point neuron/local-rate lines and 1.0-point finite-LLE lines. ' ...
-    'E colors span dark red to light coral; I colors span dark blue to light cyan. ' ...
+    'shared across state rows, with 0.8-point neuron/local-rate lines and 1.25-point finite-LLE lines. ' ...
+    'E colors span dark red through red/coral/rose; I colors span navy through blue/cyan/teal. ' ...
     'Current raster retains its original neuron count, shades and stroke widths; those requests await numeric data. ' ...
     'The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.'];
 out=struct('figs',fig,'files',{{}},'source',{{source}},'notes',{notes});
@@ -109,8 +112,8 @@ if strcmp(field,'lambda')
         text(ax,.5,.5,'finite estimate not saved','Units','normalized','HorizontalAlignment','center','FontSize',14);
         return
     end
-    plot(ax,r.t_lya,r.local_lambda,'Color',[.6 .6 .6],'LineWidth',.5);
-    plot(ax,r.t_lya,r.finite_lambda,'k','LineWidth',1.0);
+    plot(ax,r.t_lya,r.local_lambda,'Color',[.6 .6 .6],'LineWidth',.8);
+    plot(ax,r.t_lya,r.finite_lambda,'k','LineWidth',1.25);
     return
 end
 if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std'})
@@ -122,7 +125,7 @@ for q=numel(counts):-1:1
     % Deterministic half of saved neurons, same indices for every state row.
     n=max(1,floor(counts(q)/2)); selected=round(linspace(1,counts(q),n));
     ids=offsets(q)+selected; cmap=dynamics_palette(q,n);
-    for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',.5); end
+    for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',.8); end
 end
 end
 function draw_artwork(ax,I,row,col)
@@ -163,8 +166,11 @@ end
 
 function cmap=dynamics_palette(type,n)
 % Greater hue/lightness separation while keeping E reddish and I bluish.
-if type==1, endpoints=[.50 .015 .08;1 .48 .32];
-else, endpoints=[.02 .15 .55;.25 .78 .95]; end
-if n==1, cmap=endpoints(1,:); return; end
-cmap=interp1([0 1],endpoints,linspace(0,1,n));
+if type==1
+    base=[.70 .02 .06;1 .32 .18;.38 .015 .12;.85 .18 .43];
+else
+    base=[.015 .16 .48;0 .65 .85;.12 .35 .85;0 .42 .48];
+end
+if n<=size(base,1), cmap=base(1:n,:); return; end
+cmap=interp1(linspace(0,1,size(base,1)),base,linspace(0,1,n),'linear');
 end

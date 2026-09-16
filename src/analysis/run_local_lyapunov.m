@@ -5,10 +5,11 @@ function mat_file = run_local_lyapunov(cfg)
 %
 % One network (rng_seeds [1 2]) of the preset under each of its adaptation
 % conditions, run TWICE on the same Brownian path: top-K QR (exactly K, no
-% retry) and Benettin (K = 1, the manuscript's estimator). T is fixed at 60 s
-% for every mode because the stimulus staircase presets state their steps for
-% a 60-s run (12 steps of 5 s); the exponents accumulate over [30 60] after a
-% 15-s alignment. K by mode: fast 30, medium 100, production 100.
+% retry) and Benettin (K = 1, the manuscript's estimator). Legacy defaults
+% use T=60 s and accumulation[30,60] after15-s alignment. Explicit duration,
+% accumulation and stimulus-cadence options support revised bundles (mu7revised:
+% K50,T40,8 five-second input intervals). K defaults by mode: fast30,
+% medium100, production100; explicit K overrides these.
 %
 % What it is for (TR, 2026-09-14): how often the local rates are positive, and
 % whether the local KS entropy rate sum_k max(local_k, 0) spikes at every
@@ -30,6 +31,7 @@ arguments
     cfg.verbose                 = 'minimal'
     cfg.K           (1,1) double = 0     % 0 -> per run_mode
     cfg.T           (1,1) double = 60
+    cfg.step_duration_s (1,1) double = 0 %0 preserves preset input config
     cfg.accumulation_start_s (1,1) double = NaN % NaN preserves T/2
     cfg.warmup_s (1,1) double = NaN % NaN preserves T/4
     cfg.simulation_start_s (1,1) double = 0
@@ -60,13 +62,21 @@ else
 end
 if ~isfolder(out_dir); mkdir(out_dir); end
 
-[~, ~, conditions] = srnn_param_preset(cfg.preset_name);
+[preset_defaults, ~, conditions] = srnn_param_preset(cfg.preset_name);
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 title_map  = srnn_condition_titles();
 titles     = cellfun(@(n) title_map(n), cond_names, 'UniformOutput', false);
 seeds  = [1 2];
 common = {'rng_seeds', seeds, 'fs', 400, 'T_range', [cfg.simulation_start_s T], 'lya_T_interval', [acc_start T], ...
           'lya_warmup', warmup, 'verbose', cfg.verbose};
+if cfg.step_duration_s>0
+    n_steps=round(T/cfg.step_duration_s);
+    assert(n_steps>=1 && abs(n_steps*cfg.step_duration_s-T)<1e-9, ...
+        'run_local_lyapunov:Cadence','Duration must contain an integer number of stimulus steps.');
+    input=preset_defaults.input_config;
+    input.n_steps=n_steps; input.no_stim_pattern=false(1,n_steps);
+    common=[common,{'input_config',input}];
+end
 if cfg.n_override > 0
     common = [common, {'n', cfg.n_override, 'indegree', max(2, round(0.2 * cfg.n_override)), ...
         'F_tracks_network', true}];
@@ -98,7 +108,7 @@ end
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'seeds', seeds, ...
     'T', T, 'K', K, 'lya_T_interval', [acc_start T], 'lya_warmup', warmup, 'fs', 400, ...
-    'simulation_start_s', cfg.simulation_start_s, 'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
+    'simulation_start_s', cfg.simulation_start_s, 'step_duration_s',cfg.step_duration_s, 'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
 condition_titles = titles; %#ok<NASGU>
 mat_file = fullfile(out_dir, 'local_lyapunov_data.mat');
 save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', '-v7.3');

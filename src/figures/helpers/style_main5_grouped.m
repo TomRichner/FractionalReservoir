@@ -8,7 +8,7 @@ is_margin=arrayfun(@(ax) any(contains(string(ax.Title.String),'non-normal')),axs
 assert(nnz(is_margin)==1,'style_main5_grouped:Margin','Expected one margin panel.');
 margin=axs(is_margin); gains=axs(~is_margin);
 [~,order]=sort(arrayfun(@(ax) ax.Position(1),gains)); gains=gains(order);
-fig.Units='pixels'; fig.Position=[40 60 1850 580];
+fig.Units='pixels'; fig.Position=[40 60 1295 406];
 set(findall(fig,'-property','FontSize'),'FontSize',14);
 set(axs,'LineWidth',1,'Units','normalized','PositionConstraint','innerposition', ...
     'TitleFontSizeMultiplier',1,'LabelFontSizeMultiplier',1);

@@ -1023,13 +1023,13 @@ switch name
 
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu7revised'
         % Stimulus-staircase twin of the mu7 noStim preset for run_local_lyapunov:
-        % a NEW random step every 5 s that never returns to zero -- 12 steps
-        % over the stage's fixed T = 60 s, no_stim_pattern all false, each
+        % a NEW random step every 5 s that never returns to zero -- 8 steps
+        % over the stage's revised T = 40 s, no_stim_pattern all false, each
         % step a fresh amp*randn on 20% of each cell type. Same bundle.
         [d, model_class, conditions] = srnn_param_preset( ...
             'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revised');
-        d.input_config = struct('n_steps', 12, 'step_density', struct(), 'amp', 0.5, ...
-            'no_stim_pattern', false(1, 12), 'intrinsic_drive', 0, 'positive_only', false);
+        d.input_config = struct('n_steps', 8, 'step_density', struct(), 'amp', 0.5, ...
+            'no_stim_pattern', false(1, 8), 'intrinsic_drive', 0, 'positive_only', false);
 
     case 'single_neuron_mu7revised'
         % Within mu7revised bundle: reference E neuron without recurrence,

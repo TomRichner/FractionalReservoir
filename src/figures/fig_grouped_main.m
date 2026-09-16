@@ -29,6 +29,7 @@ switch group
         intro_root=cfg.intro_native_root;
         if isempty(intro_root), intro_root=fullfile(cfg.source_fig_root,'fig_introductory_concepts'); end
         a=fig_main1_concepts(cfg.preset_name,intro_root);
+        fig.Position=a.figs.Position;
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 2
