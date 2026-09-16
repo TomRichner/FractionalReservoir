@@ -1,0 +1,209 @@
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (8 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 17:04:26
+---- [1/8] fig_main1_grouped   [in paper]
+     FAILED MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+       at validateHandleToPrint (line 0)
+       at validate (line 17)
+       at print (line 37)
+---- [2/8] fig_main2_grouped   [in paper]
+     FAILED MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+       at validateHandleToPrint (line 0)
+       at validate (line 17)
+       at print (line 37)
+---- [3/8] fig_main3_grouped   [in paper]
+     FAILED MATLAB:Uicontextmenu:InvalidParent: Parent must be a Figure
+       at fig_grouped_main/native (line 138)
+       at fig_grouped_main (line 52)
+       at fig_main3_grouped (line 3)
+---- [4/8] fig_main4_grouped   [in paper]
+     FAILED MATLAB:badsubscript: Index exceeds array bounds.
+       at fig_grouped_main (line 70)
+       at fig_main4_grouped (line 3)
+       at call_figure (line 264)
+---- [5/8] fig_main5_grouped   [in paper]
+     FAILED MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+       at validateHandleToPrint (line 0)
+       at validate (line 17)
+       at print (line 37)
+---- [6/8] fig_main6_grouped   [in paper]
+     FAILED MATLAB:Uicontextmenu:InvalidParent: Parent must be a Figure
+       at fig_grouped_main/native (line 138)
+       at fig_grouped_main (line 101)
+       at fig_main6_grouped (line 3)
+---- [7/8] fig_main7_grouped   [in paper]
+     FAILED MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+       at validateHandleToPrint (line 0)
+       at validate (line 17)
+       at print (line 37)
+---- [8/8] fig_main8_grouped   [in paper]
+     FAILED MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+       at validateHandleToPrint (line 0)
+       at validate (line 17)
+       at print (line 37)
+PAPER FIGURES COMPLETE in 0.8 min: 0/8 succeeded (0/8 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  FAILED  fig_main1_grouped                 0 files    3.5 s   [in paper]
+  FAILED  fig_main2_grouped                 0 files    1.2 s   [in paper]
+  FAILED  fig_main3_grouped                 0 files    2.3 s   [in paper]
+  FAILED  fig_main4_grouped                 0 files   31.0 s   [in paper]
+  FAILED  fig_main5_grouped                 0 files    3.6 s   [in paper]
+  FAILED  fig_main6_grouped                 0 files    2.3 s   [in paper]
+  FAILED  fig_main7_grouped                 0 files    1.0 s   [in paper]
+  FAILED  fig_main8_grouped                 0 files    1.1 s   [in paper]
+--------------------------------------------------------
+  fig_main1_grouped: MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+  fig_main2_grouped: MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+  fig_main3_grouped: MATLAB:Uicontextmenu:InvalidParent: Parent must be a Figure
+  fig_main4_grouped: MATLAB:badsubscript: Index exceeds array bounds.
+  fig_main5_grouped: MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+  fig_main6_grouped: MATLAB:Uicontextmenu:InvalidParent: Parent must be a Figure
+  fig_main7_grouped: MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+  fig_main8_grouped: MATLAB:print:ExportappForPrintFigureWithUIControl: UI components are not supported. To include UI components, use the 'exportapp' function.
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (8 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 17:06:15
+---- [1/8] fig_main1_grouped   [in paper]
+     2 file(s): Fig_Main1_Grouped.png, Fig_Main1_Grouped.fig
+---- [2/8] fig_main2_grouped   [in paper]
+     2 file(s): Fig_Main2_Grouped.png, Fig_Main2_Grouped.fig
+---- [3/8] fig_main3_grouped   [in paper]
+     2 file(s): Fig_Main3_Grouped.png, Fig_Main3_Grouped.fig
+---- [4/8] fig_main4_grouped   [in paper]
+     2 file(s): Fig_Main4_Grouped.png, Fig_Main4_Grouped.fig
+---- [5/8] fig_main5_grouped   [in paper]
+     2 file(s): Fig_Main5_Grouped.png, Fig_Main5_Grouped.fig
+---- [6/8] fig_main6_grouped   [in paper]
+     2 file(s): Fig_Main6_Grouped.png, Fig_Main6_Grouped.fig
+---- [7/8] fig_main7_grouped   [in paper]
+     2 file(s): Fig_Main7_Grouped.png, Fig_Main7_Grouped.fig
+---- [8/8] fig_main8_grouped   [in paper]
+     2 file(s): Fig_Main8_Grouped.png, Fig_Main8_Grouped.fig
+PAPER FIGURES COMPLETE in 1.1 min: 8/8 succeeded (8/8 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main1_grouped                 2 files    4.8 s   [in paper]
+  OK      fig_main2_grouped                 2 files    3.8 s   [in paper]
+  OK      fig_main3_grouped                 2 files    4.8 s   [in paper]
+  OK      fig_main4_grouped                 2 files   37.4 s   [in paper]
+  OK      fig_main5_grouped                 2 files    3.6 s   [in paper]
+  OK      fig_main6_grouped                 2 files    5.1 s   [in paper]
+  OK      fig_main7_grouped                 2 files    1.6 s   [in paper]
+  OK      fig_main8_grouped                 2 files    1.7 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (4 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 17:12:31
+---- [1/4] fig_main1_grouped   [in paper]
+     2 file(s): Fig_Main1_Grouped.png, Fig_Main1_Grouped.fig
+---- [2/4] fig_main5_grouped   [in paper]
+     2 file(s): Fig_Main5_Grouped.png, Fig_Main5_Grouped.fig
+---- [3/4] fig_main6_grouped   [in paper]
+     2 file(s): Fig_Main6_Grouped.png, Fig_Main6_Grouped.fig
+---- [4/4] fig_main8_grouped   [in paper]
+     2 file(s): Fig_Main8_Grouped.png, Fig_Main8_Grouped.fig
+PAPER FIGURES COMPLETE in 0.3 min: 4/4 succeeded (4/4 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main1_grouped                 2 files    5.0 s   [in paper]
+  OK      fig_main5_grouped                 2 files    3.7 s   [in paper]
+  OK      fig_main6_grouped                 2 files    4.6 s   [in paper]
+  OK      fig_main8_grouped                 2 files    1.8 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (3 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 17:14:36
+---- [1/3] fig_main1_grouped   [in paper]
+     2 file(s): Fig_Main1_Grouped.png, Fig_Main1_Grouped.fig
+---- [2/3] fig_main6_grouped   [in paper]
+     2 file(s): Fig_Main6_Grouped.png, Fig_Main6_Grouped.fig
+---- [3/3] fig_main8_grouped   [in paper]
+     2 file(s): Fig_Main8_Grouped.png, Fig_Main8_Grouped.fig
+PAPER FIGURES COMPLETE in 0.2 min: 3/3 succeeded (3/3 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main1_grouped                 2 files    4.5 s   [in paper]
+  OK      fig_main6_grouped                 2 files    4.7 s   [in paper]
+  OK      fig_main8_grouped                 2 files    1.8 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (1 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 18:50:52
+---- [1/1] fig_main1_grouped   [in paper]
+     2 file(s): Fig_Main1_Grouped.png, Fig_Main1_Grouped.fig
+PAPER FIGURES COMPLETE in 0.1 min: 1/1 succeeded (1/1 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main1_grouped                 2 files    4.3 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (1 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 18:52:22
+---- [1/1] fig_main1_grouped   [in paper]
+     2 file(s): Fig_Main1_Grouped.png, Fig_Main1_Grouped.fig
+PAPER FIGURES COMPLETE in 0.1 min: 1/1 succeeded (1/1 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main1_grouped                 2 files    4.0 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (1 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 18:53:23
+---- [1/1] fig_main1_grouped   [in paper]
+     2 file(s): Fig_Main1_Grouped.png, Fig_Main1_Grouped.fig
+PAPER FIGURES COMPLETE in 0.1 min: 1/1 succeeded (1/1 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main1_grouped                 2 files    4.2 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (1 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 19:37:17
+---- [1/1] fig_main2_grouped   [in paper]
+     2 file(s): Fig_Main2_Grouped.png, Fig_Main2_Grouped.fig
+PAPER FIGURES COMPLETE in 0.2 min: 1/1 succeeded (1/1 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main2_grouped                 2 files    8.0 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (1 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 19:38:43
+---- [1/1] fig_main2_grouped   [in paper]
+     2 file(s): Fig_Main2_Grouped.png, Fig_Main2_Grouped.fig
+PAPER FIGURES COMPLETE in 0.1 min: 1/1 succeeded (1/1 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main2_grouped                 2 files    5.7 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (2 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 19:49:06
+---- [1/2] fig_main2_grouped   [in paper]
+     2 file(s): Fig_Main2_Grouped.png, Fig_Main2_Grouped.fig
+---- [2/2] fig_main3_grouped   [in paper]
+     FAILED MATLAB:class:MethodRestricted: Cannot access method 'excitatory_colormap' in class 'SRNNModel2'.
+       at fig_main3_stability (line 32)
+       at fig_grouped_main (line 39)
+       at fig_main3_grouped (line 3)
+PAPER FIGURES COMPLETE in 0.2 min: 1/2 succeeded (1/2 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main2_grouped                 2 files    5.8 s   [in paper]
+  FAILED  fig_main3_grouped                 0 files    0.6 s   [in paper]
+--------------------------------------------------------
+  fig_main3_grouped: MATLAB:class:MethodRestricted: Cannot access method 'excitatory_colormap' in class 'SRNNModel2'.
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (2 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 19:49:42
+---- [1/2] fig_main2_grouped   [in paper]
+     2 file(s): Fig_Main2_Grouped.png, Fig_Main2_Grouped.fig
+---- [2/2] fig_main3_grouped   [in paper]
+     2 file(s): Fig_Main3_Grouped.png, Fig_Main3_Grouped.fig
+PAPER FIGURES COMPLETE in 0.2 min: 2/2 succeeded (2/2 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main2_grouped                 2 files    5.6 s   [in paper]
+  OK      fig_main3_grouped                 2 files    4.9 s   [in paper]
+========================================================
+[log] transcript -> /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped/command_window.log
+Figure root:   /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped  (configured)
+PAPER FIGURES  (1 entries, preset celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7)  start 15-Sep-2026 19:50:43
+---- [1/1] fig_main3_grouped   [in paper]
+     2 file(s): Fig_Main3_Grouped.png, Fig_Main3_Grouped.fig
+PAPER FIGURES COMPLETE in 0.1 min: 1/1 succeeded (1/1 in-paper), output /Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_mu7_fast_grouped
+--------------------------------------------------------
+  OK      fig_main3_grouped                 2 files    5.0 s   [in paper]
+========================================================

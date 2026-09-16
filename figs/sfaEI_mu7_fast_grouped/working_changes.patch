@@ -1,0 +1,354 @@
+diff --git a/scripts/paper/README_mu7revised.md b/scripts/paper/README_mu7revised.md
+index 325ff50..d2b2604 100644
+--- a/scripts/paper/README_mu7revised.md
++++ b/scripts/paper/README_mu7revised.md
+@@ -13,8 +13,8 @@ Equivalently, run `sfaEI_mu7_grouped_figures_run.m`. This config calls no analys
+ 
+ | Group | Current source and limitations |
+ |---|---|
+-| 1 | Archived introductory PNG; native analytic F-I axes and conceptual disk schematic. The disk is an approximation, not the full adaptive Jacobian. |
+-| 2 | Archived baseline PNG, visibly labeled midpoint-step pending. No step has been fabricated. Future runs prefer saved representative dynamics. |
++| 1 | Native archived Sompolinsky axes from the explicitly selected `sfaEI_fast` introductory FIGs, with unchanged trace/eigenvalue data. Four analytic lower panels: SFA sigmoid / shifted disks / STD sigmoid / shrinking disks. Exact paired colors, 14-point fonts, axis widths1.0. Disks are conceptual approximations. |
++| 2 | Current baseline trace pixels retained under calibrated native axes; six rows A–F, titles No Adaptation/STA/MTA, requested limits and one 10-s scale bar. Original trace colors and 5-s finite-LLE start remain. Future runs use numeric saved trajectories and exact per-neuron E/I palettes. |
+ | 3 | Native saved-data eigenvalue occupancy and simplified switching-input traces. Input is eight fixed actual neurons. Local positive QR sum is `sum(max(local_rates,0),2)/log(2)`; percentage uses the same samples and strict positivity over the saved second-half window. Broader entropy interpretation remains deferred. |
+ | 4 | Native median/IQR LLE sensitivity and rate–LLE panels; inherited fixed display clipping remains. |
+ | 5 | Native non-normal margin and **only active-direction gain**, all five curves. Different colors, dashes, markers; E/I labels use “Excite E / inhibit I” and “Excite E / excite I”. Noise is RMS gain. All three condition panels share logarithmic gain limits. The current saved horizon remains **1 s**. Margin and gain sample different stages. |
+@@ -22,7 +22,7 @@ Equivalently, run `sfaEI_mu7_grouped_figures_run.m`. This config calls no analys
+ | 7 | Explicit sibling manuscript PyTorch image when present, visibly provisional. This old experiment does not establish the intended three-condition learning claim. |
+ | 8 | Archived model PSD with explicitly unavailable human SOZ panel on this laptop. Uniform DC model input is distinct from clinical 2-Hz stimulation. |
+ 
+-The archived illustrative sources contain PNGs only, not saved MATLAB FIGs or raw illustrative trajectories. Thus groups 1/2/7/8 include raster panels; saving them inside a FIG does not make their data editable. Groups 3–6 are native data graphics.
++The archived illustrative sources contain PNGs only, not saved MATLAB FIGs or raw illustrative trajectories. Groups 2/7/8 include raster panels; saving them inside a FIG does not make their data editable. Groups 1 and 3–6 are native graphics. For group1 the figure-only config explicitly names the older native Sompolinsky archive, whose simulation settings match the mu7 intro; the intervening source change only combined its two rows. Those two FIG files must also be copied to a second computer to reproduce this exact native replot.
+ 
+ ## Future computation: not executed locally
+ 
+@@ -40,7 +40,7 @@ Alternatively, edit `run_mode` in `mu7revised_run.m` and press Run. Outputs are
+ 
+ New analysis support:
+ 
+-- `run_paper_illustrations`: reference network conditions on paired seeds `[1 2]`; uniform positive input amplitude 0.5, onset 15 s midway through displayed `[0,30]` s; simulation starts at -15 s for settling. Save 4 fixed neurons per type, raw input/state/rate/synaptic output/SFA feedback/STD product. No LLE estimation in this illustration.
++- `run_paper_illustrations`: reference network conditions on paired seeds `[1 2]`; uniform positive input amplitude 0.5, onset 15 s midway through displayed `[0,30]` s; simulation starts at -15 s for settling. Save 4 fixed neurons per type, raw input/state/rate/synaptic output/SFA feedback/STD product. The network illustration now saves top-K K = 15 leading local/finite rates, with 0.05-s segments, accumulation from t = 0 and 10-s negative-time alignment. The first finite value is displayed at the first completed-segment endpoint t = 0.05 s. Single-neuron mechanisms still skip LLE estimation.
+ - Supplementary mechanism stage: main-preset-derived single E neuron, `n=1`, zero recurrent weights, noise/heterogeneity off. Columns are no adaptation / **1TS SFA only** / **1TS STD only**. The old `single_neuron_dualStd` figure used three SFA and two STD timescales and four columns; it is replaced in the revised registry by the saved-data figure.
+ - Transient gain: `cfg.transient_gain_horizon_s=5`, `cfg.transient_gain_duration_s=40` (60 in production). These are explicit knobs. Sample-start bounds are validated before any computation, requiring `T/2 + 5 < T - horizon`. The saved horizon is plotted directly; current 1-s data are never stretched.
+ 
+@@ -49,3 +49,21 @@ The new illustrative and longer-horizon analyses have **not** run on this laptop
+ ## Verification
+ 
+ MATLAB R2026a through MCP: all eight current grouped exports succeeded. Visual checks covered panel composition, all five direction curves, and timescale axes. `test_mu7revised_bundle` passed without simulations: baseline equivalence, memory noise-only difference, independent fast/medium paths, one-neuron zero weights and timescale counts, midpoint stimulus values (also checked in the built n=500 model with negative-time burn-in), and too-short-horizon rejection. Saved group 5 was also checked for exactly five curves in each of three panels and identical log limits. Code Analyzer found no new functional issues; the transient stage retains its pre-existing parfor broadcast warning. Full new-stage numerical execution is intentionally deferred.
++
++## Figure 1 mechanism revision
++
++The lower panels use paired black-to-orange SFA curves/disks and blue-to-teal STD curves/disks. STD uses the actual main-preset E→E MTS recovery/release ratios at representative raw rate0.25: each steady depression factor is1/3, and their product is1/9. The five frozen total attenuation levels span1 to1/9, so the strongest illustrated sigmoid remains nonzero. These are conceptual frozen-factor curves, not a self-consistent steady-state F-I relation or an exact transformation of the active Jacobian. See the generated Figure1 provenance for parameters and the authoritative `docs/EquationsParametersDocs/Equations_stability_paper.md` for dynamics. No simulations were run for this revision.
++
++## Figure 2 formatting and current-source limits
++
++The current mu7 archive contains only a PNG for this example. Its exact plotted trace pixels are calibrated into native axes; no other run or stage supplies replacement trajectories. Existing neutral axis/text pixels and colored legend strokes are removed, while remaining trajectory artwork is retained. Pixels overwritten by the original transparent legend glyphs cannot be recovered. The fixed source checksum prevents applying that calibration to a different image. Current finite-LLE curves still begin at 5 s and no midpoint step has been added to the existing data.
++
++New labels/axes use 14-point fonts, with 20-point column titles, one E/I legend, row letters A–F and gray column dividers. The 10-second scale bar occupies the lower-left lambda panel at x = 5…15, y = -4.8. Per-neuron colors cannot be exactly reassigned from flattened antialiased raster overlaps; the current E/I shades are retained. The future numeric plotter calls the standalone `excitatory_colormap` and `inhibitory_colormap` helpers (the same palettes used privately by `SRNNModel2`), preserves neuron ordering across rows and draws E over I.
++
++For the next `mu7revised` analysis only, `illustration_lya_start_s=0` and `illustration_lya_warmup_s=10`: alignment over [-10,0] s occurs within the simulation's [-15,30] s range. Finite rates are stored at segment endpoints (first 0.05 s). This support was statically checked and model construction validated, but no new illustrative simulations or estimates were produced locally. Input trajectories remain saved; the six main rows are x, raw rate, synaptic output, SFA feedback, STD product andlambda.
++
++## Figure 3 saved-data revision
++
++Four native rows now show eigenvalue density, 24 actual fixed input-neuron traces (12 E and 12 I), accumulated leading exponent, and local positive QR-rate sum. Condition headings use the standard black/gold/blue colors and 16-point type; all other fonts are 14. Figure 2 headings now use those condition colors too. Rows 3–4 share [0,60] s axes. The current source is **K=30**, accumulation **[30,60] s**, with saved segment-start timestamps 30…59.95 s. The figure explicitly states this; requested K=100 and early accumulation cannot be recovered by replotting.
++
++The future bundle explicitly sets `local_lyapunov_K=100` even in fast mode, `local_lyapunov_accumulation_start_s=1`, `local_lyapunov_warmup_s=15`, and `local_lyapunov_simulation_start_s=-15`. This provides the full alignment [-14,1] s before accumulation [1,60] s. Saved QR times retain the stage's segment-start convention (first completed [1,1.05] segment is indexed at 1). Legacy callers retain K by mode and [T/2,T] accumulation. No new switching simulation was run locally. Local positive sum remains a provisional local h_KS proxy, not an established invariant KS entropy.
+diff --git a/scripts/paper/mu7revised_config.m b/scripts/paper/mu7revised_config.m
+index 6020780..3a031d0 100644
+--- a/scripts/paper/mu7revised_config.m
++++ b/scripts/paper/mu7revised_config.m
+@@ -62,6 +62,12 @@
+ cfg.single_neuron_preset = 'single_neuron_mu7revised';
+ cfg.illustrations = true;
+ cfg.illustration_step_amp = 0.5;
++cfg.local_lyapunov_K = 100; % explicit also in fast mode
++cfg.local_lyapunov_accumulation_start_s = 1;
++cfg.local_lyapunov_warmup_s = 15;
++cfg.local_lyapunov_simulation_start_s = -15; % full alignment [-14,1]
++cfg.illustration_lya_start_s = 0; % first finite estimate after the [0,0.05] s segment
++cfg.illustration_lya_warmup_s = 10; % alignment over [-10,0] s; simulation starts -15
+ cfg.illustration_display_window = [0 30]; % step exactly midway, at 15 s
+ cfg.transient_gain_horizon_s = 5;
+ cfg.transient_gain_duration_s = 40; % fast: sample starts [25,35] s, 5-s horizon
+diff --git a/scripts/paper/run_all_paper_analyses.m b/scripts/paper/run_all_paper_analyses.m
+index c53765e..c828f58 100644
+--- a/scripts/paper/run_all_paper_analyses.m
++++ b/scripts/paper/run_all_paper_analyses.m
+@@ -147,6 +147,12 @@
+ % (cfg.local_lyapunov_preset: the stimulus-staircase twin of the paper preset).
+ ll_preset = cfg.preset_name;
+ if isfield(cfg, 'local_lyapunov_preset') && ~isempty(cfg.local_lyapunov_preset); ll_preset = cfg.local_lyapunov_preset; end
++ll_args={};
++ll_fields={'K','accumulation_start_s','warmup_s','simulation_start_s'};
++for j=1:numel(ll_fields)
++    key=['local_lyapunov_' ll_fields{j}];
++    if isfield(cfg,key), ll_args=[ll_args,{ll_fields{j},cfg.(key)}]; end %#ok<AGROW>
++end
+ mc_solver = '';
+ if isfield(cfg, 'mc_ode_solver'); mc_solver = cfg.mc_ode_solver; end
+ gain_horizon=0; gain_duration=0;
+@@ -176,7 +182,7 @@
+         'horizon_s',gain_horizon,'duration_s',gain_duration); ...
+     'local_lyapunov', @() run_local_lyapunov( ...
+         'preset_name', ll_preset, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
+-        'out_dir', fullfile(run_dir, 'local_lyapunov')); ...
++        'out_dir', fullfile(run_dir, 'local_lyapunov'),ll_args{:}); ...
+     'dc_lle',          @() run_dc_lle_analysis( ...
+         'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
+         'output_dir', run_dir) };
+diff --git a/scripts/paper/sfaEI_mu7_grouped_figures_config.m b/scripts/paper/sfaEI_mu7_grouped_figures_config.m
+index 08e62ee..465bbe1 100644
+--- a/scripts/paper/sfaEI_mu7_grouped_figures_config.m
++++ b/scripts/paper/sfaEI_mu7_grouped_figures_config.m
+@@ -10,4 +10,9 @@
+ root=fileparts(which('setup_paths'));
+ old_learning=fullfile(fileparts(root),'StochasticPlasticDynamicalSystemPaper','figs_pytorch','plot_for_Brian_seeds.png');
+ cfg.figures=grouped_figure_registry(cfg.preset_name,'figs/sfaEI_mu7_fast',old_learning);
++% Explicit native source for the unchanged Sompolinsky introductory example.
++% mu7 archive has only PNG. This earlier clean archive has the original data
++% graphics; the intervening source change only combined its two rows.
++cfg.figures{1}.args=[cfg.figures{1}.args, ...
++    {'intro_native_root','figs/sfaEI_fast/fig_introductory_concepts'}];
+ end
+diff --git a/src/analysis/run_local_lyapunov.m b/src/analysis/run_local_lyapunov.m
+index 9b8252b..77b0f17 100644
+--- a/src/analysis/run_local_lyapunov.m
++++ b/src/analysis/run_local_lyapunov.m
+@@ -30,6 +30,9 @@
+     cfg.verbose                 = 'minimal'
+     cfg.K           (1,1) double = 0     % 0 -> per run_mode
+     cfg.T           (1,1) double = 60
++    cfg.accumulation_start_s (1,1) double = NaN % NaN preserves T/2
++    cfg.warmup_s (1,1) double = NaN % NaN preserves T/4
++    cfg.simulation_start_s (1,1) double = 0
+     cfg.n_override  (1,1) double = 0     % tests only
+ end
+ 
+@@ -44,6 +47,12 @@
+ end
+ if cfg.K > 0; K = cfg.K; end
+ T = cfg.T;
++acc_start=cfg.accumulation_start_s; if isnan(acc_start), acc_start=T/2; end
++warmup=cfg.warmup_s; if isnan(warmup), warmup=T/4; end
++assert(isfinite(acc_start) && acc_start>=0 && acc_start<T && ...
++    isfinite(warmup) && warmup>=0 && isfinite(cfg.simulation_start_s) && ...
++    cfg.simulation_start_s<=acc_start-warmup, ...
++    'run_local_lyapunov:Window','Simulation must include the full alignment before accumulation.');
+ if isempty(cfg.out_dir)
+     out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'local_lyapunov');
+ else
+@@ -56,8 +65,8 @@
+ title_map  = srnn_condition_titles();
+ titles     = cellfun(@(n) title_map(n), cond_names, 'UniformOutput', false);
+ seeds  = [1 2];
+-common = {'rng_seeds', seeds, 'fs', 400, 'T_range', [0 T], 'lya_T_interval', [T/2 T], ...
+-          'lya_warmup', T/4, 'verbose', cfg.verbose};
++common = {'rng_seeds', seeds, 'fs', 400, 'T_range', [cfg.simulation_start_s T], 'lya_T_interval', [acc_start T], ...
++          'lya_warmup', warmup, 'verbose', cfg.verbose};
+ if cfg.n_override > 0
+     common = [common, {'n', cfg.n_override, 'indegree', max(2, round(0.2 * cfg.n_override)), ...
+         'F_tracks_network', true}];
+@@ -88,8 +97,8 @@
+ end
+ 
+ settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'seeds', seeds, ...
+-    'T', T, 'K', K, 'lya_T_interval', [T/2 T], 'lya_warmup', T/4, 'fs', 400, ...
+-    'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
++    'T', T, 'K', K, 'lya_T_interval', [acc_start T], 'lya_warmup', warmup, 'fs', 400, ...
++    'simulation_start_s', cfg.simulation_start_s, 'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
+ condition_titles = titles; %#ok<NASGU>
+ mat_file = fullfile(out_dir, 'local_lyapunov_data.mat');
+ save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', '-v7.3');
+diff --git a/src/analysis/run_paper_illustrations.m b/src/analysis/run_paper_illustrations.m
+index c474ba6..75d1145 100644
+--- a/src/analysis/run_paper_illustrations.m
++++ b/src/analysis/run_paper_illustrations.m
+@@ -4,7 +4,9 @@
+ % Network: paired reference conditions; uniform positive step at the midpoint
+ % of the displayed [0,30] s interval. Starts at -15 s to settle before display.
+ % Single neuron: within-bundle n=1/W=0 preset, no adaptation / 1TS SFA / 1TS STD.
+-% Does not estimate Lyapunov exponents: main 3 supplies those separately.
++% Network example also saves leading local/finite top-K rates. Accumulation
++% begins at t=0 with a separate negative-time alignment interval. Single-neuron
++% mechanism columns still skip Lyapunov estimation.
+ arguments
+     cfg struct
+     run_dir char
+@@ -17,7 +19,18 @@
+     settings=struct('preset_name',presets{j},'display_window',cfg.illustration_display_window, ...
+         'step_time',mean(cfg.illustration_display_window),'step_amplitude',cfg.illustration_step_amp, ...
+         'T_range',[-15 cfg.illustration_display_window(2)],'fs',400,'seeds',[1 2], ...
+-        'protocol','Uniform positive input step to all neurons; fixed displayed neuron indices; no LLE computation.');
++        'protocol','Uniform positive input step to all neurons; fixed displayed neuron indices.');
++    lya_args={'lya_method','none'};
++    settings.lya_method='none';
++    if j==1
++        settings.lya_method='topk'; settings.lya_K=15; settings.lya_dt=.05;
++        settings.lya_T_interval=[cfg.illustration_lya_start_s settings.T_range(2)];
++        settings.lya_warmup=cfg.illustration_lya_warmup_s;
++        assert(settings.lya_T_interval(1)-settings.lya_warmup>=settings.T_range(1));
++        lya_args={'lya_method','topk','lya_K',settings.lya_K,'lya_K_auto',false, ...
++            'lya_dt',settings.lya_dt,'lya_T_interval',settings.lya_T_interval, ...
++            'lya_warmup',settings.lya_warmup};
++    end
+     [~,~,conds]=srnn_param_preset(presets{j}); titles=srnn_condition_titles();
+     results=struct([]);
+     input=struct('intrinsic_drive',0,'step_time',settings.step_time, ...
+@@ -25,11 +38,23 @@
+     for c=1:numel(conds)
+         model=build_from_preset(presets{j},conds{c}.name,'T_range',settings.T_range, ...
+             'input_config',input,'fs',settings.fs,'rng_seeds',settings.seeds, ...
+-            'lya_method','none','plot_deci',2,'verbose',cfg.verbose);
++            'plot_deci',2,'verbose',cfg.verbose,lya_args{:});
+         model.run(); pd=model.plot_data; pp=model.get_params();
+         assert(SRNNCellTypePairs.routes_identical(pp),'Illustration requires identical outgoing routes.');
+         r=struct('name',conds{c}.name,'title',titles(conds{c}.name),'t',pd.t, ...
+-            'u',[],'x',[],'r',[],'syn',[],'sfa',[],'std',[],'selected',{{}},'n',model.n);
++            'u',[],'x',[],'r',[],'syn',[],'sfa',[],'std',[],'selected',{{}},'n',model.n, ...
++            'cell_type_names',{model.cell_type_names},'t_lya',[],'local_lambda',[], ...
++            'finite_lambda',[],'LLE',NaN);
++        if j==1
++            L=model.lya_results;
++            % Label estimates at segment END, not before their first data exist.
++            r.t_lya=L.t_lya(:)+round(settings.lya_dt*settings.fs)/settings.fs;
++            r.local_lambda=L.local_LE_spectrum_t(:,1);
++            r.finite_lambda=L.finite_LE_spectrum_t(:,1); r.LLE=L.LLE;
++            valid=isfinite(r.finite_lambda);
++            assert(any(valid) && min(r.t_lya(valid))>=settings.lya_T_interval(1)+settings.lya_dt-1e-8, ...
++                'run_paper_illustrations:EarlyFiniteEstimate','Finite estimates must follow their first completed segment.');
++        end
+         for q=1:model.n_cellTypes
+             name=model.cell_type_names{q}; ix=1:min(4,size(pd.x.(name),1)); r.selected{q}=ix;
+             r.u=[r.u; pd.u.(name)(ix,:)];
+diff --git a/src/figures/fig_grouped_main.m b/src/figures/fig_grouped_main.m
+index b3fc1c5..353925a 100644
+--- a/src/figures/fig_grouped_main.m
++++ b/src/figures/fig_grouped_main.m
+@@ -8,6 +8,7 @@
+     cfg.run_dir (1,:) char = ''
+     cfg.preset_name (1,:) char = ''
+     cfg.source_fig_root (1,:) char = ''
++    cfg.intro_native_root (1,:) char = ''
+     cfg.pytorch_file (1,:) char = ''
+     cfg.human_psd_file (1,:) char = ''
+     cfg.out_dir (1,:) char = ''
+@@ -25,46 +26,19 @@
+ sources = {}; notes = {};
+ switch group
+     case 1
+-        raster('fig_introductory_concepts/Fig_Intro_Concepts.png',[0 .44 1 .54]);
+-        a = fig_FI_curve('save',false,'visible',false);
+-        native(a.figs(1),[.045 .05 .48 .365]); close(a.figs);
+-        pan = panel([.55 .075 .43 .31]); ax=axes(pan); hold(ax,'on');
+-        th=linspace(0,2*pi,300);
+-        plot(ax,-.25+cos(th),sin(th),'Color',[.5 .5 .5],'LineWidth',2);
+-        plot(ax,-.25+.58*cos(th),.58*sin(th),'--','Color',[0 .45 .7],'LineWidth',2);
+-        plot(ax,-1.25+cos(th),sin(th),'-.','Color',[.85 .33 .1],'LineWidth',2);
+-        xline(ax,0,':'); yline(ax,0,':'); axis(ax,'equal'); box(ax,'off');
+-        xlabel(ax,'Re(\lambda), schematic'); ylabel(ax,'Im(\lambda), schematic');
+-        legend(ax,{'reference','STD: shrink','SFA: left shift'},'Location','southoutside','NumColumns',3,'Box','off');
+-        title(ax,{'Effective-connectivity intuition','Conceptual approximation'},'FontWeight','normal','FontSize',11);
+-        notes{end+1}='Disk schematic is conceptual, not an exact transformation of the full adaptive Jacobian. Intro is the archived Sompolinsky illustration; F-I is analytic.';
++        intro_root=cfg.intro_native_root;
++        if isempty(intro_root), intro_root=fullfile(cfg.source_fig_root,'fig_introductory_concepts'); end
++        a=fig_main1_concepts(cfg.preset_name,intro_root);
++        native(a.figs,[0 0 1 1]); close(a.figs);
++        sources=a.source; notes=a.notes;
+     case 2
+-        f=fullfile(cfg.run_dir,'representative_dynamics','representative_dynamics_data.mat');
+-        if isfile(f)
+-            D=load(f); draw_dynamics(fig,D); sources{end+1}=f;
+-        else
+-            raster('fig_example_timeseries/fig_example_timeseries.png',[0 .035 1 .91]);
+-            banner('Archived baseline dynamics; midpoint-step simulation pending');
+-            notes{end+1}='Current archive has baseline input, not a midpoint step. Revised stage has not been run.';
+-        end
++        a=fig_main2_dynamics(cfg.run_dir,cfg.source_fig_root);
++        native(a.figs,[0 0 1 1]); close(a.figs);
++        sources=a.source; notes=a.notes;
+     case 3
+-        a=fig_eig_heatmap('run_dir',cfg.run_dir,'save',false,'visible',false,'density_scale','loglog');
+-        native(a.figs(1),[0 .66 1 .32]); sources{end+1}=a.source; close(a.figs);
+-        f=fullfile(cfg.run_dir,'local_lyapunov','local_lyapunov_data.mat'); D=load(f); sources{end+1}=f;
+-        pan=panel([0 .045 1 .59]); tl=tiledlayout(pan,3,3,'TileSpacing','compact','Padding','compact');
+-        st=manuscript_style(); T=D.settings.T;
+-        for i=1:numel(D.results)
+-            r=D.results(i); tk=r.topk; t=tk.t_lya(:); col=st.condition_color(r.name);
+-            ax=nexttile(tl,i); plot(ax,r.t_ex,r.u_ex(1:min(8,size(r.u_ex,1)),:)','LineWidth',.6); xlim(ax,[0 T]); title(ax,r.title,'FontWeight','normal');
+-            if i==1, ylabel(ax,'input (8 fixed neurons)'); end
+-            ax=nexttile(tl,3+i); plot(ax,t,tk.finite_LE_spectrum_t(:,1),'Color',col,'LineWidth',1.3); yline(ax,0,':'); xlim(ax,[T/2 T]);
+-            if i==1, ylabel(ax,'accumulated \lambda_1 (s^{-1})'); end
+-            ax=nexttile(tl,6+i); h=sum(max(tk.local_LE_spectrum_t,0),2)/log(2);
+-            plot(ax,t,h,'Color',col,'LineWidth',1.1); xlim(ax,[0 T]); xline(ax,T/2,':'); xlabel(ax,'time (s)');
+-            if i==1, ylabel(ax,'local positive sum (bit/s)'); end
+-            title(ax,sprintf('%.2f%% > 0 over [%g,%g] s; K=%d',100*mean(h(t>=T/2 & t<=T)>0),T/2,T,size(tk.local_LE_spectrum_t,2)),'FontSize',10,'FontWeight','normal');
+-        end
+-        notes{end+1}='Local positive sum = sum(max(saved local QR rates,0),2)/log(2). Percentage uses identical positive-sum samples over [T/2,T], strict >0, unweighted equal QR segments. It is provisional local h_KS, not an established invariant KS entropy; broader review deferred. Eigenvalue and switching stages are separate examples.';
++        a=fig_main3_stability(cfg.run_dir);
++        native(a.figs,[0 0 1 1]); close(a.figs);
++        sources=a.source; notes=a.notes;
+     case 4
+         a=fig_sensitivity_medians('run_dir',cfg.run_dir,'preset_name',cfg.preset_name,'save',false,'visible',false);
+         native(a.figs(1),[0 .34 1 .64]); close(a.figs);
+@@ -129,16 +103,35 @@
+ end
+ % Flatten layout containers into ordinary native axes for portable export.
+ flat=figure('Visible','off','Color','w','Position',fig.Position);
+-copy_axes(fig,flat,[0 0 1 1]);
++if ismember(group,[1 2 3])
++    copy_axes(fig,flat,[.025 .025 .95 .95]);
++else
++    copy_axes(fig,flat,[0 0 1 1]);
++end
+ close(fig); fig=flat;
+-set(findall(fig,'Type','axes'),'FontSize',10);
++if ismember(group,[1 2 3])
++    set(findall(fig,'-property','FontSize'),'FontSize',14);
++    if group==2
++        tt=findall(fig,'Type','axes','-regexp','Tag','dynamics_r1_c[123]');
++        for k=1:numel(tt), tt(k).Title.FontSize=20; end
++    elseif group==3
++        tt=findall(fig,'Type','axes','-regexp','Tag','stability_r1_c[123]');
++        for k=1:numel(tt), tt(k).Title.FontSize=16; end
++    end
++else
++    set(findall(fig,'Type','axes'),'FontSize',10);
++end
+ tag=sprintf('Fig_Main%d_Grouped',group);
+ out=struct('figs',fig,'files',{{}},'source',{sources});
+ if cfg.save
+     if ~isfolder(outdir), mkdir(outdir); end
+     % PNG plus editable MATLAB figure: local-rate traces make SVG needlessly large.
+     drawnow;
+-    exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200);
++    if ismember(group,[1 2 3])
++        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,'Padding',20);
++    else
++        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200);
++    end
+     savefig(fig,fullfile(outdir,[tag '.fig']));
+     out.files=existing_outputs(outdir,tag);
+     fid=fopen(fullfile(outdir,[tag '_provenance.md']),'w'); guard=onCleanup(@()fclose(fid));
+@@ -175,22 +168,6 @@ function banner(msg)
+ function v=onoff(b)
+ if b, v='on'; else, v='off'; end
+ end
+-function draw_dynamics(fig,D)
+-% Saved display arrays only, generated by run_paper_illustrations.
+-tl=tiledlayout(fig,6,3,'TileSpacing','compact','Padding','compact');
+-rows={'u','x','r','syn','sfa','std'}; labels={'input u','x','raw rate r','synaptic output','SFA feedback','STD product'};
+-for c=1:numel(D.results)
+-    r=D.results(c);
+-    for j=1:6
+-        ax=nexttile(tl,(j-1)*3+c); Y=r.(rows{j});
+-        plot(ax,r.t,Y','LineWidth',.8); xlim(ax,D.settings.display_window); box(ax,'off');
+-        if c==1, ylabel(ax,labels{j}); end
+-        if j==1, title(ax,r.title,'FontWeight','normal'); end
+-        if j==6, xlabel(ax,'time (s)'); else, ax.XTickLabel=[]; end
+-    end
+-end
+-end
+-
+ function copy_axes(src,dst,pos)
+ % Copy data graphics, legends and colorbars together so associations survive.
+ drawnow;

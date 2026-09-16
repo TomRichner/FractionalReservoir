@@ -55,7 +55,7 @@ for c=1:3
     end
     ax=newaxis(4,c,.105,.135); h=sum(max(tk.local_LE_spectrum_t,0),2)/log(2);
     plot(ax,t,h,'Color',col,'LineWidth',1.1); ax.TickDir='out'; xlabel(ax,'Time (s)');
-    if c==1, ylabel(ax,{'KS Entropy rate',sprintf('for top-%d LLEs (bits/s)',K)}); letter(ax,'D'); end
+    if c==1, ylabel(ax,{'Expansive transients',sprintf('top-%d sum, bits/s',K)}); letter(ax,'D'); end
 end
 close(a.figs);
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
@@ -67,7 +67,7 @@ for c=1:3, ax=findobj(fig,'Tag',sprintf('stability_r1_c%d',c)); ax.Title.FontSiz
 notes={sprintf('Current switching data: K=%d; accumulation [%g,%g] s; saved segment-start timestamps retained. No early estimates fabricated. Requested K=50 and accumulation [1,40] s are prepared in mu7revised but not run.',D.settings.K,D.settings.lya_T_interval), ...
     ['Input shows 24 fixed actual neurons (12 evenly spaced E and 12 I), identical indices across conditions. ' ...
     'Row C displays saved local leading rates (thin/light) and accumulated rates (prominent); fixed requested y limits clip local excursions. ' ...
-    'The row-D KS label denotes the finite-K local positive sum = sum(max(saved local QR rates,0),2)/log(2). This is a provisional local h_KS proxy, not established invariant KS entropy; broader review deferred. Eigenvalue and switching stages are separate examples.']};
+    'Row D shows expansive transients: sum(max(saved local QR rates,0),2)/log(2), the positive local growth summed over the tracked QR directions. Division by log(2) expresses this growth in bits/s; it is not a measurement of KS entropy or information transmission. Eigenvalue and switching stages are separate examples.']};
 out=struct('figs',fig,'files',{{}},'source',{{a.source,f}},'notes',{notes});
     function ax=newaxis(row,col,y,height)
         ax=axes(fig,'Position',[.105+(col-1)*.30 y .235 height], ...
