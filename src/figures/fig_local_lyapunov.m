@@ -1,5 +1,5 @@
 function out = fig_local_lyapunov(cfg)
-% FIG_LOCAL_LYAPUNOV Local Lyapunov exponents and local KS entropy under a stimulus staircase.
+% FIG_LOCAL_LYAPUNOV Local Lyapunov exponents and expansive transients under a stimulus staircase.
 %
 %   out = FIG_LOCAL_LYAPUNOV('run_dir', d)
 %
@@ -7,9 +7,11 @@ function out = fig_local_lyapunov(cfg)
 % external input (every neuron); the K local rates with Benettin's over the
 % top; the K accumulating exponents with Benettin's finite-time curve; the
 % share of the window each local exponent is positive; how many of the K are
-% positive at each moment; and the local KS entropy rate sum_k max(local_k, 0)
+% positive at each moment; and the local positive QR-rate sum sum_k max(local_k, 0)/log(2)
 % in bit/s. Table: final lambda_1 / lambda_K / Benettin, positive shares,
-% number of positive exponents, accumulated and window-mean h_KS.
+% number of positive exponents, positive accumulated-rate sum, and mean local positive-rate sum.
+% The local sum describes transient growth in tracked directions, not KS entropy.
+% The legacy h_KS_bits field is retained for saved-data compatibility.
 %
 % PNG and .fig only, NO SVG: the figure holds ~15 million points at K = 100
 % and the vector export took minutes (2026-09-14).
@@ -106,8 +108,8 @@ for i = 1:n_cond
     xline(ax, T/2, ':', 'Color', [0.5 0.5 0.5]);
     hold(ax, 'off'); box(ax, 'off'); xlim(ax, [0 T]);
     xlabel(ax, 'time (s)', 'FontSize', st.label_fs);
-    if i == 1; ylabel(ax, 'local h_{KS} (bit/s)', 'FontSize', st.label_fs); end
-    title(ax, sprintf('local KS entropy rate; accumulated h_{KS} = %.2f bit/s', tk.h_KS_bits), 'FontWeight', 'normal', 'FontSize', 9);
+    if i == 1; ylabel(ax, {'Expansive transients', sprintf('top-%d sum, bits/s', K)}, 'FontSize', st.label_fs); end
+    title(ax, sprintf('Positive accumulated-rate sum = %.2f bits/s', tk.h_KS_bits), 'FontWeight', 'normal', 'FontSize', 9);
     set(ax, 'FontSize', st.tick_fs);
 
     rows{i} = sprintf('| %s | %+.4f | %+.4f | %+.4f | %.0f%% | %.0f%% | %d | %.2f | %.2f |', R(i).title, ...
@@ -117,7 +119,7 @@ end
 title(tl, sprintf('%s, seeds %s, T = %g s, window [%g %g] s, top-%d QR + Benettin', ...
     strrep(D.settings.preset_name, '_', '\_'), mat2str(D.settings.seeds), T, T/2, T, K), ...
     'FontWeight', 'normal', 'FontSize', 10);
-hdr = sprintf('| Condition | top-K lambda_1 | top-K lambda_%d | Benettin lambda_1 | leading local rate > 0 | Benettin local > 0 | n positive exponents | h_KS (bit/s) | window-mean local h_KS (bit/s) |', K);
+hdr = sprintf('| Condition | top-K lambda_1 | top-K lambda_%d | Benettin lambda_1 | leading local rate > 0 | Benettin local > 0 | n positive exponents | positive accumulated-rate sum (bits/s) | mean local positive-rate sum (bits/s) |', K);
 vprintf(cfg.verbose, 'verbose', '%s\n|---|---|---|---|---|---|---|---|---|\n%s\n', hdr, strjoin(rows, newline));
 
 fig_tag = 'Fig_Local_Lyapunov';

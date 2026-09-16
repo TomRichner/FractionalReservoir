@@ -53,7 +53,7 @@ Use the existing condition-style/color helpers rather than defining a different 
 - Show more than eight actual input neurons; the revised plot uses **24 fixed traces per condition**.
 - Rows 3 and 4 share the display interval **[0, 60] s**. Future estimation uses **K=50**, simulation/display endpoint **40 s**, accumulation **[1,40] s**, and eight5-second input intervals with prior15-second alignment.
 - Row C includes both saved local leading rates (thin/light) and accumulated estimates (prominent), with LaTeX label **lambda_1 (s^-1)**. A shared key distinguishes them.
-- Row D has two-line label **KS Entropy rate** / **for top-K LLEs (bits/s)**, using the actual saved K (currently30, future50). This denotes a finite-K local positive-rate sum, not an established invariant KS entropy.
+- Row D has two-line label **Expansive transients** / **top-K sum, bits/s**, using the actual saved K (currently30, future50). This is the sum of positive local QR rates divided by ln(2), describing positive local growth across the tracked directions. Do not call it KS entropy.
 - Leading-exponent display limits: no adaptation **[-0.5, 4]**; both adapting conditions **[-0.5, 0.5]**.
 - Remove lambda_1 annotations from eigenvalue-density panels. Place the final accumulated value near the end of the actual displayed window (**0.92T**) on the accumulated-exponent panel, just above or below its final value.
 - Rows 2–4: no top/right box. Rows 2–3: hide lower x-axis spine/ticks. Row 3 retains a horizontal **LLE=0** line spanning the actual saved0–T display window. Fixed limits clip local excursions; do not alter those samples. Row 4 x ticks point **outward/down**.
