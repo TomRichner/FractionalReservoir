@@ -6,7 +6,7 @@ fig=figure('Visible','off','Color','w','Position',[40 40 1450 1150]);
 old=findall(a.figs,'Type','axes');
 % Tile order is the condition order; findall returns the reverse creation order.
 [~,order]=sort(arrayfun(@(x)x.Layout.Tile,old)); old=old(order);
-st=manuscript_style(); titles={'No adaptation',{'Single-timescale','adaptation'},{'Multiple-timescale','adaptation'}};
+st=manuscript_style(); titles={'No adaptation','Single-timescale adaptation','Multiple-timescale adaptation'};
 selected=cellfun(@(v)v(round(linspace(1,numel(v),min(12,numel(v))))), ...
     D.results(1).type_indices,'UniformOutput',false);
 for c=1:3

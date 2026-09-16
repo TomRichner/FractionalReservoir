@@ -8,7 +8,7 @@ Consensus from Tom's grouped-figure feedback, 2026-09-15. Give this document to 
 |---|---|
 | Fonts | **14 pt** for ticks, axis labels, legends, annotations, and panel letters. Set sizes explicitly, including MATLAB label/title multipliers. |
 | Condition headings | Full names: **No adaptation**, **Single-timescale adaptation**, **Multiple-timescale adaptation**. Color each heading with its established condition color. STA/MTA were conversational shorthand, not requested title text. |
-| Heading size | Slightly larger than body text when needed: Figure 3 uses 16 pt; Figure 2 currently uses 20 pt. Allow wrapping without reducing readability. |
+| Heading size | Slightly larger than body text when needed: Figures 2 and 3 use 16 pt. Allow wrapping without reducing readability. |
 | Panel letters | Parenthesized capitals: **(A), (B), …**, in **regular weight**, not bold. Read across rows, then down. A letter may identify a related block of plots; see the mappings below. |
 | Axes | Line width **1.0 pt**. Prefer open axes without top/right borders unless a box is explicitly requested. |
 | Tick density | Use a few meaningful ticks. Do not fill small panels with redundant labels. Preserve the scientific range; figure-specific ticks are listed below. |
@@ -25,10 +25,11 @@ Use the existing condition-style/color helpers rather than defining a different 
 
 ### Figure 1 — concepts
 
-- Three row labels: **(A), (B), (C)**. Bring the eigenvalue and example-trace rows closer together.
+- Three row labels: **(A), (B), (C)**. Bring the eigenvalue and example-trace rows closer together. Row B has no time scale bar or time text: the example time is arbitrary up to rescaling.
 - Bottom row, left to right: SFA-shifted sigmoids; SFA-shifted eigenvalue discs; STD-rescaled sigmoids; STD-shrunken discs.
 - SFA curves and corresponding discs share a **black → orange** ramp. More orange means a larger leftward disc shift.
-- STD curves and corresponding discs share **black → dark blue → teal**. Black is the tallest sigmoid/largest disc; teal is the most flattened sigmoid/smallest disc.
+- STD curves and corresponding discs share **black → dark blue → teal**. Black is the tallest sigmoid/largest disc; teal is the most flattened sigmoid/smallest disc. The intermediate levels must be visibly distinct dark and medium blues, not near-black shades.
+- Both sigmoid x labels read **Dendritic potential**.
 - Maximum illustrated STD retains a **nonzero** sigmoid height. Derive and document the chosen attenuation from the model parameters and representative rate; do not treat the illustrative frozen-factor F-I curves as a solved steady-state response.
 - Conceptual discs use custom horizontal/vertical axes with **Re/Im** labels, like the upper examples. Hide normal axis boxes/ticks. No disc titles, units, extra axis labels, or legends.
 - All fonts 14 pt; example-trace y axes and sigmoid x/y axes width 1.0.
@@ -47,7 +48,7 @@ Use the existing condition-style/color helpers rather than defining a different 
 
 ### Figure 3 — spectra and local expansion
 
-- Four row labels **(A)–(D)**. Full-name condition-colored titles above columns, **16 pt**; other text 14 pt. Gray column dividers.
+- Four row labels **(A)–(D)**. Full-name condition-colored titles above columns on **single lines**, **16 pt**; other text 14 pt. Gray column dividers.
 - Show more than eight actual input neurons; the revised plot uses **24 fixed traces per condition**.
 - Rows 3 and 4 share the display interval **[0, 60] s**. Requested future estimation uses **K=100** and accumulation **[1, 60] s**.
 - Accumulated leading-exponent limits: no adaptation **[-0.5, 4]**; both adapting conditions **[-0.5, 0.5]**.

@@ -73,7 +73,7 @@ for c=1:3
         if j==6
             yline(ax,0,'--','Color',[0 .55 0],'LineWidth',.5,'Tag','lambda_zero');
         end
-        if j==1, title(ax,titles{c},'FontSize',20,'FontWeight','normal','Color',st.condition_color(names{c})); end
+        if j==1, title(ax,titles{c},'FontSize',16,'FontWeight','normal','Color',st.condition_color(names{c})); end
     end
 end
 % One E/I key. Current raster shades remain original; numeric data use the

@@ -115,7 +115,7 @@ if ismember(group,[1 2 3 8])
     set(findall(fig,'-property','FontSize'),'FontSize',14);
     if group==2
         tt=findall(fig,'Type','axes','-regexp','Tag','dynamics_r1_c[123]');
-        for k=1:numel(tt), tt(k).Title.FontSize=20; end
+        for k=1:numel(tt), tt(k).Title.FontSize=16; end
     elseif group==3
         tt=findall(fig,'Type','axes','-regexp','Tag','stability_r1_c[123]');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end

@@ -39,6 +39,18 @@ for k=1:3
     a.Position=[.065+(k-1)*.315 .465 .265 .225];
     a.PositionConstraint='innerposition'; a.Tag=sprintf('intro_trace_%d',k);
     a.LineWidth=1.0; a.YAxis.LineWidth=1.0;
+    % Remove only the archived 10-unit scale annotation, never a trajectory.
+    tt=findall(a,'Type','text');
+    for j=1:numel(tt)
+        if strcmp(strtrim(string(tt(j).String)),'10 s'), delete(tt(j)); end
+    end
+    ll=findall(a,'Type','line');
+    for j=1:numel(ll)
+        if numel(ll(j).XData)==2 && ll(j).LineWidth==4 && ...
+                abs(diff(ll(j).XData)-10)<1e-10 && diff(ll(j).YData)==0
+            delete(ll(j));
+        end
+    end
 end
 clear guard
 % Source illustration values are untouched: only copied graphics are styled.
@@ -55,7 +67,7 @@ a_levels=linspace(0,1,5);
 b_levels=linspace(1,b_min,5); % intermediate frozen total factors, not trajectories
 sfa_colors=a_levels(:)*[.95 .40 .04];
 % Paired black -> dark blue -> teal, with the tallest/largest level black.
-std_colors=interp1([0 .5 1],[0 0 0;0 .12 .42;0 .65 .55],a_levels(:),'linear');
+std_colors=[0 0 0;.04 .22 .65;.08 .40 .85;0 .55 .70;0 .65 .55];
 x=linspace(-.6,1.8,450);
 phi=@(z)SRNNCellTypePairs.logisticSigmoid(z,.4);
 ax1=axes(fig,'Position',[.065 .10 .18 .235],'Tag','sfa_sigmoid'); hold(ax1,'on');
@@ -75,7 +87,7 @@ for ax=[ax1 ax3]
     set(ax,'XLim',[x(1) x(end)],'YLim',[0 1.02],'XTick',[0 1],'YTick',[0 1], ...
         'LineWidth',1.0,'FontSize',14,'Box','off');
     ax.XAxis.LineWidth=1.0; ax.YAxis.LineWidth=1.0;
-    xlabel(ax,'x','FontSize',14); ylabel(ax,'synaptic output','FontSize',14);
+    xlabel(ax,'Dendritic potential','FontSize',14); ylabel(ax,'synaptic output','FontSize',14);
 end
 concept_axes(ax2,[-2.5 1],[-1.25 1.25]);
 concept_axes(ax4,[-2.9 1],[-1.9 1.9]);
@@ -102,7 +114,7 @@ notes={['For the current mu7 figure-only configuration, the native introductory 
     ['Each SFA curve and shifted disk shares the exact black-to-orange color; each STD curve and shrinking disk ' ...
     'shares the exact black-through-dark-blue-to-teal color. Disk shifts/radii are effective-connectivity intuition, not exact ' ...
     'transformations of the full active Jacobian.'], ...
-    ['Top panels are copied native saved graphics; all XData/YData, neuron selections, gains and scale-bar data are unchanged. ' ...
+    ['Top panels are copied native saved graphics; all scientific XData/YData, neuron selections and gains are unchanged. The10-unit scale bar and its text are omitted because the example time is arbitrary up to rescaling. ' ...
     'Only position, row labels, 14-point fonts and trace y-axis width1.0 are changed. No simulation or Lyapunov calculation is run.']};
 out=struct('figs',fig,'files',{{}},'source',{sources},'notes',{notes}, ...
     'sfa_colors',sfa_colors,'std_colors',std_colors,'b_levels',b_levels);
