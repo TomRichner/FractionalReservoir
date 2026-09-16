@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\memory_capacity
+Captured at: 16-Sep-2026 09:47:39
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      a413e198dd2e7bef504c6802212773cda539895d
+commit_short:a413e19
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    run_memory_capacity: cap the parallel trials by available RAM (2026-09-16)
+last_date:   2026-09-16T09:12:01-05:00
+dirty:       false
+

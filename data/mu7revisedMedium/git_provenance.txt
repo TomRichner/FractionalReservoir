@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium
+Captured at: 16-Sep-2026 01:21:16
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      449b92f9bd9dbb856d34a0f0355b35bfed21075f
+commit_short:449b92f
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    mu7revisedMedium bundle: the mu7revised network at run_mode medium (TR, 2026-09-16)
+last_date:   2026-09-16T01:21:05-05:00
+dirty:       false
+
