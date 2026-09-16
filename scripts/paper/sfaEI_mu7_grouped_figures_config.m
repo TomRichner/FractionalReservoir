@@ -10,4 +10,9 @@ cfg.verbose='minimal';
 root=fileparts(which('setup_paths'));
 old_learning=fullfile(fileparts(root),'StochasticPlasticDynamicalSystemPaper','figs_pytorch','plot_for_Brian_seeds.png');
 cfg.figures=grouped_figure_registry(cfg.preset_name,'figs/sfaEI_mu7_fast',old_learning);
+% Explicit native source for the unchanged Sompolinsky introductory example.
+% mu7 archive has only PNG. This earlier clean archive has the original data
+% graphics; the intervening source change only combined its two rows.
+cfg.figures{1}.args=[cfg.figures{1}.args, ...
+    {'intro_native_root','figs/sfaEI_fast/fig_introductory_concepts'}];
 end

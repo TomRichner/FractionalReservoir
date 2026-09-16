@@ -30,6 +30,9 @@ arguments
     cfg.verbose                 = 'minimal'
     cfg.K           (1,1) double = 0     % 0 -> per run_mode
     cfg.T           (1,1) double = 60
+    cfg.accumulation_start_s (1,1) double = NaN % NaN preserves T/2
+    cfg.warmup_s (1,1) double = NaN % NaN preserves T/4
+    cfg.simulation_start_s (1,1) double = 0
     cfg.n_override  (1,1) double = 0     % tests only
 end
 
@@ -44,6 +47,12 @@ switch cfg.run_mode
 end
 if cfg.K > 0; K = cfg.K; end
 T = cfg.T;
+acc_start=cfg.accumulation_start_s; if isnan(acc_start), acc_start=T/2; end
+warmup=cfg.warmup_s; if isnan(warmup), warmup=T/4; end
+assert(isfinite(acc_start) && acc_start>=0 && acc_start<T && ...
+    isfinite(warmup) && warmup>=0 && isfinite(cfg.simulation_start_s) && ...
+    cfg.simulation_start_s<=acc_start-warmup, ...
+    'run_local_lyapunov:Window','Simulation must include the full alignment before accumulation.');
 if isempty(cfg.out_dir)
     out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'local_lyapunov');
 else
@@ -56,8 +65,8 @@ cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 title_map  = srnn_condition_titles();
 titles     = cellfun(@(n) title_map(n), cond_names, 'UniformOutput', false);
 seeds  = [1 2];
-common = {'rng_seeds', seeds, 'fs', 400, 'T_range', [0 T], 'lya_T_interval', [T/2 T], ...
-          'lya_warmup', T/4, 'verbose', cfg.verbose};
+common = {'rng_seeds', seeds, 'fs', 400, 'T_range', [cfg.simulation_start_s T], 'lya_T_interval', [acc_start T], ...
+          'lya_warmup', warmup, 'verbose', cfg.verbose};
 if cfg.n_override > 0
     common = [common, {'n', cfg.n_override, 'indegree', max(2, round(0.2 * cfg.n_override)), ...
         'F_tracks_network', true}];
@@ -88,8 +97,8 @@ for i = 1:numel(cond_names)
 end
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'seeds', seeds, ...
-    'T', T, 'K', K, 'lya_T_interval', [T/2 T], 'lya_warmup', T/4, 'fs', 400, ...
-    'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
+    'T', T, 'K', K, 'lya_T_interval', [acc_start T], 'lya_warmup', warmup, 'fs', 400, ...
+    'simulation_start_s', cfg.simulation_start_s, 'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
 condition_titles = titles; %#ok<NASGU>
 mat_file = fullfile(out_dir, 'local_lyapunov_data.mat');
 save(mat_file, 'results', 'cond_names', 'condition_titles', 'settings', '-v7.3');
