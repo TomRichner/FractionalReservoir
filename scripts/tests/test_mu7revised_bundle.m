@@ -41,3 +41,12 @@ catch err_test
 end
 assert(bad_test);
 disp('PASS: mu7revised presets, mode paths, horizon preflight, 1TS mechanisms and midpoint input; no simulations run.');
+% mu7revisedAgain: same physics under its own preset names, corrected illustration protocol.
+cfg_again=mu7revisedAgain_config();
+assert(strcmp(cfg_again.run_dir,'data/mu7revisedAgain_fast') && strcmp(cfg_again.fig_root,'figs/mu7revisedAgain_fast'));
+[p_again,~,c_again]=srnn_param_preset(cfg_again.preset_name);
+assert(isequaln(p_again,p_test) && isequaln(c_again,c_test));
+assert(isequal(cfg_again.illustration_step_window,[10 20]) && cfg_again.illustration_neurons_per_type==25);
+[u_again,t_again]=paper_midpoint_input(struct('n',2),30,400,1,struct('step_time',10,'step_off',20,'amplitude',.5));
+assert(all(u_again(:,t_again<10)==0,'all') && all(u_again(:,t_again>=10 & t_again<20)==.5,'all') && all(u_again(:,t_again>=20)==0,'all'));
+disp('PASS: mu7revisedAgain presets, paths, middle-third step and 25 neurons per type.');

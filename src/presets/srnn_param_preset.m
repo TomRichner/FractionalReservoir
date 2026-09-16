@@ -1047,6 +1047,110 @@ switch name
             struct('name','sfa1_std0','tau_a',{on},'synapse_config',struct()), ...
             struct('name','sfa0_std1','tau_a',{off},'synapse_config',sc)};
 
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedAgain'
+        % THE mu7revisedAgain BUNDLE'S NETWORK (TR, 2026-09-15 evening): physically identical to the mu7revised one; the bundle exists because its config states the illustration protocol the manuscript wants (input step during the MIDDLE THIRD of the display window, 25 neurons per type saved). A stand-alone
+        % copy of ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 (SFA on
+        % both cell types, per-neuron setpoint S_c_i = 0.2 + 0.1 randn) with
+        % three changes:
+        %   mu_tilde_relative  8.25 -> 7 on every route (sign by presynaptic
+        %       type). The mu8p25 family is "1.5 x 5.5"; the mu5 bundle (2026-09-14)
+        %       ran at 5, and TR moved to 7 after seeing it.
+        %   tau_a_spread  0 -> [0.25 0.25]: per-neuron SFA ladders, a log-normal
+        %       jitter of that size at both ends (see the property header).
+        %   NO EXTERNAL INPUT: only the Wiener process drives the network. The
+        %       paper presets' default input_config is a three-step pattern with
+        %       a random step on 20% of each type during the MIDDLE THIRD of
+        %       every run, which overlapped every Lyapunov window
+        %       (no_stim_pattern all true turns the steps off).
+        % Written out in full rather than chained: the earlier noStim preset
+        % chained to the tauSpread0p25 bundle's preset, which the within-bundle
+        % rule forbids (a preset may chain only within its own config's bundle).
+        % The two presets below chain to THIS one and belong to the same bundle.
+        %
+        % NOT IN THE ONE-STRUCT FAMILY (test_preset_conditions): its adapting
+        % regimes carry I-SFA, like the rest of the sfaEI family.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    500, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [7 -7; 7 -7], ...     % (post <- pre), multiples of F
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % centre of the per-neuron draw
+            'mu_S_c',               [], ...      % empty: centre on S_c
+            'sigma_S_c',            [0.1 0.1], ... % per-neuron spread, both types
+            'c',                    [0.5, 0.5], ...     % TOTAL SFA budget, E AND I
+            'tau_a_spread',         [0.25 0.25], ...    % per-neuron SFA ladders
+            'input_config',         struct('n_steps', 3, 'step_density', struct(), 'amp', 0.5, ...
+                                           'no_stim_pattern', true(1, 3), 'intrinsic_drive', 0, ...
+                                           'positive_only', false), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              500, ...
+            'F_ref_indegree',       100, ...
+            'sigma_u_noise',        0.025);
+
+        % Same ladder on both types; the single-timescale regime takes the first
+        % entry on both.
+        taus     = log_ladder(0.25, 10, 3);
+        sfa_off  = {zeros(1,0), zeros(1,0)};
+        sfa_one  = {taus(1),    taus(1)};
+        sfa_all  = {taus,       taus};
+
+        dual_std   = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        single_std = struct('tau_rec', dual_std.tau_rec(1), ...
+                            'tau_rel', dual_std.tau_rel(1));
+        std_all = struct();
+        std_all.E.E.std = dual_std;     std_all.E.I.std = dual_std;
+        std_all.I.E.std = dual_std;     std_all.I.I.std = dual_std;
+        std_one = struct();
+        std_one.E.E.std = single_std;   std_one.E.I.std = single_std;
+        std_one.I.E.std = single_std;   std_one.I.I.std = single_std;
+        std_off = struct();
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
+            struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
+
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7revisedAgain'
+        % Memory-capacity twin of the mu7 noStim preset: Wiener process off
+        % (the config names sra1 as the MC integrator). Same bundle
+        % (mu7revisedAgain_config), chained under the within-bundle rule.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedAgain');
+        d.sigma_u_noise = 0;
+
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu7revisedAgain'
+        % Stimulus-staircase twin of the mu7 noStim preset for run_local_lyapunov:
+        % a NEW random step every 5 s that never returns to zero -- 8 steps
+        % over the stage's revised T = 40 s, no_stim_pattern all false, each
+        % step a fresh amp*randn on 20% of each cell type. Same bundle.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedAgain');
+        d.input_config = struct('n_steps', 8, 'step_density', struct(), 'amp', 0.5, ...
+            'no_stim_pattern', false(1, 8), 'intrinsic_drive', 0, 'positive_only', false);
+
+    case 'single_neuron_mu7revisedAgain'
+        % Within mu7revisedAgain bundle: reference E neuron without recurrence,
+        % noise or heterogeneity, isolating exactly one SFA or STD timescale.
+        [d, model_class, ref] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedAgain');
+        d.n=1; d.indegree=1; d.n_cellTypes=1; d.cell_type_names={'E'};
+        d.f=1; d.mu_tilde_relative=0; d.sigma_tilde_relative=0;
+        d.c=d.c(1); d.sigma_S_c=0; d.tau_a_spread=0;
+        d.sigma_u_noise=0; d.x0_std=0;
+        one=ref{2}; off={zeros(1,0)}; on={one.tau_a{1}};
+        sc=struct(); sc.E.E.std=one.synapse_config.E.E.std;
+        conditions={ ...
+            struct('name','no_adaptation','tau_a',{off},'synapse_config',struct()), ...
+            struct('name','sfa1_std0','tau_a',{on},'synapse_config',struct()), ...
+            struct('name','sfa0_std1','tau_a',{off},'synapse_config',sc)};
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
         % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
         % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
@@ -1578,11 +1682,17 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu7', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revised', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7revised', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu7revised', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0p025_dualStd_3cond_mu7revisedAgain', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_noStim_noise0_dualStd_3cond_mu7revisedAgain', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_steps5s_noise0p025_dualStd_3cond_mu7revisedAgain', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
     'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', ...
-    'single_neuron_dualStd', 'mc_pairs_dualStd'};
+    'single_neuron_dualStd', 'single_neuron_mu7revised', 'single_neuron_mu7revisedAgain', 'mc_pairs_dualStd'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)

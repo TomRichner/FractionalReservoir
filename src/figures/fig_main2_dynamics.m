@@ -122,10 +122,11 @@ if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std'})
 end
 Y=r.(field); counts=cellfun(@numel,r.selected); offsets=[0 cumsum(counts)];
 for q=numel(counts):-1:1
-    % Deterministic half of saved neurons, same indices for every state row.
-    n=max(1,floor(counts(q)/2)); selected=round(linspace(1,counts(q),n));
-    ids=offsets(q)+selected; cmap=dynamics_palette(q,n);
-    for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',.8); end
+    % EVERY saved neuron, same indices for every state row (TR, 2026-09-15:
+    % half of four per type was too few; the stage now saves 25 per type).
+    n=counts(q); ids=offsets(q)+(1:n); cmap=dynamics_palette(q,n);
+    lw=.8; if n>8, lw=.5; end
+    for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',lw); end
 end
 end
 function draw_artwork(ax,I,row,col)

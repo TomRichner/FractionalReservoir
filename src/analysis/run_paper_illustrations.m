@@ -13,13 +13,29 @@ arguments
 end
 setup_paths();
 out_dir=run_dir;
+% Protocol knobs with the mu7revised defaults (TR, 2026-09-15 evening):
+%   illustration_step_window   [on off] s of the uniform step; default the
+%       display midpoint to the end (mu7revised). mu7revisedAgain states the
+%       middle third of the display window.
+%   illustration_neurons_per_type   neurons saved per cell type (default 4;
+%       mu7revisedAgain saves 25 so the dynamics figure draws 50).
+step_window=[mean(cfg.illustration_display_window) Inf];
+if isfield(cfg,'illustration_step_window') && ~isempty(cfg.illustration_step_window)
+    step_window=cfg.illustration_step_window;
+end
+n_per_type=4;
+if isfield(cfg,'illustration_neurons_per_type') && ~isempty(cfg.illustration_neurons_per_type)
+    n_per_type=cfg.illustration_neurons_per_type;
+end
 variants={'representative_dynamics','single_neuron'};
 presets={cfg.preset_name,cfg.single_neuron_preset};
 for j=1:2
     settings=struct('preset_name',presets{j},'display_window',cfg.illustration_display_window, ...
-        'step_time',mean(cfg.illustration_display_window),'step_amplitude',cfg.illustration_step_amp, ...
+        'step_time',step_window(1),'step_off',step_window(2),'step_amplitude',cfg.illustration_step_amp, ...
+        'neurons_per_type',n_per_type, ...
         'T_range',[-15 cfg.illustration_display_window(2)],'fs',400,'seeds',[1 2], ...
-        'protocol','Uniform positive input step to all neurons; fixed displayed neuron indices.');
+        'protocol',sprintf('Uniform positive input step of %g to all neurons over [%g, %g] s; the first %d neurons of each type saved.', ...
+            cfg.illustration_step_amp,step_window(1),step_window(2),n_per_type));
     lya_args={'lya_method','none'};
     settings.lya_method='none';
     if j==1
@@ -33,7 +49,7 @@ for j=1:2
     end
     [~,~,conds]=srnn_param_preset(presets{j}); titles=srnn_condition_titles();
     results=[];
-    input=struct('intrinsic_drive',0,'step_time',settings.step_time, ...
+    input=struct('intrinsic_drive',0,'step_time',settings.step_time,'step_off',settings.step_off, ...
         'amplitude',settings.step_amplitude,'generator',@paper_midpoint_input);
     for c=1:numel(conds)
         model=build_from_preset(presets{j},conds{c}.name,'T_range',settings.T_range, ...
@@ -56,7 +72,7 @@ for j=1:2
                 'run_paper_illustrations:EarlyFiniteEstimate','Finite estimates must follow their first completed segment.');
         end
         for q=1:model.n_cellTypes
-            name=model.cell_type_names{q}; ix=1:min(4,size(pd.x.(name),1)); r.selected{q}=ix;
+            name=model.cell_type_names{q}; ix=1:min(n_per_type,size(pd.x.(name),1)); r.selected{q}=ix;
             r.u=[r.u; pd.u.(name)(ix,:)];
             r.x=[r.x; pd.x.(name)(ix,:)];
             r.r=[r.r; pd.r.(name)(ix,:)];
