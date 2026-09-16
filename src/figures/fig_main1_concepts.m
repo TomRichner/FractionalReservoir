@@ -36,7 +36,7 @@ for k=1:3
     a.Position=[.055+(k-1)*.315 .705 .265 .255];
     a.PositionConstraint='innerposition'; a.Tag=sprintf('intro_eigen_%d',k);
     a=copyobj(trace_ax(k),fig); a.Units='normalized';
-    a.Position=[.065+(k-1)*.315 .425 .265 .225];
+    a.Position=[.065+(k-1)*.315 .465 .265 .225];
     a.PositionConstraint='innerposition'; a.Tag=sprintf('intro_trace_%d',k);
     a.LineWidth=1.0; a.YAxis.LineWidth=1.0;
 end
@@ -54,7 +54,8 @@ assert(b_min>0 && b_min<1);
 a_levels=linspace(0,1,5);
 b_levels=linspace(1,b_min,5); % intermediate frozen total factors, not trajectories
 sfa_colors=a_levels(:)*[.95 .40 .04];
-std_colors=(1-a_levels(:))*[0 0 1]+a_levels(:)*[0 .65 .55];
+% Paired black -> dark blue -> teal, with the tallest/largest level black.
+std_colors=interp1([0 .5 1],[0 0 0;0 .12 .42;0 .65 .55],a_levels(:),'linear');
 x=linspace(-.6,1.8,450);
 phi=@(z)SRNNCellTypePairs.logisticSigmoid(z,.4);
 ax1=axes(fig,'Position',[.065 .10 .18 .235],'Tag','sfa_sigmoid'); hold(ax1,'on');
@@ -78,6 +79,13 @@ for ax=[ax1 ax3]
 end
 concept_axes(ax2,[-2.5 1],[-1.25 1.25]);
 concept_axes(ax4,[-2.9 1],[-1.9 1.9]);
+row_labels=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1], ...
+    'Visible','off','Tag','intro_row_labels');
+for j=1:3
+    row_y=[.955 .685 .34];
+    text(row_labels,.015,row_y(j),sprintf('(%c)',char('A'+j-1)), ...
+        'FontSize',14,'VerticalAlignment','top','Tag',sprintf('row_label_%d',j));
+end
 set(findall(fig,'-property','FontSize'),'FontSize',14);
 notes={['For the current mu7 figure-only configuration, the native introductory source is explicitly ' ...
     'figs/sfaEI_fast/fig_introductory_concepts (clean source commit4406b56). It uses the same ' ...
@@ -92,10 +100,10 @@ notes={['For the current mu7 figure-only configuration, the native introductory 
     'not the self-consistent rate-dependent steady-state input-output relation. ' ...
     'The two-timescale product must not be identified with a single depression variable.'], ...
     ['Each SFA curve and shifted disk shares the exact black-to-orange color; each STD curve and shrinking disk ' ...
-    'shares the exact blue-to-teal color. Disk shifts/radii are effective-connectivity intuition, not exact ' ...
+    'shares the exact black-through-dark-blue-to-teal color. Disk shifts/radii are effective-connectivity intuition, not exact ' ...
     'transformations of the full active Jacobian.'], ...
     ['Top panels are copied native saved graphics; all XData/YData, neuron selections, gains and scale-bar data are unchanged. ' ...
-    'Only position, 14-point fonts and trace y-axis width1.0 are changed. No simulation or Lyapunov calculation is run.']};
+    'Only position, row labels, 14-point fonts and trace y-axis width1.0 are changed. No simulation or Lyapunov calculation is run.']};
 out=struct('figs',fig,'files',{{}},'source',{sources},'notes',{notes}, ...
     'sfa_colors',sfa_colors,'std_colors',std_colors,'b_levels',b_levels);
 end
