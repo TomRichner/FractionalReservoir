@@ -1,6 +1,6 @@
 # Figure report
 
-_Generated 15-Sep-2026 23:52:30 on R5611351, MATLAB 26.1.0.3312084 (R2026a) Update 4._
+_Generated 16-Sep-2026 00:19:09 on R5611351, MATLAB 26.1.0.3312084 (R2026a) Update 4._
 
 | | |
 |---|---|
@@ -396,7 +396,7 @@ Run: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revised_
 
 Native saved representative trajectories; neuron identity and E/I palettes preserved across state rows.
 
-Numeric rendering selects half the saved neurons per type (4 saved -> 2 displayed, indices1 and4), shared across state rows, with 0.8-point neuron/local-rate lines and 1.25-point finite-LLE lines. E colors span dark red through red/coral/rose; I colors span navy through blue/cyan/teal. Current raster retains its original neuron count, shades and stroke widths; those requests await numeric data. The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.
+Numeric rendering draws the first half of the saved neurons of each type (25 saved -> 12 displayed), the same indices in every state row, in the model's own E/I palettes (excitatory_colormap / inhibitory_colormap, the colours SRNNModel2.plot uses). Row (A) is the uniform input step. Row (G): the local rate is low-pass filtered at 2 Hz (2nd-order Butterworth, zero phase) for display only; the finite-time lambda_1 is unfiltered. The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.
 
 
 
