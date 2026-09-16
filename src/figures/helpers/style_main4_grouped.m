@@ -35,4 +35,11 @@ end
 cb=findall(fig,'Type','colorbar');
 set(cb,'Box','off','FontSize',14);
 for k=1:numel(cb), cb(k).Label.FontSize=14; end
+% Block A spans both sensitivity rows; block B is the rate row.
+delete(findall(fig,'Tag','main4_block_A')); delete(findall(fig,'Tag','main4_block_B'));
+annotation(fig,'textbox',[.005 .955 .04 .035],'String','(A)', ...
+    'LineStyle','none','FontSize',14,'Margin',0,'Tag','main4_block_A');
+annotation(fig,'textbox',[.005 .31 .04 .035],'String','(B)', ...
+    'LineStyle','none','FontSize',14,'Margin',0,'Tag','main4_block_B');
+
 end

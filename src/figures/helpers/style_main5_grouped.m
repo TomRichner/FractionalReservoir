@@ -36,6 +36,16 @@ lg=findall(fig,'Type','legend');
 set(lg,'Units','normalized','NumColumns',3,'Box','off','FontSize',14);
 drawnow;
 for k=1:numel(lg)
-    p=lg(k).Position; p(1)=.5-p(3)/2; p(2)=.025; lg(k).Position=p;
+    center=ordered(3).Position(1)+ordered(3).Position(3)/2;
+    ordered(3).XLabel.Units='normalized'; label_extent=ordered(3).XLabel.Extent;
+    label_bottom=ordered(3).Position(2)+label_extent(2)*ordered(3).Position(4);
+    p=lg(k).Position; p(1)=center-p(3)/2; p(2)=label_bottom-.025-p(4); lg(k).Position=p;
 end
+delete(findall(fig,'Tag','main5_block_A')); delete(findall(fig,'Tag','main5_block_B'));
+for k=1:2
+    annotation(fig,'textbox',[ordered(k).Position(1)-.03 .88 .025 .06], ...
+        'String',sprintf('(%c)',char('A'+k-1)),'LineStyle','none','FontSize',14, ...
+        'Margin',0,'Tag',sprintf('main5_block_%c',char('A'+k-1)));
+end
+
 end

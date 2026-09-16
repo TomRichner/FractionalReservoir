@@ -9,7 +9,7 @@ assert(nnz(is_tau)==2,'style_main6_grouped:Timescales','Expected two timescale a
 top=axs(is_tau); bottom=axs(~is_tau);
 [~,order]=sort(arrayfun(@(ax) ax.Position(1),top)); top=top(order);
 [~,order]=sort(arrayfun(@(ax) ax.Position(1),bottom)); bottom=bottom(order);
-fig.Units='pixels'; fig.Position=[40 40 1500 1050];
+fig.Units='pixels'; fig.Position=[40 40 1100 780];
 set(axs,'Units','normalized','PositionConstraint','innerposition', ...
     'FontSize',14,'LineWidth',1,'TitleFontSizeMultiplier',1,'LabelFontSizeMultiplier',1);
 top(1).Position=[.085 .57 .36 .34];
@@ -30,7 +30,7 @@ anchors=[top(:);bottom([1 3])];
 for k=1:4
     text(anchors(k),-.14,1.07,sprintf('(%c)','A'+k-1), ...
         'Units','normalized','Clipping','off','FontSize',14, ...
-        'FontWeight','bold','Interpreter','none','Tag','main6_panel_letter');
+        'FontWeight','normal','Interpreter','none','Tag','main6_panel_letter');
 end
 lg=findall(fig,'Type','legend');
 for k=1:numel(lg)
