@@ -1,0 +1,14 @@
+Git provenance for run output: C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revised_fast
+Captured at: 15-Sep-2026 20:50:01
+
+hostname:    R5611351
+platform:    PCWIN64
+matlab:      2026a
+commit:      fb6a3fb814c094181b904e9dddc1d0ff7a570cdd
+commit_short:fb6a3fb
+branch:      main
+remote:      git@github.com:TomRichner/FractionalReservoir.git
+last_msg:    Compact grouped figures and prepare a forty-second local Lyapunov run
+last_date:   2026-09-15T20:44:30-05:00
+dirty:       false
+
