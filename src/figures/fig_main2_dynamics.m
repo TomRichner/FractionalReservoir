@@ -30,7 +30,7 @@ else
         'Data traces remain raster artwork, calibrated to the original axes; labels/axes/legend/dividers are native. ' ...
         'No data values are digitized, interpolated into new estimates, or borrowed from another stage.'], ...
         ['Original E/I neuron shades are retained. Exact individual-neuron recoloring cannot be recovered from ' ...
-        'flattened antialiased overlaps. Future numeric plots use excitatory_colormap/inhibitory_colormap.'], ...
+        'flattened antialiased overlaps. Future numeric plots use a wider lightness/hue spread within reddish E and bluish I palettes.'], ...
         ['Old first-row neutral text pixels and colored legend strokes are masked. ' ...
         'Only pixels overwritten by source legend glyphs/strokes are missing; underlying trajectories cannot be recovered there. Finite LLE still begins at 5 s; ' ...
         'the current archive has no midpoint input step. Fixed requested y limits clip outside-range source artwork.'], ...
@@ -42,8 +42,10 @@ end
 fig=figure('Visible','off','Color','w','Position',[40 40 1450 1200]);
 ax_all=gobjects(6,3);
 rows={'x','r','syn','sfa','std','lambda'};
-labels={'$x_i$','$r_i$','$\theta_i$','$\frac{c_i}{K}\sum_k a_{ik}$','$\prod_m b_{im}$','$\lambda_1\;(\mathrm{s}^{-1})$'};
-titles={'No Adaptation','STA','MTA'};
+labels={{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
+    {'Synaptic','output, $\theta_i$'},{'SFA','$\frac{c_i}{K}\sum_k a_{ik}$'}, ...
+    {'STD','$\prod_m b_{im}$'},'$\lambda_1$'};
+titles={'No adaptation',{'Single-timescale','adaptation'},{'Multiple-timescale','adaptation'}};
 st=manuscript_style(); names={'no_adaptation','sfa1_std1','sfa3_std2'};
 for c=1:3
     for j=1:6
@@ -68,19 +70,22 @@ for c=1:3
             case 5, ylim(ax,[0 1.02]); yticks(ax,[0 .5 1]);
             case 6, ylim(ax,[-5 5]); yticks(ax,[-5 0 5]);
         end
+        if j==6
+            yline(ax,0,'--','Color',[0 .55 0],'LineWidth',.5,'Tag','lambda_zero');
+        end
         if j==1, title(ax,titles{c},'FontSize',20,'FontWeight','normal','Color',st.condition_color(names{c})); end
     end
 end
 % One E/I key. Current raster shades remain original; numeric data use the
-% requested legacy E/I palette methods (no model simulation is involved).
+% wider within-type color spread (no model simulation is involved).
 if numeric
-    ce=excitatory_colormap(8); ci=inhibitory_colormap(8);
+    ce=dynamics_palette(1,2); ci=dynamics_palette(2,2);
     ce=ce(1,:); ci=ci(1,:);
 else
     tc=SRNNCellTypePairs.type_colors(2); ce=tc(1,:); ci=tc(2,:);
 end
-le=plot(ax_all(1,3),NaN,NaN,'Color',ce,'LineWidth',1.8);
-li=plot(ax_all(1,3),NaN,NaN,'Color',ci,'LineWidth',1.8);
+le=plot(ax_all(1,3),NaN,NaN,'Color',ce,'LineWidth',.5);
+li=plot(ax_all(1,3),NaN,NaN,'Color',ci,'LineWidth',.5);
 legend(ax_all(1,3),[le li],{'E','I'},'FontSize',14,'Box','off','Location','northeast');
 % Requested lower-left lambda panel, with explicit data coordinates.
 plot(ax_all(6,1),[5 15],[-4.8 -4.8],'k','LineWidth',4,'Tag','ten_second_bar');
@@ -91,6 +96,11 @@ for xpos=[.3775 .6775]
     plot(sep,[xpos xpos],[.07 .945],'Color',[.88 .88 .88],'LineWidth',2.5);
 end
 uistack(sep,'bottom');
+notes{end+1}=['Numeric rendering selects half the saved neurons per type (4 saved -> 2 displayed, indices1 and4), ' ...
+    'shared across state rows, with 0.5-point neuron/local-rate lines and 1.0-point finite-LLE lines. ' ...
+    'E colors span dark red to light coral; I colors span dark blue to light cyan. ' ...
+    'Current raster retains its original neuron count, shades and stroke widths; those requests await numeric data. ' ...
+    'The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.'];
 out=struct('figs',fig,'files',{{}},'source',{{source}},'notes',{notes});
 end
 function draw_numeric(ax,r,field)
@@ -99,8 +109,8 @@ if strcmp(field,'lambda')
         text(ax,.5,.5,'finite estimate not saved','Units','normalized','HorizontalAlignment','center','FontSize',14);
         return
     end
-    plot(ax,r.t_lya,r.local_lambda,'Color',[.6 .6 .6],'LineWidth',.7);
-    plot(ax,r.t_lya,r.finite_lambda,'k','LineWidth',2);
+    plot(ax,r.t_lya,r.local_lambda,'Color',[.6 .6 .6],'LineWidth',.5);
+    plot(ax,r.t_lya,r.finite_lambda,'k','LineWidth',1.0);
     return
 end
 if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std'})
@@ -109,9 +119,10 @@ if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std'})
 end
 Y=r.(field); counts=cellfun(@numel,r.selected); offsets=[0 cumsum(counts)];
 for q=numel(counts):-1:1
-    n=counts(q); ids=offsets(q)+(1:n);
-    if q==1, cmap=excitatory_colormap(n); else, cmap=inhibitory_colormap(n); end
-    for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',.8); end
+    % Deterministic half of saved neurons, same indices for every state row.
+    n=max(1,floor(counts(q)/2)); selected=round(linspace(1,counts(q),n));
+    ids=offsets(q)+selected; cmap=dynamics_palette(q,n);
+    for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',.5); end
 end
 end
 function draw_artwork(ax,I,row,col)
@@ -148,4 +159,12 @@ else
 end
 xdata=(double(cols([1 end]))-xl(col))/2214*20;
 image(ax,'XData',xdata,'YData',ydata,'CData',C,'Tag','archived_trace_artwork');
+end
+
+function cmap=dynamics_palette(type,n)
+% Greater hue/lightness separation while keeping E reddish and I bluish.
+if type==1, endpoints=[.50 .015 .08;1 .48 .32];
+else, endpoints=[.02 .15 .55;.25 .78 .95]; end
+if n==1, cmap=endpoints(1,:); return; end
+cmap=interp1([0 1],endpoints,linspace(0,1,n));
 end
