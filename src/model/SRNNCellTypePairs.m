@@ -907,6 +907,7 @@ classdef SRNNCellTypePairs < handle
             params.tau_b_rec = pair.tau_b_rec;
             params.tau_b_rel = pair.tau_b_rel;
             params.std_zero_floor = obj.std_zero_floor;
+            params.std_geomean = pair.std_geomean;   % C x C (pre, post) logical, false = product
             params.route_scale = pair.scale;   % C x C (pre, post), 1 where unset
             params.n_g_pairs = pair.n_g;
             params.tau_g_dec = pair.tau_g_dec;
@@ -1352,7 +1353,8 @@ classdef SRNNCellTypePairs < handle
                 'n_b', zeros(C, C), 'n_g', zeros(C, C), ...
                 'tau_b_rec', {cell(C, C)}, 'tau_b_rel', {cell(C, C)}, ...
                 'tau_g_dec', {cell(C, C)}, 'tau_g_fac', {cell(C, C)}, ...
-                'G', {cell(C, C)}, 'scale', ones(C, C));
+                'G', {cell(C, C)}, 'scale', ones(C, C), ...
+                'std_geomean', false(C, C));
             config = obj.synapse_config;
             if isempty(config), return; end
             if ~isstruct(config) || ~isscalar(config)
@@ -1416,7 +1418,8 @@ classdef SRNNCellTypePairs < handle
                             ~(isstruct(route.std) && isempty(fieldnames(route.std)))
                         std_config = route.std;
                         SRNNCellTypePairs.validate_fields(std_config, ...
-                            {'tau_rec', 'tau_rel'}, pre_name, post_name, 'std');
+                            {'tau_rec', 'tau_rel'}, pre_name, post_name, 'std', ...
+                            {'combine'});
                         tau_rec = SRNNCellTypePairs.positive_row(std_config.tau_rec, ...
                             'tau_rec', pre_name, post_name);
                         if isempty(tau_rec)
@@ -1430,6 +1433,26 @@ classdef SRNNCellTypePairs < handle
                         pair.n_b(pre, post) = numel(tau_rec);
                         pair.tau_b_rec{pre, post} = tau_rec;
                         pair.tau_b_rel{pre, post} = tau_rel;
+
+                        % STD COMBINE (2026-09-24, opt-in): how the route's M
+                        % depression factors enter theta. 'product' (DEFAULT,
+                        % bit-identical to before) is prod_m b_m; 'geomean' is
+                        % (prod_m b_m)^(1/M). With every pair at one rho =
+                        % tau_rel/tau_rec the geomean steady state is the
+                        % one-timescale 1/(1 + r/rho) at EVERY constant rate --
+                        % the depression analogue of SFA's c/K (the product
+                        % squares it at M = 2). Ported from train-srnn's
+                        % geometric-mean STD matching; see combine_std_pair.
+                        if isfield(std_config, 'combine') && ~isempty(std_config.combine)
+                            combine_mode = std_config.combine;
+                            if ~((ischar(combine_mode) && isrow(combine_mode)) || (isstring(combine_mode) && isscalar(combine_mode))) || ...
+                                    ~any(strcmp(char(combine_mode), {'product', 'geomean'}))
+                                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                                    'STD combine on route %s->%s must be ''product'' or ''geomean''.', ...
+                                    pre_name, post_name);
+                            end
+                            pair.std_geomean(pre, post) = strcmp(char(combine_mode), 'geomean');
+                        end
                     end
 
                     if isfield(route, 'stf') && ~isempty(route.stf) && ...
@@ -2137,7 +2160,8 @@ classdef SRNNCellTypePairs < handle
             S0 = vertcat(parts{:});
         end
 
-        function validate_fields(config, required, pre_name, post_name, mechanism)
+        function validate_fields(config, required, pre_name, post_name, mechanism, optional)
+            if nargin < 6, optional = {}; end
             if ~isstruct(config) || ~isscalar(config)
                 error('SRNNCellTypePairs:InvalidSynapseConfig', ...
                     '%s configuration on route %s->%s must be a scalar struct.', ...
@@ -2145,7 +2169,7 @@ classdef SRNNCellTypePairs < handle
             end
             fields = fieldnames(config);
             missing = setdiff(required, fields);
-            unknown = setdiff(fields, required);
+            unknown = setdiff(fields, [required, optional]);
             if ~isempty(missing)
                 error('SRNNCellTypePairs:InvalidSynapseConfig', ...
                     'Missing %s field on route %s->%s: %s.', ...
@@ -2279,7 +2303,8 @@ classdef SRNNCellTypePairs < handle
                     if nb > 0
                         b_state{pre, post} = reshape( ...
                             S(layout.b{pre, post}), npre, nb);
-                        depression = prod(b_state{pre, post}, 2);
+                        depression = SRNNCellTypePairs.combine_std_pair( ...
+                            prod(b_state{pre, post}, 2), params, pre, post);
                         b_derivatives{pre, post} = ...
                             (1 - b_state{pre, post}) ./ params.tau_b_rec{pre, post} ...
                             - (b_state{pre, post} .* pre_rate) ...
@@ -2322,9 +2347,44 @@ classdef SRNNCellTypePairs < handle
             if ~params.std_zero_floor || params.n_b_pairs(pre, post) == 0
                 return;
             end
+            p_min = SRNNCellTypePairs.std_zero_floor_pmin(params, pre, post);
+            b_used = (b - p_min) ./ (1 - p_min);
+        end
+
+        function p_min = std_zero_floor_pmin(params, pre, post)
+            % The combined depression factor at r = 1 (the ceiling of the
+            % logistic), which the zero floor maps to 0. Under 'geomean' the
+            % floor applies to the combined factor, so p_min is combined the
+            % same way; under 'product' this is the historical expression.
             p_min = prod(params.tau_b_rel{pre, post} ./ ...
                 (params.tau_b_rec{pre, post} + params.tau_b_rel{pre, post}));
-            b_used = (b - p_min) ./ (1 - p_min);
+            p_min = SRNNCellTypePairs.combine_std_pair(p_min, params, pre, post);
+        end
+
+        function [D, dD_dP] = combine_std_pair(P, params, pre, post)
+            %COMBINE_STD_PAIR The depression factor a route's theta uses.
+            %
+            %   [D, dD_dP] = SRNNCellTypePairs.combine_std_pair(P, params, pre, post)
+            %
+            % P is prod_m b_m over the route's M timescales (any shape). Under
+            % the default 'product' combine D = P and dD_dP = 1 (a scalar, so
+            % the Jacobian products stay bit-identical). Under 'geomean'
+            % (synapse_config.<pre>.<post>.std.combine) D = P^(1/M) and
+            % dD_dP = D / (M P); b_m > 0 always (db/dt = 1/tau_rec at b = 0),
+            % so P > 0. Every site that forms theta -- dynamics_fast,
+            % compute_Jacobian_fast, jacobian_times, unpack_and_compute_states
+            % -- goes through here, then through the zero floor.
+            D = P;
+            dD_dP = 1;
+            if ~isfield(params, 'std_geomean') || ~params.std_geomean(pre, post)
+                return;
+            end
+            M = params.n_b_pairs(pre, post);
+            if M <= 1
+                return;
+            end
+            D = P .^ (1 / M);
+            dD_dP = D ./ (M .* P);
         end
 
         function J = compute_Jacobian_fast(S, params)
@@ -2395,7 +2455,9 @@ classdef SRNNCellTypePairs < handle
                     if nb > 0
                         b_state{pre, post} = reshape( ...
                             S(row_b), npre, nb);
-                        depression{pre, post} = prod(b_state{pre, post}, 2);
+                        [depression{pre, post}, combine_gain] = ...
+                            SRNNCellTypePairs.combine_std_pair( ...
+                            prod(b_state{pre, post}, 2), params, pre, post);
                     else
                         b_state{pre, post} = ones(npre, 0);
                         depression{pre, post} = ones(npre, 1);
@@ -2483,11 +2545,12 @@ classdef SRNNCellTypePairs < handle
                         end
                         gain = 1;
                         if params.std_zero_floor
-                            p_min = prod(params.tau_b_rel{pre, post} ./ ...
-                                (params.tau_b_rec{pre, post} + ...
-                                params.tau_b_rel{pre, post}));
+                            p_min = SRNNCellTypePairs.std_zero_floor_pmin( ...
+                                params, pre, post);
                             gain = 1 / (1 - p_min);
                         end
+                        % chain rule through the combine (1 under 'product')
+                        gain = gain .* combine_gain;
                         coeff = gain .* facilitation{pre, post} .* ...
                             pre_rate .* product_derivative;
                         D = sparse(repmat((1:npre)', nb, 1), ...
@@ -2545,7 +2608,8 @@ classdef SRNNCellTypePairs < handle
             %   where Ye = Yx(idx) - c_eff * sum_k Ya_k is the perturbation of
             %   the effective input x_eff, phi' the activation derivative, and
             %   dtheta the perturbation of the synaptic output r prod(b) prod(g)
-            %   (with the zero-floor gain on the depression factor).
+            %   (with the zero-floor gain and the geomean combine on the
+            %   depression factor).
             %
             % See also: compute_Jacobian_fast, dynamics_fast, lyapunov_topk,
             %           test_jacobian_times
@@ -2615,7 +2679,8 @@ classdef SRNNCellTypePairs < handle
                     if nb > 0
                         b = reshape(S(row_b), npre, nb);
                         Yb = reshape(Y(row_b, :), npre, nb, K);
-                        depression = prod(b, 2);
+                        [depression, combine_gain] = SRNNCellTypePairs.combine_std_pair( ...
+                            prod(b, 2), params, pre, post);
                         tau_rec = params.tau_b_rec{pre, post}(:);
                         tau_rel = params.tau_b_rel{pre, post}(:);
                         % db_m/dt = (1 - b_m)/tau_rec_m - b_m r/tau_rel_m
@@ -2635,10 +2700,11 @@ classdef SRNNCellTypePairs < handle
                         end
                         gain = 1;
                         if params.std_zero_floor
-                            p_min = prod(params.tau_b_rel{pre, post} ./ ...
-                                (params.tau_b_rec{pre, post} + params.tau_b_rel{pre, post}));
+                            p_min = SRNNCellTypePairs.std_zero_floor_pmin(params, pre, post);
                             gain = 1 / (1 - p_min);
                         end
+                        % chain rule through the combine (1 under 'product')
+                        gain = gain .* combine_gain;
                         dtheta_b = gain .* reshape(sum(product_derivative .* Yb, 2), npre, K);
                     end
 
@@ -2765,7 +2831,8 @@ classdef SRNNCellTypePairs < handle
         function sig = route_fields(params, pre, post)
             % The comparable data of one route (see routes_identical).
             sig = struct('n_b', params.n_b_pairs(pre, post), 'n_g', params.n_g_pairs(pre, post), ...
-                'tau_rec', [], 'tau_rel', [], 'tau_dec', [], 'tau_fac', [], 'G', []);
+                'tau_rec', [], 'tau_rel', [], 'tau_dec', [], 'tau_fac', [], 'G', [], ...
+                'std_geomean', isfield(params, 'std_geomean') && params.std_geomean(pre, post));
             if isfield(params, 'route_scale')
                 sig.scale = params.route_scale(pre, post);
             else
@@ -3090,7 +3157,8 @@ classdef SRNNCellTypePairs < handle
                     if nb > 0
                         bq = reshape(S_out(:, layout.b{pre, post})', ...
                             npre, nb, nt);
-                        depression = reshape(prod(bq, 2), npre, nt);
+                        depression = SRNNCellTypePairs.combine_std_pair( ...
+                            reshape(prod(bq, 2), npre, nt), params, pre, post);
                         b_named.(pre_name).(post_name) = bq;
                     else
                         b_named.(pre_name).(post_name) = [];

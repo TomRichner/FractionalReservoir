@@ -146,6 +146,22 @@ replacement manuscript text are in
 [`../notes/STD_strength_matching_2026-09-13.md`](../notes/STD_strength_matching_2026-09-13.md);
 `test_route_scale` checks the presets against the formulas above.
 
+**Option, geometric-mean combine (2026-09-24; opt-in, no preset uses it).**
+Ported from train-srnn's geometric-mean STD matching. A route may set
+`synapse_config.<pre>.<post>.std.combine = 'geomean'` (default `'product'`,
+bit-identical to the form above), which replaces the route's depression
+factor by
+
+$$ \theta_j = r_j \Big(\prod_{m=1}^{M} b_{jm}\Big)^{1/M} \prod_n g_{jn}. $$
+
+When every pair shares one $\rho$ the steady state is $1/(1 + r/\rho)$ at
+**every** constant rate, not only at $r_{ref}$: it is the depression analogue
+of $c/K$, and leaves the low-rate gain and the $b_m$ ODEs unchanged. With
+`std_zero_floor` the floor is applied to the combined factor (its $p_{min}$ is
+combined the same way). `SRNNCellTypePairs.combine_std_pair` is the one
+definition; the dynamics, `plot_data.synaptic_output`, both Jacobians and
+`jacobian_times` all go through it (`test_std_geomean`).
+
 ## Facilitation (optional)
 
 `SRNNCellTypePairs` also supports short-term facilitation, per route. The paper's
