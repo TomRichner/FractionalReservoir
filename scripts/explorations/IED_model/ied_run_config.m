@@ -35,6 +35,22 @@ switch id
     case 8
         cfg=ied_run_config(7); cfg.id=8; cfg.wE=.45;
         cfg.rationale='Relative to run07, strengthen only within-module excitatory edge mean 0.35 to 0.45 (bridges use the same presynaptic mean before 0.5 scaling). Seek local amplification and sharper events while retaining weak between-module coupling.';
+    case 9
+        cfg=ied_run_config(8); cfg.id=9; cfg.wE=.60;
+        cfg.rationale='Relative to run08, increase E mean 0.45 to 0.60 to move modules closer to discharge-generating feedback. Test whether weak broad humps become sharper cluster pulses or excessive tonic activity.';
+    case 10
+        cfg=ied_run_config(9); cfg.id=10; cfg.std_on_I=false;
+        cfg.rationale='Relative to run09, retain depression on E outputs but remove it on I outputs. Preserve inhibitory transmission during an excitatory excursion so feedback can terminate it sharply. All other cellular and connectivity parameters stay fixed.';
+    case 11
+        cfg=ied_run_config(10); cfg.id=11; cfg.wI=-.40;
+        cfg.rationale='Relative to run10, weaken inhibitory edge mean -0.50 to -0.40 (E stays0.60). Direct E:I weight-balance test: allow larger local recruitment while retaining non-depressing inhibitory termination.';
+    case 12
+        cfg=ied_run_config(10); cfg.id=12; cfg.wI=-.60;
+        cfg.rationale='Relative to run10, strengthen I mean -0.50 to -0.60, bracketing the -0.40 run11. Direct opposite E:I structural-balance perturbation; E stays0.60 and inhibitory outputs remain non-depressing.';
+    case 13
+        cfg=ied_run_config(11); cfg.id=13;
+        cfg.tau_a=[.40 .75]; cfg.tau_spread=[.70 .50];
+        cfg.rationale='Relative to leading candidate run11, speed E SFA median0.75 to0.40 s and broaden its log-SD0.5 to0.7; I remains0.75/0.5. Test whether faster heterogeneous E feedback narrows local pulses without suppressing them.';
     otherwise
         error('ied_run_config:UnknownRun','Run %d has not yet been selected.',id);
 end
