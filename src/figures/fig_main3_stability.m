@@ -55,13 +55,11 @@ for c=1:3
     end
     ax=newaxis(4,c,.105,.135); h=sum(max(tk.local_LE_spectrum_t,0),2)/log(2);
     plot(ax,t,h,'Color',col,'LineWidth',1.1); ax.TickDir='out'; xlabel(ax,'Time (s)');
-    if c==1, ylabel(ax,'Expansive Transients (bits/s)'); letter(ax,'D'); end
+    if c==1, ylabel(ax,'Expansion (bits/s)'); letter(ax,'D'); end
 end
 close(a.figs);
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
 for xpos=[.3775 .6775], plot(sep,[xpos xpos],[.08 .95],'Color',[.88 .88 .88],'LineWidth',2.5); end
-text(sep,.51,.018,sprintf('Saved switching example: K = %d; accumulation [%g, %g] s', ...
-    K,D.settings.lya_T_interval),'HorizontalAlignment','center','FontSize',14);
 uistack(sep,'bottom'); set(findall(fig,'-property','FontSize'),'FontSize',14);
 for c=1:3, ax=findobj(fig,'Tag',sprintf('stability_r1_c%d',c)); ax.Title.FontSize=16; end
 notes={sprintf('Current switching data: K=%d; accumulation [%g,%g] s; saved segment-start timestamps retained. Settings are read from the completed saved analysis.',D.settings.K,D.settings.lya_T_interval), ...
