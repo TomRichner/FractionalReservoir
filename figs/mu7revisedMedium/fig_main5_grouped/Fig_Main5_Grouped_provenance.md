@@ -1,9 +1,9 @@
 # Main group 5
 
-Run: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium`
+Run: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium`
 
-- Source: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\eig_heatmap\eig_heatmap_data.mat`
-- Source: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\transient_gain\transient_gain_data.mat`
+- Source: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium/eig_heatmap/eig_heatmap_data.mat`
+- Source: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium/transient_gain/transient_gain_data.mat`
 
 Active propagator only, all five directions, regular-state medians. Saved horizon 5 s, of which the first 2 s are shown (ticks 0, 1, 2 s); no extrapolation. Margin and gain stages do not sample matched states.
 

@@ -1,8 +1,8 @@
 # Main group 2
 
-Run: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium`
+Run: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium`
 
-- Source: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium\representative_dynamics\representative_dynamics_data.mat`
+- Source: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium/representative_dynamics/representative_dynamics_data.mat`
 
 Native saved representative trajectories; neuron identity and E/I palettes preserved across state rows.
 

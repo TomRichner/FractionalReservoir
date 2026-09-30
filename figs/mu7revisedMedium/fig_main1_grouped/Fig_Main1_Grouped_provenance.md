@@ -1,8 +1,9 @@
 # Main group 1
 
-Run: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium`
+Run: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium`
 
-- Source: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\mu7revisedMedium\fig_introductory_concepts\Fig_Intro_Concepts.fig`
+- Source: `/Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_fast/fig_introductory_concepts/eigenspectra/panelA_eigenspectrum.fig`
+- Source: `/Users/tom/Desktop/local_code/FractionalReservoir/figs/sfaEI_fast/fig_introductory_concepts/statetraces/panelA_bottom_traces.fig`
 
 For the current mu7 figure-only configuration, the native introductory source is explicitly figs/sfaEI_fast/fig_introductory_concepts (clean source commit4406b56). It uses the same sompolinsky_pairs preset, gammas[0.9,1.6,2.5], seed0, 15 traces and [0,60]s as the mu7 intro. The intervening fig_introductory_concepts code change only combined the two rows; simulation code is unchanged.
 

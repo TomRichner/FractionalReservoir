@@ -1,8 +1,8 @@
 # Main group 6
 
-Run: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium`
+Run: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium`
 
-- Source: `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\data\mu7revisedMedium`
+- Source: `/Users/tom/Desktop/local_code/FractionalReservoir/data/mu7revisedMedium`
 
 Slowest-timescale axes are both linear. LLE distribution display clipping and MC trial/statistics remain those of the source run.
 
