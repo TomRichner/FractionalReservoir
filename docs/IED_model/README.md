@@ -45,11 +45,14 @@ active or highly irregular regimes. Visual review is essential.
 
 Reports include event count/rate, width, recruitment, global fraction,
 inter-event variability, mean rate, saturation, and mean pairwise x correlation.
-Top-8 QR growth is tracked without automatic K expansion. The sum of positive
+Top-8 QR growth is tracked in runs01–05; top-25 from run06 onward following
+Tom's request, without automatic K expansion. Full 400-Hz state trajectories
+and tangent parameters are retained from run06 for later reanalysis. The sum of positive
 local tracked rates is a truncated expansion diagnostic in bits/s, not entropy
 or information transmission. Event windows (−100 to +200 ms) are compared with
 remaining segments descriptively. Alignment and finite observation limit
-interpretation of these exploratory exponents; coincident growth is not proof
+interpretation of these exploratory exponents; sums with different K are not
+directly comparable. Coincident growth is not proof
 that it causes an event.
 
 ## Outputs

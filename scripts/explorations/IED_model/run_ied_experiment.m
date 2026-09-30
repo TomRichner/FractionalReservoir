@@ -29,7 +29,7 @@ args.rng_seeds=[cfg.seed cfg.seed+1]; args.ode_solver='sra1'; args.fs=cfg.fs;
 args.T_range=[-cfg.warmup cfg.duration]; args.T_plot=[0 cfg.duration]; args.plot_deci=2;
 args.lya_method='topk'; args.lya_K=cfg.K; args.lya_K_auto=false;
 args.lya_dt=.05; args.lya_warmup=cfg.warmup; args.lya_T_interval=[0 cfg.duration];
-args.filter_local_lya=false; args.store_full_state=false; args.verbose='minimal';
+args.filter_local_lya=false; args.store_full_state=cfg.K>=25; args.verbose='minimal';
 args.input_config.intrinsic_drive=0; args.input_config.no_stim_pattern=true(1,3);
 nv=struct2namevalue(args);
 if strcmp(cfg.topology,'random'), m=SRNNCellTypePairs(nv{:});
@@ -55,6 +55,9 @@ data=struct('t',p.t(:)','x',single(x),'r',single(r),'groups',groups, ...
     'E',m.type_indices{1},'I',m.type_indices{2},'sfa',reshape(sfa,1,[]), ...
     'resources',mean(resources,1),'lya',m.lya_results,'W',W, ...
     'tau_stats',tau_stats,'Sc_vec',m.S_c_vec);
+if cfg.K>=25
+    data.state_t=m.t_out; data.full_state=m.S_out; data.params=m.cached_params;
+end
 det=ied_detect_events(data.t,data.x,data.r,data.groups,data.lya);
 files=ied_plot_run(data,det,cfg,fig_dir);
 native=m.plot(); exportgraphics(native,fullfile(fig_dir,'native_model.png'),'Resolution',120); close(native);

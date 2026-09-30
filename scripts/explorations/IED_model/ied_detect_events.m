@@ -12,6 +12,7 @@ local_t=[]; local_group=[]; local_width=[];
 long_count=0;
 for j=1:numel(g)
     recruitment(j,:)=mean(active(groups==g(j),:),1);
+    if max(recruitment(j,:))<=.20, continue; end
     [~,times,width]=findpeaks(recruitment(j,:),t, ...
         'MinPeakHeight',.20,'MinPeakProminence',.10,'MinPeakDistance',.15);
     long_count=long_count+nnz(width>1);
