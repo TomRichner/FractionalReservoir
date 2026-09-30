@@ -15,11 +15,35 @@ set(axs,'Units','normalized','PositionConstraint','innerposition', ...
 top(1).Position=[.085 .57 .36 .34];
 top(2).Position=[.60 .57 .36 .34];
 for k=1:2
-    top(k).XLabel.String=strrep(top(k).XLabel.String,' (E and I)','');
+    top(k).XLabel.String='Longest SFA Time Constant (s)';
+    top(k).XLabel.Interpreter='none';
+    title(top(k),'Multiple-Timescale Adaptation','FontWeight','normal', ...
+        'Interpreter','none');
+end
+top(1).YLabel.String='Lyapunov Exp., \lambda_1 (s^{-1})';
+top(1).YLabel.Interpreter='tex';
+top(2).YLabel.String={'Leading-Vector','Squared-Norm Fraction'};
+top(2).YLabel.Interpreter='none';
+% State coordinates have their own palette; condition colors encode a
+% different quantity in A and C-D. Markers provide a second state cue.
+state_names={'SFA','STD','x'};
+state_colors=[213 94 0; 0 158 115; 142 68 173]/255;
+state_markers={'o','s','^'};
+for k=1:numel(state_names)
+    h=findall(top(2),'Type','line','DisplayName',state_names{k});
+    assert(numel(h)==1,'style_main6_grouped:States','Expected one line per state block.');
+    set(h,'Color',state_colors(k,:),'MarkerFaceColor',state_colors(k,:), ...
+        'Marker',state_markers{k});
+    if k==3, h.DisplayName='Dendritic State'; end
 end
 for k=1:3
     bottom(k).Position=[.085+(k-1)*.315 .16 .235 .27];
 end
+bottom(2).YLabel.String={'Input Reconstruction','Score (R^2)'};
+bottom(2).YLabel.Interpreter='tex';
+bottom(3).XTickLabel={'No Adaptation','1TS','MTS'};
+bottom(3).XLabel.String='Adaptation Condition';
+bottom(3).XLabel.Interpreter='none';
 % Sparse, interpretable ticks within the original limits.
 top(2).YTick=[0 .5 1];
 bottom(1).YTick=[0 8 16];
@@ -41,6 +65,7 @@ for k=1:numel(lg)
         drawnow;
         p=lg(k).Position; p(1)=.5-p(3)/2; p(2)=.035; lg(k).Position=p;
     else
+        lg(k).String={'SFA','STD','Dendritic State'};
         lg(k).Location='east';
     end
 end

@@ -36,7 +36,7 @@ for c=1:3
         end
         offset=offset+numel(ids);
     end
-    ax.XAxis.Visible='off'; if c==1, ylabel(ax,sprintf('Input (%d neurons)',offset)); letter(ax,'B'); end
+    ax.XAxis.Visible='off'; if c==1, ylabel(ax,'Input'); letter(ax,'B'); end
     ax=newaxis(3,c,.315,.14); t=tk.t_lya(:); finite=tk.finite_LE_spectrum_t(:,1);
     % Saved t_lya denotes segment starts. Preserve the archived time convention.
     plot(ax,[0 T],[0 0],':','Color',[.65 .65 .65]);
@@ -55,7 +55,7 @@ for c=1:3
     end
     ax=newaxis(4,c,.105,.135); h=sum(max(tk.local_LE_spectrum_t,0),2)/log(2);
     plot(ax,t,h,'Color',col,'LineWidth',1.1); ax.TickDir='out'; xlabel(ax,'Time (s)');
-    if c==1, ylabel(ax,{'Expansive transients',sprintf('top-%d sum, bits/s',K)}); letter(ax,'D'); end
+    if c==1, ylabel(ax,'Expansive Transients (bits/s)'); letter(ax,'D'); end
 end
 close(a.figs);
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');

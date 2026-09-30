@@ -46,8 +46,8 @@ fig=figure('Visible','off','Color','w','Position',[40 40 1450 1200]);
 ax_all=gobjects(7,3);
 rows={'u','x','r','syn','sfa','std','lambda'};
 labels={'Input, $u_i$',{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
-    {'Synaptic','output, $\theta_i$'},{'SFA','$\frac{c_i}{K}\sum_k a_{ik}$'}, ...
-    {'STD','$\prod_m b_{im}$'},'$\lambda_1$'};
+    {'Synaptic','output, $\theta_i$'},{'Spike-Frequency','Adaptation'}, ...
+    {'Synaptic','Depression'},{'Lyapunov Exp.,','$\lambda_1$'}};
 titles={'No adaptation','Single-timescale adaptation','Multiple-timescale adaptation'};
 st=manuscript_style(); names={'no_adaptation','sfa1_std1','sfa3_std2'};
 for c=1:3
@@ -63,7 +63,7 @@ for c=1:3
         ax.XAxis.Visible='off';
         if c==1
             ylabel(ax,labels{j},'Interpreter','latex','FontSize',14);
-            text(ax,-.32,1.05,sprintf('(%c)',char('A'+j-1)),'Units','normalized', ...
+            text(ax,-.40,1.05,sprintf('(%c)',char('A'+j-1)),'Units','normalized', ...
                 'FontSize',14,'HorizontalAlignment','left','VerticalAlignment','top','Clipping','off');
         end
         switch j
@@ -124,8 +124,7 @@ if strcmp(field,'u')
     plot(ax,r.t,r.u(1,:),'k','LineWidth',1.25); return
 end
 if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std'})
-    msg='no SFA'; if strcmp(field,'std'), msg='no STD'; end
-    text(ax,.5,.5,msg,'Units','normalized','HorizontalAlignment','center','FontSize',14); return
+    return
 end
 Y=r.(field); counts=cellfun(@numel,r.selected); offsets=[0 cumsum(counts)];
 for q=numel(counts):-1:1
@@ -157,8 +156,7 @@ row=row-1;   % the archived raster has six rows, x .. lambda
 xl=[297 2897 5496]; xr=xl+2214;
 yt=[101 1105 2108 3112 4115 5119]; yb=[898 1902 2906 3909 4912 5916];
 if col==1 && ismember(row,[4 5])
-    msg='no SFA'; if row==5, msg='no STD'; end
-    text(ax,.5,.5,msg,'Units','normalized','HorizontalAlignment','center','FontSize',14); return
+    return
 end
 cols=(xl(col)+4):(xr(col)-4); rr=(yt(row)+4):(yb(row)-4);
 C=I(rr,cols,:);

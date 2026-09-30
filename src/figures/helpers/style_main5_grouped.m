@@ -1,6 +1,6 @@
 function style_main5_grouped(fig)
 % STYLE_MAIN5_GROUPED Arrange native saved margin and gain graphics in one row.
-% Presentation only: preserve all curve data, styles, horizons and gain limits.
+% Presentation only: preserve all gain curve data, styles, horizons and limits.
 st=manuscript_style();
 axs=findall(fig,'Type','axes');
 assert(numel(axs)==4,'style_main5_grouped:Axes','Expected one margin and three gain axes.');
@@ -17,7 +17,10 @@ for k=1:4
     ordered(k).Position=[.055+(k-1)*.242 .35 .19 .48];
     ordered(k).Tag=sprintf('main5_panel%d',k);
 end
+% Reserve room for the descriptive two-line margin label at export.
+margin.Position([1 3])=[.08 .165];
 margin.YLim=[0 100]; margin.YTick=[0 25 50 75];
+margin.YLabel.String={'Non-Normal Amplification','Margin (s^{-1})'};
 margin.Title.String={'non-normal margin per state','(5-95%, IQR, median)'};
 names={'no_adaptation','sfa1_std1','sfa3_std2'};
 labels={'No adaptation','Single-timescale','Multiple-timescale'};

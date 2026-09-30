@@ -67,11 +67,13 @@ switch group
                 Y=cell2mat(arrayfun(@(s)s.(keys{k})(ia,:),smp(:),'UniformOutput',false));
                 hh(k)=plot(ax,t,median(Y,1),'Color',colors(k,:),'LineStyle',styles{k},'LineWidth',1.8,'Marker',marks{k},'MarkerIndices',unique(round(linspace(2,numel(t),8))),'MarkerSize',4);
             end
-            set(ax,'YScale','log'); yline(ax,1,':','HandleVisibility','off'); title(ax,r.title,'FontWeight','normal'); xlabel(ax,'time after perturbation (s)'); box(ax,'off');
+            set(ax,'YScale','log');
+            unity=yline(ax,1,'--','Color',[.5 .5 .5],'LineWidth',1.2,'DisplayName','Unity Gain');
+            title(ax,r.title,'FontWeight','normal'); xlabel(ax,'time after perturbation (s)'); box(ax,'off');
             % Only the first 2 s after the perturbation are shown (TR, 2026-09-15); the saved horizon is longer.
             set(ax,'XLim',[0 2],'XTick',[0 1 2]);
             if i==1, ylabel(ax,'active dendritic gain'); end
-            if i==2, lg=legend(ax,hh,labels,'NumColumns',3,'Box','off','FontSize',10); lg.Layout.Tile='south'; end
+            if i==2, lg=legend(ax,[hh unity],[labels {'Unity Gain'}],'NumColumns',3,'Box','off','FontSize',10); lg.Layout.Tile='south'; end
         end
         linkaxes(gain_axes,'y');
         notes{end+1}=sprintf('Active propagator only, all five directions, regular-state medians. Saved horizon %g s, of which the first 2 s are shown (ticks 0, 1, 2 s); no extrapolation. Margin and gain stages do not sample matched states.',D.settings.horizon_s);
