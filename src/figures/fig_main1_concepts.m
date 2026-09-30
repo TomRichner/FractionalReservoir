@@ -87,7 +87,7 @@ for ax=[ax1 ax3]
     set(ax,'XLim',[x(1) x(end)],'YLim',[0 1.02],'XTick',[0 1],'YTick',[0 1], ...
         'LineWidth',1.0,'FontSize',14,'Box','off');
     ax.XAxis.LineWidth=1.0; ax.YAxis.LineWidth=1.0;
-    xlabel(ax,'Dendritic potential','FontSize',14); ylabel(ax,'synaptic output','FontSize',14);
+    xlabel(ax,'Dendritic Potential','FontSize',14); ylabel(ax,'Synaptic Output','FontSize',14);
 end
 concept_axes(ax2,[-2.5 1],[-1.25 1.25]);
 concept_axes(ax4,[-2.9 1],[-1.9 1.9]);
