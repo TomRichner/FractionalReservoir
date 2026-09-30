@@ -22,6 +22,14 @@ for k=1:2
 end
 top(1).YLabel.String='Lyapunov Exp., \lambda_1 (s^{-1})';
 top(1).YLabel.Interpreter='tex';
+% Match the zero-growth boundary used in the other stability figures.
+st=manuscript_style();
+zero_ref=findall(top(1),'Type','constantline');
+zero_ref=zero_ref(arrayfun(@(h) h.Value==0,zero_ref));
+assert(isscalar(zero_ref),'style_main6_grouped:ZeroReference', ...
+    'Expected one zero-growth reference line.');
+set(zero_ref,'Color',st.zeroline_color,'LineStyle','--', ...
+    'LineWidth',st.zeroline_lw);
 top(2).YLabel.String={'Leading-Vector','Squared-Norm Fraction'};
 top(2).YLabel.Interpreter='none';
 % State coordinates have their own palette; condition colors encode a

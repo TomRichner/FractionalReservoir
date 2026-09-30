@@ -14,6 +14,14 @@ for c=1:3
     r=D.results(c); tk=r.topk; col=st.condition_color(r.name);
     ax=copyobj(old(c),fig); ax.Units='normalized'; ax.Position=[.105+(c-1)*.30 .745 .235 .18];
     ax.Tag=sprintf('stability_r1_c%d',c);
+    % Recolor only this figure's copied Re(lambda)=0 reference.
+    refs=findall(ax,'Type','line');
+    for k=1:numel(refs)
+        if numel(refs(k).XData)==2 && all(refs(k).XData==0)
+            set(refs(k),'Color',st.zeroline_color,'LineStyle','--', ...
+                'LineWidth',st.zeroline_lw,'Tag','zero_eigenvalue_reference');
+        end
+    end
     texts=findall(ax,'Type','text');
     for k=1:numel(texts)
         if startsWith(string(texts(k).String),'\lambda_1 ='), delete(texts(k)); end
@@ -39,7 +47,8 @@ for c=1:3
     ax.XAxis.Visible='off'; if c==1, ylabel(ax,'Input'); letter(ax,'B'); end
     ax=newaxis(3,c,.315,.14); t=tk.t_lya(:); finite=tk.finite_LE_spectrum_t(:,1);
     % Saved t_lya denotes segment starts. Preserve the archived time convention.
-    plot(ax,[0 T],[0 0],':','Color',[.65 .65 .65]);
+    plot(ax,[0 T],[0 0],'--','Color',st.zeroline_color, ...
+        'LineWidth',st.zeroline_lw,'Tag','zero_growth_reference');
     local_line=plot(ax,t,tk.local_LE_spectrum_t(:,1),'Color',.75+.25*col,'LineWidth',.5,'Tag','local_lambda');
     finite_line=plot(ax,t,finite,'Color',col,'LineWidth',1.7,'Tag','accumulated_lambda');
     if c==1, ylim(ax,[-.5 4]); else, ylim(ax,[-.5 .5]); end
