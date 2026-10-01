@@ -10,5 +10,11 @@ classdef IEDExplorationNetwork < SRNNCellTypePairs
             obj.W=sparse(W);
             obj.cached_params=obj.get_params();
         end
+        function replace_setpoints(obj,values)
+            assert(obj.is_built && ~obj.has_run,'Replace before run.');
+            assert(isequal(size(values),[obj.n 1]) && all(isfinite(values)));
+            obj.S_c_vec=values;
+            obj.cached_params=obj.get_params();
+        end
     end
 end

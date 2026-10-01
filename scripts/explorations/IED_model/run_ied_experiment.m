@@ -1,8 +1,13 @@
-function result = run_ied_experiment(id)
+function result = run_ied_experiment(selection,run_tag)
 % One exploratory network only; call again only after reviewing this run.
-setup_paths(); cfg=ied_run_config(id); root=fileparts(which('setup_paths'));
-data_dir=fullfile(root,'data','IED_model','20260930',sprintf('run%02d',id));
-fig_dir=fullfile(root,'figs','IED_model','20260930',sprintf('run%02d',id));
+% A config struct and a fresh tag also support replay of the frozen base.
+if nargin<2, run_tag='20260930'; end
+assert(ischar(run_tag) && ~isempty(regexp(run_tag,'^[a-zA-Z0-9_-]+$','once')));
+setup_paths();
+if isstruct(selection), cfg=selection; else, cfg=ied_run_config(selection); end
+id=cfg.id; root=fileparts(which('setup_paths'));
+data_dir=fullfile(root,'data','IED_model',run_tag,sprintf('run%02d',id));
+fig_dir=fullfile(root,'figs','IED_model',run_tag,sprintf('run%02d',id));
 assert(~isfile(fullfile(data_dir,'run.mat')),'Completed run exists; preserve it.');
 if ~isfolder(data_dir), mkdir(data_dir); end
 if ~isfolder(fig_dir), mkdir(fig_dir); end
@@ -36,6 +41,12 @@ if strcmp(cfg.topology,'random'), m=SRNNCellTypePairs(nv{:});
 else, m=IEDExplorationNetwork(nv{:}); end
 started=tic; m.build(); [W,groups,connectivity]=ied_connectivity(m,cfg);
 if ~strcmp(cfg.topology,'random'), m.replace_connectivity(W); end
+if strcmp(cfg.topology,'embedded')
+    prior_rng=rng; rng(cfg.seed+7001,'twister');
+    setpoints=m.S_c_vec; focus=groups>1;
+    setpoints(focus)=cfg.focus_sc+cfg.focus_sd*randn(nnz(focus),1);
+    rng(prior_rng); m.replace_setpoints(setpoints);
+end
 assert(all(m.u_ex==0,'all'),'External input must be zero.');
 m.run();
 p=m.plot_data; x=[p.x.E;p.x.I]; r=[p.r.E;p.r.I];
@@ -63,7 +74,7 @@ files=ied_plot_run(data,det,cfg,fig_dir);
 native=m.plot(); exportgraphics(native,fullfile(fig_dir,'native_model.png'),'Resolution',120); close(native);
 seconds=toc(started); save(fullfile(data_dir,'run.mat'),'data','det','cfg','connectivity','seconds','-v7.3');
 result=struct('cfg',cfg,'metrics',det.metrics,'connectivity',connectivity, ...
-    'tau_stats',tau_stats,'seconds',seconds,'files',{files});
+    'tau_stats',tau_stats,'seconds',seconds,'files',{files},'run_tag',run_tag);
 ied_record_run(result,root);
 vprintf('minimal','minimal','Run %02d: events %d (%.1f/min), width %.3f s, recruit %.3f, global %.3f, r %.3f, corr %.3f, lambda %.3f; %.1f s\n', ...
     id,det.metrics.event_count,det.metrics.events_per_min,det.metrics.median_width, ...
@@ -75,7 +86,7 @@ function ied_record_run(result,root)
 file=fullfile(root,'docs','IED_model','progress_2026_09_30.md');
 cfg=result.cfg; metrics=result.metrics;
 fid=fopen(file,'a'); guard=onCleanup(@()fclose(fid));
-fprintf(fid,'\n## Run %02d\n\n%s\n\n',cfg.id,cfg.rationale);
+fprintf(fid,'\n## Run %02d\n\n%s\n\nRun tag: `%s`.\n\n',cfg.id,cfg.rationale,result.run_tag);
 fprintf(fid,'Exact selected configuration:\n\n```json\n%s\n```\n\n',jsonencode(cfg,'PrettyPrint',true));
 fprintf(fid,'| Metric | Value |\n|---|---:|\n');
 fields=fieldnames(metrics);
@@ -83,9 +94,9 @@ for k=1:numel(fields), fprintf(fid,'| %s | %.6g |\n',fields{k},metrics.(fields{k
 fprintf(fid,'\nRealized indegree %.3f; within/between edges %d/%d; structural abscissa %.4f. ', ...
     result.connectivity.realized_indegree,result.connectivity.within_edges,result.connectivity.between_edges,result.connectivity.spectral_abscissa);
 fprintf(fid,'Realized E tau mean/SD %.4f/%.4f s; I %.4f/%.4f s. Runtime %.1f s.\n\n',result.tau_stats',result.seconds);
-fprintf(fid,'![Overview](../../figs/IED_model/20260930/run%02d/overview.png)\n\n',cfg.id);
-fprintf(fid,'![Event detail](../../figs/IED_model/20260930/run%02d/event_zoom.png)\n\n',cfg.id);
-fprintf(fid,'Native plot: [model.plot()](../../figs/IED_model/20260930/run%02d/native_model.png). ',cfg.id);
-fprintf(fid,'Saved trajectory/configuration: `data/IED_model/20260930/run%02d/run.mat`.\n\n',cfg.id);
+fprintf(fid,'![Overview](../../figs/IED_model/%s/run%02d/overview.png)\n\n',result.run_tag,cfg.id);
+fprintf(fid,'![Event detail](../../figs/IED_model/%s/run%02d/event_zoom.png)\n\n',result.run_tag,cfg.id);
+fprintf(fid,'Native plot: [model.plot()](../../figs/IED_model/%s/run%02d/native_model.png). ',result.run_tag,cfg.id);
+fprintf(fid,'Saved trajectory/configuration: `data/IED_model/%s/run%02d/run.mat`.\n\n',result.run_tag,cfg.id);
 fprintf(fid,'**Interpretation after visual review:** Pending.\n');
 end

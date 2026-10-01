@@ -4,11 +4,51 @@ Sequential single-network pilot requested September 30, 2026. The aim is brief,
 spontaneous, partially recruited events, rather than a globally synchronized
 burst train. This is a model-morphology exploration, not clinical IED validation.
 
+## Selected working base
+
+On October 1, Tom asked to select one and stop the search. **Run13** is the
+working base, frozen explicitly in `ied_base_config.m`. It uses 350 neurons
+(245 E/105 I), five weakly coupled 70-neuron modules, one SFA timescale per
+neuron, and one depression component on E outputs only. E and I SFA medians
+are 0.40 and 0.75 s, with log-normal SDs 0.70 and 0.50; total strength is 0.5
+on both types. Setpoints have mean0.45/SD0.15 on both types. Wiener amplitude
+is0.025; external input is zero.
+
+Within-module connection probability is0.30; between-module probability is
+0.003. Absolute Gaussian weight means are E0.60/I−0.40, SD0.08, and bridges
+are scaled by0.5. The realized mean indegree is21.37. The frozen constructor
+also retains the old random-network placeholder parameters; the replacement
+matrix above is the connectivity actually simulated.
+
+Run13 produced11 candidates in50 s, median recruitment8.6%, median dominant-
+group waveform FWHM195 ms, and negligible rate saturation (0.011% of neuron-time
+samples). Within-module x correlation was0.241, versus0.005 between modules.
+Ten of11 detected events involved a single group. The detector recruitment
+width was108 ms; this is a different measure from waveform FWHM.
+It is the most useful compromise among the tested networks,
+not a finished sparse/nonrhythmic IED model: smaller background humps remain.
+Run15 retained localized events on one additional realization of these
+physical parameters. The later embedded-focus design either spread activity
+too broadly (run18) or produced no events with weak bridges (run19).
+
+The existing result is in `data/IED_model/20260930/run13/run.mat`. To replay
+the frozen base later without overwriting it:
+
+```matlab
+setup_paths();
+cfg = ied_base_config();
+result = run_ied_experiment(cfg,'base_recheck');
+```
+
+Use a new tag for each replay. No new simulation was run merely to freeze it.
+
 The unchanged dynamics are defined in
 [the authoritative equations](../EquationsParametersDocs/Equations_stability_paper.md)
 and implemented by `SRNNCellTypePairs`. Random runs call that class directly.
 `IEDExplorationNetwork` inherits the same equations and only exposes a checked
 replacement for a built recurrent weight matrix in modular experiments.
+The embedded-focus trials also use a checked per-neuron setpoint replacement;
+both replacements rebuild the cached parameters and activation handles.
 
 From the FractionalReservoir root, through the MATLAB MCP:
 
@@ -30,6 +70,9 @@ experiments specify absolute Gaussian weight means/SD, within/between edge
 probabilities, and bridge scaling; they do not covertly renormalize the result.
 Group labels in random networks are diagnostic partitions and are not evidence
 of anatomical modules. They contain both E and I neurons.
+Ten-module trials use nominal35-neuron groups; per-type rounding gives slightly
+unequal realized sizes. Embedded trials have group1 as a245-neuron sparse
+background and groups2–4 as three35-neuron dense foci.
 
 ## Candidate detector and metrics
 
@@ -63,6 +106,9 @@ that it causes an event.
 - `figs/IED_model/20260930/runNN/`: overview, event detail and native model plot,
   ignored by git. Links in the chronological log work on this machine.
 - Scripts and Markdown are committed; generated figures/data stay local.
+- `summary_2026_09_30.csv` and `events_run13.csv` preserve compact numerical
+  comparisons. `summarize_ied_pilot(1:19,13)` rebuilds the saved-data summaries
+  and plots without rerunning any network.
 
 One exploratory realization per configuration establishes a candidate regime,
 not robustness across networks. No stimulation test is included in this pilot.

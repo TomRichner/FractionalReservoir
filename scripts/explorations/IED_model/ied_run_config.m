@@ -10,6 +10,8 @@ cfg = struct('id',id,'n',350,'f',[.5 .5],'indegree',100, ...
     'p_within',.30,'p_between',.003,'wE',.35,'wI',-.50, ...
     'w_sd',.08,'between_scale',.5,'rationale','', ...
     'interpretation','Pending visual review.');
+cfg.focus_n=35; cfg.focus_sc=.70; cfg.focus_sd=.03;
+cfg.p_background=.01; cfg.p_focus_bridge=.001;
 switch id
     case 1
         cfg.rationale='350-neuron mu7-derived 1TS reference; frozen original weight normalization, no input, additive Wiener noise. Establish whether any local events are already present.';
@@ -51,6 +53,27 @@ switch id
         cfg=ied_run_config(11); cfg.id=13;
         cfg.tau_a=[.40 .75]; cfg.tau_spread=[.70 .50];
         cfg.rationale='Relative to leading candidate run11, speed E SFA median0.75 to0.40 s and broaden its log-SD0.5 to0.7; I remains0.75/0.5. Test whether faster heterogeneous E feedback narrows local pulses without suppressing them.';
+    case 14
+        cfg=ied_run_config(13); cfg.id=14; cfg.noise=.05;
+        cfg.rationale='Relative to run13, double input-referred Wiener amplitude0.025 to0.05 on the same noise seed. Test whether stronger independent stochastic drive gives more irregular or stronger cluster events without global recruitment.';
+    case 15
+        cfg=ied_run_config(13); cfg.id=15; cfg.seed=73; cfg.noise_seed=224810;
+        cfg.rationale='Freeze run13 physical parameters, then change network/heterogeneity seed42 to73 and Wiener seed224779 to224810. One new-realization check before the 15-run checkpoint; no parameter retuning to this seed.';
+    case 16
+        cfg=ied_run_config(13); cfg.id=16;
+        cfg.groups=10; cfg.Sc=[.50 .50]; cfg.p_between=.001;
+        cfg.rationale='Extra targeted trial after Tom asked for sparser, more clustered and less rhythmic events: halve module size70 to35 neurons (10 modules, same within p0.30/per-edge weights), raise setpoint means0.45 to0.50, and reduce between-edge p0.003 to0.001. This intentionally weakens feedback toward a quieter subthreshold background; preserve 1TS/no-input/Wiener settings.';
+    case 17
+        cfg=ied_run_config(16); cfg.id=17; cfg.wE=.80;
+        cfg.rationale='Final targeted adjustment to run16: raise E edge mean0.60 to0.80 while retaining 35-neuron modules, higher setpoints and p_between0.001. Seek visibly sharper local discharges on the quieter scaffold without returning to the 70-neuron rhythmic regime.';
+    case 18
+        cfg=ied_run_config(17); cfg.id=18;
+        cfg.topology='embedded'; cfg.groups=4; cfg.p_within=.60;
+        cfg.rationale='New architecture requested by Tom: three scattered dense 35-neuron E/I foci embedded in a sparse random background. Background p0.01 and Sc mean0.50/SD0.15; within-focus p0.60 and Sc mean0.70/SD0.03. Direct focus-focus p0.001. E/I means0.80/-0.40, E-only STD, heterogeneous 1TS SFA and Wiener noise remain. High focus setpoints aim for quiet intervals followed by recurrent regenerative bursts.';
+    case 19
+        cfg=ied_run_config(18); cfg.id=19;
+        cfg.background_E=.15; cfg.background_I=-.20; cfg.background_sd=.04;
+        cfg.rationale='Relative to run18, retain dense core weights0.80/-0.40 (SD0.08), but weaken every non-core route to E0.15/I-0.20 (SD0.04). This includes background, core-background and direct core-core bridges. Test whether dense high-Sc foci remain burst-capable without global cascades.';
     otherwise
         error('ied_run_config:UnknownRun','Run %d has not yet been selected.',id);
 end

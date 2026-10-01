@@ -8,4 +8,8 @@ state=probe.S0; old=probe.W; W=old*.7; probe.replace_connectivity(W);
 assert(isequal(probe.W,W) && isequal(probe.cached_params.W,W));
 assert(isequal(probe.S0,state) && all(probe.u_ex==0,'all'));
 assert(probe.sigma_u_noise==.025 && all(probe.n_a==1));
+probe.replace_setpoints(.7*ones(probe.n,1));
+assert(isequal(probe.cached_params.S_c_vec,.7*ones(probe.n,1)));
+assert(all(probe.cached_params.activation_function(zeros(probe.n,1))==0));
+assert(isequal(probe.W,W) && isequal(probe.S0,state));
 disp('IED connectivity replacement: cached matrix, initial states, noise, and 1TS checks passed.');
