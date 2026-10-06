@@ -111,4 +111,14 @@ that it causes an event.
   and plots without rerunning any network.
 
 One exploratory realization per configuration establishes a candidate regime,
-not robustness across networks. No stimulation test is included in this pilot.
+not robustness across networks. The pilot itself contains no stimulation test.
+
+## Stimulation test (October 5, 2026)
+
+[Stimulation of the frozen base](stim_2026_10_05.md): eight realizations of
+the run13 physics, uniform input stepped from 0 to 0.05–0.30 after 60 s,
+candidate events, module-mean PSD, correlation and adaptation state compared
+between the two halves. `ied_stim_experiment` simulates and saves;
+`fig_ied_stim` draws the model counterpart of the clinical stimulation figure
+from the saved files. `ied_build_network` is the shared constructor;
+`run_ied_experiment` is unchanged.

@@ -1,11 +1,16 @@
-function out = ied_detect_events(t,x,r,groups,lya)
+function out = ied_detect_events(t,x,r,groups,lya,threshold)
 % Candidate population events, not clinically validated IED classifications.
 % Fixed detector v1. Thresholds are held constant across this pilot.
+% Optional sixth argument: an n-by-1 absolute threshold vector to apply in
+% place of the segment's own adaptive threshold (used to compare a stimulated
+% segment against the thresholds learned on its unstimulated baseline).
 t=t(:)'; fs=1/median(diff(t));
 xs=movmean(double(x),max(1,round(.025*fs)),2);
 baseline=median(xs,2);
 robust_sd=1.4826*median(abs(xs-baseline),2);
-threshold=baseline+max(3*robust_sd,.12);
+if nargin<6 || isempty(threshold)
+    threshold=baseline+max(3*robust_sd,.12);
+end
 active=xs>threshold;
 g=unique(groups(:))'; recruitment=zeros(numel(g),numel(t));
 local_t=[]; local_group=[]; local_width=[];
