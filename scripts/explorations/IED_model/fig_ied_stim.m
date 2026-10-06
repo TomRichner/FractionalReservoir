@@ -6,23 +6,25 @@ function out = fig_ied_stim(opts)
 % nothing is re-simulated.
 %
 % Panels mirror Fig_Tica_Main / Fig_TicaFullband_PSD_Supp:
-%   (A) candidate events per minute versus input amplitude, one line per
-%       network realization (0 = the no-stimulation half of each run), with
-%       the across-realization median and the fixed-criterion control;
-%   (B) module-mean PSD, geometric mean across realizations with 95% CI,
+%   (A) candidate events per minute without and with stimulation at the
+%       selected amplitude, one line per network realization (the no-stimulation
+%       value is the unstimulated half of the same run); the full amplitude
+%       sweep and the fixed-criterion control are in the stats file;
+%   (B) subnet-mean PSD, geometric mean across realizations with 95% CI,
 %       no stimulation versus the selected amplitude;
 %   (C) band-power change in dB, one marker per realization, red median;
-%   (D) change in mean pairwise correlation within and between modules;
+%   (D) change in mean pairwise correlation within and between subnets;
 %   (E) change in mean rate, SFA feedback and synaptic resources (percent);
-%   (F) the example realization's full run: mean excitatory dendritic state
-%       with detected events and the input step, then mean rate, SFA feedback
-%       and synaptic resources;
-%   (G) example module-mean traces, 15 s without and with stimulation, from
-%       the realization and amplitude named in opts, chosen by a fixed rule
-%       (the 15-s window whose event count is closest to the half's median).
+%   (F) example traces, 30 s without and with stimulation, from the
+%       realization and amplitude named in opts: mean E and mean I dendritic
+%       state, the five subnet means, and beneath them the leading Lyapunov
+%       exponent accumulated from the start of the window (needs a run made
+%       with ied_stim_experiment(...,'lya',true)). Windows are chosen by a
+%       fixed rule (event count closest to the half's median).
+% The five 70-neuron modules of ied_connectivity are called subnets here.
 arguments
     opts.tag (1,:) char = 'stim_20261005'
-    opts.amplitude (1,1) double = 0.10     % the amplitude for panels B-F
+    opts.amplitude (1,1) double = 0.20     % the amplitude for panels B-F
     opts.example_seed (1,1) double = 42
     opts.out_dir (1,:) char = ''
     opts.visible (1,1) logical = false
@@ -40,11 +42,12 @@ seeds=unique(S.seed)'; amps=unique(S.amplitude)'; nS=numel(seeds);
 purple=[0.494 0.247 0.596]; green=[0 0.62 0.45]; red=[0.85 0.2 0.1]; gray=[0.6 0.6 0.6];
 fs_tick=14;
 
-fig=figure('Color','w','Visible',onoff(opts.visible),'Units','inches','Position',[0 0 20 14]);
-tl=tiledlayout(fig,3,10,'TileSpacing','loose','Padding','compact');
+fig=figure('Color','w','Visible',onoff(opts.visible),'Units','inches','Position',[0 0 20 12]);
+tl=tiledlayout(fig,2,10,'TileSpacing','loose','Padding','compact');
 
-%% (A) event rate versus amplitude, per realization
-ax=nexttile(tl,[1 2]); hold(ax,'on');
+%% (A) paired candidate-event rate, no stimulation versus the selected amplitude
+% Rates at every tested level are still gathered for the stats file; the
+% panel shows only the two conditions, like the human panel A.
 levels=[0 amps]; rate=NaN(nS,numel(levels)); rate_fixed=rate;
 for i=1:nS
     base=S(S.seed==seeds(i) & ~S.stim,:); rate(i,1)=mean(base.events_per_min); rate_fixed(i,1)=rate(i,1);
@@ -53,18 +56,15 @@ for i=1:nS
         rate(i,j+1)=row.events_per_min; rate_fixed(i,j+1)=row.events_per_min_fixed;
     end
 end
-xpos=1:numel(levels);
-for i=1:nS, hr=plot(ax,xpos,rate(i,:),'-','Color',gray,'LineWidth',1); end
-hm=plot(ax,xpos,median(rate,1),'-o','Color',red,'LineWidth',2.5,'MarkerFaceColor',red,'MarkerSize',6);
-hf=plot(ax,xpos,median(rate_fixed,1),':s','Color',red,'LineWidth',1.5,'MarkerSize',6);
 ja=find(amps==opts.amplitude)+1;
-scatter(ax,ones(nS,1),rate(:,1),28,purple,'filled','MarkerFaceAlpha',.8);
-scatter(ax,ja*ones(nS,1),rate(:,ja),28,green,'filled','MarkerFaceAlpha',.8);
-xlim(ax,[0.6 numel(levels)+0.4]); xticks(ax,xpos); xticklabels(ax,[{'0'} compose('%.2g',amps)]);
-ylim(ax,[0 max(rate(:))*1.5]);
-xlabel(ax,'Input Amplitude'); ylabel(ax,'Candidate Events per Minute');
-legend(ax,[hr hm hf],{'Realization','Median','Median, Fixed Criterion'},'Location','north','Box','off','FontSize',11);
-style(ax,fs_tick); letter(ax,'(A)');
+ax=nexttile(tl,[1 2]); hold(ax,'on');
+for i=1:nS, plot(ax,[1 2],[rate(i,1) rate(i,ja)],'-','Color',gray,'LineWidth',1.2); end
+scatter(ax,ones(nS,1),rate(:,1),44,purple,'filled','MarkerFaceAlpha',.85);
+scatter(ax,2*ones(nS,1),rate(:,ja),44,green,'filled','MarkerFaceAlpha',.85);
+xlim(ax,[0.6 2.4]); xticks(ax,[1 2]); xticklabels(ax,{sprintf('No\\newlineStimulation'),'Stimulation'});
+ylim(ax,[0 max(rate(:,[1 ja]),[],'all')*1.1]);
+ylabel(ax,'Candidate Events per Minute');
+style(ax,fs_tick); ax.XAxis.TickLabelInterpreter='tex'; ax.XTickLabelRotation=0; letter(ax,'(A)');
 
 %% paired tables at the selected amplitude
 A0=table(); A1=table();
@@ -84,7 +84,7 @@ h0=plot(ax,fc,m0,'-','Color',purple,'LineWidth',2.2);
 h1=plot(ax,fc,m1,'--','Color',green,'LineWidth',2.2);
 set(ax,'XScale','log','YScale','log'); xlim(ax,[0.3 100]); xticks(ax,[0.3 1 3 10 30 100]);
 xticklabels(ax,{'0.3','1','3','10','30','100'}); ax.XTickLabelRotation=0;
-xlabel(ax,'Frequency (Hz)'); ylabel(ax,'Module-Mean PSD (a.u.^2/Hz)');
+xlabel(ax,'Frequency (Hz)'); ylabel(ax,'Subnet-Mean PSD (a.u.^2/Hz)');
 legend(ax,[h0 h1],{'No Stimulation','Stimulation'},'Location','southwest','Box','off','FontSize',11);
 style(ax,fs_tick); letter(ax,'(B)');
 
@@ -94,12 +94,12 @@ bands={'delta','theta','alpha','beta'}; names={'Delta','Theta','Alpha','Beta'};
 dB=zeros(nS,4);
 for b=1:4, dB(:,b)=10*log10(A1.(bands{b})./A0.(bands{b})); end
 dot_median(ax,dB,names,red,fs_tick);
-ylabel(ax,'Module-Mean Power Change (dB)'); letter(ax,'(C)');
+ylabel(ax,'Subnet-Mean Power Change (dB)'); letter(ax,'(C)');
 
 %% (D) correlation change
 ax=nexttile(tl,[1 2]); hold(ax,'on');
 dC=[A1.within_corr-A0.within_corr, A1.between_corr-A0.between_corr];
-dot_median(ax,dC,{sprintf('Within\\newlineModule'),sprintf('Between\\newlineModule')},red,fs_tick);
+dot_median(ax,dC,{sprintf('Within\\newlineSubnet'),sprintf('Between\\newlineSubnet')},red,fs_tick);
 ylabel(ax,'Mean Correlation Change'); letter(ax,'(D)');
 
 %% (E) adaptation state change (%)
@@ -108,66 +108,63 @@ pct=100*[A1.mean_rate./A0.mean_rate-1, A1.sfa_feedback./A0.sfa_feedback-1, A1.re
 dot_median(ax,pct,{'Rate','SFA','Resources'},red,fs_tick);
 ylabel(ax,'Change with Stimulation (%)'); letter(ax,'(E)');
 
-%% (F) full-run timeline of the example realization
+%% (F) example traces with the cumulative leading exponent
 ex=load(fullfile(data_dir,sprintf('seed%03d_amp%s.mat',opts.example_seed,amp_tag(opts.amplitude))), ...
     'signals','detections','cfg');
 sig=ex.signals; t=double(sig.t); G=size(sig.module_x,1);
-t_step=ex.detections(1).window(2); t_end=ex.detections(2).window(2);
-inner=tiledlayout(tl,2,1,'TileSpacing','none','Padding','tight'); inner.Layout.Tile=11; inner.Layout.TileSpan=[1 10];
-ax=nexttile(inner); hold(ax,'on');
-mx=double(sig.mean_x_E); yr=[min(mx) max(mx)]; pad=0.12*diff(yr);
-fill(ax,[t_step t_end t_end t_step],[yr(1)-pad yr(1)-pad yr(2)+2*pad yr(2)+2*pad],green,'FaceAlpha',.08,'EdgeColor','none');
-for w=1:2
-    win=ex.detections(w).window; plot(ax,win,(yr(1)-0.6*pad)*[1 1],'-','Color',[.45 .45 .45],'LineWidth',3);
-    ev=[ex.detections(w).det.events.time];
-    plot(ax,ev,(yr(2)+1.3*pad)*ones(size(ev)),'v','Color',[.15 .15 .15],'MarkerFaceColor',[.15 .15 .15],'MarkerSize',5);
+has_lya=isfield(sig,'lya_t');
+if ~has_lya
+    warning('fig_ied_stim:NoLyapunov', ...
+        'Example run has no Lyapunov tracking; rerun ied_stim_experiment with ''lya'',true,''overwrite'',true.');
 end
-plot(ax,t(t<t_step),mx(t<t_step),'-','Color',purple,'LineWidth',0.8);
-plot(ax,t(t>=t_step),mx(t>=t_step),'-','Color',green,'LineWidth',0.8);
-xlim(ax,[0 t_end]); ylim(ax,[yr(1)-1.7*pad yr(2)+2*pad]); ax.XAxis.Visible='off';
-ylabel(ax,sprintf('Mean E\\newlineDendritic State'));
-text(ax,t_end-1,yr(2)+1.9*pad,sprintf('Uniform Input %.2g',opts.amplitude),'Color',green,'FontSize',12,'VerticalAlignment','top','HorizontalAlignment','right');
-text(ax,mean(ex.detections(1).window),yr(1)-1.25*pad,'Analysis Window','FontSize',11,'Color',[.3 .3 .3],'HorizontalAlignment','center','VerticalAlignment','middle');
-text(ax,mean(ex.detections(2).window),yr(1)-1.25*pad,'Analysis Window','FontSize',11,'Color',[.3 .3 .3],'HorizontalAlignment','center','VerticalAlignment','middle');
-style(ax,fs_tick); text(ax,-0.07,1.06,'(F)','Units','normalized','FontSize',16,'Clipping','off','Tag','letter');
-ax=nexttile(inner); hold(ax,'on');
-h1=plot(ax,t,double(sig.mean_r),'-','Color',[.15 .15 .15],'LineWidth',1.2);
-h2=plot(ax,t,double(sig.sfa),'-','Color',[.85 .33 .1],'LineWidth',1.2);
-h3=plot(ax,t,double(sig.resources),'-','Color',[0 .45 .74],'LineWidth',1.2);
-xline(ax,t_step,'--','Color',green,'LineWidth',1.2);
-xlim(ax,[0 t_end]); ylim(ax,[0 0.75]); xlabel(ax,'Time (s)'); ylabel(ax,sprintf('Rate and\\newlineAdaptation State'));
-legend(ax,[h1 h2 h3],{'Mean Rate','SFA Feedback','Synaptic Resources'},'Location','east','Box','off','FontSize',11,'Orientation','horizontal');
-style(ax,fs_tick);
-
-%% (G) example traces
-spacing=0.35; win_len=15;
+spacing=0.35; win_len=30;
 titles={'No Stimulation',sprintf('Stimulation (Uniform Input %.2g)',opts.amplitude)}; cols={purple,green};
-yl=[-0.25 (G-1)*spacing+0.45];
+rows_x=[double(sig.mean_x_E);double(sig.mean_x_I);double(sig.module_x)]; nR=size(rows_x,1);
+row_names=[{'Mean E','Mean I'} compose('Subnet %d',1:G)];
+yl=[-0.25 (nR-1)*spacing+0.45];
+t0=zeros(1,2); cum=cell(1,2); cum_t=cell(1,2);
 for w=1:2
-    ax=nexttile(tl,[1 5]); hold(ax,'on');
-    d=ex.detections(w); ev=[d.det.events.time];
-    [t0,t1]=pick_window(d.window,ev,t,double(sig.module_x),win_len);
-    sel=t>=t0 & t<=t1; tt=t(sel)-t0;
-    for g=1:G
-        trace=double(sig.module_x(g,sel)); trace=trace-median(trace);
-        plot(ax,tt,trace+(G-g)*spacing,'-','Color',cols{w},'LineWidth',1);
+    ev=[ex.detections(w).det.events.time];
+    t0(w)=pick_window(ex.detections(w).window,ev,t,double(sig.module_x),win_len);
+    if has_lya
+        lt=double(sig.lya_t); ll=double(sig.lya_local); ks=lt>=t0(w) & lt<=t0(w)+win_len;
+        cum_t{w}=lt(ks)-t0(w); cum{w}=cumsum(ll(ks))./(1:nnz(ks));
     end
-    in=ev(ev>=t0 & ev<=t1)-t0;
-    if ~isempty(in), plot(ax,in,((G-1)*spacing+0.33)*ones(size(in)),'v','Color',[.15 .15 .15],'MarkerFaceColor',[.15 .15 .15],'MarkerSize',6); end
-    if w==2
-        plot(ax,[0 win_len],[yl(2) yl(2)]-0.03,'-','Color',green,'LineWidth',4);
+end
+if has_lya
+    settled=[cum{1}(cum_t{1}>=2) cum{2}(cum_t{2}>=2)];
+    lle_ylim=[min([settled 0])-0.1 max([settled 0])+0.1];
+else
+    lle_ylim=[-1 0.2];
+end
+for w=1:2
+    inner=tiledlayout(tl,5,1,'TileSpacing','none','Padding','tight');
+    inner.Layout.Tile=11+5*(w-1); inner.Layout.TileSpan=[1 5];
+    ax=nexttile(inner,[4 1]); hold(ax,'on');
+    ev=[ex.detections(w).det.events.time]; t1=t0(w)+win_len;
+    sel=t>=t0(w) & t<=t1; tt=t(sel)-t0(w);
+    for k=1:nR
+        trace=rows_x(k,sel); trace=trace-median(trace);
+        plot(ax,tt,trace+(nR-k)*spacing,'-','Color',cols{w},'LineWidth',0.9);
     end
-    yticks(ax,(0:G-1)*spacing); yticklabels(ax,compose('Module %d',G:-1:1));
-    xlim(ax,[0 win_len]); ylim(ax,yl); set(ax,'XColor','none');
+    in=ev(ev>=t0(w) & ev<=t1)-t0(w);
+    if ~isempty(in), plot(ax,in,((nR-1)*spacing+0.33)*ones(size(in)),'v','Color',[.15 .15 .15],'MarkerFaceColor',[.15 .15 .15],'MarkerSize',6); end
+    yticks(ax,(0:nR-1)*spacing); yticklabels(ax,row_names(end:-1:1));
+    xlim(ax,[0 win_len]); ylim(ax,yl);
     title(ax,titles{w},'FontWeight','normal','Color',cols{w},'FontSize',fs_tick);
-    style(ax,fs_tick); ax.YAxis.Visible='on'; ax.XAxis.Visible='off';
-    if w==1, text(ax,-0.07,1.06,'(G)','Units','normalized','FontSize',16,'Clipping','off','Tag','letter'); end
+    style(ax,fs_tick); ax.XAxis.Visible='off';
+    if w==1, text(ax,-0.07,1.04,'(F)','Units','normalized','FontSize',16,'Clipping','off','Tag','letter'); end
     if w==2
-        x0=win_len-2.2; y0=yl(1)+0.02;
-        plot(ax,[x0 x0+1],[y0 y0],'k-','LineWidth',2); plot(ax,[x0+1 x0+1],[y0 y0+0.2],'k-','LineWidth',2);
-        text(ax,x0+0.5,y0-0.04,'1 s','HorizontalAlignment','center','FontSize',12);
-        text(ax,x0+1.05,y0+0.1,'0.2 a.u.','FontSize',12);
+        x0=win_len-0.6; y0=yl(1)+0.02;
+        plot(ax,[x0 x0],[y0 y0+0.2],'k-','LineWidth',2);
+        text(ax,x0+0.15,y0+0.1,'0.2 a.u.','FontSize',12);
     end
+    ax2=nexttile(inner,[1 1]); hold(ax2,'on');
+    if has_lya, plot(ax2,cum_t{w},cum{w},'-','Color',cols{w},'LineWidth',1.8); end
+    yline(ax2,0,'--','Color',[.5 .5 .5],'LineWidth',1);
+    xlim(ax2,[0 win_len]); ylim(ax2,lle_ylim);
+    xlabel(ax2,'Time (s)'); ylabel(ax2,sprintf('Cumulative\\newline\\lambda_1 (s^{-1})'));
+    style(ax2,fs_tick);
 end
 set(findall(fig,'-property','FontSize'),'FontSize',fs_tick);
 set(findall(fig,'Type','text','Tag','letter'),'FontSize',16);
@@ -223,10 +220,11 @@ tcrit=tinv(0.975,max(n-1,1)); half=tcrit.*sd./sqrt(n);
 m=10.^mu; lo=10.^(mu-half); hi=10.^(mu+half);
 end
 function [t0,t1]=pick_window(window,ev,t,module_x,win_len)
-% Fixed rule: tile the half into win_len-s windows (dropping the first and
-% last 5 s), take the window whose event count is closest to the median count,
-% breaking ties by the RMS closest to the median RMS.
-starts=window(1)+5:win_len:window(2)-5-win_len;
+% Fixed rule: candidate win_len-s windows start every 5 s inside the half
+% (dropping its first and last 5 s); take the one whose event count is
+% closest to the median count, breaking ties by the RMS closest to the
+% median RMS.
+starts=window(1)+5:5:window(2)-5-win_len;
 counts=arrayfun(@(a)nnz(ev>=a & ev<a+win_len),starts);
 rms=arrayfun(@(a)sqrt(mean(var(module_x(:,t>=a & t<a+win_len),0,2))),starts);
 score=abs(counts-median(counts))+1e-3*abs(rms-median(rms));
@@ -241,12 +239,12 @@ for j=1:numel(stats.levels)
     r=stats.rate_by_level(:,j); rf=stats.rate_fixed_by_level(:,j);
     fprintf(fid,'| %.3g | %.1f [%.1f, %.1f] | %.1f [%.1f, %.1f] |\n',stats.levels(j),median(r),min(r),max(r),median(rf),min(rf),max(rf));
 end
-fprintf(fid,'\n## At the selected amplitude (median [min, max] across realizations)\n\n| Quantity | No stimulation | Stimulation | Change |\n|---|---|---|---|\n');
+fprintf(fid,'\n## At the selected amplitude (median [min, max] across realizations; event-shape rows omit realizations with no events)\n\n| Quantity | No stimulation | Stimulation | Change |\n|---|---|---|---|\n');
 q={'events_per_min','Events/min';'mean_rate','Mean rate';'sfa_feedback','SFA feedback';'resources','Synaptic resources'; ...
-   'within_corr','Within-module correlation';'between_corr','Between-module correlation';'median_recruitment','Median recruitment';'waveform_fwhm','Waveform FWHM (s)'};
+   'within_corr','Within-subnet correlation';'between_corr','Between-subnet correlation';'median_recruitment','Median recruitment';'waveform_fwhm','Waveform FWHM (s)'};
 for k=1:size(q,1)
     a=A0.(q{k,1}); b=A1.(q{k,1});
-    fprintf(fid,'| %s | %.3g [%.3g, %.3g] | %.3g [%.3g, %.3g] | %+.3g |\n',q{k,2},median(a),min(a),max(a),median(b),min(b),max(b),median(b-a));
+    fprintf(fid,'| %s | %.3g [%.3g, %.3g] | %.3g [%.3g, %.3g] | %+.3g |\n',q{k,2},median(a,'omitnan'),min(a),max(a),median(b,'omitnan'),min(b),max(b),median(b-a,'omitnan'));
 end
 fprintf(fid,'\nEvent-rate ratio stimulation / no stimulation: median %.2f, range [%.2f, %.2f]; below 1 in %d of %d.\n\n', ...
     median(stats.rate_ratio),min(stats.rate_ratio),max(stats.rate_ratio),nnz(stats.rate_ratio<1),numel(stats.rate_ratio));

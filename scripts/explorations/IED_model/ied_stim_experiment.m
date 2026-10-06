@@ -6,10 +6,12 @@ function out = ied_stim_experiment(opts)
 % first hold s and then steps to the amplitude for another hold s. The first
 % settle s of each half are discarded and the two remaining windows are
 % analyzed identically: candidate events (detector v1, applied per window
-% and also with the no-stimulation excursion criterion held fixed), module-mean
+% and also with the no-stimulation excursion criterion held fixed), subnet-mean
 % Welch PSDs and band powers, pairwise correlation, mean rate, SFA feedback
 % and synaptic resources. Results are saved per run under
-% data/IED_model/<tag>/ and never overwritten unless asked.
+% data/IED_model/<tag>/ and never overwritten unless asked. With opts.lya the
+% leading Lyapunov exponent is tracked too (slower); the trajectory itself is
+% unchanged, so a run can be redone with 'overwrite' to add it.
 arguments
     opts.amplitudes (1,:) double = [0.05 0.10 0.20 0.30]
     opts.seeds (1,:) double = 42
@@ -19,6 +21,7 @@ arguments
     opts.store_full (1,1) logical = false
     opts.overwrite (1,1) logical = false
     opts.verbose (1,1) logical = true
+    opts.lya (1,1) logical = false      % track the leading exponent (top-K QR, K = 8)
 end
 setup_paths(); root=fileparts(which('setup_paths'));
 data_dir=fullfile(root,'data','IED_model',opts.tag);
@@ -36,9 +39,14 @@ for s=opts.seeds
         input_config=struct('dc_levels',[0 A],'hold_dur',opts.hold,'ramp_dur',0, ...
             'noise_intensity',0,'intrinsic_drive',[],'generator',@dc_staircase_stimulus);
         started=tic;
-        [m,groups,connectivity]=ied_build_network(cfg,input_config, ...
-            'lya_method','none','T_range',[-cfg.warmup cfg.duration], ...
-            'T_plot',[0 cfg.duration]);
+        if opts.lya
+            lya_args={'lya_method','topk','lya_K',8,'lya_K_auto',false,'lya_dt',.05, ...
+                'lya_warmup',cfg.warmup,'lya_T_interval',[0 cfg.duration]};
+        else
+            lya_args={'lya_method','none'};
+        end
+        [m,groups,connectivity]=ied_build_network(cfg,input_config,lya_args{:}, ...
+            'T_range',[-cfg.warmup cfg.duration],'T_plot',[0 cfg.duration]);
         m.run();
         run=analyze_run(m,groups,cfg,A,opts);
         run.connectivity=connectivity; run.seconds=toc(started);
@@ -120,6 +128,13 @@ signals=struct('t',t,'module_x',single(module_x),'mean_x_E',single(mean(x(m.type
     'mean_x_I',single(mean(x(m.type_indices{2},:),1)),'mean_r',single(mean(r,1)),'sfa',single(sfa), ...
     'resources',single(resources),'u',single(interp1(tu,u,t)),'groups',groups, ...
     'E',m.type_indices{1},'I',m.type_indices{2});
+lya=m.lya_results;
+if ~isempty(lya) && isfield(lya,'local_LE_spectrum_t')
+    % Local leading rate sampled every lya_dt, shifted by half a step as in
+    % ied_detect_events; the figure accumulates it within each window.
+    signals.lya_t=lya.t_lya(:)'+.025; signals.lya_local=lya.local_LE_spectrum_t(:,1)';
+    signals.lya_accumulated=lya.finite_LE_spectrum_t(:,1)'; signals.lambda1=lya.LE_spectrum(1);
+end
 run=struct('summary',summary,'signals',signals,'detections',detections, ...
     'full',struct('x',single(x),'r',single(r)));
 end
