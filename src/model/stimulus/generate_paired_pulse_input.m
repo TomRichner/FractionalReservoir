@@ -1,8 +1,9 @@
-function [u_ex, t_ex] = generate_paired_pulse_input(params, T, fs, rng_seed, pulse_config)
+function [u_ex, t_ex, info] = generate_paired_pulse_input(params, T, fs, rng_seed, pulse_config)
 % GENERATE_PAIRED_PULSE_INPUT Generates paired-pulse input for SRNN simulation.
 %
 % Syntax:
 %   [u_ex, t_ex] = generate_paired_pulse_input(params, T, fs, rng_seed, pulse_config)
+%   [u_ex, t_ex, info] = generate_paired_pulse_input(...)
 %
 % Inputs:
 %   params       - Struct with .n (number of neurons)
@@ -13,6 +14,17 @@ function [u_ex, t_ex] = generate_paired_pulse_input(params, T, fs, rng_seed, pul
 %                  .amp          - Pulse amplitude (default 3)
 %                  .width_ms     - Pulse width in ms (default 0.5)
 %                  .neuron_frac  - Fraction of neurons to stimulate (default 0.2)
+%                  .target_types - Cell of cell-type names to draw them from
+%                                  (default {}: all neurons); see
+%                                  stim_target_indices
+%
+% Outputs:
+%   u_ex, t_ex   - as every input_config.generator returns them
+%   info         - (optional third output, for the analysis) struct with
+%                  event_times / isis of one cycle, cycle_len, onset_times
+%                  and onset_isi (every event in [0, T] whose last pulse
+%                  fits, and its ISI; 0 = single pulse), width_samples,
+%                  stim_idx, amp
 %
 % Description:
 %   Generates a repeating 10s cycle of stimulation:
@@ -26,54 +38,57 @@ function [u_ex, t_ex] = generate_paired_pulse_input(params, T, fs, rng_seed, pul
     if nargin < 5
         pulse_config = struct();
     end
-    
+
     % Default configuration
     amp = 3;
     if isfield(pulse_config, 'amp'), amp = pulse_config.amp; end
-    
+
     width_ms = 0.5;
     if isfield(pulse_config, 'width_ms'), width_ms = pulse_config.width_ms; end
-    
+
     neuron_frac = 0.2;
     if isfield(pulse_config, 'neuron_frac'), neuron_frac = pulse_config.neuron_frac; end
-
-    rng(rng_seed);
 
     dt = 1/fs;
     t_ex = (0:dt:T)';
     nt = length(t_ex);
     u_ex = zeros(params.n, nt);
 
-    % Select neurons to stimulate
-    n_stim = round(params.n * neuron_frac);
-    stim_indices = randperm(params.n, n_stim);
+    % Select neurons to stimulate. stim_target_indices draws exactly what
+    % rng(rng_seed); randperm(params.n, round(params.n*neuron_frac)) used to
+    % (sorted, which changes nothing here), restores the global RNG, and is
+    % shared with generate_am_pulse_train so both protocols drive the same
+    % neurons for one seed (2026-10-20).
+    pulse_config.neuron_frac = neuron_frac;
+    stim_indices = stim_target_indices(params, rng_seed, pulse_config);
+    n_stim = numel(stim_indices);
 
     % Cycle parameters
     cycle_len_sec = 10;
     cycle_len_samples = round(cycle_len_sec * fs);
-    
+
     % Pulse width in samples
     width_samples = max(1, round(width_ms / 1000 * fs));
-    
+
     % Base times for events within a cycle (seconds)
     event_times = [1.25, 3.75, 6.25, 8.75];
-    
+
     % ISIs for the events (seconds). 0 means single pulse.
     isis = [0, 0.002, 0.010, 0.100];
 
     % Create one cycle template
     cycle_template = zeros(1, cycle_len_samples);
-    
+
     for i = 1:length(event_times)
         t_start = event_times(i);
         isi = isis(i);
-        
+
         % First pulse
         idx1 = round(t_start * fs) + 1;
         if idx1 + width_samples - 1 <= cycle_len_samples
             cycle_template(idx1 : idx1 + width_samples - 1) = amp;
         end
-        
+
         % Second pulse (if ISI > 0)
         if isi > 0
             t_start_2 = t_start + isi;
@@ -92,5 +107,15 @@ function [u_ex, t_ex] = generate_paired_pulse_input(params, T, fs, rng_seed, pul
     % Apply to selected neurons
     u_ex(stim_indices, :) = repmat(full_stim_trace, n_stim, 1);
 
-end
+    if nargout > 2
+        n_cyc = ceil(T / cycle_len_sec) + 1;
+        onsets = reshape(event_times(:) + (0:n_cyc-1) * cycle_len_sec, 1, []);
+        isi_all = reshape(repmat(isis(:), 1, n_cyc), 1, []);
+        keep = onsets + isi_all + width_samples / fs <= T;
+        info = struct('event_times', event_times, 'isis', isis, ...
+            'cycle_len', cycle_len_sec, 'onset_times', onsets(keep), ...
+            'onset_isi', isi_all(keep), 'width_samples', width_samples, ...
+            'stim_idx', stim_indices, 'amp', amp);
+    end
 
+end
