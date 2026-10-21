@@ -52,6 +52,12 @@ arguments
     cfg.human_leads   (1,:) double = [10.0 7.7 6.2]   % wider cohort medians (22 subjects)
     cfg.human_label (1,:) char    = 'Human SEEG (22 subjects)'
     cfg.show_no_adaptation (1,1) logical = false   % true: drawn faint, no intervals
+    % 'equations': row labels as symbols (r Pi b, (c/K) Sigma a, Pi b);
+    % 'words': labels in words, the equations left to the caption (TR,
+    % 2026-10-20: the poster's v2). Saved as fig_sine_stim_poster_v2 --
+    % give it its own out_dir, since save_figure_stable deletes
+    % <tag>* first and 'fig_sine_stim_poster' is a prefix of it.
+    cfg.labels      (1,:) char {mustBeMember(cfg.labels, {'equations', 'words'})} = 'equations'
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.verbose     (1,:) char    = 'minimal'
@@ -84,8 +90,19 @@ PI = char(928); SIG = char(931); DEG = char(176);
 W = 10.0; H = 9.2;
 fig = figure('Color', 'w', 'Visible', 'off', 'Units', 'inches', 'Position', [0.2 0.2 W H]);
 mkax = @(l, b, w, h) axes(fig, 'Units', 'inches', 'Position', [l b w h], 'FontName', FN);
-lx = 1.6; lw = 2.65;                       % left column
-row_b = [5.55, 3.85, 2.45, 1.05]; row_h = [2.25, 1.05, 1.05, 1.05];
+words = strcmp(cfg.labels, 'words');
+if words
+    % Row names are horizontal titles above each row (a 20-pt word label
+    % does not fit along a 1-in axis), so the column is wider and the rows
+    % leave a title line between them.
+    lx = 1.05; lw = 3.55; bx = 5.85;
+    row_b = [6.2, 4.0, 2.5, 1.0]; row_h = [1.95, 0.95, 0.95, 0.95];
+    tag = 'fig_sine_stim_poster_v2';
+else
+    lx = 1.6; lw = 2.65; bx = 6.25;        % left column; right panel's left edge
+    row_b = [5.55, 3.85, 2.45, 1.05]; row_h = [2.25, 1.05, 1.05, 1.05];
+    tag = 'fig_sine_stim_poster';
+end
 
 k = pick(cfg.show_condition, sprintf('sine_%gs', cfg.period));
 m = M(k); R = S.results(k); f = m.fits(1); Tm = cfg.period;
@@ -98,8 +115,13 @@ for j = 1:numel(pt)
     plot(ax1, [pt(j) pt(j)], [60 pa(j)], '-', 'Color', [0.6 0.6 0.6], 'LineWidth', 1.6);
 end
 plot(ax1, m.envelope_t, 100 * m.envelope / R.info.amp, '-', 'Color', grey, 'LineWidth', 3);
-ylim(ax1, [60 190]); set(ax1, 'YTick', [70 100], 'YColor', grey);
-ylabel(ax1, 'Stimulus (%)', 'FontSize', fs_txt, 'FontName', FN);
+ylim(ax1, [60 190 - 25 * words]); set(ax1, 'YTick', [70 100], 'YColor', grey);
+if words
+    text(ax1, 0, 1.03, 'Stimulus (% of peak)', 'Units', 'normalized', 'Color', grey, ...
+        'VerticalAlignment', 'bottom', 'FontSize', fs_txt, 'FontName', FN);
+else
+    ylabel(ax1, 'Stimulus (%)', 'FontSize', fs_txt, 'FontName', FN);
+end
 yyaxis(ax1, 'right'); hold(ax1, 'on');
 tt = linspace(0, Tm, 400); ph = 2 * pi * tt / Tm;
 fit_y = f.a * cos(ph) + f.b * sin(ph) + f.offset;
@@ -120,10 +142,17 @@ text(ax1, 0.98, 0.99, sprintf('lead %.0f%s', f.lead_deg, DEG), 'Units', 'normali
     'FontSize', fs_txt + 2, 'FontName', FN);
 
 % ---- rows 2-4: driven E synaptic output, SFA, STD -----------------------------
-rows = { ...
-    'syn', {'Synaptic', ['output r' PI 'b']}, 'syn_stim'; ...
-    'sfa', {'SFA', ['(c/K)' SIG 'a']},        ''; ...
-    'std', {'STD', [PI 'b']},                 ''};
+if words
+    rows = { ...
+        'syn', 'Synaptic output',            'syn_stim'; ...
+        'sfa', 'Spike-frequency adaptation', ''; ...
+        'std', 'Synaptic resources',         ''};
+else
+    rows = { ...
+        'syn', {'Synaptic', ['output r' PI 'b']}, 'syn_stim'; ...
+        'sfa', {'SFA', ['(c/K)' SIG 'a']},        ''; ...
+        'std', {'STD', [PI 'b']},                 ''};
+end
 ax_r = gobjects(1, 3);
 for i = 1:3
     ax = mkax(lx, row_b(i + 1), lw, row_h(i + 1)); ax_r(i) = ax; hold(ax, 'on');
@@ -149,7 +178,12 @@ for i = 1:3
     set(ax, 'YTick', nice_ticks(yr(1), yr(2)));
     text(ax, 0.99, 0.99, label, 'Units', 'normalized', 'HorizontalAlignment', 'right', ...
         'VerticalAlignment', 'top', 'FontSize', fs_txt, 'FontName', FN);
-    ylabel(ax, rows{i, 2}, 'FontSize', fs_txt, 'FontName', FN);
+    if words
+        text(ax, 0, 1.03, rows{i, 2}, 'Units', 'normalized', 'VerticalAlignment', 'bottom', ...
+            'FontSize', fs_txt, 'FontName', FN);
+    else
+        ylabel(ax, rows{i, 2}, 'FontSize', fs_txt, 'FontName', FN);
+    end
 end
 all_left = [ax1, ax_r];
 for ax = all_left
@@ -160,14 +194,22 @@ for ax = all_left
 end
 set(ax_r(end), 'XTick', 0:1:Tm);
 xlabel(ax_r(end), 'Time in cycle (s)', 'FontSize', fs_txt, 'FontName', FN);
-text(ax1, 0.5, 1.06, sprintf('Model, %g s period', Tm), 'Units', 'normalized', ...
-    'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', 'FontSize', fs_ttl, 'FontName', FN);
-% Who the traces belong to, under the heading of rows 2-4.
-text(ax_r(1), 0.01, 0.99, 'driven E', 'Units', 'normalized', 'Color', E_drv, ...
-    'VerticalAlignment', 'top', 'FontSize', fs_txt, 'FontName', FN);
+if words
+    text(ax1, 0.5, 1.03 + 0.43 / row_h(1), sprintf('Model, %g s period', Tm), 'Units', 'normalized', ...
+        'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', 'FontSize', fs_ttl, 'FontName', FN);
+    % Whose traces rows 2-4 are, on a line of its own above them.
+    text(ax_r(1), 0, 1.03 + 0.42 / row_h(2), 'Driven E, population mean:', 'Units', 'normalized', ...
+        'Color', E_drv, 'VerticalAlignment', 'bottom', 'FontSize', fs_txt, 'FontName', FN);
+else
+    text(ax1, 0.5, 1.06, sprintf('Model, %g s period', Tm), 'Units', 'normalized', ...
+        'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', 'FontSize', fs_ttl, 'FontName', FN);
+    % Who the traces belong to, under the heading of rows 2-4.
+    text(ax_r(1), 0.01, 0.99, 'driven E', 'Units', 'normalized', 'Color', E_drv, ...
+        'VerticalAlignment', 'top', 'FontSize', fs_txt, 'FontName', FN);
+end
 
 % ---- right: lead against period ------------------------------------------------
-axB = mkax(6.25, 3.4, 3.55, 4.75); hold(axB, 'on');
+axB = mkax(bx, 3.4, W - bx - 0.2, 4.75); hold(axB, 'on');
 series = {'sfa1_std1', 'Single timescale'; 'sfa3_std2', 'Multiple timescales'};
 if cfg.show_no_adaptation, series = [{'no_adaptation', 'No adaptation'}; series]; end
 hb = gobjects(1, 0); names = {}; lead_rows = {};
@@ -218,8 +260,8 @@ source = sprintf(['%s; run_stim_evoked, preset %s, fs %g Hz, seeds %s; E-only dr
     cfg.human_label, S.settings.git.commit_short);
 out = struct('figs', fig, 'files', {{}}, 'source', source, 'leads', leads);
 if cfg.save
-    save_figure_stable(out_dir, 'fig_sine_stim_poster', fig);
-    out.files = existing_outputs(out_dir, 'fig_sine_stim_poster');
+    save_figure_stable(out_dir, tag, fig);
+    out.files = existing_outputs(out_dir, tag);
 end
 vprintf(cfg.verbose, 'minimal', '  [sine_stim_poster] %d files in %s\n', numel(out.files), out_dir);
 if cfg.visible, set(fig, 'Visible', 'on'); end
