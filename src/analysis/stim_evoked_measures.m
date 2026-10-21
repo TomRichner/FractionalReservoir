@@ -26,10 +26,14 @@ function M = stim_evoked_measures(results, opts)
 % [d + 10, d + 60] ms divided by RMS of the single pulse's over [10, 60] ms
 % (the human definition, so the first pulse's tail is in the numerator at
 % short ISIs). The LTI prediction is the same ratio computed on
-% s(t) + s(t - d), s the single-pulse average.
+% s(t) + s(t - d), s the single-pulse average. ratio_isolated is the second
+% response alone, RMS over [d + 10, d + 60] ms of (pair - s) over the
+% single's RMS: 1 for an LTI system, whatever the overlap.
 %
 % Options:
 %   discard_s - stimulation time excluded from the averages (default 10)
+%   n_boot    - bootstrap resamples of whole cycles for the lead interval of the primary readout
+%               (fits(i).lead_ci, 2.5 and 97.5 percentiles; default 500)
 %   readouts  - N x 3 cell {name, var, groups}: var a field of
 %               results(k).readouts ('x','r','syn','sfa','std'), groups a cell
 %               of group names whose count-weighted mean is the signal.
@@ -46,6 +50,7 @@ arguments
     results struct
     opts.discard_s (1,1) double = 10
     opts.readouts cell = default_readouts()
+    opts.n_boot (1,1) double = 500
 end
 M = [];
 for k = 1:numel(results)
@@ -54,7 +59,8 @@ for k = 1:numel(results)
         'kind', R.kind, 'mod_period', R.mod_period, 'readout_names', {opts.readouts(:, 1)'}, ...
         'fits', [], 'sizes', {{}}, 'phase', [], 't_in_cycle', [], 'n_cycles_used', NaN, ...
         'epoch_t', [], 'epochs', {{}}, 'cycle_t', [], 'cycle_traces', struct(), ...
-        'envelope_t', [], 'envelope', [], 'paired', struct());
+        'envelope_t', [], 'envelope', [], 'paired', struct(), ...
+        'trace_lag_deg', struct(), 'trace_mod', struct());
     fs_r = 1 / median(diff(R.t));
     if strcmp(R.kind, 'sine')
         m = sine_measures(m, R, fs_r, opts);
@@ -76,7 +82,9 @@ R = { ...
     'x_I_nonstim', 'x',   {'I_nonstim'}; ...
     'r_nonstim',   'r',   {'E_nonstim', 'I_nonstim'}; ...
     'r_stim',      'r',   {'E_stim'}; ...
-    'syn_stim',    'syn', {'E_stim'}};
+    'syn_stim',    'syn', {'E_stim'}; ...
+    'sfa_stim',    'sfa', {'E_stim'}; ...
+    'std_stim',    'std', {'E_stim'}};
 end
 
 function y = signal(R, var, groups)
@@ -139,6 +147,26 @@ for i = 1:size(opts.readouts, 1)
     end
     sz = rms_win(avg, tl, [0.01 0.06]);
     f = sine_fit(m.phase(:), sz(:));
+    % Bootstrap over CYCLES (resampled with replacement, the whole cycle
+    % kept together), the lead refitted each time: a 95 % interval that
+    % reflects the noise and the network's own fluctuations, one network.
+    c_use = cyc(use);
+    leads = nan(opts.n_boot * (i == 1), 1);    % primary readout only
+    stream = RandStream('twister', 'Seed', 20261020);
+    for bsi = 1:numel(leads)
+        pick = cyc_ok(randi(stream, numel(cyc_ok), numel(cyc_ok), 1));
+        w = sum(c_use(:) == pick(:)', 2);           % times each epoch is drawn
+        bavg = nan(n_pos, numel(tl));
+        for j = 1:n_pos
+            sel = abs(p_use(:) - pos_vals(j)) < 1e-6;
+            bavg(j, :) = (w(sel)' * E(sel, :)) / sum(w(sel));
+        end
+        bf = sine_fit(m.phase(:), rms_win(bavg, tl, [0.01 0.06]));
+        leads(bsi) = bf.lead_deg;
+    end
+    % Circular: centre the draws on the point estimate before the percentiles.
+    d = mod(leads - f.lead_deg + 180, 360) - 180;
+    if ~isempty(d), f.lead_ci = f.lead_deg + prctile(d, [2.5 97.5]); end
     if isempty(fits), fits = f; else, fits(end + 1) = f; end %#ok<AGROW>
     m.sizes{i} = sz(:)';
     m.epochs{i} = avg;
@@ -161,7 +189,17 @@ for v = 1:numel(vars)
                 acc = acc + y(i0:i0 + n_s - 1); n = n + 1;
             end
         end
-        m.cycle_traces.(vars{v}).(groups{g}) = acc / max(n, 1);
+        tr = acc / max(n, 1);
+        m.cycle_traces.(vars{v}).(groups{g}) = tr;
+        % Phase of the trace's fundamental (the modulation frequency) as a
+        % LAG after the envelope peak, degrees, positive = later. For the
+        % depression product the TROUGH is the moment of strongest
+        % depression, so its lag is that of the trough.
+        c1 = sum(tr .* exp(-1i * 2 * pi * m.cycle_t / Tm));
+        peak = -angle(c1);
+        if strcmp(vars{v}, 'std'), peak = peak + pi; end
+        m.trace_lag_deg.(vars{v}).(groups{g}) = mod(rad2deg(peak - pi) + 180, 360) - 180;
+        m.trace_mod.(vars{v}).(groups{g}) = 2 * abs(c1) / n_s;   % fundamental amplitude
     end
 end
 end
@@ -175,7 +213,7 @@ peak = atan2(beta(2), beta(1));
 lead = mod(rad2deg(pi - peak) + 180, 360) - 180;
 f = struct('a', beta(1), 'b', beta(2), 'offset', beta(3), ...
     'amplitude', hypot(beta(1), beta(2)), 'rel_mod', hypot(beta(1), beta(2)) / beta(3), ...
-    'peak_phase', mod(peak, 2 * pi), 'lead_deg', lead, 'r2', r2);
+    'peak_phase', mod(peak, 2 * pi), 'lead_deg', lead, 'r2', r2, 'lead_ci', [NaN NaN]);
 end
 
 function m = paired_measures(m, R, fs_r, opts)
@@ -185,6 +223,7 @@ isis = R.info.isis;
 P = struct('isis', isis, 'readouts', {opts.readouts(:, 1)'});
 P.ratio = nan(size(opts.readouts, 1), numel(isis));
 P.ratio_lti = P.ratio;
+P.ratio_isolated = P.ratio;
 P.n_events = arrayfun(@(d) nnz(use & abs(isi - d) < 1e-9), isis);
 for i = 1:size(opts.readouts, 1)
     y = signal(R, opts.readouts{i, 2}, opts.readouts{i, 3});
@@ -205,6 +244,9 @@ for i = 1:size(opts.readouts, 1)
         if d == 0, lti(j, :) = s; end
         P.ratio(i, j) = rms_win(avg(j, :), tl, [d + 0.01, d + 0.06]) / s_ref;
         P.ratio_lti(i, j) = rms_win(lti(j, :), tl, [d + 0.01, d + 0.06]) / s_ref;
+        % The second response ALONE: the pair minus the single-pulse response,
+        % over the same window, against the single. 1 for an LTI system.
+        P.ratio_isolated(i, j) = rms_win(avg(j, :) - s, tl, [d + 0.01, d + 0.06]) / s_ref;
     end
     m.epochs{i} = avg;
     P.lti{i} = lti;
