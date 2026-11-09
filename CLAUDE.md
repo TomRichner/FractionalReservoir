@@ -410,6 +410,21 @@ When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnaly
 - `F_tracks_network` (default `true`) computes `F` from the current `n`/`indegree`, which makes `R` *exactly* independent of `n` (the `n·α` cancels in `get.R`). Set it `false` to pin `F` to `(F_ref_n, F_ref_indegree)` — the weight distribution then stays fixed while `R` varies with network size. Freezing `F` does **not** freeze the network: `build()` still passes the real `alpha` to `RMTBlocks`, so connectivity tracks the grid point. The choice is recorded in `resolved_defaults`, and `same_config` refuses to pool runs that used different conventions.
 - Time vectors typically start negative (e.g. `T_range = [-10, 20]`) to allow transient settling before the analysis window.
 
+## Workspace
+
+This repo is one folder of a multi-folder VS Code workspace (`FractionalReservoir.code-workspace`,
+gitignored and machine-local). Access to the sibling folders is already persisted in
+`.claude/settings.local.json`; run `/add-workspace` to re-sync after the workspace file changes.
+
+| Directory | What it holds |
+|---|---|
+| `../StochasticPlasticDynamicalSystemPaper` | The manuscript this code supports (`Manuscript5.md`, pandoc markdown with Zotero citations). Its `figs/` and `figs_stim/` links point at figure runs under this repo's `figs/`. |
+| `../PDF2md` | Private reading corpus: scientific papers OCR'd from PDF to markdown, the literature behind the manuscript. |
+| `../Kreiss` | Study repo on computing the Kreiss constant (Mitchell 2020, 2021) for systems identified from SEEG data; related transient-amplification theory. |
+| `../claude-plugins` | The `tom-tools` plugin marketplace: `md2doc`, `md2pdf`, `mistralocr`, `zoteus`, `matlab-mcp` and the skills used to build the manuscript. |
+| `../../gitlab_repos/cscs_stim_stability` | Clinical EEG pipeline for chronic subthreshold cortical stimulation stability (MATLAB + Python); `manuscript_stim/` produces the clinical stimulation figure. |
+| `../Stim-Analysis-Figs` | Copies of the clinical stimulation figures (`Fig_Tica_Main`, supplementary PSD) exported from `cscs_stim_stability`. It is a separate GitHub repo because the manuscript is also written on machines without access to the Mayo GitLab, so only the figures, never the pipeline or data, are published there for `set_figs_stim.sh` to link. |
+
 ## Commit messages
 
 Never add a `Co-Authored-By: Claude ...` trailer (or any other Claude/AI attribution) to commit messages in this repo. Plain commit messages only.
