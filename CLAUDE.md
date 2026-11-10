@@ -16,6 +16,25 @@ turned out to be **wrong** as well as what worked — the wrong turns are the pa
 that is otherwise lost, and they are what stops the next session re-deriving a
 dead end.
 
+## Current work (as of 2026-11-10)
+
+We are bringing the manuscript to a final draft, due 2026-11-16, from Brian
+Lundstrom's feedback. Two documents to read first:
+
+- **`../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`** is
+  the to-do list and the record of what was asked and decided: the 1TS versus
+  MTS normalization, the stimulation causality experiments, the gain sweep of
+  LLE and memory capacity, the closing figure, and the reframing of the text.
+  It lives in the manuscript repo (see "Workspace" below).
+- **`docs/notes/Codebase_map_2026-11-10.md`** maps the manuscript's figures
+  back to the script, analysis stages and classes that produce them. It is a
+  snapshot of what the current manuscript exercises, not a maintained
+  reference.
+
+Reorganising and archiving this repo (`scripts/paper/`, `data/`, `figs/`) is
+deferred until after the deadline (TR, 2026-11-10). Until then, new
+experiments follow the existing conventions and nothing is moved or deleted.
+
 ## What this project is
 
 MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD). The dynamics implemented are:
