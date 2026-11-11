@@ -207,8 +207,11 @@ model's arithmetic.
   `sfa3_stdc2`, in a **four-condition** preset that also keeps the product
   MTS (`sfa3_std2`) for the side-by-side; title and colour entries (the
   chain takes the product's current colour, the product becomes green);
-  two figure sets per run, three-condition and four-condition; regenerate
-  the preset fixture.
+  two figure sets per run, three-condition and four-condition, selected by
+  `cfg.conditions`; `full_adaptation_condition` learns the chain's name
+  (today it would silently return `sfa1_std1` for the paper's three
+  conditions); the SFA-timescale sweep runs both MTS conditions (Tom);
+  regenerate the preset fixture. Plan A section 4.4.
 - **Done when:** the bundle runs at `fast`; preset tests pass.
 - **Depends on:** FD-004.
 - **Result:** _(pending)_
@@ -335,7 +338,10 @@ model's arithmetic.
 - **Serves:** a later paper. **Facilitation does not appear in this one.**
   Built now so the model does not have to be refactored twice.
 - **What:** the release-coupled, serial form: option C (section 5) of
-  `docs/notes/Depression_facilitation_model_options_2026-11-11.md`. Release
+  `docs/notes/Depression_facilitation_model_options_2026-11-11.md`, built
+  as an extension of the chain's route model (`route_pool`), not as a
+  third model (Tom; Plan A section 4.0). The full design is Plan A
+  section 4.6, to be written by the lead and reviewed by Tom first. Release
   probability multiplies both the output and the rate at which the
   releasable pool is used; in the multiple-timescale form a calcium trace
   drives release probability. Per route, like depression, so different
@@ -355,25 +361,92 @@ model's arithmetic.
   which then covers `stf_spread` too. The calcium trace is per route.
 - **Result:** _(pending)_
 
+### FD-020 Tolerance regression tier
+
+- **Status:** open (acceptance test agreed with Tom in the execution plan;
+  Plan A sections 2.2 and 7.3, steps 0b and 0c)
+- **Serves:** block A; every later edit to the model's arithmetic
+- **What:** in `scripts/tests/regression/`: `regression_tol_run` (builds
+  the cases, returns raw arrays), `regression_tol_compare` (element-wise;
+  per leaf the largest absolute and relative difference, reported on a
+  pass too; integers, logicals and text exact),
+  `make_regression_tol_reference(name)`, `regression_tol_check(name)`,
+  `test_regression_tolerance`. `regression_compare` is not reused for the
+  first two layers: it compares digest statistics, not elements. Three
+  layers:
+  - **Pointwise.** At states stored in the fixture (from the stable runs,
+    from chaotic runs of `regression_pairs_*` in all three conditions with
+    noise off and on, and from the "options" network of
+    `regression_rapid_run`: three cell types, geomean, zero floor, STF,
+    dual STF, route scale): `dynamics_fast`, `compute_Jacobian_fast`,
+    `jacobian_times`, and a **canonical parameter view** (scaled `W`,
+    `tau_d`, `c_eff`, `tau_a_matrix`, setpoints, `route_fields` per route).
+    Proposed rtol 1e-12. The view is canonical because `params` changes
+    shape in the refactor: the fixture stores physics, not the struct.
+    Leaves present in the anchor must match; new leaves are reported, not
+    failed.
+  - **Stable, end to end.** New presets `regression_stable_*`, chained
+    within the regression bundle: the regression network with the gain
+    lowered until every condition is stable with a clear margin (all three
+    estimators), driven by the step staircase, noise off and on; plus a
+    stable variant of the options network. Trajectories, `plot_data`, all
+    three Lyapunov estimators, transient gain, a 12-job sweep, memory
+    capacity. Proposed rtol 1e-9; discrete outputs exact.
+  - **Chaotic and bundle.** The existing rapid, stages and full digests
+    through `regression_compare` with a loose `rtol`: missing, extra,
+    shape, file and figure rows fail; value rows are reported as a band.
+  - **Mutation checks** (step 0c, in a worktree, never merged). Each must
+    fail the tier: a `tau_rec` off by 1e-6 relative; a `tau_a` rung off by
+    1e-6; the `(b, a)` block dropped; the `(x, b)` block dropped; the
+    `(g, x)` block dropped; one block of `jacobian_times` scaled by
+    `1 + 1e-9`; the recovery term's sign flipped; `c / K` replaced by `c`;
+    a change confined to one route (`I->E`); the geomean gain omitted from
+    the Jacobian only; the route scale dropped from `params.W`. The list,
+    adapted, is re-run on the refactored code after FD-021 and on the
+    chain when its reference is captured.
+- **Done when:** (1) two captures from one tree are bit-identical; (2) the
+  tier passes against its own anchor at tolerance zero; (3) the anchor is
+  captured from a clean tree whose `SRNNCellTypePairs.m` blob equals the
+  one at the FD-003 references, with the commit and blob hash stored in
+  it; (4) every mutation fails the tier at the tolerances then fixed, and
+  the list, results and margins are in `docs/notes/`; (5) the rapid, quick
+  and stages gates are unaffected, the preset fixture regenerated
+  deliberately; (6) run time recorded, in the quick suite if under a
+  minute; fixture size reported (target under about 20 MB, sparse
+  Jacobians).
+- **Depends on:** FD-017. Comes before any edit to the model class.
+- **Result:** _(pending)_
+
+### FD-021 Refactor behind one route interface
+
+- **Status:** open (interface design approved by Tom; Plan A sections 2.1
+  and 4.0, step 0d)
+- **Serves:** block A
+- **What:** product depression and today's facilitation move behind the
+  route interface of Plan A section 4.0, as `src/model/routes/route_product`
+  resolved through `route_model`. No new model, property or behaviour.
+  The public signatures of `dynamics_fast`, `compute_Jacobian_fast`,
+  `jacobian_times`, `unpack_and_compute_states`, `get_params`,
+  `route_fields` and `routes_identical` do not change; the state layout
+  does not change; `params` keeps the fields read outside the class.
+- **Done when:** the tolerance tier passes against the anchor and a fresh
+  pre-edit capture; `test_route_models` (new: each model's `rhs` against a
+  hand loop, `linearize` against central differences of its own `rhs`,
+  `steady_state` against a long integration) passes; the quick suite
+  passes unedited; the four functions contain no depression- or
+  facilitation-specific arithmetic; `rhs`, the assembled Jacobian and
+  `jacobian_times` (K = 15) are timed before and after at n = 100 and
+  n = 500, and a slowdown above 10 % goes to Tom before the merge; the
+  adapted mutation list fails the tier on the refactored code; then the
+  lead re-captures the three exact references once, with the reason in the
+  commit.
+- **Depends on:** FD-020.
+- **Result:** _(pending)_
+
 ## To be planned
 
 Named so they are not lost. Each needs a planning session with Tom before it
 becomes an issue with an acceptance test.
-
-- **FD-020 Tolerance regression tier** (block A; agreed in outline with Tom
-  2026-11-11; Plan A sections 2.2 and 7.3, steps 0b and 0c). Pointwise
-  comparison of the right-hand side, the Jacobian and `jacobian_times` at
-  stored states; small stable networks end to end; an anchor captured from
-  the untouched model class; mutation checks that every one of a list of
-  small deliberate errors fails it. Tolerances to be fixed from those
-  checks. Comes after FD-017 and before any edit to the model class.
-- **FD-021 Refactor behind one route interface** (block A; agreed in
-  outline with Tom 2026-11-11; Plan A section 2.1 and step 0d). Product
-  depression and today's facilitation move behind an interface (state
-  derivative, output factor, their partials), with no new model. Gated by
-  FD-020; the exact references are re-captured once afterwards. The
-  interface design is to be written into the plan and reviewed by Tom
-  first.
 
 - **FD-008 Frozen-reserve control** (block A). **Dropped 2026-11-10:** Tom
   settled that 1TS and MTS are not strength-matched at steady state, so the

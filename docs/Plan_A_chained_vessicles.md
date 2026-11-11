@@ -8,11 +8,13 @@ to the questions in section 9, and again the same day: the code is to be
 general, checked by a tolerance-based regression, and the pool module and
 that regression are built first (sections 2, 6 and 7.3).** Sections 3 to 5
 were written for the earlier branch-per-site approach and are read with
-section 2 in mind until the lead adds the interface design. Still under discussion: facilitation (a
-note with the options is at
-`docs/notes/Depression_facilitation_model_options_2026-11-11.md`), and how a
-MATLAB session's parallel-pool size is set and honoured (item 9). Neither
-blocks reading the plan; the second must be settled before workers run.
+section 2 and the interface design of section 4.0 in mind. **Tom approved
+the interface design and said go; execution has started** (the approved
+execution plan added section 4.0, the outline in 4.6, the points marked
+"added with the execution plan" in 4.4, and FD-020 and FD-021 as full
+issues). Still to be written and reviewed by Tom before step 8: the full
+facilitation design (section 4.6; the options note is
+`docs/notes/Depression_facilitation_model_options_2026-11-11.md`).
 
 This is the implementation plan for **block A** of
 `../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`
@@ -164,9 +166,9 @@ Today's product depression, today's facilitation, the chain, and later the
 chain with release-coupled facilitation are implementations of that
 interface. `dynamics_fast`, `compute_Jacobian_fast`, `jacobian_times` and
 `unpack_and_compute_states` each call it once per route and contain no
-model-specific branches. The lead writes the interface (names, argument
-shapes, where it lives) into section 4 after re-reading the class and
-before briefing step 0d; Tom reviews it first.
+model-specific branches. The interface (names, argument shapes, where it
+lives) is section 4.0, written after re-reading the class and approved by
+Tom.
 
 Wherever sections 3 to 5 still say "chain branch", read "the chain's
 implementation of the route interface".
@@ -250,6 +252,82 @@ Outside the model class:
 
 ## 4. Design
 
+### 4.0 The route interface (reviewed and approved by Tom)
+
+This is the design section 2.1 asked for. Tom settled its open points:
+the state vector keeps today's ordering; the models are function files in
+`src/model/routes/`; chained facilitation extends the chain's model and is
+not a third one.
+
+**One local system per route.** A route `(pre, post)` owns a state `s`
+(`npre x ns`, one row per presynaptic neuron), is driven by the presynaptic
+rate `r` (`npre x 1`), and returns an output factor `F` (`npre x 1`) with
+synaptic output `theta = r .* F`. Depression and facilitation stop being
+two blocks the class joins: chained facilitation puts `g` inside the
+release term of `b1`, so they must be one system.
+
+**Where it lives:** `src/model/routes/`, plain function files, one per
+model, each returning a struct of function handles (the pattern of the
+solver registry in `src/model/integrators/` and of `lyapunov_topk`). A
+model can be tested alone, without building a network, and
+`SRNN_ESN_reservoir` inherits it.
+
+| Handle | Shapes | Meaning |
+|---|---|---|
+| `P = compile(std_cfg, stf_cfg, opts)` | route config in, nominal rows out | validates one route; sets `P.n_b`, `P.n_g`, `P.signature` |
+| `s0 = initial(P)` | `1 x ns` | starting values (pools 1, `g` 1, calcium 0) |
+| `[ds, F] = rhs(s, r, P)` | `npre x ns`, `npre x 1` | state derivative and output factor |
+| `F = output(s, P)` | `s` may be `npre x ns x nt` | output factor alone, for unpacking |
+| `L = linearize(s, r, P)` | `L.A` `npre x ns x ns`, `L.B` `npre x ns`, `L.F`, `L.Fs` `npre x ns` | `d(ds)/ds`, `d(ds)/dr`, `F`, `dF/ds` |
+| `ss = steady_state(r, P)` | closed form at constant rate | tests, `fig_STD_steady_state`, the tables |
+
+`route_model(name)` is the registry, the one place a model name is
+resolved. `get_params` stores `params.route(pre, post)` with the model, its
+`P` and its state indices.
+
+How the four class functions use it, identically for every model:
+
+- `dynamics_fast`: `[ds, F] = rhs(...)`; `recurrent += W_block * (F .* r)`.
+- `compute_Jacobian_fast`: `(s, s)` from `L.A` (timescale-major: entry
+  `(m, k)` of neuron `i` at row `(m-1)*npre + i`, column `(k-1)*npre + i`);
+  `(s, x)` = `L.B .* phi'`; `(s, a)` = `-c_eff * L.B .* phi'`; `(x, s)` =
+  `W_block * diag(r .* L.Fs(:, k)) / tau_d`; `(x, x)` and `(x, a)` from
+  `L.F .* phi'`.
+- `jacobian_times`: `Zs = A*Ys + B .* dr`;
+  `dtheta = F .* dr + r .* (Fs*Ys)`.
+- `unpack_and_compute_states`: `synaptic_output = output(s, P) .* rate`.
+
+Fixed points of the design:
+
+1. **Two models.** `route_product`: today's product depression (with
+   `combine` and the zero floor inside it) times today's output-only
+   facilitation; it also serves a route with no synapse dynamics.
+   `route_pool`: the vesicle-pool family. The chain (step 1) is
+   `route_pool` with `b1, b2`; chained facilitation (step 8) adds `g` and
+   the calcium trace to the same file. Wherever this plan says "a third
+   implementation", read "the pool model, extended".
+2. **The state vector keeps today's order,**
+   `[a | all routes' b-block | all routes' g-block | x]`. A route's state
+   is the index list `[layout.b{pre,post}, layout.g{pre,post}]`; it need
+   not be contiguous. The reserve is column 2 of the b-block; the calcium
+   trace is column 2 of the g-block and counts as STF in `lya_summary`. The
+   anchor's stored states and Jacobians therefore compare element for
+   element, and saved runs stay readable.
+3. **`F` depends on the route's state only.** True of every model decided
+   or proposed; the class carries the rate dependence. (Section 2.1 allows
+   `dF/dr`; adding it later is one field.)
+4. **Parameters are carried per neuron from the start** (`npre x k`
+   matrices in `P`, the nominal row replicated), as `tau_a_matrix` is. The
+   spread (FD-015) then only fills in drawn values; it adds no code path.
+5. `combine_std_pair` and the floor statics remain on the class only as
+   thin delegations where tests call them.
+6. **Invariants of the refactor (FD-021):** the public signatures of
+   `dynamics_fast`, `compute_Jacobian_fast`, `jacobian_times`,
+   `unpack_and_compute_states`, `get_params`, `route_fields` and
+   `routes_identical` do not change; `params` keeps the fields read outside
+   the class (`n_b_pairs`, `n_g_pairs`, `state_layout`, the nominal
+   `tau_b_*`, `tau_g_*`, `G`, `std_geomean`, `route_scale`).
+
 ### 4.1 Route configuration
 
 ```matlab
@@ -270,9 +348,11 @@ synapse_config.E.E.std = struct('model', 'chain', ...
 - `std.combine` is an error on a chain route.
 - `route.scale` stays allowed on a chain route (it multiplies the weights and
   is folded into `params.W` in `get_params`, independent of the model).
-- Facilitation (`route.stf`) on a chain route: **refused in this pass**,
-  with a clear error, unless Tom decides otherwise (section 9, item 4, has
-  the sketch of a two-variable facilitation for later). The paper uses none.
+- Facilitation (`route.stf`) on a chain route: **refused until step 8**,
+  with a clear error. Step 8 adds the release-coupled form
+  (`stf.model = 'chain'`, section 4.6); today's output-only `stf` on a
+  chain route stays refused after that, with an error naming
+  `stf.model = 'chain'`. The paper uses none.
 - `params.std_chain` (`C x C` logical) and `params.std_n2` (`C x C`, NaN where
   unused). `n_b_pairs` is 2 for a chain route.
 
@@ -398,6 +478,40 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
   The step 2 inventory lists which figures assume three.
 - A config and run script pair in `scripts/paper/`, copied from
   `mu7revisedMedium_config.m` as `regression_fast_config.m` was.
+- **Added with the execution plan** (found by reading the code; the first
+  three are fixed by the lead so the workers agree):
+  - **The option that names the conditions drawn is `cfg.conditions`** (a
+    cell of names; empty means all the run has). `make_all_paper_figures`
+    has no such mechanism today; it passes the option to every figure as
+    `'conditions'`. One new helper,
+    `src/figures/helpers/select_conditions.m`, turns (available, requested)
+    into the ordered list and errors on a name the run lacks. Literal name
+    lists in the figures are replaced by it.
+  - **`full_adaptation_condition` does not recognise `sfa3_stdc2`**: the
+    name matches neither exact pattern, so it is skipped. Given the paper's
+    three conditions the function would **silently return `sfa1_std1`**;
+    given four, the product. It gains a third exact pattern for
+    `sfaX_stdcY`, the chain wins a tie, and a plural form returns every
+    condition at the top adaptation count, chain first. This lands in the
+    same merge as the first chain preset.
+  - **The SFA-timescale sweep runs both MTS conditions** (Tom).
+    `run_tau_sensitivity_analysis` sweeps one condition today, the
+    most-adapted; it sweeps the plural list, and `fig_sfa_EOC_allStd` draws
+    the selected ones (the chain alone in the three-condition set, both in
+    the four-condition set).
+  - Hard-wired to three conditions, beyond the name maps:
+    `fig_main2_dynamics` (asserts 3), `fig_main3_stability`,
+    `fig_grouped_main`, `style_main4_grouped` (asserts 9 axes),
+    `style_main5_grouped` (asserts 4), `style_main6_grouped`,
+    `fig_STD_strength_matching`. Most stage figures already loop over the
+    run's conditions. `fig_sensitivity_medians` and
+    `fig_EI_weights_param_space` take their list from the preset, not the
+    run.
+  - `single_neuron_mu7revisedMedium` takes the 1TS condition by position
+    (`ref{2}`), and `regression_digest` names `results.sfa3_std2`.
+  - Depression arithmetic repeated outside the class, beyond section 3's
+    list: `fig_adaptation_methods`, `run_paper_illustrations`,
+    `run_stim_evoked`, `run_stim_neurons`.
 - Adding presets fails `test_preset_golden` by design. Procedure: confirm the
   only failure is "valid-preset list unchanged", delete the fixture, run
   `make_preset_golden`, force-add it, and say in the commit why. Also add the
@@ -416,7 +530,45 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
   `b(:,1)` for a chain route and goes through `combine_std_pair` otherwise).
   That static is added in step 1 so the display work can use it.
 - `fig_STD_steady_state` and `write_manuscript_tables` state the steady
-  state and the equations; both need the chain's (C4 and C1 to C3).
+  state and the equations; both need the chain's (C4 and C1 to C3). The
+  route model's `steady_state` handle (section 4.0) is the one place the
+  closed form is written.
+
+### 4.6 Chained facilitation (FD-018): outline
+
+**Outline only. The lead writes the full section (linearisation table,
+steady state, test list) and Tom reviews it before step 8 is briefed.**
+
+Form: option C of the facilitation note (release-coupled, serial), in
+`route_pool`. With `u = 1/tau_rec1`, `v = 1/tau_rec2`, `w = 1/tau_rel`,
+`q = 1/n2`, and drive `d = h` (two-variable form) or `d = r`
+(one-variable):
+
+```
+db1/dt = b2 (1 - b1) u - g b1 r w          dg/dt = (1 - g)/tau_dec + (G - g) d / tau_fac
+db2/dt = (1 - b2) v - q b2 (1 - b1) u      dh/dt = (r - h)/tau_h
+F = g b1
+```
+
+Absent variables are removed, never clamped: no reserve drops `b2` (1TS
+depression); no `tau_h` drops `h` and the rate drives `g` (1TS
+facilitation: today's equation plus the coupling). Steady state: `h = r`,
+`g = (1 + G k r)/(1 + k r)` with `k = tau_dec/tau_fac`, and the pools from
+(C4) evaluated at the rate `g r`.
+
+Proposed configuration (today's forms unchanged):
+
+```matlab
+stf = struct('model','chain','tau_dec',6,'tau_fac',2.5,'G',2.86);           % coupled, g only
+stf = struct('model','chain','tau_dec',6,'tau_fac',2.5,'G',2.86,'tau_h',1); % coupled, h -> g
+```
+
+A coupled `stf` requires the route's depression to be absent, a single
+pool or the chain; it is refused beside a multi-component product,
+`combine` or the zero floor.
+
+Open for Tom's review of the full section: whether `G` is jittered by
+`stf_spread`, and whether a coupled `stf` with no depression is allowed.
 
 ## 5. Tests
 
@@ -476,7 +628,7 @@ Run by the lead on merged `main`, in the lead's MATLAB, after each merge.
 
 | Gate | Command | When | Must show |
 |---|---|---|---|
-| Tolerance tier | its own test, built in step 0b (name fixed then) | after every merge that touches `src/model/` or `src/analysis/ParamSpaceAnalysis2.m`; against the anchor always, and against a fresh pre-edit capture for a critical edit | PASS on all three layers. A failure is a defect to find, **not a reason to loosen a tolerance or re-capture**. |
+| Tolerance tier | `run_all_tests('test_regression_tolerance')` against the anchor; `regression_tol_check('<name>')` against a pre-edit capture (built in step 0b, FD-020) | after every merge that touches `src/model/` or `src/analysis/ParamSpaceAnalysis2.m`; against the anchor always, and against a fresh pre-edit capture for a critical edit | PASS on all three layers. A failure is a defect to find, **not a reason to loosen a tolerance or re-capture**. |
 | Ultrarapid, exact | `run_all_tests('test_regression_rapid')` | after every merge that should move no number (pool module, configs, figures, plumbing); and after model merges once it has been re-captured (below) | PASS, exact |
 | Quick suite | `run_all_tests('quick')` | after every merge | all pass |
 | Stages | `run_all_tests('test_regression_stages')` | after the pool module, and after the display and stage work merges | PASS |
@@ -914,6 +1066,16 @@ Workers start with no memory of this conversation. Each brief gives:
    produced, three-condition and four-condition (section 4.4).
 7. **Automatic pool creation.** Off, machine-wide; Tom has done it.
 8. **Reserve refill.** 5 s.
+
+10. **The route interface** (section 4.0), settled with the execution
+    plan: the state vector keeps today's ordering; the route models are
+    function files in `src/model/routes/`; chained facilitation extends the
+    chain's model (`route_pool`) and is not a third model.
+11. **The SFA-timescale sweep** runs both MTS conditions, chained and
+    product (section 4.4).
+12. **Mutation checks are repeated** on the refactored code after step 0d
+    and on the chain in step 5, with the list adapted, so the tier is known
+    to catch errors in the code it guards. (An addition to step 0c.)
 
 **Still under discussion (the lead's recommendation in each):**
 
