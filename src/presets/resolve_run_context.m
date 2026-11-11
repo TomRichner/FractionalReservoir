@@ -48,9 +48,15 @@ function ctx = resolve_run_context(analysis, opts)
 %                   create its own dated folder", which is what a standalone
 %                   run wants.
 %   save_figs       whether the caller wants extra figure formats written.
+%   param_space_seed  seed for the joint parameter-space sample (FD-016).
+%                   Empty, the default, leaves it unset: the sample is drawn
+%                   from the clock, as it always was. A nonnegative integer
+%                   makes two runs sample the same grid points; see
+%                   ParamSpaceAnalysis2.sample_seed. Used by 'param_space' only.
 %
 % OUTPUT ctx, with the fields every caller needs:
 %   .analysis .run_mode .preset_name .verbose .save_figs .output_dir
+%   .param_space_seed  as given ([] = unset)
 %   .preset_defaults  the preset struct as srnn_param_preset returned it
 %   .model_class      'SRNNModel2' | 'SRNNCellTypePairs'
 %   .conditions       the four adaptation regimes, spelled for that class
@@ -76,6 +82,7 @@ arguments
     opts.output_dir  (1,:) char = ''
     opts.save_figs   (1,1) logical = false
     opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
+    opts.param_space_seed          = []          % [] = unset; else ParamSpaceAnalysis2.sample_seed for the joint sample
 end
 
 ctx = struct();
@@ -85,6 +92,10 @@ ctx.preset_name = opts.preset_name;
 ctx.output_dir  = opts.output_dir;
 ctx.save_figs   = opts.save_figs;
 ctx.verbose     = verbose_name(opts.verbose);
+% Carried as given; ParamSpaceAnalysis2 validates it. Only
+% run_param_space_analysis reads it: the 1-D sweeps run in sequential order
+% and draw nothing.
+ctx.param_space_seed = opts.param_space_seed;
 
 % The preset carries three things, not one: the overrides, the class they are
 % written for, and the conditions. Taking all three from the same call is what

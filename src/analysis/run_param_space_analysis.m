@@ -107,6 +107,16 @@ n_target = ctx.cfg.n_grid_points;
 n_full   = ctx.n_levels ^ numel(psa.grid_params);
 psa.subset_fraction = min(1, n_target / n_full);
 
+% WHICH points: drawn from the clock unless the context carries a seed (FD-016).
+% Unset (the field absent or empty, which is every bundle made before the seed
+% existed) the PSA keeps its default and nothing changes. Set, two runs sample
+% the same n_target points and can be compared point for point. A context
+% built by hand without the field is accepted, hence the isfield.
+if isfield(ctx, 'param_space_seed') && ~isempty(ctx.param_space_seed)
+    psa.sample_seed = ctx.param_space_seed;
+    vprintf(ctx.verbose, 'minimal', '[param_space] sample_seed=%d\n', psa.sample_seed);
+end
+
 %% Conditions
 % From the preset rather than PSA's built-in defaults, which are spelled in
 % SRNNModel2's n_a_E / n_b_E vocabulary and would be passed verbatim to whatever

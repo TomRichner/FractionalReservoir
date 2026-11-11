@@ -61,6 +61,34 @@ classdef ParamSpaceAnalysis2 < handle
         % -- which need randomize_order = false for their ordered axes -- cannot
         % use this, and do not need to: they are 1-D.
         subset_fraction = 1            % Fraction of grid points to run, (0, 1]. Needs randomize_order.
+
+        % Seed for the random execution order, and so for WHICH grid points a
+        % subset_fraction < 1 run simulates (FD-016).
+        %
+        % Empty (the default) is the behaviour this class always had:
+        % generate_grid calls rng('shuffle') and randperm, so the order comes
+        % from the clock, differs on every run, and the caller's global
+        % random stream is left reseeded.
+        %
+        % A finite nonnegative integer (at most 2^32 - 1) makes the draw
+        % reproducible: two objects with the same grid and the same seed get
+        % the same shuffled_indices, so two runs of the joint sweep simulate
+        % the same points, and a run() repeated on a loaded object redraws
+        % the same schedule. The permutation is drawn from a PRIVATE
+        % RandStream('mt19937ar', 'Seed', sample_seed), never from the global
+        % stream, for two reasons: the global stream is left exactly as it
+        % was found (nothing downstream of generate_grid changes because a
+        % seed was set), and the generator is pinned, where rng(seed) would
+        % keep whichever generator is current (the client's and a pool
+        % worker's differ).
+        %
+        % It changes the SAMPLE, not the experiment: results sit at their
+        % grid position and each point's network seed is tied to that
+        % position, so same_config ignores it, as it ignores subset_fraction.
+        % It has no effect with randomize_order = false (generate_grid warns).
+        % Saved with the object; written to param_space_summary.mat only when
+        % set, so an unseeded run's summary has the fields it always had.
+        sample_seed = []               % [] = rng('shuffle') as before | integer = reproducible order
     end
 
     %% Model Default Properties
@@ -695,6 +723,7 @@ classdef ParamSpaceAnalysis2 < handle
             % created, so a rejected config leaves no empty dated folder behind.
             obj.validate_model_defaults();
             obj.validate_noise_settings();
+            obj.validate_sample_seed();
             obj.report_shadowed_defaults();
 
             % Create timestamped output directory
@@ -804,10 +833,11 @@ classdef ParamSpaceAnalysis2 < handle
             %   runs sweep the same grid under the same conditions and model
             %   parameters, so their results can be concatenated for combined
             %   plotting. The reps-axis LENGTH, randomize_order,
-            %   network_seed_offset and subset_fraction are intentionally
-            %   ignored (expected to differ across runs) -- pooling two
-            %   different random subsets of the same grid is precisely what
-            %   subsetting is for. `reason` explains the first mismatch found.
+            %   network_seed_offset, subset_fraction and sample_seed are
+            %   intentionally ignored (expected to differ across runs) --
+            %   pooling two different random subsets of the same grid is
+            %   precisely what subsetting is for, and sample_seed only picks
+            %   which subset. `reason` explains the first mismatch found.
             %
             %   Model parameters are compared through resolved_defaults -- the
             %   FULL parameter set each run froze at run time -- so two runs with
@@ -1936,6 +1966,7 @@ classdef ParamSpaceAnalysis2 < handle
             s.vector_param_config = obj.vector_param_config;
             s.randomize_order = obj.randomize_order;
             s.subset_fraction = obj.subset_fraction;
+            s.sample_seed = obj.sample_seed;
             s.network_seed_offset = obj.network_seed_offset;
 
             % Model Default Properties (public)
@@ -2307,6 +2338,8 @@ classdef ParamSpaceAnalysis2 < handle
                 if isfield(s, 'vector_param_config'), obj.vector_param_config = s.vector_param_config; end
                 if isfield(s, 'randomize_order'), obj.randomize_order = s.randomize_order; end
                 if isfield(s, 'subset_fraction'), obj.subset_fraction = s.subset_fraction; end
+                % Absent before FD-016; stays empty, which is how those runs drew.
+                if isfield(s, 'sample_seed'), obj.sample_seed = s.sample_seed; end
                 if isfield(s, 'network_seed_offset'), obj.network_seed_offset = s.network_seed_offset; end
 
                 % Model Default Properties (public)
@@ -2529,7 +2562,10 @@ classdef ParamSpaceAnalysis2 < handle
             % On a 7-axis grid that difference is the whole planning question.
             %
             % Calling it again rebuilds the grid and redraws the execution
-            % order, discarding any previous schedule.
+            % order, discarding any previous schedule. With sample_seed set
+            % the redraw gives the same order; unset, a new one.
+
+            obj.validate_sample_seed();
 
             n_params = length(obj.grid_params);
             obj.param_vectors = cell(1, n_params);
@@ -2607,11 +2643,24 @@ classdef ParamSpaceAnalysis2 < handle
             end
 
             % Set execution order
-            if obj.randomize_order
+            if obj.randomize_order && isempty(obj.sample_seed)
                 rng('shuffle');
                 obj.shuffled_indices = randperm(obj.num_combinations);
                 vprintf(obj.verbose, 'verbose', 'Generated %d parameter combinations (randomized order)\n', obj.num_combinations);
+            elseif obj.randomize_order
+                % Seeded: a private, generator-pinned stream, so the order
+                % depends on the seed alone and the global stream is not
+                % touched. See the sample_seed property comment.
+                sample_stream = RandStream('mt19937ar', 'Seed', obj.sample_seed);
+                obj.shuffled_indices = randperm(sample_stream, obj.num_combinations);
+                vprintf(obj.verbose, 'verbose', 'Generated %d parameter combinations (randomized order, sample_seed = %d)\n', ...
+                    obj.num_combinations, obj.sample_seed);
             else
+                if ~isempty(obj.sample_seed)
+                    warning('ParamSpaceAnalysis2:SampleSeedUnused', ...
+                        'sample_seed = %d has no effect with randomize_order = false: the order is sequential.', ...
+                        obj.sample_seed);
+                end
                 obj.shuffled_indices = 1:obj.num_combinations;
                 vprintf(obj.verbose, 'verbose', 'Generated %d parameter combinations (sequential order)\n', obj.num_combinations);
             end
@@ -2622,6 +2671,28 @@ classdef ParamSpaceAnalysis2 < handle
             % the unrun points are simply empty. See the subset_fraction
             % property comment for why that is safe.
             obj.apply_subset_fraction();
+        end
+
+        function validate_sample_seed(obj)
+            % VALIDATE_SAMPLE_SEED Empty, or a finite nonnegative integer scalar.
+            %
+            % Called by run() before the output directory is created, and by
+            % generate_grid, which is public and can be called on its own.
+            v = obj.sample_seed;
+            if isempty(v)
+                return;   % unset: rng('shuffle'), as before
+            end
+            if ~(isnumeric(v) && isscalar(v) && isreal(v) && isfinite(v) && ...
+                    v >= 0 && v == floor(v) && v <= 2^32 - 1)
+                if isnumeric(v) || islogical(v) || ischar(v)
+                    shown = mat2str(v);
+                else
+                    shown = sprintf('a %s', class(v));
+                end
+                error('ParamSpaceAnalysis2:BadSampleSeed', ...
+                    ['sample_seed must be empty (draw from the clock) or a finite ' ...
+                     'nonnegative integer scalar no larger than 2^32 - 1; got %s.'], shown);
+            end
         end
 
         function apply_subset_fraction(obj)
@@ -2819,6 +2890,14 @@ classdef ParamSpaceAnalysis2 < handle
             % full one that mostly failed.
             summary_data.subset_fraction = obj.subset_fraction;
             summary_data.num_run = numel(obj.shuffled_indices);
+            % Only when set. An unseeded run's summary keeps exactly the
+            % fields it had before the seed existed: the full regression tier
+            % digests every field of every sweep's summary and reports a new
+            % key as a difference, and "unset moves nothing" includes that.
+            % A summary without the field was drawn from the clock.
+            if ~isempty(obj.sample_seed)
+                summary_data.sample_seed = obj.sample_seed;
+            end
             summary_data.analysis_start_time = obj.analysis_start_time;
             summary_data.analysis_completed = datestr(now);
 
