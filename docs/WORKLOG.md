@@ -34,6 +34,44 @@ Entry template:
 
 ---
 
+## 2026-11-11 15:10 (session 1766c926-8e9d-42f1-ba3a-5851de78596b, scripts/paper archive)
+
+**Issues touched:** none. Tom asked which `scripts/paper` files produced the
+manuscript's figures and to archive the rest; this is an exception to the
+deferred reorganisation, recorded in the to-do list and in `CLAUDE.md`.
+
+**Commits:** this repo, "scripts/paper: archive the 22 config/run pairs the
+manuscript's figures do not use"; manuscript repo, "To-do: scripts/paper
+archive done as an exception to the deferred reorganisation".
+
+**Done:** 44 files (22 `*_config.m` / `*_run.m` pairs) moved with `git mv`
+into `scripts/paper/archive/`, contents unchanged. Nine `.m` files stay: the
+manuscript bundle (`mu7revisedMedium_config` / `_run`,
+`run_all_paper_analyses`, `make_all_paper_figures`,
+`grouped_figure_registry`), the regression bundle (`regression_fast_config`
+/ `_run`), and `paper_config` with `reproduce_paper_run`. The three `.md`
+notes in `scripts/paper/` were left where they are.
+
+**Verified:** in MATLAB, before and after the move, all 25 `*_config`
+functions were called and returned the same preset names; all 44 archived
+files resolve by name to `archive/` after `setup_paths`. `run_all_tests` on
+`test_mu7revised_bundle`, `test_run_modes`, `test_verbose_levels`,
+`test_preset_golden`, `test_preset_conditions`: all pass.
+
+**Not verified / known gaps:** no regression tier was run (no file a tier
+reads was moved or edited). No archived `*_run.m` was executed. A MATLAB
+session started before the move needs `setup_paths` again to see `archive/`.
+
+**Raised, not acted on:** `paper_config` and `reproduce_paper_run` are not
+the manuscript's: `paper_config` names the mu8p25 network, so "reproduce the
+paper" there builds a superseded one. They stay because both entry points
+default to `paper_config()`, two tests call it, and the README points at
+both. `README_mu7revised.md` mostly describes archived bundles.
+
+**Next:** unchanged from the entry below.
+
+---
+
 ## 2026-11-11 (session 7ec5eb22-1e10-4e89-8903-1803563a876a, planning, second half)
 
 **Issues touched:** FD-020 (tolerance tier) and FD-021 (refactor) named
