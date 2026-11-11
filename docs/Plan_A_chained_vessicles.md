@@ -4,8 +4,9 @@
 by the lead agent at the end of the session that produced the decisions, the
 test audit and the regression references, so that the work can be picked up
 after the conversation is compacted. **Revised 2026-11-11 with Tom's answers
-to the questions in section 9.** Three points there are still under
-discussion and one new one was found; none blocks reading the plan.
+to the questions in section 9.** Two points there are still under
+discussion (facilitation, the joint-sample seed) and one new one was found
+(the default pool profile); none blocks reading the plan.
 
 This is the implementation plan for **block A** of
 `../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`
@@ -280,11 +281,11 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
   | `sfa3_std2` | three timescales | product: `tau_rec [2 4]`, `tau_rel [0.25 0.5]` | product MTS, kept for the side-by-side |
 
   All four routes carry the depression in each adapting condition.
-- **Where the spread is set (section 9, item 3, still to be confirmed):**
-  recommended at preset level, `std_spread = [0.25 0.25]`, exactly as
-  `tau_a_spread` is set today, with the condition names unchanged. Then all
-  three adapting conditions are jittered with shared draws, and the preset's
-  name says so (`..._stdSpread0p25_...`).
+- **The spread is set in the preset, not in a condition** (Tom,
+  2026-11-11): `std_spread = [0.25 0.25]`, exactly as `tau_a_spread` is set
+  today, with the condition names unchanged. All three adapting conditions
+  are then jittered with shared draws, and the preset's name says so
+  (`..._stdSpread0p25_...`).
 - Every map keyed on condition names must learn `sfa3_stdc2`: titles
   (`srnn_condition_titles`), colours and short labels (`manuscript_style`,
   `mc_condition_colors`), the grouped figure styles, and
@@ -657,6 +658,14 @@ Workers start with no memory of this conversation. Each brief gives:
 1. **Where the spread is allowed.** On all three kinds of route: chain,
    one-component, and multi-component product.
 2. **The MTS chain condition's name.** `sfa3_stdc2`.
+3. **Where the jitter is set.** In the **preset**, not in a condition, as
+   the SFA spread is (`tau_a_spread` in the preset's struct). Condition
+   names are unchanged: `sfa1_std1` and `sfa3_std2` keep their names with
+   the spread on, and no `stdj` names are introduced. The reasons: the
+   validator requires every condition of a preset to set the same fields;
+   precedence is preset < condition < grid and the spread is a property of
+   the network; the regression references use presets that never set it;
+   and `same_config` refuses to pool runs whose `std_spread` differs.
 6. **Reruns.** Agents never run `medium` or larger; only Tom starts them and
    says when they are done. The plan includes one `fast` run after block A is
    built. Analyses run on **four** conditions, and two figure sets are
@@ -666,25 +675,6 @@ Workers start with no memory of this conversation. Each brief gives:
 
 **Still under discussion (the lead's recommendation in each):**
 
-3. **Where the jitter is set, and whether jittered conditions get new
-   names.** For SFA, the jitter is set in the **preset**
-   (`tau_a_spread = [0.25 0.25]` in the preset's struct), not in a
-   condition. Conditions carry only `tau_a` and `synapse_config`, and their
-   names state timescale counts, not jitter: `sfa1_std1` already exists with
-   and without the SFA spread in different presets. Recommendation: do the
-   same for depression. Set `std_spread` in the preset, keep `sfa1_std1` and
-   `sfa3_std2`, add `sfa3_stdc2`, and let the preset's name carry the spread.
-   Reasons: `validate_preset_conditions` requires every condition to set the
-   same fields, so a condition-level spread would have to be set (as zeros)
-   on `no_adaptation` too; precedence is preset < condition < grid, and the
-   spread is a property of the network, like the SFA spread; the regression
-   references are unaffected either way, because they use existing presets
-   that never set it; and `same_config` already refuses to pool runs whose
-   `std_spread` differs, since it is frozen into `resolved_defaults`. The
-   alternative, condition-level spread with names such as `sfa1_stdj1` and
-   `sfa3_stdj2`, is what to choose only if one preset must hold jittered and
-   unjittered versions of a condition side by side; it costs an entry in
-   every name map per new name.
 4. **Facilitation.** Recommendation: refuse it on chain routes in this pass.
    If a two-variable facilitation is wanted later, the form that matches the
    chain's logic is residual calcium driving a slower release-probability
