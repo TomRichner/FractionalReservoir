@@ -122,6 +122,7 @@ function names = slow_test_names()
 % which adds its start-up time once). Everything else took under 30 s each.
 % Re-time and edit this list when a test is added or changes weight.
     names = {
+        'test_regression_bundle'            % ~50 min  the FULL regression: every stage and figure (32 + 18 min)
         'test_numerics_verification_stage'  % 737 s  the numerics stage at 'fast', five checks x 3 conditions
         'test_lyapunov_topk'                % 165 s  top-K against the ode45 full-spectrum QR reference
         'test_sensitivity_refactor'         %  61 s  two sensitivity sweeps on a parallel pool
