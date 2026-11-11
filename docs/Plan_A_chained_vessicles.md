@@ -536,8 +536,9 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
 
 ### 4.6 Chained facilitation (FD-018)
 
-**Written by the lead; AWAITING TOM'S REVIEW. Step 8 is not briefed until
-Tom has read this section and answered the questions at its end.** The
+**Written by the lead. Tom has answered the first two questions at its end
+(2026-11-11); the parameter values are still being chosen, and step 8 is
+briefed once they are.** The
 derivations are by hand (the options note, section 5, checked its steady
 state numerically; nothing here has been simulated). The worker's tests
 are what verify them.
@@ -666,18 +667,18 @@ fixed column order: $\tau_{dec}$, $\tau_{fac}$, $\tau_h$, then the ceiling
 (question 1). No ordering floor is needed: the facilitation variables
 have no "slower than" relation to keep.
 
-**Questions for Tom:**
+**Tom's answers (2026-11-11):**
 
-1. **Is the ceiling $G$ jittered?** The lead's recommendation: yes, as a
-   log-normal spread on the excess $G - 1$, so $G \ge 1$ holds for every
-   neuron. It is the counterpart of jittering the reserve size $n_2$.
-2. **Is coupled facilitation allowed on a route with no depression?** The
-   lead's recommendation: yes. The coupling then has nothing to act on and
-   the route is a facilitating synapse with `F = g` (the E-to-I case of
-   the options note, question 5), optionally with the calcium trace.
-3. **Values.** None are proposed. The tests use the only facilitation
-   numbers in the repo (`single_neuron_stf`: 6 s, 2.5 s, 1/0.35) and an
-   arbitrary `tau_h`. A preset that uses the form needs chosen values.
+1. **The ceiling $G$ is jittered by `stf_spread`**, as a log-normal spread
+   on the excess $G - 1$, so $G \ge 1$ holds for every neuron. It is the
+   counterpart of jittering the reserve size $n_2$.
+2. **Coupled facilitation is allowed on a route with no depression.** The
+   coupling then has nothing to act on and the route is a facilitating
+   synapse with `F = g` (the E-to-I case of the options note, question 5),
+   optionally with the calcium trace.
+3. **Values: under discussion with Tom.** Until they are chosen the only
+   facilitation numbers in the repo are `single_neuron_stf`'s (6 s, 2.5 s,
+   1/0.35). The code does not depend on them; a preset and the tests do.
 
 ## 5. Tests
 
