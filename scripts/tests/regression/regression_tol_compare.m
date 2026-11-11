@@ -126,10 +126,17 @@ for q = 1:numel(layer_names)
         'n_new', nnz(strcmp(L.status, 'new')), 'worst_max_rel', 0, 'worst_key', '', 'rtol', NaN);
     is_float = strcmp(L.kind, 'float') & isfinite(L.max_rel);
     if any(is_float)
+        % The worst leaf is the one CLOSEST TO ITS OWN TOLERANCE (leaves
+        % under an override have another rtol than the layer's), or, when
+        % the tolerance is zero, the one that moved most.
         F = L(is_float, :);
-        [s.worst_max_rel, w] = max(F.max_rel);
+        closeness = F.max_rel ./ F.rtol;
+        closeness(F.max_rel == 0) = 0;
+        if all(F.rtol == 0); closeness = F.max_rel; end
+        [~, w] = max(closeness);
+        s.worst_max_rel = F.max_rel(w);
         s.worst_key = F.key{w};
-        s.rtol = min(F.rtol);
+        s.rtol = F.rtol(w);
     end
     summary(end + 1) = s; %#ok<AGROW>
 end
@@ -139,13 +146,17 @@ if opts.verbose
         numel(ref_keys), numel(new_keys), numel(ia));
     for q = 1:numel(summary)
         s = summary(q);
-        fprintf('  %-10s %4d leaves, rtol %-7.1e  worst relative difference %.2e', ...
-            s.layer, s.n_leaves, s.rtol, s.worst_max_rel);
-        if s.worst_max_rel > 0
-            fprintf('\n             at %s', s.worst_key);
-            if s.rtol > 0
-                fprintf('\n             (tolerance / worst = %.1e)', s.rtol / s.worst_max_rel);
-            end
+        fprintf('  %-10s %4d leaves', s.layer, s.n_leaves);
+        if s.worst_max_rel > s.rtol && s.rtol > 0
+            fprintf('; furthest outside its tolerance: relative difference %.2e against rtol %.1e (%.1e times OUTSIDE)\n             at %s', ...
+                s.worst_max_rel, s.rtol, s.worst_max_rel / s.rtol, s.worst_key);
+        elseif s.worst_max_rel > 0 && s.rtol > 0
+            fprintf('; closest to its tolerance: relative difference %.2e against rtol %.1e (%.1e times inside)\n             at %s', ...
+                s.worst_max_rel, s.rtol, s.rtol / s.worst_max_rel, s.worst_key);
+        elseif s.worst_max_rel > 0
+            fprintf('; largest relative difference %.2e (rtol 0)\n             at %s', s.worst_max_rel, s.worst_key);
+        else
+            fprintf('; no float leaf moved');
         end
         fprintf('\n             %d FAIL, %d missing, %d new\n', s.n_fail, s.n_missing, s.n_new);
     end

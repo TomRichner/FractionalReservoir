@@ -32,6 +32,9 @@ function [ok, leaves, info] = regression_tol_check(name, opts)
 % equality, which holds for the same code on the same thread count),
 % settings (default regression_tol_settings()), verbose.
 %
+% A case that throws does not stop the check: its error is printed, its
+% leaves count as missing, and OK is false (see regression_tol_run).
+%
 % INFO has the reference's meta, the fresh run (info.data), its duration
 % and the per-layer summary of regression_tol_compare.
 %
@@ -69,6 +72,15 @@ end
     'rtol', opts.rtol, 'verbose', opts.verbose);
 info = struct('ref_file', ref_file, 'meta', ref.meta, 'data', data, 'seconds', seconds, ...
     'summary', summary);
+% Cases that threw. Their reference leaves already count as missing; this
+% says why, and keeps OK false even for a case the reference does not hold.
+if ~isempty(data.info.errors)
+    ok = false;
+    if opts.verbose
+        fprintf('  %d case(s) did not run:\n', numel(data.info.errors));
+        fprintf('    ERROR   %s\n', data.info.errors{:});
+    end
+end
 if opts.verbose
     if ok; verdict = 'PASS'; else; verdict = 'DIFFERENCES FOUND'; end
     fprintf('regression_tol_check(''%s''): %s (%.0f s)\n', name, verdict, seconds);

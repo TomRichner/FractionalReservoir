@@ -101,6 +101,16 @@ function [R, seconds] = regression_tol_run(ref_data)
 % whether one is up. It does depend, at round-off, on the client's thread
 % count (see regression_tol_settings); R.info.threads records it.
 %
+% A CASE THAT THROWS. In a capture the error is rethrown: a reference with
+% a hole in it is no reference. In a check it is recorded and the run goes
+% on, so one case that no longer runs does not hide what the others have
+% to say: the case's branch holds a single field ERROR with the message,
+% the reference's leaves under it then count as missing (which fails), and
+% R.info.errors lists the messages. (How this was found: a tau_rec off by
+% 1e-6 on one route makes SRNN_ESN_reservoir refuse the synaptic readout,
+% because the routes of one presynaptic type are no longer identical; the
+% first version of this function died there and reported nothing.)
+%
 % IT USES ONLY THE PUBLIC SURFACE THAT THE REFACTOR KEEPS: build, run,
 % get_params, the statics dynamics_fast, compute_Jacobian_fast,
 % jacobian_times, finite_difference_jacobian, transient_gain, route_fields,
@@ -133,6 +143,7 @@ integrators = struct('name', {'rk4_noise_off', 'sra1_noise_on'}, ...
 
 R = struct('pointwise', struct(), 'stable', struct(), 'info', struct());
 R.info.threads = maxNumCompThreads;
+errors = {};
 
 %% Layer 1a. Chaotic networks: states only, then single evaluations
 chaos_args = {'rng_seeds', [5 6], 'T_range', [0 4], 'fs', 200, 'store_full_state', true, ...
@@ -141,26 +152,36 @@ sets = struct('name', {'pairs_noStim', 'pairs_steps'}, 'preset', {P_chaos, P_ste
 for q = 1:numel(sets)
     for i = 1:numel(cond_names)
         for s = 1:numel(integrators)
-            m = build_from_preset(sets(q).preset, cond_names{i}, chaos_args{:}, integrators(s).args{:});
-            if capture
-                m.run();
-                [S, t] = pick_states(m);
-            else
-                [S, t] = stored_states(ref_data, {sets(q).name, cond_names{i}, integrators(s).name});
+            key = {'pointwise', sets(q).name, cond_names{i}, integrators(s).name};
+            try
+                m = build_from_preset(sets(q).preset, cond_names{i}, chaos_args{:}, integrators(s).args{:});
+                if capture
+                    m.run();
+                    [S, t] = pick_states(m);
+                else
+                    [S, t] = stored_states(ref_data, key(2:end));
+                end
+                R = setfield(R, key{:}, pointwise_case(m, S, t));
+            catch err
+                [R, errors] = failed(R, errors, capture, err, key);
             end
-            R.pointwise.(sets(q).name).(cond_names{i}).(integrators(s).name) = pointwise_case(m, S, t);
         end
     end
 end
 
-mo = options_model(1, false);
-if capture
-    mo.run();
-    [S, t] = pick_states(mo);
-else
-    [S, t] = stored_states(ref_data, {'options_chaotic'});
+key = {'pointwise', 'options_chaotic'};
+try
+    mo = options_model(1, false);
+    if capture
+        mo.run();
+        [S, t] = pick_states(mo);
+    else
+        [S, t] = stored_states(ref_data, key(2:end));
+    end
+    R = setfield(R, key{:}, pointwise_case(mo, S, t));
+catch err
+    [R, errors] = failed(R, errors, capture, err, key);
 end
-R.pointwise.options_chaotic = pointwise_case(mo, S, t);
 
 %% Layer 2a. The stable networks: three conditions x two integrators
 stable_args = {'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, 'store_full_state', true, ...
@@ -168,33 +189,42 @@ stable_args = {'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, 'store_full_stat
     'lya_T_interval', [1.5 5], 'lya_warmup', 1.5, 'verbose', 'near-none'};
 for i = 1:numel(cond_names)
     for s = 1:numel(integrators)
-        % The preset states the noise; only the integrator is named here.
-        m = build_from_preset(P_stable.(integrators(s).name), cond_names{i}, stable_args{:}, ...
-            'ode_solver', integrators(s).args{end});
-        m.run();
-        R.stable.model.(cond_names{i}).(integrators(s).name) = end_to_end(m);
-        if capture
-            [S, t] = pick_states(m);
-        else
-            [S, t] = stored_states(ref_data, {'stable_steps', cond_names{i}, integrators(s).name});
-        end
-        R.pointwise.stable_steps.(cond_names{i}).(integrators(s).name) = pointwise_case(m, S, t);
-
-        % 2b. On the most-adapted condition with noise on: the transient gain
-        % in its three variants, and the finite-difference Jacobian.
-        if i == numel(cond_names) && s == numel(integrators)
-            p = m.get_params();
-            p.u_interpolant = m.u_interpolant;
-            extra = struct();
-            i0 = find(m.t_out >= 2.5, 1);
-            for variant = {'frozen_x', 'frozen_full', 'active'}
-                [G, g_info] = SRNNCellTypePairs.transient_gain(m.S_out, m.t_out, i0, p, 0.5, ...
-                    struct('variant', variant{1}));
-                extra.transient_gain.(variant{1}) = struct('G', G, 'info', drop_volatile(g_info));
+        key_run = {'stable', 'model', cond_names{i}, integrators(s).name};
+        key_pw  = {'pointwise', 'stable_steps', cond_names{i}, integrators(s).name};
+        keys = {key_run, key_pw};
+        with_extra = i == numel(cond_names) && s == numel(integrators);
+        if with_extra; keys{end + 1} = {'stable', 'extra'}; end %#ok<AGROW>
+        try
+            % The preset states the noise; only the integrator is named here.
+            m = build_from_preset(P_stable.(integrators(s).name), cond_names{i}, stable_args{:}, ...
+                'ode_solver', integrators(s).args{end});
+            m.run();
+            R = setfield(R, key_run{:}, end_to_end(m));
+            if capture
+                [S, t] = pick_states(m);
+            else
+                [S, t] = stored_states(ref_data, key_pw(2:end));
             end
-            extra.finite_difference_J = SRNNCellTypePairs.finite_difference_jacobian( ...
-                m.S_out(end, :)', p, 1e-6);
-            R.stable.extra = extra;
+            R = setfield(R, key_pw{:}, pointwise_case(m, S, t));
+
+            % 2b. On the most-adapted condition with noise on: the transient
+            % gain in its three variants, and the finite-difference Jacobian.
+            if with_extra
+                p = m.get_params();
+                p.u_interpolant = m.u_interpolant;
+                extra = struct();
+                i0 = find(m.t_out >= 2.5, 1);
+                for variant = {'frozen_x', 'frozen_full', 'active'}
+                    [G, g_info] = SRNNCellTypePairs.transient_gain(m.S_out, m.t_out, i0, p, 0.5, ...
+                        struct('variant', variant{1}));
+                    extra.transient_gain.(variant{1}) = struct('G', G, 'info', drop_volatile(g_info));
+                end
+                extra.finite_difference_J = SRNNCellTypePairs.finite_difference_jacobian( ...
+                    m.S_out(end, :)', p, 1e-6);
+                R.stable.extra = extra;
+            end
+        catch err
+            [R, errors] = failed(R, errors, capture, err, keys{:});
         end
     end
 end
@@ -204,47 +234,65 @@ end
 small = {'n', 20, 'indegree', 4, 'F_ref_n', 20, 'F_ref_indegree', 4, 'rng_seeds', [5 6], ...
     'T_range', [0 3], 'fs', 200, 'lya_T_interval', [1.5 3], 'lya_warmup', 1, 'verbose', 'near-none'};
 for i = [1, numel(cond_names)]
-    mb = build_from_preset(P_stable.sra1_noise_on, cond_names{i}, small{:}, ...
-        'ode_solver', 'sra1', 'lya_method', 'benettin');
-    mb.run();
-    mq = build_from_preset(P_stable.rk4_noise_off, cond_names{i}, small{:}, ...
-        'ode_solver', 'rk4', 'lya_method', 'qr');
-    mq.run();
-    R.stable.estimators.(cond_names{i}) = struct('benettin', drop_volatile(mb.lya_results), ...
-        'qr', drop_volatile(mq.lya_results));
+    key = {'stable', 'estimators', cond_names{i}};
+    try
+        mb = build_from_preset(P_stable.sra1_noise_on, cond_names{i}, small{:}, ...
+            'ode_solver', 'sra1', 'lya_method', 'benettin');
+        mb.run();
+        mq = build_from_preset(P_stable.rk4_noise_off, cond_names{i}, small{:}, ...
+            'ode_solver', 'rk4', 'lya_method', 'qr');
+        mq.run();
+        R = setfield(R, key{:}, struct('benettin', drop_volatile(mb.lya_results), ...
+            'qr', drop_volatile(mq.lya_results)));
+    catch err
+        [R, errors] = failed(R, errors, capture, err, key);
+    end
 end
 
 %% Layer 2d. The options network, stable
-mo = options_model(0.2, true);
-mo.run();
-R.stable.options = end_to_end(mo);
-if capture
-    [S, t] = pick_states(mo);
-else
-    [S, t] = stored_states(ref_data, {'options_stable'});
+key_run = {'stable', 'options'};
+key_pw  = {'pointwise', 'options_stable'};
+try
+    mo = options_model(0.2, true);
+    mo.run();
+    R = setfield(R, key_run{:}, end_to_end(mo));
+    if capture
+        [S, t] = pick_states(mo);
+    else
+        [S, t] = stored_states(ref_data, key_pw(2:end));
+    end
+    R = setfield(R, key_pw{:}, pointwise_case(mo, S, t));
+catch err
+    [R, errors] = failed(R, errors, capture, err, key_run, key_pw);
 end
-R.pointwise.options_stable = pointwise_case(mo, S, t);
 
 %% Layer 2e. A sweep, set up as the sweep stages set theirs up
-ctx = resolve_run_context('param_space', 'preset_name', P_stable.sra1_noise_on, ...
-    'run_mode', 'fast', 'verbose', 'near-none');
-d = ctx.model_defaults;
-d.T_range = [0 4]; d.lya_T_interval = [2 4]; d.lya_warmup = 1;
 scratch = tempname;
-psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 6, 'note', 'regression_tol', ...
-    'randomize_order', false, 'verbose', 'near-none', 'use_parallel', false);
-psa.model_class    = ctx.model_class;
-psa.integer_params = ctx.integer_params;
-psa.model_defaults = d;
-psa.output_dir     = scratch;
-psa.set_conditions(ctx.conditions);
-psa.add_grid_parameter('level_of_chaos', [0.1, 0.2]);
-psa.add_grid_parameter('reps', 1:2);
-psa.run();
-for i = 1:numel(cond_names)
-    rc = psa.results.(cond_names{i});
-    R.stable.sweep.(cond_names{i}) = cellfun(@drop_volatile, rc, 'UniformOutput', false);
+try
+    ctx = resolve_run_context('param_space', 'preset_name', P_stable.sra1_noise_on, ...
+        'run_mode', 'fast', 'verbose', 'near-none');
+    d = ctx.model_defaults;
+    d.T_range = [0 4]; d.lya_T_interval = [2 4]; d.lya_warmup = 1;
+    psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 6, 'note', 'regression_tol', ...
+        'randomize_order', false, 'verbose', 'near-none', 'use_parallel', false);
+    psa.model_class    = ctx.model_class;
+    psa.integer_params = ctx.integer_params;
+    psa.model_defaults = d;
+    psa.output_dir     = scratch;
+    psa.set_conditions(ctx.conditions);
+    psa.add_grid_parameter('level_of_chaos', [0.1, 0.2]);
+    psa.add_grid_parameter('reps', 1:2);
+    psa.run();
+    sweep = struct();
+    for i = 1:numel(cond_names)
+        rc = psa.results.(cond_names{i});
+        sweep.(cond_names{i}) = cellfun(@drop_volatile, rc, 'UniformOutput', false);
+    end
+    R.stable.sweep = sweep;
+catch err
+    [R, errors] = failed(R, errors, capture, err, {'stable', 'sweep'});
 end
+% Only the results are kept: the sweep's own files hold wall-clock times.
 if isfolder(scratch); rmdir(scratch, 's'); end
 
 %% Layer 2f. Memory capacity through the reservoir class
@@ -256,16 +304,59 @@ base_args = [struct2namevalue(preset_mc), ...
      'T_wash', 5 * fs, 'T_train', 30 * fs, 'T_test', 15 * fs, 'd_max', 3 * fs}];
 for i = 1:numel(conditions_mc)
     c = conditions_mc{i};
-    cargs = struct2namevalue(rmfield(c, 'name'));
-    esn = SRNN_ESN_reservoir(base_args{:}, cargs{:});
-    esn.build();
-    [MC, R2, res] = esn.run_memory_capacity('readout_signal', 'synaptic', ...
-        'verbose', false, 'store_timeseries', false);
-    R.stable.mc.(c.name) = struct('MC', MC, 'R2', R2, 'delay_s', res.delay_s, ...
-        'hold_len', res.hold_len, 'W', esn.W, 'W_in', esn.W_in);
+    key = {'stable', 'mc', c.name};
+    try
+        cargs = struct2namevalue(rmfield(c, 'name'));
+        esn = SRNN_ESN_reservoir(base_args{:}, cargs{:});
+        esn.build();
+        [MC, R2, res] = esn.run_memory_capacity('readout_signal', 'synaptic', ...
+            'verbose', false, 'store_timeseries', false);
+        R = setfield(R, key{:}, struct('MC', MC, 'R2', R2, 'delay_s', res.delay_s, ...
+            'hold_len', res.hold_len, 'W', esn.W, 'W_in', esn.W_in));
+    catch err
+        [R, errors] = failed(R, errors, capture, err, key);
+    end
 end
 
+% Only a check can have recorded errors (a capture rethrows), and a
+% capture's output stays exactly what the anchor holds.
+if ~capture
+    R.info.errors = errors;
+end
 seconds = toc(t_all);
+end
+
+%% ------------------------------------------------------------------------
+function [R, errors] = failed(R, errors, capture, err, varargin)
+% A case that threw. In a CAPTURE that is fatal: a reference with a hole in
+% it is no reference. In a CHECK the error is recorded and the run goes
+% on, so that one case that no longer runs (a route check that now
+% refuses, say) does not hide what every other case has to say. Each key
+% path in VARARGIN that the case had not yet filled gets a one-field
+% struct holding the message; the reference's leaves under it then count
+% as missing, which fails the comparison, and R.info.errors lists the
+% messages for regression_tol_check to print.
+if capture
+    rethrow(err);
+end
+text = sprintf('%s (%s)', err.message, err.identifier);
+for k = 1:numel(varargin)
+    path = varargin{k};
+    node = R;
+    present = true;
+    for j = 1:numel(path)
+        if isstruct(node) && isfield(node, path{j})
+            node = node.(path{j});
+        else
+            present = false;
+            break;
+        end
+    end
+    if ~present
+        R = setfield(R, path{:}, struct('ERROR', text));
+        errors{end + 1} = sprintf('%s: %s', strjoin(path, '.'), text); %#ok<AGROW>
+    end
+end
 end
 
 %% ------------------------------------------------------------------------
