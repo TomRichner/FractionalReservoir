@@ -34,6 +34,48 @@ Entry template:
 
 ---
 
+## 2026-11-10 22:18 CST (session ceb409cc-a8b9-485a-83e9-993fc3383d2f)
+
+**Issues touched:** none. Tooling for the working arrangement, at Tom's
+request: can several subagents run MATLAB at once?
+
+**Commits:** `1be5011` six MATLAB worker agents (this repo, force-added
+under the gitignored `.claude/`); `5cb7e53` usage note and CLAUDE.md pointer
+(manuscript repo). The reasoning and the wrong turn are in `1be5011`.
+
+**Done:** `.claude/agents/matlab-fable-1..3` (Fable 5.2) and
+`matlab-opus-1..3` (Opus 5.5), medium effort, each with a private MATLAB
+through its own inline MCP server. Usage note:
+`../StochasticPlasticDynamicalSystemPaper/docs/MATLAB_worker_agents.md`.
+No source, test or fixture was touched.
+
+**Verified:** from scratch space. Ordinary subagents share the lead's one
+MATLAB (same pid, workspace and working folder; calls queue). Two instances
+of one worker type share a MATLAB and overwrite each other. Two differently
+named workers ran concurrently in separate MATLABs. The installed
+`matlab-fable-1` and `matlab-opus-1`, spawned together with `pool: 2`, ran
+on the right models, each opened and closed a 2-worker pool, and left no
+process behind.
+
+**Not verified / known gaps:** all six at once; desktop display mode; a
+worker resumed after finishing; a job longer than the 30-minute call limit.
+A session that was running before `.claude/agents/` existed must be
+restarted to see the agents. With `AutoCreate` on, a worker briefed
+`pool: 0` can still acquire the default pool by reaching a `parfor`.
+
+**Raised, not acted on:** (1) turning `parallel.Settings.Pool.AutoCreate`
+off machine-wide would close that gap but changes the desktop MATLAB too;
+Tom to decide. (2) This repo's CLAUDE.md does not mention the worker agents
+or the pool budget; the pointer went into the manuscript repo's CLAUDE.md as
+asked. (3) The local cluster keeps jobs 1 to 9 "because they contain crash
+dump files" (printed on every pool start). (4) The agent files hold this
+workstation's paths.
+
+**Next:** nothing owed. Regression tiers were not run: no code they cover
+changed.
+
+---
+
 ## 2026-11-10 21:40 CST (session 7ec5eb22-1e10-4e89-8903-1803563a876a, continued)
 
 **Issues touched:** FD-001 in progress -> done; FD-002 open -> done; FD-003
