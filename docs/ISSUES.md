@@ -49,6 +49,7 @@ FD-002 fast regression bundle ─┴─> FD-003 regression reference
         FD-003 ──> FD-004 chained-pool STD ──> FD-005 chain unit tests
         FD-004 ──> FD-006 display and reservoir code
         FD-004 ──> FD-007 chain presets ──> FD-009 MTS reruns
+        FD-004, FD-005 ──> FD-015 per-neuron spread on the chain
 ```
 
 FD-003 comes before any change to the model class: the reference has to be
@@ -164,12 +165,35 @@ captured from the code as it stands.
 - **Depends on:** FD-004.
 - **Result:** _(pending)_
 
+### FD-015 Per-neuron spread on the chain's parameters
+
+- **Status:** open (requested by Tom 2026-11-10; five points to confirm,
+  listed in block A of the to-do list under "Per-neuron spread in the
+  depression parameters")
+- **Serves:** block A
+- **What:** a per-neuron log-normal spread on the chain's time constants
+  (releasable-pool refill and release, reserve refill) and on the reserve
+  size, sigma = 0.25 as for SFA. Values stay positive and a longer time
+  constant gets a proportionally larger variance. Depression has no spread
+  today: each route shares one row of time constants. Follow the SFA
+  pattern (`tau_a_spread`, `tau_a_matrix`, its own seeded stream with the
+  RNG state restored).
+- **Done when:** a zero spread reproduces the non-jittered chain bit for
+  bit; the draws are reproducible from the seed and leave the connectivity,
+  setpoints and SFA ladders unchanged; the analytic Jacobian and the
+  Jacobian product pass their tests with a nonzero spread; the regression
+  bundle is unchanged for existing presets.
+- **Depends on:** FD-004, FD-005.
+- **Result:** _(pending)_
+
 ## To be planned
 
 Named so they are not lost. Each needs a planning session with Tom before it
 becomes an issue with an acceptance test.
 
-- **FD-008 Frozen-reserve control** (block A). Blocked on the decision
+- **FD-008 Frozen-reserve control** (block A). **Dropped 2026-11-10:** Tom
+  settled that 1TS and MTS are not strength-matched at steady state, so the
+  control it was proposed for is not needed. Was: blocked on the decision
   whether to run it.
 - **FD-009 MTS reruns at `medium` or better** (block A): sweeps, memory
   capacity, stability and transient stages on the chain preset.
