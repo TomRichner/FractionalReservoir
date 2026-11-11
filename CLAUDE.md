@@ -185,6 +185,18 @@ waits (a call silent for 30 minutes is dropped, though MATLAB carries on):
 launch it and read `data/regression_fast/<tag>.result.txt`. And **no tier
 covers the joint parameter-space sample**, because `ParamSpaceAnalysis2`
 seeds it with `rng('shuffle')`: its 128 grid points differ on every run.
+(Since FD-016 a bundle can set `cfg.param_space_seed` to make the sample
+repeatable; the regression bundle and every existing config leave it
+unset, so their behaviour and the references are unchanged.)
+
+**Launching a long run through a timer:** the TimerFcn must be a plain
+function-handle call, for example
+`@(~,~) regression_check('tag', 'x')`, with an `ErrorFcn` that writes the
+error to a file. An `evalc('try ... catch ME ...')` inside an anonymous
+function fails at once with "Attempt to add ... to a static workspace",
+silently as far as the MCP call can tell (this cost a 30-minute wait on
+2026-11-11). Check that the run directory exists a minute after
+launching.
 
 **The stages and full tiers need a parallel pool up, of any size** (found
 with FD-017). A pool of 4 and a pool of 14 give identical bytes, but a run
@@ -425,6 +437,7 @@ A `handle` class that runs grid sweeps over `SRNNModel2`. Key behaviors not obvi
 - Default conditions are 4 adaptation regimes: `no_adaptation`, `sfa_only`, `std_only`, `sfa_and_std` — toggle via `n_a_E` / `n_b_E`.
 - Execution is **batched parfor with checkpoint files** (`batch_size`, `output_dir`); a run can be resumed by loading the PSA and calling `run()` again.
 - `randomize_order=true` (default) gives representative early-stopping; `false` is required for sensitivity sweeps where ordered axes matter.
+- **`sample_seed`** (FD-016, default empty) seeds the random order, and so the subset that `subset_fraction` keeps. Empty is the old behaviour, `rng('shuffle')` then `randperm`, so the sample differs on every run. A nonnegative integer draws the permutation from a private `mt19937ar` stream: the same sample every run, and the global random stream untouched. A bundle sets it through `cfg.param_space_seed`, which `run_all_paper_analyses` carries by argument to `run_all_analyses`, `resolve_run_context` (`ctx.param_space_seed`) and `run_param_space_analysis`. `same_config` ignores it, as it ignores `subset_fraction`. It is saved in `psa_object.mat` always and in the summary **only when set** (a summary field added unconditionally would have moved the full regression reference).
 - Reps are added as a grid axis (`add_grid_parameter('reps', 1:n_reps)`), not as a separate property.
 - Output directory defaults to `<root>/data/param_space/<folder_prefix>_<note>_<timestamp>/`. `folder_prefix` is overridden to `'1D_sensitivity'` / `'tau_sensitivity'` by the sensitivity scripts.
 

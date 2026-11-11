@@ -1227,7 +1227,11 @@ Workers start with no memory of this conversation. Each brief gives:
    result does not depend on it. A small job for a Fable worker (it edits
    a class), done before the four-condition `fast` run of step 6; it can
    run beside step 3 because it touches only `ParamSpaceAnalysis2.m`,
-   `run_param_space_analysis.m` and the new bundle's config.
+   `run_param_space_analysis.m` and the new bundle's config. **Built and
+   merged (FD-016):** the property is `sample_seed`, the config field
+   `cfg.param_space_seed`; it also needed `run_all_analyses.m`,
+   `resolve_run_context.m` and `run_all_paper_analyses.m` to carry the
+   value by argument. The chain bundle's config sets it (step 3).
 6. **Reruns.** Agents never run `medium` or larger; only Tom starts them and
    says when they are done. The plan includes one `fast` run after block A is
    built. Analyses run on **four** conditions, and two figure sets are
