@@ -1,0 +1,176 @@
+# Issues: code work toward the final draft
+
+The list of discrete pieces of work in **this repo** needed for the final
+draft of the manuscript. Started 2026-11-10.
+
+## How this file is used
+
+Three documents, three jobs:
+
+| Document | Answers | Lives in |
+|---|---|---|
+| `../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md` | **What and why.** The feedback, the decisions, the manuscript-level tasks (blocks A to G). | manuscript repo |
+| `docs/ISSUES.md` (this file) | **What exactly, in the code.** One entry per piece of work that can be finished and checked. | this repo |
+| `docs/WORKLOG.md` | **What happened, session by session.** What was done, what was verified, what is next. | this repo |
+
+Rules:
+
+- **One issue is one checkable piece of work.** It names the to-do block it
+  serves, what "done" means, and what it depends on. If an issue cannot be
+  given an acceptance test, it is not ready and stays in "To be planned".
+- **Issues are created by planning with Tom**, not on an agent's own
+  initiative. A defect noticed during other work is raised (in the reply and
+  in the worklog) and becomes an issue only when Tom agrees. This is the
+  repo's scope rule.
+- **Status is one of:** `open`, `in progress`, `blocked` (say on what),
+  `done` (give the commits), `dropped` (say why). Update the status in the
+  same commit as the work, or in the commit that closes the session.
+- **IDs are permanent.** `FD-001`, `FD-002`, ... Never renumber or reuse; a
+  dropped issue keeps its number.
+- **Manuscript text is not tracked here.** Edits to `Manuscript5.md` are
+  tracked in `final_draft_to_do.md`. An issue here ends at "the run exists
+  and the figure is on disk".
+- **Decisions are not recorded here.** They go in `final_draft_to_do.md`; an
+  issue links to the block that holds the decision.
+- **Reasoning stays in commit messages**, as before. An issue's "Result"
+  line points at commits; it does not restate them.
+
+Work is done by one agent on the current branch (`main`), so there are no
+merges to juggle (TR, 2026-11-10). Subagents are used for bounded jobs that
+do not overlap the main agent's files.
+
+## Order
+
+Dependencies, not priority:
+
+```
+FD-001 test audit ─┐
+FD-002 fast regression bundle ─┴─> FD-003 regression reference
+        FD-003 ──> FD-004 chained-pool STD ──> FD-005 chain unit tests
+        FD-004 ──> FD-006 display and reservoir code
+        FD-004 ──> FD-007 chain presets ──> FD-009 MTS reruns
+```
+
+FD-003 comes before any change to the model class: the reference has to be
+captured from the code as it stands.
+
+## Issues
+
+### FD-001 Audit the existing tests
+
+- **Status:** in progress (2026-11-10)
+- **Serves:** all blocks (the safety net for everything below)
+- **What:** `scripts/tests/` holds about 60 files of uncertain state. Run
+  every test, classify each as passing, failing because the test is stale,
+  or failing because the code is wrong. Remove stale tests. Write missing
+  ones for the current pipeline (`SRNNCellTypePairs`, `SRNN_ESN_reservoir`,
+  `ParamSpaceAnalysis2`, presets).
+- **Done when:** every remaining test passes or has a recorded reason; a
+  single entry point runs them all and prints a summary; the audit's
+  findings (including any real defects found, not fixed) are in the worklog.
+- **Depends on:** nothing.
+- **Result:** _(pending)_
+
+### FD-002 Fast regression bundle
+
+- **Status:** open
+- **Serves:** all blocks
+- **What:** a preset and a config that exercise the same stages as the
+  manuscript's bundle (`mu7revisedMedium`) on a network small and short
+  enough to run in minutes. The existing `fast` mode takes about 67 minutes
+  for the full pipeline, which is too slow to run before and after every
+  change.
+- **Done when:** the bundle runs end to end without error; its wall time is
+  recorded; it follows the existing bundle conventions.
+- **Depends on:** FD-001 (so the preset fixture and tests are in a known
+  state before a preset is added).
+- **Result:** _(pending)_
+
+### FD-003 Regression reference and comparison test
+
+- **Status:** open
+- **Serves:** all blocks
+- **What:** run the FD-002 bundle on the code as it stands and save a small
+  reference of its key outputs (per-condition growth rates, firing rates,
+  memory capacity, and the other per-stage scalars). A test reruns the bundle
+  and compares against the reference.
+- **Done when:** the reference is saved and tracked; the comparison test
+  passes on unchanged code; a second run on the same machine shows how
+  reproducible each quantity is, and the tolerances are set from that.
+- **Depends on:** FD-002.
+- **Result:** _(pending)_
+
+### FD-004 Chained-pool depression in `SRNNCellTypePairs`
+
+- **Status:** open (decision made, implementation to be planned)
+- **Serves:** block A
+- **What:** add the chained vesicle-pool model as an opt-in per route beside
+  the current product, which stays the default and bit-identical. A route
+  with one component is unchanged and is the 1TS condition; no reserve
+  variable exists for it. Equations (C1) to (C3) in the manuscript repo's
+  `adaptation_normalization.md`. Touches the route configuration, the
+  dynamics, the analytic Jacobian, the matrix-free Jacobian product, the
+  state unpacking, and the route signature. `std_zero_floor` is refused for
+  chain routes.
+- **Done when:** FD-005's tests pass and the FD-003 regression is unchanged
+  for every existing preset.
+- **Depends on:** FD-003.
+- **Result:** _(pending)_
+
+### FD-005 Unit tests for the chain
+
+- **Status:** open
+- **Serves:** block A
+- **What:** analytic Jacobian against finite differences; Jacobian product
+  against the assembled Jacobian; a very large reserve reproducing the single
+  pool; steady state against (C4); default routes bit-identical to before; a
+  one-component route identical under either model.
+- **Done when:** all pass and are in the FD-001 entry point.
+- **Depends on:** FD-004 (written alongside it).
+- **Result:** _(pending)_
+
+### FD-006 Display and reservoir code for the chain
+
+- **Status:** open
+- **Serves:** block A
+- **What:** code outside the dynamics that recomputes the product itself:
+  the reservoir class's route signature and time-series plot, the STD
+  steady-state figure, the generated equation and parameter tables, the
+  depression panel of the example time series. Each should ask the model for
+  the route's depression factor.
+- **Done when:** the paper figures build on a chain preset and show the right
+  quantity; the product presets' figures are unchanged.
+- **Depends on:** FD-004.
+- **Result:** _(pending)_
+
+### FD-007 Chain presets and conditions
+
+- **Status:** open
+- **Serves:** block A
+- **What:** a preset bundle on the current baseline network with the MTS
+  condition using the chain (reserve size 2; time constants in block A),
+  under its own condition name with title and colour entries; regenerate the
+  preset fixture.
+- **Done when:** the bundle runs at `fast`; preset tests pass.
+- **Depends on:** FD-004.
+- **Result:** _(pending)_
+
+## To be planned
+
+Named so they are not lost. Each needs a planning session with Tom before it
+becomes an issue with an acceptance test.
+
+- **FD-008 Frozen-reserve control** (block A). Blocked on the decision
+  whether to run it.
+- **FD-009 MTS reruns at `medium` or better** (block A): sweeps, memory
+  capacity, stability and transient stages on the chain preset.
+- **FD-010 Gain sweep of growth rate and memory capacity** (block C),
+  including the no-adaptation pilot and the 3:2 and 2:3 networks.
+- **FD-011 Stimulation: adaptation is necessary** (block B): the 2 × 2 plus
+  frozen-state experiment, more than one kind of aberrant activity, the
+  parameter-space version, and which network carries it.
+- **FD-012 Combined stimulation figure** (block B; merges manuscript
+  Figures 7 and 8).
+- **FD-013 Closing figure** (block D).
+- **FD-014 Paper figure of 1TS versus MTS depression** (block A), from the
+  demonstration scripts.

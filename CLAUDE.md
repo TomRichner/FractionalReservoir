@@ -35,6 +35,38 @@ Reorganising and archiving this repo (`scripts/paper/`, `data/`, `figs/`) is
 deferred until after the deadline (TR, 2026-11-10). Until then, new
 experiments follow the existing conventions and nothing is moved or deleted.
 
+### How the work is tracked
+
+The work is too large for one session, so it is tracked in three documents.
+**Start every session by reading them in this order:**
+
+1. `../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`:
+   **what and why**. Feedback, decisions, manuscript-level tasks.
+2. **`docs/ISSUES.md`**: **what exactly, in this repo**. One entry per
+   checkable piece of code work (`FD-001`, ...), with what "done" means and
+   what it depends on. Issues come out of planning with Tom; an agent does
+   not open one on its own initiative.
+3. **`docs/WORKLOG.md`**: **what happened**. One short entry per session,
+   newest first: commits, what was verified and how, what was not, what is
+   next. Read the top entry before starting; add one before stopping.
+
+Each file's header states its own rules. Two that are easy to get wrong:
+decisions are recorded in the to-do list, not in an issue; and the worklog
+points at commits, it does not replace them. **Commit messages are still the
+record of reasoning** (see "Scope" above).
+
+Working arrangement (TR, 2026-11-10): one agent does most of the
+implementation, on the current branch (`main`), so there are no merges to
+juggle. Subagents take bounded jobs that do not overlap the main agent's
+files. Commit at logical intervals.
+
+Decisions already made that affect the code: depression gains a **chained
+vesicle-pool model** as an opt-in per route, beside the current product,
+which stays the default and bit-identical (FD-004). A route with one
+depression component is the single-timescale condition and carries no
+reserve variable. A fast regression bundle and its saved reference (FD-002,
+FD-003) are captured **before** the model class is touched.
+
 ## What this project is
 
 MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD). The dynamics implemented are:
