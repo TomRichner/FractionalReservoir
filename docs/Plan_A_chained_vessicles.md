@@ -533,10 +533,12 @@ Rules from `MATLAB_worker_agents.md` that bind this plan:
   reached with no pool runs serially in the client instead of opening the
   default pool. The `pool: 0` gap described in `MATLAB_worker_agents.md` is
   closed; a pool exists only where someone opened one.
-- **Name the pool profile.** See section 9, item 9: the default profile is
-  currently `Just1` (one worker), so `parpool(parallel.defaultProfile, N)`
-  fails for N above 1. Until that is settled, open pools with
-  `parpool('Processes', N)`.
+- **Never open the default profile.** It is `Just1` (one worker) and stays
+  so. A pool is opened with `pool_set(N)` once the pool module exists
+  (step 0a), and with `parpool('Processes', N)` until then. The six worker
+  prompts and `MATLAB_worker_agents.md` were rewritten on 2026-11-11 to
+  say this: a worker checks `exist('pool_set', 'file')` and uses whichever
+  applies, so the prompts need no edit when the module lands.
 - A worker's MATLAB is cold, private, and gone when the worker finishes.
   What the lead needs must be on disk or in the report.
 - The worker agents load only in a session started after
@@ -860,10 +862,10 @@ Workers start with no memory of this conversation. Each brief gives:
   one-worker pool, so sweeps run on one worker; and
   `run_lyapunov_spectrum`, `run_transient_gain`,
   `run_numerics_verification` and `wait_for_parpool` call
-  `parpool(parallel.defaultProfile, n)` with n up to 12, which errors. The
-  six worker-agent prompts use the same call. Until section 9, item 9 is
-  settled: open a `Processes` pool by name before running a stage, and do
-  not run the full bundle.
+  `parpool(parallel.defaultProfile, n)` with n up to 12, which errors. (The
+  six worker-agent prompts used the same call; fixed 2026-11-11.) Until
+  the pool module of step 0a exists: open a `Processes` pool by name
+  before running a stage, and do not run the full bundle.
 - **No pool means serial.** With automatic creation off, forgetting to
   open a pool no longer oversubscribes the machine; it runs slowly on one
   core instead. A job that seems stuck may simply have no pool.

@@ -270,7 +270,10 @@ captured from the code as it stands.
   - `restart_parpool`, `wait_for_parpool`, and the pool-opening lines in
     `run_lyapunov_spectrum`, `run_transient_gain` and
     `run_numerics_verification` go through the module. The six worker-agent
-    prompts and `MATLAB_worker_agents.md` are updated to `pool_set(N)`.
+    prompts and `MATLAB_worker_agents.md` already describe `pool_set(N)`
+    with a `parpool('Processes', N)` fallback for the time before the
+    module exists (rewritten 2026-11-11); when it lands, the fallback and
+    the usage note's "before the module" column are removed.
   - An option to run a session's workers at lowered priority, so the
     desktop, the CLI and remote desktop stay responsive (Tom, 2026-11-11).
     **Pinning workers to cores is out of scope for now**

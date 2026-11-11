@@ -43,32 +43,40 @@ stays forbidden.
 
 ## Parallel pool: the lead allocates it, you start and stop it
 
-The machine cannot carry one default pool per worker: several MATLABs each
-opening the default pool would oversubscribe the cores many times over. So a
-pool is never left to `parfor`'s automatic start, and its size is the lead's
-decision, not yours.
+Several MATLABs each opening a full pool would oversubscribe the cores, so a
+pool's size is the lead's decision, not yours. Two facts about this machine:
+automatic pool creation is **off**, so a `parfor` reached with no pool runs
+serially in your client and does not open one; and the default pool profile
+is `Just1`, a one-worker profile Tom keeps on purpose. **Never open the
+default profile** (`parpool` with no profile, or `parallel.defaultProfile`).
 
 - Your brief states `pool: N`. If it says nothing, N is 0.
-- **`pool: 0`**: you hold no pool. A `parfor` reached with no pool up starts
-  the default pool by itself, so stay away from code that reaches one: set
-  `use_parallel = false` on a `ParamSpaceAnalysis2`, and do not call `parpool`,
-  `restart_parpool`, `wait_for_parpool`, `run_all_analyses`,
-  `run_all_paper_analyses` or the parallel stage functions
-  (`run_memory_capacity`, `run_eig_heatmap`, `run_lyapunov_spectrum`,
-  `run_transient_gain`, `run_numerics_verification`, `run_dc_lle_analysis`).
-  After any call that might have reached a `parfor`, check
-  `isempty(gcp('nocreate'))`; if a pool appeared, delete it and say so in your
-  report. If the job cannot be done without a pool, stop and tell the lead
-  instead of opening one.
-- **`pool: N`, N >= 1**: straight after `setup_paths`, run
-  `delete(gcp('nocreate')); pool = parpool(parallel.defaultProfile, N);` and
-  confirm `pool.NumWorkers == N`. If it fails (no free licence seat, for
-  example), report the error text to the lead; do not retry in a loop.
-- **Never resize.** `restart_parpool()` deletes the pool and opens the default
-  size, and `run_all_analyses` calls it three times. Run those only when the
-  brief says you have the whole machine.
-- **Before you finish**, whatever happened: `delete(gcp('nocreate'))`, then
-  confirm `isempty(gcp('nocreate'))`.
+- **Opening it**, straight after `setup_paths`:
+  - If the project's pool module is on the path (`exist('pool_set', 'file')`
+    is 2), run `pool_set(N)`. It records your allocation and opens exactly N
+    workers on the right profile; `pool_set(0)` records that you hold none.
+    From then on use only the module: `pool_ensure()` to get your pool,
+    `pool_restart()` to restart it at the same size, `pool_release()` to
+    close it, `pool_status()` to see who holds what.
+  - If it is not on the path yet (it is issue FD-017), and N >= 1, run
+    `delete(gcp('nocreate')); pool = parpool('Processes', N);`.
+  Then confirm the pool has N workers. If opening fails (no free licence
+  seat, for example), report the error text to the lead; do not retry in a
+  loop.
+- **`pool: 0`**: you hold no pool and do not open one. Code that reaches a
+  `parfor` runs serially, which is slow but harmless. If the job cannot be
+  done in reasonable time that way, stop and tell the lead instead of
+  opening a pool.
+- **Never resize, and beware code that opens a pool by itself.** Until the
+  pool module exists, `restart_parpool()` opens the one-worker default
+  profile (so `run_all_analyses` and `run_all_paper_analyses`, which call
+  it, end up on one worker), and `wait_for_parpool`, `run_lyapunov_spectrum`,
+  `run_transient_gain` and `run_numerics_verification` error when no pool is
+  up. Open your pool first, and run the two entry points only when the brief
+  says you have the whole machine.
+- **Before you finish**, whatever happened: `pool_release()` if the module
+  exists, otherwise `delete(gcp('nocreate'))`; then confirm
+  `isempty(gcp('nocreate'))`.
 
 ## Scope and report
 
