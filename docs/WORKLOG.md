@@ -34,6 +34,85 @@ Entry template:
 
 ---
 
+## 2026-11-11 (session 7ec5eb22-1e10-4e89-8903-1803563a876a, planning, second half)
+
+**Issues touched:** FD-020 (tolerance tier) and FD-021 (refactor) named
+under "To be planned"; FD-004, FD-005, FD-015, FD-018 reworded (no
+bit-identity on the model's arithmetic); FD-017 gained a note on the agent
+prompts. No code changed, so no regression tier was run.
+
+**Commits (this repo):** `81f32e5` Plan A: generalise behind a tolerance
+gate; pool module, then tolerance tier, first; `cb764a1` CLAUDE.md, README:
+align with the revised Plan A; `6a463b9` CLAUDE.md, README, Plan A: how
+ISSUES, WORKLOG and the worker agents are used; `e891de1` Worker agents:
+stop opening the default pool profile; describe the pool module; `74abae4`
+Docs: no dates govern the work; 1TS has no clamped variable; four
+conditions, three in the paper; `849e591` ISSUES: bit-identity on the
+model's arithmetic is decided against; FD-020, FD-021 named.
+**Commits (manuscript repo):** `96cf126` To-do: general code behind a
+tolerance regression; build order for block A; `6190c2f` To-do: how the
+issues file, the worklog and the worker agents are used; `71ec7d9` Worker
+agents note: pools after AutoCreate off and Just1 as default profile;
+`4ea83c8` To-do: remove the dates; 1TS without a clamped variable; four
+conditions analysed, three shown; stale lines; `57fff5a` To-do: the
+tolerance tier and the refactor are FD-020 and FD-021.
+
+**Done:** Tom's decisions, written into Plan A, CLAUDE.md, README, ISSUES,
+the to-do list, the six agent prompts and `MATLAB_worker_agents.md`:
+- the code is general, behind one route interface; this replaces "branch,
+  do not generalise";
+- a tolerance regression tier in three layers, with an anchor from the
+  untouched model class, mutation checks on it, and the exact references
+  re-captured once after the refactor;
+- build order: pool module, tolerance tier, mutation checks, refactor,
+  chain, the chain's references, chained facilitation, spread;
+- 1TS carries no reserve variable (removed, not clamped); the same for
+  facilitation;
+- four conditions in every analysis, three in the paper; chained MTS takes
+  product MTS's colour and position, product MTS is green in a fourth
+  column;
+- no dates in the repos' documents; quality first;
+- worker prompts never open the default profile (`pool_set(N)` if present,
+  else `parpool('Processes', N)`).
+
+**Verified:** after the compaction the lead re-read the plan, the issues,
+the to-do list, the facilitation note, the synapse sites of
+`SRNNCellTypePairs.m` (`compile_synapse_config`, `get_params`, the layout,
+`dynamics_fast`, `compute_Jacobian_fast`, `jacobian_times`, `route_fields`,
+`unpack_and_compute_states`), `regression_compare` and
+`regression_rapid_run`. Both trees clean; the model class is untouched.
+Tried to start `matlab-opus-1`: "Agent type not found".
+
+**Not verified / known gaps:** the worker agents do not load in this
+session (it was started in the manuscript repo; an exit and resume did not
+load them), so a fresh session started in FractionalReservoir is needed
+before step 0a. The rewritten agent prompts are untested on a worker. Not
+yet written: the route-interface design, the facilitation design section,
+FD-020 and FD-021 as full issues. The tolerances (1e-12 pointwise, 1e-9
+stable end to end) and the 10 % slowdown limit are the lead's proposals.
+Nothing pushed (this repo 6 ahead of origin before this commit, the
+manuscript repo 5).
+
+**Raised, not acted on:** (1) The route interface must be one local system
+per route: chained facilitation puts g in the b1 release term and a calcium
+trace drives g, so an "std block" and an "stf block" cannot stay separate.
+Whether the state vector keeps today's ordering (all b, then all g) or
+becomes contiguous per route is Tom's to decide. (2) `regression_compare`
+already takes `rtol` / `atol`, but compares digest statistics (sum,
+weighted sum, min, max), not elements; the pointwise layer should compare
+element by element and report the largest difference per leaf. (3) Carried
+from earlier: `build()` reseeds the global RNG; `close all` in two tests
+and apparently in `run_sensitivity_analysis`; stale pointers in
+`srnn_param_preset.m:119` and three example headers; `run_all_tests('slow')`
+not rerun since the regression tests joined.
+
+**Next:** plan mode with Tom: the route-interface design into plan
+section 4, FD-020 and FD-021 as full issues, the facilitation design
+section; Tom's go; then a fresh session in FractionalReservoir (check
+`/agents`) and step 0a (FD-017).
+
+---
+
 ## 2026-11-11 (session 7ec5eb22-1e10-4e89-8903-1803563a876a, planning; written before compaction)
 
 **Issues touched:** FD-016, FD-017, FD-018 created; FD-019 added to "to be
