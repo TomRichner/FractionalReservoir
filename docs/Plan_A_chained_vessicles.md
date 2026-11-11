@@ -4,7 +4,11 @@
 by the lead agent at the end of the session that produced the decisions, the
 test audit and the regression references, so that the work can be picked up
 after the conversation is compacted. **Revised 2026-11-11 with Tom's answers
-to the questions in section 9.** Still under discussion: facilitation (a
+to the questions in section 9, and again the same day: the code is to be
+general, checked by a tolerance-based regression, and the pool module and
+that regression are built first (sections 2, 6 and 7.3).** Sections 3 to 5
+were written for the earlier branch-per-site approach and are read with
+section 2 in mind until the lead adds the interface design. Still under discussion: facilitation (a
 note with the options is at
 `docs/notes/Depression_facilitation_model_options_2026-11-11.md`), and how a
 MATLAB session's parallel-pool size is set and honoured (item 9). Neither
@@ -80,7 +84,7 @@ $b_1 = 1$ it is $-r/\tau_{rel} \le 0$, and likewise for $b_2$.
 
 | Decision | Value |
 |---|---|
-| Both models supported | The chain is an opt-in per route. The product stays the default and **bit-identical**. The geometric-mean option stays. |
+| Both models supported | The chain is an opt-in per route. The product stays the default and gives the **same numbers to round-off** (revised 2026-11-11: no longer bit-identical through the refactor; see section 2). The geometric-mean option stays. |
 | 1TS | A route with one depression component: the current single-pool equation, one state per presynaptic neuron. **No reserve variable exists**, so no unused state and no zero eigenvalue. |
 | MTS | The same releasable-pool equation plus a dynamic reserve: two states per route, the same count as today's two-timescale product. |
 | Reserve size $n_2$ | 2 |
@@ -110,29 +114,78 @@ $k_2 = 10r$: $b_1$ is 0.420, 0.200, 0.106, 0.054 at $r$ = 0.1, 0.25, 0.5,
 1.0 (1TS: 0.556, 0.333, 0.200, 0.111; current product: 0.309, 0.111, 0.040,
 0.012), and the sustained output $r\,b_1$ rises to a ceiling of $1/18$.
 
-## 2. The one rule that shapes the implementation: branch, do not generalise
+## 2. The rule that shapes the implementation: generalise, behind a tolerance gate
 
-The acceptance test for "the product stays the default and bit-identical" is
-the ultrarapid regression, and it compares **bytes**. Reordering a floating
-point expression changes the last bit and fails it.
+**Revised 2026-11-11 (Tom). This replaces "branch, do not generalise".**
+The first version of this section told workers to leave the product code
+textually as it was and add an `if chain` branch at every site, so that the
+byte-exact ultrarapid regression would keep passing. That put the
+convenience of the gate ahead of the quality of the code, which is not what
+Tom wants: **the code is to be cleanly written and general, and the
+regression is to be built so that it can check such code.**
 
-So at every site, **leave the existing product code textually as it is and
-add a branch for chain routes**:
+### 2.1 What "general" means here
 
-```matlab
-if params.std_chain(pre, post)
-    % new chain code
-else
-    % the existing lines, untouched
-end
-```
+Each route `(pre, post)` carries a small local system driven by the
+presynaptic rate. The model class talks to it through one interface with
+three parts:
 
-Do not rewrite the product path into a generic helper that both models call,
-however tidy that looks. A shared helper is fine only where the existing code
-already goes through one (`combine_std_pair`, `apply_std_zero_floor_pair`).
+- the derivative of the route's state;
+- the route's output factor (what multiplies the rate to give $\theta$);
+- the partial derivatives of both, with respect to the route's state and
+  the rate.
 
-If a refactor of the product path is ever wanted, it is a separate commit,
-justified on its own, and it replaces the references deliberately.
+Today's product depression, today's facilitation, the chain, and later the
+chain with release-coupled facilitation are implementations of that
+interface. `dynamics_fast`, `compute_Jacobian_fast`, `jacobian_times` and
+`unpack_and_compute_states` each call it once per route and contain no
+model-specific branches. The lead writes the interface (names, argument
+shapes, where it lives) into section 4 after re-reading the class and
+before briefing step 0d; Tom reviews it first.
+
+Wherever sections 3 to 5 still say "chain branch", read "the chain's
+implementation of the route interface".
+
+### 2.2 What the regression becomes
+
+A byte comparison cannot survive a reordered floating-point expression, and
+a tolerance cannot be applied to a chaotic trajectory, where a last-bit
+difference grows to order one within tens of seconds. So the gate for
+numerical code is a **tolerance tier** with three layers:
+
+| Layer | What is compared | How |
+|---|---|---|
+| Pointwise | The right-hand side, the assembled Jacobian, `jacobian_times`, and the packed parameters, evaluated at states stored in the fixture. The stored states include ones from chaotic runs: a single evaluation does not depend on regime. | Tight relative tolerance (proposed 1e-12; set from what the mutation checks show). |
+| Stable networks, end to end | Trajectories, all three Lyapunov estimators, transient gain, a small sweep, memory capacity, on small networks that are stable with a clear margin and are driven by stimulus steps through high rates and deep depression. | Looser tolerance (proposed 1e-9). Discrete outputs (counts of positive exponents, the K used, clip counts) are compared exactly, on cases chosen away from their thresholds. |
+| Chaotic networks and the bundle | Every stage ran, every figure was written, fields present; summary statistics within a loose band. | Structural and statistical only. |
+
+The three existing byte-exact references (rapid, stages, full) stay. They
+are the right gate for changes that should move no number at all: the pool
+module, configs, figures, plumbing. **They stop being the gate for edits to
+the model's arithmetic**, and after the refactor of step 0d the ultrarapid
+one is expected to differ in the last bits; it is then replaced
+deliberately (section 6).
+
+References in the tolerance tier are cheap, so **a fresh one is captured
+before any critical edit** (for example before touching the Jacobian) and
+compared after. One **anchor** reference, captured from the model class
+before it is touched, is kept throughout and compared at tolerance after
+every merge, so a chain of re-captures cannot walk away from the original.
+
+### 2.3 The order this imposes
+
+1. The pool module (step 0a).
+2. The tolerance tier, with its anchor captured from the untouched model
+   class (step 0b).
+3. Mutation checks: small deliberate errors, each of which the tier must
+   catch (step 0c).
+4. The refactor: product depression and today's facilitation moved behind
+   the route interface, with no new model (step 0d). The gate then tests
+   one thing, whether the refactor changed the numbers.
+5. The chain as a second implementation (step 1), then chained
+   facilitation as a third (step 8).
+
+Section 7.3 has the detail.
 
 ## 3. The code as it stands
 
@@ -265,9 +318,10 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
 - Save and restore the RNG state around the draw.
 - `get_params` then carries per-neuron values for the routes of a type whose
   spread is nonzero. **A zero spread must leave `params` exactly as it is
-  today**: do not convert the shared rows to matrices unless the ultrarapid
-  regression still passes byte for byte. If it does not, keep the row path
-  and branch on whether the type has a spread.
+  today**, or the same to round-off with the tolerance tier passing
+  (revised 2026-11-11, section 2). Prefer one code path that always
+  carries per-neuron values, as the SFA ladder does, over a branch on
+  whether the type has a spread.
 - With the spread on, the product path's three sites (`dynamics_fast`,
   `compute_Jacobian_fast`, `jacobian_times`) must accept `npre x nb`
   matrices of time constants where they take `1 x nb` rows today. In
@@ -383,10 +437,12 @@ a one-component route and an undepressed route:
    $\tau_{rec_1}$, $\tau_{rel_1}$ and $\tau_{rec_2}$ per neuron.
 
 Both go in the quick suite (each well under 30 s). Existing tests that must
-keep passing untouched: `test_std_product_model` (frozen trajectory
-checksums of the product model), `test_jacobian_times`, `test_std_geomean`,
+keep passing: `test_std_product_model` (frozen trajectory checksums of the
+product model), `test_jacobian_times`, `test_std_geomean`,
 `test_SRNNCellTypePairs`, `test_esn_route_redundancy`,
-`test_pairs_reproducibility`.
+`test_pairs_reproducibility`. Those that freeze checksums may move in the
+last bits at the refactor of step 0d; see that step for how that is
+handled. After it they pass unedited.
 
 ## 6. Gates
 
@@ -394,14 +450,27 @@ Run by the lead on merged `main`, in the lead's MATLAB, after each merge.
 
 | Gate | Command | When | Must show |
 |---|---|---|---|
-| Ultrarapid | `run_all_tests('test_regression_rapid')` | after every merge that touches `src/model/` or `src/analysis/ParamSpaceAnalysis2.m` | PASS, exact. **Any difference is a defect in the merge**, not a reason to regenerate. |
+| Tolerance tier | its own test, built in step 0b (name fixed then) | after every merge that touches `src/model/` or `src/analysis/ParamSpaceAnalysis2.m`; against the anchor always, and against a fresh pre-edit capture for a critical edit | PASS on all three layers. A failure is a defect to find, **not a reason to loosen a tolerance or re-capture**. |
+| Ultrarapid, exact | `run_all_tests('test_regression_rapid')` | after every merge that should move no number (pool module, configs, figures, plumbing); and after model merges once it has been re-captured (below) | PASS, exact |
 | Quick suite | `run_all_tests('quick')` | after every merge | all pass |
-| Stages | `run_all_tests('test_regression_stages')` | after the display and stage work merges | PASS |
-| Full | `regression_check()` launched through a timer, outcome read from `data/regression_fast/<tag>.result.txt` (about 50 min; the MCP client drops a call silent for 30 min) | once, when steps 1 to 4 are all merged | PASS |
+| Stages | `run_all_tests('test_regression_stages')` | after the pool module, and after the display and stage work merges | PASS |
+| Full | `regression_check()` launched through a timer, outcome read from `data/regression_fast/<tag>.result.txt` (about 50 min; the MCP client drops a call silent for 30 min) | once after the pool module; once when steps 1 to 4 are all merged | PASS |
 
-**The existing references are never regenerated in this work.** The chain
-adds new behaviour on new routes; it must not move a single existing number.
-Coverage of the chain itself goes into a **new** reference (step 5).
+**When the exact references are replaced.** The refactor of step 0d is
+expected to change last bits on the product path. When it does, and the
+tolerance tier passes against the anchor, the three exact references are
+re-captured once from the merged refactor (delete the fixture, run
+`make_regression_reference(tier)` from a clean tree, say why in the
+commit). From then on they are exact gates again, also for the chain and
+facilitation merges, which must not move a number on routes that do not
+use them. A re-capture is never done to make a failing gate pass: the
+tolerance tier must have passed first. The stages and full tiers run
+chaotic networks, so after a re-capture their old and new values can
+differ visibly; the evidence that nothing changed is the tolerance tier,
+not those tiers.
+
+Coverage of the chain itself goes into the tolerance tier and a **new**
+exact reference (step 5).
 
 After a classdef edit the lead's MATLAB needs `clear classes` (it wipes the
 base workspace; say so). `ParamSpaceAnalysis2.srnn_property_info` caches the
@@ -476,19 +545,84 @@ Files are assigned so that no two concurrent workers edit the same file:
 
 ### 7.3 Sequence
 
-The model class is one file and its three depression sites must agree with
-each other, so **steps 1 and 3 cannot be split or run in parallel**. Work
-that does not touch that file runs beside them.
+The model class is one file and its depression sites must agree with each
+other, so **work on it is strictly one worker at a time**: steps 0d, 1, 8
+and the spread, in that order. Work that does not touch that file runs
+beside them.
 
-**Step 0a. The pool module, FD-017 (one worker, then the lead).** Decided
-2026-11-11 and **done before anything else**: the `pool_*` functions and
-the session allocation described in `docs/ISSUES.md`, FD-017. Every later
-brief then says `pool_set(N)` instead of naming a profile. Gate: the
-stages tier passes unchanged.
+The order in brief (revised 2026-11-11, section 2.3):
+
+1. Step 0: pre-flight.
+2. Step 0a: the pool module.
+3. Step 0b: the tolerance tier and its anchor.
+4. Step 0c: mutation checks on the tier.
+5. Step 0d: the refactor behind the route interface, no new model.
+6. Step 1: the chain. Then step 5 (its reference), step 8 (chained
+   facilitation) and the spread, with steps 2 to 4, 6 and 7 as described.
 
 **Step 0. Pre-flight (lead).** Clean tree; worker agents listed; the lead's
 pool closed; quick suite and ultrarapid tier pass; Tom's answers to
 section 9 written into the to-do list.
+
+**Step 0a. The pool module, FD-017 (one worker, then the lead).** Decided
+2026-11-11 and **built before the tolerance tier and everything after
+it**: the `pool_*` functions and the session allocation described in
+`docs/ISSUES.md`, FD-017. Every later brief then says `pool_set(N)`
+instead of naming a profile. Pool handling must not move a number, so its
+gates are the exact ones: ultrarapid, stages, and the full tier once.
+
+**Step 0b. The tolerance tier (one Fable worker, then the lead).** Built
+on the model class **as it stands, untouched**, so the anchor describes the
+code before this work.
+
+- Stable regression presets: small networks derived from the regression
+  network, each adapting condition included, stable with a clear margin
+  (the leading exponent well below zero, confirmed by all three
+  estimators), driven by stimulus steps so that rates and depression range
+  widely. Noise on in some, off in others. They follow the rules for
+  presets (stated in full, added to the preset fixture deliberately).
+- The fixture: stored states for the pointwise layer (from the stable runs
+  and from chaotic runs of the existing regression presets), the pointwise
+  values at them, and the stable networks' end-to-end results.
+- `regression_compare` gains a tolerance argument (zero means exact, as
+  now) and reports the largest difference per leaf, so a pass says how
+  close it was.
+- A capture function that can write either the anchor or a dated
+  pre-edit reference, and a check that compares against a named one.
+- The test joins the quick suite if it runs in under a minute.
+- Acceptance: two captures from the same code are identical; the tier
+  passes against its own anchor at tolerance zero; the existing gates are
+  unaffected.
+
+**Step 0c. Mutation checks (the same worker, in its worktree; never
+merged).** Each of a written list of small deliberate errors is applied to
+the model class, the tier is run, and the outcome recorded; then the edit
+is reverted. The list covers at least: a time constant off by 1e-6
+relative; a dropped term in each Jacobian block; `jacobian_times` and the
+assembled Jacobian made to disagree in one block; a sign error in a
+recovery term; the SFA division by K removed; a change that touches only
+one route. **Every mutation must fail the tier.** One that passes means a
+tolerance is too loose or a layer is missing, and the tier is fixed before
+going on. The list and the results go in a note under `docs/notes/`, and
+the tolerances are fixed from them.
+
+**Step 0d. The refactor (one Fable worker, alone on the model class).**
+Product depression and today's facilitation move behind the route
+interface of section 2.1. No new model, no new behaviour, no new property.
+
+- Before starting: a fresh pre-edit capture of the tolerance tier.
+- Acceptance: the tolerance tier passes against the anchor and the fresh
+  capture; the quick suite passes, including `test_std_product_model`,
+  `test_jacobian_times`, `test_std_geomean` and the facilitation tests;
+  `jacobian_times` and a full right-hand-side evaluation are timed before
+  and after at n = 100 and at the manuscript's size, and a slowdown above
+  10 % is reported to Tom before the merge.
+- If the exact ultrarapid gate still passes, good. If it does not, that is
+  expected: the lead re-captures the exact references as section 6
+  describes, after the tolerance tier has passed.
+- Tests that freeze product checksums (`test_std_product_model`,
+  `test_pairs_reproducibility`) may need the same treatment; the worker
+  reports which, and the lead decides with the tolerance evidence in hand.
 
 **Step 1. The chain in the model class: FD-004 and FD-005.**
 One Fable worker (`matlab-fable-1`), alone, `pool: 4` (the quick suite
@@ -496,10 +630,11 @@ reaches `parfor`).
 
 - Edits: `src/model/SRNNCellTypePairs.m` and the new
   `scripts/tests/test_std_chain_model.m`. Nothing else.
-- Builds: the route configuration and validation; the chain branch in
+- Builds: the route configuration and validation; the chain as a second
+  implementation of the route interface that step 0d put in place (so
   `dynamics_fast`, `compute_Jacobian_fast`, `jacobian_times` and
-  `unpack_and_compute_states`; `route_fields`; the public
-  `std_route_factor` static; the refusals.
+  `unpack_and_compute_states` should need little or no change);
+  `route_fields`; the public `std_route_factor` static; the refusals.
 - Suggested commit order, each leaving the suite green: (a) configuration,
   validation and params, with no dynamics yet (a chain route errors as "not
   implemented"); (b) `dynamics_fast` and the tests of the equations and
@@ -507,9 +642,13 @@ reaches `parfor`).
   (d) `jacobian_times` and the equality test; (e) unpacking, the factor
   static, the remaining tests.
 - Acceptance: `test_std_chain_model` passes; `run_all_tests('quick')` passes
-  on its branch; **`test_regression_rapid` passes exactly**.
-- Lead: review the diff against section 2 (are the product lines
-  untouched?) and section 4.2, merge, run the ultrarapid and quick gates.
+  on its branch; the tolerance tier passes against the anchor; and
+  `test_regression_rapid` passes exactly against the reference re-captured
+  after step 0d (adding a model must not move a number on routes that do
+  not use it).
+- Lead: review the diff against section 2 (does the chain sit behind the
+  interface, with no model-specific branch in the four functions?) and
+  section 4.2, merge, run the tolerance, ultrarapid and quick gates.
 
 **Step 2. In parallel with step 1, on files step 1 does not touch.**
 
@@ -572,12 +711,13 @@ an existing three-condition product preset; `test_regression_stages`
 passes. Lead: stages gate, then the full gate.
 
 **Step 5. A reference for the chain itself (lead, with one Fable worker).**
-Once the chain passes its unit tests and the gates: a **new** ultrarapid
-reference covering a chain network (trajectories, Jacobians, the three
-estimators, a sweep, memory capacity, with and without the spread), saved
-as its own fixture beside the existing three, with its own check and test.
-The existing references are not edited. Two runs first, to confirm it
-reproduces.
+Once the chain passes its unit tests and the gates: the chain is added to
+the tolerance tier (stable chain networks and pointwise states, in a
+reference of its own so the anchor is not edited), and a **new** exact
+ultrarapid reference covers a chain network (trajectories, Jacobians, the
+three estimators, a sweep, memory capacity, with and without the spread),
+saved as its own fixture beside the existing three, with its own check and
+test. Two runs first, to confirm it reproduces.
 
 **Step 6. The four-condition bundle at `fast`, and stop.** In the lead's
 desktop MATLAB with the whole machine (pool opened by name, 12 workers):
@@ -602,12 +742,16 @@ here, which put it after the `fast` run to protect the draft date). One
 Fable worker on the model class, alone, as in step 1. The order on that
 one file is therefore:
 
-1. the chain (step 1, FD-004 and FD-005);
-2. the chain's own regression reference (step 5), captured as soon as
+1. the refactor behind the route interface (step 0d);
+2. the chain (step 1, FD-004 and FD-005);
+3. the chain's own regression references (step 5), captured as soon as
    step 1 is merged and its gates pass, **before** facilitation is begun;
-3. chained facilitation (this step), whose regression is that reference:
-   with facilitation off, every number must be unchanged;
-4. the per-neuron spread (step 3's FD-015), which then covers both
+4. chained facilitation (this step), a third implementation of the
+   interface, whose regression is those references: with facilitation
+   off, the chain must agree with them (within tolerance on the tolerance
+   tier; exactly on the exact reference unless the lead has the tolerance
+   evidence to re-capture it);
+5. the per-neuron spread (step 3's FD-015), which then covers both
    `std_spread` and `stf_spread`.
 
 The jobs that do not touch the model class (the reservoir class, the
@@ -643,8 +787,9 @@ Workers start with no memory of this conversation. Each brief gives:
    `adaptation_normalization.md` for the equations.
 4. The files it may edit, and that nothing else may be touched.
 5. The rule of section 2, where it applies, in full.
-6. The acceptance commands, and that a difference in
-   `test_regression_rapid` is a defect to find, never a reason to regenerate.
+6. The acceptance commands, and that a failure of the tolerance tier is a
+   defect to find, never a reason to loosen a tolerance or re-capture.
+   Only the lead replaces a reference.
 7. Commit rules: on its own branch, stage by name, no AI attribution, the
    message carries the reasoning and what turned out wrong.
 8. What to report: what was built, what was run and what it showed, what
@@ -653,8 +798,20 @@ Workers start with no memory of this conversation. Each brief gives:
 
 ## 8. Risks and traps
 
-- **Bit-identity.** The reason for section 2. If the ultrarapid gate fails
-  after a merge, bisect the merge; do not adjust a tolerance.
+- **A tolerance that hides a bug.** The reason for the mutation checks of
+  step 0c. If the tolerance tier fails after a merge, bisect the merge; do
+  not loosen a tolerance. If an exact gate fails on a merge that should
+  have moved no number, that is a defect too.
+- **Chaotic runs are not gated end to end.** After the exact references
+  are re-captured, nothing compares a long chaotic run before and after
+  the refactor except statistically. The evidence is the pointwise layer
+  (which includes chaotic states) and the stable networks.
+- **Discrete outputs can flip under round-off** (counts of positive
+  exponents, the automatic doubling of K, clip counts). The stable presets
+  are chosen away from those thresholds, and the note from step 0c records
+  the margins.
+- **The general form could be slower.** `jacobian_times` is the hot path
+  of the Lyapunov estimates; step 0d times it before and after.
 - **`jacobian_times` drift.** It has no independent check except equality
   with the assembled Jacobian, which in turn rests on finite differences.
   Both tests must cover chain routes, with and without the spread.
@@ -765,9 +922,15 @@ Code side of block A is done when:
 
 - [ ] `test_std_chain_model` and `test_std_spread` pass and are in the quick
       suite (FD-005, FD-015).
-- [ ] The three existing regression references pass unchanged on merged
-      `main` (ultrarapid exactly; stages and full with their recorded ignore
-      patterns).
+- [ ] The pool module is in and no `parpool(` call remains outside it
+      (FD-017).
+- [ ] The tolerance tier exists, every mutation of step 0c fails it, and
+      it passes against its anchor on merged `main`.
+- [ ] Product depression, facilitation and the chain sit behind one route
+      interface; the four functions carry no model-specific branch.
+- [ ] The exact references pass on merged `main` (ultrarapid exactly;
+      stages and full with their recorded ignore patterns), re-captured
+      once after the refactor with the reason in the commit.
 - [ ] A chain preset builds, runs, sweeps, and goes through memory capacity
       with the synaptic readout (FD-004, FD-007).
 - [ ] The four-condition bundle runs end to end at `fast`, and both figure
