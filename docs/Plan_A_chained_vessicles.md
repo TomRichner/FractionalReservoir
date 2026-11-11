@@ -21,6 +21,14 @@ word used in the text.)
 
 ## 0. How to use this plan
 
+**The plan is the guide, not the deadline** (Tom, 2026-11-11). 2026-11-16
+is the date a draft is due; the submission date is 2026-12-02, and a
+reasonable draft already exists. So the work is not to be cut down,
+reordered or left partial to meet the 16th. Lay an excellent foundation
+first and go fast on top of it. What the deadline does change: before the
+16th, avoid production runs of more than about two hours; use the fast
+regression tiers and `fast` pre-production runs instead.
+
 **If you are the lead agent picking this up:**
 
 1. Read, in order: `CLAUDE.md` ("Current work"), block A of the to-do list,
@@ -588,13 +596,35 @@ steady-state curves, from
 with the chosen parameters. It must show what Brian accepted: the first-cycle
 match and the steady-state difference.
 
-**Step 8. Chained facilitation, FD-018** (one Fable worker on the model
-class, alone, as in step 1). Decided 2026-11-11: facilitation is not in
-this paper, but it is built now so the model is not refactored twice. The
-form is option C of the facilitation note (release-coupled, a calcium
-trace driving release probability). Its regression is the chain's own
-reference from step 5: with facilitation off, every number must be
-unchanged. It comes after step 6 so that it cannot delay the draft.
+**Step 8. Chained facilitation, FD-018: built straight after the chain,
+not at the end** (Tom, 2026-11-11; this replaces the order first written
+here, which put it after the `fast` run to protect the draft date). One
+Fable worker on the model class, alone, as in step 1. The order on that
+one file is therefore:
+
+1. the chain (step 1, FD-004 and FD-005);
+2. the chain's own regression reference (step 5), captured as soon as
+   step 1 is merged and its gates pass, **before** facilitation is begun;
+3. chained facilitation (this step), whose regression is that reference:
+   with facilitation off, every number must be unchanged;
+4. the per-neuron spread (step 3's FD-015), which then covers both
+   `std_spread` and `stf_spread`.
+
+The jobs that do not touch the model class (the reservoir class, the
+presets, the display code, the joint-sample seed) run beside these as
+already described. Facilitation is not in this paper; it is built now so
+the model is refactored once.
+
+The form is option C of
+`docs/notes/Depression_facilitation_model_options_2026-11-11.md`
+(section 5): release probability multiplies both the output and the rate
+at which the releasable pool is used, and in the multiple-timescale form
+a calcium trace drives release probability. **The calcium trace is stored
+per route** (Tom, 2026-11-11), like depression and facilitation: local
+calcium at different axon terminals can differ, and this allows a time
+constant per route. The lead writes the design section for it (route
+configuration, linearisation, tests) into this plan before briefing the
+worker, as sections 4.1 to 4.3 do for the chain.
 
 **Not in this plan:** the manuscript text (Methods Eqs. 5 and 6, the
 Supplemental Methods, the conditions and timescale tables, the paragraph on
@@ -702,7 +732,11 @@ Workers start with no memory of this conversation. Each brief gives:
 
 **Still under discussion (the lead's recommendation in each):**
 
-4. **Facilitation.** Recommendation: refuse it on chain routes in this pass.
+4. **Facilitation.** **Decided 2026-11-11: it is built, straight after the
+   chain (step 8), in the release-coupled serial form, with the calcium
+   trace per route and its own spread (`stf_spread`).** Until step 8 lands,
+   a chain route refuses `stf` with a clear error. The lead's earlier
+   recommendation, kept for the record, was to refuse it on chain routes in this pass.
    If a two-variable facilitation is wanted later, the form that matches the
    chain's logic is residual calcium driving a slower release-probability
    variable, with release probability also scaling how fast the releasable

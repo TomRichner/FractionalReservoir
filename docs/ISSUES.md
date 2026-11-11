@@ -271,10 +271,11 @@ captured from the code as it stands.
     `run_lyapunov_spectrum`, `run_transient_gain` and
     `run_numerics_verification` go through the module. The six worker-agent
     prompts and `MATLAB_worker_agents.md` are updated to `pool_set(N)`.
-  - Optional, to be decided after it works: lowering worker priority, or
-    pinning each session's workers to its own cores and leaving two free
-    (`docs/notes/set_parpool_cpu_affinity.m` is Tom's earlier script; it is
-    Windows-only).
+  - An option to run a session's workers at lowered priority, so the
+    desktop, the CLI and remote desktop stay responsive (Tom, 2026-11-11).
+    **Pinning workers to cores is out of scope for now**
+    (`docs/notes/set_parpool_cpu_affinity.m` is Tom's earlier, Windows-only
+    script, kept for reference).
 - **Checked 2026-11-11** (a subagent, in the lead's MATLAB, R2026a): the
   variable round-trips, is private to the MATLAB process (a child process
   inherits it, an unrelated shell does not see it), and survives
@@ -321,9 +322,9 @@ captured from the code as it stands.
   before this work began** (Plan A step 5); the existing references pass
   unchanged; today's facilitation on product routes (`single_neuron_stf`)
   is bit-identical.
-- **Depends on:** FD-004, FD-005, FD-015, and the chain's own reference.
-  Sequenced after the four-condition `fast` run so it cannot delay the
-  draft, unless Tom says otherwise.
+- **Depends on:** FD-004, FD-005 and the chain's own reference. **Built
+  straight after the chain** (Tom, 2026-11-11), before the spread (FD-015),
+  which then covers `stf_spread` too. The calcium trace is per route.
 - **Result:** _(pending)_
 
 ## To be planned

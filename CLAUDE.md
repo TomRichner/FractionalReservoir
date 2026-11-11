@@ -18,8 +18,18 @@ dead end.
 
 ## Current work (as of 2026-11-10)
 
-We are bringing the manuscript to a final draft, due 2026-11-16, from Brian
-Lundstrom's feedback. Two documents to read first:
+We are bringing the manuscript to a final draft from Brian Lundstrom's
+feedback. A draft is due 2026-11-16; submission is 2026-12-02.
+
+**The plan is the guide, not the deadline** (Tom, 2026-11-11). 2026-11-16
+is the date a draft is due; the submission date is 2026-12-02, and a
+reasonable draft already exists. So the work is not to be cut down,
+reordered or left partial to meet the 16th. Lay an excellent foundation
+first and go fast on top of it. What the deadline does change: before the
+16th, avoid production runs of more than about two hours; use the fast
+regression tiers and `fast` pre-production runs instead.
+
+Two documents to read first:
 
 - **`../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`** is
   the to-do list and the record of what was asked and decided: the 1TS versus
