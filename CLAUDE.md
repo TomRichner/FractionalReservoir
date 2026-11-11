@@ -44,15 +44,21 @@ Two documents to read first:
 Reorganising and archiving this repo (`scripts/paper/`, `data/`, `figs/`) is
 deferred until the final-draft work is finished (TR, 2026-11-10). Until then, new
 experiments follow the existing conventions and nothing is moved or deleted.
-**One exception (Tom, 2026-11-11): `scripts/paper/archive/`** holds the 22
-`*_config.m` / `*_run.m` pairs that did not produce the manuscript's figures.
-They were moved, not changed, and `setup_paths` adds the folder to the path,
-so every one still resolves and runs by name (`test_mu7revised_bundle` and
-`run_overnight_queue`'s default queue call some of them). What stays in
-`scripts/paper/` is the manuscript bundle (`mu7revisedMedium_config` / `_run`,
-the two entry points, `grouped_figure_registry`), the regression bundle
-(`regression_fast_config` / `_run`), and `paper_config` with
+**One exception (Tom, 2026-11-11): `scripts/paper/archive/`** holds the 18
+`*_config.m` / `*_run.m` pairs that neither produced the manuscript's figures
+nor are needed for block A. They were moved, not changed, and `setup_paths`
+adds the folder to the path, so every one still resolves and runs by name
+(`test_mu7revised_bundle` and `run_overnight_queue`'s default queue call some
+of them). What stays in `scripts/paper/` is the manuscript bundle
+(`mu7revisedMedium_config` / `_run`, the two entry points,
+`grouped_figure_registry`), the regression bundle (`regression_fast_config` /
+`_run`), the four STD-matching bundles (`stdScaled_fast`, `stdUsage_fast`,
+`stdUsage_med`, `stdSingleMatched_fast`), and `paper_config` with
 `reproduce_paper_run`. A new bundle still goes in `scripts/paper/` itself.
+**`reproduce_paper_run` runs the manuscript's bundle** (`mu7revisedMedium_config`)
+since the same day; `paper_config`, the default of a bare call to either entry
+point, still names the older mu8p25 network and is not what the paper was
+built from.
 
 ### How the work is tracked
 

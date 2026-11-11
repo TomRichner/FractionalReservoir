@@ -61,10 +61,15 @@ run_dir = run_all_paper_analyses();   % all heavy compute, hours
 results = make_all_paper_figures();   % every figure, minutes
 ```
 
-Called with no argument, both take their settings from `paper_config()`. To do
-both in one action, open and run
-[`scripts/paper/reproduce_paper_run.m`](scripts/paper/reproduce_paper_run.m),
-which is those two lines and a summary.
+Called with no argument, both take their settings from `paper_config()`; given
+a config struct, they run that bundle instead. **To rerun the manuscript's own
+run**, open and run
+[`scripts/paper/reproduce_paper_run.m`](scripts/paper/reproduce_paper_run.m):
+it passes the bundle the manuscript is built against
+(`mu7revisedMedium_config`, about 7 hours at `'medium'`) to both and prints a
+summary. Its header says what it writes, what it refuses to overwrite, and
+which two figures come from elsewhere. `paper_config()` names an older
+network, not the manuscript's.
 
 **[`scripts/paper/paper_config.m`](scripts/paper/paper_config.m) is the one file
 to edit** — it names the preset (*which network*) and the run mode (*how much

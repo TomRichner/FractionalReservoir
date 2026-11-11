@@ -38,35 +38,51 @@ Entry template:
 
 **Issues touched:** none. Tom asked which `scripts/paper` files produced the
 manuscript's figures and to archive the rest; this is an exception to the
-deferred reorganisation, recorded in the to-do list and in `CLAUDE.md`.
+deferred reorganisation, recorded in the to-do list and in `CLAUDE.md`. He
+then asked for the STD-matching bundles back and for `reproduce_paper_run`
+to run the manuscript's run.
 
-**Commits:** this repo, "scripts/paper: archive the 22 config/run pairs the
-manuscript's figures do not use"; manuscript repo, "To-do: scripts/paper
-archive done as an exception to the deferred reorganisation".
+**Commits:** this repo, `d477013` scripts/paper: archive the 22 config/run
+pairs the manuscript's figures do not use; then "reproduce_paper_run runs
+the manuscript's bundle; STD-matching bundles back out of the archive".
+Manuscript repo, `9a55969` and "To-do: STD-matching bundles stay in
+scripts/paper; reproduce_paper_run runs the manuscript's bundle".
 
-**Done:** 44 files (22 `*_config.m` / `*_run.m` pairs) moved with `git mv`
-into `scripts/paper/archive/`, contents unchanged. Nine `.m` files stay: the
-manuscript bundle (`mu7revisedMedium_config` / `_run`,
-`run_all_paper_analyses`, `make_all_paper_figures`,
-`grouped_figure_registry`), the regression bundle (`regression_fast_config`
-/ `_run`), and `paper_config` with `reproduce_paper_run`. The three `.md`
-notes in `scripts/paper/` were left where they are.
+**Done:** 36 files (18 `*_config.m` / `*_run.m` pairs) are in
+`scripts/paper/archive/`, moved with `git mv`, contents unchanged (44 were
+moved at first; the 8 files of `stdScaled_fast`, `stdUsage_fast`,
+`stdUsage_med`, `stdSingleMatched_fast` went back, being live for block A).
+Seventeen `.m` files stay: the manuscript bundle (`mu7revisedMedium_config`
+/ `_run`, `run_all_paper_analyses`, `make_all_paper_figures`,
+`grouped_figure_registry`), the regression bundle, the STD-matching
+bundles, and `paper_config` with `reproduce_paper_run`. The three `.md`
+notes were left where they are. `reproduce_paper_run.m` now passes
+`mu7revisedMedium_config()` to both entry points (it ran `paper_config()`,
+the mu8p25 network); README and `CLAUDE.md` say so.
 
-**Verified:** in MATLAB, before and after the move, all 25 `*_config`
-functions were called and returned the same preset names; all 44 archived
-files resolve by name to `archive/` after `setup_paths`. `run_all_tests` on
-`test_mu7revised_bundle`, `test_run_modes`, `test_verbose_levels`,
-`test_preset_golden`, `test_preset_conditions`: all pass.
+**Verified:** in MATLAB, all 25 `*_config` functions return the same preset
+names before the move, after it, and after the move back; all 53 `.m` files
+resolve by name to where they now sit. `test_mu7revised_bundle` and
+`test_run_modes` pass in the final state; `test_verbose_levels`,
+`test_preset_golden` and `test_preset_conditions` passed after the first
+move. `reproduce_paper_run` was run on this machine: it built the
+mu7revisedMedium cfg (medium, `data/mu7revisedMedium`,
+`figs/mu7revisedMedium`) and stopped at
+`run_all_paper_analyses:TargetNotEmpty`, as intended where the manuscript's
+run already exists; `git status` shows nothing written under `data/` or
+`figs/`. Code Analyzer: no issues.
 
-**Not verified / known gaps:** no regression tier was run (no file a tier
-reads was moved or edited). No archived `*_run.m` was executed. A MATLAB
-session started before the move needs `setup_paths` again to see `archive/`.
+**Not verified / known gaps:** `reproduce_paper_run` has not been run
+through (7 h at medium; Tom's to start, and it needs
+`data/mu7revisedMedium` moved aside first). No regression tier was run (no
+file a tier reads was moved or edited). No archived `*_run.m` was executed.
+A MATLAB session started before the move needs `setup_paths` again.
 
-**Raised, not acted on:** `paper_config` and `reproduce_paper_run` are not
-the manuscript's: `paper_config` names the mu8p25 network, so "reproduce the
-paper" there builds a superseded one. They stay because both entry points
-default to `paper_config()`, two tests call it, and the README points at
-both. `README_mu7revised.md` mostly describes archived bundles.
+**Raised, not acted on:** `paper_config` still names the mu8p25 network, so
+a bare `run_all_paper_analyses()` / `make_all_paper_figures()` is not the
+manuscript's run; the README and `CLAUDE.md` sections that call it "the one
+file to edit" describe that default. `README_mu7revised.md` mostly
+describes archived bundles.
 
 **Next:** unchanged from the entry below.
 
