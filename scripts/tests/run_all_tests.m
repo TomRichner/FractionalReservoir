@@ -118,9 +118,19 @@ end
 function names = slow_test_names()
 % Tests left out of run_all_tests('quick'): the ones that took 30 s or more
 % when every test was timed on 2026-11-10 (seconds in the comments; 14-core
-% desktop; the stage and sweep tests start a parallel pool if none is open,
-% which adds its start-up time once). Everything else took under 30 s each.
-% Re-time and edit this list when a test is added or changes weight.
+% desktop). Everything else took under 30 s each. Re-time and edit this list
+% when a test is added or changes weight.
+%
+% POOLS. No test opens a pool of its own choosing any more (FD-017): the
+% stage and sweep tests use the session's pool, which is whatever pool_set(N)
+% allocated before the run. With pool_set(0), or with no allocation at all
+% (then with pool_ensure's warning in the test's output), they run serially
+% and more slowly; the timings here were taken with a pool up. Serial
+% results equal pool results only to round-off (the client is multithreaded,
+% pool workers are not), so the byte-exact test_regression_stages and
+% test_regression_bundle NEED A POOL UP, of any size; test_regression_rapid
+% passes either way. test_pool_module is the exception to all this: it
+% restarts the session's pool several times and puts it back as it found it.
     names = {
         'test_regression_bundle'            % ~50 min  the FULL regression: every stage and figure (32 + 18 min)
         'test_numerics_verification_stage'  % 737 s  the numerics stage at 'fast', five checks x 3 conditions
@@ -128,6 +138,7 @@ function names = slow_test_names()
         'test_lyapunov_topk'                % 165 s  top-K against the ode45 full-spectrum QR reference
         'test_sensitivity_refactor'         %  61 s  two sensitivity sweeps on a parallel pool
         'test_benettin_vs_qr'               %  50 s  SRNNModel2, n = 300, both methods
+        'test_pool_module'                  %  47 s  the pool module: opens, restarts and resizes the session's pool
         'test_RMTBlocks_predictions'        %  37 s  eigenvalue statistics over many draws
         'test_eig_heatmap_stage'            %  33 s  analysis stage + three figures
         };

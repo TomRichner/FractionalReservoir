@@ -60,7 +60,7 @@ arguments
     cfg.duration_s  (1,1) double = 0     % 0 -> mode duration; must leave room for sample history
     cfg.horizon_s   (1,1) double = 0     % 0 -> per run_mode
     cfg.n_override  (1,1) double = 0     % 0 -> the preset's n (tests use a small one)
-    cfg.n_workers   (1,1) double = 0     % 0 -> min(12, cores)
+    cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.report_dt   (1,1) double = 0.02
 end
 
@@ -126,8 +126,10 @@ n_cond     = numel(cond_names);
 vprintf(cfg.verbose, 'minimal', '[transient_gain] preset=%s run_mode=%s: %d conditions x %d seeds, T = %g s, %d regular + up to %d onset + %d quiet samples, horizon %g s, {%s}\n', ...
     cfg.preset_name, cfg.run_mode, n_cond, n_seeds, T, n_regular, n_exc, n_exc, horizon, strjoin(P.variants, ', '));
 
-pool = ensure_pool(cfg.n_workers);
-vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', pool.NumWorkers);
+pool = pool_ensure('verbose', cfg.verbose);
+n_pool = 1;                          % no pool: the trials run serially in the client
+if ~isempty(pool); n_pool = pool.NumWorkers; end
+vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', n_pool);
 
 %% One parfor over every (condition, seed) trial
 [ci, si] = ndgrid(1:n_cond, 1:n_seeds);
@@ -169,7 +171,7 @@ settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'min_pos_segments', P.min_pos, 'min_quiet_segments', P.min_quiet, 'dir_warmup_s', P.dir_warmup, ...
     'sample_window', [P.t_lo, P.t_hi], 'variants', {P.variants}, ...
     'directions', {{'ei_diff', 'ei_sum', 'lyap'}}, ...
-    'n_workers', pool.NumWorkers, 'minutes', toc(t_stage) / 60);
+    'n_workers', n_pool,'minutes', toc(t_stage) / 60);
 condition_titles = titles;   % saved name
 results = res;               % saved name
 mat_file = fullfile(out_dir, 'transient_gain_data.mat');
@@ -310,21 +312,6 @@ for v = 1:numel(variants)
     parts{v} = sprintf('%s %.2f', variants{v}, median(g));
 end
 s = ['median G_max (regular): ' strjoin(parts, ', ')];
-end
-
-function pool = ensure_pool(n_workers)
-% Use the pool that is up; else try to start one; else run serially (warn).
-pool = gcp('nocreate');
-if ~isempty(pool); return; end
-if n_workers <= 0; n_workers = min(12, feature('numcores')); end
-try
-    pool = parpool(parallel.defaultProfile, n_workers);
-catch ME
-    warning('run_transient_gain:NoPool', ...
-        ['Could not start a parallel pool (%s). Running the trials SERIALLY. ' ...
-         'Secure a pool first with wait_for_parpool.'], strtok(ME.message, newline));
-    pool = struct('NumWorkers', 1);
-end
 end
 
 function s = pretty(name)

@@ -42,7 +42,7 @@ arguments
     cfg.K           (1,1) double = 0     % 0 -> per run_mode
     cfg.n_override  (1,1) double = 0     % 0 -> the preset's n (tests use a small one)
     cfg.noise_off_too (1,1) logical = true
-    cfg.n_workers   (1,1) double = 0     % 0 -> min(12, cores)
+    cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
 end
 
 setup_paths();
@@ -97,8 +97,10 @@ if sigma_preset == 0; variants = {'noise_off'}; end
 vprintf(cfg.verbose, 'minimal', '[lyapunov_spectrum] preset=%s run_mode=%s: %d conditions x %d seeds x {%s}, T = %g s, K = %d (cap %d)\n', ...
     cfg.preset_name, cfg.run_mode, n_cond, n_seeds, strjoin(variants, ', '), T, K, P.K_max);
 
-pool = ensure_pool(cfg.n_workers);
-vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', pool.NumWorkers);
+pool = pool_ensure('verbose', cfg.verbose);
+n_pool = 1;                          % no pool: the seed loops run serially in the client
+if ~isempty(pool); n_pool = pool.NumWorkers; end
+vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', n_pool);
 
 t_stage = tic;
 res = struct('name', cond_names, 'title', titles);
@@ -123,7 +125,7 @@ settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'T', T, 'lya_T_interval', P.lya_T_interval, 'lya_warmup', P.lya_warmup, ...
     'lya_dt', P.lya_dt, 'K', K, 'K_max', P.K_max, 'fs', P.fs, 'n_seeds', n_seeds, ...
     'sigma_u_noise', sigma_preset, 'variants', {variants}, ...
-    'n_workers', pool.NumWorkers, 'minutes', toc(t_stage) / 60);
+    'n_workers', n_pool,'minutes', toc(t_stage) / 60);
 condition_titles = titles;   % saved name
 results = res;               % saved name
 mat_file = fullfile(out_dir, 'lyapunov_spectrum_data.mat');
@@ -169,21 +171,6 @@ end
 
 function s = dky_txt(r)
 if r.D_KY_resolved; s = sprintf('%.1f', r.D_KY); else; s = sprintf('> %d (unresolved)', r.K_used); end
-end
-
-function pool = ensure_pool(n_workers)
-% Use the pool that is up; else try to start one; else run serially (warn).
-pool = gcp('nocreate');
-if ~isempty(pool); return; end
-if n_workers <= 0; n_workers = min(12, feature('numcores')); end
-try
-    pool = parpool(parallel.defaultProfile, n_workers);
-catch ME
-    warning('run_lyapunov_spectrum:NoPool', ...
-        ['Could not start a parallel pool (%s). Running the seed loops SERIALLY. ' ...
-         'Secure a pool first with wait_for_parpool.'], strtok(ME.message, newline));
-    pool = struct('NumWorkers', 1);
-end
 end
 
 function s = pretty(name)
