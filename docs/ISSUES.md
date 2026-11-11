@@ -249,7 +249,8 @@ model's arithmetic.
 
 ### FD-016 A seed for the joint parameter-space sample
 
-- **Status:** open (decided by Tom 2026-11-11)
+- **Status:** in progress (briefed to `matlab-fable-2`, beside step 0b;
+  decided by Tom 2026-11-11)
 - **Serves:** blocks A to D (comparable reruns), and the regression
 - **What:** `ParamSpaceAnalysis2` draws the joint sample with
   `rng('shuffle')` and `randperm`, so its 128 grid points differ on every
@@ -364,8 +365,9 @@ model's arithmetic.
 
 ### FD-020 Tolerance regression tier
 
-- **Status:** open (acceptance test agreed with Tom in the execution plan;
-  Plan A sections 2.2 and 7.3, steps 0b and 0c)
+- **Status:** in progress (step 0b briefed to `matlab-fable-1`; acceptance
+  test agreed with Tom in the execution plan; Plan A sections 2.2 and
+  7.3, steps 0b and 0c)
 - **Serves:** block A; every later edit to the model's arithmetic
 - **What:** in `scripts/tests/regression/`: `regression_tol_run` (builds
   the cases, returns raw arrays), `regression_tol_compare` (element-wise;
