@@ -55,10 +55,26 @@ decisions are recorded in the to-do list, not in an issue; and the worklog
 points at commits, it does not replace them. **Commit messages are still the
 record of reasoning** (see "Scope" above).
 
-Working arrangement (TR, 2026-11-10): one agent does most of the
-implementation, on the current branch (`main`), so there are no merges to
-juggle. Subagents take bounded jobs that do not overlap the main agent's
-files. Commit at logical intervals.
+Working arrangement (TR, 2026-11-10, revised the same day): **a lead agent
+orchestrates and worker agents build.** The lead writes the briefs, reviews
+every diff, runs the regression gates and handles the merges, so it keeps
+the architecture in view; it was first planned that one agent would do all
+the building, and that was dropped. Up to two Fable 5.2 workers at medium
+effort take the difficult work (re-implementing classes, numerical methods,
+equations in code); up to three Opus 5.5 workers at medium effort take the
+straightforward work (configs, scripts, plots). The workers are the six
+agents in `.claude/agents/` (`matlab-fable-1..3`, `matlab-opus-1..3`), each
+with a private MATLAB session; **read
+`../StochasticPlasticDynamicalSystemPaper/docs/MATLAB_worker_agents.md`
+before delegating MATLAB work**: one instance of each agent at a time, and
+every brief states `pool: N`, with at most 12 pool workers summed over all
+MATLAB sessions on the machine. Commit at logical intervals.
+
+**The plan for block A is `docs/Plan_A_chained_vessicles.md`**: the design
+of the chained-pool model and its per-neuron spread, the tests, the gates,
+the order of the builds and which worker does each, and the questions still
+open. Read it before any work on FD-004, FD-005, FD-006, FD-007 or FD-015,
+and do not start that work until Tom says go.
 
 Decisions already made that affect the code: depression gains a **chained
 vesicle-pool model** as an opt-in per route, beside the current product,

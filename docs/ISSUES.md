@@ -35,9 +35,11 @@ Rules:
 - **Reasoning stays in commit messages**, as before. An issue's "Result"
   line points at commits; it does not restate them.
 
-Work is done by one agent on the current branch (`main`), so there are no
-merges to juggle (TR, 2026-11-10). Subagents are used for bounded jobs that
-do not overlap the main agent's files.
+A lead agent orchestrates and worker agents build (TR, 2026-11-10; the
+earlier arrangement, one agent doing all the building, was dropped the same
+day). The lead reviews, runs the regression gates and merges. Who builds
+which issue, in what order, is in `docs/Plan_A_chained_vessicles.md` for
+block A.
 
 ## Order
 
