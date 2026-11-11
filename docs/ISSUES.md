@@ -58,7 +58,7 @@ captured from the code as it stands.
 
 ### FD-001 Audit the existing tests
 
-- **Status:** in progress (2026-11-10)
+- **Status:** done (2026-11-10)
 - **Serves:** all blocks (the safety net for everything below)
 - **What:** `scripts/tests/` holds about 60 files of uncertain state. Run
   every test, classify each as passing, failing because the test is stale,
@@ -69,7 +69,16 @@ captured from the code as it stands.
   single entry point runs them all and prints a summary; the audit's
   findings (including any real defects found, not fixed) are in the worklog.
 - **Depends on:** nothing.
-- **Result:** _(pending)_
+- **Result:** commits `ba0508c` (entry point), `a356bd4` (removals),
+  `32bbf5e` (test fixes), `155b5ef` (new tests). All 58 remaining tests pass.
+  `run_all_tests('quick')` is 52 tests in about 3.5 minutes;
+  `run_all_tests('slow')` is 6 tests in about 18. No defect was found in
+  `src/`: the four failing tests were all wrong on the test side. Five
+  run-and-plot scripts that asserted nothing were removed. Three tests were
+  added (`test_std_product_model`, `test_pairs_reproducibility`,
+  `test_psa_pairs_end_to_end`) and `test_sample_hold_mc` was ported to the
+  current reservoir class. Done by a subagent; its findings and the gaps it
+  listed are in the worklog entry of 2026-11-10.
 
 ### FD-002 Fast regression bundle
 
