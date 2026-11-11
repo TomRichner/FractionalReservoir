@@ -446,6 +446,30 @@ model's arithmetic.
 - **Depends on:** FD-020.
 - **Result:** _(pending)_
 
+### FD-022 Remove the remnants of resuming a `ParamSpaceAnalysis2` run
+
+- **Status:** open (Tom, 2026-11-11: resume is not needed; remove what is
+  left of it, in the future). Not scheduled; it does not block block A.
+- **Serves:** housekeeping; keeps the documentation true
+- **What:** `CLAUDE.md` and the class header say a sweep "can be resumed by
+  loading the PSA and calling `run()` again". The FD-016 worker reported
+  that this no longer works: `run()` appends a new dated folder to
+  `output_dir` and calls `generate_grid` again, so it starts a new run in a
+  nested directory and never finds the old `temp_batches`. Tom's reading
+  is that resume existed and was not carried through an earlier refactor.
+  **The lead has not verified the report**; the first step is to confirm
+  it. Then remove the claim from `CLAUDE.md` and the class header, and
+  remove code that exists only for resuming (for example the skip of a
+  batch whose file already exists in `run_batched_simulation`), keeping
+  whatever the batch files are still needed for (consolidation, memory).
+- **Done when:** the report is confirmed or corrected in the commit
+  message; no document or comment says a run can be resumed; no code path
+  exists only to resume one; the ultrarapid, quick and stages gates pass
+  unchanged (removing dead code must not move a number).
+- **Depends on:** nothing. `ParamSpaceAnalysis2.m` is one file, so not
+  beside other work on it.
+- **Result:** _(pending)_
+
 ## To be planned
 
 Named so they are not lost. Each needs a planning session with Tom before it
