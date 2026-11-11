@@ -249,8 +249,7 @@ model's arithmetic.
 
 ### FD-016 A seed for the joint parameter-space sample
 
-- **Status:** in progress (briefed to `matlab-fable-2`, beside step 0b;
-  decided by Tom 2026-11-11)
+- **Status:** done (2026-11-11)
 - **Serves:** blocks A to D (comparable reruns), and the regression
 - **What:** `ParamSpaceAnalysis2` draws the joint sample with
   `rng('shuffle')` and `randperm`, so its 128 grid points differ on every
@@ -264,7 +263,13 @@ model's arithmetic.
   and quick gates pass unchanged.
 - **Depends on:** nothing; must land before the four-condition `fast` run
   of Plan A step 6.
-- **Result:** _(pending)_
+- **Result:** commit `68da56f` (worker `matlab-fable-2`), merged as
+  `fafd990`. `ParamSpaceAnalysis2.sample_seed`, set from a bundle's
+  `cfg.param_space_seed`. On merged main: quick 54 of 54 (ultrarapid
+  exact), stages tier pass, `test_psa_sample_seed` in the quick suite. The
+  seed is in `psa_object.mat` always and in the summary only when set (so
+  the full reference does not move). No existing config sets it; the
+  chain bundle's will.
 
 ### FD-017 One place for the parallel pool: `pool_*` functions and a session allocation
 
