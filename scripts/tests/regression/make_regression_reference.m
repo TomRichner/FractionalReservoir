@@ -61,6 +61,11 @@ commit = strtrim(commit);
 % fixture) do not count.
 [~, dirty] = system(sprintf('git -C "%s" status --porcelain --untracked-files=no', project_root));
 dirty = strtrim(dirty);
+% Replacing a reference means deleting the tracked fixture first, which git
+% reports as a change. That one line is this function's own business.
+lines = strtrim(splitlines(string(dirty)));
+lines = lines(strlength(lines) > 0 & ~endsWith(lines, names.(tier)));
+dirty = char(strjoin(lines, newline));
 if ~isempty(dirty) && ~opts.allow_dirty
     error('make_regression_reference:DirtyTree', ...
         'Tracked files have uncommitted changes; commit them first.\n%s', dirty);
