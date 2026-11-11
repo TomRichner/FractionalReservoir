@@ -23,6 +23,9 @@ function run_dir = run_all_analyses(preset_name, run_mode, opts)
 %   save_figs    write extra figure formats alongside each sweep (default true).
 %   output_dir   override the dated directory (default: create one).
 %   assemble     stack the 1-D sensitivity sheets after the sweeps (default true).
+%   param_space_seed  seed for the joint parameter-space sample (default [],
+%                unset: drawn from the clock as before). Passed to the
+%                param_space stage only; see ParamSpaceAnalysis2.sample_seed.
 %
 % WAS A SCRIPT that ran three other scripts, passing settings through
 % base-workspace `master_*` variables the callees read with exist(). Everything
@@ -48,6 +51,7 @@ arguments
     opts.output_dir   (1,:) char    = ''
     opts.assemble     (1,1) logical = true
     opts.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
+    opts.param_space_seed           = []          % [] = unset (clock); else the seed of the joint sample
 end
 
 setup_paths();
@@ -159,7 +163,10 @@ vprintf(opts.verbose, 'verbose', '========================================\n');
 vprintf(opts.verbose, 'minimal', '[3/3] Running Parameter Space Analysis...\n');
 vprintf(opts.verbose, 'verbose', '========================================\n');
 pool_restart(opts.verbose);
-run_param_space_analysis(resolve_run_context('param_space', ctx_args{:}));
+% The joint sample's seed goes to this stage alone: it is the only one that
+% draws a random order. Empty leaves the sample drawn from the clock.
+run_param_space_analysis(resolve_run_context('param_space', ctx_args{:}, ...
+    'param_space_seed', opts.param_space_seed));
 
 %% Human-readable parameter record
 % parameters.md next to run_manifest.mat: the preset and run mode, what the

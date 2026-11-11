@@ -129,8 +129,23 @@ t_all = tic;
 % auto-named one it can only open once run_all_analyses has created the
 % directory, so the sweep stage's lines are missing from that log. One log
 % at a time, process-global; the onCleanup closes it however this exits.
+%
+% cfg.param_space_seed (optional; absent or empty = unset) seeds the joint
+% parameter-space sample, so two runs of a bundle simulate the same grid
+% points (FD-016). Unset, the sample is drawn from the clock as it always
+% was. Checked here, before any compute: the PSA would reject a bad value
+% too, but only after the two sensitivity stages had run.
+param_space_seed = [];
+if isfield(cfg, 'param_space_seed'); param_space_seed = cfg.param_space_seed; end
+if ~isempty(param_space_seed) && ~(isnumeric(param_space_seed) && isscalar(param_space_seed) && ...
+        isreal(param_space_seed) && isfinite(param_space_seed) && param_space_seed >= 0 && ...
+        param_space_seed == floor(param_space_seed) && param_space_seed <= 2^32 - 1)
+    error('run_all_paper_analyses:BadParamSpaceSeed', ...
+        'cfg.param_space_seed must be empty or a nonnegative integer scalar no larger than 2^32 - 1.');
+end
 if isempty(cfg.run_dir)
-    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'verbose', cfg.verbose);
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'verbose', cfg.verbose, ...
+        'param_space_seed', param_space_seed);
     log_guard = start_log(fullfile(run_dir, 'command_window.log'), cfg.verbose); %#ok<NASGU>
 else
     out_dir = cfg.run_dir;
@@ -141,7 +156,8 @@ else
     if ~isfolder(out_dir); mkdir(out_dir); end
     log_guard = start_log(fullfile(out_dir, 'command_window.log'), cfg.verbose); %#ok<NASGU>
     vprintf(cfg.verbose, 'minimal', '  output   : %s\n', out_dir);
-    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir, 'verbose', cfg.verbose);
+    run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir, 'verbose', cfg.verbose, ...
+        'param_space_seed', param_space_seed);
 end
 
 results = struct('stage', {}, 'ok', {}, 'minutes', {}, 'detail', {}, 'err', {});
