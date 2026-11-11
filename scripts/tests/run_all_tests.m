@@ -124,6 +124,7 @@ function names = slow_test_names()
     names = {
         'test_regression_bundle'            % ~50 min  the FULL regression: every stage and figure (32 + 18 min)
         'test_numerics_verification_stage'  % 737 s  the numerics stage at 'fast', five checks x 3 conditions
+        'test_regression_stages'            % ~3 min  the MIDDLE regression: three stages and their figures
         'test_lyapunov_topk'                % 165 s  top-K against the ode45 full-spectrum QR reference
         'test_sensitivity_refactor'         %  61 s  two sensitivity sweeps on a parallel pool
         'test_benettin_vs_qr'               %  50 s  SRNNModel2, n = 300, both methods

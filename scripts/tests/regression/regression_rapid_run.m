@@ -1,43 +1,54 @@
 function [out_dir, seconds] = regression_rapid_run(out_dir)
-% REGRESSION_RAPID_RUN The ultrarapid regression: the model, a sweep and a memory-capacity run, in about a minute.
+% REGRESSION_RAPID_RUN The ultrarapid regression: the model, a sweep and a memory-capacity run, in about half a minute.
 %
 %   out_dir = regression_rapid_run()          % a new folder under tempdir
 %   [out_dir, seconds] = regression_rapid_run(out_dir)
 %
-% TWO TIERS OF REGRESSION (TR, 2026-11-10). The FULL tier
-% (regression_fast_run) runs every analysis stage and every figure of the
-% manuscript's bundle on the 100-neuron network; it takes about an hour, so
-% it is for milestones. THIS is the ultrarapid tier, cheap enough to run
-% after every edit to the model class. It does not go through
-% run_all_paper_analyses or any stage function, because the stages size
-% themselves by run mode and the smallest mode is the slow part. It calls
-% the three classes the pipeline is built on directly:
+% THREE TIERS OF REGRESSION (TR, 2026-11-10):
+%   ultrarapid  THIS                    ~30 s    the three classes, directly
+%   stages      regression_stages_run   ~3 min   stage functions and figures
+%   full        regression_fast_run     ~50 min  the whole bundle
+%
+% This is the tier cheap enough to run after every edit to the model class.
+% It does not go through run_all_paper_analyses or any stage function,
+% because the stages size themselves by run mode and the smallest mode is
+% the slow part. It calls the three classes the pipeline is built on
+% directly:
 %
 %   1. SRNNCellTypePairs, the regression network (n = 100) in each of the
 %      preset's three conditions, noise off (rk4) and noise on (sra1): the
 %      full state trajectory, the unpacked time series (rates, synaptic
 %      output, adaptation and depression variables), the top-K Lyapunov
 %      results, and at three states the analytic Jacobian, its largest real
-%      eigenvalue, and the matrix-free Jacobian product.
+%      eigenvalue, and the matrix-free Jacobian product. Also, on the
+%      most-adapted condition, the transient gain in its three variants and
+%      the finite-difference Jacobian; on a reduced network, the Benettin
+%      and QR Lyapunov estimators (the main runs use top-K); and a
+%      three-type network with every synapse option the paper's presets do
+%      not use (facilitation, the geometric-mean combine, a route weight
+%      scale, the zero floor), so those numbers are pinned as well.
 %   2. ParamSpaceAnalysis2, a 12-job serial sweep (two gains x two reps x
 %      three conditions) set up from resolve_run_context as the sweep stages
 %      set theirs up.
 %   3. SRNN_ESN_reservoir, a short memory-capacity run in each condition on
 %      the noise-free twin, with the synaptic readout.
 %
-% What it writes: OUT_DIR/rapid_model.mat, rapid_sweep.mat, rapid_mc.mat.
+% What it writes: OUT_DIR/rapid_model.mat, rapid_model_extra.mat,
+% rapid_sweep.mat, rapid_mc.mat.
 % regression_digest reduces them and regression_compare compares, exactly as
 % for the full tier. Wall-clock fields are removed before saving.
 %
 % WHAT IT DOES NOT COVER: the analysis stage functions, the figures, and
 % anything at the manuscript's network size. A change that passes here can
-% still move a stage's output; the full tier is the check for that.
+% still move a stage's output; the stages tier and the full tier are the
+% checks for that.
 %
 % DO NOT RETUNE the settings below. Like the regression preset, their job is
 % to stay the same. If they must change, the reference changes with them and
 % the commit says why.
 %
-% See also: regression_rapid_check, regression_digest, regression_fast_run
+% See also: regression_rapid_check, regression_stages_run, regression_digest,
+%           regression_fast_run
 arguments
     out_dir (1,:) char = ''
 end
@@ -95,9 +106,71 @@ for i = 1:numel(cond_names)
             r.dS{k} = SRNNCellTypePairs.dynamics_fast(m.t_out(idx(k)), S, p);
         end
         model.(cond_names{i}).(integrators(s).name) = r;
+
+        % 1b. On the most-adapted condition with noise on: the transient
+        % gain in its three variants, and the finite-difference Jacobian.
+        if i == numel(cond_names) && s == numel(integrators)
+            extra = struct();
+            i0 = find(m.t_out >= 3, 1);
+            for variant = {'frozen_x', 'frozen_full', 'active'}
+                [G, g_info] = SRNNCellTypePairs.transient_gain(m.S_out, m.t_out, i0, p, 0.5, ...
+                    struct('variant', variant{1}));
+                extra.transient_gain.(variant{1}) = struct('G', G, 'info', drop_timing(g_info));
+            end
+            S = m.S_out(idx(end), :)';
+            Jfd = SRNNCellTypePairs.finite_difference_jacobian(S, p, 1e-6);
+            extra.finite_difference.J = Jfd;
+            extra.finite_difference.max_abs_vs_analytic = ...
+                full(max(abs(Jfd - SRNNCellTypePairs.compute_Jacobian_fast(S, p)), [], 'all'));
+        end
     end
 end
 save(fullfile(out_dir, 'rapid_model.mat'), 'model', '-v7');
+
+%% 1c. The other two Lyapunov estimators, on a reduced network
+% Benettin re-integrates the dynamics and QR integrates the variational
+% equation with the Jacobian, each by its own route; the main runs above use
+% top-K only. Small n because QR carries N^2 equations.
+small = {'n', 20, 'indegree', 5, 'F_tracks_network', true, 'rng_seeds', [5 6], ...
+    'T_range', [0 3], 'fs', 200, 'lya_T_interval', [1.5 3], 'lya_warmup', 1, 'verbose', 'near-none'};
+estimators = struct();
+for i = [1, numel(cond_names)]
+    mb = build_from_preset(P, cond_names{i}, small{:}, 'ode_solver', 'sra1', 'lya_method', 'benettin');
+    mb.run();
+    mq = build_from_preset(P, cond_names{i}, small{:}, 'sigma_u_noise', 0, 'ode_solver', 'rk4', 'lya_method', 'qr');
+    mq.run();
+    estimators.(cond_names{i}) = struct('benettin', drop_timing(mb.lya_results), ...
+        'qr', drop_timing(mq.lya_results));
+end
+
+%% 1d. Synapse options the paper's presets do not use
+% Three cell types with facilitation, a geometric-mean combine, a route
+% weight scale and the zero floor all live, so their numbers are pinned too.
+sc = struct();
+sc.E.E.std   = struct('tau_rec', [0.3 1], 'tau_rel', 0.2, 'combine', 'geomean');
+sc.E.PV.stf  = struct('tau_dec', 0.5, 'tau_fac', 0.25, 'G', 2);
+sc.E.SST.std = struct('tau_rec', 0.8, 'tau_rel', 0.25);
+sc.E.SST.stf = struct('tau_dec', [0.4 1.2], 'tau_fac', [0.2 0.3], 'G', [1.5 2]);
+sc.PV.PV.std = struct('tau_rec', 0.6, 'tau_rel', 0.3);
+sc.PV.PV.scale = 2;
+sc.SST.PV.stf = struct('tau_dec', 0.9, 'tau_fac', 0.4, 'G', 1.8);
+mo = SRNNCellTypePairs( ...
+    'n', 30, 'indegree', 10, 'n_cellTypes', 3, 'cell_type_names', {'E', 'PV', 'SST'}, ...
+    'f', [0.5 0.3 0.2], 'mu_tilde_relative', [3 -4 -2], 'sigma_tilde_relative', [1 1 1], ...
+    'tau_a', {[0.25 1], [], 2}, 'c', [0.3 0 0.2], 'synapse_config', sc, ...
+    'std_zero_floor', true, 'rng_seeds', [5 6], 'T_range', [0 3], 'fs', 200, ...
+    'ode_solver', 'rk4', 'lya_method', 'topk', 'lya_K', 5, 'lya_K_auto', false, ...
+    'lya_T_interval', [1.5 3], 'lya_warmup', 1, 'store_full_state', true, 'verbose', 'near-none');
+mo.build(); mo.run();
+po = mo.get_params(); po.u_interpolant = mo.u_interpolant;
+So = mo.S_out(end, :)';
+No = numel(So);
+options = struct('W', mo.W, 'S_out', mo.S_out, 'plot_data', mo.plot_data, ...
+    'lya_results', drop_timing(mo.lya_results), ...
+    'J', SRNNCellTypePairs.compute_Jacobian_fast(So, po), ...
+    'JY', SRNNCellTypePairs.jacobian_times(So, cos((1:No)' * (1:3)) / sqrt(No), po), ...
+    'dS', SRNNCellTypePairs.dynamics_fast(mo.t_out(end), So, po));
+save(fullfile(out_dir, 'rapid_model_extra.mat'), 'extra', 'estimators', 'options', '-v7');
 
 %% 2. A sweep, set up as the sweep stages set theirs up
 ctx = resolve_run_context('param_space', 'preset_name', P, 'run_mode', 'fast', 'verbose', 'near-none');
