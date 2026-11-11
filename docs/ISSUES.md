@@ -103,24 +103,35 @@ captured from the code as it stands.
   and numerics (4 min) are sized by run mode, which a config cannot change.
   A smaller run mode would cut it but means editing every stage; not done.
 
-### FD-003 Regression references and comparison tests, in two tiers
+### FD-003 Regression references and comparison tests, in three tiers
 
-- **Status:** in progress (ultrarapid tier done; full tier's reference
-  pending a second run)
+- **Status:** done (2026-11-10)
 - **Serves:** all blocks
-- **What:** TR, 2026-11-10: the regression has to be faster, so two tiers.
-  **Ultrarapid** (`regression_rapid_run`, about 15 s): the three classes
-  called directly, no stage functions. **Full** (`regression_fast_run`, about
-  50 min): every stage and figure of the FD-002 bundle. Both are reduced by
-  the generic `regression_digest` and compared by `regression_compare`.
+- **What:** TR, 2026-11-10: the regression has to be faster, so tiers.
+  **Ultrarapid** (`regression_rapid_run`, about 35 s): the three classes
+  called directly, no stage functions. **Stages** (`regression_stages_run`,
+  2 min): three stage functions and four figures. **Full**
+  (`regression_fast_run`, about 50 min): every stage and figure of the
+  FD-002 bundle. All are reduced by the generic `regression_digest` and
+  compared by `regression_compare`.
 - **Done when:** each tier has a tracked reference made from a clean tree;
   its check passes on unchanged code; and two runs on the same machine show
   how reproducible it is, with any ignore patterns set from that.
 - **Depends on:** FD-002.
-- **Result:** tooling `7fcf533`; ultrarapid reference `a12e372` (858
-  leaves, 41 kB, exact, no ignore patterns; two runs bit-identical;
-  `test_regression_rapid` passes in 15 s and is in the quick suite). Full
-  tier: _(pending)_.
+- **Result:** tooling `7fcf533`, `10879e1`, `cae664d`. References, all made
+  from a clean tree before any change to the model class:
+  - ultrarapid `bef29cb`: 994 leaves, exact, no ignore patterns; two runs
+    bit-identical; `test_regression_rapid` passes in 36 s (quick suite).
+  - stages `58ed2ce`: 1245 leaves and 18 files; wall-clock fields ignored;
+    two runs otherwise bit-identical; `test_regression_stages`, 2 min
+    (slow list).
+  - full `c6b71ec`: 4583 leaves, 176 run files, 183 figure files; a second
+    complete analysis run was bit-identical apart from wall-clock fields,
+    the commit recorded in the manifest, and the joint parameter-space
+    sample; `test_regression_bundle`, about 50 min (slow list).
+  The joint sample is NOT covered: `ParamSpaceAnalysis2` seeds it with
+  `rng('shuffle')`, so its 128 points differ on every run. Raised, not
+  changed.
 
 ### FD-004 Chained-pool depression in `SRNNCellTypePairs`
 

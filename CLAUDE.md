@@ -64,8 +64,35 @@ Decisions already made that affect the code: depression gains a **chained
 vesicle-pool model** as an opt-in per route, beside the current product,
 which stays the default and bit-identical (FD-004). A route with one
 depression component is the single-timescale condition and carries no
-reserve variable. A fast regression bundle and its saved reference (FD-002,
-FD-003) are captured **before** the model class is touched.
+reserve variable.
+
+### Regression tests: run these around every change
+
+Three tiers, each comparing against a reference saved from the code as it
+stood on 2026-11-10, **before** the model class was touched (FD-003). All
+use the 100-neuron regression network (`regression_pairs_*` presets, the
+manuscript network at one fifth the size; do not retune them).
+
+| Tier | Run it with | Time | What it covers |
+|---|---|---|---|
+| Ultrarapid | `run_all_tests('test_regression_rapid')` | 36 s | `SRNNCellTypePairs`, `ParamSpaceAnalysis2` and `SRNN_ESN_reservoir` called directly: trajectories, Jacobians, all three Lyapunov estimators, transient gain, a sweep, memory capacity, and the synapse options the paper's presets leave off. Bit for bit. |
+| Stages | `run_all_tests('test_regression_stages')` | 2 min | Three stage functions (Lyapunov spectrum, transient gain, memory-capacity example) and four figures. |
+| Full | `run_all_tests('test_regression_bundle')` | about 50 min | Every stage and all 36 figures of the manuscript's bundle (`regression_fast_config`). |
+
+Run the ultrarapid tier after every edit to the model, the reservoir or the
+sweep driver; the stages tier before committing a change to a stage or a
+figure; the full tier at milestones. The code is in
+`scripts/tests/regression/` and the references in `scripts/tests/fixtures/`
+(force-added). **A reference is replaced only deliberately**: delete the
+fixture, run `make_regression_reference(tier)` from a clean tree, and say in
+the commit message why the expected values moved. Figures are compared by
+file name, not by pixel.
+
+Two things to know. The full tier runs longer than the MATLAB MCP client
+waits (a call silent for 30 minutes is dropped, though MATLAB carries on):
+launch it and read `data/regression_fast/<tag>.result.txt`. And **no tier
+covers the joint parameter-space sample**, because `ParamSpaceAnalysis2`
+seeds it with `rng('shuffle')`: its 128 grid points differ on every run.
 
 ## What this project is
 
@@ -153,7 +180,7 @@ Four figures name their own preset because they are deliberately different netwo
 
 `setup_paths.m` lives at the **repo root** and derives everything from its own location. It deliberately enumerates `src/` and `scripts/` rather than `genpath`-ing the root: `data/`, `figs/` and `docs/` must stay off the path, and `data/param_space/run_all_*/` holds copies of the launcher scripts that would otherwise shadow the originals. It never calls `savepath`. `run_all_analyses.m` and friends derive `project_root = fileparts(which('setup_paths'))`, so they tolerate living in a subdirectory.
 
-There is no standalone test framework; ad-hoc verification scripts live in `scripts/tests/` as `test_*.m` (e.g. `test_std_product_model.m`, `test_psa_saveload.m`, `test_SRNNCellTypePairs.m`, `test_SRNN2_S_c_heterogeneity.m`). **`run_all_tests` is the one entry point** (2026-11-10): `run_all_tests('quick')` runs the 52 fast tests in about 3.5 minutes, `run_all_tests('slow')` the 6 slow ones in about 18, and it takes a name, a wildcard or a cell of names; it returns a table and counts a printed `FAIL` as a failure even when nothing throws. Run single tests from the MATLAB editor or via the matlab MCP `run_matlab_file` tool. Two report styles coexist: some print `PASS`/`FAIL` per check and a final banner, others `assert` and are silent until they throw.
+There is no standalone test framework; ad-hoc verification scripts live in `scripts/tests/` as `test_*.m` (e.g. `test_std_product_model.m`, `test_psa_saveload.m`, `test_SRNNCellTypePairs.m`, `test_SRNN2_S_c_heterogeneity.m`). **`run_all_tests` is the one entry point** (2026-11-10): `run_all_tests('quick')` runs the 53 fast tests in about 4.5 minutes (including the ultrarapid regression), `run_all_tests('slow')` the 8 slow ones (about 20 minutes plus the 50-minute full regression), and it takes a name, a wildcard or a cell of names; it returns a table and counts a printed `FAIL` as a failure even when nothing throws. Run single tests from the MATLAB editor or via the matlab MCP `run_matlab_file` tool. Two report styles coexist: some print `PASS`/`FAIL` per check and a final banner, others `assert` and are silent until they throw.
 
 **Run the tests that cover what you touched, including the plotting assertions.** Several tests reach into figure objects (`test_SRNNCellTypePairs` checks the actual line colours of `plot_celltypes`), so a change to a colormap or a plot helper can break a test that looks unrelated to the model maths.
 
@@ -387,9 +414,9 @@ anything.
 - `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
 - `scripts/paper/` — the two entry points, `paper_config.m` and `reproduce_paper_run.m`. **Start here.**
 - `scripts/examples/` — exploratory scripts. Nineteen of them, thirteen having moved out of `tests/` where they had accumulated; several are stale, and reviewing them is tracked follow-up work.
-- `scripts/tests/` — 58 `test_*.m` verification scripts (audited 2026-11-10, FD-001: all pass; five exploratory scripts that asserted nothing were removed), `run_all_tests.m`, plus the two `*TestAccess` helper classes, `make_preset_golden.m` (a fixture generator, not a test) and `fixtures/`. Run them from the editor or via the matlab MCP `run_matlab_file` tool.
+- `scripts/tests/` — 61 `test_*.m` verification scripts, three of them the regression tiers (audited 2026-11-10, FD-001: all pass; five exploratory scripts that asserted nothing were removed), `run_all_tests.m`, plus the two `*TestAccess` helper classes, `make_preset_golden.m` (a fixture generator, not a test) and `fixtures/`. Run them from the editor or via the matlab MCP `run_matlab_file` tool.
 
-  **`fixtures/golden_preset_outputs.mat` is force-added to git** (`*.mat` is gitignored). It freezes every `srnn_param_preset` output — 38 presets and 124 conditions as of 2026-11-10 (13 and 49 when first captured), plus the retired/unknown error identifiers — first captured *before* the conditions refactor and regenerated whenever a preset is added (2026-09-04 for the two `mu8p25` presets, 2026-09-09 for `sfaEI`), and `test_preset_golden` compares against it with no exclusions. Note the unknown-name error *message* is frozen too, and it embeds the valid-preset list, so **adding a preset legitimately fails this test** until the fixture is regenerated. If that test fails, fix the code, not the fixture: `make_preset_golden` refuses to overwrite an existing one, so regenerating means deleting the `.mat` deliberately and saying in the commit message why the expected values moved.
+  **`fixtures/golden_preset_outputs.mat` is force-added to git** (`*.mat` is gitignored). It freezes every `srnn_param_preset` output — 42 presets and 136 conditions as of 2026-11-10, after the four regression presets were added (13 and 49 when first captured), plus the retired/unknown error identifiers — first captured *before* the conditions refactor and regenerated whenever a preset is added (2026-09-04 for the two `mu8p25` presets, 2026-09-09 for `sfaEI`), and `test_preset_golden` compares against it with no exclusions. Note the unknown-name error *message* is frozen too, and it embeds the valid-preset list, so **adding a preset legitimately fails this test** until the fixture is regenerated. If that test fails, fix the code, not the fixture: `make_preset_golden` refuses to overwrite an existing one, so regenerating means deleting the `.mat` deliberately and saying in the commit message why the expected values moved.
 
 ### Figure conventions
 
