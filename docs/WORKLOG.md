@@ -34,6 +34,59 @@ Entry template:
 
 ---
 
+## 2026-11-11 (session 7ec5eb22-1e10-4e89-8903-1803563a876a, planning; written before compaction)
+
+**Issues touched:** FD-016, FD-017, FD-018 created; FD-019 added to "to be
+planned"; FD-007, FD-009, FD-015 revised. No code changed, so no regression
+tier was run.
+
+**Commits (this repo):** `6b3d874` Plan A written; `ab02708`, `caf6744`,
+`172f38b`, `ebb0b68` Plan A revised with Tom's answers; `77ae6b0`, `e806fb2`
+issues; `65b7832` the facilitation options note.
+**Commits (manuscript repo):** `05c4aef`, `5f8c499`, `7221748`, `d0c4e2e`,
+`4563473` (to-do list, CLAUDE.md pointer, equations file, worker-agent note).
+
+**Done:** `docs/Plan_A_chained_vessicles.md`, the implementation plan for
+block A, and Tom's decisions on it, all written into the plan and the to-do
+list:
+- reserve refill 5 s; chained MTS named `sfa3_stdc2`;
+- spread allowed on chain, one-component and product routes; set in the
+  preset (`std_spread`), condition names unchanged;
+- four conditions analysed, two figure sets per run (three- and
+  four-condition), chained MTS takes product MTS's colour, product MTS green;
+- agents never run `medium` or larger;
+- the joint sample gets an optional seed (FD-016);
+- all pool handling goes through a `pool_*` module with the session's
+  allocation in an environment variable (FD-017), **built first**;
+- chained facilitation (option C of the note) is built after chained
+  depression, for a later paper (FD-018);
+- working arrangement: the lead orchestrates and merges, at most two Fable
+  5.2 and three Opus 5.5 medium workers build.
+
+**Verified:** by a subagent in the lead's MATLAB: an environment variable is
+private to the MATLAB process and survives `clear functions`; pool workers
+copy it once at pool start and never see a later change; a pool worker is
+identifiable from the OS by `-parallelserver` and its parent process id.
+Checked directly: `parallel.Settings.Pool.AutoCreate` is off and
+`parallel.defaultProfile` is `Just1` (one worker).
+
+**Not verified / known gaps:** the facilitation note's derivations were not
+all checked by the lead and none of its options was simulated. `clear all` /
+`clear classes` on the client were not tested against the environment
+variable. The worker agents are not loaded in this session (it predates
+`.claude/agents/`); Tom is restarting the session.
+
+**Raised, not acted on:** until FD-017 exists, code that opens the default
+profile misbehaves (`restart_parpool` opens one worker; three stage
+functions and `wait_for_parpool` error), so `test_regression_stages` and the
+full bundle need a `Processes` pool opened by name first. Tom's
+licence-holding one-worker pool was not running when checked.
+
+**Next:** after the restart, the lead re-reads the plan and the code, asks
+Tom any remaining questions, and waits for go. Then Plan A step 0a (FD-017).
+
+---
+
 ## 2026-11-10 22:18 CST (session ceb409cc-a8b9-485a-83e9-993fc3383d2f)
 
 **Issues touched:** none. Tooling for the working arrangement, at Tom's
