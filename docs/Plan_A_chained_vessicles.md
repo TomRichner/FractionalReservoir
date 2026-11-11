@@ -534,8 +534,12 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
     right labels, and not error or mislabel; spacing and sizing are not
     polished. So `fig_eig_heatmap` keeps its 2 x 2 grid at four
     conditions.
-  - Short labels (the lead's choice, not put to Tom): the chain takes
-    "SFA+STD"; the product becomes "SFA+STD (product)".
+  - **Short labels** (Tom): the chain takes "SFA+STD"; the product
+    becomes "SFA+prodSTD".
+  - **Figure layout is the lead's and the workers' judgement** (Tom): at
+    this stage Tom is asked about correctness and direction, not
+    aesthetics. Layout choices are made, stated in the commit, and not
+    put to him as questions.
 - Adding presets fails `test_preset_golden` by design. Procedure: confirm the
   only failure is "valid-preset list unchanged", delete the fixture, run
   `make_preset_golden`, force-add it, and say in the commit why. Also add the
