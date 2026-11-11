@@ -534,10 +534,13 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
   route model's `steady_state` handle (section 4.0) is the one place the
   closed form is written.
 
-### 4.6 Chained facilitation (FD-018): outline
+### 4.6 Chained facilitation (FD-018)
 
-**Outline only. The lead writes the full section (linearisation table,
-steady state, test list) and Tom reviews it before step 8 is briefed.**
+**Written by the lead; AWAITING TOM'S REVIEW. Step 8 is not briefed until
+Tom has read this section and answered the questions at its end.** The
+derivations are by hand (the options note, section 5, checked its steady
+state numerically; nothing here has been simulated). The worker's tests
+are what verify them.
 
 Form: option C of the facilitation note (release-coupled, serial), in
 `route_pool`. With `u = 1/tau_rec1`, `v = 1/tau_rec2`, `w = 1/tau_rel`,
@@ -567,8 +570,114 @@ A coupled `stf` requires the route's depression to be absent, a single
 pool or the chain; it is refused beside a multi-component product,
 `combine` or the zero floor.
 
-Open for Tom's review of the full section: whether `G` is jittered by
-`stf_spread`, and whether a coupled `stf` with no depression is allowed.
+**Which state a route carries, and which model serves it.** No variable
+is ever clamped; a route has exactly the columns listed.
+
+| Route's `std` | Route's `stf` | b-block | g-block | Model |
+|---|---|---|---|---|
+| none | none | none | none | `route_product` |
+| one component | none | `b1` | none | `route_product` (the 1TS condition; same equation as the pool without a reserve) |
+| product, any count; `combine`; zero floor | today's (output only), any count | `b1..bM` | `g1..gL` | `route_product` |
+| `chain` | none | `b1, b2` | none | `route_pool` (step 1) |
+| one component | `chain` | `b1` | `g` | `route_pool` |
+| one component | `chain` with `tau_h` | `b1` | `g, h` | `route_pool` |
+| `chain` | `chain` | `b1, b2` | `g` | `route_pool` |
+| `chain` | `chain` with `tau_h` | `b1, b2` | `g, h` | `route_pool` |
+| none | `chain`, with or without `tau_h` | none | `g` or `g, h` | `route_pool`, `F = g` (question 2 below) |
+| `chain` | today's (output only) | | | refused |
+| product with two or more components | `chain` | | | refused |
+
+Validation of `stf.model = 'chain'`: `tau_dec`, `tau_fac` and `G` are
+scalars (one release-probability variable), `G >= 1`, `tau_h` if present is
+a positive finite scalar. `stf.model` absent or `'product'` is today's
+facilitation, unchanged.
+
+**Linearisation**, for the route with all four variables. For a route
+without the reserve, delete the `b2` row and column and put `b2 = 1`; for
+one without the calcium trace, delete the `h` row and column and put
+`d = r`; for one without depression, delete both `b` rows and columns and
+`F = g`.
+
+| | $\partial/\partial b_1$ | $\partial/\partial b_2$ | $\partial/\partial g$ | $\partial/\partial h$ | $\partial/\partial r$ |
+|---|---|---|---|---|---|
+| $\dot b_1$ | $-b_2 u - g\,r\,w$ | $(1-b_1)\,u$ | $-b_1 r\,w$ | $0$ | $-g\,b_1 w$ |
+| $\dot b_2$ | $q\,b_2 u$ | $-v - q\,(1-b_1)\,u$ | $0$ | $0$ | $0$ |
+| $\dot g$ | $0$ | $0$ | $-1/\tau_{dec} - d/\tau_{fac}$ | $(G-g)/\tau_{fac}$ | $0$ with $h$; $(G-g)/\tau_{fac}$ without |
+| $\dot h$ | $0$ | $0$ | $0$ | $-1/\tau_h$ | $1/\tau_h$ |
+| $F$ | $g$ | $0$ | $b_1$ | $0$ | none |
+
+Only $b_1$ and $g$ feed the output. With the calcium trace the rate
+reaches $g$ only through $h$, so the `(g, x)` and `(g, a)` blocks vanish
+and `(h, x)`, `(h, a)`, `(g, h)` appear. The one block that is new in
+kind is `(b_1, g)`: a facilitation variable inside a depression equation,
+which is why a route is one system (section 4.0).
+
+**Ranges.** $b_1, b_2 \in [0, 1]$, $g \in [1, G]$, $h \in [0, 1]$; each is
+invariant by the sign of its derivative at the two ends (options note,
+sections 4 and 5).
+
+**Steady state at constant rate $r$.** $h = r$;
+$g = (1 + G\kappa r)/(1 + \kappa r)$ with $\kappa = \tau_{dec}/\tau_{fac}$,
+with or without the calcium trace; the pools are (C4) evaluated at the
+effective rate $\rho = g\,r$ ($k_2 = 0$ without a reserve); and the output
+is $r\,g\,b_1 = \rho\, b_1(\rho)$. So at steady state coupled facilitation
+stretches the rate axis and nothing else: it moves the output toward the
+depression ceiling at lower rates and does not raise the ceiling. This is
+what `route_pool`'s `steady_state` returns.
+
+**Tests, `test_stf_chain_model.m`** (quick suite), on a small network
+with one route of each `route_pool` row above and one product route:
+
+1. `rhs` equals a per-neuron loop evaluation of the equations, written
+   independently, for every variant. (In `test_route_models`: `linearize`
+   against central differences of `rhs`, for every variant.)
+2. Steady state against a long integration at several rates; the output
+   equals the facilitation-free chain's steady output evaluated at $g\,r$.
+3. The assembled Jacobian against `finite_difference_jacobian`, and
+   `jacobian_times` against the assembled Jacobian (`K` = 1, several,
+   `Y = eye(N)`), at random interior states and at states from a
+   trajectory.
+4. Limits. `G = 1`: $g$ stays at 1 and the pools follow the chain without
+   facilitation, to a stated tolerance. `tau_h` very small: the
+   two-variable form approaches the one-variable form. `n2 = 1e12`: the
+   reserve stays at 1 and $b_1$, $g$ follow the single pool with coupled
+   facilitation.
+5. Every variable stays in its range over a run with large rate swings.
+6. Each refusal in the table raises its own error; a vector `tau_dec`,
+   `G < 1`, a non-positive `tau_h` likewise.
+7. Stored synaptic output equals $r\,g\,b_1$; `plot_data`'s facilitation
+   array has columns `[g, h]`; the leading-vector fractions of
+   `lya_summary` sum to 1 with $h$ counted as STF; a neuron's routes with
+   identical configuration pass `routes_identical` and the reservoir's
+   redundancy check.
+8. All three Lyapunov estimators run on such a network.
+
+**Regression for step 8** (FD-018's acceptance): with facilitation off,
+the chain reproduces the references saved for it in step 5 (tolerance
+tier; exactly on its exact reference unless the lead re-captures with the
+tolerance evidence in hand); the anchor still passes, which covers today's
+facilitation on product routes (the options network) to round-off, and
+`test_c_over_K` covers `single_neuron_stf`.
+
+**The spread (FD-015), for facilitation.** `stf_spread` (`1 x C`, by
+presynaptic type, default zeros) with its own seed `stf_seed` and its own
+stream, drawn once per presynaptic neuron and shared by its routes, in a
+fixed column order: $\tau_{dec}$, $\tau_{fac}$, $\tau_h$, then the ceiling
+(question 1). No ordering floor is needed: the facilitation variables
+have no "slower than" relation to keep.
+
+**Questions for Tom:**
+
+1. **Is the ceiling $G$ jittered?** The lead's recommendation: yes, as a
+   log-normal spread on the excess $G - 1$, so $G \ge 1$ holds for every
+   neuron. It is the counterpart of jittering the reserve size $n_2$.
+2. **Is coupled facilitation allowed on a route with no depression?** The
+   lead's recommendation: yes. The coupling then has nothing to act on and
+   the route is a facilitating synapse with `F = g` (the E-to-I case of
+   the options note, question 5), optionally with the calcium trace.
+3. **Values.** None are proposed. The tests use the only facilitation
+   numbers in the repo (`single_neuron_stf`: 6 s, 2.5 s, 1/0.35) and an
+   arbitrary `tau_h`. A preset that uses the form needs chosen values.
 
 ## 5. Tests
 
