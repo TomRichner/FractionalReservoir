@@ -88,9 +88,19 @@ and do not start that work until Tom says go.
 
 Decisions already made that affect the code: depression gains a **chained
 vesicle-pool model** as an opt-in per route, beside the current product,
-which stays the default and bit-identical (FD-004). A route with one
-depression component is the single-timescale condition and carries no
-reserve variable.
+which stays the default and gives the same numbers to round-off (FD-004).
+A route with one depression component is the single-timescale condition
+and carries no reserve variable.
+
+**The code is to be general, not branched per model** (Tom, 2026-11-11;
+plan, section 2). Product depression, today's facilitation, the chain and
+chained facilitation sit behind one route interface. Do not leave the
+product code untouched and add `if chain` branches to keep a byte-exact
+test passing: that was the plan's first rule and Tom rejected it. The
+build order is: the pool module (FD-017), a **tolerance regression tier**
+with an anchor from the untouched model class, mutation checks on it, the
+refactor behind the interface with no new model, then the chain, then
+chained facilitation.
 
 ### Regression tests: run these around every change
 
@@ -113,6 +123,18 @@ figure; the full tier at milestones. The code is in
 fixture, run `make_regression_reference(tier)` from a clean tree, and say in
 the commit message why the expected values moved. Figures are compared by
 file name, not by pixel.
+
+**These three tiers compare bytes, so they gate changes that should move
+no number** (the pool module, configs, figures, plumbing). They cannot
+gate a rewrite of the model's arithmetic, where a reordered expression
+changes the last bit, and a tolerance cannot be applied to their chaotic
+trajectories. For that, Plan A (sections 2 and 6) adds a **tolerance
+tier**, not built yet: single evaluations of the right-hand side and the
+Jacobians at stored states, and small stable networks end to end, with a
+fresh reference captured before any critical edit and one anchor kept
+throughout. A tolerance-tier failure is a defect to find, never a reason
+to loosen a tolerance. After the refactor of Plan A step 0d passes that
+tier, the three exact references are re-captured once, by the lead.
 
 Two things to know. The full tier runs longer than the MATLAB MCP client
 waits (a call silent for 30 minutes is dropped, though MATLAB carries on):

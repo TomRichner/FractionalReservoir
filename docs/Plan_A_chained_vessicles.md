@@ -909,8 +909,11 @@ Workers start with no memory of this conversation. Each brief gives:
    without depleting faster. Not built, not planned for the draft.
 **New, found 2026-11-11:**
 
-9. **The default pool profile is `Just1`.** It has one worker, so pool code
-   that uses the default profile breaks (section 8). Two ways to settle it:
+9. **The default pool profile is `Just1`.** **Settled 2026-11-11 by
+   FD-017:** `Just1` stays the default and the pool module names
+   `Processes` itself (step 0a). The question as first put, for the record:
+   it has one worker, so pool code that uses the default profile breaks
+   (section 8). Two ways to settle it:
    set the default profile back to `Processes` and have the licence-holding
    session open `Just1` by name; or leave `Just1` as the default and change
    the five call sites and the six worker-agent files to name `Processes`.

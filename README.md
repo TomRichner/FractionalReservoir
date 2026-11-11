@@ -39,6 +39,13 @@ Three details that are easy to get wrong:
 Full statement, including the optional facilitation equations:
 [`docs/EquationsParametersDocs/Equations_stability_paper.md`](docs/EquationsParametersDocs/Equations_stability_paper.md).
 
+**In progress (November 2026).** The equations above are the code as it
+stands. Depression is gaining a second, opt-in model per route, two vesicle
+pools in series, and the per-route synapse models are being moved behind
+one interface, checked by a tolerance-based regression. The plan is
+[`docs/Plan_A_chained_vessicles.md`](docs/Plan_A_chained_vessicles.md);
+none of it is built yet.
+
 ## Running it
 
 Once per session, with the working directory at the repo root:
@@ -77,7 +84,7 @@ uses `'production'`, which is a deliberate edit rather than the default.
 | `src/util/` | cross-cutting helpers |
 | `scripts/paper/` | the two entry points and their config — **start here** |
 | `scripts/examples/` | exploratory scripts |
-| `scripts/tests/` | verification scripts, run individually |
+| `scripts/tests/` | verification scripts and the regression tiers; `run_all_tests('quick')` runs the fast ones |
 | `figs/paper/` | where the figures are written (gitignored, regenerable) |
 | `data/` | run directories (gitignored) |
 | `docs/` | equations, parameter reference, design notes |
