@@ -102,4 +102,17 @@ to one is not a change to the other.
 2026-09-02. `SRNNModel2` is still exercised by tests but no longer appears in
 the paper pipeline.
 
-`CLAUDE.md` carries the working conventions in more detail.
+## Working on it
+
+`CLAUDE.md` carries the working conventions in detail. For the current work:
+
+- [`docs/ISSUES.md`](docs/ISSUES.md) lists each piece of code work (`FD-001`
+  onward) with its acceptance test and status. Look there for what is open.
+- [`docs/WORKLOG.md`](docs/WORKLOG.md) has one entry per session, newest
+  first: what was done, what was verified, what is next. Read the top entry
+  before starting and add one before stopping.
+- `.claude/agents/` defines six Claude Code worker agents
+  (`matlab-fable-1..3`, `matlab-opus-1..3`), each with a private MATLAB
+  session, which a lead agent briefs for parallel work. They are available
+  in a Claude Code session started in this repo; `CLAUDE.md` says how they
+  are used.

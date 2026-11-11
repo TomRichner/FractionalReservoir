@@ -47,6 +47,30 @@ regression tiers and `fast` pre-production runs instead.
 4. Then work through section 7 in order. You orchestrate, review and merge;
    workers build.
 
+**The files this plan is worked through, and how each is used:**
+
+- **`docs/ISSUES.md`**: one entry per checkable piece of work (`FD-001`
+  onward), with what "done" means and what it depends on. Every step of
+  section 7.3 serves an issue; a step without one (the tolerance tier, the
+  refactor) gets its issue agreed with Tom before it starts. The lead sets
+  an issue to `in progress` when it briefs the worker and to `done`, with
+  the commits and the result, in the commit that merges the work. Agents
+  do not open issues on their own initiative.
+- **`docs/WORKLOG.md`**: one short entry per session, newest first. The
+  lead reads the top entry before starting and adds one before stopping:
+  the commits, which gates were run and what they showed, what was not
+  verified, what is next. Workers' reports are summarised there. Reasoning
+  stays in the commit messages.
+- **`.claude/agents/matlab-fable-1..3.md`, `matlab-opus-1..3.md`**: the six
+  worker definitions. Each fixes the worker's model and effort, gives it a
+  private MATLAB through its own MCP server, and carries its standing
+  rules. The lead starts a worker with the Agent tool by that name and a
+  brief written to section 7.4; section 7.1 has the rules (one instance of
+  each at a time, `pool: N` in every brief). They are listed only in a
+  session started in this repo; restart here if they are missing.
+- **The to-do list** in the manuscript repo records decisions; when Tom
+  decides something during this work, it is written there, then here.
+
 **What the plan assumes is true** (all verified on 2026-11-10; re-check the
 first two before starting):
 

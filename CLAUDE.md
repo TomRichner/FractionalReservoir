@@ -80,6 +80,27 @@ before delegating MATLAB work**: one instance of each agent at a time, and
 every brief states `pool: N`, with at most 12 pool workers summed over all
 MATLAB sessions on the machine. Commit at logical intervals.
 
+How to use the worker agents:
+
+- Each is defined by one file, `.claude/agents/matlab-fable-N.md` or
+  `matlab-opus-N.md`: its model and effort, its own MATLAB MCP server
+  (tools `mcp__matlab_fN__*` or `mcp__matlab_oN__*`), and its standing
+  instructions. Change a worker's behaviour there, in all six files alike.
+- The lead starts one with the Agent tool, `subagent_type` set to the
+  agent's name (`matlab-fable-1`), and `isolation: "worktree"` when another
+  worker is running. **They are listed only in a session started with this
+  repo as the working directory, after the files existed**; if they are
+  missing from the agent list, restart the session here.
+- A brief follows Plan A, section 7.4: `pool: N` on the first line, the
+  goal and its issue number, what to read, the files it may edit, the
+  acceptance commands, the commit rules, what to report.
+- A worker commits on its own branch and reports. It never merges, never
+  replaces a regression reference, never edits `ISSUES.md`, `WORKLOG.md`
+  or the plan: those are the lead's. The lead sets the issue to
+  `in progress` when it briefs the worker, and to `done` with the commits
+  when the merge has passed its gates; the worker's report goes into the
+  session's worklog entry.
+
 **The plan for block A is `docs/Plan_A_chained_vessicles.md`**: the design
 of the chained-pool model and its per-neuron spread, the tests, the gates,
 the order of the builds and which worker does each, and the questions still
