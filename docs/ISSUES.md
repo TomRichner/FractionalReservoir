@@ -275,6 +275,25 @@ captured from the code as it stands.
     pinning each session's workers to its own cores and leaving two free
     (`docs/notes/set_parpool_cpu_affinity.m` is Tom's earlier script; it is
     Windows-only).
+- **Checked 2026-11-11** (a subagent, in the lead's MATLAB, R2026a): the
+  variable round-trips, is private to the MATLAB process (a child process
+  inherits it, an unrelated shell does not see it), and survives
+  `clear functions`; `clear all` and `clear classes` were tested on pool
+  workers, not on the client, and it survived there. A `persistent` is
+  reset by `clear functions` unless the function is `mlock`ed. What the
+  wrappers must allow for:
+  - **Workers copy the client's environment once, when the pool starts.**
+    A later `setenv` on the client is not seen by them. So the variable is
+    client-side only, and `pool_set` must restart the pool when N changes
+    while one is up.
+  - It does not outlive the MATLAB process, so every new session sets it.
+  - Reading a pool's size and profile and reopening the same works
+    (`gcp('nocreate').NumWorkers`, `.Cluster.Profile`); delete took about
+    2.5 s and reopening two workers about 5.5 s (15 s the first time).
+  - From the operating system, a pool worker is a `MATLAB.exe` with
+    `-parallelserver` on its command line whose parent process id is the
+    client's `feature('getpid')`. So `pool_status` can count real workers
+    per client without relying on the registry alone.
 - **Done when:** no `parpool(` call remains outside the module; a session
   set to N opens N and restarts at N; an unset session runs a `parfor`
   serially with the warning and the two entry points refuse; `pool_status`
