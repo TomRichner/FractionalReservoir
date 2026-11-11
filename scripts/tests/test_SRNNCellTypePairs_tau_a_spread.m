@@ -62,9 +62,14 @@ P = 'celltype_pairs_sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25';
 base = {'n', 40, 'indegree', 8, 'F_tracks_network', true, 'sigma_u_noise', 0, ...
     'ode_solver', 'rk4', 'rng_seeds', [1 2], 'T_range', [0 12], 'lya_T_interval', [4 12], ...
     'lya_warmup', 4, 'lya_dt', 0.1, 'store_full_state', true, 'lya_method', 'topk', 'lya_K', 10};
+% The nominal-ladder run. Section 10 compares the spread run against it, so
+% it must exist whether or not the reference file below does. (It was built
+% only inside the `if`, so once the session-local reference file was gone
+% the test died at its last check with "Unable to resolve mB"; fixed
+% 2026-11-10.)
+mB = run_preset(P, 'sfa3_std2', base);
 if exist(scratch, 'file')
     ref = load(scratch);
-    mB = run_preset(P, 'sfa3_std2', base);
     d_S  = max(abs(mB.S_out(end, :) - ref.S_end));
     d_LE = max(abs(mB.lya_results.LE_spectrum - ref.LE));
     all_passed = check(sprintf('BIT-IDENTICAL to the pre-feature reference: final state (diff %.1e)', d_S), d_S == 0) && all_passed;

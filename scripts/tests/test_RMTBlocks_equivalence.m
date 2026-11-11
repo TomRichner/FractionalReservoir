@@ -19,24 +19,30 @@
 %
 % Run with the matlab MCP (run_matlab_file), not matlab -batch.
 
-%% Bootstrap
-this_dir = fileparts(mfilename('fullpath'));
-repo_root = fileparts(this_dir);
-addpath(repo_root);
-setup_paths();
-
-% Probe for the reference classes in sibling repositories. All of the author's
-% repos live side by side under github_repos/, so a relative probe is reliable;
-% if they are not there the relevant sections simply skip.
-siblings = fileparts(repo_root);
-ref_paths = { ...
-    fullfile(siblings, 'ConnectivityAdaptation', 'RandomMatrixTheory'), ...
-    fullfile(siblings, 'FractionalReservoir', 'src', 'connectivity') ...
-    };
-for k = 1:numel(ref_paths)
-    if exist(ref_paths{k}, 'dir')
-        addpath(ref_paths{k});
-    end
+%% Reference classes
+% Assumes setup_paths has run, like every other test (RMTMatrix lives in
+% src/model/connectivity and is on the path already).
+%
+% RMT is the original class, in the sibling repository ConnectivityAdaptation.
+% All of the author's repos live side by side under github_repos/, so a
+% relative probe is reliable; if it is not there sections 1 and 7 simply skip.
+%
+% The probe was wrong from 2026-09-02 to 2026-11-10: it took the repo root
+% to be one level above this file, which was true when the tests sat in
+% <root>/tests and stopped being true when they moved to <root>/scripts/tests.
+% It then looked for the sibling INSIDE this repo, found nothing, and the
+% eight RMT checks skipped on every run while the banner still reported zero
+% failures. The root now comes from setup_paths, which is depth-independent.
+%
+% The folder is added at the END of the path and removed again when this
+% script's workspace is cleared: it also holds its own copies of
+% save_some_figs_to_folder_2 and AddLetters2Plots, which must not shadow
+% this repo's or stay on the session path.
+repo_root = fileparts(which('setup_paths'));
+rmt_dir = fullfile(fileparts(repo_root), 'ConnectivityAdaptation', 'RandomMatrixTheory');
+if exist(rmt_dir, 'dir') && ~any(strcmpi(rmt_dir, strsplit(path, pathsep)))
+    addpath(rmt_dir, '-end');
+    rmt_path_cleanup = onCleanup(@() rmpath(rmt_dir)); %#ok<NASGU>
 end
 
 has_RMT       = exist('RMT', 'class') == 8;

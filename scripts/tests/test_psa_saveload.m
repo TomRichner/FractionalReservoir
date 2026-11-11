@@ -8,8 +8,6 @@
 %
 % See also: ParamSpaceAnalysis2, SRNNModel2
 
-close all
-clc;
 fprintf('=== Testing ParamSpaceAnalysis2 saveobj/loadobj ===\n\n');
 
 %% Create and configure a minimal PSA

@@ -119,7 +119,11 @@ end
 
 %% ------------------------------------------------------------------------
 function s = ptxt(p)
-if isnan(p); s = 'n/a '; elseif p; s = 'PASS'; else; s = 'FAIL'; end
+% The stage's VERDICT per criterion, not a test outcome: fast windows miss
+% the L and C thresholds by design (see the header), and the test passes
+% regardless. So it is printed as met / unmet, never as the PASS / FAIL
+% words a check prints: run_all_tests reads a printed FAIL as a failed test.
+if isnan(p); s = 'n/a  '; elseif p; s = 'met  '; else; s = 'unmet'; end
 end
 
 function ok = throws_id(fn, id)

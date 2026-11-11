@@ -26,7 +26,7 @@
 % warmup while Benettin is within 0.2% (see the table on SRNNModel2.lya_warmup);
 % at 10 s both have plateaued.
 
-close all; clear; clc;
+clear;
 
 %% Shared configuration
 % Same rng_seeds (default [1 2]) => identical W, stimulus, and fiducial

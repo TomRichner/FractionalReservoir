@@ -1,6 +1,6 @@
 % test_SRNNCellTypePairs.m - Pair-specific STD/STF dynamics and Jacobian.
 
-clear; clc;
+clear;
 rng(0);
 
 model = make_pair_model('none');

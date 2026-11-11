@@ -33,11 +33,10 @@
 %
 % Run with the matlab MCP (run_matlab_file), not matlab -batch.
 
-%% Bootstrap
-this_dir = fileparts(mfilename('fullpath'));
-repo_root = fileparts(this_dir);
-addpath(repo_root);
-setup_paths();
+%% Assumes setup_paths has run, like every other test.
+% (This used to add the folder above this file to the path and call
+% setup_paths itself. The first was a leftover from when the tests sat in
+% <root>/tests, and CLAUDE.md asks tests to carry no path code.)
 
 rng(20260810);
 

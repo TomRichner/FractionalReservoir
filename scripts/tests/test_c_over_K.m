@@ -48,7 +48,15 @@ F = {
  'single_neuron_stf', {}, {
     'sfa1_std0',      93.9903825304, 5.55519680910
     'sfa1_std1_stf1', 647.781482404, 24.0779561777 }
- 'single_neuron_dualStd', {}, {
+ ... % single_neuron_dualStd carried the paper's sigma_u_noise = 0.025 when
+ ... % these checksums were captured; the preset was deliberately made
+ ... % noise-free on 2026-09-14 (TR; see its case block), which moved all four
+ ... % sums and left this row failing until 2026-11-10. The override puts the
+ ... % captured noise level back (and names 'sra1', which build_from_preset
+ ... % would have picked for a noisy preset), so the row still compares
+ ... % today's c/K physics against the cbcf637 numbers: with it, all four
+ ... % reproduce to 12 figures. The checksums themselves are untouched.
+ 'single_neuron_dualStd', {'sigma_u_noise',0.025,'ode_solver','sra1'}, {
     'no_adaptation',  175.026795357, 9.43683102318
     'sfa3_std0',      320.505680170, 10.9637823696
     'sfa0_std2',      424.368611267, 15.0522656270

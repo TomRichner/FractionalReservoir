@@ -11,7 +11,6 @@
 %   4. Calibration of the Erdos-Renyi P(strong) estimate against Monte Carlo
 %   5. A live SRNNModel2 build at the fig_stim_engages_adaptation settings
 
-clc;
 fprintf('=== test_connectivity_class ===\n\n');
 
 n_pass = 0; n_fail = 0;
