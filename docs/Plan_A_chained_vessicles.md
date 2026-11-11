@@ -536,9 +536,9 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
 
 ### 4.6 Chained facilitation (FD-018)
 
-**Written by the lead. Tom has answered the first two questions at its end
-(2026-11-11); the parameter values are still being chosen, and step 8 is
-briefed once they are.** The
+**Written by the lead; Tom has answered the questions at its end and
+chosen the parameter values (2026-11-11), so step 8 can be briefed when
+its turn comes.** The
 derivations are by hand (the options note, section 5, checked its steady
 state numerically; nothing here has been simulated). The worker's tests
 are what verify them.
@@ -676,9 +676,33 @@ have no "slower than" relation to keep.
    coupling then has nothing to act on and the route is a facilitating
    synapse with `F = g` (the E-to-I case of the options note, question 5),
    optionally with the calcium trace.
-3. **Values: under discussion with Tom.** Until they are chosen the only
-   facilitation numbers in the repo are `single_neuron_stf`'s (6 s, 2.5 s,
-   1/0.35). The code does not depend on them; a preset and the tests do.
+3. **Values (Tom, 2026-11-11).** They are preset values; the code does
+   not depend on them. The tests of step 8 use them.
+
+   | Parameter | Value | Why |
+   |---|---|---|
+   | Ceiling $G$ | **5** | $G = 1/U$ with resting release probability $U = 0.2$ |
+   | Build-up $\tau_{fac}$ | **0.25 s, tied to $\tau_{rel}$ in the preset** | the strict Tsodyks-Markram case: one number, $U$, sets the release time, the build-up time and the ceiling. The preset writes `tau_fac` from the route's `tau_rel`; the code keeps them independent |
+   | Decay $\tau_{dec}$ | **1.5 s** | the facilitation time constant used with $U = 0.2$ |
+   | Calcium trace $\tau_h$ | **0.5 s** | a model choice: between the dendritic time constant (0.1 s) and the effective decay of $g$ (0.6 s at a rate of 0.25), so the lag is visible |
+   | `stf_spread` | **0.25** | as for SFA and depression |
+
+   $U = 0.2$ and 1.5 s are recalled from Mongillo et al. (2008), **not
+   checked against the paper**; they need a citation check before they are
+   cited. $\tau_h$ has no source.
+
+   What they give, from the closed-form steady state (computed, not
+   simulated): $(G - 1)\,\tau_{dec}/\tau_{fac} = 24 > 8$, so a route is net
+   facilitating at low rate (`single_neuron_stf`'s numbers give 4.5 and
+   are not). $g$ is 1.43, 2.50, 3.40, 4.43 at rates 0.02, 0.1, 0.25, 1.
+   Sustained output relative to no facilitation, on the chain: 1.32, 1.19,
+   1.08, 1.02; on the single pool: 1.35, 1.50, 1.31, 1.09. The chain is
+   near its ceiling of 1/18 by a rate of 0.1 and coupled facilitation
+   cannot raise that ceiling, so what it changes is the low-rate range and
+   the onset of activity.
+
+   Which routes carry facilitation is a preset choice for the later paper
+   and is not decided here.
 
 ## 5. Tests
 
