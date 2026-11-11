@@ -680,12 +680,15 @@ end
 %% ------------------------------------------------------------------------
 function m = mc_workers_from_memory(gb_per_trial)
 % How many MC trials fit side by side: available physical RAM over the
-% per-trial footprint, at least 1, at most the pool size (or the default
-% pool size when none is open). The `memory` function exists on Windows
-% only; elsewhere the pool size is used unchanged.
-pool = gcp('nocreate');
+% per-trial footprint, at least 1, at most the session's pool size. The pool
+% comes from pool_ensure: the one that is up, else the session's allocation,
+% opened now. (With no pool up this used to read the DEFAULT profile's size,
+% a pool the parfor below would then never have had.) With no pool to be had
+% the trials run serially and this is 1. The `memory` function exists on
+% Windows only; elsewhere the pool size is used unchanged.
+pool = pool_ensure();
 if isempty(pool)
-    m = parcluster(parallel.defaultProfile).NumWorkers;
+    m = 1;
 else
     m = pool.NumWorkers;
 end

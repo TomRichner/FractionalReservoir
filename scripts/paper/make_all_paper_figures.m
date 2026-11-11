@@ -44,6 +44,19 @@ end
 
 setup_paths();
 
+%% PREFLIGHT: this session must have a pool allocation
+% Several figures simulate, some through a parfor. With no allocation set
+% those loops would run serially without anyone having chosen that, so the
+% pass is refused before anything is resolved or created. pool_set(0) is an
+% allocation (serial, on purpose) and is accepted. Same check as
+% run_all_paper_analyses.
+pc = pool_config();
+if ~pc.is_set
+    error('make_all_paper_figures:NoPoolAllocation', ...
+        ['No parallel-pool allocation is set for this MATLAB session, so the figure pass is ' ...
+         'refused.\n%s'], pc.how_to_set);
+end
+
 %% Resolve the run once
 % Figures that read no run directory (the analytic ones) ignore this; passing it
 % to them is harmless and keeps the call uniform.

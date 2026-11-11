@@ -78,6 +78,21 @@ if ~ismember(cfg.run_mode, valid_modes)
         cfg.run_mode, strjoin(valid_modes, ', '));
 end
 
+%% PREFLIGHT: this session must have a pool allocation
+% Hours of sweeps on an unknown number of workers is not something to find
+% out afterwards. With automatic pool creation off, a session that never
+% opened a pool runs every parfor serially; and several MATLAB sessions
+% share this machine, so the size is for whoever divides it to decide, not
+% this function. pool_set(N) records it; pool_set(0) is an allocation too
+% (run serially, on purpose) and is accepted. Checked before any compute and
+% before the run directory is created.
+pc = pool_config();
+if ~pc.is_set
+    error('run_all_paper_analyses:NoPoolAllocation', ...
+        ['No parallel-pool allocation is set for this MATLAB session, so the analyses are ' ...
+         'refused rather than run serially for hours.\n%s'], pc.how_to_set);
+end
+
 % KEEP THE SWEEP PLOTS OFF SCREEN unless asked otherwise (cfg.visible_figures,
 % default false). The sub-analyses plot and save at the end of each stage, and
 % each new window raises itself and takes keyboard focus -- so an unattended run
@@ -197,7 +212,7 @@ for k = 1:size(stages, 1)
     t0 = tic;
     lastwarn('');
     try
-        restart_parpool();
+        pool_restart(cfg.verbose);
         detail = stages{k, 2}();
         results = record(results, name, true, toc(t0)/60, detail, '');
         vprintf(cfg.verbose, 'minimal', '  -> %s\n', detail);

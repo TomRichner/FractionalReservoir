@@ -89,12 +89,14 @@ function mat_file = run_numerics_verification(cfg)
 % PARALLEL. The three blocks per condition are parfor loops over trials (L
 % over trial x integrator). Every job builds its own model inside the worker
 % from the preset and the seed; nothing is shared but the settings struct.
-% An existing pool is used as is (secure one first with wait_for_parpool,
-% which polls the network licence for a free seat); otherwise n_workers,
-% default min(12, cores), leaving headroom on a 14-core box;
-% per-worker memory peaks at about 1.5 GB (an ode45 run holding 20 s of 4000
-% states, or a reshoot holding the reference rows plus a 12800 Hz noise
-% tensor), so 12 workers fit in 64 GB. Worker output is interleaved.
+% The pool is the session's (pool_ensure): an existing one is used as is,
+% otherwise it is opened at the size set with pool_set; with allocation 0,
+% none set, or no licence seat to be had, the loops run serially (slow but
+% correct; settings.n_workers then records 1). The n_workers argument no
+% longer opens anything. Per-worker memory peaks at about 1.5 GB (an ode45
+% run holding 20 s of 4000 states, or a reshoot holding the reference rows
+% plus a 12800 Hz noise tensor), so 12 workers fit in 64 GB. Worker output
+% is interleaved.
 %
 % Every model is an SRNNNumericsProbe -- SRNNCellTypePairs with the noise
 % tensor injectable and a public segment integrator, nothing else. The
@@ -130,7 +132,7 @@ arguments
     cfg.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     cfg.n_trials_reshoot (1,1) double  = 0     % 0 -> per run_mode
     cfg.n_trials_lle     (1,1) double  = 0     % 0 -> per run_mode
-    cfg.n_workers        (1,1) double  = 0     % 0 -> min(12, cores)
+    cfg.n_workers        (1,1) double  = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
 end
 
 setup_paths();
@@ -233,8 +235,10 @@ vprintf(cfg.verbose, 'verbose', '  L: Benettin LLE, ode45 vs sra1 @ %d Hz, T = %
 vprintf(cfg.verbose, 'verbose', '  C: Benettin vs QR, n = %d, T = %s                              x %d trials\n', ...
     n_small, mat2str(T_small), n_lle);
 
-pool = ensure_pool(cfg.n_workers);
-vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', pool.NumWorkers);
+pool = pool_ensure('verbose', cfg.verbose);
+n_pool = 1;                          % no pool: the trial loops run serially in the client
+if ~isempty(pool); n_pool = pool.NumWorkers; end
+vprintf(cfg.verbose, 'verbose', '  parallel pool: %d workers\n', n_pool);
 
 t_stage = tic;
 res = struct('name', cond_names, 'title', titles, 'reshoot', [], 'lle', [], 'qr', [], 'jacobian', [], 'summary', []);
@@ -299,7 +303,7 @@ settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'T_lle', T_lle, 'fs_lle', P.fs_lle, ...
     'n_small', n_small, 'T_small', T_small, 'lya_small_warmup', P.lya_small_warmup, 'K_small', P.K_small, ...
     'max_restarts', max_restarts, 'block_names', {{'x', 'a', 'b'}}, ...
-    'n_trials_reshoot', n_reshoot, 'n_trials_lle', n_lle, 'n_workers', pool.NumWorkers, ...
+    'n_trials_reshoot', n_reshoot, 'n_trials_lle', n_lle, 'n_workers', n_pool,...
     'n_jac', P.n_jac, 'h_jac', P.h_jac, 'jac_kink_margin', P.jac_kink_margin, ...
     'acceptance', acceptance, ...
     'minutes', toc(t_stage) / 60);
@@ -316,30 +320,6 @@ vprintf(cfg.verbose, 'minimal', '[numerics_verification] %.1f min -> %s\n', sett
 end
 
 %% ------------------------------------------------------------------------
-function pool = ensure_pool(n_workers)
-% Use the pool that is up, whatever its size (secure one first with
-% wait_for_parpool, which polls the network licence); otherwise try to start
-% one with n_workers (default min(12, cores)). If that fails -- no toolbox,
-% or the 15-seat licence fully checked out -- warn and return a stand-in with
-% NumWorkers = 1: the parfor loops below then run serially, slow but correct.
-pool = gcp('nocreate');
-if ~isempty(pool)
-    return
-end
-if n_workers <= 0
-    n_workers = min(12, feature('numcores'));
-end
-try
-    pool = parpool(parallel.defaultProfile, n_workers);
-catch ME
-    warning('run_numerics_verification:NoPool', ...
-        ['Could not start a parallel pool (%s). Running the trial loops ' ...
-         'SERIALLY; expect roughly n_workers times the wall time. ' ...
-         'Secure a pool first with wait_for_parpool.'], strtok(ME.message, newline));
-    pool = struct('NumWorkers', 1);
-end
-end
-
 function T = reshoot_trial(P, cname, seeds)
 % Sub-experiments A and B on one network. Returns seeds / free / noisy.
 T = struct('seeds', seeds, 'free', [], 'noisy', []);

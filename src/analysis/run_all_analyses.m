@@ -102,9 +102,11 @@ vprintf(opts.verbose, 'verbose', '========================================\n');
 vprintf(opts.verbose, 'minimal', '[1/3] Running Sensitivity Analysis...\n');
 vprintf(opts.verbose, 'verbose', '========================================\n');
 % A fresh pool before each stage. The three analyses run back to back for hours
-% against one pool otherwise; see restart_parpool for why that is worth
+% against one pool otherwise; see pool_restart for why that is worth
 % avoiding and for what is and is not established about the aug_13 failure.
-restart_parpool();
+% The size is the session's allocation (pool_set): pool_restart reopens what
+% was up, and never the default profile.
+pool_restart(opts.verbose);
 run_sensitivity_analysis(resolve_run_context('sensitivity', ctx_args{:}));
 
 %% 1b. Assemble the 1-D sensitivity sheets
@@ -149,14 +151,14 @@ end
 vprintf(opts.verbose, 'verbose', '========================================\n');
 vprintf(opts.verbose, 'minimal', '[2/3] Running Tau Sensitivity Analysis...\n');
 vprintf(opts.verbose, 'verbose', '========================================\n');
-restart_parpool();
+pool_restart(opts.verbose);
 run_tau_sensitivity_analysis(resolve_run_context('tau_sensitivity', ctx_args{:}));
 
 %% 3. Parameter space
 vprintf(opts.verbose, 'verbose', '========================================\n');
 vprintf(opts.verbose, 'minimal', '[3/3] Running Parameter Space Analysis...\n');
 vprintf(opts.verbose, 'verbose', '========================================\n');
-restart_parpool();
+pool_restart(opts.verbose);
 run_param_space_analysis(resolve_run_context('param_space', ctx_args{:}));
 
 %% Human-readable parameter record
