@@ -472,6 +472,12 @@ The model class is one file and its three depression sites must agree with
 each other, so **steps 1 and 3 cannot be split or run in parallel**. Work
 that does not touch that file runs beside them.
 
+**Step 0a. The pool module, FD-017 (one worker, then the lead).** Decided
+2026-11-11 and **done before anything else**: the `pool_*` functions and
+the session allocation described in `docs/ISSUES.md`, FD-017. Every later
+brief then says `pool_set(N)` instead of naming a profile. Gate: the
+stages tier passes unchanged.
+
 **Step 0. Pre-flight (lead).** Clean tree; worker agents listed; the lead's
 pool closed; quick suite and ultrarapid tier pass; Tom's answers to
 section 9 written into the to-do list.
@@ -581,6 +587,14 @@ steady-state curves, from
 `scripts/explorations/adaptation_normalization/demo_chain_1TS_vs_MTS.m`,
 with the chosen parameters. It must show what Brian accepted: the first-cycle
 match and the steady-state difference.
+
+**Step 8. Chained facilitation, FD-018** (one Fable worker on the model
+class, alone, as in step 1). Decided 2026-11-11: facilitation is not in
+this paper, but it is built now so the model is not refactored twice. The
+form is option C of the facilitation note (release-coupled, a calcium
+trace driving release probability). Its regression is the chain's own
+reference from step 5: with facilitation off, every number must be
+unchanged. It comes after step 6 so that it cannot delay the draft.
 
 **Not in this plan:** the manuscript text (Methods Eqs. 5 and 6, the
 Supplemental Methods, the conditions and timescale tables, the paragraph on

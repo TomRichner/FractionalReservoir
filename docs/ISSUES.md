@@ -239,6 +239,74 @@ captured from the code as it stands.
   of Plan A step 6.
 - **Result:** _(pending)_
 
+### FD-017 One place for the parallel pool: `pool_*` functions and a session allocation
+
+- **Status:** open (decided by Tom 2026-11-11). **First job, before Plan A
+  step 1**: no worker should run a sweep or a stage until it exists.
+- **Serves:** every block; the multi-agent working arrangement
+- **What:** a small module in `src/util/` through which all pool handling
+  goes, so that no code opens the default profile or a hard-coded size.
+  - The session's allocation lives in an **environment variable of the
+    MATLAB process** (`setenv`), set in one step by `pool_set(N)`. It
+    survives `clear all` and `clear classes`, and a launcher can set it
+    before MATLAB starts.
+  - `pool_set(N)` records N and opens exactly N workers on a named profile
+    (`Processes`); `pool_set(0)` means no pool. `pool_ensure()` returns the
+    session's pool, opening it if down. `pool_restart()` replaces
+    `restart_parpool`: it reads the size of the pool that is up and reopens
+    the same number. `pool_release()` closes it. `pool_status()` shows who
+    holds what across the machine.
+  - A machine-level registry (one small file per session: process id, a
+    label such as the agent's name, worker count, start time), so agents can
+    see each other. **Visibility only: the 12-worker budget is not enforced
+    in code** (Tom: exceeding it bogs the CPU down but does not crash; the
+    aim is to leave a couple of cores free for the CLI and remote desktop).
+  - **With no allocation set, library code runs serially with a loud
+    warning; `run_all_paper_analyses` and `make_all_paper_figures` refuse to
+    start.**
+  - The default profile stays `Just1` (Tom): it also stops legacy code from
+    auto-starting a large pool. The profile name and the budget figure each
+    appear once, in the module.
+  - `restart_parpool`, `wait_for_parpool`, and the pool-opening lines in
+    `run_lyapunov_spectrum`, `run_transient_gain` and
+    `run_numerics_verification` go through the module. The six worker-agent
+    prompts and `MATLAB_worker_agents.md` are updated to `pool_set(N)`.
+  - Optional, to be decided after it works: lowering worker priority, or
+    pinning each session's workers to its own cores and leaving two free
+    (`docs/notes/set_parpool_cpu_affinity.m` is Tom's earlier script; it is
+    Windows-only).
+- **Done when:** no `parpool(` call remains outside the module; a session
+  set to N opens N and restarts at N; an unset session runs a `parfor`
+  serially with the warning and the two entry points refuse; `pool_status`
+  lists two concurrent sessions correctly; the stages and full regression
+  tiers pass unchanged (pool handling must not move a number).
+- **Depends on:** nothing.
+- **Result:** _(pending)_
+
+### FD-018 Chained facilitation, after chained depression
+
+- **Status:** open (decided by Tom 2026-11-11; design to be confirmed)
+- **Serves:** a later paper. **Facilitation does not appear in this one.**
+  Built now so the model does not have to be refactored twice.
+- **What:** the release-coupled, serial form: option C (section 5) of
+  `docs/notes/Depression_facilitation_model_options_2026-11-11.md`. Release
+  probability multiplies both the output and the rate at which the
+  releasable pool is used; in the multiple-timescale form a calcium trace
+  drives release probability. Per route, like depression, so different
+  cell-type pairs can carry different short-term plasticity (several E and
+  several I types are expected later). A per-neuron spread on its time
+  constants (`stf_spread`), set in the preset like `std_spread`.
+- **Done when:** its own unit tests pass (equations by hand, steady state,
+  finite-difference Jacobian, Jacobian product); **with facilitation off,
+  the chain reproduces, bit for bit, the reference saved for the chain
+  before this work began** (Plan A step 5); the existing references pass
+  unchanged; today's facilitation on product routes (`single_neuron_stf`)
+  is bit-identical.
+- **Depends on:** FD-004, FD-005, FD-015, and the chain's own reference.
+  Sequenced after the four-condition `fast` run so it cannot delay the
+  draft, unless Tom says otherwise.
+- **Result:** _(pending)_
+
 ## To be planned
 
 Named so they are not lost. Each needs a planning session with Tom before it
@@ -262,3 +330,9 @@ becomes an issue with an acceptance test.
 - **FD-013 Closing figure** (block D).
 - **FD-014 Paper figure of 1TS versus MTS depression** (block A), from the
   demonstration scripts.
+- **FD-019 A best-practices repo for multi-agent MATLAB** (Tom's idea,
+  2026-11-11; after the deadline). If the worker agents, the `pool_*`
+  functions and the session environment variable work well here, lift
+  them into a separate repo with examples and documentation so other
+  projects can use the same arrangement (MATLAB MCP server, one private
+  session per agent, Parallel Computing Toolbox), and test it on a Mac.
