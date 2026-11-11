@@ -183,9 +183,12 @@ captured from the code as it stands.
 - **Status:** open
 - **Serves:** block A
 - **What:** a preset bundle on the current baseline network with the MTS
-  condition using the chain (reserve size 2; time constants in block A),
-  under its own condition name with title and colour entries; regenerate the
-  preset fixture.
+  condition using the chain (reserve size 2, reserve refill 5 s), named
+  `sfa3_stdc2`, in a **four-condition** preset that also keeps the product
+  MTS (`sfa3_std2`) for the side-by-side; title and colour entries (the
+  chain takes the product's current colour, the product becomes green);
+  two figure sets per run, three-condition and four-condition; regenerate
+  the preset fixture.
 - **Done when:** the bundle runs at `fast`; preset tests pass.
 - **Depends on:** FD-004.
 - **Result:** _(pending)_
@@ -194,8 +197,9 @@ captured from the code as it stands.
 
 - **Status:** open (requested and design confirmed by Tom 2026-11-10; see
   block A of the to-do list, "Per-neuron spread in the depression
-  parameters"). One point left for planning: whether the spread is
-  allowed on product and single-pool routes or only on chain routes.
+  parameters"). Allowed on all three kinds of route: chain, one-component
+  and multi-component product (Tom, 2026-11-11). Still under discussion:
+  whether it is set in the preset or per condition (plan, section 9).
 - **Serves:** block A
 - **What:** a per-neuron log-normal spread on the chain's time constants
   (releasable-pool refill and release, reserve refill) and on the reserve
@@ -227,7 +231,9 @@ becomes an issue with an acceptance test.
   control it was proposed for is not needed. Was: blocked on the decision
   whether to run it.
 - **FD-009 MTS reruns at `medium` or better** (block A): sweeps, memory
-  capacity, stability and transient stages on the chain preset.
+  capacity, stability and transient stages on the chain preset. **Agents do
+  not run these**: only Tom starts them and says when they are done (Tom,
+  2026-11-11). Plan A ends with one `fast` run on four conditions.
 - **FD-010 Gain sweep of growth rate and memory capacity** (block C),
   including the no-adaptation pilot and the 3:2 and 2:3 networks.
 - **FD-011 Stimulation: adaptation is necessary** (block B): the 2 × 2 plus
