@@ -921,7 +921,7 @@ adding a component does not add strength.
 
 ### Recommendation
 
-1. **For the draft due 2026-11-16: section 2, no facilitation.** The paper
+1. **For this paper: section 2, no facilitation.** The paper
    uses none, and Plan A's refusal of `stf` on chain routes can stand.
 2. **The decision that matters is the coupling, not the second variable.** If
    facilitation is to sit beside the chain, I recommend release coupling

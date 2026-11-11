@@ -19,15 +19,15 @@ dead end.
 ## Current work (as of 2026-11-10)
 
 We are bringing the manuscript to a final draft from Brian Lundstrom's
-feedback. A draft is due 2026-11-16; submission is 2026-12-02.
+feedback.
 
-**The plan is the guide, not the deadline** (Tom, 2026-11-11). 2026-11-16
-is the date a draft is due; the submission date is 2026-12-02, and a
-reasonable draft already exists. So the work is not to be cut down,
-reordered or left partial to meet the 16th. Lay an excellent foundation
-first and go fast on top of it. What the deadline does change: before the
-16th, avoid production runs of more than about two hours; use the fast
-regression tiers and `fast` pre-production runs instead.
+**Quality comes first, and the plan is the guide** (Tom, 2026-11-11). A
+reasonable draft already exists, so nothing here is to be cut down,
+reordered, deferred or left partial in order to finish sooner. Lay an
+excellent foundation first and go fast on top of it. No date governs
+this work, and none is to be written into these documents. Where compute
+is costly, save on compute, not on scope: use the regression tiers and
+`fast` pre-production runs; `medium` and larger runs are Tom's to start.
 
 Two documents to read first:
 
@@ -42,7 +42,7 @@ Two documents to read first:
   reference.
 
 Reorganising and archiving this repo (`scripts/paper/`, `data/`, `figs/`) is
-deferred until after the deadline (TR, 2026-11-10). Until then, new
+deferred until the final-draft work is finished (TR, 2026-11-10). Until then, new
 experiments follow the existing conventions and nothing is moved or deleted.
 
 ### How the work is tracked
@@ -110,8 +110,16 @@ and do not start that work until Tom says go.
 Decisions already made that affect the code: depression gains a **chained
 vesicle-pool model** as an opt-in per route, beside the current product,
 which stays the default and gives the same numbers to round-off (FD-004).
-A route with one depression component is the single-timescale condition
-and carries no reserve variable.
+A route with one depression component is the single-timescale condition.
+It is equivalent to the chain with the reserve held full, but it carries
+**no reserve variable**: the model never keeps an unused or clamped state
+variable, because it enlarges the state and adds zero eigenvalues and zero
+Lyapunov exponents that mean nothing. The same rule holds for
+facilitation. **Every analysis runs four conditions** (no adaptation, 1TS,
+chained MTS, product MTS); **the paper shows three**. In the figures
+chained MTS takes over product MTS's base colour and position, and a
+second version of every figure adds product MTS as a fourth column in
+green.
 
 **The code is to be general, not branched per model** (Tom, 2026-11-11;
 plan, section 2). Product depression, today's facilitation, the chain and

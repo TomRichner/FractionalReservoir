@@ -354,7 +354,7 @@ becomes an issue with an acceptance test.
 - **FD-014 Paper figure of 1TS versus MTS depression** (block A), from the
   demonstration scripts.
 - **FD-019 A best-practices repo for multi-agent MATLAB** (Tom's idea,
-  2026-11-11; after the deadline). If the worker agents, the `pool_*`
+  2026-11-11; after the final-draft work). If the worker agents, the `pool_*`
   functions and the session environment variable work well here, lift
   them into a separate repo with examples and documentation so other
   projects can use the same arrangement (MATLAB MCP server, one private

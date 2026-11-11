@@ -25,13 +25,13 @@ word used in the text.)
 
 ## 0. How to use this plan
 
-**The plan is the guide, not the deadline** (Tom, 2026-11-11). 2026-11-16
-is the date a draft is due; the submission date is 2026-12-02, and a
-reasonable draft already exists. So the work is not to be cut down,
-reordered or left partial to meet the 16th. Lay an excellent foundation
-first and go fast on top of it. What the deadline does change: before the
-16th, avoid production runs of more than about two hours; use the fast
-regression tiers and `fast` pre-production runs instead.
+**Quality comes first, and the plan is the guide** (Tom, 2026-11-11). A
+reasonable draft already exists, so nothing here is to be cut down,
+reordered, deferred or left partial in order to finish sooner. Lay an
+excellent foundation first and go fast on top of it. No date governs
+this work, and none is to be written into these documents. Where compute
+is costly, save on compute, not on scope: use the regression tiers and
+`fast` pre-production runs; `medium` and larger runs are Tom's to start.
 
 **If you are the lead agent picking this up:**
 
@@ -109,7 +109,7 @@ $b_1 = 1$ it is $-r/\tau_{rel} \le 0$, and likewise for $b_2$.
 | Decision | Value |
 |---|---|
 | Both models supported | The chain is an opt-in per route. The product stays the default and gives the **same numbers to round-off** (revised 2026-11-11: no longer bit-identical through the refactor; see section 2). The geometric-mean option stays. |
-| 1TS | A route with one depression component: the current single-pool equation, one state per presynaptic neuron. **No reserve variable exists**, so no unused state and no zero eigenvalue. |
+| 1TS | A route with one depression component: the current single-pool equation, one state per presynaptic neuron. It is **equivalent to the chain with the reserve held full, and is implemented by removing the reserve variable, not clamping it** (Tom): the model keeps no unused or clamped state variables, because they enlarge the state and add zero eigenvalues and zero Lyapunov exponents that mean nothing. The same rule holds for facilitation: its single-timescale form drops the second state variable. |
 | MTS | The same releasable-pool equation plus a dynamic reserve: two states per route, the same count as today's two-timescale product. |
 | Reserve size $n_2$ | 2 |
 | $\tau_{rec_1}$, $\tau_{rel}$ | 2 s, 0.25 s (unchanged, so (C1) is identical in 1TS and MTS) |
@@ -120,8 +120,8 @@ $b_1 = 1$ it is $-r/\tau_{rel} \le 0$, and likewise for $b_2$.
 | Per-neuron spread | Log-normal, $\sigma = 0.25$, on the depression time constants and on $n_2$. Independent draws per presynaptic neuron, shared by all its outgoing routes. **Allowed on all three kinds of route: chain, one-component, and multi-component product** (Tom, 2026-11-11). 1TS is jittered with the same $\tau_{rec_1}$ and $\tau_{rel}$ draws as MTS. On a chain route the reserve refill is kept slower than the releasable-pool refill, with a minimum separation. **Default is no spread, so existing presets run bit for bit as today.** |
 | `std_zero_floor` | Refused on chain routes. |
 | MTS chain condition | Named **`sfa3_stdc2`** (Tom, 2026-11-11). |
-| Conditions analysed | **Four**: no adaptation, 1TS, chained MTS, product MTS. Tom and Brian want the chain and the product side by side during blocks A to D; the final paper will probably show three. |
-| Figure sets | **Two from every run**: a three-condition set (no adaptation, 1TS, chained MTS) and a four-condition set with product MTS as a fourth column or colour. In the three-condition styling the chained MTS takes over the colour product MTS has now; product MTS gets a new colour (green). |
+| Conditions analysed | **Four, in every analysis**: no adaptation, 1TS, chained MTS, product MTS. **The paper shows three**: no adaptation, 1TS, chained MTS. Product MTS is kept so the chain and the product can be seen side by side while this is developed. |
+| Figure sets | **Two versions of every figure, from every run.** The three-condition version (no adaptation, 1TS, chained MTS) is the paper's: **chained MTS takes over product MTS's base colour and its position** in the figure. The four-condition version adds product MTS as a **fourth column, in a new fourth base colour, green**, for comparison. |
 | Reruns | **Agents never run `medium` or larger.** Only Tom starts those and only Tom says when they are done. The plan ends with one `fast` run. |
 | Parallel pools | Automatic pool creation is **off** machine-wide (Tom, 2026-11-11). Up to 12 workers in total across the lead and all workers. Tom keeps one MATLAB session with a one-worker pool on the `Just1` profile to hold a toolbox licence seat; it does not count against the 12. |
 
@@ -381,7 +381,8 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
   exact regular expressions (read its header on why optional groups cannot
   be used). With four conditions it must return the chained MTS, not the
   product MTS.
-- **Colours and titles.** `sfa3_stdc2` takes the colour and the title
+- **Colours and titles.** `sfa3_stdc2` takes the colour, the position
+  in each figure (the column or slot product MTS occupies now) and the title
   ("Multiple-Timescale Adaptation") that `sfa3_std2` has now. `sfa3_std2`
   gets a new colour (green) and a title that says what it is (for example
   "Multiple-Timescale Adaptation (product)"). Runs made before this change
@@ -764,7 +765,7 @@ match and the steady-state difference.
 
 **Step 8. Chained facilitation, FD-018: built straight after the chain,
 not at the end** (Tom, 2026-11-11; this replaces the order first written
-here, which put it after the `fast` run to protect the draft date). One
+here, which put it after the `fast` run). One
 Fable worker on the model class, alone, as in step 1. The order on that
 one file is therefore:
 
@@ -932,7 +933,7 @@ Workers start with no memory of this conversation. Each brief gives:
 
    Today's model drives $g$ by the rate directly and does not let $g$ change
    how fast resources are used, so a facilitated synapse transmits more
-   without depleting faster. Not built, not planned for the draft.
+   without depleting faster. It does not appear in this paper.
 **New, found 2026-11-11:**
 
 9. **The default pool profile is `Just1`.** **Settled 2026-11-11 by

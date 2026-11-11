@@ -6,7 +6,7 @@ backwards from the figure files `Manuscript5.md` embeds (in the sibling repo
 them. Written at the start of the final-draft work (to-do list:
 `StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`), as
 orientation for the new experiments and for the reorganisation deferred until
-after the 2026-11-16 deadline.
+the final-draft work is finished.
 
 This is a snapshot. `CLAUDE.md` is the maintained reference for conventions;
 this note only says which parts of the repo the current manuscript actually
