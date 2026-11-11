@@ -83,7 +83,7 @@ captured from the code as it stands.
 
 ### FD-002 Fast regression bundle
 
-- **Status:** open
+- **Status:** done (2026-11-10), but slower than intended; see Result
 - **Serves:** all blocks
 - **What:** a preset and a config that exercise the same stages as the
   manuscript's bundle (`mu7revisedMedium`) on a network small and short
@@ -94,21 +94,33 @@ captured from the code as it stands.
   recorded; it follows the existing bundle conventions.
 - **Depends on:** FD-001 (so the preset fixture and tests are in a known
   state before a preset is added).
-- **Result:** _(pending)_
+- **Result:** commit `a24334b`. Four presets (`regression_pairs_*`,
+  `single_neuron_regression`: the manuscript network at n = 100, indegree =
+  20), `regression_fast_config(tag)` and `regression_fast_run(tag)`. First
+  run, tag `reference`: all ten analysis stages OK in 31.7 min and 36 of 36
+  figures OK in 18.3 min, so about 50 min, not minutes. The 1-D sweeps
+  shrank with the network; the joint sample (9 min), memory capacity (6 min)
+  and numerics (4 min) are sized by run mode, which a config cannot change.
+  A smaller run mode would cut it but means editing every stage; not done.
 
-### FD-003 Regression reference and comparison test
+### FD-003 Regression references and comparison tests, in two tiers
 
-- **Status:** open
+- **Status:** in progress (ultrarapid tier done; full tier's reference
+  pending a second run)
 - **Serves:** all blocks
-- **What:** run the FD-002 bundle on the code as it stands and save a small
-  reference of its key outputs (per-condition growth rates, firing rates,
-  memory capacity, and the other per-stage scalars). A test reruns the bundle
-  and compares against the reference.
-- **Done when:** the reference is saved and tracked; the comparison test
-  passes on unchanged code; a second run on the same machine shows how
-  reproducible each quantity is, and the tolerances are set from that.
+- **What:** TR, 2026-11-10: the regression has to be faster, so two tiers.
+  **Ultrarapid** (`regression_rapid_run`, about 15 s): the three classes
+  called directly, no stage functions. **Full** (`regression_fast_run`, about
+  50 min): every stage and figure of the FD-002 bundle. Both are reduced by
+  the generic `regression_digest` and compared by `regression_compare`.
+- **Done when:** each tier has a tracked reference made from a clean tree;
+  its check passes on unchanged code; and two runs on the same machine show
+  how reproducible it is, with any ignore patterns set from that.
 - **Depends on:** FD-002.
-- **Result:** _(pending)_
+- **Result:** tooling `7fcf533`; ultrarapid reference `a12e372` (858
+  leaves, 41 kB, exact, no ignore patterns; two runs bit-identical;
+  `test_regression_rapid` passes in 15 s and is in the quick suite). Full
+  tier: _(pending)_.
 
 ### FD-004 Chained-pool depression in `SRNNCellTypePairs`
 
@@ -167,9 +179,10 @@ captured from the code as it stands.
 
 ### FD-015 Per-neuron spread on the chain's parameters
 
-- **Status:** open (requested by Tom 2026-11-10; five points to confirm,
-  listed in block A of the to-do list under "Per-neuron spread in the
-  depression parameters")
+- **Status:** open (requested and design confirmed by Tom 2026-11-10; see
+  block A of the to-do list, "Per-neuron spread in the depression
+  parameters"). One point left for planning: whether the spread is
+  allowed on product and single-pool routes or only on chain routes.
 - **Serves:** block A
 - **What:** a per-neuron log-normal spread on the chain's time constants
   (releasable-pool refill and release, reserve refill) and on the reserve
@@ -177,7 +190,12 @@ captured from the code as it stands.
   constant gets a proportionally larger variance. Depression has no spread
   today: each route shares one row of time constants. Follow the SFA
   pattern (`tau_a_spread`, `tau_a_matrix`, its own seeded stream with the
-  RNG state restored).
+  RNG state restored). Confirmed design: the four quantities drawn
+  independently; one draw per presynaptic neuron, shared by its routes;
+  the single-timescale condition jittered with the same releasable-pool
+  draws; the reserve kept slower than the releasable pool with a minimum
+  separation; **the default is no spread, so every existing preset runs
+  bit for bit as today**.
 - **Done when:** a zero spread reproduces the non-jittered chain bit for
   bit; the draws are reproducible from the seed and leave the connectivity,
   setpoints and SFA ladders unchanged; the analytic Jacobian and the
