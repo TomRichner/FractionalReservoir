@@ -48,14 +48,29 @@ Dependencies, not priority:
 ```
 FD-001 test audit ─┐
 FD-002 fast regression bundle ─┴─> FD-003 regression reference
-        FD-003 ──> FD-004 chained-pool STD ──> FD-005 chain unit tests
+        FD-017 pool module ──> FD-020 tolerance tier ──> FD-021 refactor
+        FD-021 ──> FD-004 chained-pool STD ──> FD-005 chain unit tests
+        FD-004 ──> FD-018 chained facilitation ──> FD-015 per-neuron spread
         FD-004 ──> FD-006 display and reservoir code
-        FD-004 ──> FD-007 chain presets ──> FD-009 MTS reruns
-        FD-004, FD-005 ──> FD-015 per-neuron spread on the chain
+        FD-004 ──> FD-007 chain presets ──> FD-009 reruns
 ```
 
-FD-003 comes before any change to the model class: the reference has to be
-captured from the code as it stands.
+FD-003 and FD-020 come before any change to the model class: their
+references have to be captured from the code as it stands.
+
+**Decided against, 2026-11-11 (Tom): "bit-identical" as the requirement
+on existing behaviour.** Issues FD-004, FD-005, FD-015 and FD-018 were
+first written to require that the product model and existing presets
+stay bit for bit as they were, and the plan turned that into leaving the
+product code textually untouched and branching per model. Tom rejected
+it: it put the convenience of a byte-exact test ahead of clean, general
+code. The requirement is now that existing behaviour gives the **same
+numbers to round-off, shown by the tolerance regression tier** (FD-020;
+Plan A, sections 2 and 6). Byte-exact comparison remains the gate only
+for changes that should move no number at all (the pool module, configs,
+figures), and the exact references are re-captured once after the
+refactor (FD-021). Do not reintroduce a bit-identity requirement on the
+model's arithmetic.
 
 ## Issues
 
@@ -140,16 +155,20 @@ captured from the code as it stands.
 - **Status:** open (decision made, implementation to be planned)
 - **Serves:** block A
 - **What:** add the chained vesicle-pool model as an opt-in per route beside
-  the current product, which stays the default and bit-identical. A route
-  with one component is unchanged and is the 1TS condition; no reserve
-  variable exists for it. Equations (C1) to (C3) in the manuscript repo's
+  the current product, which stays the default and gives the same numbers
+  to round-off. Built as a second implementation of the route interface
+  that FD-021 puts in place, not as a branch at each site. A route with
+  one component is the 1TS condition: equivalent to the reserve held full,
+  implemented with no reserve variable. Equations (C1) to (C3) in the manuscript repo's
   `adaptation_normalization.md`. Touches the route configuration, the
   dynamics, the analytic Jacobian, the matrix-free Jacobian product, the
   state unpacking, and the route signature. `std_zero_floor` is refused for
   chain routes.
-- **Done when:** FD-005's tests pass and the FD-003 regression is unchanged
-  for every existing preset.
-- **Depends on:** FD-003.
+- **Done when:** FD-005's tests pass; the tolerance tier (FD-020) passes
+  against its anchor; and the exact references re-captured after FD-021
+  pass unchanged (adding a model must not move a number on routes that do
+  not use it).
+- **Depends on:** FD-003, FD-020, FD-021.
 - **Result:** _(pending)_
 
 ### FD-005 Unit tests for the chain
@@ -158,7 +177,8 @@ captured from the code as it stands.
 - **Serves:** block A
 - **What:** analytic Jacobian against finite differences; Jacobian product
   against the assembled Jacobian; a very large reserve reproducing the single
-  pool; steady state against (C4); default routes bit-identical to before; a
+  pool; steady state against (C4); default routes unchanged (the regression
+  gates of FD-004, not a bit-identity test here); a
   one-component route identical under either model.
 - **Done when:** all pass and are in the FD-001 entry point.
 - **Depends on:** FD-004 (written alongside it).
@@ -198,8 +218,9 @@ captured from the code as it stands.
 - **Status:** open (requested and design confirmed by Tom 2026-11-10; see
   block A of the to-do list, "Per-neuron spread in the depression
   parameters"). Allowed on all three kinds of route: chain, one-component
-  and multi-component product (Tom, 2026-11-11). Still under discussion:
-  whether it is set in the preset or per condition (plan, section 9).
+  and multi-component product (Tom, 2026-11-11). Set in the
+  preset, not in a condition (Tom, 2026-11-11). Built after chained
+  facilitation, so it also covers `stf_spread`.
 - **Serves:** block A
 - **What:** a per-neuron log-normal spread on the chain's time constants
   (releasable-pool refill and release, reserve refill) and on the reserve
@@ -212,13 +233,15 @@ captured from the code as it stands.
   the single-timescale condition jittered with the same releasable-pool
   draws; the reserve kept slower than the releasable pool with a minimum
   separation; **the default is no spread, so every existing preset runs
-  bit for bit as today**.
-- **Done when:** a zero spread reproduces the non-jittered chain bit for
-  bit; the draws are reproducible from the seed and leave the connectivity,
+  as today** (to round-off, by the tolerance tier; one code path that
+  always carries per-neuron values is preferred to a branch on whether a
+  spread is set).
+- **Done when:** a zero spread reproduces the non-jittered model within
+  the tolerance tier; the draws are reproducible from the seed and leave the connectivity,
   setpoints and SFA ladders unchanged; the analytic Jacobian and the
   Jacobian product pass their tests with a nonzero spread; the regression
-  bundle is unchanged for existing presets.
-- **Depends on:** FD-004, FD-005.
+  gates pass for existing presets.
+- **Depends on:** FD-004, FD-005, FD-018.
 - **Result:** _(pending)_
 
 ### FD-016 A seed for the joint parameter-space sample
@@ -321,10 +344,12 @@ captured from the code as it stands.
   constants (`stf_spread`), set in the preset like `std_spread`.
 - **Done when:** its own unit tests pass (equations by hand, steady state,
   finite-difference Jacobian, Jacobian product); **with facilitation off,
-  the chain reproduces, bit for bit, the reference saved for the chain
-  before this work began** (Plan A step 5); the existing references pass
-  unchanged; today's facilitation on product routes (`single_neuron_stf`)
-  is bit-identical.
+  the chain agrees with the references saved for it before this work
+  began** (Plan A step 5: within tolerance on the tolerance tier, and
+  exactly on the chain's exact reference unless the lead re-captures it
+  with the tolerance evidence in hand); the existing gates pass; today's
+  facilitation on product routes (`single_neuron_stf`) gives the same
+  numbers to round-off.
 - **Depends on:** FD-004, FD-005 and the chain's own reference. **Built
   straight after the chain** (Tom, 2026-11-11), before the spread (FD-015),
   which then covers `stf_spread` too. The calcium trace is per route.
@@ -334,6 +359,21 @@ captured from the code as it stands.
 
 Named so they are not lost. Each needs a planning session with Tom before it
 becomes an issue with an acceptance test.
+
+- **FD-020 Tolerance regression tier** (block A; agreed in outline with Tom
+  2026-11-11; Plan A sections 2.2 and 7.3, steps 0b and 0c). Pointwise
+  comparison of the right-hand side, the Jacobian and `jacobian_times` at
+  stored states; small stable networks end to end; an anchor captured from
+  the untouched model class; mutation checks that every one of a list of
+  small deliberate errors fails it. Tolerances to be fixed from those
+  checks. Comes after FD-017 and before any edit to the model class.
+- **FD-021 Refactor behind one route interface** (block A; agreed in
+  outline with Tom 2026-11-11; Plan A section 2.1 and step 0d). Product
+  depression and today's facilitation move behind an interface (state
+  derivative, output factor, their partials), with no new model. Gated by
+  FD-020; the exact references are re-captured once afterwards. The
+  interface design is to be written into the plan and reviewed by Tom
+  first.
 
 - **FD-008 Frozen-reserve control** (block A). **Dropped 2026-11-10:** Tom
   settled that 1TS and MTS are not strength-matched at steady state, so the

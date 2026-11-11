@@ -51,8 +51,9 @@ is costly, save on compute, not on scope: use the regression tiers and
 
 - **`docs/ISSUES.md`**: one entry per checkable piece of work (`FD-001`
   onward), with what "done" means and what it depends on. Every step of
-  section 7.3 serves an issue; a step without one (the tolerance tier, the
-  refactor) gets its issue agreed with Tom before it starts. The lead sets
+  section 7.3 serves an issue; the tolerance tier (FD-020) and the
+  refactor (FD-021) are named under "To be planned" and each becomes a
+  full issue, with its acceptance test agreed with Tom, before it starts. The lead sets
   an issue to `in progress` when it briefs the worker and to `done`, with
   the commits and the result, in the commit that merges the work. Agents
   do not open issues on their own initiative.
