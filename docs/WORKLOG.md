@@ -34,6 +34,93 @@ Entry template:
 
 ---
 
+## 2026-11-11 17:10 (session cc2136bc-6794-4ea6-962d-9eb831682265, Plan A execution begins; entry written mid-session)
+
+**Issues touched:** FD-017 open -> in progress -> merged (set to done when
+the full-tier gate below reports); FD-020 and FD-021 written as full
+issues; FD-020 open -> in progress (step 0b); FD-016 open -> in progress;
+FD-007 and FD-018 reworded.
+
+**Commits (this repo):** `53000f5` Plan A 4.0, FD-020 / FD-021, 4.6
+outline; `5cf8cd8`, `6ed8476`, `f0b0941` Plan A 4.6 in full, Tom's
+answers, the facilitation parameter values; `e737f68` the step 2 inventory
+(worker `matlab-opus-1`); `7f52b12`, `96f1806` Tom's figure decisions;
+`ce771b7` FD-017 (worker `matlab-fable-1`), merged as `ff0bd02`; `a5c5911`
+CLAUDE.md, Plan A and the six worker prompts for the pool module;
+`33480de`, `f6ae523` issue statuses with gate results.
+**Commits (manuscript repo):** `6426c5f`, `6f2ec58`, `a1a4913`, `f76f198`
+decisions into the to-do list; `cff93d0` the worker-agents note.
+
+**Done:**
+- Tom approved the execution plan (the route interface, FD-020 and FD-021
+  as issues, the sequence). His decisions, all in the to-do list: state
+  order kept; route models as function files in `src/model/routes/`;
+  chained facilitation extends `route_pool`; the tau sweep runs both MTS
+  conditions; facilitation ceiling jittered on `G - 1`; coupled
+  facilitation allowed without depression; facilitation values (G 5,
+  `tau_fac` tied to `tau_rel`, `tau_dec` 1.5 s, `tau_h` 0.5 s, spread
+  0.25); product MTS green `[0 0.7 0]`; both figure versions for every
+  three-condition figure, the single-neuron one included; four-condition
+  layouts need not be polished; short labels "SFA+STD" and "SFA+prodSTD";
+  layout is not a question for Tom.
+- Step 0: pre-flight and the docs above.
+- Step 0a: the pool module (`src/util/pool_*.m`), every pool call site
+  routed through it, `restart_parpool` deleted, both entry points refuse
+  without an allocation.
+- Step 2: the display and conditions inventory,
+  `docs/notes/Inventory_chain_display_and_conditions_2026-11-11.md`.
+
+**Verified:**
+- Pre-flight on `53000f5`: quick 53 of 53, 297 s.
+- FD-017 on merged `ff0bd02`, lead's MATLAB: quick 53 of 53 (247 s, pool
+  10); `test_pool_module` pass (53 s, session left as found); stages tier
+  pass on pool 12 with `settings.n_workers` ignored; a second session
+  (`matlab-opus-1`, pool 2) ran `pool_status` and listed both, 12 of 12,
+  no warning. The lead read the whole diff.
+- `SRNNCellTypePairs.m` is still blob `2b0118d4`, the one the FD-003
+  references were made from.
+
+**Not verified / known gaps:**
+- **The analysis half of the full tier is running** (tag `fd017`, pool 6,
+  started 17:02; result in `data/regression_fast/fd017.result.txt`). The
+  figure half is skipped for FD-017 by agreement with Tom: the module
+  changes no figure code.
+- The pool module's non-Windows paths are untested.
+- The facilitation section 4.6 is hand-derived, unsimulated.
+- FD-020 (`matlab-fable-1`, pool 3) and FD-016 (`matlab-fable-2`, pool 3)
+  are running and unreviewed.
+
+**Raised, not acted on:**
+- **`settings.n_workers` is a compared leaf** in the stages and full
+  references, captured on 14 workers; the lead passes an ignore pattern
+  until the re-capture after step 0d stores it.
+- **Serial differs from a pool run at round-off** (466 leaves of the
+  stages tier, 1e-13 to 1e-15), so the stages and full tiers need a pool
+  up. Predates FD-017.
+- **Worktrees start from `origin/main`**, so briefs begin with
+  `git merge --ff-only main`. Nothing is pushed (Tom's call).
+- The full tier takes 50 min; Tom asked whether 20 is possible. Measured
+  breakdown and two options (cheaper figure export in the regression
+  bundle; a run mode below `fast`) were discussed, nothing decided. It
+  would be its own issue.
+- From the workers: `write_run_parameters_md` prints only the first
+  condition's synapse config and calls it common to all; seven stages
+  freeze display titles at compute time; `run_overnight_queue`'s
+  pre-flight does not check the pool allocation; `fig_to_do_in_future.md`
+  and two archived scripts ask for 13 workers; nine crashed jobs sit in
+  the `Processes` profile's job storage and are announced on every pool
+  start; `wait_for_parpool` and `replot_sensitivity` print with bare
+  `fprintf`.
+- Citation check owed: release probability 0.2 and 1.5 s (Mongillo et al.
+  2008, from memory); `tau_h` has no source.
+
+**Next:** read `fd017.result.txt`, set FD-017 to done. Review and merge
+FD-016 and FD-020 as they report; the lead re-captures the tolerance
+anchor on merged main and requires bit-identity with the worker's. Then
+step 0c (mutation checks), the tolerances to Tom, step 0d.
+
+---
+
 ## 2026-11-11 15:10 (session 1766c926-8e9d-42f1-ba3a-5851de78596b, scripts/paper archive)
 
 **Issues touched:** none. Tom asked which `scripts/paper` files produced the
