@@ -267,7 +267,8 @@ model's arithmetic.
 
 ### FD-017 One place for the parallel pool: `pool_*` functions and a session allocation
 
-- **Status:** open (decided by Tom 2026-11-11). **First job, before Plan A
+- **Status:** in progress (briefed to `matlab-fable-1`, Plan A step 0a;
+  decided by Tom 2026-11-11). **First job, before Plan A
   step 1**: no worker should run a sweep or a stage until it exists.
 - **Serves:** every block; the multi-agent working arrangement
 - **What:** a small module in `src/util/` through which all pool handling
