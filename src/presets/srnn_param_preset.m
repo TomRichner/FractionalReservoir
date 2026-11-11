@@ -1255,6 +1255,113 @@ switch name
             struct('name','sfa1_std0','tau_a',{on},'synapse_config',struct()), ...
             struct('name','sfa0_std1','tau_a',{off},'synapse_config',sc)};
 
+    case 'regression_pairs_noStim_noise0p025_dualStd_3cond'
+        % THE REGRESSION BUNDLE'S NETWORK (2026-11-10, FD-002): the manuscript
+        % network (..._3cond_mu7revisedMedium) at ONE FIFTH THE SIZE, so the
+        % whole pipeline runs in minutes and can be rerun before and after a
+        % change to the model. Belongs to scripts/paper/regression_fast_config.
+        % It is a test fixture, not a network any figure in the paper shows.
+        %
+        % Differences from the manuscript preset, all four forced by the size:
+        %   n         500 -> 100
+        %   indegree  100 -> 20     (same connection density, alpha = 0.2)
+        %   F_ref_n / F_ref_indegree  500 / 100 -> 100 / 20   (so the frozen
+        %       weight scale F is the one this network's own size gives)
+        % Everything else is the manuscript preset's, value for value: SFA on
+        % both cell types, per-neuron setpoints and SFA ladders, no external
+        % input, Wiener noise 0.025, and the same three conditions with the
+        % same names (no_adaptation / sfa1_std1 / sfa3_std2, depression as the
+        % product of independent components).
+        %
+        % Written out in full rather than chained: a preset may chain only
+        % within its own config's bundle, and the manuscript preset belongs to
+        % another. The three presets below chain to THIS one.
+        %
+        % DO NOT RETUNE IT. Its job is to stay the same so that a change in
+        % its outputs means the code changed. If the physics of the paper
+        % network moves on, add a new regression preset; do not edit this one.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    100, ...
+            'indegree',             20, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [7 -7; 7 -7], ...     % (post <- pre), multiples of F
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % centre of the per-neuron draw
+            'mu_S_c',               [], ...      % empty: centre on S_c
+            'sigma_S_c',            [0.1 0.1], ... % per-neuron spread, both types
+            'c',                    [0.5, 0.5], ...     % TOTAL SFA budget, E AND I
+            'tau_a_spread',         [0.25 0.25], ...    % per-neuron SFA ladders
+            'input_config',         struct('n_steps', 3, 'step_density', struct(), 'amp', 0.5, ...
+                                           'no_stim_pattern', true(1, 3), 'intrinsic_drive', 0, ...
+                                           'positive_only', false), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              100, ...
+            'F_ref_indegree',       20, ...
+            'sigma_u_noise',        0.025);
+
+        % Same ladder on both types; the single-timescale regime takes the first
+        % entry on both.
+        taus     = log_ladder(0.25, 10, 3);
+        sfa_off  = {zeros(1,0), zeros(1,0)};
+        sfa_one  = {taus(1),    taus(1)};
+        sfa_all  = {taus,       taus};
+
+        dual_std   = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+        single_std = struct('tau_rec', dual_std.tau_rec(1), ...
+                            'tau_rel', dual_std.tau_rel(1));
+        std_all = struct();
+        std_all.E.E.std = dual_std;     std_all.E.I.std = dual_std;
+        std_all.I.E.std = dual_std;     std_all.I.I.std = dual_std;
+        std_one = struct();
+        std_one.E.E.std = single_std;   std_one.E.I.std = single_std;
+        std_one.I.E.std = single_std;   std_one.I.I.std = single_std;
+        std_off = struct();
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
+            struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_all) };
+
+    case 'regression_pairs_noStim_noise0_dualStd_3cond'
+        % Memory-capacity twin of the regression preset: Wiener process off.
+        % Same bundle (regression_fast_config), chained under the
+        % within-bundle rule.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'regression_pairs_noStim_noise0p025_dualStd_3cond');
+        d.sigma_u_noise = 0;
+
+    case 'regression_pairs_steps5s_noise0p025_dualStd_3cond'
+        % Stimulus-staircase twin of the regression preset for
+        % run_local_lyapunov: a new random step every 5 s that never returns
+        % to zero, as in the manuscript bundle's steps5s twin. Same bundle.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'regression_pairs_noStim_noise0p025_dualStd_3cond');
+        d.input_config = struct('n_steps', 8, 'step_density', struct(), 'amp', 0.5, ...
+            'no_stim_pattern', false(1, 8), 'intrinsic_drive', 0, 'positive_only', false);
+
+    case 'single_neuron_regression'
+        % Within the regression bundle: reference E neuron without recurrence,
+        % noise or heterogeneity, isolating exactly one SFA or STD timescale
+        % (the regression counterpart of single_neuron_mu7revisedMedium).
+        [d, model_class, ref] = srnn_param_preset( ...
+            'regression_pairs_noStim_noise0p025_dualStd_3cond');
+        d.n=1; d.indegree=1; d.n_cellTypes=1; d.cell_type_names={'E'};
+        d.f=1; d.mu_tilde_relative=0; d.sigma_tilde_relative=0;
+        d.c=d.c(1); d.sigma_S_c=0; d.tau_a_spread=0;
+        d.sigma_u_noise=0; d.x0_std=0;
+        one=ref{2}; off={zeros(1,0)}; on={one.tau_a{1}};
+        sc=struct(); sc.E.E.std=one.synapse_config.E.E.std;
+        conditions={ ...
+            struct('name','no_adaptation','tau_a',{off},'synapse_config',struct()), ...
+            struct('name','sfa1_std0','tau_a',{on},'synapse_config',struct()), ...
+            struct('name','sfa0_std1','tau_a',{off},'synapse_config',sc)};
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
         % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
         % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
@@ -1799,7 +1906,12 @@ names = {'default', 'overconnected', ...
     ... % figure presets -- networks that are deliberately not the paper's
     ... % operating point, named so the figures stop hardcoding them
     'bursting_pairs', 'sompolinsky_pairs', 'single_neuron_stf', ...
-    'single_neuron_dualStd', 'single_neuron_mu7revised', 'single_neuron_mu7revisedAgain', 'single_neuron_mu7revisedMedium', 'mc_pairs_dualStd'};
+    'single_neuron_dualStd', 'single_neuron_mu7revised', 'single_neuron_mu7revisedAgain', 'single_neuron_mu7revisedMedium', 'mc_pairs_dualStd', ...
+    ... % the regression bundle (regression_fast_config): a test fixture
+    'regression_pairs_noStim_noise0p025_dualStd_3cond', ...
+    'regression_pairs_noStim_noise0_dualStd_3cond', ...
+    'regression_pairs_steps5s_noise0p025_dualStd_3cond', ...
+    'single_neuron_regression'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
