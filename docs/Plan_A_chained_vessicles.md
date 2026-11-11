@@ -512,6 +512,30 @@ Follow the SFA spread (`tau_a_spread`, `build_tau_a_matrix`) closely.
   - Depression arithmetic repeated outside the class, beyond section 3's
     list: `fig_adaptation_methods`, `run_paper_illustrations`,
     `run_stim_evoked`, `run_stim_neurons`.
+- **The line-level inventory for steps 3 and 4** is
+  `docs/notes/Inventory_chain_display_and_conditions_2026-11-11.md`
+  (step 2, done): every site, the registry entry by entry, three work
+  packages for step 4, and sixteen points raised (its section 7).
+- **Tom's decisions on what the inventory raised (2026-11-11):**
+  - **Product MTS is drawn in green `[0 0.7 0]`.** Green was kept out of
+    the condition palette for red-green colour blindness; the
+    four-condition figures are for Tom's own review, so that does not
+    apply to them. The comment in `manuscript_style` that explains the
+    exclusion is updated to say so.
+  - **Every figure that has three conditions today gets both versions,
+    the single-neuron figure included,** so the chain bundle's
+    single-neuron preset has four conditions. The lead's reading, for Tom
+    to correct: it keeps its three (`no_adaptation`, `sfa1_std0`,
+    `sfa0_std1`) and gains chain depression alone, `sfa0_stdc2`, as the
+    fourth; the three-condition figure is unchanged.
+  - **The three-condition set is for the paper and is laid out with
+    care. The four-condition set is for Tom to review and its layout need
+    not be perfected:** it must build, show the right data under the
+    right labels, and not error or mislabel; spacing and sizing are not
+    polished. So `fig_eig_heatmap` keeps its 2 x 2 grid at four
+    conditions.
+  - Short labels (the lead's choice, not put to Tom): the chain takes
+    "SFA+STD"; the product becomes "SFA+STD (product)".
 - Adding presets fails `test_preset_golden` by design. Procedure: confirm the
   only failure is "valid-preset list unchanged", delete the fixture, run
   `make_preset_golden`, force-add it, and say in the commit why. Also add the
