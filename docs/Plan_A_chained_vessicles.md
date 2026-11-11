@@ -846,11 +846,12 @@ Rules from `MATLAB_worker_agents.md` that bind this plan:
   default pool. The `pool: 0` gap described in `MATLAB_worker_agents.md` is
   closed; a pool exists only where someone opened one.
 - **Never open the default profile.** It is `Just1` (one worker) and stays
-  so. A pool is opened with `pool_set(N)` once the pool module exists
-  (step 0a), and with `parpool('Processes', N)` until then. The six worker
-  prompts and `MATLAB_worker_agents.md` were rewritten on 2026-11-11 to
-  say this: a worker checks `exist('pool_set', 'file')` and uses whichever
-  applies, so the prompts need no edit when the module lands.
+  so. A pool is opened with `pool_set(N)` (the pool module, step 0a, is
+  built) and closed with `pool_release()`.
+- **A worker's worktree starts from `origin/main`, not from the lead's
+  local `main`** (found in step 0a). The lead's doc commits are local, so
+  every brief begins with `git merge --ff-only main` and names the commit
+  the worktree should then be at.
 - A worker's MATLAB is cold, private, and gone when the worker finishes.
   What the lead needs must be on disk or in the report.
 - The worker agents load only in a session started after
@@ -1167,20 +1168,25 @@ Workers start with no memory of this conversation. Each brief gives:
 - **Worktrees and the shared machine.** Each worker has its own MATLAB but
   they share the cores and the RAM. `run_memory_capacity` sizes itself from
   free RAM as if alone; do not run two memory-heavy jobs side by side.
-- **The default pool profile is `Just1`.** Checked 2026-11-11 from the
-  lead's MATLAB: `parallel.defaultProfile` is `Just1`, a one-worker profile.
-  Code that opens the default profile now misbehaves: `restart_parpool`
-  (called by `run_all_analyses` and `run_all_paper_analyses`) opens a
-  one-worker pool, so sweeps run on one worker; and
-  `run_lyapunov_spectrum`, `run_transient_gain`,
-  `run_numerics_verification` and `wait_for_parpool` call
-  `parpool(parallel.defaultProfile, n)` with n up to 12, which errors. (The
-  six worker-agent prompts used the same call; fixed 2026-11-11.) Until
-  the pool module of step 0a exists: open a `Processes` pool by name
-  before running a stage, and do not run the full bundle.
-- **No pool means serial.** With automatic creation off, forgetting to
-  open a pool no longer oversubscribes the machine; it runs slowly on one
-  core instead. A job that seems stuck may simply have no pool.
+- **The default pool profile is `Just1`**, a one-worker profile, and it
+  stays the default. Since step 0a nothing opens it: all pool handling
+  goes through `pool_*`, and the two entry points refuse to start until
+  the session has an allocation (`pool_set(N)`).
+- **No pool means serial, and serial is not byte-identical.** With
+  automatic creation off, forgetting to open a pool no longer
+  oversubscribes the machine; it runs slowly in the client instead. A job
+  that seems stuck may simply have no pool. And a serial run differs from
+  a pool run at round-off (1e-13 to 1e-15 relative), because the client is
+  multithreaded and a pool worker is not: **the stages and full exact
+  tiers need a pool up, of any size.** The ultrarapid tier does not.
+- **`settings.n_workers` is a compared leaf.** Three stages save the pool
+  size, and the references were captured on 14 workers, so a gate run at
+  another size differs in that leaf alone. Until the re-capture after
+  step 0d stores the ignore pattern, the lead passes
+  `'ignore', {'settings\.n_workers$'}` to the stages and full checks.
+- **The tolerance tier must not depend on the thread count either.** It
+  runs in the client; its fixture records `maxNumCompThreads`, and its
+  tolerances have to absorb a different thread count (step 0b).
 - **The 30-minute limit.** A MATLAB call silent for 30 minutes is dropped by
   the client though MATLAB carries on. Long runs are launched through a
   timer and followed by reading a file; multi-hour runs belong in the lead's

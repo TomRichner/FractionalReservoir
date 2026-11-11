@@ -186,6 +186,46 @@ launch it and read `data/regression_fast/<tag>.result.txt`. And **no tier
 covers the joint parameter-space sample**, because `ParamSpaceAnalysis2`
 seeds it with `rng('shuffle')`: its 128 grid points differ on every run.
 
+**The stages and full tiers need a parallel pool up, of any size** (found
+with FD-017). A pool of 4 and a pool of 14 give identical bytes, but a run
+with no pool is serial in the client and differs from the references at
+round-off (1e-13 to 1e-15 relative, 466 leaves of the stages tier): the
+client is multithreaded and a pool worker is not. The ultrarapid tier is
+serial by construction and passes with or without a pool. One leaf does
+depend on the pool's size: three stages save `settings.n_workers`, and the
+references were captured on 14 workers. Until the references are
+re-captured with that leaf ignored, either hold 14 workers or call the
+check with it ignored:
+`regression_stages_check('ignore', {'settings\.n_workers$'})`,
+`regression_check('ignore', {'settings\.n_workers$'})`.
+
+### Parallel pools: one module, one allocation per MATLAB session
+
+**All pool handling goes through `src/util/pool_*.m`** (FD-017). Nothing
+else in `src/` or `scripts/` calls `parpool`, and nothing opens the default
+profile, which on this workstation is `Just1` (one worker, kept on purpose
+by Tom to hold a licence seat). Automatic pool creation is off, so a
+`parfor` reached with no pool runs serially.
+
+- `pool_set(N)` records this session's allocation (in an environment
+  variable of the MATLAB process, so it survives `clear all` and
+  `clear classes`) and opens exactly N workers on the `Processes` profile;
+  `pool_set(0)` states that the session holds none. Options: `'label'`,
+  `'low_priority'`.
+- `pool_ensure()` is what library code calls: the pool that is up, else
+  the allocation opened now; empty at allocation 0; empty **with a loud
+  warning** when no allocation is set. `pool_restart()` replaces
+  `restart_parpool`. `pool_release()` closes the pool and sets the
+  allocation to 0. `pool_status()` lists every session on the machine with
+  its allocated and actually running workers.
+- **`run_all_paper_analyses` and `make_all_paper_figures` refuse to start
+  until the session has an allocation.** Run `pool_set(N)` first.
+- The budget is 12 workers summed over every MATLAB on the machine (the
+  lead's and each worker agent's). It is reported by `pool_status`, not
+  enforced. The profile name and the budget are each written once, in
+  `pool_config`.
+- A stage's own `n_workers` argument no longer opens anything.
+
 ## What this project is
 
 MATLAB research code for simulating and analyzing a Spiking Rate Neural Network (SRNN) reservoir with spike-frequency adaptation (SFA) and short-term synaptic depression (STD). The dynamics implemented are:
@@ -493,7 +533,7 @@ named arguments), return your output directory, and read nothing from the caller
   - `helpers/` — was `_common/`: `manuscript_style` (fonts, condition palette — returns values, never sets global state), `with_manuscript_defaults`, `build_from_preset`, `resolve_run_dir`, `resolve_data_file`, `write_manuscript_tables`, `fig_doc_tables`, `write_figure_manifest`, `figure_settings`, `default_out_dir`, `existing_outputs`, `panel_letters`, `sort_axes_left_to_right`. Joined by `save_figure_stable`, `apply_percent_axis`, `preset_default_values` and `mark_default_value`, which had been stranded in the replot folder — `save_figure_stable` alone is called by 18 figures, and its own header records that it ended up there only because that is where it was extracted.
   - `replot/` — the `replot_*` regenerators, `assemble_sensitivity_figure`, `combine_runs`, `combine_two_runs`.
 - `plotting/` — colormaps, line/scatter helpers, time-series panel plots, `param_space_plots/` for post-hoc visualization, `plot_saving/save_some_figs_to_folder_2.m` (used by everything that writes figures). **Kept separate from `figures/` deliberately**: these are primitives `SRNNModel2.plot()` itself calls, so they belong to the model's surface, whereas `figures/` is manuscript composition on top. Merging them would make the model depend on the manuscript.
-- `util/` — cross-cutting helpers with no layer of their own: `merge_struct`, `struct2namevalue`, `restart_parpool`, `capture_git_provenance`, `verify_shared_build`, `write_run_parameters_md`.
+- `util/` — cross-cutting helpers with no layer of their own: `merge_struct`, `struct2namevalue`, the pool module (`pool_set`, `pool_ensure`, `pool_restart`, `pool_release`, `pool_status`, with `pool_config` and `pool_registry` behind them, and `wait_for_parpool`), `capture_git_provenance`, `verify_shared_build`, `write_run_parameters_md`.
 
 ### `scripts/` — the three things a human invokes
 

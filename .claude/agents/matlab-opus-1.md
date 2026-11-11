@@ -51,34 +51,37 @@ is `Just1`, a one-worker profile Tom keeps on purpose. **Never open the
 default profile** (`parpool` with no profile, or `parallel.defaultProfile`).
 
 - Your brief states `pool: N`. If it says nothing, N is 0.
-- **Opening it**, straight after `setup_paths`:
-  - If the project's pool module is on the path (`exist('pool_set', 'file')`
-    is 2), run `pool_set(N)`. It records your allocation and opens exactly N
-    workers on the right profile; `pool_set(0)` records that you hold none.
-    From then on use only the module: `pool_ensure()` to get your pool,
-    `pool_restart()` to restart it at the same size, `pool_release()` to
-    close it, `pool_status()` to see who holds what.
-  - If it is not on the path yet (it is issue FD-017), and N >= 1, run
-    `delete(gcp('nocreate')); pool = parpool('Processes', N);`.
-  Then confirm the pool has N workers. If opening fails (no free licence
+- **All pool handling goes through the project's pool module**
+  (`src/util/pool_*.m`). Straight after `setup_paths`, run
+  `pool_set(N, 'label', '<your agent name>')`. It records your allocation
+  and opens exactly N workers on the right profile; `pool_set(0)` records
+  that you hold none. Confirm the pool has N workers. From then on use only
+  the module: `pool_ensure()` to get your pool, `pool_restart()` to restart
+  it at the same size, `pool_status()` to see who holds what across the
+  machine. Never call `parpool` yourself. If opening fails (no free licence
   seat, for example), report the error text to the lead; do not retry in a
   loop.
-- **`pool: 0`**: you hold no pool and do not open one. Code that reaches a
-  `parfor` runs serially, which is slow but harmless. If the job cannot be
-  done in reasonable time that way, stop and tell the lead instead of
-  opening a pool.
-- **Never resize, and beware code that opens a pool by itself.** Until the
-  pool module exists, `restart_parpool()` opens the one-worker default
-  profile (so `run_all_analyses` and `run_all_paper_analyses`, which call
-  it, end up on one worker), and `wait_for_parpool`, `run_lyapunov_spectrum`,
-  `run_transient_gain` and `run_numerics_verification` error when no pool is
-  up. Open your pool first, and run the two entry points only when the brief
-  says you have the whole machine.
-- **Before you finish**, whatever happened: `pool_release()` if the module
-  exists, otherwise `delete(gcp('nocreate'))`; then confirm
+- **`pool: 0`**: run `pool_set(0)`. You hold no pool, and code that reaches
+  a `parfor` runs serially in your client, which is slow but harmless. If
+  the job cannot be done in reasonable time that way, stop and tell the
+  lead instead of opening a pool.
+- **Serial is not byte-identical to a pool run.** The client is
+  multithreaded and a pool worker is not, so results differ at round-off
+  (1e-13 to 1e-15 relative). The stages and full regression tiers
+  therefore need a pool up, of any size; the ultrarapid tier does not.
+- **Never resize.** The stage functions and the two entry points use your
+  session's allocation; a stage's own `n_workers` argument opens nothing.
+  `run_all_paper_analyses` and `make_all_paper_figures` refuse to start in
+  a session with no allocation, and you run them only when the brief says
+  you have the whole machine.
+- **Before you finish**, whatever happened: `pool_release()`, then confirm
   `isempty(gcp('nocreate'))`.
 
 ## Scope and report
+
+**If you were started in a git worktree, it was created from `origin/main`,
+which can be behind the lead's local `main`.** When the brief names a
+commit, run `git merge --ff-only main` first and check you are at it.
 
 Touch only the files the brief names, do not commit unless the brief tells you
 to, and do not spawn agents. Report: what you ran, where the outputs are, what
