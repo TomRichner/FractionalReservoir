@@ -221,6 +221,24 @@ captured from the code as it stands.
 - **Depends on:** FD-004, FD-005.
 - **Result:** _(pending)_
 
+### FD-016 A seed for the joint parameter-space sample
+
+- **Status:** open (decided by Tom 2026-11-11)
+- **Serves:** blocks A to D (comparable reruns), and the regression
+- **What:** `ParamSpaceAnalysis2` draws the joint sample with
+  `rng('shuffle')` and `randperm`, so its 128 grid points differ on every
+  run. Add a seed for that draw as an option. **Unset, the behaviour is
+  today's**, so existing bundles and the regression references do not
+  move. `run_param_space_analysis` passes it from the config; new bundles
+  set it.
+- **Done when:** two runs with the same seed sample the same points and
+  give identical results for that stage; with the seed unset two runs
+  differ as now; the seed is recorded with the run; the ultrarapid, stages
+  and quick gates pass unchanged.
+- **Depends on:** nothing; must land before the four-condition `fast` run
+  of Plan A step 6.
+- **Result:** _(pending)_
+
 ## To be planned
 
 Named so they are not lost. Each needs a planning session with Tom before it

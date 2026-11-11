@@ -4,9 +4,11 @@
 by the lead agent at the end of the session that produced the decisions, the
 test audit and the regression references, so that the work can be picked up
 after the conversation is compacted. **Revised 2026-11-11 with Tom's answers
-to the questions in section 9.** Two points there are still under
-discussion (facilitation, the joint-sample seed) and one new one was found
-(the default pool profile); none blocks reading the plan.
+to the questions in section 9.** Still under discussion: facilitation (a
+note with the options is at
+`docs/notes/Depression_facilitation_model_options_2026-11-11.md`), and how a
+MATLAB session's parallel-pool size is set and honoured (item 9). Neither
+blocks reading the plan; the second must be settled before workers run.
 
 This is the implementation plan for **block A** of
 `../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`
@@ -666,6 +668,17 @@ Workers start with no memory of this conversation. Each brief gives:
    precedence is preset < condition < grid and the spread is a property of
    the network; the regression references use presets that never set it;
    and `same_config` refuses to pool runs whose `std_spread` differs.
+5. **A fixed seed for the joint parameter-space sample.** Yes, as an
+   option whose default is today's behaviour (FD-016). `ParamSpaceAnalysis2`
+   gains a seed for its shuffle; left unset it calls `rng('shuffle')` as
+   now, so existing bundles and the three regression references are
+   untouched. New bundles set it, so the chain bundle and any later rerun
+   sample the same 128 connectivity points and can be compared across
+   runs. It is a setting, so the sample can be changed to check that a
+   result does not depend on it. A small job for a Fable worker (it edits
+   a class), done before the four-condition `fast` run of step 6; it can
+   run beside step 3 because it touches only `ParamSpaceAnalysis2.m`,
+   `run_param_space_analysis.m` and the new bundle's config.
 6. **Reruns.** Agents never run `medium` or larger; only Tom starts them and
    says when they are done. The plan includes one `fast` run after block A is
    built. Analyses run on **four** conditions, and two figure sets are
@@ -689,18 +702,6 @@ Workers start with no memory of this conversation. Each brief gives:
    Today's model drives $g$ by the rate directly and does not let $g$ change
    how fast resources are used, so a facilitated synapse transmits more
    without depleting faster. Not built, not planned for the draft.
-5. **A fixed seed for the joint parameter-space sample.** Recommendation:
-   yes, as an option whose default is today's behaviour. For: the
-   manuscript's numbers would regenerate exactly; later runs (the chain
-   bundle, the reruns) would sample the **same** 128 connectivity points and
-   so be comparable across runs; and the regression could cover the stage.
-   Against: one fixed sample of 128 from 2,187 could be unrepresentative and
-   nobody would see it, so the seed should be a setting that can be changed
-   to check; and it is a change to shared code (`ParamSpaceAnalysis2`).
-   Within one run the conditions already share their sample, so this does
-   not affect the four-condition comparison itself. If the default stays as
-   it is and new bundles opt in, the existing references are untouched.
-
 **New, found 2026-11-11:**
 
 9. **The default pool profile is `Just1`.** It has one worker, so pool code
