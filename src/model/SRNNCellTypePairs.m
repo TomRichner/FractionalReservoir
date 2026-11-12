@@ -928,17 +928,25 @@ classdef SRNNCellTypePairs < handle
             % above already carry them. Empty in the homogeneous case.
             params.S_c_vec = obj.S_c_vec;
             params.x0_std = obj.x0_std;
-            params.N_sys_eqs = obj.N_sys_eqs;
-            params.state_layout = SRNNCellTypePairs.make_state_layout( ...
+            layout = SRNNCellTypePairs.make_state_layout( ...
                 obj.n, obj.n_per_type, obj.n_a, pair.n_b, pair.n_g);
+            % The layout's length IS the number of equations (the same sum
+            % get.N_sys_eqs forms); reading it here saves compiling the
+            % synapse configuration a second time in every get_params.
+            params.N_sys_eqs = layout.N;
+            params.state_layout = layout;
             % A route's state is its b-block followed by its g-block. The two
             % are not adjacent in the state vector (every route's b-block
             % comes before any g-block), so the route carries an index list.
+            % Both blocks are component-major (one run of npre per
+            % component), so reshape(S(idx), npre, ns) is the route's state.
+            % The table is A CELL, {pre, post}: taking one element out of a
+            % struct array costs five times what a cell lookup does, once
+            % per route in every right-hand-side evaluation.
             params.route = pair.route;
             for pre = 1:obj.n_cellTypes
                 for post = 1:obj.n_cellTypes
-                    params.route(pre, post).idx = [params.state_layout.b{pre, post}, ...
-                        params.state_layout.g{pre, post}];
+                    params.route{pre, post}.idx = [layout.b{pre, post}, layout.g{pre, post}];
                 end
             end
             params.rng_seeds = obj.rng_seeds;
@@ -1376,8 +1384,8 @@ classdef SRNNCellTypePairs < handle
             % the route's model (src/model/routes; see route_model), whose
             % compile validates it and returns the route's parameters P.
             %
-            % pair.route is the C x C (pre, post) struct array compile_route
-            % returns (model, P, cfg, opts). The other fields are the nominal
+            % pair.route is the C x C cell, {pre, post}, of the structs
+            % compile_route returns (model, P, cfg, opts). The other fields are the nominal
             % values that code outside the model reads, under the names they
             % have always had (n_b, n_g, tau_b_rec, ..., scale).
             C = obj.n_cellTypes;
@@ -1388,7 +1396,7 @@ classdef SRNNCellTypePairs < handle
                 'tau_b_rec', {cell(C, C)}, 'tau_b_rel', {cell(C, C)}, ...
                 'tau_g_dec', {cell(C, C)}, 'tau_g_fac', {cell(C, C)}, ...
                 'G', {cell(C, C)}, 'scale', ones(C, C), ...
-                'std_geomean', false(C, C), 'route', []);
+                'std_geomean', false(C, C), 'route', {cell(C, C)});
 
             config = obj.synapse_config;
             if ~isempty(config)
@@ -1459,10 +1467,7 @@ classdef SRNNCellTypePairs < handle
                         'npre', counts(pre), 'zero_floor', obj.std_zero_floor, ...
                         'label', [pre_name '->' post_name], ...
                         'err_id_prefix', 'SRNNCellTypePairs'));
-                    if isempty(pair.route)
-                        pair.route = repmat(compiled, C, C);
-                    end
-                    pair.route(pre, post) = compiled;
+                    pair.route{pre, post} = compiled;
 
                     nominal = compiled.P.nominal;
                     pair.n_b(pre, post) = compiled.P.n_b;
@@ -2136,9 +2141,8 @@ classdef SRNNCellTypePairs < handle
             S0 = zeros(layout.N, 1);
             for pre = 1:params.n_cellTypes
                 for post = 1:params.n_cellTypes
-                    route = params.route(pre, post);
-                    start = repmat(route.model.initial(route.P), params.n_per_type(pre), 1);
-                    S0(route.idx) = start(:);
+                    route = params.route{pre, post};
+                    S0(route.idx) = repmat(route.model.initial(route.P), params.n_per_type(pre), 1);   % numel matches; column-major is component-major
                 end
             end
             S0(layout.x) = params.x0_std .* randn(params.n, 1);
@@ -2157,7 +2161,8 @@ classdef SRNNCellTypePairs < handle
             %   cfg, opts   as given, so the route can be compiled again
             %   idx    the route's rows of the state vector, filled in by
             %          get_params: [layout.b{pre, post}, layout.g{pre, post}],
-            %          so that reshape(S(idx), npre, P.ns) is the route's state
+            %          so that reshape(S(idx), npre, P.ns) is the route's
+            %          state and dS(idx) = ds puts its derivative back
             %
             % THE MODEL'S NAME IS RESOLVED HERE AND NOWHERE ELSE in the class.
             % Every route is 'product' today: the configuration has no field
@@ -2182,15 +2187,15 @@ classdef SRNNCellTypePairs < handle
             % compile per route per call and is meant for such checks; a
             % model that wants the floor sets the property before build().
             route = params.route;
-            if params.std_zero_floor == route(1).opts.zero_floor
+            if params.std_zero_floor == route{1}.opts.zero_floor
                 return;
             end
             for k = 1:numel(route)
-                opts = route(k).opts;
+                opts = route{k}.opts;
                 opts.zero_floor = params.std_zero_floor;
-                again = SRNNCellTypePairs.compile_route(route(k).cfg, opts);
-                again.idx = route(k).idx;
-                route(k) = again;
+                again = SRNNCellTypePairs.compile_route(route{k}.cfg, opts);
+                again.idx = route{k}.idx;
+                route{k} = again;
             end
         end
 
@@ -2239,86 +2244,48 @@ classdef SRNNCellTypePairs < handle
             u = params.u_interpolant(t)';
             C = params.n_cellTypes;
             layout = params.state_layout;
-            a = cell(1, C);
-            b_state = cell(C, C);
-            g_state = cell(C, C);
+            route = SRNNCellTypePairs.active_routes(params);
             x = S(layout.x);
             x_eff = x;
-
+            a = cell(1, C);
             for q = 1:C
-                idx = params.type_indices{q};
-                nq = params.n_per_type(q);
                 if params.n_a(q) > 0
-                    a{q} = reshape(S(layout.a{q}), nq, params.n_a(q));
+                    idx = params.type_indices{q};
+                    a{q} = reshape(S(layout.a{q}), params.n_per_type(q), params.n_a(q));
                     x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
-                else
-                    a{q} = zeros(nq, 0);
                 end
             end
-
             rate = params.activation_function(x_eff);
-            a_derivatives = cell(1, C);
+
+            dS = zeros(layout.N, 1);
             for q = 1:C
-                idx = params.type_indices{q};
                 if params.n_a(q) > 0
-                    a_derivatives{q} = ((rate(idx) - a{q}) ./ params.tau_a_matrix{q});
-                else
-                    a_derivatives{q} = [];
+                    dS(layout.a{q}) = (rate(params.type_indices{q}) - a{q}) ./ params.tau_a_matrix{q};
                 end
             end
 
-            b_derivatives = cell(C, C);
-            g_derivatives = cell(C, C);
+            % The routes. Each route's model advances the route's state (one
+            % row per presynaptic neuron), driven by the presynaptic rate,
+            % and returns the output factor F; the route's synaptic output
+            % is theta = F .* rate. What a route's state is and how it moves
+            % is the model's business (src/model/routes; route_model).
             recurrent = zeros(params.n, 1);
             for pre = 1:C
                 pre_idx = params.type_indices{pre};
                 npre = params.n_per_type(pre);
                 pre_rate = rate(pre_idx);
                 for post = 1:C
-                    nb = params.n_b_pairs(pre, post);
-                    ng = params.n_g_pairs(pre, post);
-                    depression = ones(npre, 1);
-                    facilitation = ones(npre, 1);
-                    if nb > 0
-                        b_state{pre, post} = reshape( ...
-                            S(layout.b{pre, post}), npre, nb);
-                        depression = SRNNCellTypePairs.combine_std_pair( ...
-                            prod(b_state{pre, post}, 2), params, pre, post);
-                        b_derivatives{pre, post} = ...
-                            (1 - b_state{pre, post}) ./ params.tau_b_rec{pre, post} ...
-                            - (b_state{pre, post} .* pre_rate) ...
-                            ./ params.tau_b_rel{pre, post};
-                    else
-                        b_state{pre, post} = ones(npre, 0);
-                        b_derivatives{pre, post} = [];
-                    end
-                    if ng > 0
-                        g_state{pre, post} = reshape( ...
-                            S(layout.g{pre, post}), npre, ng);
-                        facilitation = prod(g_state{pre, post}, 2);
-                        g_derivatives{pre, post} = ...
-                            (1 - g_state{pre, post}) ./ params.tau_g_dec{pre, post} ...
-                            + ((params.G{pre, post} - g_state{pre, post}) .* pre_rate) ...
-                            ./ params.tau_g_fac{pre, post};
-                    else
-                        g_state{pre, post} = ones(npre, 0);
-                        g_derivatives{pre, post} = [];
-                    end
-                    depression = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
-                        depression, params, pre, post);
+                    R = route{pre, post};
+                    model = R.model;
+                    P = R.P;
+                    [ds, F] = model.rhs(reshape(S(R.idx), npre, P.ns), pre_rate, P);
+                    dS(R.idx) = ds;
                     post_idx = params.type_indices{post};
                     recurrent(post_idx) = recurrent(post_idx) + ...
-                        params.W(post_idx, pre_idx) * ...
-                        (facilitation .* depression .* pre_rate);
+                        params.W(post_idx, pre_idx) * (F .* pre_rate);
                 end
             end
-
-            derivatives = [a_derivatives, reshape(b_derivatives', 1, []), ...
-                reshape(g_derivatives', 1, []), {(-x + recurrent + u) ./ params.tau_d}];
-            for k = 1:numel(derivatives) - 1
-                derivatives{k} = derivatives{k}(:);
-            end
-            dS = vertcat(derivatives{:});
+            dS(layout.x) = (-x + recurrent + u) ./ params.tau_d;
         end
 
         function b_used = apply_std_zero_floor_pair(b, params, pre, post)

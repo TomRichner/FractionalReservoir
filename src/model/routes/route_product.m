@@ -110,15 +110,14 @@ P.n_g = numel(nominal.tau_dec);
 P.ns = P.n_b + P.n_g;
 P.npre = opts.npre;
 P.nominal = nominal;
-P.signature = rmfield(nominal, 'zero_floor');
+P.signature = nominal;
 P.signature.model = P.model;
-P.signature.zero_floor = nominal.zero_floor && P.n_b > 0;
+P.signature.zero_floor = nominal.zero_floor && P.n_b > 0;    % in force, not merely asked for
 
 % Per neuron, the nominal row replicated.
-rows = @(v) repmat(reshape(v, 1, []), opts.npre, 1);
-P.tau_rest  = rows([nominal.tau_rec, nominal.tau_dec]);
-P.tau_drive = rows([nominal.tau_rel, nominal.tau_fac]);
-P.target    = rows([zeros(1, P.n_b), nominal.G]);
+P.tau_rest  = per_neuron([nominal.tau_rec, nominal.tau_dec], opts.npre);
+P.tau_drive = per_neuron([nominal.tau_rel, nominal.tau_fac], opts.npre);
+P.target    = per_neuron([zeros(1, P.n_b), nominal.G], opts.npre);
 P.geomean = strcmp(nominal.combine, 'geomean') && P.n_b > 1;
 
 % The floor's p_min: the depression factor, before the floor, at the
@@ -143,8 +142,10 @@ F = output(s, P);
 end
 
 function F = output(s, P)
-D = zero_floor(combine(prod(s(:, 1:P.n_b, :), 2), P), P);
-F = D .* prod(s(:, P.n_b + 1:end, :), 2);
+F = depression(prod(s(:, 1:P.n_b, :), 2), P);
+if P.n_g > 0
+    F = F .* prod(s(:, P.n_b + 1:end, :), 2);
+end
 end
 
 function L = linearize(s, r, P)
@@ -155,16 +156,15 @@ A(:, 1:ns + 1:end) = -1 ./ P.tau_rest - r ./ P.tau_drive;    % the diagonal (m, 
 L.A = reshape(A, npre, ns, ns);
 L.B = (P.target - s) ./ P.tau_drive;
 
+% F = D(P_b) prod(g), so
+%   dF/db_m = (dD/dP_b) (the product of the other b) prod(g)
+%   dF/dg_l = D (the product of the other g)
 b = s(:, 1:P.n_b);
 g = s(:, P.n_b + 1:end);
-[D, dD_dP] = combine(prod(b, 2), P);
-[D, floor_gain] = zero_floor(D, P);
+[D, dD_dP] = depression(prod(b, 2), P);
 facilitation = prod(g, 2);
 L.F = D .* facilitation;
-% dF/db_m = (dD/dP_b) (product of the other b) prod(g);
-% dF/dg_l = D (product of the other g).
-L.Fs = [(floor_gain .* dD_dP .* facilitation) .* product_of_others(b), ...
-        D .* product_of_others(g)];
+L.Fs = [(dD_dP .* facilitation) .* product_of_others(b), D .* product_of_others(g)];
 end
 
 function ss = steady_state(r, P)
@@ -176,7 +176,20 @@ ss.s = (1 + P.target .* k .* r) ./ (1 + k .* r);
 ss.F = output(ss.s, P);
 end
 
-%% The two steps of the depression factor
+%% The depression factor, and its two steps
+
+function [D, dD_dP] = depression(P_b, P)
+% D from P_b = prod_m b_m (the combine, then the floor), and dD/dP_b.
+D = P_b;
+dD_dP = 1;
+if P.geomean
+    [D, dD_dP] = combine(P_b, P);
+end
+if P.zero_floor
+    [D, floor_gain] = zero_floor(D, P);
+    dD_dP = floor_gain .* dD_dP;
+end
+end
 
 function [D, dD_dP] = combine(P_b, P)
 %COMBINE The depression factor D from P_b = prod_m b_m, and dD/dP_b.
@@ -229,15 +242,27 @@ function check_fields(cfg, required, optional, mechanism, label, err_id)
 if ~isstruct(cfg) || ~isscalar(cfg)
     error(err_id, '%s configuration on route %s must be a scalar struct.', mechanism, label);
 end
+% (Plain loops: this runs for every route on every get_params, and setdiff
+% on two short cell arrays costs more than the rest of compile.)
 fields = fieldnames(cfg);
-missing = setdiff(required, fields);
-unknown = setdiff(fields, [required, optional]);
-if ~isempty(missing)
-    error(err_id, 'Missing %s field on route %s: %s.', mechanism, label, missing{1});
+known = [required, optional];
+for k = 1:numel(required)
+    if ~any(strcmp(required{k}, fields))
+        missing = setdiff(required, fields);
+        error(err_id, 'Missing %s field on route %s: %s.', mechanism, label, missing{1});
+    end
 end
-if ~isempty(unknown)
-    error(err_id, 'Unknown %s field on route %s: %s.', mechanism, label, unknown{1});
+for k = 1:numel(fields)
+    if ~any(strcmp(fields{k}, known))
+        unknown = setdiff(fields, known);
+        error(err_id, 'Unknown %s field on route %s: %s.', mechanism, label, unknown{1});
+    end
 end
+end
+
+function M = per_neuron(row, npre)
+% The nominal row, one copy per presynaptic neuron (npre x 0 when empty).
+M = repmat(reshape(row, 1, []), npre, 1);
 end
 
 function value = positive_row(value, count, field_name, mechanism, label, err_id)
