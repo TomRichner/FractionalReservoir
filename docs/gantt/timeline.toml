@@ -678,7 +678,7 @@ commits = "41ac6b1, 0c706f5"
 # ---------------------------------------------------------------- block A, remaining
 
 [[task]]
-id = "A_10_B"
+id = "A_10_B1"
 block = "A"
 group = "Plan A: finishing (steps 10 to 12)"
 name = "Spread into the mu7chain preset"
@@ -702,18 +702,120 @@ block = "A"
 group = "Plan A: finishing (steps 10 to 12)"
 name = "Hold point: Tom looks at example traces"
 who = "tom"
-status = "tom"
-what = "Before any long run, the lead runs the example time series for a few seeds interactively and Tom may hand-tune the connectivity. The long runs wait for Tom's word."
-gate = "Tom says go."
-depends = ["A_10_B", "A_9_T"]
-estimate = 45
+status = "done"
+what = "Before any long run, the lead ran the example time series for a few seeds interactively so Tom could look and hand-tune the connectivity. Tom looked at four seeds, asked for a stimulated example and two extra plots (A_10_B2, A_10_B3), and then decided the next run himself: an 'essential' run in place of the fast run (FD-023)."
+gate = "Tom's decision on the next run."
+depends = ["A_10_B1", "A_9_T"]
 start = 2026-11-12T10:39:00-06:00
+end = 2026-11-12T12:51:23-06:00
+took_min = 132
 approx_start = true
-source = "start: the lead's statement (about 10:39): example time series for three seeds run and shown in Tom's MATLAB"
+rule = "commits on main; start: the lead's statement (about 10:39), example time series shown in Tom's MATLAB; end: ddb4da4 (FD-023 opened, recording Tom's decision)"
 estimate_of_record = 45
 estimate_of_record_text = "30 to 60 min (drawn as 45 min)"
 estimate_of_record_source = "the lead's list of remaining steps in its brief for this timeline, frozen when the hold point began"
-note = "Under way: the lead has shown the example traces for three seeds; Tom is looking and may tune the connectivity. It is Tom's time and uncertain; the projection does not include waiting for Tom to be available."
+note = "Tom's time, including about an hour with no activity in the session. The end is the commit that records his decision (12:51); the build it asked for was started a minute earlier, at 12:50."
+
+[[task]]
+id = "A_10_B2"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12)"
+name = "Example figure: overrides of the preset"
+who = "lead"
+issue = "FD-007"
+status = "done"
+what = "For Tom's look at the example network: the example time-series figure takes name-value overrides of the preset, so a stimulus or another connectivity can be tried at once without writing a new preset. It is how Tom may hand-tune the connectivity from what he sees."
+gate = "The lead's interactive runs of the figure with overrides (commit message)."
+depends = ["A_10_B1"]
+start = 2026-11-12T10:54:52-06:00
+end = 2026-11-12T11:37:12-06:00
+took_min = 42
+approx_start = true
+rule = "commits on main; start: 889e25a (the lead's previous commit); end: 0bc35ca"
+merge = "0bc35ca (committed on main)"
+note = "Served the hold point A_10_U; no estimate was recorded before it ran."
+
+[[task]]
+id = "A_10_B3"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12)"
+name = "Example figure: stimulus and W eigenvalues"
+who = "opus"
+worker = "matlab-opus-1"
+issue = "FD-007"
+status = "done"
+what = "Two figures Tom asked for while looking at the example network, as options of the example time-series figure: the stimulus on its own, and the eigenvalues of the connectivity matrix W. They show what the stimulus does and where the network's connectivity sits, so Tom may hand-tune the connectivity from them."
+gate = "The lead's review of the diff and of the figures before the merge."
+depends = ["A_10_B1"]
+start = 2026-11-12T12:38:34-06:00
+end = 2026-11-12T12:51:54-06:00
+took_min = 13
+approx_start = false
+rule = "brief to merge; start: 12:38:34, when the lead started the worker (the session's task record; no commit marks the brief); end: merge"
+merge = "9c9c1f1"
+commits = "21198b2"
+note = "Served the hold point A_10_U; no estimate was recorded before it ran. Built beside A_10_B2."
+
+[[task]]
+id = "A_11_B"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12)"
+name = "Build the 'essential' run speed"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-023"
+status = "running"
+what = "A run size below 'fast' (1-D sweeps at 4 levels and 2 reps, a 32-point joint sample) plus a way for a bundle to run only the stages it needs, so that figures 2 to 4 can be had in about 35 minutes. Tom asked for it in place of the fast run that was to end Plan A."
+gate = "Unit tests and the two ultrarapid regression tiers only, by Tom's instruction; no end-to-end run before the merge (the essential run is the first)."
+depends = ["A_10_U"]
+estimate = 90
+start = 2026-11-12T12:50:31-06:00
+approx_start = false
+source = "start: 12:50:31, when the lead started the worker (the session's task record); recorded by the lead's status commit ddb4da4 (FD-023 opened, 12:51)"
+estimate_of_record = 90
+estimate_of_record_text = "1 h 30 min"
+estimate_of_record_source = "the lead's estimate, given three minutes after it started the worker (so not strictly before the task began), in its brief for this timeline update"
+
+[[task]]
+id = "A_11_T1"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12)"
+name = "Lead's gates on the essential merge"
+who = "lead"
+issue = "FD-023"
+status = "planned"
+what = "The new unit tests and the ultrarapid regression tiers on merged main."
+gate = "All pass."
+depends = ["A_11_B"]
+estimate = 15
+
+[[task]]
+id = "A_11_T2"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12)"
+name = "Essential run, four conditions (12 workers)"
+who = "opus"
+issue = "FD-023, FD-007"
+status = "planned"
+what = "The mu7chain bundle at the new 'essential' size, only the stages figures 2 to 4 need, with the four-condition figures, on all 12 pool workers. It replaces the fast run that was to end Plan A and is the first end-to-end run of the finished model and of the essential mode. If it takes longer than 35 minutes it is not corrected and not run a second time; the time it took is reported (Tom, 2026-11-12)."
+gate = "Every selected stage finishes with all four conditions and the four-condition figures are written; the time it took is reported."
+depends = ["A_11_T1"]
+estimate = 45
+note = "35 min including the figures is Tom's budget; the lead's own scaled estimate was 28 to 33 min, not measured. Drawn as 45 min because bars are whole quarter hours."
+
+[[task]]
+id = "A_11_U"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12)"
+name = "Tom and the lead look at the figures"
+who = "lead+tom"
+issue = "FD-023"
+status = "tom"
+what = "Tom and the lead look at the essential run's figures together. Block B is planned after this (Tom: 'After we look at the figures from the essential run together, we will then plan B')."
+gate = "Tom has looked and spoken."
+depends = ["A_11_T2"]
+estimate = 30
+guess = true
 
 [[task]]
 id = "A_10_T1"
@@ -722,11 +824,11 @@ group = "Plan A: finishing (steps 10 to 12)"
 name = "Quick suite, then full regression tier"
 who = "lead"
 status = "planned"
-what = "First the quick test suite (about 10 min) on the preset commit fd1fb99, which so far was checked by six targeted tests only. Then the full tier: reruns every stage and all 36 figures of the small copy of the manuscript bundle and compares with the stored references, about 50 min. The milestone check that the finished model still reproduces the paper's pipeline."
+what = "First the quick test suite (about 10 min) on main. Then the full tier: reruns every stage and all 36 figures of the small copy of the manuscript bundle and compares with the stored references, about 50 min. The milestone check that the finished model still reproduces the paper's pipeline. It no longer comes before a long run: it runs after the essential run, when the desktop MATLAB and the pool are free, and before block B's building, which is built on its reference."
 gate = "Quick suite passes; full tier: no difference beyond the recorded ignore patterns."
-depends = ["A_10_U"]
+depends = ["A_11_T2"]
 estimate = 60
-note = "About 10 + 50 min. The full tier needs the desktop MATLAB."
+note = "About 10 + 50 min. The full tier needs the desktop MATLAB and the pool, which the essential run holds (all 12 workers). Placed after it by the lead's decision."
 
 [[task]]
 id = "A_10_T2"
@@ -735,63 +837,9 @@ group = "Plan A: finishing (steps 10 to 12)"
 name = "Full reference re-captured"
 who = "lead"
 status = "planned"
-what = "The full tier's reference is saved again, deliberately, because the condition titles changed; the commit says why the expected values moved."
+what = "The full tier's reference is saved again, deliberately, because the condition titles changed; the commit says why the expected values moved. Block B is built on this reference."
 gate = "Second run of the full tier on the new code reproduces it."
 depends = ["A_10_T1"]
-estimate = 15
-
-[[task]]
-id = "A_11_T1"
-block = "A"
-group = "Plan A: finishing (steps 10 to 12)"
-name = "Fast run, four conditions (12 workers)"
-who = "lead"
-issue = "FD-007"
-status = "planned"
-what = "The whole analysis pipeline of the mu7chain bundle at 'fast' size on all four conditions. Tests that every stage runs end to end on the finished model; it is the last run agents make (medium and larger are Tom's)."
-gate = "Every stage finishes with all four conditions."
-depends = ["A_10_T2"]
-estimate = 180
-note = "Lead's estimate; the preliminary run took 4.06 h on 6 workers. Does not start until Tom says so."
-
-[[task]]
-id = "A_11_T2"
-block = "A"
-group = "Plan A: finishing (steps 10 to 12)"
-name = "Three-condition figure set (paper)"
-who = "lead"
-issue = "FD-006"
-status = "planned"
-what = "Builds every figure with the paper's three conditions from the fast run. Tests the figure half of the pipeline."
-gate = "Every entry written to disk."
-depends = ["A_11_T1"]
-estimate = 15
-note = "About 10 min, drawn as 15."
-
-[[task]]
-id = "A_11_T3"
-block = "A"
-group = "Plan A: finishing (steps 10 to 12)"
-name = "Four-condition figure set (review)"
-who = "lead"
-issue = "FD-006"
-status = "planned"
-what = "The same figures with product MTS added as a fourth column in green, for Tom to compare chain and product."
-gate = "Every entry written to disk."
-depends = ["A_11_T2"]
-estimate = 15
-note = "About 10 min, drawn as 15."
-
-[[task]]
-id = "A_11_T4"
-block = "A"
-group = "Plan A: finishing (steps 10 to 12)"
-name = "Check every stage and figure; report"
-who = "lead"
-status = "planned"
-what = "The lead opens every stage's output and every figure of both sets, and reports to Tom."
-gate = "The report to Tom."
-depends = ["A_11_T3"]
 estimate = 15
 
 [[task]]
@@ -803,7 +851,7 @@ who = "lead"
 status = "planned"
 what = "Goes through the checklist of Plan A section 10, brings ISSUES and WORKLOG up to date and ticks block A's boxes in the to-do list."
 gate = "Every item of Plan A section 10 ticked or explained."
-depends = ["A_11_T4"]
+depends = ["A_11_U", "A_10_T2"]
 estimate = 30
 
 # ---------------------------------------------------------------- block B (rough)
@@ -818,10 +866,10 @@ issue = "FD-011, FD-012"
 status = "tom"
 what = "Decide which network carries the stimulation result, the measure of aberrant activity, what 'hyperexcitable at baseline' means and which form of tonic input to show; turn FD-011 and FD-012 into issues."
 gate = "Issues written with acceptance tests."
-depends = ["A_12_T"]
+depends = ["A_11_U"]
 estimate = 120
 guess = true
-note = "Placed after block A closes because the lead's scope is Plan A until then."
+note = "Follows the look at the essential run's figures (A_11_U), as Tom has it; block B's building also waits for the full regression reference (A_10_T2)."
 
 [[task]]
 id = "B_1_B"
@@ -833,7 +881,7 @@ issue = "FD-011"
 status = "planned"
 what = "Stimulation off / on crossed with adaptation intact / removed, plus stimulation with the adaptation variables held at their pre-stimulation values. Shows whether suppression needs adaptation to be recruited."
 gate = "To be set when planned."
-depends = ["B_0_P"]
+depends = ["B_0_P", "A_10_T2"]
 estimate = 480
 guess = true
 
@@ -847,7 +895,7 @@ issue = "FD-011"
 status = "planned"
 what = "Across connectivity, the fraction of hyperexcitable networks in which stimulation suppresses aberrant activity, with and without adaptation; memory capacity and sensitivity recorded with stimulation on."
 gate = "To be set when planned."
-depends = ["B_0_P"]
+depends = ["B_0_P", "A_10_T2"]
 estimate = 480
 guess = true
 
