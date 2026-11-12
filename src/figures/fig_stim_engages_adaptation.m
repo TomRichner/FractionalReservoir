@@ -91,6 +91,13 @@ model.run();
 
 [fig1, ~] = model.plot();
 set(fig1, 'Name', 'bursting time series');
+% model.plot() opens its figure at the session's DefaultFigurePosition, which
+% is 1067 x 643 px in the lead's desktop MATLAB (where every reference was
+% drawn) but 560 x 337 in a worker MATLAB with no desktop: there the seven
+% stacked panels collapsed to slivers under their labels (2026-11-12). The size
+% is stated here so the sheet no longer depends on which MATLAB draws it; it is
+% the size the reference sheets have.
+set(fig1, 'Units', 'pixels', 'Position', [321 227 1067 643]);
 
 p = model.plot_data;
 t_full = p.t(:);

@@ -79,7 +79,8 @@ for i=fig_vec
             saveas(fh, fullfile(save_folder, [save_name '_f_' num2str(i)]), 'fig');
         end
         if any(strcmpi(fig_type,'png'))
-            exportgraphics(fh, fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']), 'Resolution', 600)
+            exportgraphics(fh, fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']), ...
+                'Resolution', png_resolution(fh))
         end
         if any(strcmpi(fig_type,'svg'))
             % Was set(gcf, ...), which targeted whatever figure happened to be
@@ -104,4 +105,31 @@ if ~isempty(failed)
     warning('save_some_figs_to_folder_2:SomeFiguresNotSaved', ...
         '%d of %d figures did not save for ''%s'': %s', ...
         numel(failed), numel(fig_vec), save_name, strjoin(failed, ', '));
+end
+end
+
+function res = png_resolution(fh)
+% PNG resolution for fh: 600 dpi, lowered so the rendered canvas stays within
+% MAX_CANVAS pixels on its longer side.
+%
+% WHY (2026-11-12, FD-006). Above 4096 pixels the raster export draws the
+% canvas in tiles that do not line up: text is cut along the seam (a tick
+% label '30' came out as '3', '0' as an arch, '0.2' with its top half missing)
+% and lines on the far side of the seam are shifted against their axes (a step
+% at t = 10 s drawn at 10.3 s). Measured on the single-neuron figure, 1000 x 850
+% px: clean at 200 dpi, the seam at 4096 px of the uncropped canvas at 430 and
+% 600 dpi, and the same exported from the reopened .fig, so it is the export,
+% not the figure. rendererinfo reports a 16384 texture limit, so the limit
+% cannot be read from it. The .svg and .fig are unaffected. A figure up to
+% 6.67 in (640 px at 96 ppi) still gets 600 dpi; a larger one gets
+% proportionally fewer dpi and so about 4000 px, still ample for print.
+MAX_CANVAS = 4000;
+res = 600;
+try
+    px  = getpixelposition(fh);
+    ppi = get(groot, 'ScreenPixelsPerInch');
+    res = min(600, floor(MAX_CANVAS * ppi / max(px(3:4))));
+catch
+    % no pixel size to be had: keep 600
+end
 end

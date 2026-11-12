@@ -108,8 +108,11 @@ hold(ax, 'off');
 legend(ax, h, labels, 'Location', 'best', 'Box', 'off');
 xlabel(ax, 'DC level (input units)');
 ylabel(ax, 'mean local \lambda_1   (\pm 1 std across seeds)');
-title(ax, sprintf('Local Lyapunov exponent vs tonic DC drive  (%d seeds, %s)', ...
-    r.n_seeds, strrep(r.config.preset_name, '_', '\_')));
+% The preset in a smaller subtitle (2026-11-12): the preset names grew past
+% the figure width, and inline the title ran off both edges and could not be
+% read; as a bold second line it still ran off the right.
+title(ax, sprintf('Local Lyapunov exponent vs tonic DC drive  (%d seeds)', r.n_seeds));
+subtitle(ax, r.config.preset_name, 'Interpreter', 'none', 'FontSize', 8);
 grid(ax, 'off');
 box(ax, 'off');
 
