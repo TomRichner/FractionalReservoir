@@ -2292,49 +2292,39 @@ classdef SRNNCellTypePairs < handle
             dS(layout.x) = (-x + recurrent + u) ./ params.tau_d;
         end
 
-        function b_used = apply_std_zero_floor_pair(b, params, pre, post)
-            b_used = b;
-            if ~params.std_zero_floor || params.n_b_pairs(pre, post) == 0
-                return;
-            end
-            p_min = SRNNCellTypePairs.std_zero_floor_pmin(params, pre, post);
-            b_used = (b - p_min) ./ (1 - p_min);
+        % The next three predate the route models and are kept for callers
+        % that name them. Each is a delegation to the route's model: the
+        % arithmetic is in route_product, and they apply to its routes only
+        % (every route today). dynamics_fast, compute_Jacobian_fast,
+        % jacobian_times and unpack_and_compute_states do not call them.
+
+        function D_used = apply_std_zero_floor_pair(D, params, pre, post)
+            % The zero floor's map of a depression factor D on route
+            % (pre, post); D unchanged when the floor is off or the route
+            % has no depression.
+            route = SRNNCellTypePairs.active_routes(params);
+            R = route{pre, post};
+            D_used = R.model.zero_floor(D, R.P);
         end
 
         function p_min = std_zero_floor_pmin(params, pre, post)
-            % The combined depression factor at r = 1 (the ceiling of the
-            % logistic), which the zero floor maps to 0. Under 'geomean' the
-            % floor applies to the combined factor, so p_min is combined the
-            % same way; under 'product' this is the historical expression.
-            p_min = prod(params.tau_b_rel{pre, post} ./ ...
-                (params.tau_b_rec{pre, post} + params.tau_b_rel{pre, post}));
-            p_min = SRNNCellTypePairs.combine_std_pair(p_min, params, pre, post);
+            % The depression factor of route (pre, post) at the steady state
+            % of r = 1, which the zero floor maps to 0: npre x 1, one value
+            % per presynaptic neuron; [] on a route without depression.
+            p_min = params.route{pre, post}.P.p_min;
         end
 
-        function [D, dD_dP] = combine_std_pair(P, params, pre, post)
-            %COMBINE_STD_PAIR The depression factor a route's theta uses.
+        function [D, dD_dP] = combine_std_pair(P_b, params, pre, post)
+            %COMBINE_STD_PAIR The depression factor of route (pre, post), before the floor.
             %
-            %   [D, dD_dP] = SRNNCellTypePairs.combine_std_pair(P, params, pre, post)
+            %   [D, dD_dP] = SRNNCellTypePairs.combine_std_pair(P_b, params, pre, post)
             %
-            % P is prod_m b_m over the route's M timescales (any shape). Under
-            % the default 'product' combine D = P and dD_dP = 1 (a scalar, so
-            % the Jacobian products stay bit-identical). Under 'geomean'
-            % (synapse_config.<pre>.<post>.std.combine) D = P^(1/M) and
-            % dD_dP = D / (M P); b_m > 0 always (db/dt = 1/tau_rec at b = 0),
-            % so P > 0. Every site that forms theta -- dynamics_fast,
-            % compute_Jacobian_fast, jacobian_times, unpack_and_compute_states
-            % -- goes through here, then through the zero floor.
-            D = P;
-            dD_dP = 1;
-            if ~isfield(params, 'std_geomean') || ~params.std_geomean(pre, post)
-                return;
-            end
-            M = params.n_b_pairs(pre, post);
-            if M <= 1
-                return;
-            end
-            D = P .^ (1 / M);
-            dD_dP = D ./ (M .* P);
+            % P_b is prod_m b_m over the route's M components (any shape).
+            % 'product' combine: D = P_b, dD_dP = 1. 'geomean'
+            % (synapse_config.<pre>.<post>.std.combine): D = P_b^(1/M),
+            % dD_dP = D / (M P_b).
+            R = params.route{pre, post};
+            [D, dD_dP] = R.model.combine(P_b, R.P);
         end
 
         function J = compute_Jacobian_fast(S, params)
@@ -2956,6 +2946,7 @@ classdef SRNNCellTypePairs < handle
                 unpack_and_compute_states(S_out, params)
             nt = size(S_out, 1);
             layout = params.state_layout;
+            route = SRNNCellTypePairs.active_routes(params);
             x_all = S_out(:, layout.x)';
             x_eff = x_all;
             a_named = struct(); b_named = struct(); g_named = struct();
@@ -2984,31 +2975,23 @@ classdef SRNNCellTypePairs < handle
                 synaptic_output_named.(pre_name) = struct();
                 for post = 1:params.n_cellTypes
                     post_name = params.cell_type_names{post};
-                    nb = params.n_b_pairs(pre, post);
-                    ng = params.n_g_pairs(pre, post);
-                    depression = ones(npre, nt);
-                    facilitation = ones(npre, nt);
-                    if nb > 0
-                        bq = reshape(S_out(:, layout.b{pre, post})', ...
-                            npre, nb, nt);
-                        depression = SRNNCellTypePairs.combine_std_pair( ...
-                            reshape(prod(bq, 2), npre, nt), params, pre, post);
-                        b_named.(pre_name).(post_name) = bq;
-                    else
-                        b_named.(pre_name).(post_name) = [];
+                    R = route{pre, post};
+                    P = R.P;
+                    % The route's state at every time, npre x ns x nt. Its
+                    % first P.n_b columns are the route's b-block and the
+                    % rest its g-block; either is [] when the route has none.
+                    s = reshape(S_out(:, R.idx)', npre, P.ns, nt);
+                    b_named.(pre_name).(post_name) = [];
+                    g_named.(pre_name).(post_name) = [];
+                    if P.n_b > 0
+                        b_named.(pre_name).(post_name) = s(:, 1:P.n_b, :);
                     end
-                    if ng > 0
-                        gq = reshape(S_out(:, layout.g{pre, post})', ...
-                            npre, ng, nt);
-                        facilitation = reshape(prod(gq, 2), npre, nt);
-                        g_named.(pre_name).(post_name) = gq;
-                    else
-                        g_named.(pre_name).(post_name) = [];
+                    if P.n_g > 0
+                        g_named.(pre_name).(post_name) = s(:, P.n_b + 1:end, :);
                     end
-                    depression = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
-                        depression, params, pre, post);
+                    % Synaptic output = the model's output factor times the rate.
                     synaptic_output_named.(pre_name).(post_name) = ...
-                        facilitation .* depression .* rate(pre_idx, :);
+                        reshape(R.model.output(s, P), npre, nt) .* rate(pre_idx, :);
                 end
             end
             x_named = SRNNCellTypePairs.split_by_type(x_all, params, 1);
