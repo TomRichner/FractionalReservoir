@@ -5,6 +5,37 @@ function cfg = mu7chain_config(run_mode, figure_set)
 %   cfg = mu7chain_config('medium')           % Tom starts medium and larger himself
 %   cfg = mu7chain_config('fast', '3cond')    % the paper's figure pass
 %   cfg = mu7chain_config('fast', '4cond')    % the review pass, product MTS added
+%   cfg = mu7chain_config('essential')        % a first look: figures 2-4 and brief sweeps
+%
+% 'essential' (Tom, 2026-11-12, FD-023): A LOOK AT A NETWORK BEFORE COMMITTING
+% TO LONG RUNS, sized for about 35 minutes on 12 pool workers, simulation and
+% figures together (an estimate from the preliminary fast run's stage
+% timings; not measured when this was written). It is the one mode of this
+% bundle that does not run every stage or draw every figure:
+%   runs     sweeps (the seven 1-D sensitivity sweeps and the joint
+%            parameter-space sample), eig_heatmap (the reference example
+%            only), local_lyapunov, paper_illustrations
+%   skips    the tau sweep, memory_capacity, mc_example, numerics,
+%            lyapunov_spectrum, transient_gain, dc_lle (the data of main
+%            figures 5 and 6 and of the supplementary checks)
+%   sizes    1-D sweeps 4 levels x 2 reps (fast: 5 x 5); joint sample 32
+%            points (fast: 128); every window, integrator and stage size
+%            otherwise is fast's (analysis_run_config, run_mode_names)
+%   figures  ONE set, four conditions, in figs/mu7chain_essential_4cond: the
+%            grouped main figures 2, 3 and 4, the sensitivity sheets and
+%            medians, the joint-sample histograms, the joint sample coloured
+%            by realised E:I weight balance, and the stand-alone versions of
+%            what the grouped figures compose (eigenvalue heat map, lambda_1
+%            against rate). mu7chain_run makes that one pass; the 3cond set
+%            can still be asked for by name and is not made by default.
+%   reading  TWO REPS PER LEVEL: the interquartile bands of figure 4 are the
+%            spread of two runs and mean almost nothing. The run shows the
+%            regime (where lambda_1 and the rates sit, which way each
+%            parameter pushes), not trends, and nothing from it goes in the
+%            paper.
+% The selection is three config fields read by run_all_paper_analyses
+% (paper_stage_plan): cfg.stages, cfg.sweeps, cfg.eig_heatmap_examples. In
+% every other mode they are empty, which means everything, as before.
 %
 % WHAT CHANGED FROM mu7revisedMedium_config. The network is the manuscript's
 % baseline, value for value (see the preset's case block), and every stage
@@ -71,6 +102,26 @@ cfg.run_mode    = run_mode;
 % nonnegative integer would do; this one is used nowhere else.
 cfg.param_space_seed = 7202;
 
+%% Which stages run (FD-023)
+% Empty means every stage, every sweep and the eig-heatmap stage's default
+% examples: every mode but 'essential'. See the header for what 'essential'
+% is for. Its stages are the ones main figures 2, 3 and 4 read:
+%   figure 2   representative_dynamics, saved by paper_illustrations
+%   figure 3   local_lyapunov, and the reference example of eig_heatmap
+%   figure 4   the 1-D sensitivity sweeps and the joint sample
+is_essential = strcmp(run_mode, 'essential');
+cfg.stages = {};
+cfg.sweeps = {};
+cfg.eig_heatmap_examples = [];
+if is_essential
+    cfg.stages = {'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations'};
+    cfg.sweeps = {'sensitivity', 'param_space'};
+    % The reference network alone: fig_eig_heatmap (and figure 3 through it)
+    % reads the reference; the two E:I-imbalanced examples feed only
+    % fig_eig_heatmap_imbalance, which this mode does not draw.
+    cfg.eig_heatmap_examples = struct('label', 'reference', 'overrides', struct());
+end
+
 %% Which conditions are drawn, and where
 % Order is the order the figures lay them out. In the 3-condition set the
 % chain takes the product's place, colour and title; the 4-condition set adds
@@ -82,6 +133,14 @@ switch figure_set
         cfg.conditions = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2', 'sfa3_std2'};
 end
 cfg.figure_set = figure_set;
+% The sets mu7chain_run draws for this mode, one make_all_paper_figures pass
+% each: both, except in 'essential', which makes the four-condition set alone
+% (Tom, 2026-11-12: "the 3 condition figures don't need to be generated").
+if strcmp(run_mode, 'essential')
+    cfg.figure_sets = {'4cond'};
+else
+    cfg.figure_sets = {'3cond', '4cond'};
+end
 
 %% Where things land -- fixed, so this cannot touch any other run
 cfg.run_dir  = ['data/mu7chain_' run_mode];                       % analyses write, figures read
@@ -205,6 +264,31 @@ F = add(F, 'doc_tables',                      @fig_doc_tables,                  
         {'preset_name', cfg.preset_name});
 % Built for THIS set's fig_root (see "why the registry is built per set").
 F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
+
+% 'essential' keeps the entries whose data its stages make, and no other: a
+% figure whose stage did not run errors by design (resolve_data_file), so it
+% must not be listed. Kept by NAME from the registry above, so each entry is
+% the one every other mode draws, in the same order. What each reads:
+%   fig_sensitivity_analysis_allStd   the 1-D sweeps (the sensitivity sheets)
+%   fig_sensitivity_medians           the 1-D sweeps
+%   fig_param_space_allStd            the joint sample (histograms)
+%   fig_EI_weights_param_space        the joint sample, coloured by realised
+%                                     E:I weight balance
+%   fig_lle_vs_rate                   the joint sample and the 1-D sweeps
+%   fig_eig_heatmap                   eig_heatmap, the reference example
+%   fig_main2_grouped                 representative_dynamics (paper_illustrations)
+%   fig_main3_grouped                 local_lyapunov and eig_heatmap
+%   fig_main4_grouped                 the 1-D sweeps and the joint sample
+if is_essential
+    keep = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', ...
+            'fig_param_space_allStd', 'fig_EI_weights_param_space', 'fig_lle_vs_rate', ...
+            'fig_eig_heatmap', 'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped'};
+    names = cellfun(@(f) f.name, F, 'UniformOutput', false);
+    missing = setdiff(keep, names);
+    assert(isempty(missing), 'mu7chain_config:EssentialRegistry', ...
+        'The essential set names entries the registry lacks: %s.', strjoin(missing, ', '));
+    F = F(ismember(names, keep));
+end
 cfg.figures = F;
 end
 
