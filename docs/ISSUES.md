@@ -706,7 +706,7 @@ becomes an issue with an acceptance test.
   Figures 7 and 8).
 - **FD-013 Closing figure** (block D).
 - **FD-014 Paper figure of 1TS versus MTS depression** (block A), from the
-  demonstration scripts. **In progress (2026-11-12, `matlab-opus-2`),
+  demonstration scripts. **Done (2026-11-12; `matlab-opus-2`, commit `9b76912`, merge `7c3d6dd`; quick 64 of 64 and the stages tier exact on merged main; result in the merge commit and in the to-do list).** Was: in progress,
   Plan A step 7.** It was listed here as needing planning with Tom; the
   lead wrote its acceptance itself under Tom's instruction to carry
   Plan A through: a pipeline figure function `fig_std_1TS_vs_MTS` that
