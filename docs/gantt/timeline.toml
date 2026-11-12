@@ -1,0 +1,1037 @@
+# Data for the final-draft timeline (docs/gantt/plan_timeline.html).
+# Read docs/gantt/Plan_Timeline.md before editing. Build the page with
+#   uv run python build_timeline.py
+# from this folder.
+#
+# Every [[task]]:
+#   id        task code <stage>_<step>_<kind>[n]  (see Plan_Timeline.md)
+#   block     A, B, C or D           group   row group heading within the block
+#   name      short name for the label column (at most 44 characters)
+#   who       lead | fable | opus | workers | tom | lead+tom
+#   worker    optional, the worker agent's name (matlab-fable-1, ...)
+#   issue     optional, FD-0xx
+#   status    done | running | planned | tom   (tom = waiting on Tom / Tom's own)
+#   what      one or two plain sentences: what the step does and why
+#   gate      how it is checked
+#   depends   list of task codes it waits for
+#   estimate  working estimate in minutes, a multiple of 15 (required unless done);
+#             corrected freely while the task has not started
+#   guess     true when the estimate is a guess rather than the lead's figure
+#   estimate_of_record         minutes; the estimate FROZEN when the task started.
+#   estimate_of_record_text    optional, as it was stated ("2.5 to 3 h")
+#   estimate_of_record_source  where it was recorded before the task ran
+#             Never filled in after the fact, never edited once set.
+#   start, end   actual times (required for done; start required for running)
+#   took_min  done only: measured minutes, end - start (checked against them)
+#   rule      done only: which rule gave start and end (see Plan_Timeline.md)
+#   approx_start true when the start is inferred, not recorded
+#   source    for tasks not done: where the start or estimate comes from
+#   merge     the merge commit into main, when merged
+#   commits   the branch's commits
+#   note      anything else for the hover box
+
+[meta]
+title = "Final-draft work: build and test timeline"
+utc_offset = "-06:00"
+compress_idle_hours = 3
+
+[[block]]
+id = "A"
+name = "Block A: 1TS vs MTS on one equation (chained pools, Plan A)"
+rough = false
+
+[[block]]
+id = "B"
+name = "Block B: stimulation suppresses discharges because of adaptation"
+rough = true
+
+[[block]]
+id = "C"
+name = "Block C: memory capacity across connectivity (gain sweep)"
+rough = true
+
+[[block]]
+id = "D"
+name = "Block D: the closing figure"
+rough = true
+
+# ---------------------------------------------------------------- block A, before Plan A
+
+[[task]]
+id = "A_0_T1"
+block = "A"
+group = "Before Plan A: tests and regression (2026-11-10)"
+name = "Audit the existing tests"
+who = "lead"
+issue = "FD-001"
+status = "done"
+what = "Ran every test script, fixed the broken ones, removed five that checked nothing, and added one command (run_all_tests) that runs them all. Done first so that later changes to the model are checked by tests that are known to work."
+gate = "All tests pass (58 at the time)."
+start = 2026-11-10T18:32:42-06:00
+end = 2026-11-10T19:38:27-06:00
+took_min = 66
+approx_start = true
+rule = "commits on main; start: e0e8e4d (tracking files created); end: 7793b6f (FD-001 done)"
+commits = "ba0508c..7793b6f, on main"
+note = "At this time one agent did all the work; the lead / worker arrangement came the same evening."
+
+[[task]]
+id = "A_0_T2"
+block = "A"
+group = "Before Plan A: tests and regression (2026-11-10)"
+name = "Regression bundle (100-neuron copy)"
+who = "lead"
+issue = "FD-002"
+status = "done"
+what = "A small copy of the manuscript's whole pipeline (the paper network at one fifth the size) that runs every analysis stage and every figure, so a code change can be checked against the paper's own computations."
+gate = "The bundle runs end to end (about 50 min)."
+depends = ["A_0_T1"]
+start = 2026-11-10T19:38:27-06:00
+end = 2026-11-10T20:43:01-06:00
+took_min = 65
+approx_start = true
+rule = "commits on main; start: end of FD-001; end: 1cb82de (FD-002 done)"
+commits = "a24334b, on main"
+
+[[task]]
+id = "A_0_T3"
+block = "A"
+group = "Before Plan A: tests and regression (2026-11-10)"
+name = "Regression references in three tiers"
+who = "lead"
+issue = "FD-003"
+status = "done"
+what = "Saved the results of the unchanged code as references, and three checks that compare against them: ultrarapid (36 s), stages (2 min) and full (about 50 min). Any later change that moves a number by accident is caught."
+gate = "Each tier passes against its own reference."
+depends = ["A_0_T1"]
+start = 2026-11-10T20:00:00-06:00
+end = 2026-11-10T21:43:19-06:00
+took_min = 103
+approx_start = true
+rule = "commits on main; start: estimated between a24334b (19:43) and the first FD-003 commit 7fcf533 (20:40); end: cd5d79a"
+commits = "7fcf533..cd5d79a, on main"
+
+[[task]]
+id = "A_0_B"
+block = "A"
+group = "Before Plan A: tests and regression (2026-11-10)"
+name = "Six MATLAB worker agents set up"
+who = "lead"
+status = "done"
+what = "Defined six worker agents (three on Fable, three on Opus), each with its own private MATLAB session, so building can run in parallel without workers disturbing each other."
+gate = "Each worker starts its own MATLAB (checked when first used)."
+depends = ["A_0_T3"]
+start = 2026-11-10T21:43:19-06:00
+end = 2026-11-10T22:18:21-06:00
+took_min = 35
+approx_start = true
+rule = "commits on main; 1be5011, fde6e88"
+
+[[task]]
+id = "A_0_P1"
+block = "A"
+group = "Before Plan A: tests and regression (2026-11-10)"
+name = "Plan A written (first version)"
+who = "lead"
+status = "done"
+what = "The implementation plan for the chained vesicle-pool model: design, tests, gates, order of the builds and who does each."
+gate = "Read and answered by Tom the next morning."
+depends = ["A_0_B"]
+start = 2026-11-10T22:18:21-06:00
+end = 2026-11-10T22:44:28-06:00
+took_min = 26
+approx_start = true
+rule = "commits on main; 6b3d874"
+
+[[task]]
+id = "A_0_P2"
+block = "A"
+group = "Planning with Tom (2026-11-11)"
+name = "Planning with Tom: build order, interface"
+who = "lead+tom"
+status = "done"
+what = "Tom's answers worked into Plan A: general code under one route interface instead of per-model branches, a tolerance-based regression tier, the pool module first, chained facilitation straight after the chain, four conditions in every analysis and three in the paper."
+gate = "Tom approved the execution plan."
+depends = ["A_0_P1"]
+start = 2026-11-11T08:51:34-06:00
+end = 2026-11-11T16:30:56-06:00
+took_min = 459
+approx_start = true
+rule = "commits on main; first commit ab02708, last f0b0941 (facilitation values chosen by Tom); includes breaks that git does not show"
+note = "This bar spans a working day of discussion and includes pauses."
+
+[[task]]
+id = "A_0_T4"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Pre-flight checks before building"
+who = "lead"
+status = "done"
+what = "Clean tree, worker agents listed, the quick test suite passing, before the first worker is briefed."
+gate = "Quick suite 53 of 53."
+depends = ["A_0_P2"]
+start = 2026-11-11T16:00:00-06:00
+end = 2026-11-11T16:17:57-06:00
+took_min = 18
+approx_start = true
+rule = "worklog; worklog: 'Pre-flight on 53000f5: quick 53 of 53, 297 s'"
+
+[[task]]
+id = "A_2_P"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Inventory of display code to change"
+who = "opus"
+worker = "matlab-opus-1"
+status = "done"
+what = "A read-only survey of every figure and table that computes depression itself or assumes exactly three conditions, so the later display work could be split into packages without two workers editing one file."
+gate = "Reviewed by the lead; written to docs/notes/."
+depends = ["A_0_T4"]
+start = 2026-11-11T16:17:57-06:00
+end = 2026-11-11T16:35:15-06:00
+took_min = 17
+approx_start = true
+rule = "commits on main; e737f68"
+
+[[task]]
+id = "A_0a_B"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Parallel-pool module"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-017"
+status = "done"
+what = "One small module through which every MATLAB session opens its pool of parallel workers, so the machine's 12 workers are shared by the lead and up to five worker agents without overcommitting."
+gate = "Quick suite, stages tier, and the full tier's analysis half (A_0a_T)."
+depends = ["A_0_T4"]
+start = 2026-11-11T16:19:54-06:00
+end = 2026-11-11T16:53:44-06:00
+took_min = 34
+approx_start = true
+rule = "brief to merge; start: 33480de (FD-017 in progress); end: merge"
+merge = "ff0bd02"
+commits = "ce771b7"
+
+[[task]]
+id = "A_0a_T"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Full-tier gate on the pool module"
+who = "lead"
+issue = "FD-017"
+status = "done"
+what = "Reran the analysis half of the full regression tier to show that the pool module moved no number."
+gate = "No value difference (38 min on 9 workers)."
+depends = ["A_0a_B"]
+start = 2026-11-11T17:02:00-06:00
+end = 2026-11-11T17:40:00-06:00
+took_min = 38
+approx_start = true
+rule = "worklog; worklog: 'started 17:02', '38 min on 9 workers'"
+
+[[task]]
+id = "A_0b_B1"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Tolerance regression tier and anchor"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-020"
+status = "done"
+what = "A regression check that allows round-off differences: it compares the model's equations at 111 stored states, and small stable networks end to end, against an 'anchor' saved from the model before anyone touched it. Needed because a rewrite of the model's arithmetic changes the last digit, which the byte-exact tiers cannot tolerate."
+gate = "Two captures identical; the lead's capture equals the worker's; quick suite 55 of 55."
+depends = ["A_0a_B"]
+start = 2026-11-11T17:02:26-06:00
+end = 2026-11-11T18:19:06-06:00
+took_min = 77
+approx_start = true
+rule = "brief to merge; start: f6ae523 (briefed); end: merge"
+merge = "4dc3d84"
+commits = "85bda9b, 222a43c, 6eeb904, dfc5da2"
+
+[[task]]
+id = "A_0b_B2"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Seed for the joint parameter sample"
+who = "fable"
+worker = "matlab-fable-2"
+issue = "FD-016"
+status = "done"
+what = "An option that makes the 128 random connectivity points of the joint parameter sweep repeatable, so later runs sample the same networks and can be compared. Unset, behaviour is as before."
+gate = "Quick suite; stages tier unchanged."
+depends = ["A_0a_B"]
+start = 2026-11-11T17:02:26-06:00
+end = 2026-11-11T17:32:56-06:00
+took_min = 30
+approx_start = true
+rule = "brief to merge; start: f6ae523 (briefed); end: merge"
+merge = "fafd990"
+commits = "68da56f"
+note = "FD-016 has no step number in Plan A; it ran beside step 0b and carries that number."
+
+[[task]]
+id = "A_0c_T"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Mutation checks on the tolerance tier"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-020"
+status = "done"
+what = "Put 55 small deliberate errors into the model one at a time (a time constant off by one part in a million, a dropped Jacobian term, a sign error ...) and confirmed the tolerance tier catches every one. This is what shows the tolerances are tight enough."
+gate = "55 of 55 caught by compared values."
+depends = ["A_0b_B1"]
+start = 2026-11-11T18:19:06-06:00
+end = 2026-11-11T19:13:06-06:00
+took_min = 54
+approx_start = true
+rule = "previous merge to merge; start: merge of 0b; end: merge"
+merge = "24e515b"
+commits = "988feae"
+
+[[task]]
+id = "A_0c_P"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Tom fixes the tolerances"
+who = "tom"
+status = "done"
+what = "Tom reviewed the mutation results and fixed the tolerances as proposed. The build waited for this; such waits are what the projection of future work leaves out."
+gate = "Decision recorded in the to-do list."
+depends = ["A_0c_T"]
+start = 2026-11-11T19:13:06-06:00
+end = 2026-11-11T21:19:38-06:00
+took_min = 127
+rule = "commits on main; end: aa95aca (tolerances fixed by Tom)"
+
+[[task]]
+id = "A_0d_B"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Refactor onto one route interface"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-021"
+status = "done"
+what = "Moved the existing depression and facilitation arithmetic out of the model's core functions into separate 'route models' under one interface, with no new model. The chain then becomes a second route model rather than a branch at every site."
+gate = "Tolerance tier against the anchor (worst 4.8e-16 against 1e-12); quick suite; 71 mutations caught on the refactored code; timing within 5 %."
+depends = ["A_0c_P"]
+start = 2026-11-11T21:38:05-06:00
+end = 2026-11-11T23:39:22-06:00
+took_min = 121
+approx_start = true
+rule = "brief to merge; start: 429101d (FD-021 in progress); end: merge"
+merge = "7d49430"
+commits = "d3d1e82..964e8b2"
+
+[[task]]
+id = "A_0d_T"
+block = "A"
+group = "Plan A: foundation (steps 0 to 0d)"
+name = "Gates; exact references re-captured"
+who = "lead"
+issue = "FD-021"
+status = "done"
+what = "After the refactor the byte-exact references were saved again, once and deliberately, after the tolerance tier showed the numbers had moved only at round-off. Includes a full-tier run (about 40 min of analyses plus figures)."
+gate = "Full bundle: no structural difference; 605 of 4583 values moved, median 5.7e-16."
+depends = ["A_0d_B"]
+start = 2026-11-11T23:39:22-06:00
+end = 2026-11-12T01:09:05-06:00
+took_min = 90
+rule = "merge to gates commit; 8d7d2c9 ultrarapid, dfc93f0 stages, cc51085 full"
+
+# ---------------------------------------------------------------- block A, the chain
+
+[[task]]
+id = "A_1_B"
+block = "A"
+group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
+name = "Chained vesicle-pool depression"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-004, FD-005"
+status = "done"
+what = "The chain itself: a releasable pool refilled from a slower reserve, as a second route model, with its analytic Jacobian and unit tests (Jacobian against finite differences, steady state against the closed form, a huge reserve reproducing the single pool)."
+gate = "test_std_chain_model; quick suite 57 of 57; tolerance tier against the anchor; ultrarapid tier byte-exact."
+depends = ["A_0d_B"]
+start = 2026-11-11T23:55:40-06:00
+end = 2026-11-12T01:09:21-06:00
+took_min = 74
+approx_start = true
+rule = "brief to merge; start: dfc93f0 (FD-004 in progress); end: merge"
+merge = "3d2ed56"
+commits = "2b5f6c2..97aad1c"
+
+[[task]]
+id = "A_1_T"
+block = "A"
+group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
+name = "Lead's gates on the chain merge"
+who = "lead"
+issue = "FD-004, FD-005"
+status = "done"
+what = "Tolerance tier, ultrarapid tier and quick suite on merged main; the equations file updated to state the chain."
+gate = "All pass."
+depends = ["A_1_B"]
+start = 2026-11-12T01:09:21-06:00
+end = 2026-11-12T01:17:12-06:00
+took_min = 8
+approx_start = true
+rule = "merge to gates commit; end: f5759cd (issues done, equations file)"
+
+[[task]]
+id = "A_5_T"
+block = "A"
+group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
+name = "Regression references for the chain"
+who = "fable"
+worker = "matlab-fable-1"
+status = "done"
+what = "The existing references contain no chain, so the chain got its own: a tolerance suite and an exact tier on chain networks, saved before facilitation was begun so facilitation could be checked against them."
+gate = "Two captures reproduce; mutation checks on the chain suite; lead re-captures on main and requires bit-identity."
+depends = ["A_1_T"]
+start = 2026-11-12T01:20:48-06:00
+end = 2026-11-12T04:12:49-06:00
+took_min = 172
+approx_start = true
+rule = "brief to merge; start: 127c92c (steps 3 and 5 briefed); end: merge"
+merge = "3c9a447"
+commits = "020dfa7..c9a5d80"
+
+[[task]]
+id = "A_8_B"
+block = "A"
+group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
+name = "Release-coupled facilitation"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-018"
+status = "done"
+what = "Chained facilitation (release probability driven by a calcium trace, coupled to how fast the releasable pool is used). Not in this paper; built now so the model is refactored only once."
+gate = "With facilitation off, the chain matches its references; a new stf_chain suite and its mutation checks."
+depends = ["A_5_T"]
+start = 2026-11-12T04:24:39-06:00
+end = 2026-11-12T06:59:43-06:00
+took_min = 155
+approx_start = true
+rule = "brief to merge; start: c07af7b (step 8 briefed); end: merge"
+merge = "2b455ff"
+commits = "43d6a91..87f51c0"
+
+[[task]]
+id = "A_8_T"
+block = "A"
+group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
+name = "Lead's gates on the facilitation merge"
+who = "lead"
+issue = "FD-018"
+status = "done"
+what = "Anchor, chain reference at zero tolerance, the lead's own capture of the facilitation reference, quick suite."
+gate = "All pass; quick 67 of 67."
+depends = ["A_8_B"]
+start = 2026-11-12T06:59:43-06:00
+end = 2026-11-12T07:12:26-06:00
+took_min = 13
+approx_start = true
+rule = "merge to gates commit; end: ce60a0b (FD-018 done)"
+
+[[task]]
+id = "A_9_B"
+block = "A"
+group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
+name = "Per-neuron spread of synapse parameters"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-015"
+status = "done"
+what = "Each neuron gets its own depression and facilitation time constants and reserve size, drawn log-normally around the nominal values (sigma 0.25, as the SFA time constants already have). A zero spread reproduces the model without it."
+gate = "test_std_spread; a fourth tolerance suite ('spread') and 57 mutations caught; exact chain tier gains spread cases with no existing value moved."
+depends = ["A_8_T"]
+start = 2026-11-12T07:12:26-06:00
+end = 2026-11-12T10:20:32-06:00
+took_min = 188
+approx_start = true
+rule = "brief to merge; start: ce60a0b (FD-015 in progress); end: merge"
+merge = "b466a98"
+commits = "6a0129f..6d95077"
+
+[[task]]
+id = "A_9_T"
+block = "A"
+group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
+name = "Lead's gates on the spread merge"
+who = "lead"
+issue = "FD-015"
+status = "done"
+what = "Four tolerance suites (about 25 s each), the quick suite (about 10 min) and the stages tier (2 min) on merged main."
+gate = "The anchor passes; the chain, facilitation and spread suites pass at exact equality; quick suite 69 of 69; stages tier exact."
+depends = ["A_9_B"]
+start = 2026-11-12T10:20:32-06:00
+end = 2026-11-12T10:43:48-06:00
+took_min = 23
+rule = "merge to gates commit; start: merge b466a98; end: d563f2c (ISSUES: FD-015 done with the lead's gates)"
+note = "The lead states the gates themselves finished at about 10:35, so about 15 min; the measured 23 min runs to the commit recording them. No estimate of record: the brief's 'about 15 min' was written while the gates ran."
+
+# ---------------------------------------------------------------- block A, presets and display
+
+[[task]]
+id = "A_3_B1"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Reservoir class sees the chain"
+who = "fable"
+worker = "matlab-fable-2"
+issue = "FD-006"
+status = "done"
+what = "The memory-capacity reservoir reads each neuron's synaptic output; it now asks the route model instead of assuming the product, so it works on chain routes."
+gate = "test_esn_route_redundancy with chain cases; quick suite."
+depends = ["A_1_B"]
+start = 2026-11-12T01:09:21-06:00
+end = 2026-11-12T01:33:53-06:00
+took_min = 25
+approx_start = true
+rule = "previous merge to merge; start: step 1 merge; end: merge"
+merge = "4ebf27c"
+commits = "48d9ddd"
+
+[[task]]
+id = "A_3_B2"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Chain presets and the mu7chain bundle"
+who = "opus"
+worker = "matlab-opus-2"
+issue = "FD-007"
+status = "done"
+what = "The networks of the new experiment (four conditions: none, 1TS, chained MTS, product MTS), their names, titles and colours, and the configuration that runs the whole pipeline on them and makes both figure sets."
+gate = "Preset tests; a chain model builds and runs from the preset; stages reference re-captured for the retitled product condition."
+depends = ["A_1_B"]
+start = 2026-11-12T01:09:21-06:00
+end = 2026-11-12T01:41:43-06:00
+took_min = 32
+approx_start = true
+rule = "previous merge to merge; start: step 1 merge; end: merge"
+merge = "257e4f1"
+commits = "0df8b63, 82d2e7a"
+
+[[task]]
+id = "A_3_T"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Preliminary fast run of mu7chain"
+who = "opus"
+worker = "matlab-opus-3"
+issue = "FD-007"
+status = "done"
+what = "A first 'fast' run of every analysis on the four conditions, made early so the figure workers had real data and so stages that silently skip the chain were found now. Tests the analysis half of the pipeline; not the final run."
+gate = "All ten stages finished, each holding all four conditions."
+depends = ["A_3_B2"]
+start = 2026-11-12T01:56:41-06:00
+end = 2026-11-12T06:50:21-06:00
+took_min = 294
+approx_start = true
+rule = "decision to worklog: start a091c97 (the lead decides the run and briefs the worker), end 9d8cc95 (worklog records it finished)"
+estimate_of_record = 165
+estimate_of_record_text = "2.5 to 3 h (drawn as the midpoint, 2 h 45 min)"
+estimate_of_record_source = "the lead's expectation when it briefed matlab-opus-3; relayed by the lead on 2026-11-12, not written in the repo's documents"
+note = "The run itself took 4.06 h on six workers; the bar also holds a first attempt that died 25 min in and was restarted, so the ratio includes the restart. Not merged: data only, in data/mu7chain_fast_prelim (made before the depression spread existed)."
+
+[[task]]
+id = "A_4_B1"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Figures: the condition-selection option"
+who = "opus"
+issue = "FD-006"
+status = "done"
+what = "One option, cfg.conditions, that tells every figure which conditions to draw, so one run yields both the paper's three-condition set and the four-condition review set."
+gate = "Quick suite 59 of 59."
+depends = ["A_3_B2"]
+start = 2026-11-12T01:41:43-06:00
+end = 2026-11-12T02:13:44-06:00
+took_min = 32
+approx_start = true
+rule = "previous merge to merge; start: FD-007 merge; end: merge"
+merge = "3e1bd04"
+commits = "85d601d"
+
+[[task]]
+id = "A_4_B2"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Figures: the parameter sweeps"
+who = "opus"
+issue = "FD-006"
+status = "done"
+what = "The sweep figures follow the condition selection; the SFA-timescale sweep runs both MTS conditions."
+gate = "test_sweep_figures_conditions; quick suite."
+depends = ["A_4_B1"]
+start = 2026-11-12T02:13:44-06:00
+end = 2026-11-12T03:54:02-06:00
+took_min = 100
+approx_start = true
+rule = "previous merge to merge; start: previous display merge; end: merge"
+merge = "1debb64"
+commits = "9c3f0de"
+
+[[task]]
+id = "A_4_B3"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Figures: the analysis stages"
+who = "opus"
+worker = "matlab-opus-2"
+issue = "FD-006"
+status = "done"
+what = "The figures drawn from stage data follow the selection and title conditions by name; depression factors are asked of the model, not recomputed."
+gate = "Quick suite; stages tier."
+depends = ["A_4_B1"]
+start = 2026-11-12T02:13:44-06:00
+end = 2026-11-12T04:34:28-06:00
+took_min = 141
+approx_start = true
+rule = "previous merge to merge; start: previous display merge; end: merge"
+merge = "b487051"
+commits = "f8584c7, e089e9d"
+
+[[task]]
+id = "A_4_B4"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Figures: steady state, concepts, tables"
+who = "opus"
+issue = "FD-006"
+status = "done"
+what = "The analytic depression figures and the generated equation and parameter tables are right on chain routes."
+gate = "Quick suite; stages tier."
+depends = ["A_4_B3"]
+start = 2026-11-12T04:37:11-06:00
+end = 2026-11-12T05:14:10-06:00
+took_min = 37
+approx_start = true
+rule = "previous merge to merge; start: bedef99 (lead's decisions on the display work); end: merge"
+merge = "d2aefa7"
+commits = "690a8b7"
+
+[[task]]
+id = "A_4_B5"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Figures: the grouped main figures"
+who = "opus"
+issue = "FD-006"
+status = "done"
+what = "The composite main figures follow the condition selection, labelled by name."
+gate = "test_grouped_conditions_styles; quick suite."
+depends = ["A_4_B3"]
+start = 2026-11-12T04:37:11-06:00
+end = 2026-11-12T06:46:53-06:00
+took_min = 130
+approx_start = true
+rule = "previous merge to merge; start: bedef99; end: merge"
+merge = "20bccd2"
+commits = "2099d6f..9eaa7dc"
+
+[[task]]
+id = "A_7_B"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Figure: 1TS against chained MTS"
+who = "opus"
+worker = "matlab-opus-2"
+issue = "FD-014"
+status = "done"
+what = "The paper figure Brian asked for: the two conditions' depression under a sinusoidal rate, rate steps and at steady state, showing that they match at the onset of activity (within 1.4 %) and differ under sustained activity."
+gate = "Test against an independent integration; quick 64 of 64; stages tier exact."
+depends = ["A_4_B3"]
+start = 2026-11-12T04:37:11-06:00
+end = 2026-11-12T05:45:07-06:00
+took_min = 68
+approx_start = true
+rule = "previous merge to merge; start not recorded: between the WP2 merge (04:34) and the status commit dadbe78 (05:17); end: merge"
+merge = "7c3d6dd"
+commits = "9b76912"
+
+[[task]]
+id = "A_4_T"
+block = "A"
+group = "Plan A: presets, display code and figures (steps 3, 4, 7)"
+name = "Integration pass: both figure sets build"
+who = "opus"
+issue = "FD-006"
+status = "done"
+what = "Built every figure of both sets from the preliminary run and fixed what failed. Tests the figure half of the pipeline: 37 of 37 entries in each set."
+gate = "37 of 37 in each set; the older product run still builds 36 of 36; quick 67 of 67, stages tier exact."
+depends = ["A_4_B4", "A_4_B5", "A_3_T"]
+start = 2026-11-12T06:59:43-06:00
+end = 2026-11-12T08:32:00-06:00
+took_min = 92
+approx_start = true
+rule = "previous merge to merge; start: estimated from the preceding merges; end: merge"
+merge = "a46e05c"
+commits = "41ac6b1, 0c706f5"
+
+# ---------------------------------------------------------------- block A, remaining
+
+[[task]]
+id = "A_10_B"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Spread into the mu7chain preset"
+who = "lead"
+issue = "FD-007"
+status = "done"
+what = "The paper's preset gets the per-neuron spread (0.25), and the stored copy of every preset's output is regenerated so the preset test knows about it."
+gate = "test_preset_golden, test_preset_conditions, test_mu7chain_bundle, test_std_spread and three more pass (commit message)."
+depends = ["A_9_B"]
+start = 2026-11-12T10:20:53-06:00
+end = 2026-11-12T10:39:11-06:00
+took_min = 18
+approx_start = true
+rule = "lead's previous commit to its commit: start 1a51e91 (the lead's last commit before it), end fd1fb99"
+merge = "fd1fb99 (committed on main)"
+note = "The lead's brief gave 30 min for this step, but that brief was written about when the step ran, so it is not used as an estimate of record. Ran beside A_9_T."
+
+[[task]]
+id = "A_10_T1"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Hold point: Tom looks at example traces"
+who = "tom"
+status = "tom"
+what = "Before any long run, the lead runs the example time series for a few seeds interactively and Tom may hand-tune the connectivity. The long runs wait for Tom's word."
+gate = "Tom says go."
+depends = ["A_10_B", "A_9_T"]
+estimate = 45
+start = 2026-11-12T10:39:00-06:00
+approx_start = true
+source = "start: the lead's statement (about 10:39): example time series for three seeds run and shown in Tom's MATLAB"
+estimate_of_record = 45
+estimate_of_record_text = "30 to 60 min (drawn as 45 min)"
+estimate_of_record_source = "the lead's list of remaining steps in its brief for this timeline, frozen when the hold point began"
+note = "Under way: the lead has shown the example traces for three seeds; Tom is looking and may tune the connectivity. It is Tom's time and uncertain; the projection does not include waiting for Tom to be available."
+
+[[task]]
+id = "A_10_T2"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Quick suite, then full regression tier"
+who = "lead"
+status = "planned"
+what = "First the quick test suite (about 10 min) on the preset commit fd1fb99, which so far was checked by six targeted tests only. Then the full tier: reruns every stage and all 36 figures of the small copy of the manuscript bundle and compares with the stored references, about 50 min. The milestone check that the finished model still reproduces the paper's pipeline."
+gate = "Quick suite passes; full tier: no difference beyond the recorded ignore patterns."
+depends = ["A_10_T1"]
+estimate = 60
+note = "About 10 + 50 min. The full tier needs the desktop MATLAB."
+
+[[task]]
+id = "A_10_T3"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Full reference re-captured"
+who = "lead"
+status = "planned"
+what = "The full tier's reference is saved again, deliberately, because the condition titles changed; the commit says why the expected values moved."
+gate = "Second run of the full tier on the new code reproduces it."
+depends = ["A_10_T2"]
+estimate = 15
+
+[[task]]
+id = "A_11_T1"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Fast run, four conditions (12 workers)"
+who = "lead"
+issue = "FD-007"
+status = "planned"
+what = "The whole analysis pipeline of the mu7chain bundle at 'fast' size on all four conditions. Tests that every stage runs end to end on the finished model; it is the last run agents make (medium and larger are Tom's)."
+gate = "Every stage finishes with all four conditions."
+depends = ["A_10_T3"]
+estimate = 180
+note = "Lead's estimate; the preliminary run took 4.06 h on 6 workers. Does not start until Tom says so."
+
+[[task]]
+id = "A_11_T2"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Three-condition figure set (paper)"
+who = "lead"
+issue = "FD-006"
+status = "planned"
+what = "Builds every figure with the paper's three conditions from the fast run. Tests the figure half of the pipeline."
+gate = "Every entry written to disk."
+depends = ["A_11_T1"]
+estimate = 15
+note = "About 10 min, drawn as 15."
+
+[[task]]
+id = "A_11_T3"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Four-condition figure set (review)"
+who = "lead"
+issue = "FD-006"
+status = "planned"
+what = "The same figures with product MTS added as a fourth column in green, for Tom to compare chain and product."
+gate = "Every entry written to disk."
+depends = ["A_11_T2"]
+estimate = 15
+note = "About 10 min, drawn as 15."
+
+[[task]]
+id = "A_11_T4"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Check every stage and figure; report"
+who = "lead"
+status = "planned"
+what = "The lead opens every stage's output and every figure of both sets, and reports to Tom."
+gate = "The report to Tom."
+depends = ["A_11_T3"]
+estimate = 15
+
+[[task]]
+id = "A_12_T"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Close-out: Plan A 'done means' list"
+who = "lead"
+status = "planned"
+what = "Goes through the checklist of Plan A section 10, brings ISSUES and WORKLOG up to date and ticks block A's boxes in the to-do list."
+gate = "Every item of Plan A section 10 ticked or explained."
+depends = ["A_11_T4"]
+estimate = 30
+
+[[task]]
+id = "A_13_B"
+block = "A"
+group = "Plan A: finishing (steps 10 to 12) and after"
+name = "Medium run(s) for the paper (Tom)"
+who = "tom"
+issue = "FD-009"
+status = "tom"
+what = "The paper's results: the sweeps, memory capacity, stability and transient analyses on all four conditions at 'medium' or larger. Only Tom starts these runs and says when they are done."
+gate = "Tom's judgement."
+depends = ["A_12_T"]
+estimate = 720
+guess = true
+rough = true
+note = "Duration not known. The 12 h bar is a placeholder guess, not an estimate from a measured run."
+
+# ---------------------------------------------------------------- block B (rough)
+
+[[task]]
+id = "B_0_P"
+block = "B"
+group = "Block B (rough: not yet planned in detail)"
+name = "Plan block B with Tom"
+who = "lead+tom"
+issue = "FD-011, FD-012"
+status = "tom"
+what = "Decide which network carries the stimulation result, the measure of aberrant activity, what 'hyperexcitable at baseline' means and which form of tonic input to show; turn FD-011 and FD-012 into issues."
+gate = "Issues written with acceptance tests."
+depends = ["A_12_T"]
+estimate = 120
+guess = true
+note = "Placed after block A closes because the lead's scope is Plan A until then."
+
+[[task]]
+id = "B_1_B"
+block = "B"
+group = "Block B (rough: not yet planned in detail)"
+name = "Causal 2 x 2 with frozen-state arm"
+who = "workers"
+issue = "FD-011"
+status = "planned"
+what = "Stimulation off / on crossed with adaptation intact / removed, plus stimulation with the adaptation variables held at their pre-stimulation values. Shows whether suppression needs adaptation to be recruited."
+gate = "To be set when planned."
+depends = ["B_0_P"]
+estimate = 480
+guess = true
+
+[[task]]
+id = "B_2_B"
+block = "B"
+group = "Block B (rough: not yet planned in detail)"
+name = "Parameter-space version of the experiment"
+who = "workers"
+issue = "FD-011"
+status = "planned"
+what = "Across connectivity, the fraction of hyperexcitable networks in which stimulation suppresses aberrant activity, with and without adaptation; memory capacity and sensitivity recorded with stimulation on."
+gate = "To be set when planned."
+depends = ["B_0_P"]
+estimate = 480
+guess = true
+
+[[task]]
+id = "B_3_T"
+block = "B"
+group = "Block B (rough: not yet planned in detail)"
+name = "Fast run of the stimulation experiments"
+who = "lead"
+status = "planned"
+what = "A 'fast' run of both experiments to test that they run end to end before the expensive run."
+gate = "To be set when planned."
+depends = ["B_1_B", "B_2_B"]
+estimate = 240
+guess = true
+
+[[task]]
+id = "B_4_B"
+block = "B"
+group = "Block B (rough: not yet planned in detail)"
+name = "Medium run of block B (Tom)"
+who = "tom"
+status = "tom"
+what = "The run whose results go into the paper; Tom's to start and to call done."
+gate = "Tom's judgement."
+depends = ["B_3_T"]
+estimate = 720
+guess = true
+
+[[task]]
+id = "B_5_B"
+block = "B"
+group = "Block B (rough: not yet planned in detail)"
+name = "Combined stimulation figure (Figs 7 + 8)"
+who = "workers"
+issue = "FD-012"
+status = "planned"
+what = "One figure combining the clinical and model stimulation figures, with the causal result in it; supplementary figures with time series and parameter-space maps."
+gate = "To be set when planned."
+depends = ["B_4_B"]
+estimate = 360
+guess = true
+
+# ---------------------------------------------------------------- block C (rough)
+
+[[task]]
+id = "C_0_P"
+block = "C"
+group = "Block C (rough: not yet planned in detail)"
+name = "Plan block C with Tom"
+who = "lead+tom"
+issue = "FD-010"
+status = "tom"
+what = "Turn the gain sweep into an issue: how the 3:2 and 2:3 E:I networks are realised, whether the fit is against gain or log gain, whether the exponent is measured with the memory-task input on."
+gate = "Issue written with acceptance tests."
+depends = ["A_12_T"]
+estimate = 120
+guess = true
+note = "The pilot itself does not depend on block A; it is placed here because the lead's scope is Plan A until block A closes."
+
+[[task]]
+id = "C_1_T"
+block = "C"
+group = "Block C (rough: not yet planned in detail)"
+name = "Pilot: no-adaptation gain sweep"
+who = "workers"
+issue = "FD-010"
+status = "planned"
+what = "A coarse sweep of overall connectivity gain without adaptation, noise off, to find where the leading exponent crosses zero and where memory peaks, so the real sweep brackets the peak."
+gate = "To be set when planned."
+depends = ["C_0_P"]
+estimate = 180
+guess = true
+
+[[task]]
+id = "C_2_B"
+block = "C"
+group = "Block C (rough: not yet planned in detail)"
+name = "Gain-sweep stage and E:I presets"
+who = "workers"
+issue = "FD-010"
+status = "planned"
+what = "A stage that measures memory capacity and the leading exponent for every gain, seed and condition (today memory capacity runs at one network only), and the 3:2 and 2:3 networks as presets."
+gate = "To be set when planned."
+depends = ["C_1_T"]
+estimate = 480
+guess = true
+
+[[task]]
+id = "C_3_T"
+block = "C"
+group = "Block C (rough: not yet planned in detail)"
+name = "Fast run of the gain sweep"
+who = "lead"
+issue = "FD-010"
+status = "planned"
+what = "A 'fast' run on four conditions and three E:I balances, to test the stage end to end and estimate the cost of the real run."
+gate = "To be set when planned."
+depends = ["C_2_B"]
+estimate = 240
+guess = true
+
+[[task]]
+id = "C_4_B"
+block = "C"
+group = "Block C (rough: not yet planned in detail)"
+name = "Medium gain-sweep runs (Tom)"
+who = "tom"
+issue = "FD-010"
+status = "tom"
+what = "The gain sweep for the paper on the three E:I balances; three balances triple the cost."
+gate = "Tom's judgement."
+depends = ["C_3_T"]
+estimate = 960
+guess = true
+
+[[task]]
+id = "C_5_B"
+block = "C"
+group = "Block C (rough: not yet planned in detail)"
+name = "Statistics and memory figure"
+who = "workers"
+issue = "FD-010"
+status = "planned"
+what = "Per condition and E:I balance: Gaussian height, centre and width of memory against gain, mean and variance across the range; the figure of gain vs memory, exponent vs memory and gain vs exponent."
+gate = "To be set when planned."
+depends = ["C_4_B"]
+estimate = 360
+guess = true
+
+# ---------------------------------------------------------------- block D (rough)
+
+[[task]]
+id = "D_0_P"
+block = "D"
+group = "Block D (rough: not yet planned in detail)"
+name = "Sketch the closing figure's panels"
+who = "lead+tom"
+issue = "FD-013"
+status = "tom"
+what = "One panel per step of the paper's story (stability across connectivity; responsiveness; suppression of discharges; memory with tonic drive), and which panels are new compute and which re-plotted."
+gate = "Layout agreed with Tom."
+depends = ["B_0_P", "C_0_P"]
+estimate = 120
+guess = true
+
+[[task]]
+id = "D_1_B"
+block = "D"
+group = "Block D (rough: not yet planned in detail)"
+name = "Build the closing figure and supplements"
+who = "workers"
+issue = "FD-013"
+status = "planned"
+what = "The figure itself and the supplementary figures supporting each panel; panel 3 comes from block B's parameter-space sweep, panel 4 from block C."
+gate = "To be set when planned."
+depends = ["D_0_P", "B_5_B", "C_5_B"]
+estimate = 360
+guess = true
+
+[[task]]
+id = "D_2_B"
+block = "D"
+group = "Block D (rough: not yet planned in detail)"
+name = "Results text for the closing figure"
+who = "lead+tom"
+issue = "FD-013"
+status = "tom"
+what = "The Results section that carries the closing figure and bridges into the Discussion."
+gate = "Tom's review."
+depends = ["D_1_B"]
+estimate = 240
+guess = true
