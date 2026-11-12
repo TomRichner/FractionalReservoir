@@ -18,7 +18,9 @@ function out_dir = run_stim_neurons(cfg, opts)
 %          drift's intermediate stage), which is what an input of that value
 %          held for the step would add. Regenerated from the model's
 %          noise_seed exactly as build_noise draws it.
-%   x, r, syn (r prod_m b_m, route 1), sfa ((c/K) sum_k a_k), std (prod_m b_m)
+%   x, r, syn (r times the depression factor, route 1), sfa ((c/K) sum_k a_k),
+%   std (the depression factor, SRNNCellTypePairs.std_route_factor: prod_m b_m
+%   on a product route, the releasable pool b_1 on a chained route)
 %
 % at the full rate fs. The rerun is checked against the saved population
 % mean of run_stim_evoked (the undriven E neurons' x) before anything is
@@ -86,7 +88,12 @@ for q = 1:numel(params.cell_type_names)
     full.syn(ix, :) = so.(nm).(posts{1});
     if ~isempty(a.(nm)), full.sfa(ix, :) = params.c_eff(q) * reshape(sum(a.(nm), 2), nq, []); end
     B = b.(nm).(posts{1});
-    if ~isempty(B), full.std(ix, :) = reshape(prod(B, 2), nq, []); end
+    if ~isempty(B)
+        % The route's depression factor from the model (FD-006): prod(b) on a
+        % product route (the same bits as before), b1 on a chained route.
+        post_q = find(strcmp(params.cell_type_names, posts{1}), 1);
+        full.std(ix, :) = reshape(SRNNCellTypePairs.std_route_factor(B, params, q, post_q), nq, []);
+    end
 end
 
 % The Wiener term, regenerated as build_noise draws it (xi1 first, then xi2).
