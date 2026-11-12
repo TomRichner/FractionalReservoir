@@ -722,17 +722,24 @@ if strcmp(model_class, 'SRNNModel2')
     fprintf(fid, '\n');
 end
 
-% synapse_config nests too deeply for a table cell, so expand it once.
+% synapse_config nests too deeply for a table cell, so expand it per condition.
+% EVERY condition's own (FD-006, inventory R2). This used to print the FIRST
+% condition's and call it "identical for every condition that has depressing
+% routes", which was false whenever a one-pool condition sat beside a
+% two-pool one (sfa1_std1 against sfa3_std2) and is false again for the
+% chained pool against the product. Each route is described in words (which
+% depression model, with its time constants) and then given verbatim.
 for i = 1:numel(conds)
     c = conds{i};
-    if isfield(c, 'synapse_config') && ~isempty(fieldnames(c.synapse_config))
-        fprintf(fid, '%s\n', ['`synapse_config` for `' c.name '` (identical for every ' ...
-            'condition that has depressing routes):']);
-        fprintf(fid, '\n');
-        fmt_value_block(fid, 'synapse_config', c.synapse_config, 0, '');
-        fprintf(fid, '\n');
-        break
+    if ~isfield(c, 'synapse_config') || ~isstruct(c.synapse_config) || ...
+            isempty(fieldnames(c.synapse_config))
+        continue
     end
+    fprintf(fid, '%s\n', ['`synapse_config` for `' c.name '`:']);
+    fprintf(fid, '\n');
+    write_route_summary(fid, c.synapse_config);
+    fmt_value_block(fid, 'synapse_config', c.synapse_config, 0, '');
+    fprintf(fid, '\n');
 end
 
 % A subset run is worth naming: tau_sensitivity deliberately runs one condition.
@@ -1070,6 +1077,113 @@ for i = 1:numel(names)
         parts{end+1} = ['`' path '`: `' fmt_value(a.(n)) '` → `' fmt_value(b.(n)) '`']; %#ok<AGROW>
     end
 end
+end
+
+function write_route_summary(fid, sc)
+% WRITE_ROUTE_SUMMARY One line per distinct route configuration, in words.
+%
+% synapse_config.<pre>.<post> is one route, read PRE -> POST. Routes whose
+% configuration is identical share a line, so a condition with the same
+% depression on all four routes reads as one sentence.
+descs = {};
+labels = {};
+pres = fieldnames(sc);
+for p = 1:numel(pres)
+    posts = sc.(pres{p});
+    if ~isstruct(posts) || ~isscalar(posts); continue; end
+    pf = fieldnames(posts);
+    for q = 1:numel(pf)
+        lbl = [pres{p} '→' pf{q}];
+        d = describe_route(posts.(pf{q}));
+        k = find(strcmp(descs, d), 1);
+        if isempty(k)
+            descs{end+1} = d;          %#ok<AGROW>
+            labels{end+1} = {lbl};     %#ok<AGROW>
+        else
+            labels{k}{end+1} = lbl; %#ok<AGROW>
+        end
+    end
+end
+for k = 1:numel(descs)
+    if isscalar(labels{k}), w = 'Route'; else, w = 'Routes'; end
+    fprintf(fid, '%s\n', sprintf('- %s %s: %s.', w, strjoin(labels{k}, ', '), descs{k}));
+end
+if ~isempty(descs); fprintf(fid, '\n'); end
+end
+
+function s = describe_route(r)
+% DESCRIBE_ROUTE One route's synapses in words: its depression model and time
+% constants, any facilitation, any weight scale, and any field not described
+% (given verbatim, so nothing is silently left out).
+if ~isstruct(r) || ~isscalar(r)
+    s = ['`' fmt_value(r) '`'];
+    return
+end
+parts = {};
+if isfield(r, 'std') && isstruct(r.std) && isscalar(r.std) && ~isempty(fieldnames(r.std))
+    parts{end+1} = describe_std(r.std);
+else
+    parts{end+1} = 'no depression';
+end
+if isfield(r, 'stf') && isstruct(r.stf) && isscalar(r.stf) && ~isempty(fieldnames(r.stf))
+    parts{end+1} = ['facilitation (' describe_fields(r.stf, fieldnames(r.stf)) ')'];
+end
+if isfield(r, 'scale')
+    parts{end+1} = ['weight scale `' fmt_value(r.scale) '`'];
+end
+other = setdiff(fieldnames(r), {'std', 'stf', 'scale'}, 'stable');
+if ~isempty(other)
+    parts{end+1} = ['also ' describe_fields(r, other)];
+end
+s = strjoin(parts, '; ');
+end
+
+function s = describe_std(d)
+% DESCRIBE_STD The depression of one route. Three forms (route_model): the
+% CHAINED vesicle pools (std.model = 'chain': a releasable pool refilled from a
+% reserve; tau_rec = [releasable refill, reserve refill], one tau_rel, the
+% capacity ratio n2), ONE pool, or the PRODUCT of several independent pools.
+is_chain = isfield(d, 'model') && (ischar(d.model) || isstring(d.model)) && strcmp(d.model, 'chain');
+known = {'model', 'tau_rec', 'tau_rel'};
+if is_chain
+    known = [known, {'n2'}];
+    if isfield(d, 'tau_rec') && numel(d.tau_rec) == 2
+        rec = sprintf(['releasable-pool refill `tau_rec(1)` = %s s, reserve refill ' ...
+            '`tau_rec(2)` = %s s'], fmt_value(d.tau_rec(1)), fmt_value(d.tau_rec(2)));
+    else
+        rec = ['`tau_rec` = `' fmt_value(field_or(d, 'tau_rec')) '` s'];
+    end
+    s = sprintf(['chained vesicle pools (`std.model` = ''chain'': a releasable pool ' ...
+        'refilled from a reserve): %s, release `tau_rel` = %s s, reserve/releasable ' ...
+        'capacity `n2` = %s'], rec, fmt_value(field_or(d, 'tau_rel')), fmt_value(field_or(d, 'n2')));
+else
+    tr = field_or(d, 'tau_rec');
+    K = numel(tr);
+    if K == 1
+        s = sprintf('one depression pool: `tau_rec` = %s s, `tau_rel` = %s s', ...
+            fmt_value(tr), fmt_value(field_or(d, 'tau_rel')));
+    else
+        s = sprintf(['product of %d independent depression pools: `tau_rec` = `%s` s, ' ...
+            '`tau_rel` = `%s` s'], K, fmt_value(tr), fmt_value(field_or(d, 'tau_rel')));
+    end
+    if isfield(d, 'combine')
+        known = [known, {'combine'}];
+        s = [s ', combined by `' fmt_value(d.combine) '`'];
+    end
+end
+other = setdiff(fieldnames(d), known, 'stable');
+if ~isempty(other)
+    s = [s ', also ' describe_fields(d, other)];
+end
+end
+
+function s = describe_fields(st, names)
+s = strjoin(cellfun(@(f) ['`' f '` = `' fmt_value(st.(f)) '`'], names(:)', ...
+    'UniformOutput', false), ', ');
+end
+
+function v = field_or(st, name)
+if isfield(st, name), v = st.(name); else, v = []; end
 end
 
 function fmt_value_block(fid, label, v, indent, source)

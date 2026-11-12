@@ -44,8 +44,20 @@ function out = fig_local_vs_finite_lle(cfg)
 % > 0, and the medians of frac_local_positive, mean_positive_excursion_s and
 % p95_finite_0p2s.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006). A cell of condition
+% names, one panel each, LEFT TO RIGHT IN THE ORDER GIVEN; empty (the
+% default) draws every condition with near-default jobs, in load order,
+% exactly as before the option existed. The selection is resolved by
+% select_conditions against every condition the 1-D sweeps' PSA objects
+% hold, so a name the run lacks is an error (select_conditions:
+% NoSuchCondition), and a selected condition with no successful near-default
+% job is an error too (fig_local_vs_finite_lle:NoJobs). The table lists the
+% drawn conditions in the same order. Titles and colours come from
+% manuscript_style by NAME. The layout is 1 x N, 380 px per panel.
+%
 % See also: fig_lle_vs_rate, fig_sensitivity_medians, sweep_metrics,
-%           SRNNCellTypePairs.lya_summary, preset_default_values
+%           SRNNCellTypePairs.lya_summary, preset_default_values,
+%           select_conditions
 
 arguments
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
@@ -55,6 +67,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''          % unused; the run records its preset
+    cfg.conditions                = {}          % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -66,9 +79,26 @@ if isempty(cfg.run_dir) || ~isfolder(cfg.run_dir)
 end
 
 %% Load
-near  = load_near_default(cfg.run_dir, cfg.verbose);
+[near, held] = load_near_default(cfg.run_dir, cfg.verbose);
 joint = load_joint(cfg.run_dir, cfg.verbose);
-cond_names = near.cond_names;
+requested = cfg.conditions;
+if isempty(requested) || ((ischar(requested) || isstring(requested)) && all(strlength(requested) == 0))
+    requested = {};                    % {}, [], '' and "" mean all, as in select_conditions
+end
+selecting = ~isempty(requested);
+if selecting
+    % Requested order; a name no sweep holds errors here (NoSuchCondition).
+    cond_names = select_conditions(held, requested);
+    no_jobs = cond_names(~ismember(cond_names, near.cond_names));
+    if ~isempty(no_jobs)
+        error('fig_local_vs_finite_lle:NoJobs', ...
+            'Selected condition(s) with no successful near-default job under %s: {%s}.', ...
+            cfg.run_dir, strjoin(no_jobs, ', '));
+    end
+else
+    cond_names = near.cond_names;      % load order, as before the option existed
+end
+[~, near_idx] = ismember(cond_names, near.cond_names);   % panel i draws near set entry near_idx(i)
 n_cond = numel(cond_names);
 if n_cond == 0
     error('fig_local_vs_finite_lle:NoJobs', 'No successful jobs found under %s.', cfg.run_dir);
@@ -84,7 +114,7 @@ rows = {};
 % values narrow; the 1st-99th percentiles of the pooled local rates cover both.
 all_local = [];
 for i = 1:n_cond
-    all_local = [all_local; near.local{i}(:)]; %#ok<AGROW>
+    all_local = [all_local; near.local{near_idx(i)}(:)]; %#ok<AGROW>
 end
 % Fixed window (TR, 2026-09-15): [-2 3] 1/s with ticks at -2, 0, 2. all_local
 % is kept for the table's share > 0.
@@ -95,8 +125,8 @@ for i = 1:n_cond
     name = cond_names{i};
     col  = st.condition_color(name);
     light = 1 - 0.45 * (1 - col);
-    loc  = near.local{i}; loc = loc(isfinite(loc));
-    lle  = near.lle{i};
+    loc  = near.local{near_idx(i)}; loc = loc(isfinite(loc));
+    lle  = near.lle{near_idx(i)};
 
     ax = nexttile(tl); hold(ax, 'on');
     if ~isempty(loc)
@@ -129,8 +159,12 @@ for i = 1:n_cond
     end
 end
 linkaxes(ax_top, 'y');
+% The counts are those of the FIRST DRAWN condition (by name; every condition
+% runs at the same grid points, so they are normally equal).
+j_joint = find(strcmp(joint.cond_names, cond_names{1}), 1);
+if isempty(j_joint); n_joint = 0; else; n_joint = numel(joint.lle{j_joint}); end
 title(tl, sprintf('Local expansion vs finite-time \\lambda_1: %d near-default networks per condition, joint sample of %d', ...
-    numel(near.lle{1}), numel(joint.lle{1})), 'FontWeight', 'normal', 'FontSize', 11);
+    numel(near.lle{near_idx(1)}), n_joint), 'FontWeight', 'normal', 'FontSize', 11);
 
 hdr = '| Condition | set | n | lambda_1 median [IQR] | share lambda_1 < 0 | local rate share > 0 | median frac_local_positive | median mean excursion (s) | median p95 finite 0.2 s |';
 sep = '|---|---|---|---|---|---|---|---|---|';
@@ -148,6 +182,10 @@ if cfg.save
     if fid > 0
         fprintf(fid, '# Local rate vs finite-time lambda_1\n\nRun: `%s`. Near-default = 1-D sweeps at the level nearest the preset default (%s); joint = param_space sample.\n\n', ...
             cfg.run_dir, strjoin(near.sweeps, ', '));
+        if selecting
+            fprintf(fid, 'Conditions drawn (selected, in this order): %s. The run holds: %s.\n\n', ...
+                strjoin(cond_names, ', '), strjoin(held, ', '));
+        end
         fprintf(fid, '%s\n%s\n', hdr, sep);
         fprintf(fid, '%s\n', rows{:});
         fclose(fid);
@@ -199,9 +237,12 @@ function v = field_or_nan(r, f)
 if isfield(r, f) && ~isempty(r.(f)); v = r.(f); else; v = NaN; end
 end
 
-function D = load_near_default(run_dir, verbose)
+function [D, held] = load_near_default(run_dir, verbose)
 % Every 1D_sensitivity_* sweep at the level nearest the preset default.
+% held: every condition name the sweeps' PSA objects hold, first-seen order
+% (with or without successful jobs), which a selection is resolved against.
 D = empty_set('near-default');
+held = {};
 listing = dir(fullfile(run_dir, '1D_sensitivity_*'));
 listing = listing([listing.isdir]);
 if isempty(listing)
@@ -221,6 +262,7 @@ for k = 1:numel(listing)
     end
     D.sweeps{end + 1} = g;
     cn = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
+    held = [held, cn(~ismember(cn, held))]; %#ok<AGROW>
     for c = 1:numel(cn)
         if ~isfield(psa.results, cn{c}); continue; end
         R = psa.results.(cn{c});

@@ -30,6 +30,14 @@ function [psa, fig_handles] = load_and_make_unit_histograms(results_dir, options
 %                   networks happened to be sampled; pass an explicit range for a
 %                   bar that means the same thing in every run.
 %   ColorLabel    - y-label on the colorbar figure (default 'fraction excitatory')
+%   Conditions    - cell of condition names to draw, one subplot each, LEFT TO
+%                   RIGHT IN THE ORDER GIVEN (FD-006). Empty (default) draws
+%                   every condition the run holds, in its order, as before.
+%                   Resolved by select_conditions, so a name the run lacks is
+%                   an error. Unselected conditions are not read at all, so
+%                   they also do not enter derived colour limits.
+%   Verbose       - 'verbose' | 'minimal' (default) | 'near-none'; the
+%                   progress lines print at 'verbose' only.
 %
 % Output:
 %   psa         - The loaded ParamSpaceAnalysis object
@@ -46,6 +54,8 @@ arguments
     options.ColorFcn = []
     options.CLim double = []
     options.ColorLabel (1,:) char = 'fraction excitatory'
+    options.Conditions = {}
+    options.Verbose (1,:) char = 'minimal'
 end
 
 normalize_mode = options.NormalizeMode;
@@ -71,8 +81,8 @@ if ~exist(results_dir, 'dir')
         'Directory not found: %s', results_dir);
 end
 
-fprintf('=== Loading Parameter Space Analysis for Unit Histograms ===\n');
-fprintf('Directory: %s\n\n', results_dir);
+vprintf(options.Verbose, 'verbose', '=== Loading Parameter Space Analysis for Unit Histograms ===\n');
+vprintf(options.Verbose, 'verbose', 'Directory: %s\n\n', results_dir);
 
 %% Load the run
 % from_dir handles what this used to do by hand: read psa_object.mat, fall back
@@ -82,6 +92,7 @@ psa = ParamSpaceAnalysis2.from_dir(results_dir);
 
 %% Get condition info
 condition_names = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
+condition_names = select_conditions(condition_names, options.Conditions);   % empty = all, unchanged
 num_conditions = length(condition_names);
 
 % The shared map, not a local copy. This file held a SIXTH copy of the same
@@ -186,7 +197,7 @@ else
 end
 
 if has_f_variation
-    fprintf('Coloring by %s: CLim [%.3f, %.3f], data [%.3f, %.3f]\n', ...
+    vprintf(options.Verbose, 'verbose', 'Coloring by %s: CLim [%.3f, %.3f], data [%.3f, %.3f]\n', ...
         color_by, f_min, f_max, min(all_f_combined), max(all_f_combined));
 end
 
@@ -201,7 +212,7 @@ for m_idx = 1:length(metrics)
     metric_label = metric_labels{m_idx};
     metric_range = metric_ranges{m_idx};
 
-    fprintf('\nPlotting %s distribution...\n', metric);
+    vprintf(options.Verbose, 'verbose', '\nPlotting %s distribution...\n', metric);
 
     % Create figure with matching dimensions
     fig = figure('Name', sprintf('%s Unit Histogram', metric), ...
@@ -302,6 +313,6 @@ if has_f_variation
 
 end
 
-fprintf('\nDone!\n');
+vprintf(options.Verbose, 'verbose', '\nDone!\n');
 
 end

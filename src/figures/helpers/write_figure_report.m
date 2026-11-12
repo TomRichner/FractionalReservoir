@@ -266,7 +266,9 @@ end
 man_file = fullfile(fig_root, 'manifest.md');
 if isfile(man_file)
     txt = fileread(man_file);
-    for key = {'Run directory', 'Preset', 'Run mode', 'Result', 'Elapsed'}
+    % 'Conditions' (FD-006) says which condition set this figure root drew,
+    % so a _3cond and a _4cond report can be told apart at a glance.
+    for key = {'Run directory', 'Preset', 'Run mode', 'Conditions', 'Result', 'Elapsed'}
         val = regexp(txt, ['^\|\s*' key{1} '\s*\|\s*(.*?)\s*\|\s*$'], ...
             'tokens', 'once', 'lineanchors');
         if ~isempty(val)

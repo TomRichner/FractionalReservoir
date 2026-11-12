@@ -17,7 +17,17 @@ function out = fig_param_space_allStd(cfg)
 % caller can collect or verify them. The requirement is met instead by saving an
 % explicitly named handle, and by deleting the prep folder afterwards.
 %
-% See also: resolve_run_dir, replot_param_space_analysis, fig_EI_param_space
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006). A cell of condition
+% names, one column each, LEFT TO RIGHT IN THE ORDER GIVEN; empty (the
+% default) draws every condition the param-space sample holds, in its order,
+% exactly as before the option existed. Resolved by select_conditions inside
+% replot_param_space_analysis against the run's own PSA object, so a name the
+% run lacks is an error, not a missing column. Column titles come from
+% srnn_condition_titles by NAME (psa.plot). The sheet is 1 x N, 350 px per
+% column.
+%
+% See also: resolve_run_dir, replot_param_space_analysis, fig_EI_param_space,
+%           select_conditions
 
 arguments
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
@@ -26,6 +36,7 @@ arguments
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
+    cfg.conditions                = {}          % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -43,7 +54,7 @@ x_shift = 0.007;   % nudge column dividers slightly left (normalized figure unit
 % 1) Regenerate one distribution figure per registry measure with in_sheets
 %    set (sweep_metrics) into a replot_param_space_<dt>/figures/ folder.
 %    (no 'close all force' -- see the header note; it destroyed sibling figures)
-replot_dir = replot_param_space_analysis(run_dir);
+replot_dir = replot_param_space_analysis(run_dir, 'conditions', cfg.conditions, 'verbose', cfg.verbose);
 specs = sweep_metrics();
 specs = specs([specs.in_sheets]);
 

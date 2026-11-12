@@ -1,40 +1,55 @@
-function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate_n_bins)
+function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate_n_bins, opts)
 % REPLOT_SENSITIVITY Reload 1D sensitivity PSA objects and regenerate figures.
 %
 %   replot_dir = REPLOT_SENSITIVITY(data_root)
 %   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range)
 %   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range, n_bins)
 %   replot_dir = REPLOT_SENSITIVITY(data_root, lle_hist_range, n_bins, rate_n_bins)
+%   replot_dir = REPLOT_SENSITIVITY(..., 'conditions', names, 'verbose', level)
 %
 % Inputs:
 %   data_root      : path to a run_all_<dt> folder containing 1D_sensitivity_*
 %                    subdirectories produced by run_sensitivity_analysis.m
 %   lle_hist_range : optional 2-element [ymin ymax] for the LLE histogram
-%                    (default [-1, 1]); mean_rate uses its plot_sensitivity
-%                    default range of [0, 1]
+%                    (default [-2, 2]); every other measure uses its
+%                    sweep_metrics sens_range
 %   n_bins         : optional number of LLE histogram bins. When omitted, uses
 %                    plot_sensitivity's default (35).
-%   rate_n_bins    : optional number of mean_rate histogram bins. When omitted,
-%                    uses plot_sensitivity's default (35). Pass the same value
-%                    as n_bins to give both metrics the same vertical
-%                    resolution.
-%
-% Note: n_bins counts linspace EDGES, so the plotted image has n_bins+1 rows
-% (n_bins-1 interior bins plus the two -inf/+inf overflow bins).
+%   rate_n_bins    : optional number of bins for every other measure. When
+%                    omitted, uses plot_sensitivity's default (35). Pass the
+%                    same value as n_bins to give all measures the same
+%                    vertical resolution.
+%   'conditions'   : cell of condition names to draw as columns, LEFT TO RIGHT
+%                    IN THE ORDER GIVEN (FD-006). Empty (the default) draws
+%                    every condition each sweep holds, in its own order, as
+%                    before the option existed. Resolved per sweep by
+%                    select_conditions, so a name a sweep does not hold is an
+%                    error (select_conditions:NoSuchCondition), never a
+%                    missing column. The selection is applied to the LOADED
+%                    PSA object's conditions list only (results are keyed by
+%                    name, and plot_sensitivity draws psa.conditions in
+%                    order); nothing is written back to the run.
+%   'verbose'      : 'verbose' | 'minimal' (default) | 'near-none'
 %
 % Output:
 %   replot_dir     : path to the new replot_sensitivity_<dt> folder under data_root
 %
-% No simulations are re-run -- only plotting from saved results.
+% No simulations are re-run -- only plotting from saved results. Only the
+% figures this function draws are saved and closed. It used to save EVERY open
+% figure and then 'close all', which in a batch destroyed the figures of the
+% entries run before it (inventory R13).
 
-    if nargin < 2 || isempty(lle_hist_range)
+arguments
+    data_root (1,:) char
+    lle_hist_range double = []
+    n_bins double = []
+    rate_n_bins double = []
+    opts.conditions = {}
+    opts.verbose (1,:) char = 'minimal'
+end
+
+    if isempty(lle_hist_range)
         lle_hist_range = [-2,2];
-    end
-    if nargin < 3
-        n_bins = [];
-    end
-    if nargin < 4
-        rate_n_bins = [];
     end
 
     setup_paths();
@@ -51,7 +66,7 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate
     if ~exist(replot_dir, 'dir')
         mkdir(replot_dir);
     end
-    fprintf('Replot output directory:\n  %s\n\n', replot_dir);
+    vprintf(opts.verbose, 'verbose', 'Replot output directory:\n  %s\n\n', replot_dir);
 
     % Per-metric plot_sensitivity args (constant across params); include n_bins
     % only when the caller provided it, else plot_sensitivity uses its default.
@@ -83,7 +98,7 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate
             continue;
         end
 
-        fprintf('Loading sensitivity from:\n  %s\n', src_dir);
+        vprintf(opts.verbose, 'verbose', 'Loading sensitivity from:\n  %s\n', src_dir);
         psa = ParamSpaceAnalysis2.from_dir(src_dir);
 
         swept = setdiff(psa.grid_params, {'reps'}, 'stable');
@@ -94,19 +109,33 @@ function replot_dir = replot_sensitivity(data_root, lle_hist_range, n_bins, rate
         end
         param_name = swept{1};
 
+        % The columns, in the requested order (empty = all, unchanged).
+        held = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
+        [~, idx] = select_conditions(held, opts.conditions);
+        psa.conditions = psa.conditions(idx);
+
         psa.output_dir = replot_dir;
 
+        before = findall(groot, 'Type', 'figure');
         for mi = 1:numel(metric_args)
             psa.plot_sensitivity(metric_args{mi}{:});
+        end
+        after = findall(groot, 'Type', 'figure');
+        made = after(~ismember(after, before));
+        if isempty(made)
+            % Never pass an empty list on: save_some_figs_to_folder_2 reads []
+            % as "every open figure".
+            warning('replot_sensitivity:NoFigures', 'plot_sensitivity drew nothing for %s.', src_dir);
+            continue;
         end
 
         fig_dir = fullfile(replot_dir, 'figures');
         save_some_figs_to_folder_2(fig_dir, ...
-            sprintf('sensitivity_%s', param_name), [], {'fig', 'png'});
+            sprintf('sensitivity_%s', param_name), sort([made.Number]), {'fig', 'png'});
 
-        close all;
-        fprintf('  -> figures saved to %s\n\n', fig_dir);
+        close(made);
+        vprintf(opts.verbose, 'verbose', '  -> figures saved to %s\n\n', fig_dir);
     end
 
-    fprintf('Done. All replots in:\n  %s\n', replot_dir);
+    vprintf(opts.verbose, 'verbose', 'Done. All replots in:\n  %s\n', replot_dir);
 end
