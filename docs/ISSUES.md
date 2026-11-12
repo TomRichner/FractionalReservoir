@@ -227,9 +227,44 @@ model's arithmetic.
 
 ### FD-006 Display and reservoir code for the chain
 
-- **Status:** in progress (the reservoir class is briefed to
-  `matlab-fable-2`, Plan A step 3; the figures and tables follow in
-  step 4, after the presets merge)
+- **Status:** in progress. Merged: the reservoir class (`48d9ddd`, merge
+  `4ebf27c`); `cfg.conditions`, `select_conditions` and the pass-through
+  in `make_all_paper_figures` (`85d601d`, merge `3e1bd04`); the sweep
+  figures and the two-condition tau sweep (`9c3f0de`, merge `1debb64`);
+  the stage-data figures and the depression-factor sites (`f8584c7`,
+  `e089e9d`, merge `b487051`). Running: the grouped main figures
+  (`matlab-opus-1`) and the analytic depression figures and generated
+  tables (`matlab-opus-2`).
+  **Decisions by the lead:**
+  1. *The reservoir's time-series depression panel still multiplies the
+     factors of a type's routes together* (so two identical routes draw
+     the factor squared). Left: every product network draws it so today,
+     the model class's plots collapse routes the same way, and product
+     presets' figures are to stay unchanged. A trace per route would be
+     truer: a suggestion, not done.
+  2. *A figure never silently draws other conditions than it was asked
+     for.* A requested condition the run lacks is an error. The one
+     stated exception is `fig_sfa_EOC_allStd`, which draws the
+     intersection of the selection with what the tau sweep holds, since
+     that sweep holds only the multiple-timescale conditions by design.
+  3. *Titles come from the condition name, not from the title a stage
+     saved with its data*, so figures regenerated from older product runs
+     now read "Multiple-Timescale Adaptation (product)" for `sfa3_std2`.
+  4. *The single-neuron figure: three columns in the paper's set, four
+     in the review set.* The worker's rule maps a selection of network
+     conditions onto the single-neuron conditions by mechanism, which
+     draws all four columns in both sets; it is kept as the fallback. The
+     bundle's config names that entry's own conditions per figure set
+     (no adaptation, SFA alone, single-pool depression alone; the review
+     set adds chain depression alone), as the lead told Tom on
+     2026-11-11.
+  5. *Two tests that need the regression run directory are on the slow
+     list and print SKIP without it* (`test_select_conditions_figure`,
+     `test_sweep_figures_conditions`). The data they need is not in git.
+  6. *The display work was split into five briefs, not three:* the option
+     first (the others depend on it), then the sweep and stage packages
+     in parallel, then the grouped composites and the analytic figures in
+     parallel (the composites copy panels from the first two).
 - **Serves:** block A
 - **What:** code outside the dynamics that recomputes the product itself:
   the reservoir class's route signature and time-series plot, the STD
