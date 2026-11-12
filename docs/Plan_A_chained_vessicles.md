@@ -35,6 +35,17 @@ this work, and none is to be written into these documents. Where compute
 is costly, save on compute, not on scope: use the regression tiers and
 `fast` pre-production runs; `medium` and larger runs are Tom's to start.
 
+**Standing instruction (Tom, 2026-11-11, during execution): the lead
+carries this plan through to completion without stopping to ask him.**
+Where the lead would have asked, it decides with its best judgement,
+records the decision and its reason in `docs/ISSUES.md` or
+`docs/WORKLOG.md`, and proceeds to the next step. Every "come back to
+Tom", "reported to Tom" and "do not start until he says go" below is
+superseded by this: those are the lead's decisions, recorded for Tom to
+read afterwards. The limits that stay are in `CLAUDE.md` ("The lead
+carries Plan A through to completion"): no `medium` or larger runs, no
+loosened tolerance, no push, no scope beyond this plan.
+
 **If you are the lead agent picking this up:**
 
 1. Read, in order: `CLAUDE.md` ("Current work"), block A of the to-do list,

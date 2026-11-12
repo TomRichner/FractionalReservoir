@@ -475,7 +475,9 @@ model's arithmetic.
   passes unedited; the four functions contain no depression- or
   facilitation-specific arithmetic; `rhs`, the assembled Jacobian and
   `jacobian_times` (K = 15) are timed before and after at n = 100 and
-  n = 500, and a slowdown above 10 % goes to Tom before the merge; the
+  n = 500, and **the lead decides** whether a slowdown above 10 % is
+  acceptable or worth fixing, recording the decision here (Tom,
+  2026-11-11: this was to go to him; he wants the lead to decide); the
   adapted mutation list fails the tier on the refactored code; then the
   lead re-captures the three exact references once, with the reason in the
   commit.

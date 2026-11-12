@@ -95,6 +95,37 @@ before delegating MATLAB work**: one instance of each agent at a time, and
 every brief states `pool: N`, with at most 12 pool workers summed over all
 MATLAB sessions on the machine. Commit at logical intervals.
 
+**The lead carries Plan A through to completion without stopping to ask
+Tom (Tom, 2026-11-11).** A question left waiting while Tom is away or
+asleep stops all progress for hours, and he does not want that. So:
+
+- **Work through `docs/Plan_A_chained_vessicles.md` in order until it is
+  complete**, orchestrating the workers as it describes. When one step is
+  merged and its gates pass, brief the next. Do not end a turn to wait for
+  an answer; waiting for a worker or a long run is the only reason to
+  pause.
+- **Decisions are the lead's to make, with its best judgement.** Where
+  the lead would once have asked (a design choice the plan leaves open, a
+  worker's departure from its brief, whether a slowdown or a thin spot is
+  acceptable or worth fixing, how to resolve a failing gate), it decides,
+  **writes the decision and its reason into `docs/ISSUES.md` (under the
+  issue) or the session's entry in `docs/WORKLOG.md`**, and proceeds. Tom
+  reads those afterwards and can reverse a decision then. The earlier
+  "come back to Tom" points in the plan (the 10 % timing rule of step 0d
+  among them) are the lead's own decisions now.
+- **Use the worker agents to get the work done**; the lead briefs,
+  reviews every diff, runs the gates and merges.
+- **What does not change:** agents never run `medium` or larger (Plan A
+  ends with one `fast` run, then a report to Tom); a tolerance-tier
+  failure is a defect to find, never a reason to loosen a tolerance; a
+  reference is replaced only deliberately, with the reason in the commit;
+  nothing is pushed; the scope is Plan A as written, and work the lead
+  would like to add beyond it is noted in `ISSUES.md` or the worklog as a
+  suggestion, not done.
+- Decisions that record what the paper will say (parameter values,
+  condition names, what a figure shows) still go into the to-do list in
+  the manuscript repo, marked as the lead's decision so Tom can find them.
+
 How to use the worker agents:
 
 - Each is defined by one file, `.claude/agents/matlab-fable-N.md` or
