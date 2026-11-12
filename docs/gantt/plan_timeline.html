@@ -1,0 +1,1343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Final-draft timeline</title>
+<style>
+:root {
+  --bg: #fbfbfa; --fg: #1d1f22; --muted: #5d636b; --line: #d9dcdf; --line2: #eceef0;
+  --band-block: #e6e9ee; --band-group: #f1f3f5; --proj: #f3f6fb; --gap: #eeeeee;
+  --done: #7c8794; --run-bg: #f2c46d; --run-fg: #b8862c; --plan-bg: #ffffff; --plan: #3f6fb5;
+  --tom-bg: #efe4f7; --tom-fg: #8656a8; --now: #c0392b; --tip-bg: #ffffff; --tip-b: #b9bec5;
+  --code: #2e4f7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17191c; --fg: #e3e5e8; --muted: #9aa1aa; --line: #3a3f45; --line2: #262a2f;
+    --band-block: #2a2f36; --band-group: #21252a; --proj: #1b2230; --gap: #24272b;
+    --done: #8a96a4; --run-bg: #a8792a; --run-fg: #e0b25f; --plan-bg: #1d232c; --plan: #7aa7e8;
+    --tom-bg: #3a2c45; --tom-fg: #c79ae6; --now: #ff6b5b; --tip-bg: #22262b; --tip-b: #4a5058;
+    --code: #9cc0f0;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17191c; --fg: #e3e5e8; --muted: #9aa1aa; --line: #3a3f45; --line2: #262a2f;
+  --band-block: #2a2f36; --band-group: #21252a; --proj: #1b2230; --gap: #24272b;
+  --done: #8a96a4; --run-bg: #a8792a; --run-fg: #e0b25f; --plan-bg: #1d232c; --plan: #7aa7e8;
+  --tom-bg: #3a2c45; --tom-fg: #c79ae6; --now: #ff6b5b; --tip-bg: #22262b; --tip-b: #4a5058;
+  --code: #9cc0f0;
+}
+html, body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { padding: 16px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+p { margin: 6px 0; max-width: 72rem; }
+.meta { color: var(--muted); }
+.cols { display: flex; flex-wrap: wrap; gap: 16px 32px; margin: 10px 0 14px; }
+.cols > section { flex: 1 1 22rem; max-width: 46rem; }
+h2 { font-size: 15px; margin: 6px 0; }
+table { border-collapse: collapse; }
+td, th { border-bottom: 1px solid var(--line); padding: 3px 8px 3px 0; vertical-align: top; text-align: left; }
+td.num { white-space: nowrap; }
+dl.legend { display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; margin: 0; }
+dl.legend dt { white-space: nowrap; }
+.sw { display: inline-block; width: 26px; height: 12px; vertical-align: -1px; border-radius: 2px; margin-right: 4px; }
+.sw.done { background: var(--done); }
+.sw.running { background: repeating-linear-gradient(45deg, var(--run-bg) 0 4px, var(--run-fg) 4px 6px); }
+.sw.planned { background: var(--plan-bg); border: 1.5px solid var(--plan); box-sizing: border-box; }
+.sw.tom { background: radial-gradient(var(--tom-fg) 1px, var(--tom-bg) 1.5px) 0 0 / 6px 6px; border: 1.5px solid var(--tom-fg); box-sizing: border-box; }
+.sw.rough { background: var(--plan-bg); border: 1.5px dashed var(--plan); box-sizing: border-box; opacity: .75; }
+.sw.now { width: 2px; background: var(--now); }
+code { color: var(--code); }
+.scroll { overflow-x: auto; border: 1px solid var(--line); background: var(--bg); }
+.inner { display: flex; width: max-content; }
+.labels { position: sticky; left: 0; z-index: 2; flex: none; }
+.chart { flex: none; display: block; }
+svg text { fill: var(--fg); font-size: 12px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.lbg { fill: var(--bg); }
+.band-block { fill: var(--band-block); }
+.band-group { fill: var(--band-group); }
+.proj { fill: var(--proj); }
+.gap { fill: var(--gap); }
+.gaplabel { fill: var(--muted); font-size: 10px; }
+.g-hour { stroke: var(--line2); stroke-width: 1; }
+.g-q { stroke: var(--line); stroke-width: 1; }
+.g-day { stroke: var(--line); stroke-width: 1.5; }
+.axisline { stroke: var(--line); }
+.divider { stroke: var(--line); }
+.tick { font-size: 10px; fill: var(--muted); }
+.tick.fut { font-style: italic; }
+.day { font-size: 11px; font-weight: 600; fill: var(--muted); }
+.day.fut { font-style: italic; font-weight: 400; }
+.colhead { font-weight: 600; fill: var(--muted); font-size: 11px; }
+.blockname { font-weight: 700; font-size: 13px; }
+.groupname { font-size: 11px; fill: var(--muted); font-weight: 600; }
+.code { font-family: ui-monospace, Consolas, monospace; fill: var(--code); font-size: 12px; }
+.who, .stat { font-size: 11px; fill: var(--muted); }
+.lhit { fill: transparent; }
+.lrow:hover .lhit, .lrow.hl .lhit { fill: var(--proj); }
+.bar { stroke-width: 1.5; }
+.st-done { fill: var(--done); stroke: var(--done); }
+.st-running { fill: url(#p-run); stroke: var(--run-fg); }
+.st-planned { fill: var(--plan-bg); stroke: var(--plan); }
+.st-tom { fill: url(#p-tom); stroke: var(--tom-fg); }
+.rough { stroke-dasharray: 5 3; opacity: .78; }
+.p-run-bg { fill: var(--run-bg); } .p-run-fg { stroke: var(--run-fg); stroke-width: 3; }
+.p-tom-bg { fill: var(--tom-bg); } .p-tom-fg { fill: var(--tom-fg); }
+.estmark { stroke: var(--fg); stroke-width: 1.5; stroke-dasharray: 2 2; }
+.barlabel { font-size: 10.5px; fill: var(--muted); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+.now { stroke: var(--now); stroke-width: 2; }
+.nowlabel { fill: var(--now); font-size: 11px; font-weight: 700; }
+g.task { cursor: default; outline: none; }
+g.task:focus .bar, g.task:hover .bar, g.task.hl .bar { stroke: var(--fg); stroke-width: 2.5; }
+#tip { position: fixed; z-index: 10; display: none; max-width: 30rem; background: var(--tip-bg);
+  color: var(--fg); border: 1px solid var(--tip-b); border-radius: 6px; padding: 10px 12px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.18); font-size: 13px; pointer-events: none; }
+#tip h3 { margin: 0 0 2px; font-size: 14px; }
+#tip .read { color: var(--muted); font-size: 11.5px; margin-bottom: 6px; }
+#tip p { margin: 4px 0; }
+#tip .k { color: var(--muted); }
+#tip .roughnote { font-style: italic; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Final-draft work: build and test timeline</h1>
+<p class="meta">Generated 2026-11-12 10:47 (UTC-06:00) from <code>docs/gantt/timeline.toml</code> by <code>build_timeline.py</code>.</p>
+<p><strong>For visibility only.</strong> This chart shows the current plan and an estimate of how long its steps take. It sets no finish date for anything. Past work sits at its real times from the git log; everything right of the red <em>now</em> line is a projection in working time from now, as if the work ran without pause (no nights, no waiting for Tom). It is regenerated after every merge and the estimates are corrected each time; blocks B, C and D will move most as they are planned.</p>
+<p><strong>For agents building or testing:</strong> nobody is bound by this chart. A step takes as long as doing it properly takes; never shorten, skip, reorder or hurry work to match a bar. A step that runs longer than its estimate is not a problem, only an estimate to correct at the next update. Quality comes first and the plan is the guide.</p>
+<div class="cols">
+<section>
+<h2>Remaining estimated work per block</h2>
+<table><thead><tr><th>Block</th><th>Tasks done</th><th>Remaining, working time</th></tr></thead>
+<tbody>
+<tr><td>Block A: 1TS vs MTS on one equation (chained pools, Plan A)</td><td class="num">33 of 43</td><td class="num">18 h 30 min (includes guesses)</td></tr>
+<tr><td>Block B: stimulation suppresses discharges because of adaptation</td><td class="num">0 of 6</td><td class="num">40 h (rough, mostly guesses)</td></tr>
+<tr><td>Block C: memory capacity across connectivity (gain sweep)</td><td class="num">0 of 6</td><td class="num">39 h (rough, mostly guesses)</td></tr>
+<tr><td>Block D: the closing figure</td><td class="num">0 of 3</td><td class="num">12 h (rough, mostly guesses)</td></tr>
+</tbody></table>
+<h2>Estimates against actuals</h2>
+<p>1 of 33 finished tasks had an estimate recorded before they ran. Actual / estimate: median 1.78, range 1.78.</p><ul><li><code>A_3_T</code> Preliminary fast run of mu7chain: estimated 2.5 to 3 h (drawn as the midpoint, 2 h 45 min), took 4 h 54 min (ratio 1.78)</li></ul><p class="meta">The other finished tasks show their actual time alone. Estimates are not filled in after the fact. From now on a task's estimate is frozen when it starts, so this comparison grows with every finished task. It is information for planning, not a score.</p>
+</section>
+<section>
+<h2>How to read it</h2>
+<dl class="legend">
+<dt><code>A_0c_T</code></dt><dd>Task code <em>stage_step_kind</em>: block A, step 0c of the plan, a Test. Kinds: P plan, B build, T test. A trailing number (<code>A_4_B2</code>) separates several tasks of one kind in one step. Rough blocks number their steps 0, 1, 2&hellip; with 0 the planning step.</dd>
+<dt><span class="sw done"></span>&#x2713; done</dt><dd>finished; drawn at its actual times</dd>
+<dt><span class="sw running"></span>&#x25B6; running</dt><dd>under way now; a dotted tick marks where its estimate ended if it runs longer</dd>
+<dt><span class="sw planned"></span>&#x25CB; planned</dt><dd>not started; placed after what it waits for</dd>
+<dt><span class="sw tom"></span>&#x25C6; waiting on Tom</dt><dd>needs Tom: a decision, a review, or a run only Tom starts</dd>
+<dt><span class="sw rough"></span>dashed</dt><dd>rough: not planned in detail, duration a guess (&asymp;)</dd>
+<dt><span class="sw now"></span> now</dt><dd>when this page was generated</dd>
+<dt>grey &ldquo;idle&rdquo; column</dt><dd>a past stretch with no recorded work, drawn narrow</dd>
+</dl>
+<p>Hover over (or tab to) a bar or a row for what the step does, who does it, what it waits for and how it is checked.</p>
+</section>
+</div>
+<div class="scroll"><div class="inner">
+<svg class="labels" width="590" height="1764" viewBox="0 0 590 1764" aria-hidden="false">
+<rect class="lbg" x="0" y="0" width="590" height="1764"/>
+<text class="colhead" x="8" y="41">code</text><text class="colhead" x="92" y="41">task</text><text class="colhead" x="392" y="41">who</text><text class="colhead" x="482" y="41">status</text>
+<line class="axisline" x1="0" y1="46" x2="590" y2="46"/>
+<rect class="band-block" x="0" y="46" width="590" height="30"/>
+<text class="blockname" x="8" y="66">Block A: 1TS vs MTS on one equation (chained pools, Plan A)</text>
+<rect class="band-group" x="0" y="76" width="590" height="22"/>
+<text class="groupname" x="14" y="91">Before Plan A: tests and regression (2026-11-10)</text>
+<g class="task lrow" data-id="A_0_T1">
+<rect class="lhit" x="0" y="98" width="590" height="24"/>
+<text class="code" x="8" y="114.0">A_0_T1</text>
+<text class="tname" x="92" y="114.0">Audit the existing tests</text>
+<text class="who" x="392" y="114.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="114.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0_T2">
+<rect class="lhit" x="0" y="122" width="590" height="24"/>
+<text class="code" x="8" y="138.0">A_0_T2</text>
+<text class="tname" x="92" y="138.0">Regression bundle (100-neuron copy)</text>
+<text class="who" x="392" y="138.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="138.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0_T3">
+<rect class="lhit" x="0" y="146" width="590" height="24"/>
+<text class="code" x="8" y="162.0">A_0_T3</text>
+<text class="tname" x="92" y="162.0">Regression references in three tiers</text>
+<text class="who" x="392" y="162.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="162.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0_B">
+<rect class="lhit" x="0" y="170" width="590" height="24"/>
+<text class="code" x="8" y="186.0">A_0_B</text>
+<text class="tname" x="92" y="186.0">Six MATLAB worker agents set up</text>
+<text class="who" x="392" y="186.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="186.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0_P1">
+<rect class="lhit" x="0" y="194" width="590" height="24"/>
+<text class="code" x="8" y="210.0">A_0_P1</text>
+<text class="tname" x="92" y="210.0">Plan A written (first version)</text>
+<text class="who" x="392" y="210.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="210.0">✓ done</text>
+</g>
+<rect class="band-group" x="0" y="218" width="590" height="22"/>
+<text class="groupname" x="14" y="233">Planning with Tom (2026-11-11)</text>
+<g class="task lrow" data-id="A_0_P2">
+<rect class="lhit" x="0" y="240" width="590" height="24"/>
+<text class="code" x="8" y="256.0">A_0_P2</text>
+<text class="tname" x="92" y="256.0">Planning with Tom: build order, interface</text>
+<text class="who" x="392" y="256.0">lead + Tom</text>
+<text class="stat st-done-t" x="482" y="256.0">✓ done</text>
+</g>
+<rect class="band-group" x="0" y="264" width="590" height="22"/>
+<text class="groupname" x="14" y="279">Plan A: foundation (steps 0 to 0d)</text>
+<g class="task lrow" data-id="A_0_T4">
+<rect class="lhit" x="0" y="286" width="590" height="24"/>
+<text class="code" x="8" y="302.0">A_0_T4</text>
+<text class="tname" x="92" y="302.0">Pre-flight checks before building</text>
+<text class="who" x="392" y="302.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="302.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_2_P">
+<rect class="lhit" x="0" y="310" width="590" height="24"/>
+<text class="code" x="8" y="326.0">A_2_P</text>
+<text class="tname" x="92" y="326.0">Inventory of display code to change</text>
+<text class="who" x="392" y="326.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="326.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0a_B">
+<rect class="lhit" x="0" y="334" width="590" height="24"/>
+<text class="code" x="8" y="350.0">A_0a_B</text>
+<text class="tname" x="92" y="350.0">Parallel-pool module</text>
+<text class="who" x="392" y="350.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="350.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0a_T">
+<rect class="lhit" x="0" y="358" width="590" height="24"/>
+<text class="code" x="8" y="374.0">A_0a_T</text>
+<text class="tname" x="92" y="374.0">Full-tier gate on the pool module</text>
+<text class="who" x="392" y="374.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="374.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0b_B1">
+<rect class="lhit" x="0" y="382" width="590" height="24"/>
+<text class="code" x="8" y="398.0">A_0b_B1</text>
+<text class="tname" x="92" y="398.0">Tolerance regression tier and anchor</text>
+<text class="who" x="392" y="398.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="398.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0b_B2">
+<rect class="lhit" x="0" y="406" width="590" height="24"/>
+<text class="code" x="8" y="422.0">A_0b_B2</text>
+<text class="tname" x="92" y="422.0">Seed for the joint parameter sample</text>
+<text class="who" x="392" y="422.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="422.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0c_T">
+<rect class="lhit" x="0" y="430" width="590" height="24"/>
+<text class="code" x="8" y="446.0">A_0c_T</text>
+<text class="tname" x="92" y="446.0">Mutation checks on the tolerance tier</text>
+<text class="who" x="392" y="446.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="446.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0c_P">
+<rect class="lhit" x="0" y="454" width="590" height="24"/>
+<text class="code" x="8" y="470.0">A_0c_P</text>
+<text class="tname" x="92" y="470.0">Tom fixes the tolerances</text>
+<text class="who" x="392" y="470.0">Tom</text>
+<text class="stat st-done-t" x="482" y="470.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0d_B">
+<rect class="lhit" x="0" y="478" width="590" height="24"/>
+<text class="code" x="8" y="494.0">A_0d_B</text>
+<text class="tname" x="92" y="494.0">Refactor onto one route interface</text>
+<text class="who" x="392" y="494.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="494.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_0d_T">
+<rect class="lhit" x="0" y="502" width="590" height="24"/>
+<text class="code" x="8" y="518.0">A_0d_T</text>
+<text class="tname" x="92" y="518.0">Gates; exact references re-captured</text>
+<text class="who" x="392" y="518.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="518.0">✓ done</text>
+</g>
+<rect class="band-group" x="0" y="526" width="590" height="22"/>
+<text class="groupname" x="14" y="541">Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)</text>
+<g class="task lrow" data-id="A_1_B">
+<rect class="lhit" x="0" y="548" width="590" height="24"/>
+<text class="code" x="8" y="564.0">A_1_B</text>
+<text class="tname" x="92" y="564.0">Chained vesicle-pool depression</text>
+<text class="who" x="392" y="564.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="564.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_1_T">
+<rect class="lhit" x="0" y="572" width="590" height="24"/>
+<text class="code" x="8" y="588.0">A_1_T</text>
+<text class="tname" x="92" y="588.0">Lead&#x27;s gates on the chain merge</text>
+<text class="who" x="392" y="588.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="588.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_5_T">
+<rect class="lhit" x="0" y="596" width="590" height="24"/>
+<text class="code" x="8" y="612.0">A_5_T</text>
+<text class="tname" x="92" y="612.0">Regression references for the chain</text>
+<text class="who" x="392" y="612.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="612.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_8_B">
+<rect class="lhit" x="0" y="620" width="590" height="24"/>
+<text class="code" x="8" y="636.0">A_8_B</text>
+<text class="tname" x="92" y="636.0">Release-coupled facilitation</text>
+<text class="who" x="392" y="636.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="636.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_8_T">
+<rect class="lhit" x="0" y="644" width="590" height="24"/>
+<text class="code" x="8" y="660.0">A_8_T</text>
+<text class="tname" x="92" y="660.0">Lead&#x27;s gates on the facilitation merge</text>
+<text class="who" x="392" y="660.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="660.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_9_B">
+<rect class="lhit" x="0" y="668" width="590" height="24"/>
+<text class="code" x="8" y="684.0">A_9_B</text>
+<text class="tname" x="92" y="684.0">Per-neuron spread of synapse parameters</text>
+<text class="who" x="392" y="684.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="684.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_9_T">
+<rect class="lhit" x="0" y="692" width="590" height="24"/>
+<text class="code" x="8" y="708.0">A_9_T</text>
+<text class="tname" x="92" y="708.0">Lead&#x27;s gates on the spread merge</text>
+<text class="who" x="392" y="708.0">lead agent</text>
+<text class="stat st-running-t" x="482" y="708.0">▶ running</text>
+</g>
+<rect class="band-group" x="0" y="716" width="590" height="22"/>
+<text class="groupname" x="14" y="731">Plan A: presets, display code and figures (steps 3, 4, 7)</text>
+<g class="task lrow" data-id="A_3_B1">
+<rect class="lhit" x="0" y="738" width="590" height="24"/>
+<text class="code" x="8" y="754.0">A_3_B1</text>
+<text class="tname" x="92" y="754.0">Reservoir class sees the chain</text>
+<text class="who" x="392" y="754.0">Fable worker</text>
+<text class="stat st-done-t" x="482" y="754.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_3_B2">
+<rect class="lhit" x="0" y="762" width="590" height="24"/>
+<text class="code" x="8" y="778.0">A_3_B2</text>
+<text class="tname" x="92" y="778.0">Chain presets and the mu7chain bundle</text>
+<text class="who" x="392" y="778.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="778.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_3_T">
+<rect class="lhit" x="0" y="786" width="590" height="24"/>
+<text class="code" x="8" y="802.0">A_3_T</text>
+<text class="tname" x="92" y="802.0">Preliminary fast run of mu7chain</text>
+<text class="who" x="392" y="802.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="802.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_4_B1">
+<rect class="lhit" x="0" y="810" width="590" height="24"/>
+<text class="code" x="8" y="826.0">A_4_B1</text>
+<text class="tname" x="92" y="826.0">Figures: the condition-selection option</text>
+<text class="who" x="392" y="826.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="826.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_4_B2">
+<rect class="lhit" x="0" y="834" width="590" height="24"/>
+<text class="code" x="8" y="850.0">A_4_B2</text>
+<text class="tname" x="92" y="850.0">Figures: the parameter sweeps</text>
+<text class="who" x="392" y="850.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="850.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_4_B3">
+<rect class="lhit" x="0" y="858" width="590" height="24"/>
+<text class="code" x="8" y="874.0">A_4_B3</text>
+<text class="tname" x="92" y="874.0">Figures: the analysis stages</text>
+<text class="who" x="392" y="874.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="874.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_4_B4">
+<rect class="lhit" x="0" y="882" width="590" height="24"/>
+<text class="code" x="8" y="898.0">A_4_B4</text>
+<text class="tname" x="92" y="898.0">Figures: steady state, concepts, tables</text>
+<text class="who" x="392" y="898.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="898.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_4_B5">
+<rect class="lhit" x="0" y="906" width="590" height="24"/>
+<text class="code" x="8" y="922.0">A_4_B5</text>
+<text class="tname" x="92" y="922.0">Figures: the grouped main figures</text>
+<text class="who" x="392" y="922.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="922.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_7_B">
+<rect class="lhit" x="0" y="930" width="590" height="24"/>
+<text class="code" x="8" y="946.0">A_7_B</text>
+<text class="tname" x="92" y="946.0">Figure: 1TS against chained MTS</text>
+<text class="who" x="392" y="946.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="946.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_4_T">
+<rect class="lhit" x="0" y="954" width="590" height="24"/>
+<text class="code" x="8" y="970.0">A_4_T</text>
+<text class="tname" x="92" y="970.0">Integration pass: both figure sets build</text>
+<text class="who" x="392" y="970.0">Opus worker</text>
+<text class="stat st-done-t" x="482" y="970.0">✓ done</text>
+</g>
+<rect class="band-group" x="0" y="978" width="590" height="22"/>
+<text class="groupname" x="14" y="993">Plan A: finishing (steps 10 to 12) and after</text>
+<g class="task lrow" data-id="A_10_B">
+<rect class="lhit" x="0" y="1000" width="590" height="24"/>
+<text class="code" x="8" y="1016.0">A_10_B</text>
+<text class="tname" x="92" y="1016.0">Spread into the mu7chain preset</text>
+<text class="who" x="392" y="1016.0">lead agent</text>
+<text class="stat st-done-t" x="482" y="1016.0">✓ done</text>
+</g>
+<g class="task lrow" data-id="A_10_T1">
+<rect class="lhit" x="0" y="1024" width="590" height="24"/>
+<text class="code" x="8" y="1040.0">A_10_T1</text>
+<text class="tname" x="92" y="1040.0">Hold point: Tom looks at example traces</text>
+<text class="who" x="392" y="1040.0">Tom</text>
+<text class="stat st-tom-t" x="482" y="1040.0">◆ waiting on Tom</text>
+</g>
+<g class="task lrow" data-id="A_10_T2">
+<rect class="lhit" x="0" y="1048" width="590" height="24"/>
+<text class="code" x="8" y="1064.0">A_10_T2</text>
+<text class="tname" x="92" y="1064.0">Full regression tier</text>
+<text class="who" x="392" y="1064.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1064.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="A_10_T3">
+<rect class="lhit" x="0" y="1072" width="590" height="24"/>
+<text class="code" x="8" y="1088.0">A_10_T3</text>
+<text class="tname" x="92" y="1088.0">Full reference re-captured</text>
+<text class="who" x="392" y="1088.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1088.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="A_11_T1">
+<rect class="lhit" x="0" y="1096" width="590" height="24"/>
+<text class="code" x="8" y="1112.0">A_11_T1</text>
+<text class="tname" x="92" y="1112.0">Fast run, four conditions (12 workers)</text>
+<text class="who" x="392" y="1112.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1112.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="A_11_T2">
+<rect class="lhit" x="0" y="1120" width="590" height="24"/>
+<text class="code" x="8" y="1136.0">A_11_T2</text>
+<text class="tname" x="92" y="1136.0">Three-condition figure set (paper)</text>
+<text class="who" x="392" y="1136.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1136.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="A_11_T3">
+<rect class="lhit" x="0" y="1144" width="590" height="24"/>
+<text class="code" x="8" y="1160.0">A_11_T3</text>
+<text class="tname" x="92" y="1160.0">Four-condition figure set (review)</text>
+<text class="who" x="392" y="1160.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1160.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="A_11_T4">
+<rect class="lhit" x="0" y="1168" width="590" height="24"/>
+<text class="code" x="8" y="1184.0">A_11_T4</text>
+<text class="tname" x="92" y="1184.0">Check every stage and figure; report</text>
+<text class="who" x="392" y="1184.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1184.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="A_12_T">
+<rect class="lhit" x="0" y="1192" width="590" height="24"/>
+<text class="code" x="8" y="1208.0">A_12_T</text>
+<text class="tname" x="92" y="1208.0">Close-out: Plan A &#x27;done means&#x27; list</text>
+<text class="who" x="392" y="1208.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1208.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="A_13_B">
+<rect class="lhit" x="0" y="1216" width="590" height="24"/>
+<text class="code" x="8" y="1232.0">A_13_B</text>
+<text class="tname" x="92" y="1232.0">Medium run(s) for the paper (Tom)</text>
+<text class="who" x="392" y="1232.0">Tom</text>
+<text class="stat st-tom-t" x="482" y="1232.0">◆ waiting on Tom</text>
+</g>
+<rect class="band-block" x="0" y="1240" width="590" height="30"/>
+<text class="blockname" x="8" y="1260">Block B: stimulation suppresses discharges because of adaptation</text>
+<rect class="band-group" x="0" y="1270" width="590" height="22"/>
+<text class="groupname" x="14" y="1285">Block B (rough: not yet planned in detail)</text>
+<g class="task lrow" data-id="B_0_P">
+<rect class="lhit" x="0" y="1292" width="590" height="24"/>
+<text class="code" x="8" y="1308.0">B_0_P</text>
+<text class="tname" x="92" y="1308.0">Plan block B with Tom</text>
+<text class="who" x="392" y="1308.0">lead + Tom</text>
+<text class="stat st-tom-t" x="482" y="1308.0">◆ waiting on Tom</text>
+</g>
+<g class="task lrow" data-id="B_1_B">
+<rect class="lhit" x="0" y="1316" width="590" height="24"/>
+<text class="code" x="8" y="1332.0">B_1_B</text>
+<text class="tname" x="92" y="1332.0">Causal 2 x 2 with frozen-state arm</text>
+<text class="who" x="392" y="1332.0">worker agents</text>
+<text class="stat st-planned-t" x="482" y="1332.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="B_2_B">
+<rect class="lhit" x="0" y="1340" width="590" height="24"/>
+<text class="code" x="8" y="1356.0">B_2_B</text>
+<text class="tname" x="92" y="1356.0">Parameter-space version of the experiment</text>
+<text class="who" x="392" y="1356.0">worker agents</text>
+<text class="stat st-planned-t" x="482" y="1356.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="B_3_T">
+<rect class="lhit" x="0" y="1364" width="590" height="24"/>
+<text class="code" x="8" y="1380.0">B_3_T</text>
+<text class="tname" x="92" y="1380.0">Fast run of the stimulation experiments</text>
+<text class="who" x="392" y="1380.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1380.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="B_4_B">
+<rect class="lhit" x="0" y="1388" width="590" height="24"/>
+<text class="code" x="8" y="1404.0">B_4_B</text>
+<text class="tname" x="92" y="1404.0">Medium run of block B (Tom)</text>
+<text class="who" x="392" y="1404.0">Tom</text>
+<text class="stat st-tom-t" x="482" y="1404.0">◆ waiting on Tom</text>
+</g>
+<g class="task lrow" data-id="B_5_B">
+<rect class="lhit" x="0" y="1412" width="590" height="24"/>
+<text class="code" x="8" y="1428.0">B_5_B</text>
+<text class="tname" x="92" y="1428.0">Combined stimulation figure (Figs 7 + 8)</text>
+<text class="who" x="392" y="1428.0">worker agents</text>
+<text class="stat st-planned-t" x="482" y="1428.0">○ planned</text>
+</g>
+<rect class="band-block" x="0" y="1436" width="590" height="30"/>
+<text class="blockname" x="8" y="1456">Block C: memory capacity across connectivity (gain sweep)</text>
+<rect class="band-group" x="0" y="1466" width="590" height="22"/>
+<text class="groupname" x="14" y="1481">Block C (rough: not yet planned in detail)</text>
+<g class="task lrow" data-id="C_0_P">
+<rect class="lhit" x="0" y="1488" width="590" height="24"/>
+<text class="code" x="8" y="1504.0">C_0_P</text>
+<text class="tname" x="92" y="1504.0">Plan block C with Tom</text>
+<text class="who" x="392" y="1504.0">lead + Tom</text>
+<text class="stat st-tom-t" x="482" y="1504.0">◆ waiting on Tom</text>
+</g>
+<g class="task lrow" data-id="C_1_T">
+<rect class="lhit" x="0" y="1512" width="590" height="24"/>
+<text class="code" x="8" y="1528.0">C_1_T</text>
+<text class="tname" x="92" y="1528.0">Pilot: no-adaptation gain sweep</text>
+<text class="who" x="392" y="1528.0">worker agents</text>
+<text class="stat st-planned-t" x="482" y="1528.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="C_2_B">
+<rect class="lhit" x="0" y="1536" width="590" height="24"/>
+<text class="code" x="8" y="1552.0">C_2_B</text>
+<text class="tname" x="92" y="1552.0">Gain-sweep stage and E:I presets</text>
+<text class="who" x="392" y="1552.0">worker agents</text>
+<text class="stat st-planned-t" x="482" y="1552.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="C_3_T">
+<rect class="lhit" x="0" y="1560" width="590" height="24"/>
+<text class="code" x="8" y="1576.0">C_3_T</text>
+<text class="tname" x="92" y="1576.0">Fast run of the gain sweep</text>
+<text class="who" x="392" y="1576.0">lead agent</text>
+<text class="stat st-planned-t" x="482" y="1576.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="C_4_B">
+<rect class="lhit" x="0" y="1584" width="590" height="24"/>
+<text class="code" x="8" y="1600.0">C_4_B</text>
+<text class="tname" x="92" y="1600.0">Medium gain-sweep runs (Tom)</text>
+<text class="who" x="392" y="1600.0">Tom</text>
+<text class="stat st-tom-t" x="482" y="1600.0">◆ waiting on Tom</text>
+</g>
+<g class="task lrow" data-id="C_5_B">
+<rect class="lhit" x="0" y="1608" width="590" height="24"/>
+<text class="code" x="8" y="1624.0">C_5_B</text>
+<text class="tname" x="92" y="1624.0">Statistics and memory figure</text>
+<text class="who" x="392" y="1624.0">worker agents</text>
+<text class="stat st-planned-t" x="482" y="1624.0">○ planned</text>
+</g>
+<rect class="band-block" x="0" y="1632" width="590" height="30"/>
+<text class="blockname" x="8" y="1652">Block D: the closing figure</text>
+<rect class="band-group" x="0" y="1662" width="590" height="22"/>
+<text class="groupname" x="14" y="1677">Block D (rough: not yet planned in detail)</text>
+<g class="task lrow" data-id="D_0_P">
+<rect class="lhit" x="0" y="1684" width="590" height="24"/>
+<text class="code" x="8" y="1700.0">D_0_P</text>
+<text class="tname" x="92" y="1700.0">Sketch the closing figure&#x27;s panels</text>
+<text class="who" x="392" y="1700.0">lead + Tom</text>
+<text class="stat st-tom-t" x="482" y="1700.0">◆ waiting on Tom</text>
+</g>
+<g class="task lrow" data-id="D_1_B">
+<rect class="lhit" x="0" y="1708" width="590" height="24"/>
+<text class="code" x="8" y="1724.0">D_1_B</text>
+<text class="tname" x="92" y="1724.0">Build the closing figure and supplements</text>
+<text class="who" x="392" y="1724.0">worker agents</text>
+<text class="stat st-planned-t" x="482" y="1724.0">○ planned</text>
+</g>
+<g class="task lrow" data-id="D_2_B">
+<rect class="lhit" x="0" y="1732" width="590" height="24"/>
+<text class="code" x="8" y="1748.0">D_2_B</text>
+<text class="tname" x="92" y="1748.0">Results text for the closing figure</text>
+<text class="who" x="392" y="1748.0">lead + Tom</text>
+<text class="stat st-tom-t" x="482" y="1748.0">◆ waiting on Tom</text>
+</g>
+<line class="divider" x1="589.5" y1="0" x2="589.5" y2="1764"/>
+</svg>
+<svg class="chart" width="3810" height="1764" viewBox="0 0 3810 1764" role="img" aria-label="Gantt chart of the final-draft work">
+<defs>
+<pattern id="p-run" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+<rect class="p-run-bg" width="8" height="8"/><line class="p-run-fg" x1="0" y1="0" x2="0" y2="8"/></pattern>
+<pattern id="p-tom" width="6" height="6" patternUnits="userSpaceOnUse">
+<rect class="p-tom-bg" width="6" height="6"/><circle class="p-tom-fg" cx="3" cy="3" r="1.2"/></pattern>
+</defs>
+<rect class="proj" x="1400.0" y="0" width="2240.0" height="1764"/>
+<rect class="band-block" x="0" y="46" width="3810" height="30"/>
+<rect class="band-group" x="0" y="76" width="3810" height="22"/>
+<rect class="band-group" x="0" y="218" width="3810" height="22"/>
+<rect class="band-group" x="0" y="264" width="3810" height="22"/>
+<rect class="band-group" x="0" y="526" width="3810" height="22"/>
+<rect class="band-group" x="0" y="716" width="3810" height="22"/>
+<rect class="band-group" x="0" y="978" width="3810" height="22"/>
+<rect class="band-block" x="0" y="1240" width="3810" height="30"/>
+<rect class="band-group" x="0" y="1270" width="3810" height="22"/>
+<rect class="band-block" x="0" y="1436" width="3810" height="30"/>
+<rect class="band-group" x="0" y="1466" width="3810" height="22"/>
+<rect class="band-block" x="0" y="1632" width="3810" height="30"/>
+<rect class="band-group" x="0" y="1662" width="3810" height="22"/>
+<rect class="gap" x="240.0" y="18" width="40" height="1746"/>
+<text class="gaplabel" x="260.0" y="41" text-anchor="middle">idle</text>
+<text class="gaplabel" x="260.0" y="60" text-anchor="middle">7 h</text>
+<line class="g-hour" x1="0.0" y1="30" x2="0.0" y2="1764"/>
+<text class="tick" x="2.0" y="41">18</text>
+<line class="g-q" x1="10.0" y1="36" x2="10.0" y2="46"/>
+<line class="g-q" x1="20.0" y1="36" x2="20.0" y2="46"/>
+<line class="g-q" x1="30.0" y1="36" x2="30.0" y2="46"/>
+<line class="g-hour" x1="40.0" y1="30" x2="40.0" y2="1764"/>
+<text class="tick" x="42.0" y="41">19</text>
+<line class="g-q" x1="50.0" y1="36" x2="50.0" y2="46"/>
+<line class="g-q" x1="60.0" y1="36" x2="60.0" y2="46"/>
+<line class="g-q" x1="70.0" y1="36" x2="70.0" y2="46"/>
+<line class="g-hour" x1="80.0" y1="30" x2="80.0" y2="1764"/>
+<text class="tick" x="82.0" y="41">20</text>
+<line class="g-q" x1="90.0" y1="36" x2="90.0" y2="46"/>
+<line class="g-q" x1="100.0" y1="36" x2="100.0" y2="46"/>
+<line class="g-q" x1="110.0" y1="36" x2="110.0" y2="46"/>
+<line class="g-hour" x1="120.0" y1="30" x2="120.0" y2="1764"/>
+<text class="tick" x="122.0" y="41">21</text>
+<line class="g-q" x1="130.0" y1="36" x2="130.0" y2="46"/>
+<line class="g-q" x1="140.0" y1="36" x2="140.0" y2="46"/>
+<line class="g-q" x1="150.0" y1="36" x2="150.0" y2="46"/>
+<line class="g-hour" x1="160.0" y1="30" x2="160.0" y2="1764"/>
+<text class="tick" x="162.0" y="41">22</text>
+<line class="g-q" x1="170.0" y1="36" x2="170.0" y2="46"/>
+<line class="g-q" x1="180.0" y1="36" x2="180.0" y2="46"/>
+<line class="g-q" x1="190.0" y1="36" x2="190.0" y2="46"/>
+<line class="g-hour" x1="200.0" y1="30" x2="200.0" y2="1764"/>
+<text class="tick" x="202.0" y="41">23</text>
+<line class="g-q" x1="210.0" y1="36" x2="210.0" y2="46"/>
+<line class="g-q" x1="220.0" y1="36" x2="220.0" y2="46"/>
+<line class="g-q" x1="230.0" y1="36" x2="230.0" y2="46"/>
+<line class="g-hour" x1="240.0" y1="30" x2="240.0" y2="1764"/>
+<line class="g-hour" x1="280.0" y1="30" x2="280.0" y2="1764"/>
+<text class="tick" x="282.0" y="41">07</text>
+<line class="g-q" x1="290.0" y1="36" x2="290.0" y2="46"/>
+<line class="g-q" x1="300.0" y1="36" x2="300.0" y2="46"/>
+<line class="g-q" x1="310.0" y1="36" x2="310.0" y2="46"/>
+<line class="g-hour" x1="320.0" y1="30" x2="320.0" y2="1764"/>
+<text class="tick" x="322.0" y="41">08</text>
+<line class="g-q" x1="330.0" y1="36" x2="330.0" y2="46"/>
+<line class="g-q" x1="340.0" y1="36" x2="340.0" y2="46"/>
+<line class="g-q" x1="350.0" y1="36" x2="350.0" y2="46"/>
+<line class="g-hour" x1="360.0" y1="30" x2="360.0" y2="1764"/>
+<text class="tick" x="362.0" y="41">09</text>
+<line class="g-q" x1="370.0" y1="36" x2="370.0" y2="46"/>
+<line class="g-q" x1="380.0" y1="36" x2="380.0" y2="46"/>
+<line class="g-q" x1="390.0" y1="36" x2="390.0" y2="46"/>
+<line class="g-hour" x1="400.0" y1="30" x2="400.0" y2="1764"/>
+<text class="tick" x="402.0" y="41">10</text>
+<line class="g-q" x1="410.0" y1="36" x2="410.0" y2="46"/>
+<line class="g-q" x1="420.0" y1="36" x2="420.0" y2="46"/>
+<line class="g-q" x1="430.0" y1="36" x2="430.0" y2="46"/>
+<line class="g-hour" x1="440.0" y1="30" x2="440.0" y2="1764"/>
+<text class="tick" x="442.0" y="41">11</text>
+<line class="g-q" x1="450.0" y1="36" x2="450.0" y2="46"/>
+<line class="g-q" x1="460.0" y1="36" x2="460.0" y2="46"/>
+<line class="g-q" x1="470.0" y1="36" x2="470.0" y2="46"/>
+<line class="g-hour" x1="480.0" y1="30" x2="480.0" y2="1764"/>
+<text class="tick" x="482.0" y="41">12</text>
+<line class="g-q" x1="490.0" y1="36" x2="490.0" y2="46"/>
+<line class="g-q" x1="500.0" y1="36" x2="500.0" y2="46"/>
+<line class="g-q" x1="510.0" y1="36" x2="510.0" y2="46"/>
+<line class="g-hour" x1="520.0" y1="30" x2="520.0" y2="1764"/>
+<text class="tick" x="522.0" y="41">13</text>
+<line class="g-q" x1="530.0" y1="36" x2="530.0" y2="46"/>
+<line class="g-q" x1="540.0" y1="36" x2="540.0" y2="46"/>
+<line class="g-q" x1="550.0" y1="36" x2="550.0" y2="46"/>
+<line class="g-hour" x1="560.0" y1="30" x2="560.0" y2="1764"/>
+<text class="tick" x="562.0" y="41">14</text>
+<line class="g-q" x1="570.0" y1="36" x2="570.0" y2="46"/>
+<line class="g-q" x1="580.0" y1="36" x2="580.0" y2="46"/>
+<line class="g-q" x1="590.0" y1="36" x2="590.0" y2="46"/>
+<line class="g-hour" x1="600.0" y1="30" x2="600.0" y2="1764"/>
+<text class="tick" x="602.0" y="41">15</text>
+<line class="g-q" x1="610.0" y1="36" x2="610.0" y2="46"/>
+<line class="g-q" x1="620.0" y1="36" x2="620.0" y2="46"/>
+<line class="g-q" x1="630.0" y1="36" x2="630.0" y2="46"/>
+<line class="g-hour" x1="640.0" y1="30" x2="640.0" y2="1764"/>
+<text class="tick" x="642.0" y="41">16</text>
+<line class="g-q" x1="650.0" y1="36" x2="650.0" y2="46"/>
+<line class="g-q" x1="660.0" y1="36" x2="660.0" y2="46"/>
+<line class="g-q" x1="670.0" y1="36" x2="670.0" y2="46"/>
+<line class="g-hour" x1="680.0" y1="30" x2="680.0" y2="1764"/>
+<text class="tick" x="682.0" y="41">17</text>
+<line class="g-q" x1="690.0" y1="36" x2="690.0" y2="46"/>
+<line class="g-q" x1="700.0" y1="36" x2="700.0" y2="46"/>
+<line class="g-q" x1="710.0" y1="36" x2="710.0" y2="46"/>
+<line class="g-hour" x1="720.0" y1="30" x2="720.0" y2="1764"/>
+<text class="tick" x="722.0" y="41">18</text>
+<line class="g-q" x1="730.0" y1="36" x2="730.0" y2="46"/>
+<line class="g-q" x1="740.0" y1="36" x2="740.0" y2="46"/>
+<line class="g-q" x1="750.0" y1="36" x2="750.0" y2="46"/>
+<line class="g-hour" x1="760.0" y1="30" x2="760.0" y2="1764"/>
+<text class="tick" x="762.0" y="41">19</text>
+<line class="g-q" x1="770.0" y1="36" x2="770.0" y2="46"/>
+<line class="g-q" x1="780.0" y1="36" x2="780.0" y2="46"/>
+<line class="g-q" x1="790.0" y1="36" x2="790.0" y2="46"/>
+<line class="g-hour" x1="800.0" y1="30" x2="800.0" y2="1764"/>
+<text class="tick" x="802.0" y="41">20</text>
+<line class="g-q" x1="810.0" y1="36" x2="810.0" y2="46"/>
+<line class="g-q" x1="820.0" y1="36" x2="820.0" y2="46"/>
+<line class="g-q" x1="830.0" y1="36" x2="830.0" y2="46"/>
+<line class="g-hour" x1="840.0" y1="30" x2="840.0" y2="1764"/>
+<text class="tick" x="842.0" y="41">21</text>
+<line class="g-q" x1="850.0" y1="36" x2="850.0" y2="46"/>
+<line class="g-q" x1="860.0" y1="36" x2="860.0" y2="46"/>
+<line class="g-q" x1="870.0" y1="36" x2="870.0" y2="46"/>
+<line class="g-hour" x1="880.0" y1="30" x2="880.0" y2="1764"/>
+<text class="tick" x="882.0" y="41">22</text>
+<line class="g-q" x1="890.0" y1="36" x2="890.0" y2="46"/>
+<line class="g-q" x1="900.0" y1="36" x2="900.0" y2="46"/>
+<line class="g-q" x1="910.0" y1="36" x2="910.0" y2="46"/>
+<line class="g-hour" x1="920.0" y1="30" x2="920.0" y2="1764"/>
+<text class="tick" x="922.0" y="41">23</text>
+<line class="g-q" x1="930.0" y1="36" x2="930.0" y2="46"/>
+<line class="g-q" x1="940.0" y1="36" x2="940.0" y2="46"/>
+<line class="g-q" x1="950.0" y1="36" x2="950.0" y2="46"/>
+<line class="g-hour" x1="960.0" y1="30" x2="960.0" y2="1764"/>
+<text class="tick" x="962.0" y="41">00</text>
+<line class="g-q" x1="970.0" y1="36" x2="970.0" y2="46"/>
+<line class="g-q" x1="980.0" y1="36" x2="980.0" y2="46"/>
+<line class="g-q" x1="990.0" y1="36" x2="990.0" y2="46"/>
+<line class="g-hour" x1="1000.0" y1="30" x2="1000.0" y2="1764"/>
+<text class="tick" x="1002.0" y="41">01</text>
+<line class="g-q" x1="1010.0" y1="36" x2="1010.0" y2="46"/>
+<line class="g-q" x1="1020.0" y1="36" x2="1020.0" y2="46"/>
+<line class="g-q" x1="1030.0" y1="36" x2="1030.0" y2="46"/>
+<line class="g-hour" x1="1040.0" y1="30" x2="1040.0" y2="1764"/>
+<text class="tick" x="1042.0" y="41">02</text>
+<line class="g-q" x1="1050.0" y1="36" x2="1050.0" y2="46"/>
+<line class="g-q" x1="1060.0" y1="36" x2="1060.0" y2="46"/>
+<line class="g-q" x1="1070.0" y1="36" x2="1070.0" y2="46"/>
+<line class="g-hour" x1="1080.0" y1="30" x2="1080.0" y2="1764"/>
+<text class="tick" x="1082.0" y="41">03</text>
+<line class="g-q" x1="1090.0" y1="36" x2="1090.0" y2="46"/>
+<line class="g-q" x1="1100.0" y1="36" x2="1100.0" y2="46"/>
+<line class="g-q" x1="1110.0" y1="36" x2="1110.0" y2="46"/>
+<line class="g-hour" x1="1120.0" y1="30" x2="1120.0" y2="1764"/>
+<text class="tick" x="1122.0" y="41">04</text>
+<line class="g-q" x1="1130.0" y1="36" x2="1130.0" y2="46"/>
+<line class="g-q" x1="1140.0" y1="36" x2="1140.0" y2="46"/>
+<line class="g-q" x1="1150.0" y1="36" x2="1150.0" y2="46"/>
+<line class="g-hour" x1="1160.0" y1="30" x2="1160.0" y2="1764"/>
+<text class="tick" x="1162.0" y="41">05</text>
+<line class="g-q" x1="1170.0" y1="36" x2="1170.0" y2="46"/>
+<line class="g-q" x1="1180.0" y1="36" x2="1180.0" y2="46"/>
+<line class="g-q" x1="1190.0" y1="36" x2="1190.0" y2="46"/>
+<line class="g-hour" x1="1200.0" y1="30" x2="1200.0" y2="1764"/>
+<text class="tick" x="1202.0" y="41">06</text>
+<line class="g-q" x1="1210.0" y1="36" x2="1210.0" y2="46"/>
+<line class="g-q" x1="1220.0" y1="36" x2="1220.0" y2="46"/>
+<line class="g-q" x1="1230.0" y1="36" x2="1230.0" y2="46"/>
+<line class="g-hour" x1="1240.0" y1="30" x2="1240.0" y2="1764"/>
+<text class="tick" x="1242.0" y="41">07</text>
+<line class="g-q" x1="1250.0" y1="36" x2="1250.0" y2="46"/>
+<line class="g-q" x1="1260.0" y1="36" x2="1260.0" y2="46"/>
+<line class="g-q" x1="1270.0" y1="36" x2="1270.0" y2="46"/>
+<line class="g-hour" x1="1280.0" y1="30" x2="1280.0" y2="1764"/>
+<text class="tick" x="1282.0" y="41">08</text>
+<line class="g-q" x1="1290.0" y1="36" x2="1290.0" y2="46"/>
+<line class="g-q" x1="1300.0" y1="36" x2="1300.0" y2="46"/>
+<line class="g-q" x1="1310.0" y1="36" x2="1310.0" y2="46"/>
+<line class="g-hour" x1="1320.0" y1="30" x2="1320.0" y2="1764"/>
+<text class="tick" x="1322.0" y="41">09</text>
+<line class="g-q" x1="1330.0" y1="36" x2="1330.0" y2="46"/>
+<line class="g-q" x1="1340.0" y1="36" x2="1340.0" y2="46"/>
+<line class="g-q" x1="1350.0" y1="36" x2="1350.0" y2="46"/>
+<line class="g-hour" x1="1360.0" y1="30" x2="1360.0" y2="1764"/>
+<text class="tick" x="1362.0" y="41">10</text>
+<line class="g-q" x1="1370.0" y1="36" x2="1370.0" y2="46"/>
+<line class="g-q" x1="1380.0" y1="36" x2="1380.0" y2="46"/>
+<line class="g-q" x1="1390.0" y1="36" x2="1390.0" y2="46"/>
+<line class="g-hour" x1="1400.0" y1="30" x2="1400.0" y2="1764"/>
+<text class="tick fut" x="1402.0" y="41">+0:00</text>
+<line class="g-q" x1="1410.0" y1="36" x2="1410.0" y2="46"/>
+<line class="g-q" x1="1420.0" y1="36" x2="1420.0" y2="46"/>
+<line class="g-q" x1="1430.0" y1="36" x2="1430.0" y2="46"/>
+<line class="g-hour" x1="1440.0" y1="30" x2="1440.0" y2="1764"/>
+<line class="g-q" x1="1450.0" y1="36" x2="1450.0" y2="46"/>
+<line class="g-q" x1="1460.0" y1="36" x2="1460.0" y2="46"/>
+<line class="g-q" x1="1470.0" y1="36" x2="1470.0" y2="46"/>
+<line class="g-hour" x1="1480.0" y1="30" x2="1480.0" y2="1764"/>
+<text class="tick fut" x="1482.0" y="41">+2:00</text>
+<line class="g-q" x1="1490.0" y1="36" x2="1490.0" y2="46"/>
+<line class="g-q" x1="1500.0" y1="36" x2="1500.0" y2="46"/>
+<line class="g-q" x1="1510.0" y1="36" x2="1510.0" y2="46"/>
+<line class="g-hour" x1="1520.0" y1="30" x2="1520.0" y2="1764"/>
+<line class="g-q" x1="1530.0" y1="36" x2="1530.0" y2="46"/>
+<line class="g-q" x1="1540.0" y1="36" x2="1540.0" y2="46"/>
+<line class="g-q" x1="1550.0" y1="36" x2="1550.0" y2="46"/>
+<line class="g-hour" x1="1560.0" y1="30" x2="1560.0" y2="1764"/>
+<text class="tick fut" x="1562.0" y="41">+4:00</text>
+<line class="g-q" x1="1570.0" y1="36" x2="1570.0" y2="46"/>
+<line class="g-q" x1="1580.0" y1="36" x2="1580.0" y2="46"/>
+<line class="g-q" x1="1590.0" y1="36" x2="1590.0" y2="46"/>
+<line class="g-hour" x1="1600.0" y1="30" x2="1600.0" y2="1764"/>
+<line class="g-q" x1="1610.0" y1="36" x2="1610.0" y2="46"/>
+<line class="g-q" x1="1620.0" y1="36" x2="1620.0" y2="46"/>
+<line class="g-q" x1="1630.0" y1="36" x2="1630.0" y2="46"/>
+<line class="g-hour" x1="1640.0" y1="30" x2="1640.0" y2="1764"/>
+<text class="tick fut" x="1642.0" y="41">+6:00</text>
+<line class="g-q" x1="1650.0" y1="36" x2="1650.0" y2="46"/>
+<line class="g-q" x1="1660.0" y1="36" x2="1660.0" y2="46"/>
+<line class="g-q" x1="1670.0" y1="36" x2="1670.0" y2="46"/>
+<line class="g-hour" x1="1680.0" y1="30" x2="1680.0" y2="1764"/>
+<line class="g-q" x1="1690.0" y1="36" x2="1690.0" y2="46"/>
+<line class="g-q" x1="1700.0" y1="36" x2="1700.0" y2="46"/>
+<line class="g-q" x1="1710.0" y1="36" x2="1710.0" y2="46"/>
+<line class="g-hour" x1="1720.0" y1="30" x2="1720.0" y2="1764"/>
+<text class="tick fut" x="1722.0" y="41">+8:00</text>
+<line class="g-q" x1="1730.0" y1="36" x2="1730.0" y2="46"/>
+<line class="g-q" x1="1740.0" y1="36" x2="1740.0" y2="46"/>
+<line class="g-q" x1="1750.0" y1="36" x2="1750.0" y2="46"/>
+<line class="g-hour" x1="1760.0" y1="30" x2="1760.0" y2="1764"/>
+<line class="g-q" x1="1770.0" y1="36" x2="1770.0" y2="46"/>
+<line class="g-q" x1="1780.0" y1="36" x2="1780.0" y2="46"/>
+<line class="g-q" x1="1790.0" y1="36" x2="1790.0" y2="46"/>
+<line class="g-hour" x1="1800.0" y1="30" x2="1800.0" y2="1764"/>
+<text class="tick fut" x="1802.0" y="41">+10:00</text>
+<line class="g-q" x1="1810.0" y1="36" x2="1810.0" y2="46"/>
+<line class="g-q" x1="1820.0" y1="36" x2="1820.0" y2="46"/>
+<line class="g-q" x1="1830.0" y1="36" x2="1830.0" y2="46"/>
+<line class="g-hour" x1="1840.0" y1="30" x2="1840.0" y2="1764"/>
+<line class="g-q" x1="1850.0" y1="36" x2="1850.0" y2="46"/>
+<line class="g-q" x1="1860.0" y1="36" x2="1860.0" y2="46"/>
+<line class="g-q" x1="1870.0" y1="36" x2="1870.0" y2="46"/>
+<line class="g-hour" x1="1880.0" y1="30" x2="1880.0" y2="1764"/>
+<text class="tick fut" x="1882.0" y="41">+12:00</text>
+<line class="g-q" x1="1890.0" y1="36" x2="1890.0" y2="46"/>
+<line class="g-q" x1="1900.0" y1="36" x2="1900.0" y2="46"/>
+<line class="g-q" x1="1910.0" y1="36" x2="1910.0" y2="46"/>
+<line class="g-hour" x1="1920.0" y1="30" x2="1920.0" y2="1764"/>
+<line class="g-q" x1="1930.0" y1="36" x2="1930.0" y2="46"/>
+<line class="g-q" x1="1940.0" y1="36" x2="1940.0" y2="46"/>
+<line class="g-q" x1="1950.0" y1="36" x2="1950.0" y2="46"/>
+<line class="g-hour" x1="1960.0" y1="30" x2="1960.0" y2="1764"/>
+<text class="tick fut" x="1962.0" y="41">+14:00</text>
+<line class="g-q" x1="1970.0" y1="36" x2="1970.0" y2="46"/>
+<line class="g-q" x1="1980.0" y1="36" x2="1980.0" y2="46"/>
+<line class="g-q" x1="1990.0" y1="36" x2="1990.0" y2="46"/>
+<line class="g-hour" x1="2000.0" y1="30" x2="2000.0" y2="1764"/>
+<line class="g-q" x1="2010.0" y1="36" x2="2010.0" y2="46"/>
+<line class="g-q" x1="2020.0" y1="36" x2="2020.0" y2="46"/>
+<line class="g-q" x1="2030.0" y1="36" x2="2030.0" y2="46"/>
+<line class="g-hour" x1="2040.0" y1="30" x2="2040.0" y2="1764"/>
+<text class="tick fut" x="2042.0" y="41">+16:00</text>
+<line class="g-q" x1="2050.0" y1="36" x2="2050.0" y2="46"/>
+<line class="g-q" x1="2060.0" y1="36" x2="2060.0" y2="46"/>
+<line class="g-q" x1="2070.0" y1="36" x2="2070.0" y2="46"/>
+<line class="g-hour" x1="2080.0" y1="30" x2="2080.0" y2="1764"/>
+<line class="g-q" x1="2090.0" y1="36" x2="2090.0" y2="46"/>
+<line class="g-q" x1="2100.0" y1="36" x2="2100.0" y2="46"/>
+<line class="g-q" x1="2110.0" y1="36" x2="2110.0" y2="46"/>
+<line class="g-hour" x1="2120.0" y1="30" x2="2120.0" y2="1764"/>
+<text class="tick fut" x="2122.0" y="41">+18:00</text>
+<line class="g-q" x1="2130.0" y1="36" x2="2130.0" y2="46"/>
+<line class="g-q" x1="2140.0" y1="36" x2="2140.0" y2="46"/>
+<line class="g-q" x1="2150.0" y1="36" x2="2150.0" y2="46"/>
+<line class="g-hour" x1="2160.0" y1="30" x2="2160.0" y2="1764"/>
+<line class="g-q" x1="2170.0" y1="36" x2="2170.0" y2="46"/>
+<line class="g-q" x1="2180.0" y1="36" x2="2180.0" y2="46"/>
+<line class="g-q" x1="2190.0" y1="36" x2="2190.0" y2="46"/>
+<line class="g-hour" x1="2200.0" y1="30" x2="2200.0" y2="1764"/>
+<text class="tick fut" x="2202.0" y="41">+20:00</text>
+<line class="g-q" x1="2210.0" y1="36" x2="2210.0" y2="46"/>
+<line class="g-q" x1="2220.0" y1="36" x2="2220.0" y2="46"/>
+<line class="g-q" x1="2230.0" y1="36" x2="2230.0" y2="46"/>
+<line class="g-hour" x1="2240.0" y1="30" x2="2240.0" y2="1764"/>
+<line class="g-q" x1="2250.0" y1="36" x2="2250.0" y2="46"/>
+<line class="g-q" x1="2260.0" y1="36" x2="2260.0" y2="46"/>
+<line class="g-q" x1="2270.0" y1="36" x2="2270.0" y2="46"/>
+<line class="g-hour" x1="2280.0" y1="30" x2="2280.0" y2="1764"/>
+<text class="tick fut" x="2282.0" y="41">+22:00</text>
+<line class="g-q" x1="2290.0" y1="36" x2="2290.0" y2="46"/>
+<line class="g-q" x1="2300.0" y1="36" x2="2300.0" y2="46"/>
+<line class="g-q" x1="2310.0" y1="36" x2="2310.0" y2="46"/>
+<line class="g-hour" x1="2320.0" y1="30" x2="2320.0" y2="1764"/>
+<line class="g-q" x1="2330.0" y1="36" x2="2330.0" y2="46"/>
+<line class="g-q" x1="2340.0" y1="36" x2="2340.0" y2="46"/>
+<line class="g-q" x1="2350.0" y1="36" x2="2350.0" y2="46"/>
+<line class="g-hour" x1="2360.0" y1="30" x2="2360.0" y2="1764"/>
+<text class="tick fut" x="2362.0" y="41">+24:00</text>
+<line class="g-q" x1="2370.0" y1="36" x2="2370.0" y2="46"/>
+<line class="g-q" x1="2380.0" y1="36" x2="2380.0" y2="46"/>
+<line class="g-q" x1="2390.0" y1="36" x2="2390.0" y2="46"/>
+<line class="g-hour" x1="2400.0" y1="30" x2="2400.0" y2="1764"/>
+<line class="g-q" x1="2410.0" y1="36" x2="2410.0" y2="46"/>
+<line class="g-q" x1="2420.0" y1="36" x2="2420.0" y2="46"/>
+<line class="g-q" x1="2430.0" y1="36" x2="2430.0" y2="46"/>
+<line class="g-hour" x1="2440.0" y1="30" x2="2440.0" y2="1764"/>
+<text class="tick fut" x="2442.0" y="41">+26:00</text>
+<line class="g-q" x1="2450.0" y1="36" x2="2450.0" y2="46"/>
+<line class="g-q" x1="2460.0" y1="36" x2="2460.0" y2="46"/>
+<line class="g-q" x1="2470.0" y1="36" x2="2470.0" y2="46"/>
+<line class="g-hour" x1="2480.0" y1="30" x2="2480.0" y2="1764"/>
+<line class="g-q" x1="2490.0" y1="36" x2="2490.0" y2="46"/>
+<line class="g-q" x1="2500.0" y1="36" x2="2500.0" y2="46"/>
+<line class="g-q" x1="2510.0" y1="36" x2="2510.0" y2="46"/>
+<line class="g-hour" x1="2520.0" y1="30" x2="2520.0" y2="1764"/>
+<text class="tick fut" x="2522.0" y="41">+28:00</text>
+<line class="g-q" x1="2530.0" y1="36" x2="2530.0" y2="46"/>
+<line class="g-q" x1="2540.0" y1="36" x2="2540.0" y2="46"/>
+<line class="g-q" x1="2550.0" y1="36" x2="2550.0" y2="46"/>
+<line class="g-hour" x1="2560.0" y1="30" x2="2560.0" y2="1764"/>
+<line class="g-q" x1="2570.0" y1="36" x2="2570.0" y2="46"/>
+<line class="g-q" x1="2580.0" y1="36" x2="2580.0" y2="46"/>
+<line class="g-q" x1="2590.0" y1="36" x2="2590.0" y2="46"/>
+<line class="g-hour" x1="2600.0" y1="30" x2="2600.0" y2="1764"/>
+<text class="tick fut" x="2602.0" y="41">+30:00</text>
+<line class="g-q" x1="2610.0" y1="36" x2="2610.0" y2="46"/>
+<line class="g-q" x1="2620.0" y1="36" x2="2620.0" y2="46"/>
+<line class="g-q" x1="2630.0" y1="36" x2="2630.0" y2="46"/>
+<line class="g-hour" x1="2640.0" y1="30" x2="2640.0" y2="1764"/>
+<line class="g-q" x1="2650.0" y1="36" x2="2650.0" y2="46"/>
+<line class="g-q" x1="2660.0" y1="36" x2="2660.0" y2="46"/>
+<line class="g-q" x1="2670.0" y1="36" x2="2670.0" y2="46"/>
+<line class="g-hour" x1="2680.0" y1="30" x2="2680.0" y2="1764"/>
+<text class="tick fut" x="2682.0" y="41">+32:00</text>
+<line class="g-q" x1="2690.0" y1="36" x2="2690.0" y2="46"/>
+<line class="g-q" x1="2700.0" y1="36" x2="2700.0" y2="46"/>
+<line class="g-q" x1="2710.0" y1="36" x2="2710.0" y2="46"/>
+<line class="g-hour" x1="2720.0" y1="30" x2="2720.0" y2="1764"/>
+<line class="g-q" x1="2730.0" y1="36" x2="2730.0" y2="46"/>
+<line class="g-q" x1="2740.0" y1="36" x2="2740.0" y2="46"/>
+<line class="g-q" x1="2750.0" y1="36" x2="2750.0" y2="46"/>
+<line class="g-hour" x1="2760.0" y1="30" x2="2760.0" y2="1764"/>
+<text class="tick fut" x="2762.0" y="41">+34:00</text>
+<line class="g-q" x1="2770.0" y1="36" x2="2770.0" y2="46"/>
+<line class="g-q" x1="2780.0" y1="36" x2="2780.0" y2="46"/>
+<line class="g-q" x1="2790.0" y1="36" x2="2790.0" y2="46"/>
+<line class="g-hour" x1="2800.0" y1="30" x2="2800.0" y2="1764"/>
+<line class="g-q" x1="2810.0" y1="36" x2="2810.0" y2="46"/>
+<line class="g-q" x1="2820.0" y1="36" x2="2820.0" y2="46"/>
+<line class="g-q" x1="2830.0" y1="36" x2="2830.0" y2="46"/>
+<line class="g-hour" x1="2840.0" y1="30" x2="2840.0" y2="1764"/>
+<text class="tick fut" x="2842.0" y="41">+36:00</text>
+<line class="g-q" x1="2850.0" y1="36" x2="2850.0" y2="46"/>
+<line class="g-q" x1="2860.0" y1="36" x2="2860.0" y2="46"/>
+<line class="g-q" x1="2870.0" y1="36" x2="2870.0" y2="46"/>
+<line class="g-hour" x1="2880.0" y1="30" x2="2880.0" y2="1764"/>
+<line class="g-q" x1="2890.0" y1="36" x2="2890.0" y2="46"/>
+<line class="g-q" x1="2900.0" y1="36" x2="2900.0" y2="46"/>
+<line class="g-q" x1="2910.0" y1="36" x2="2910.0" y2="46"/>
+<line class="g-hour" x1="2920.0" y1="30" x2="2920.0" y2="1764"/>
+<text class="tick fut" x="2922.0" y="41">+38:00</text>
+<line class="g-q" x1="2930.0" y1="36" x2="2930.0" y2="46"/>
+<line class="g-q" x1="2940.0" y1="36" x2="2940.0" y2="46"/>
+<line class="g-q" x1="2950.0" y1="36" x2="2950.0" y2="46"/>
+<line class="g-hour" x1="2960.0" y1="30" x2="2960.0" y2="1764"/>
+<line class="g-q" x1="2970.0" y1="36" x2="2970.0" y2="46"/>
+<line class="g-q" x1="2980.0" y1="36" x2="2980.0" y2="46"/>
+<line class="g-q" x1="2990.0" y1="36" x2="2990.0" y2="46"/>
+<line class="g-hour" x1="3000.0" y1="30" x2="3000.0" y2="1764"/>
+<text class="tick fut" x="3002.0" y="41">+40:00</text>
+<line class="g-q" x1="3010.0" y1="36" x2="3010.0" y2="46"/>
+<line class="g-q" x1="3020.0" y1="36" x2="3020.0" y2="46"/>
+<line class="g-q" x1="3030.0" y1="36" x2="3030.0" y2="46"/>
+<line class="g-hour" x1="3040.0" y1="30" x2="3040.0" y2="1764"/>
+<line class="g-q" x1="3050.0" y1="36" x2="3050.0" y2="46"/>
+<line class="g-q" x1="3060.0" y1="36" x2="3060.0" y2="46"/>
+<line class="g-q" x1="3070.0" y1="36" x2="3070.0" y2="46"/>
+<line class="g-hour" x1="3080.0" y1="30" x2="3080.0" y2="1764"/>
+<text class="tick fut" x="3082.0" y="41">+42:00</text>
+<line class="g-q" x1="3090.0" y1="36" x2="3090.0" y2="46"/>
+<line class="g-q" x1="3100.0" y1="36" x2="3100.0" y2="46"/>
+<line class="g-q" x1="3110.0" y1="36" x2="3110.0" y2="46"/>
+<line class="g-hour" x1="3120.0" y1="30" x2="3120.0" y2="1764"/>
+<line class="g-q" x1="3130.0" y1="36" x2="3130.0" y2="46"/>
+<line class="g-q" x1="3140.0" y1="36" x2="3140.0" y2="46"/>
+<line class="g-q" x1="3150.0" y1="36" x2="3150.0" y2="46"/>
+<line class="g-hour" x1="3160.0" y1="30" x2="3160.0" y2="1764"/>
+<text class="tick fut" x="3162.0" y="41">+44:00</text>
+<line class="g-q" x1="3170.0" y1="36" x2="3170.0" y2="46"/>
+<line class="g-q" x1="3180.0" y1="36" x2="3180.0" y2="46"/>
+<line class="g-q" x1="3190.0" y1="36" x2="3190.0" y2="46"/>
+<line class="g-hour" x1="3200.0" y1="30" x2="3200.0" y2="1764"/>
+<line class="g-q" x1="3210.0" y1="36" x2="3210.0" y2="46"/>
+<line class="g-q" x1="3220.0" y1="36" x2="3220.0" y2="46"/>
+<line class="g-q" x1="3230.0" y1="36" x2="3230.0" y2="46"/>
+<line class="g-hour" x1="3240.0" y1="30" x2="3240.0" y2="1764"/>
+<text class="tick fut" x="3242.0" y="41">+46:00</text>
+<line class="g-q" x1="3250.0" y1="36" x2="3250.0" y2="46"/>
+<line class="g-q" x1="3260.0" y1="36" x2="3260.0" y2="46"/>
+<line class="g-q" x1="3270.0" y1="36" x2="3270.0" y2="46"/>
+<line class="g-hour" x1="3280.0" y1="30" x2="3280.0" y2="1764"/>
+<line class="g-q" x1="3290.0" y1="36" x2="3290.0" y2="46"/>
+<line class="g-q" x1="3300.0" y1="36" x2="3300.0" y2="46"/>
+<line class="g-q" x1="3310.0" y1="36" x2="3310.0" y2="46"/>
+<line class="g-hour" x1="3320.0" y1="30" x2="3320.0" y2="1764"/>
+<text class="tick fut" x="3322.0" y="41">+48:00</text>
+<line class="g-q" x1="3330.0" y1="36" x2="3330.0" y2="46"/>
+<line class="g-q" x1="3340.0" y1="36" x2="3340.0" y2="46"/>
+<line class="g-q" x1="3350.0" y1="36" x2="3350.0" y2="46"/>
+<line class="g-hour" x1="3360.0" y1="30" x2="3360.0" y2="1764"/>
+<line class="g-q" x1="3370.0" y1="36" x2="3370.0" y2="46"/>
+<line class="g-q" x1="3380.0" y1="36" x2="3380.0" y2="46"/>
+<line class="g-q" x1="3390.0" y1="36" x2="3390.0" y2="46"/>
+<line class="g-hour" x1="3400.0" y1="30" x2="3400.0" y2="1764"/>
+<text class="tick fut" x="3402.0" y="41">+50:00</text>
+<line class="g-q" x1="3410.0" y1="36" x2="3410.0" y2="46"/>
+<line class="g-q" x1="3420.0" y1="36" x2="3420.0" y2="46"/>
+<line class="g-q" x1="3430.0" y1="36" x2="3430.0" y2="46"/>
+<line class="g-hour" x1="3440.0" y1="30" x2="3440.0" y2="1764"/>
+<line class="g-q" x1="3450.0" y1="36" x2="3450.0" y2="46"/>
+<line class="g-q" x1="3460.0" y1="36" x2="3460.0" y2="46"/>
+<line class="g-q" x1="3470.0" y1="36" x2="3470.0" y2="46"/>
+<line class="g-hour" x1="3480.0" y1="30" x2="3480.0" y2="1764"/>
+<text class="tick fut" x="3482.0" y="41">+52:00</text>
+<line class="g-q" x1="3490.0" y1="36" x2="3490.0" y2="46"/>
+<line class="g-q" x1="3500.0" y1="36" x2="3500.0" y2="46"/>
+<line class="g-q" x1="3510.0" y1="36" x2="3510.0" y2="46"/>
+<line class="g-hour" x1="3520.0" y1="30" x2="3520.0" y2="1764"/>
+<line class="g-q" x1="3530.0" y1="36" x2="3530.0" y2="46"/>
+<line class="g-q" x1="3540.0" y1="36" x2="3540.0" y2="46"/>
+<line class="g-q" x1="3550.0" y1="36" x2="3550.0" y2="46"/>
+<line class="g-hour" x1="3560.0" y1="30" x2="3560.0" y2="1764"/>
+<text class="tick fut" x="3562.0" y="41">+54:00</text>
+<line class="g-q" x1="3570.0" y1="36" x2="3570.0" y2="46"/>
+<line class="g-q" x1="3580.0" y1="36" x2="3580.0" y2="46"/>
+<line class="g-q" x1="3590.0" y1="36" x2="3590.0" y2="46"/>
+<line class="g-hour" x1="3600.0" y1="30" x2="3600.0" y2="1764"/>
+<line class="g-q" x1="3610.0" y1="36" x2="3610.0" y2="46"/>
+<line class="g-q" x1="3620.0" y1="36" x2="3620.0" y2="46"/>
+<line class="g-q" x1="3630.0" y1="36" x2="3630.0" y2="46"/>
+<line class="g-hour" x1="3640.0" y1="30" x2="3640.0" y2="1764"/>
+<text class="tick fut" x="3642.0" y="41">+56:00</text>
+<line class="g-day" x1="0.0" y1="0" x2="0.0" y2="1764"/>
+<text class="day" x="3.0" y="14">Tue 2026-11-10</text>
+<line class="g-day" x1="240.0" y1="0" x2="240.0" y2="1764"/>
+<text class="day" x="243.0" y="14">Wed 2026-11-11</text>
+<line class="g-day" x1="960.0" y1="0" x2="960.0" y2="1764"/>
+<text class="day" x="963.0" y="14">Thu 2026-11-12</text>
+<text class="day fut" x="1406.0" y="14">projection: working time from now (+h:mm), no pauses; not a schedule</text>
+<line class="axisline" x1="0" y1="46" x2="3810" y2="46"/>
+<g class="task" data-id="A_0_T1" tabindex="0" aria-label="A_0_T1 Audit the existing tests, done">
+<rect class="bar st-done" x="20.0" y="102" width="50.0" height="16" rx="3"/>
+<text class="barlabel" x="75.0" y="114.0">A_0_T1 · took ≈ 1 h 06 min</text>
+</g>
+<g class="task" data-id="A_0_T2" tabindex="0" aria-label="A_0_T2 Regression bundle (100-neuron copy), done">
+<rect class="bar st-done" x="60.0" y="126" width="50.0" height="16" rx="3"/>
+<text class="barlabel" x="115.0" y="138.0">A_0_T2 · took ≈ 1 h 05 min</text>
+</g>
+<g class="task" data-id="A_0_T3" tabindex="0" aria-label="A_0_T3 Regression references in three tiers, done">
+<rect class="bar st-done" x="80.0" y="150" width="70.0" height="16" rx="3"/>
+<text class="barlabel" x="155.0" y="162.0">A_0_T3 · took ≈ 1 h 43 min</text>
+</g>
+<g class="task" data-id="A_0_B" tabindex="0" aria-label="A_0_B Six MATLAB worker agents set up, done">
+<rect class="bar st-done" x="140.0" y="174" width="40.0" height="16" rx="3"/>
+<text class="barlabel" x="185.0" y="186.0">A_0_B · took ≈ 35 min</text>
+</g>
+<g class="task" data-id="A_0_P1" tabindex="0" aria-label="A_0_P1 Plan A written (first version), done">
+<rect class="bar st-done" x="170.0" y="198" width="20.0" height="16" rx="3"/>
+<text class="barlabel" x="195.0" y="210.0">A_0_P1 · took ≈ 26 min</text>
+</g>
+<g class="task" data-id="A_0_P2" tabindex="0" aria-label="A_0_P2 Planning with Tom: build order, interface, done">
+<rect class="bar st-done" x="350.0" y="244" width="320.0" height="16" rx="3"/>
+<text class="barlabel" x="675.0" y="256.0">A_0_P2 · took ≈ 7 h 39 min</text>
+</g>
+<g class="task" data-id="A_0_T4" tabindex="0" aria-label="A_0_T4 Pre-flight checks before building, done">
+<rect class="bar st-done" x="640.0" y="290" width="20.0" height="16" rx="3"/>
+<text class="barlabel" x="665.0" y="302.0">A_0_T4 · took ≈ 18 min</text>
+</g>
+<g class="task" data-id="A_2_P" tabindex="0" aria-label="A_2_P Inventory of display code to change, done">
+<rect class="bar st-done" x="650.0" y="314" width="20.0" height="16" rx="3"/>
+<text class="barlabel" x="675.0" y="326.0">A_2_P · took ≈ 17 min</text>
+</g>
+<g class="task" data-id="A_0a_B" tabindex="0" aria-label="A_0a_B Parallel-pool module, done">
+<rect class="bar st-done" x="650.0" y="338" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="685.0" y="350.0">A_0a_B · took ≈ 34 min</text>
+</g>
+<g class="task" data-id="A_0a_T" tabindex="0" aria-label="A_0a_T Full-tier gate on the pool module, done">
+<rect class="bar st-done" x="680.0" y="362" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="715.0" y="374.0">A_0a_T · took ≈ 38 min</text>
+</g>
+<g class="task" data-id="A_0b_B1" tabindex="0" aria-label="A_0b_B1 Tolerance regression tier and anchor, done">
+<rect class="bar st-done" x="680.0" y="386" width="60.0" height="16" rx="3"/>
+<text class="barlabel" x="745.0" y="398.0">A_0b_B1 · took ≈ 1 h 17 min</text>
+</g>
+<g class="task" data-id="A_0b_B2" tabindex="0" aria-label="A_0b_B2 Seed for the joint parameter sample, done">
+<rect class="bar st-done" x="680.0" y="410" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="715.0" y="422.0">A_0b_B2 · took ≈ 30 min</text>
+</g>
+<g class="task" data-id="A_0c_T" tabindex="0" aria-label="A_0c_T Mutation checks on the tolerance tier, done">
+<rect class="bar st-done" x="730.0" y="434" width="40.0" height="16" rx="3"/>
+<text class="barlabel" x="775.0" y="446.0">A_0c_T · took ≈ 54 min</text>
+</g>
+<g class="task" data-id="A_0c_P" tabindex="0" aria-label="A_0c_P Tom fixes the tolerances, done">
+<rect class="bar st-done" x="760.0" y="458" width="100.0" height="16" rx="3"/>
+<text class="barlabel" x="865.0" y="470.0">A_0c_P · took 2 h 07 min</text>
+</g>
+<g class="task" data-id="A_0d_B" tabindex="0" aria-label="A_0d_B Refactor onto one route interface, done">
+<rect class="bar st-done" x="860.0" y="482" width="90.0" height="16" rx="3"/>
+<text class="barlabel" x="955.0" y="494.0">A_0d_B · took ≈ 2 h 01 min</text>
+</g>
+<g class="task" data-id="A_0d_T" tabindex="0" aria-label="A_0d_T Gates; exact references re-captured, done">
+<rect class="bar st-done" x="940.0" y="506" width="70.0" height="16" rx="3"/>
+<text class="barlabel" x="1015.0" y="518.0">A_0d_T · took 1 h 30 min</text>
+</g>
+<g class="task" data-id="A_1_B" tabindex="0" aria-label="A_1_B Chained vesicle-pool depression, done">
+<rect class="bar st-done" x="950.0" y="552" width="60.0" height="16" rx="3"/>
+<text class="barlabel" x="1015.0" y="564.0">A_1_B · took ≈ 1 h 14 min</text>
+</g>
+<g class="task" data-id="A_1_T" tabindex="0" aria-label="A_1_T Lead&#x27;s gates on the chain merge, done">
+<rect class="bar st-done" x="1000.0" y="576" width="20.0" height="16" rx="3"/>
+<text class="barlabel" x="1025.0" y="588.0">A_1_T · took ≈ 8 min</text>
+</g>
+<g class="task" data-id="A_5_T" tabindex="0" aria-label="A_5_T Regression references for the chain, done">
+<rect class="bar st-done" x="1010.0" y="600" width="120.0" height="16" rx="3"/>
+<text class="barlabel" x="1135.0" y="612.0">A_5_T · took ≈ 2 h 52 min</text>
+</g>
+<g class="task" data-id="A_8_B" tabindex="0" aria-label="A_8_B Release-coupled facilitation, done">
+<rect class="bar st-done" x="1130.0" y="624" width="110.0" height="16" rx="3"/>
+<text class="barlabel" x="1245.0" y="636.0">A_8_B · took ≈ 2 h 35 min</text>
+</g>
+<g class="task" data-id="A_8_T" tabindex="0" aria-label="A_8_T Lead&#x27;s gates on the facilitation merge, done">
+<rect class="bar st-done" x="1230.0" y="648" width="20.0" height="16" rx="3"/>
+<text class="barlabel" x="1255.0" y="660.0">A_8_T · took ≈ 13 min</text>
+</g>
+<g class="task" data-id="A_9_B" tabindex="0" aria-label="A_9_B Per-neuron spread of synapse parameters, done">
+<rect class="bar st-done" x="1240.0" y="672" width="140.0" height="16" rx="3"/>
+<text class="barlabel" x="1385.0" y="684.0">A_9_B · took ≈ 3 h 08 min</text>
+</g>
+<g class="task" data-id="A_9_T" tabindex="0" aria-label="A_9_T Lead&#x27;s gates on the spread merge, running">
+<rect class="bar st-running" x="1370.0" y="696" width="40.0" height="16" rx="3"/>
+<line class="estmark" x1="1380.0" y1="694" x2="1380.0" y2="714"/>
+<text class="barlabel" x="1415.0" y="708.0">A_9_T · running longer than the 15 min estimated</text>
+</g>
+<g class="task" data-id="A_3_B1" tabindex="0" aria-label="A_3_B1 Reservoir class sees the chain, done">
+<rect class="bar st-done" x="1000.0" y="742" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="1035.0" y="754.0">A_3_B1 · took ≈ 25 min</text>
+</g>
+<g class="task" data-id="A_3_B2" tabindex="0" aria-label="A_3_B2 Chain presets and the mu7chain bundle, done">
+<rect class="bar st-done" x="1000.0" y="766" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="1035.0" y="778.0">A_3_B2 · took ≈ 32 min</text>
+</g>
+<g class="task" data-id="A_3_T" tabindex="0" aria-label="A_3_T Preliminary fast run of mu7chain, done">
+<rect class="bar st-done" x="1030.0" y="790" width="210.0" height="16" rx="3"/>
+<text class="barlabel" x="1245.0" y="802.0">A_3_T · est. 2 h 45 min, took ≈ 4 h 54 min</text>
+</g>
+<g class="task" data-id="A_4_B1" tabindex="0" aria-label="A_4_B1 Figures: the condition-selection option, done">
+<rect class="bar st-done" x="1020.0" y="814" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="1055.0" y="826.0">A_4_B1 · took ≈ 32 min</text>
+</g>
+<g class="task" data-id="A_4_B2" tabindex="0" aria-label="A_4_B2 Figures: the parameter sweeps, done">
+<rect class="bar st-done" x="1040.0" y="838" width="80.0" height="16" rx="3"/>
+<text class="barlabel" x="1125.0" y="850.0">A_4_B2 · took ≈ 1 h 40 min</text>
+</g>
+<g class="task" data-id="A_4_B3" tabindex="0" aria-label="A_4_B3 Figures: the analysis stages, done">
+<rect class="bar st-done" x="1040.0" y="862" width="110.0" height="16" rx="3"/>
+<text class="barlabel" x="1155.0" y="874.0">A_4_B3 · took ≈ 2 h 21 min</text>
+</g>
+<g class="task" data-id="A_4_B4" tabindex="0" aria-label="A_4_B4 Figures: steady state, concepts, tables, done">
+<rect class="bar st-done" x="1140.0" y="886" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="1175.0" y="898.0">A_4_B4 · took ≈ 37 min</text>
+</g>
+<g class="task" data-id="A_4_B5" tabindex="0" aria-label="A_4_B5 Figures: the grouped main figures, done">
+<rect class="bar st-done" x="1140.0" y="910" width="100.0" height="16" rx="3"/>
+<text class="barlabel" x="1245.0" y="922.0">A_4_B5 · took ≈ 2 h 10 min</text>
+</g>
+<g class="task" data-id="A_7_B" tabindex="0" aria-label="A_7_B Figure: 1TS against chained MTS, done">
+<rect class="bar st-done" x="1140.0" y="934" width="60.0" height="16" rx="3"/>
+<text class="barlabel" x="1205.0" y="946.0">A_7_B · took ≈ 1 h 08 min</text>
+</g>
+<g class="task" data-id="A_4_T" tabindex="0" aria-label="A_4_T Integration pass: both figure sets build, done">
+<rect class="bar st-done" x="1230.0" y="958" width="80.0" height="16" rx="3"/>
+<text class="barlabel" x="1315.0" y="970.0">A_4_T · took ≈ 1 h 32 min</text>
+</g>
+<g class="task" data-id="A_10_B" tabindex="0" aria-label="A_10_B Spread into the mu7chain preset, done">
+<rect class="bar st-done" x="1370.0" y="1004" width="20.0" height="16" rx="3"/>
+<text class="barlabel" x="1395.0" y="1016.0">A_10_B · took ≈ 18 min</text>
+</g>
+<g class="task" data-id="A_10_T1" tabindex="0" aria-label="A_10_T1 Hold point: Tom looks at example traces, waiting on Tom">
+<rect class="bar st-tom" x="1410.0" y="1028" width="30.0" height="16" rx="3"/>
+<text class="barlabel" x="1445.0" y="1040.0">A_10_T1 · 45 min</text>
+</g>
+<g class="task" data-id="A_10_T2" tabindex="0" aria-label="A_10_T2 Full regression tier, planned">
+<rect class="bar st-planned" x="1440.0" y="1052" width="40.0" height="16" rx="3"/>
+<text class="barlabel" x="1485.0" y="1064.0">A_10_T2 · 1 h</text>
+</g>
+<g class="task" data-id="A_10_T3" tabindex="0" aria-label="A_10_T3 Full reference re-captured, planned">
+<rect class="bar st-planned" x="1480.0" y="1076" width="10.0" height="16" rx="3"/>
+<text class="barlabel" x="1495.0" y="1088.0">A_10_T3 · 15 min</text>
+</g>
+<g class="task" data-id="A_11_T1" tabindex="0" aria-label="A_11_T1 Fast run, four conditions (12 workers), planned">
+<rect class="bar st-planned" x="1490.0" y="1100" width="120.0" height="16" rx="3"/>
+<text class="barlabel" x="1615.0" y="1112.0">A_11_T1 · 3 h</text>
+</g>
+<g class="task" data-id="A_11_T2" tabindex="0" aria-label="A_11_T2 Three-condition figure set (paper), planned">
+<rect class="bar st-planned" x="1610.0" y="1124" width="10.0" height="16" rx="3"/>
+<text class="barlabel" x="1625.0" y="1136.0">A_11_T2 · 15 min</text>
+</g>
+<g class="task" data-id="A_11_T3" tabindex="0" aria-label="A_11_T3 Four-condition figure set (review), planned">
+<rect class="bar st-planned" x="1620.0" y="1148" width="10.0" height="16" rx="3"/>
+<text class="barlabel" x="1635.0" y="1160.0">A_11_T3 · 15 min</text>
+</g>
+<g class="task" data-id="A_11_T4" tabindex="0" aria-label="A_11_T4 Check every stage and figure; report, planned">
+<rect class="bar st-planned" x="1630.0" y="1172" width="10.0" height="16" rx="3"/>
+<text class="barlabel" x="1645.0" y="1184.0">A_11_T4 · 15 min</text>
+</g>
+<g class="task" data-id="A_12_T" tabindex="0" aria-label="A_12_T Close-out: Plan A &#x27;done means&#x27; list, planned">
+<rect class="bar st-planned" x="1640.0" y="1196" width="20.0" height="16" rx="3"/>
+<text class="barlabel" x="1665.0" y="1208.0">A_12_T · 30 min</text>
+</g>
+<g class="task" data-id="A_13_B" tabindex="0" aria-label="A_13_B Medium run(s) for the paper (Tom), waiting on Tom">
+<rect class="bar st-tom rough" x="1660.0" y="1220" width="480.0" height="16" rx="3"/>
+<text class="barlabel" x="2145.0" y="1232.0">A_13_B · ≈ 12 h (guess)</text>
+</g>
+<g class="task" data-id="B_0_P" tabindex="0" aria-label="B_0_P Plan block B with Tom, waiting on Tom">
+<rect class="bar st-tom rough" x="1660.0" y="1296" width="80.0" height="16" rx="3"/>
+<text class="barlabel" x="1745.0" y="1308.0">B_0_P · ≈ 2 h (guess)</text>
+</g>
+<g class="task" data-id="B_1_B" tabindex="0" aria-label="B_1_B Causal 2 x 2 with frozen-state arm, planned">
+<rect class="bar st-planned rough" x="1740.0" y="1320" width="320.0" height="16" rx="3"/>
+<text class="barlabel" x="2065.0" y="1332.0">B_1_B · ≈ 8 h (guess)</text>
+</g>
+<g class="task" data-id="B_2_B" tabindex="0" aria-label="B_2_B Parameter-space version of the experiment, planned">
+<rect class="bar st-planned rough" x="1740.0" y="1344" width="320.0" height="16" rx="3"/>
+<text class="barlabel" x="2065.0" y="1356.0">B_2_B · ≈ 8 h (guess)</text>
+</g>
+<g class="task" data-id="B_3_T" tabindex="0" aria-label="B_3_T Fast run of the stimulation experiments, planned">
+<rect class="bar st-planned rough" x="2060.0" y="1368" width="160.0" height="16" rx="3"/>
+<text class="barlabel" x="2225.0" y="1380.0">B_3_T · ≈ 4 h (guess)</text>
+</g>
+<g class="task" data-id="B_4_B" tabindex="0" aria-label="B_4_B Medium run of block B (Tom), waiting on Tom">
+<rect class="bar st-tom rough" x="2220.0" y="1392" width="480.0" height="16" rx="3"/>
+<text class="barlabel" x="2705.0" y="1404.0">B_4_B · ≈ 12 h (guess)</text>
+</g>
+<g class="task" data-id="B_5_B" tabindex="0" aria-label="B_5_B Combined stimulation figure (Figs 7 + 8), planned">
+<rect class="bar st-planned rough" x="2700.0" y="1416" width="240.0" height="16" rx="3"/>
+<text class="barlabel" x="2945.0" y="1428.0">B_5_B · ≈ 6 h (guess)</text>
+</g>
+<g class="task" data-id="C_0_P" tabindex="0" aria-label="C_0_P Plan block C with Tom, waiting on Tom">
+<rect class="bar st-tom rough" x="1660.0" y="1492" width="80.0" height="16" rx="3"/>
+<text class="barlabel" x="1745.0" y="1504.0">C_0_P · ≈ 2 h (guess)</text>
+</g>
+<g class="task" data-id="C_1_T" tabindex="0" aria-label="C_1_T Pilot: no-adaptation gain sweep, planned">
+<rect class="bar st-planned rough" x="1740.0" y="1516" width="120.0" height="16" rx="3"/>
+<text class="barlabel" x="1865.0" y="1528.0">C_1_T · ≈ 3 h (guess)</text>
+</g>
+<g class="task" data-id="C_2_B" tabindex="0" aria-label="C_2_B Gain-sweep stage and E:I presets, planned">
+<rect class="bar st-planned rough" x="1860.0" y="1540" width="320.0" height="16" rx="3"/>
+<text class="barlabel" x="2185.0" y="1552.0">C_2_B · ≈ 8 h (guess)</text>
+</g>
+<g class="task" data-id="C_3_T" tabindex="0" aria-label="C_3_T Fast run of the gain sweep, planned">
+<rect class="bar st-planned rough" x="2180.0" y="1564" width="160.0" height="16" rx="3"/>
+<text class="barlabel" x="2345.0" y="1576.0">C_3_T · ≈ 4 h (guess)</text>
+</g>
+<g class="task" data-id="C_4_B" tabindex="0" aria-label="C_4_B Medium gain-sweep runs (Tom), waiting on Tom">
+<rect class="bar st-tom rough" x="2340.0" y="1588" width="640.0" height="16" rx="3"/>
+<text class="barlabel" x="2985.0" y="1600.0">C_4_B · ≈ 16 h (guess)</text>
+</g>
+<g class="task" data-id="C_5_B" tabindex="0" aria-label="C_5_B Statistics and memory figure, planned">
+<rect class="bar st-planned rough" x="2980.0" y="1612" width="240.0" height="16" rx="3"/>
+<text class="barlabel" x="3225.0" y="1624.0">C_5_B · ≈ 6 h (guess)</text>
+</g>
+<g class="task" data-id="D_0_P" tabindex="0" aria-label="D_0_P Sketch the closing figure&#x27;s panels, waiting on Tom">
+<rect class="bar st-tom rough" x="1740.0" y="1688" width="80.0" height="16" rx="3"/>
+<text class="barlabel" x="1825.0" y="1700.0">D_0_P · ≈ 2 h (guess)</text>
+</g>
+<g class="task" data-id="D_1_B" tabindex="0" aria-label="D_1_B Build the closing figure and supplements, planned">
+<rect class="bar st-planned rough" x="3220.0" y="1712" width="240.0" height="16" rx="3"/>
+<text class="barlabel" x="3465.0" y="1724.0">D_1_B · ≈ 6 h (guess)</text>
+</g>
+<g class="task" data-id="D_2_B" tabindex="0" aria-label="D_2_B Results text for the closing figure, waiting on Tom">
+<rect class="bar st-tom rough" x="3460.0" y="1736" width="160.0" height="16" rx="3"/>
+<text class="barlabel" x="3625.0" y="1748.0">D_2_B · ≈ 4 h (guess)</text>
+</g>
+<line class="now" x1="1391.3" y1="0" x2="1391.3" y2="1764"/>
+<text class="nowlabel" x="1387.3" y="27" text-anchor="end">now 10:47</text>
+</svg>
+</div></div>
+</main>
+<div id="tip" role="tooltip"></div>
+<script id="taskdata" type="application/json">{"A_0_B": {"code": "A_0_B", "codeRead": "stage A, step 0, Build", "commits": "", "gate": "Each worker starts its own MATLAB (checked when first used).", "issue": "", "merge": "", "name": "Six MATLAB worker agents set up", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 35 min (approximate: the start was inferred), 2026-11-10 21:43 to 2026-11-10 22:18. Measured by: commits on main; 1be5011, fde6e88.", "waits": ["A_0_T3 Regression references in three tiers"], "what": "Defined six worker agents (three on Fable, three on Opus), each with its own private MATLAB session, so building can run in parallel without workers disturbing each other.", "who": "lead agent"}, "A_0_P1": {"code": "A_0_P1", "codeRead": "stage A, step 0, Plan 1", "commits": "", "gate": "Read and answered by Tom the next morning.", "issue": "", "merge": "", "name": "Plan A written (first version)", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 26 min (approximate: the start was inferred), 2026-11-10 22:18 to 2026-11-10 22:44. Measured by: commits on main; 6b3d874.", "waits": ["A_0_B Six MATLAB worker agents set up"], "what": "The implementation plan for the chained vesicle-pool model: design, tests, gates, order of the builds and who does each.", "who": "lead agent"}, "A_0_P2": {"code": "A_0_P2", "codeRead": "stage A, step 0, Plan 2", "commits": "", "gate": "Tom approved the execution plan.", "issue": "", "merge": "", "name": "Planning with Tom: build order, interface", "note": "This bar spans a working day of discussion and includes pauses.", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 7 h 39 min (approximate: the start was inferred), 2026-11-11 08:51 to 2026-11-11 16:30. Measured by: commits on main; first commit ab02708, last f0b0941 (facilitation values chosen by Tom); includes breaks that git does not show.", "waits": ["A_0_P1 Plan A written (first version)"], "what": "Tom's answers worked into Plan A: general code under one route interface instead of per-model branches, a tolerance-based regression tier, the pool module first, chained facilitation straight after the chain, four conditions in every analysis and three in the paper.", "who": "lead + Tom"}, "A_0_T1": {"code": "A_0_T1", "codeRead": "stage A, step 0, Test 1", "commits": "ba0508c..7793b6f, on main", "gate": "All tests pass (58 at the time).", "issue": "FD-001", "merge": "", "name": "Audit the existing tests", "note": "At this time one agent did all the work; the lead / worker arrangement came the same evening.", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 06 min (approximate: the start was inferred), 2026-11-10 18:32 to 2026-11-10 19:38. Measured by: commits on main; start: e0e8e4d (tracking files created); end: 7793b6f (FD-001 done).", "waits": [], "what": "Ran every test script, fixed the broken ones, removed five that checked nothing, and added one command (run_all_tests) that runs them all. Done first so that later changes to the model are checked by tests that are known to work.", "who": "lead agent"}, "A_0_T2": {"code": "A_0_T2", "codeRead": "stage A, step 0, Test 2", "commits": "a24334b, on main", "gate": "The bundle runs end to end (about 50 min).", "issue": "FD-002", "merge": "", "name": "Regression bundle (100-neuron copy)", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 05 min (approximate: the start was inferred), 2026-11-10 19:38 to 2026-11-10 20:43. Measured by: commits on main; start: end of FD-001; end: 1cb82de (FD-002 done).", "waits": ["A_0_T1 Audit the existing tests"], "what": "A small copy of the manuscript's whole pipeline (the paper network at one fifth the size) that runs every analysis stage and every figure, so a code change can be checked against the paper's own computations.", "who": "lead agent"}, "A_0_T3": {"code": "A_0_T3", "codeRead": "stage A, step 0, Test 3", "commits": "7fcf533..cd5d79a, on main", "gate": "Each tier passes against its own reference.", "issue": "FD-003", "merge": "", "name": "Regression references in three tiers", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 43 min (approximate: the start was inferred), 2026-11-10 20:00 to 2026-11-10 21:43. Measured by: commits on main; start: estimated between a24334b (19:43) and the first FD-003 commit 7fcf533 (20:40); end: cd5d79a.", "waits": ["A_0_T1 Audit the existing tests"], "what": "Saved the results of the unchanged code as references, and three checks that compare against them: ultrarapid (36 s), stages (2 min) and full (about 50 min). Any later change that moves a number by accident is caught.", "who": "lead agent"}, "A_0_T4": {"code": "A_0_T4", "codeRead": "stage A, step 0, Test 4", "commits": "", "gate": "Quick suite 53 of 53.", "issue": "", "merge": "", "name": "Pre-flight checks before building", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 18 min (approximate: the start was inferred), 2026-11-11 16:00 to 2026-11-11 16:17. Measured by: worklog; worklog: 'Pre-flight on 53000f5: quick 53 of 53, 297 s'.", "waits": ["A_0_P2 Planning with Tom: build order, interface"], "what": "Clean tree, worker agents listed, the quick test suite passing, before the first worker is briefed.", "who": "lead agent"}, "A_0a_B": {"code": "A_0a_B", "codeRead": "stage A, step 0a, Build", "commits": "ce771b7", "gate": "Quick suite, stages tier, and the full tier's analysis half (A_0a_T).", "issue": "FD-017", "merge": "ff0bd02", "name": "Parallel-pool module", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 34 min (approximate: the start was inferred), 2026-11-11 16:19 to 2026-11-11 16:53. Measured by: brief to merge; start: 33480de (FD-017 in progress); end: merge.", "waits": ["A_0_T4 Pre-flight checks before building"], "what": "One small module through which every MATLAB session opens its pool of parallel workers, so the machine's 12 workers are shared by the lead and up to five worker agents without overcommitting.", "who": "Fable worker (matlab-fable-1)"}, "A_0a_T": {"code": "A_0a_T", "codeRead": "stage A, step 0a, Test", "commits": "", "gate": "No value difference (38 min on 9 workers).", "issue": "FD-017", "merge": "", "name": "Full-tier gate on the pool module", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 38 min (approximate: the start was inferred), 2026-11-11 17:02 to 2026-11-11 17:40. Measured by: worklog; worklog: 'started 17:02', '38 min on 9 workers'.", "waits": ["A_0a_B Parallel-pool module"], "what": "Reran the analysis half of the full regression tier to show that the pool module moved no number.", "who": "lead agent"}, "A_0b_B1": {"code": "A_0b_B1", "codeRead": "stage A, step 0b, Build 1", "commits": "85bda9b, 222a43c, 6eeb904, dfc5da2", "gate": "Two captures identical; the lead's capture equals the worker's; quick suite 55 of 55.", "issue": "FD-020", "merge": "4dc3d84", "name": "Tolerance regression tier and anchor", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 17 min (approximate: the start was inferred), 2026-11-11 17:02 to 2026-11-11 18:19. Measured by: brief to merge; start: f6ae523 (briefed); end: merge.", "waits": ["A_0a_B Parallel-pool module"], "what": "A regression check that allows round-off differences: it compares the model's equations at 111 stored states, and small stable networks end to end, against an 'anchor' saved from the model before anyone touched it. Needed because a rewrite of the model's arithmetic changes the last digit, which the byte-exact tiers cannot tolerate.", "who": "Fable worker (matlab-fable-1)"}, "A_0b_B2": {"code": "A_0b_B2", "codeRead": "stage A, step 0b, Build 2", "commits": "68da56f", "gate": "Quick suite; stages tier unchanged.", "issue": "FD-016", "merge": "fafd990", "name": "Seed for the joint parameter sample", "note": "FD-016 has no step number in Plan A; it ran beside step 0b and carries that number.", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 30 min (approximate: the start was inferred), 2026-11-11 17:02 to 2026-11-11 17:32. Measured by: brief to merge; start: f6ae523 (briefed); end: merge.", "waits": ["A_0a_B Parallel-pool module"], "what": "An option that makes the 128 random connectivity points of the joint parameter sweep repeatable, so later runs sample the same networks and can be compared. Unset, behaviour is as before.", "who": "Fable worker (matlab-fable-2)"}, "A_0c_P": {"code": "A_0c_P", "codeRead": "stage A, step 0c, Plan", "commits": "", "gate": "Decision recorded in the to-do list.", "issue": "", "merge": "", "name": "Tom fixes the tolerances", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 2 h 07 min, 2026-11-11 19:13 to 2026-11-11 21:19. Measured by: commits on main; end: aa95aca (tolerances fixed by Tom).", "waits": ["A_0c_T Mutation checks on the tolerance tier"], "what": "Tom reviewed the mutation results and fixed the tolerances as proposed. The build waited for this; such waits are what the projection of future work leaves out.", "who": "Tom"}, "A_0c_T": {"code": "A_0c_T", "codeRead": "stage A, step 0c, Test", "commits": "988feae", "gate": "55 of 55 caught by compared values.", "issue": "FD-020", "merge": "24e515b", "name": "Mutation checks on the tolerance tier", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 54 min (approximate: the start was inferred), 2026-11-11 18:19 to 2026-11-11 19:13. Measured by: previous merge to merge; start: merge of 0b; end: merge.", "waits": ["A_0b_B1 Tolerance regression tier and anchor"], "what": "Put 55 small deliberate errors into the model one at a time (a time constant off by one part in a million, a dropped Jacobian term, a sign error ...) and confirmed the tolerance tier catches every one. This is what shows the tolerances are tight enough.", "who": "Fable worker (matlab-fable-1)"}, "A_0d_B": {"code": "A_0d_B", "codeRead": "stage A, step 0d, Build", "commits": "d3d1e82..964e8b2", "gate": "Tolerance tier against the anchor (worst 4.8e-16 against 1e-12); quick suite; 71 mutations caught on the refactored code; timing within 5 %.", "issue": "FD-021", "merge": "7d49430", "name": "Refactor onto one route interface", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 2 h 01 min (approximate: the start was inferred), 2026-11-11 21:38 to 2026-11-11 23:39. Measured by: brief to merge; start: 429101d (FD-021 in progress); end: merge.", "waits": ["A_0c_P Tom fixes the tolerances"], "what": "Moved the existing depression and facilitation arithmetic out of the model's core functions into separate 'route models' under one interface, with no new model. The chain then becomes a second route model rather than a branch at every site.", "who": "Fable worker (matlab-fable-1)"}, "A_0d_T": {"code": "A_0d_T", "codeRead": "stage A, step 0d, Test", "commits": "", "gate": "Full bundle: no structural difference; 605 of 4583 values moved, median 5.7e-16.", "issue": "FD-021", "merge": "", "name": "Gates; exact references re-captured", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 30 min, 2026-11-11 23:39 to 2026-11-12 01:09. Measured by: merge to gates commit; 8d7d2c9 ultrarapid, dfc93f0 stages, cc51085 full.", "waits": ["A_0d_B Refactor onto one route interface"], "what": "After the refactor the byte-exact references were saved again, once and deliberately, after the tolerance tier showed the numbers had moved only at round-off. Includes a full-tier run (about 40 min of analyses plus figures).", "who": "lead agent"}, "A_10_B": {"code": "A_10_B", "codeRead": "stage A, step 10, Build", "commits": "", "gate": "test_preset_golden, test_preset_conditions, test_mu7chain_bundle, test_std_spread and three more pass (commit message).", "issue": "FD-007", "merge": "fd1fb99 (committed on main)", "name": "Spread into the mu7chain preset", "note": "The lead's brief gave 30 min for this step, but that brief was written about when the step ran, so it is not used as an estimate of record. Ran beside A_9_T.", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 18 min (approximate: the start was inferred), 2026-11-12 10:20 to 2026-11-12 10:39. Measured by: lead's previous commit to its commit: start 1a51e91 (the lead's last commit before it), end fd1fb99.", "waits": ["A_9_B Per-neuron spread of synapse parameters"], "what": "The paper's preset gets the per-neuron spread (0.25), and the stored copy of every preset's output is regenerated so the preset test knows about it.", "who": "lead agent"}, "A_10_T1": {"code": "A_10_T1", "codeRead": "stage A, step 10, Test 1", "commits": "", "gate": "Tom says go.", "issue": "", "merge": "", "name": "Hold point: Tom looks at example traces", "note": "The lead's estimate is 30 to 60 min of Tom's time; drawn at 45. It is uncertain, and the projection does not include waiting for Tom to be available.", "prior": "", "rough": false, "source": "", "status": "waiting on Tom", "timing": "Estimate: 45 min. Placed at +0:15 to +1:00 of working time from now, after what it waits for.", "waits": ["A_10_B Spread into the mu7chain preset", "A_9_T Lead's gates on the spread merge"], "what": "Before any long run, the lead runs the example time series for a few seeds interactively and Tom may hand-tune the connectivity. The long runs wait for Tom's word.", "who": "Tom"}, "A_10_T2": {"code": "A_10_T2", "codeRead": "stage A, step 10, Test 2", "commits": "", "gate": "No difference beyond the recorded ignore patterns.", "issue": "", "merge": "", "name": "Full regression tier", "note": "About 50 min, drawn as 60 because bars are whole quarter-hours. Needs the desktop MATLAB.", "prior": "", "rough": false, "source": "", "status": "planned", "timing": "Estimate: 1 h. Placed at +1:00 to +2:00 of working time from now, after what it waits for.", "waits": ["A_10_T1 Hold point: Tom looks at example traces"], "what": "Reruns every stage and all 36 figures of the small copy of the manuscript bundle and compares with the stored references, about 50 min. The milestone check that the finished model still reproduces the paper's pipeline.", "who": "lead agent"}, "A_10_T3": {"code": "A_10_T3", "codeRead": "stage A, step 10, Test 3", "commits": "", "gate": "Second run of the full tier on the new code reproduces it.", "issue": "", "merge": "", "name": "Full reference re-captured", "note": "", "prior": "", "rough": false, "source": "", "status": "planned", "timing": "Estimate: 15 min. Placed at +2:00 to +2:15 of working time from now, after what it waits for.", "waits": ["A_10_T2 Full regression tier"], "what": "The full tier's reference is saved again, deliberately, because the condition titles changed; the commit says why the expected values moved.", "who": "lead agent"}, "A_11_T1": {"code": "A_11_T1", "codeRead": "stage A, step 11, Test 1", "commits": "", "gate": "Every stage finishes with all four conditions.", "issue": "FD-007", "merge": "", "name": "Fast run, four conditions (12 workers)", "note": "Lead's estimate; the preliminary run took 4.06 h on 6 workers. Does not start until Tom says so.", "prior": "", "rough": false, "source": "", "status": "planned", "timing": "Estimate: 3 h. Placed at +2:15 to +5:15 of working time from now, after what it waits for.", "waits": ["A_10_T3 Full reference re-captured"], "what": "The whole analysis pipeline of the mu7chain bundle at 'fast' size on all four conditions. Tests that every stage runs end to end on the finished model; it is the last run agents make (medium and larger are Tom's).", "who": "lead agent"}, "A_11_T2": {"code": "A_11_T2", "codeRead": "stage A, step 11, Test 2", "commits": "", "gate": "Every entry written to disk.", "issue": "FD-006", "merge": "", "name": "Three-condition figure set (paper)", "note": "About 10 min, drawn as 15.", "prior": "", "rough": false, "source": "", "status": "planned", "timing": "Estimate: 15 min. Placed at +5:15 to +5:30 of working time from now, after what it waits for.", "waits": ["A_11_T1 Fast run, four conditions (12 workers)"], "what": "Builds every figure with the paper's three conditions from the fast run. Tests the figure half of the pipeline.", "who": "lead agent"}, "A_11_T3": {"code": "A_11_T3", "codeRead": "stage A, step 11, Test 3", "commits": "", "gate": "Every entry written to disk.", "issue": "FD-006", "merge": "", "name": "Four-condition figure set (review)", "note": "About 10 min, drawn as 15.", "prior": "", "rough": false, "source": "", "status": "planned", "timing": "Estimate: 15 min. Placed at +5:30 to +5:45 of working time from now, after what it waits for.", "waits": ["A_11_T2 Three-condition figure set (paper)"], "what": "The same figures with product MTS added as a fourth column in green, for Tom to compare chain and product.", "who": "lead agent"}, "A_11_T4": {"code": "A_11_T4", "codeRead": "stage A, step 11, Test 4", "commits": "", "gate": "The report to Tom.", "issue": "", "merge": "", "name": "Check every stage and figure; report", "note": "", "prior": "", "rough": false, "source": "", "status": "planned", "timing": "Estimate: 15 min. Placed at +5:45 to +6:00 of working time from now, after what it waits for.", "waits": ["A_11_T3 Four-condition figure set (review)"], "what": "The lead opens every stage's output and every figure of both sets, and reports to Tom.", "who": "lead agent"}, "A_12_T": {"code": "A_12_T", "codeRead": "stage A, step 12, Test", "commits": "", "gate": "Every item of Plan A section 10 ticked or explained.", "issue": "", "merge": "", "name": "Close-out: Plan A 'done means' list", "note": "", "prior": "", "rough": false, "source": "", "status": "planned", "timing": "Estimate: 30 min. Placed at +6:00 to +6:30 of working time from now, after what it waits for.", "waits": ["A_11_T4 Check every stage and figure; report"], "what": "Goes through the checklist of Plan A section 10, brings ISSUES and WORKLOG up to date and ticks block A's boxes in the to-do list.", "who": "lead agent"}, "A_13_B": {"code": "A_13_B", "codeRead": "stage A, step 13, Build", "commits": "", "gate": "Tom's judgement.", "issue": "FD-009", "merge": "", "name": "Medium run(s) for the paper (Tom)", "note": "Duration not known. The 12 h bar is a placeholder guess, not an estimate from a measured run.", "prior": "", "rough": true, "source": "", "status": "waiting on Tom", "timing": "Estimate: 12 h (a guess). Placed at +6:30 to +18:30 of working time from now, after what it waits for.", "waits": ["A_12_T Close-out: Plan A 'done means' list"], "what": "The paper's results: the sweeps, memory capacity, stability and transient analyses on all four conditions at 'medium' or larger. Only Tom starts these runs and says when they are done.", "who": "Tom"}, "A_1_B": {"code": "A_1_B", "codeRead": "stage A, step 1, Build", "commits": "2b5f6c2..97aad1c", "gate": "test_std_chain_model; quick suite 57 of 57; tolerance tier against the anchor; ultrarapid tier byte-exact.", "issue": "FD-004, FD-005", "merge": "3d2ed56", "name": "Chained vesicle-pool depression", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 14 min (approximate: the start was inferred), 2026-11-11 23:55 to 2026-11-12 01:09. Measured by: brief to merge; start: dfc93f0 (FD-004 in progress); end: merge.", "waits": ["A_0d_B Refactor onto one route interface"], "what": "The chain itself: a releasable pool refilled from a slower reserve, as a second route model, with its analytic Jacobian and unit tests (Jacobian against finite differences, steady state against the closed form, a huge reserve reproducing the single pool).", "who": "Fable worker (matlab-fable-1)"}, "A_1_T": {"code": "A_1_T", "codeRead": "stage A, step 1, Test", "commits": "", "gate": "All pass.", "issue": "FD-004, FD-005", "merge": "", "name": "Lead's gates on the chain merge", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 8 min (approximate: the start was inferred), 2026-11-12 01:09 to 2026-11-12 01:17. Measured by: merge to gates commit; end: f5759cd (issues done, equations file).", "waits": ["A_1_B Chained vesicle-pool depression"], "what": "Tolerance tier, ultrarapid tier and quick suite on merged main; the equations file updated to state the chain.", "who": "lead agent"}, "A_2_P": {"code": "A_2_P", "codeRead": "stage A, step 2, Plan", "commits": "", "gate": "Reviewed by the lead; written to docs/notes/.", "issue": "", "merge": "", "name": "Inventory of display code to change", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 17 min (approximate: the start was inferred), 2026-11-11 16:17 to 2026-11-11 16:35. Measured by: commits on main; e737f68.", "waits": ["A_0_T4 Pre-flight checks before building"], "what": "A read-only survey of every figure and table that computes depression itself or assumes exactly three conditions, so the later display work could be split into packages without two workers editing one file.", "who": "Opus worker (matlab-opus-1)"}, "A_3_B1": {"code": "A_3_B1", "codeRead": "stage A, step 3, Build 1", "commits": "48d9ddd", "gate": "test_esn_route_redundancy with chain cases; quick suite.", "issue": "FD-006", "merge": "4ebf27c", "name": "Reservoir class sees the chain", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 25 min (approximate: the start was inferred), 2026-11-12 01:09 to 2026-11-12 01:33. Measured by: previous merge to merge; start: step 1 merge; end: merge.", "waits": ["A_1_B Chained vesicle-pool depression"], "what": "The memory-capacity reservoir reads each neuron's synaptic output; it now asks the route model instead of assuming the product, so it works on chain routes.", "who": "Fable worker (matlab-fable-2)"}, "A_3_B2": {"code": "A_3_B2", "codeRead": "stage A, step 3, Build 2", "commits": "0df8b63, 82d2e7a", "gate": "Preset tests; a chain model builds and runs from the preset; stages reference re-captured for the retitled product condition.", "issue": "FD-007", "merge": "257e4f1", "name": "Chain presets and the mu7chain bundle", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 32 min (approximate: the start was inferred), 2026-11-12 01:09 to 2026-11-12 01:41. Measured by: previous merge to merge; start: step 1 merge; end: merge.", "waits": ["A_1_B Chained vesicle-pool depression"], "what": "The networks of the new experiment (four conditions: none, 1TS, chained MTS, product MTS), their names, titles and colours, and the configuration that runs the whole pipeline on them and makes both figure sets.", "who": "Opus worker (matlab-opus-2)"}, "A_3_T": {"code": "A_3_T", "codeRead": "stage A, step 3, Test", "commits": "", "gate": "All ten stages finished, each holding all four conditions.", "issue": "FD-007", "merge": "", "name": "Preliminary fast run of mu7chain", "note": "The run itself took 4.06 h on six workers; the bar also holds a first attempt that died 25 min in and was restarted, so the ratio includes the restart. Not merged: data only, in data/mu7chain_fast_prelim (made before the depression spread existed).", "prior": "2.5 to 3 h (drawn as the midpoint, 2 h 45 min) (recorded before it ran: the lead's expectation when it briefed matlab-opus-3; relayed by the lead on 2026-11-12, not written in the repo's documents)", "rough": false, "source": "", "status": "done", "timing": "Took 4 h 54 min (approximate: the start was inferred), 2026-11-12 01:56 to 2026-11-12 06:50. Measured by: decision to worklog: start a091c97 (the lead decides the run and briefs the worker), end 9d8cc95 (worklog records it finished). Actual / estimate = 1.78.", "waits": ["A_3_B2 Chain presets and the mu7chain bundle"], "what": "A first 'fast' run of every analysis on the four conditions, made early so the figure workers had real data and so stages that silently skip the chain were found now. Tests the analysis half of the pipeline; not the final run.", "who": "Opus worker (matlab-opus-3)"}, "A_4_B1": {"code": "A_4_B1", "codeRead": "stage A, step 4, Build 1", "commits": "85d601d", "gate": "Quick suite 59 of 59.", "issue": "FD-006", "merge": "3e1bd04", "name": "Figures: the condition-selection option", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 32 min (approximate: the start was inferred), 2026-11-12 01:41 to 2026-11-12 02:13. Measured by: previous merge to merge; start: FD-007 merge; end: merge.", "waits": ["A_3_B2 Chain presets and the mu7chain bundle"], "what": "One option, cfg.conditions, that tells every figure which conditions to draw, so one run yields both the paper's three-condition set and the four-condition review set.", "who": "Opus worker"}, "A_4_B2": {"code": "A_4_B2", "codeRead": "stage A, step 4, Build 2", "commits": "9c3f0de", "gate": "test_sweep_figures_conditions; quick suite.", "issue": "FD-006", "merge": "1debb64", "name": "Figures: the parameter sweeps", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 40 min (approximate: the start was inferred), 2026-11-12 02:13 to 2026-11-12 03:54. Measured by: previous merge to merge; start: previous display merge; end: merge.", "waits": ["A_4_B1 Figures: the condition-selection option"], "what": "The sweep figures follow the condition selection; the SFA-timescale sweep runs both MTS conditions.", "who": "Opus worker"}, "A_4_B3": {"code": "A_4_B3", "codeRead": "stage A, step 4, Build 3", "commits": "f8584c7, e089e9d", "gate": "Quick suite; stages tier.", "issue": "FD-006", "merge": "b487051", "name": "Figures: the analysis stages", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 2 h 21 min (approximate: the start was inferred), 2026-11-12 02:13 to 2026-11-12 04:34. Measured by: previous merge to merge; start: previous display merge; end: merge.", "waits": ["A_4_B1 Figures: the condition-selection option"], "what": "The figures drawn from stage data follow the selection and title conditions by name; depression factors are asked of the model, not recomputed.", "who": "Opus worker (matlab-opus-2)"}, "A_4_B4": {"code": "A_4_B4", "codeRead": "stage A, step 4, Build 4", "commits": "690a8b7", "gate": "Quick suite; stages tier.", "issue": "FD-006", "merge": "d2aefa7", "name": "Figures: steady state, concepts, tables", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 37 min (approximate: the start was inferred), 2026-11-12 04:37 to 2026-11-12 05:14. Measured by: previous merge to merge; start: bedef99 (lead's decisions on the display work); end: merge.", "waits": ["A_4_B3 Figures: the analysis stages"], "what": "The analytic depression figures and the generated equation and parameter tables are right on chain routes.", "who": "Opus worker"}, "A_4_B5": {"code": "A_4_B5", "codeRead": "stage A, step 4, Build 5", "commits": "2099d6f..9eaa7dc", "gate": "test_grouped_conditions_styles; quick suite.", "issue": "FD-006", "merge": "20bccd2", "name": "Figures: the grouped main figures", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 2 h 10 min (approximate: the start was inferred), 2026-11-12 04:37 to 2026-11-12 06:46. Measured by: previous merge to merge; start: bedef99; end: merge.", "waits": ["A_4_B3 Figures: the analysis stages"], "what": "The composite main figures follow the condition selection, labelled by name.", "who": "Opus worker"}, "A_4_T": {"code": "A_4_T", "codeRead": "stage A, step 4, Test", "commits": "41ac6b1, 0c706f5", "gate": "37 of 37 in each set; the older product run still builds 36 of 36; quick 67 of 67, stages tier exact.", "issue": "FD-006", "merge": "a46e05c", "name": "Integration pass: both figure sets build", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 32 min (approximate: the start was inferred), 2026-11-12 06:59 to 2026-11-12 08:32. Measured by: previous merge to merge; start: estimated from the preceding merges; end: merge.", "waits": ["A_4_B4 Figures: steady state, concepts, tables", "A_4_B5 Figures: the grouped main figures", "A_3_T Preliminary fast run of mu7chain"], "what": "Built every figure of both sets from the preliminary run and fixed what failed. Tests the figure half of the pipeline: 37 of 37 entries in each set.", "who": "Opus worker"}, "A_5_T": {"code": "A_5_T", "codeRead": "stage A, step 5, Test", "commits": "020dfa7..c9a5d80", "gate": "Two captures reproduce; mutation checks on the chain suite; lead re-captures on main and requires bit-identity.", "issue": "", "merge": "3c9a447", "name": "Regression references for the chain", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 2 h 52 min (approximate: the start was inferred), 2026-11-12 01:20 to 2026-11-12 04:12. Measured by: brief to merge; start: 127c92c (steps 3 and 5 briefed); end: merge.", "waits": ["A_1_T Lead's gates on the chain merge"], "what": "The existing references contain no chain, so the chain got its own: a tolerance suite and an exact tier on chain networks, saved before facilitation was begun so facilitation could be checked against them.", "who": "Fable worker (matlab-fable-1)"}, "A_7_B": {"code": "A_7_B", "codeRead": "stage A, step 7, Build", "commits": "9b76912", "gate": "Test against an independent integration; quick 64 of 64; stages tier exact.", "issue": "FD-014", "merge": "7c3d6dd", "name": "Figure: 1TS against chained MTS", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 1 h 08 min (approximate: the start was inferred), 2026-11-12 04:37 to 2026-11-12 05:45. Measured by: previous merge to merge; start not recorded: between the WP2 merge (04:34) and the status commit dadbe78 (05:17); end: merge.", "waits": ["A_4_B3 Figures: the analysis stages"], "what": "The paper figure Brian asked for: the two conditions' depression under a sinusoidal rate, rate steps and at steady state, showing that they match at the onset of activity (within 1.4 %) and differ under sustained activity.", "who": "Opus worker (matlab-opus-2)"}, "A_8_B": {"code": "A_8_B", "codeRead": "stage A, step 8, Build", "commits": "43d6a91..87f51c0", "gate": "With facilitation off, the chain matches its references; a new stf_chain suite and its mutation checks.", "issue": "FD-018", "merge": "2b455ff", "name": "Release-coupled facilitation", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 2 h 35 min (approximate: the start was inferred), 2026-11-12 04:24 to 2026-11-12 06:59. Measured by: brief to merge; start: c07af7b (step 8 briefed); end: merge.", "waits": ["A_5_T Regression references for the chain"], "what": "Chained facilitation (release probability driven by a calcium trace, coupled to how fast the releasable pool is used). Not in this paper; built now so the model is refactored only once.", "who": "Fable worker (matlab-fable-1)"}, "A_8_T": {"code": "A_8_T", "codeRead": "stage A, step 8, Test", "commits": "", "gate": "All pass; quick 67 of 67.", "issue": "FD-018", "merge": "", "name": "Lead's gates on the facilitation merge", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 13 min (approximate: the start was inferred), 2026-11-12 06:59 to 2026-11-12 07:12. Measured by: merge to gates commit; end: ce60a0b (FD-018 done).", "waits": ["A_8_B Release-coupled facilitation"], "what": "Anchor, chain reference at zero tolerance, the lead's own capture of the facilitation reference, quick suite.", "who": "lead agent"}, "A_9_B": {"code": "A_9_B", "codeRead": "stage A, step 9, Build", "commits": "6a0129f..6d95077", "gate": "test_std_spread; a fourth tolerance suite ('spread') and 57 mutations caught; exact chain tier gains spread cases with no existing value moved.", "issue": "FD-015", "merge": "b466a98", "name": "Per-neuron spread of synapse parameters", "note": "", "prior": "no prior estimate", "rough": false, "source": "", "status": "done", "timing": "Took 3 h 08 min (approximate: the start was inferred), 2026-11-12 07:12 to 2026-11-12 10:20. Measured by: brief to merge; start: ce60a0b (FD-015 in progress); end: merge.", "waits": ["A_8_T Lead's gates on the facilitation merge"], "what": "Each neuron gets its own depression and facilitation time constants and reserve size, drawn log-normally around the nominal values (sigma 0.25, as the SFA time constants already have). A zero spread reproduces the model without it.", "who": "Fable worker (matlab-fable-1)"}, "A_9_T": {"code": "A_9_T", "codeRead": "stage A, step 9, Test", "commits": "", "gate": "All pass.", "issue": "FD-015", "merge": "", "name": "Lead's gates on the spread merge", "note": "", "prior": "no prior estimate", "rough": false, "source": "start: merge b466a98; estimate from the lead", "status": "running", "timing": "Started 2026-11-12 10:20 (approximately). Estimate: 15 min. Still running after 26 min: it is taking longer than estimated, and the bar is drawn to a quarter hour past now.", "waits": ["A_9_B Per-neuron spread of synapse parameters"], "what": "Four tolerance suites (about 25 s each), the quick suite (about 10 min) and the stages tier (2 min) on merged main.", "who": "lead agent"}, "B_0_P": {"code": "B_0_P", "codeRead": "stage B, step 0, Plan", "commits": "", "gate": "Issues written with acceptance tests.", "issue": "FD-011, FD-012", "merge": "", "name": "Plan block B with Tom", "note": "Placed after block A closes because the lead's scope is Plan A until then.", "prior": "", "rough": true, "source": "", "status": "waiting on Tom", "timing": "Estimate: 2 h (a guess). Placed at +6:30 to +8:30 of working time from now, after what it waits for.", "waits": ["A_12_T Close-out: Plan A 'done means' list"], "what": "Decide which network carries the stimulation result, the measure of aberrant activity, what 'hyperexcitable at baseline' means and which form of tonic input to show; turn FD-011 and FD-012 into issues.", "who": "lead + Tom"}, "B_1_B": {"code": "B_1_B", "codeRead": "stage B, step 1, Build", "commits": "", "gate": "To be set when planned.", "issue": "FD-011", "merge": "", "name": "Causal 2 x 2 with frozen-state arm", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 8 h (a guess). Placed at +8:30 to +16:30 of working time from now, after what it waits for.", "waits": ["B_0_P Plan block B with Tom"], "what": "Stimulation off / on crossed with adaptation intact / removed, plus stimulation with the adaptation variables held at their pre-stimulation values. Shows whether suppression needs adaptation to be recruited.", "who": "worker agents"}, "B_2_B": {"code": "B_2_B", "codeRead": "stage B, step 2, Build", "commits": "", "gate": "To be set when planned.", "issue": "FD-011", "merge": "", "name": "Parameter-space version of the experiment", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 8 h (a guess). Placed at +8:30 to +16:30 of working time from now, after what it waits for.", "waits": ["B_0_P Plan block B with Tom"], "what": "Across connectivity, the fraction of hyperexcitable networks in which stimulation suppresses aberrant activity, with and without adaptation; memory capacity and sensitivity recorded with stimulation on.", "who": "worker agents"}, "B_3_T": {"code": "B_3_T", "codeRead": "stage B, step 3, Test", "commits": "", "gate": "To be set when planned.", "issue": "", "merge": "", "name": "Fast run of the stimulation experiments", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 4 h (a guess). Placed at +16:30 to +20:30 of working time from now, after what it waits for.", "waits": ["B_1_B Causal 2 x 2 with frozen-state arm", "B_2_B Parameter-space version of the experiment"], "what": "A 'fast' run of both experiments to test that they run end to end before the expensive run.", "who": "lead agent"}, "B_4_B": {"code": "B_4_B", "codeRead": "stage B, step 4, Build", "commits": "", "gate": "Tom's judgement.", "issue": "", "merge": "", "name": "Medium run of block B (Tom)", "note": "", "prior": "", "rough": true, "source": "", "status": "waiting on Tom", "timing": "Estimate: 12 h (a guess). Placed at +20:30 to +32:30 of working time from now, after what it waits for.", "waits": ["B_3_T Fast run of the stimulation experiments"], "what": "The run whose results go into the paper; Tom's to start and to call done.", "who": "Tom"}, "B_5_B": {"code": "B_5_B", "codeRead": "stage B, step 5, Build", "commits": "", "gate": "To be set when planned.", "issue": "FD-012", "merge": "", "name": "Combined stimulation figure (Figs 7 + 8)", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 6 h (a guess). Placed at +32:30 to +38:30 of working time from now, after what it waits for.", "waits": ["B_4_B Medium run of block B (Tom)"], "what": "One figure combining the clinical and model stimulation figures, with the causal result in it; supplementary figures with time series and parameter-space maps.", "who": "worker agents"}, "C_0_P": {"code": "C_0_P", "codeRead": "stage C, step 0, Plan", "commits": "", "gate": "Issue written with acceptance tests.", "issue": "FD-010", "merge": "", "name": "Plan block C with Tom", "note": "The pilot itself does not depend on block A; it is placed here because the lead's scope is Plan A until block A closes.", "prior": "", "rough": true, "source": "", "status": "waiting on Tom", "timing": "Estimate: 2 h (a guess). Placed at +6:30 to +8:30 of working time from now, after what it waits for.", "waits": ["A_12_T Close-out: Plan A 'done means' list"], "what": "Turn the gain sweep into an issue: how the 3:2 and 2:3 E:I networks are realised, whether the fit is against gain or log gain, whether the exponent is measured with the memory-task input on.", "who": "lead + Tom"}, "C_1_T": {"code": "C_1_T", "codeRead": "stage C, step 1, Test", "commits": "", "gate": "To be set when planned.", "issue": "FD-010", "merge": "", "name": "Pilot: no-adaptation gain sweep", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 3 h (a guess). Placed at +8:30 to +11:30 of working time from now, after what it waits for.", "waits": ["C_0_P Plan block C with Tom"], "what": "A coarse sweep of overall connectivity gain without adaptation, noise off, to find where the leading exponent crosses zero and where memory peaks, so the real sweep brackets the peak.", "who": "worker agents"}, "C_2_B": {"code": "C_2_B", "codeRead": "stage C, step 2, Build", "commits": "", "gate": "To be set when planned.", "issue": "FD-010", "merge": "", "name": "Gain-sweep stage and E:I presets", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 8 h (a guess). Placed at +11:30 to +19:30 of working time from now, after what it waits for.", "waits": ["C_1_T Pilot: no-adaptation gain sweep"], "what": "A stage that measures memory capacity and the leading exponent for every gain, seed and condition (today memory capacity runs at one network only), and the 3:2 and 2:3 networks as presets.", "who": "worker agents"}, "C_3_T": {"code": "C_3_T", "codeRead": "stage C, step 3, Test", "commits": "", "gate": "To be set when planned.", "issue": "FD-010", "merge": "", "name": "Fast run of the gain sweep", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 4 h (a guess). Placed at +19:30 to +23:30 of working time from now, after what it waits for.", "waits": ["C_2_B Gain-sweep stage and E:I presets"], "what": "A 'fast' run on four conditions and three E:I balances, to test the stage end to end and estimate the cost of the real run.", "who": "lead agent"}, "C_4_B": {"code": "C_4_B", "codeRead": "stage C, step 4, Build", "commits": "", "gate": "Tom's judgement.", "issue": "FD-010", "merge": "", "name": "Medium gain-sweep runs (Tom)", "note": "", "prior": "", "rough": true, "source": "", "status": "waiting on Tom", "timing": "Estimate: 16 h (a guess). Placed at +23:30 to +39:30 of working time from now, after what it waits for.", "waits": ["C_3_T Fast run of the gain sweep"], "what": "The gain sweep for the paper on the three E:I balances; three balances triple the cost.", "who": "Tom"}, "C_5_B": {"code": "C_5_B", "codeRead": "stage C, step 5, Build", "commits": "", "gate": "To be set when planned.", "issue": "FD-010", "merge": "", "name": "Statistics and memory figure", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 6 h (a guess). Placed at +39:30 to +45:30 of working time from now, after what it waits for.", "waits": ["C_4_B Medium gain-sweep runs (Tom)"], "what": "Per condition and E:I balance: Gaussian height, centre and width of memory against gain, mean and variance across the range; the figure of gain vs memory, exponent vs memory and gain vs exponent.", "who": "worker agents"}, "D_0_P": {"code": "D_0_P", "codeRead": "stage D, step 0, Plan", "commits": "", "gate": "Layout agreed with Tom.", "issue": "FD-013", "merge": "", "name": "Sketch the closing figure's panels", "note": "", "prior": "", "rough": true, "source": "", "status": "waiting on Tom", "timing": "Estimate: 2 h (a guess). Placed at +8:30 to +10:30 of working time from now, after what it waits for.", "waits": ["B_0_P Plan block B with Tom", "C_0_P Plan block C with Tom"], "what": "One panel per step of the paper's story (stability across connectivity; responsiveness; suppression of discharges; memory with tonic drive), and which panels are new compute and which re-plotted.", "who": "lead + Tom"}, "D_1_B": {"code": "D_1_B", "codeRead": "stage D, step 1, Build", "commits": "", "gate": "To be set when planned.", "issue": "FD-013", "merge": "", "name": "Build the closing figure and supplements", "note": "", "prior": "", "rough": true, "source": "", "status": "planned", "timing": "Estimate: 6 h (a guess). Placed at +45:30 to +51:30 of working time from now, after what it waits for.", "waits": ["D_0_P Sketch the closing figure's panels", "B_5_B Combined stimulation figure (Figs 7 + 8)", "C_5_B Statistics and memory figure"], "what": "The figure itself and the supplementary figures supporting each panel; panel 3 comes from block B's parameter-space sweep, panel 4 from block C.", "who": "worker agents"}, "D_2_B": {"code": "D_2_B", "codeRead": "stage D, step 2, Build", "commits": "", "gate": "Tom's review.", "issue": "FD-013", "merge": "", "name": "Results text for the closing figure", "note": "", "prior": "", "rough": true, "source": "", "status": "waiting on Tom", "timing": "Estimate: 4 h (a guess). Placed at +51:30 to +55:30 of working time from now, after what it waits for.", "waits": ["D_1_B Build the closing figure and supplements"], "what": "The Results section that carries the closing figure and bridges into the Discussion.", "who": "lead + Tom"}}</script>
+<script>
+(function () {
+  var info = JSON.parse(document.getElementById('taskdata').textContent);
+  var tip = document.getElementById('tip');
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function line(label, text) {
+    var p = el('p'); p.appendChild(el('span', 'k', label + ': ')); p.appendChild(document.createTextNode(text));
+    return p;
+  }
+  function fill(d) {
+    tip.textContent = '';
+    tip.appendChild(el('h3', null, d.code + '  ' + d.name));
+    tip.appendChild(el('div', 'read', d.codeRead + (d.issue ? ' \u00B7 ' + d.issue : '')));
+    tip.appendChild(el('p', null, d.what));
+    tip.appendChild(line('Who', d.who));
+    tip.appendChild(line('Status', d.status));
+    tip.appendChild(line('Time', d.timing));
+    if (d.prior) tip.appendChild(line('Prior estimate', d.prior));
+    tip.appendChild(line('Waits for', d.waits.length ? d.waits.join('; ') : 'nothing'));
+    tip.appendChild(line('Checked by', d.gate));
+    if (d.merge) tip.appendChild(line('Merged as', d.merge));
+    if (d.commits) tip.appendChild(line('Commits', d.commits));
+    if (d.note) tip.appendChild(line('Note', d.note));
+    if (d.source) tip.appendChild(line('Times from', d.source));
+    if (d.rough) tip.appendChild(el('p', 'roughnote', 'Rough: not yet planned in detail; it will change as it is planned.'));
+  }
+  function place(x, y) {
+    var w = tip.offsetWidth, h = tip.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    var left = x + 16, top = y + 16;
+    if (left + w > vw - 8) left = Math.max(8, x - w - 16);
+    if (top + h > vh - 8) top = Math.max(8, vh - h - 8);
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  function mark(id, on) {
+    document.querySelectorAll('g.task[data-id="' + id + '"]').forEach(function (g) { g.classList.toggle('hl', on); });
+  }
+  var current = null;
+  document.querySelectorAll('g.task').forEach(function (g) {
+    var id = g.getAttribute('data-id');
+    g.addEventListener('mouseenter', function (ev) { current = id; fill(info[id]); tip.style.display = 'block'; place(ev.clientX, ev.clientY); mark(id, true); });
+    g.addEventListener('mousemove', function (ev) { place(ev.clientX, ev.clientY); });
+    g.addEventListener('mouseleave', function () { tip.style.display = 'none'; mark(id, false); current = null; });
+    g.addEventListener('focus', function () { var r = g.getBoundingClientRect(); fill(info[id]); tip.style.display = 'block'; place(r.right, r.top); mark(id, true); });
+    g.addEventListener('blur', function () { tip.style.display = 'none'; mark(id, false); });
+  });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') tip.style.display = 'none'; });
+  // open with "now" in view: a quarter of the visible chart lies before it
+  var scroller = document.querySelector('.scroll');
+  var nowLine = document.querySelector('line.now');
+  var leftW = document.querySelector('svg.labels').getBoundingClientRect().width;
+  function scrollTo(x) { scroller.scrollLeft = Math.max(0, x - (scroller.clientWidth - leftW) * 0.25); }
+  scrollTo(parseFloat(nowLine.getAttribute('x1')));
+  // #show=CODE opens that task's hover box (for checking the page without a mouse)
+  var m = /^#show=([A-Za-z0-9_]+)$/.exec(location.hash);
+  if (m && info[m[1]]) {
+    var g = document.querySelector('svg.chart g.task[data-id="' + m[1] + '"]');
+    var bar = g.querySelector('rect');
+    scrollTo(parseFloat(bar.getAttribute('x')));
+    var r = bar.getBoundingClientRect();
+    fill(info[m[1]]); tip.style.display = 'block'; place(r.left, r.bottom); mark(m[1], true);
+  }
+})();
+</script>
+</body>
+</html>
