@@ -56,7 +56,24 @@ arguments
     % which is how the pipeline's tables ended up outside its own output root.
     cfg.out_dir     (1,:) char = ''
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
+    % Condition names the tables cover, in order; empty = every condition of
+    % the preset (select_conditions). See "WHICH CONDITIONS" below.
+    cfg.conditions                = {}
 end
+% WHICH CONDITIONS (FD-006). The equations and the conditions table cover the
+% covered conditions: every one by default, the selection when cfg.conditions
+% names one. The parameter table describes ONE built model, under the most
+% adapted of the covered conditions (full_adaptation_condition: the chain wins
+% a tie with the product). The depression the equations state is read off the
+% compiled routes of the covered conditions (route_model: P.model,
+% P.nominal), never off a condition's name:
+%   * product routes (independent pools, route_product) -> the product
+%     equation for b_im; the "product SQUARES the depression" prose appears
+%     only when a covered condition has a product of TWO OR MORE pools;
+%   * chain routes (route_pool) -> (C1)-(C3) of
+%     docs/EquationsParametersDocs/Equations_stability_paper.md, the chain's
+%     parameters (both refill times, the one release time, n2) and its steady
+%     state (C4), evaluated with the model's own steady_state handle.
 
 setup_paths();
 if isempty(cfg.out_dir)
@@ -67,15 +84,26 @@ else
 end
 out_dir = ensure_dir(out_dir);
 
-[preset, model_class, conditions] = srnn_param_preset(cfg.preset_name);
-% Empty -> the preset's most-adapted regime, whatever it is called. The tables
-% document the fullest configuration, and which condition that is varies by
-% preset since names now state their timescale counts.
-model = build_from_preset(cfg.preset_name, '');
+[preset, model_class, all_conditions] = srnn_param_preset(cfg.preset_name);
+all_names = cellfun(@(c) c.name, all_conditions, 'UniformOutput', false);
+[~, keep] = select_conditions(all_names, cfg.conditions);
+conditions = all_conditions(keep);
+% The most-adapted COVERED regime, whatever it is called. The tables document
+% the fullest configuration, and which condition that is varies by preset
+% since names now state their timescale counts. A selection with no
+% conforming name (no_adaptation alone) falls back to the preset's own.
+try
+    full_name = full_adaptation_condition(conditions);
+catch
+    full_name = full_adaptation_condition(all_conditions);
+end
+model = build_from_preset(cfg.preset_name, full_name);
 M = model_facts(model, model_class, preset);
 % The regime the model above was built under, for the provenance banner. This
 % was the literal 'sfa_and_std' for a week after that name stopped existing.
-M.condition = full_adaptation_condition(conditions);
+M.condition = full_name;
+M.n_all_conditions = numel(all_conditions);
+M = depression_facts(M, conditions, model);
 
 paths = {};
 paths{end+1} = write_equation_table(out_dir, cfg.preset_name, M);
@@ -150,12 +178,156 @@ M.has_noise = any(M.sigma_u_noise(:) > 0);
 M.preset_fields = fieldnames(preset);
 end
 
+function M = depression_facts(M, conditions, model)
+% What depression the COVERED conditions carry, from their compiled routes.
+%   M.n_b_max       the widest PRODUCT route (the M of the product equation),
+%                   over the covered conditions; 0 with no product depression
+%   M.any_product   some covered route has product depression (n_b >= 1)
+%   M.any_chain     some covered route is a chain
+%   M.chains        the distinct chain routes (one per P.signature): their
+%                   nominal values and steady state, for the prose
+%   M.cond_dep      per covered condition, the table column's text
+%   M.any_stf       also true when a covered condition has facilitation
+% For SRNNModel2 (no routes) the built model's facts stand as they are.
+M.any_chain = false;
+M.product_ratios = [];   % tau_rec./tau_rel of the first covered product route of n_b_max pools
+M.chains = struct('nominal', {}, 'probe_r', {}, 'b1', {}, 'b2', {}, 'ceiling', {}, 'conditions', {});
+M.cond_dep = repmat({'none'}, 1, numel(conditions));
+if ~M.is_pairs
+    M.any_product = M.n_b_max > 0;
+    if M.n_b_max > 0
+        M.product_ratios = M.routes(1).tau_rec ./ M.routes(1).tau_rel;
+    end
+    return
+end
+% The rep model's own routes decide M.n_b_max as before, widened by any
+% covered condition's product routes.
+M.n_b_max = 0;
+for k = 1:numel(M.routes)
+    if ~M.routes(k).is_chain
+        M.n_b_max = max(M.n_b_max, numel(M.routes(k).tau_rec));
+    end
+    M.any_chain = M.any_chain || M.routes(k).is_chain;
+end
+probe_r = [0.1 0.25 0.5 1];
+best_nb = 0;
+zero_floor =isprop(model, 'std_zero_floor') && model.std_zero_floor;
+for c = 1:numel(conditions)
+    routes = condition_routes(conditions{c}, zero_floor);
+    texts = cell(1, numel(routes));
+    for k = 1:numel(routes)
+        P = routes(k).P;
+        if P.n_b > 0 && strcmp(P.model, 'product')
+            M.n_b_max = max(M.n_b_max, P.n_b);
+            if P.n_b > best_nb
+                best_nb = P.n_b;
+                M.product_ratios = P.nominal.tau_rec ./ P.nominal.tau_rel;
+            end
+        end
+        M.any_stf = M.any_stf || P.n_g > 0;
+        if strcmp(P.model, 'pool')
+            M.any_chain = true;
+            j = find(arrayfun(@(x) isequal(x.nominal, P.signature), M.chains), 1);
+            if isempty(j)
+                [b1, b2, ceiling] = chain_steady_state(routes(k), probe_r);
+                M.chains(end+1) = struct('nominal', P.signature, 'probe_r', probe_r, ...
+                    'b1', b1, 'b2', b2, 'ceiling', ceiling, 'conditions', {{}});
+                j = numel(M.chains);
+            end
+            if ~any(strcmp(M.chains(j).conditions, conditions{c}.name))
+                M.chains(j).conditions{end+1} = conditions{c}.name;
+            end
+        end
+        texts{k} = depression_text(P);
+    end
+    if isempty(routes)
+        continue
+    end
+    labels = {routes.label};
+    if isscalar(unique(texts))
+        M.cond_dep{c} = texts{1};          % every depressing route alike
+    else
+        M.cond_dep{c} = strjoin(strcat(labels, {': '}, texts), '; ');
+    end
+end
+M.any_product = M.n_b_max > 0;
+end
+
+function routes = condition_routes(cd_, zero_floor)
+% The condition's depressing routes, compiled by the model class's own route
+% compiler (SRNNCellTypePairs.compile_route), labelled "EE", "EI", ...
+routes = struct('label', {}, 'model', {}, 'P', {});
+if ~isfield(cd_, 'synapse_config') || ~isstruct(cd_.synapse_config); return; end
+sc = cd_.synapse_config;
+pres = fieldnames(sc);
+for a = 1:numel(pres)
+    posts = fieldnames(sc.(pres{a}));
+    for b = 1:numel(posts)
+        e = sc.(pres{a}).(posts{b});
+        if ~(isfield(e, 'std') && ~isempty(e.std)); continue; end
+        stf = [];
+        if isfield(e, 'stf'); stf = e.stf; end
+        R = SRNNCellTypePairs.compile_route(struct('std', e.std, 'stf', stf), ...
+            struct('npre', 1, 'zero_floor', zero_floor, ...
+            'label', sprintf('%s->%s', pres{a}, posts{b}), 'err_id_prefix', 'write_manuscript_tables'));
+        routes(end+1) = struct('label', [pres{a} posts{b}], 'model', R.model, 'P', R.P); %#ok<AGROW>
+    end
+end
+end
+
+function [b1, b2, ceiling] = chain_steady_state(route, probe_r)
+% The chain's steady state at the probe rates and its sustained-output
+% ceiling, from the route model's steady_state handle (route_pool's (C4)).
+b1 = zeros(size(probe_r)); b2 = b1;
+for k = 1:numel(probe_r)
+    ss = route.model.steady_state(probe_r(k), route.P);
+    b1(k) = route.model.depression(ss.s(:, 1:route.P.n_b), route.P);
+    b2(k) = ss.s(1, 2);
+end
+r_inf = 1e9;                       % r b1 -> the ceiling as r -> infinity
+ss = route.model.steady_state(r_inf, route.P);
+ceiling = r_inf * ss.F;
+end
+
+function s = depression_text(P)
+% One route's depression, as the conditions table states it (from P.nominal).
+n = P.nominal;
+if strcmp(P.model, 'pool')
+    s = sprintf('chained pools: $\\tau_{rec}$ = %s s, $\\tau_{rel}$ = %s s, $n_2$ = %g', ...
+        vec(n.tau_rec), vec(n.tau_rel), n.n2);
+elseif P.n_b == 1
+    s = sprintf('one pool: $\\tau_{rec}$ = %s s, $\\tau_{rel}$ = %s s', vec(n.tau_rec), vec(n.tau_rel));
+else
+    s = sprintf('product of %d pools: $\\tau_{rec}$ = %s s, $\\tau_{rel}$ = %s s', ...
+        P.n_b, vec(n.tau_rec), vec(n.tau_rel));
+end
+if strcmp(P.model, 'product') && isfield(n, 'combine') && strcmp(n.combine, 'geomean')
+    s = [s ', geometric-mean combine'];
+end
+if P.n_g > 0
+    s = sprintf('%s; facilitation $\\tau_{dec}$ = %s s, $\\tau_{fac}$ = %s s, $G$ = %s', ...
+        s, vec(n.tau_dec), vec(n.tau_fac), vec(n.G));
+end
+end
+
+function s = vec(v)
+if isscalar(v)
+    s = sprintf('%g', v);
+else
+    s = ['[' strjoin(arrayfun(@(x) sprintf('%g', x), v, 'UniformOutput', false), ', ') ']'];
+end
+end
+
 function R = route_facts(model)
-% One entry per depressing/facilitating route, from the compiled synapse config.
+% One entry per depressing/facilitating route of the BUILT model. The values
+% are the configuration as written; whether the route is a chain is the
+% compiled route's (get_params: params.route{pre, post}.P.model).
 R = struct('label', {}, 'tau_rec', {}, 'tau_rel', {}, ...
-           'has_stf', {}, 'tau_dec', {}, 'tau_fac', {}, 'G', {});
+           'has_stf', {}, 'tau_dec', {}, 'tau_fac', {}, 'G', {}, 'is_chain', {}, 'n2', {});
 sc = model.synapse_config;
 if ~isstruct(sc); return; end
+params = model.get_params();
+type_names = model.cell_type_names;
 pres = fieldnames(sc);
 for a = 1:numel(pres)
     posts = fieldnames(sc.(pres{a}));
@@ -166,10 +338,13 @@ for a = 1:numel(pres)
         if ~has_std && ~has_stf; continue; end
         r = struct('label', sprintf('%s to %s', pres{a}, posts{b}), ...
             'tau_rec', [], 'tau_rel', [], 'has_stf', has_stf, ...
-            'tau_dec', [], 'tau_fac', [], 'G', []);
+            'tau_dec', [], 'tau_fac', [], 'G', [], 'is_chain', false, 'n2', []);
         if has_std
             r.tau_rec = e.std.tau_rec(:)';
             r.tau_rel = e.std.tau_rel(:)';
+            P = params.route{strcmp(type_names, pres{a}), strcmp(type_names, posts{b})}.P;
+            r.is_chain = strcmp(P.model, 'pool');
+            if r.is_chain; r.n2 = P.nominal.n2; end
         end
         if has_stf
             r.tau_dec = e.stf.tau_dec(:)';
@@ -200,8 +375,21 @@ fprintf(fid, '## System equations\n\n');
 % What still tracks the preset: the noise term is present only for a stochastic
 % preset, the b equation only when there is depression, and facilitation adds
 % its factor and equation only when a route carries STF.
+%
+% Chained pools (FD-006): with chain routes alone theta's factor is b_{i1},
+% the releasable pool, as the canonical file writes it; with product routes
+% as well (1TS is a product of one pool), theta carries a depression factor
+% D_i, and a line states D_i for each form. Product-only presets are
+% written exactly as before.
 theta_factors = {};
-if M.n_b_max > 0; theta_factors{end+1} = '\prod_{m=1}^{M} b_{im}'; end
+mixed = M.any_chain && M.any_product;
+if mixed
+    theta_factors{end+1} = 'D_{i}';
+elseif M.any_chain
+    theta_factors{end+1} = 'b_{i1}';
+elseif M.n_b_max > 0
+    theta_factors{end+1} = '\prod_{m=1}^{M} b_{im}';
+end
 if M.any_stf;     theta_factors{end+1} = '\prod_{n=1}^{n_f} g_{in}'; end
 % Spelled exactly as the canonical file spells it -- r_{i} and plain spaces --
 % so the generated block can be diffed against it.
@@ -220,12 +408,24 @@ else
 end
 eqs = { ...
     dx_line, ...
-    ['\theta_i &= ' theta_rhs], ...
+    ['\theta_i &= ' theta_rhs]};
+if mixed
+    eqs{end+1} = ['D_{i} &= \prod_{m=1}^{M} b_{im} \quad \text{(independent pools)}, ' ...
+        '\qquad D_{i} = b_{i1} \quad \text{(chained pools)}'];
+end
+eqs = [eqs, { ...
     'r_i &= \phi\left( x_i - a_{0_i} - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right)', ...
-    '\frac{da_{ik}}{dt} &= \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K'};
+    '\frac{da_{ik}}{dt} &= \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K'}];
 if M.n_b_max > 0
     eqs{end+1} = ['\frac{db_{im}}{dt} &= \frac{1-b_{im}}{\tau_{rec_m}} - ' ...
         '\frac{b_{im}\, r_i}{\tau_{rel_m}}, \qquad m = 1, \dots, M'];
+end
+if M.any_chain
+    % (C1) and (C2), spelled as the canonical file spells them.
+    eqs{end+1} = ['\frac{db_{i1}}{dt} &= \frac{b_{i2}\,(1 - b_{i1})}{\tau_{rec_1}} - ' ...
+        '\frac{b_{i1}\, r_i}{\tau_{rel}}'];
+    eqs{end+1} = ['\frac{db_{i2}}{dt} &= \frac{1 - b_{i2}}{\tau_{rec_2}} - ' ...
+        '\frac{1}{n_2}\,\frac{b_{i2}\,(1 - b_{i1})}{\tau_{rec_1}}'];
 end
 if M.any_stf
     eqs{end+1} = ['\frac{dg_{in}}{dt} &= \frac{1-g_{in}}{\tau_{dec_n}} + ' ...
@@ -256,10 +456,17 @@ if any(M.sigma_S_c(:) > 0)
 else
     setpoint_note = sprintf('%s for every neuron here', fmt(M.S_c));
 end
+if M.any_chain && M.any_product
+    m_phrase = ['$M$ the number of independent depression pools of a product ' ...
+        'route ($M = 1$ is the single pool)'];
+elseif M.any_chain
+    m_phrase = '$b_{i1}$, $b_{i2}$ the two chained depression pools';
+else
+    m_phrase = '$M$ the number of depression timescales';
+end
 fprintf(fid, ['$\\phi$ is centred on zero; $a_{0_i}$ is the **setpoint** ' ...
-    '(`S_c`), %s. $K$ is the number of SFA timescales and $M$ the number of ' ...
-    'depression timescales; their values for this preset are in the parameter ' ...
-    'table below.\n\n'], setpoint_note);
+    '(`S_c`), %s. $K$ is the number of SFA timescales and %s; their values ' ...
+    'for this preset are in the parameter table below.\n\n'], setpoint_note, m_phrase);
 fprintf(fid, ['The rate $r_i$ is the **pre-depression** output of the ' ...
     'nonlinearity. Depression and facilitation enter presynaptically, as ' ...
     'factors multiplying $r_j$ inside the recurrent sum, so both mechanisms are ' ...
@@ -276,14 +483,17 @@ if M.n_b_max > 1
     % Quote the actual depth this preset reaches. The ratio tau_rec/tau_rel is
     % the ONLY combination that sets the steady state, so it is what the numbers
     % below are computed from.
-    ratios = [];
-    for k = 1:numel(M.routes)
-        if ~isempty(M.routes(k).tau_rec)
-            ratios = M.routes(k).tau_rec ./ M.routes(k).tau_rel;
-            break
-        end
+    % From the first covered PRODUCT route of the widest count (depression_facts);
+    % a chain's two tau_rec share one tau_rel and are not two factors of a
+    % product.
+    ratios = M.product_ratios;
+    lead = 'The';
+    if M.any_chain
+        % Mixed: say which routes this paragraph is about.
+        lead = 'On a route with **independent** pools (not a chain), the';
     end
-    fprintf(fid, ['The depression timescales enter as a **product**, which is ' ...
+    fprintf(fid, '%s', lead);
+    fprintf(fid, [' depression timescales enter as a **product**, which is ' ...
         'the reason for using more than one: %d of them SQUARE the depression ' ...
         'at steady state, so the extra timescale buys DEPTH and not merely a ' ...
         'slower approach. There is no split of $\\tau$ that would make them ' ...
@@ -314,6 +524,10 @@ if M.n_b_max > 1
         'than sums.\n\n']);
 end
 
+if M.any_chain
+    write_chain_prose(fid, M);
+end
+
 fprintf(fid, ['The sparse weights are drawn element-wise and scaled by the ' ...
     'synaptic gain $g$:\n\n$$\nw_{ij} = g\\, S_{ij}\\left( \\tilde{\\sigma}_{ij}\\, ' ...
     '\\xi_{ij} + \\tilde{\\mu}_{ij} \\right), \\qquad \\xi_{ij} \\sim ' ...
@@ -324,6 +538,51 @@ fprintf(fid, ['with $(\\tilde{\\mu}, \\tilde{\\sigma})$ indexed by ' ...
 
 fprintf(fid, '## Parameters as run\n\n');
 write_param_rows(fid, M);
+end
+
+function write_chain_prose(fid, M)
+% What the chained pools are, and their steady state, for each distinct chain
+% route of the covered conditions. The values are the route model's
+% (route_pool: steady_state), evaluated in depression_facts.
+fprintf(fid, ['On a **chained** route the two depression variables are pools in ' ...
+    'series, not factors of a product: $b_{i1}$ is the **releasable pool**, the ' ...
+    'only one released from and the only one in $\\theta_i$, and $b_{i2}$ the ' ...
+    '**reserve** that refills it, at a rate proportional to how full the reserve ' ...
+    'is; the reserve refills toward full with its own, slower time constant and ' ...
+    'loses what it hands on, divided by its relative capacity $n_2$. Both start ' ...
+    'at 1 and stay in $[0, 1]$.\n\n']);
+if M.any_product
+    fprintf(fid, ['With the reserve held full ($b_{i2} \\equiv 1$) the releasable-pool ' ...
+        'equation is the single-pool equation ($M = 1$), so single-pool and chained ' ...
+        'depression share the releasable-pool equation and differ by the reserve. ' ...
+        'The reserve starts full, so the two coincide at the onset of activity and ' ...
+        'come apart as sustained activity draws the reserve down. They are not ' ...
+        'matched in steady-state depth.\n\n']);
+end
+fprintf(fid, ['At a constant rate $r$, with $k_1 = r\\,\\tau_{rec_1}/\\tau_{rel}$, ' ...
+    '$k_2 = r\\,\\tau_{rec_2}/(n_2\\,\\tau_{rel})$ and $s = 1 + k_1 + k_2$, the ' ...
+    'steady state is\n\n$$\nb_1 = \\frac{2}{s + \\sqrt{s^2 - 4k_2}}, \\qquad ' ...
+    'b_2 = 1 - k_2\\, b_1 ,\n$$\n\n']);
+fprintf(fid, ['and the sustained output $r\\, b_1$ rises with the rate to the ceiling ' ...
+    '$\\big(\\tau_{rec_1}/\\tau_{rel} + \\tau_{rec_2}/(n_2\\,\\tau_{rel})\\big)^{-1}$; ' ...
+    'it has no peak.\n\n']);
+for j = 1:numel(M.chains)
+    c = M.chains(j);
+    fprintf(fid, ['With $\\tau_{rec} = %s$ s, $\\tau_{rel} = %s$ s and $n_2 = %g$ ' ...
+        '(%s): $b_1$ = %s and $b_2$ = %s at $r$ = %s; the ceiling is %.4g.\n\n'], ...
+        vec(c.nominal.tau_rec), vec(c.nominal.tau_rel), c.nominal.n2, ...
+        strjoin(cellfun(@(n) ['`' n '`'], c.conditions, 'UniformOutput', false), ', '), ...
+        num_list(c.b1, '%.3f'), num_list(c.b2, '%.3f'), num_list(c.probe_r, '%g'), c.ceiling);
+end
+end
+
+function s = num_list(v, f)
+s = strjoin(arrayfun(@(x) sprintf(f, x), v, 'UniformOutput', false), ', ');
+end
+
+function tf = route_is_chain(r)
+% A route entry of M.routes is a chain (SRNNModel2's entries have no field).
+tf = isfield(r, 'is_chain') && r.is_chain;
 end
 
 %% ------------------------------------------------------------------------
@@ -389,10 +648,22 @@ row(fid, '$\sigma_{\tau_a}$', ...
 row(fid, '$c$',          'SFA coupling per type',     M.c,        '--');
 % M as in the equations: depression timescales. Uniform across routes in every
 % preset so far; if a preset ever differs by route, this is the widest one.
-row(fid, '$M$',          'STD timescales',            M.n_b_max,  '--');
+if M.any_chain
+    % With chains in play M counts only the pools of a PRODUCT route.
+    row(fid, '$M$',      'STD pools of a product route (covered conditions)', M.n_b_max, '--');
+else
+    row(fid, '$M$',      'STD timescales',            M.n_b_max,  '--');
+end
 for k = 1:numel(M.routes)
     r = M.routes(k);
-    if ~isempty(r.tau_rec)
+    if route_is_chain(r)
+        % (C1)-(C3): two refill times, ONE release time, the reserve's size.
+        row(fid, sprintf('$\\tau_{rec_1}$ (%s)', r.label), 'Chained STD: releasable-pool refill', r.tau_rec(1), 's');
+        row(fid, sprintf('$\\tau_{rec_2}$ (%s)', r.label), 'Chained STD: reserve refill', r.tau_rec(2), 's');
+        row(fid, sprintf('$\\tau_{rel}$ (%s)', r.label),   'Chained STD: release (releasable pool only)', r.tau_rel, 's');
+        row(fid, sprintf('$n_2$ (%s)', r.label), ...
+            'Chained STD: reserve capacity / releasable-pool capacity', r.n2, '--');
+    elseif ~isempty(r.tau_rec)
         row(fid, sprintf('$\\tau_{rec}$ (%s)', r.label), 'STD recovery', r.tau_rec, 's');
         row(fid, sprintf('$\\tau_{rel}$ (%s)', r.label), 'STD release',  r.tau_rel, 's');
     end
@@ -418,7 +689,10 @@ c = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
 fprintf(fid, ['Every sweep runs each grid point under all %d regimes, on the ' ...
     '**same network** (the weight seed is shared), so the comparison is ' ...
-    'paired.\n\n'], numel(conditions));
+    'paired.\n\n'], M.n_all_conditions);
+if numel(conditions) < M.n_all_conditions
+    fprintf(fid, 'This table covers the %d of them this figure set draws.\n\n', numel(conditions));
+end
 write_conditions_rows(fid, conditions, M);
 end
 
@@ -436,9 +710,13 @@ end
 function write_conditions_rows(fid, conditions, M)
 % Header row and one row per regime; the only place the table is spelled out.
 if M.is_pairs
+    % The Depression column (FD-006) names each condition's depression model
+    % and its time constants, read off the compiled routes (depression_facts):
+    % without it the chained and the product MTS print identical rows (same
+    % routes, same tau_a).
     fprintf(fid, ['| Condition | SFA timescales $\\tau_a$ (s) | Depressing routes ' ...
-        '| Facilitating routes |\n']);
-    fprintf(fid, '|---|---|---|---|\n');
+        '| Depression | Facilitating routes |\n']);
+    fprintf(fid, '|---|---|---|---|---|\n');
     for k = 1:numel(conditions)
         cd_ = conditions{k};
         R = cond_routes(cd_);
@@ -446,8 +724,8 @@ if M.is_pairs
         % from it on the model, so there is no n_a field here to read -- and the
         % values are what a reader actually wants: two regimes can share a count
         % and differ in which timescales they use.
-        fprintf(fid, '| %s | %s | %s | %s |\n', ...
-            tidy(cd_.name), tau_a_str(cd_), R.std, R.stf);
+        fprintf(fid, '| %s | %s | %s | %s | %s |\n', ...
+            tidy(cd_.name), tau_a_str(cd_), R.std, M.cond_dep{k}, R.stf);
     end
     fprintf(fid, '\n');
 else

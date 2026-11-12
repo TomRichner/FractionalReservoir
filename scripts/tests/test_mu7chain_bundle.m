@@ -15,6 +15,10 @@
 %   * the chained-MTS network builds and runs for one second at reduced size,
 %     with finite output and identical routes;
 %   * the single-neuron preset builds and runs in all four conditions;
+%   * the single-neuron figure's registry entry names its own conditions in
+%     each set, and with the entry's args after the bundle's (the order
+%     make_all_paper_figures uses) it draws three columns in the 3cond set
+%     and four in the 4cond set;
 %   * run_all_paper_analyses' run-mode pre-flight accepts the config's mode.
 %
 % Asserts; silent until it throws, then prints one PASS line.
@@ -175,6 +179,34 @@ for q = 1:4
     evalc('m1.run();');
     assert(m1.n == 1 && all(m1.W(:) == 0) && all(isfinite(m1.S_out(:))), ...
         'single neuron, %s', cnd_one{q}.name);
+end
+
+%% The single-neuron figure: its own condition list per set, 3 and 4 columns
+% The registry entry names the single-neuron conditions in its own args,
+% which follow the bundle-wide 'conditions' in make_all_paper_figures' call
+% and so override it. Checked by drawing the figure with exactly that
+% argument order, on a synthetic single_neuron stage holding the preset's
+% four conditions (the figure only replots; no simulation is needed).
+sn_want = struct('c3', {{'no_adaptation', 'sfa1_std0', 'sfa0_std1'}}, ...
+                 'c4', {{'no_adaptation', 'sfa1_std0', 'sfa0_std1', 'sfa0_stdc2'}});
+tmp_run = tempname; mkdir(fullfile(tmp_run, 'single_neuron'));
+cleanup_run = onCleanup(@() rmdir(tmp_run, 's'));
+tt = linspace(0, 30, 61);
+res = struct('name', name_of(cnd_one), 'title', '', 't', tt, 'u', tt, 'x', tt, 'r', tt, ...
+    'syn', tt, 'sfa', tt, 'std', tt, 'std_model', {'none', 'none', 'product', 'chain'}, 'n', 1);
+results = res; settings = struct('display_window', [0 30]);
+save(fullfile(tmp_run, 'single_neuron', 'single_neuron_data.mat'), 'results', 'settings');
+for c = {{cfg3, 'c3', 3}, {cfg4, 'c4', 4}}
+    k = c{1}{1}; want = sn_want.(c{1}{2}); n_col = c{1}{3};
+    names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
+    e = k.figures{strcmp(names, 'fig_single_neuron_revised')};
+    assert(isequal(e.args, {'conditions', want}), 'single-neuron args, %s set', k.figure_set);
+    assert(isequal(k.single_neuron_conditions, want));
+    args = [{'run_dir', tmp_run, 'save', false, 'visible', false, 'conditions', k.conditions}, e.args];
+    o = fig_single_neuron_revised(args{:});
+    n_ax = numel(findall(o.figs, 'Type', 'axes'));
+    close(o.figs);
+    assert(n_ax == 6 * n_col, '%s set: %d axes, want %d columns', k.figure_set, n_ax, n_col);
 end
 
 disp('PASS: test_mu7chain_bundle -- two figure sets, presets, conditions, name maps, chain and single-neuron runs.');

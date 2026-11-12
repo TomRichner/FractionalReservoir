@@ -219,6 +219,19 @@ function v = std_route(preset_name, cond_name)
 names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 sc = conditions{strcmp(names, cond_name)}.synapse_config;
 route = sc.E.E;
+% THIS IS A STUDY OF THE PRODUCT MODEL. theta_ss below is the product of
+% independent pools, 1/(1 + r/rho_m) multiplied over m; on a chain route
+% (std.model = 'chain': two tau_rec, ONE tau_rel) the scalar tau_rel would
+% broadcast and the product of two independent pools would be drawn for a
+% model that has none. The chain's steady state is route_pool's (C4), drawn
+% by fig_STD_steady_state. Refused rather than computed wrong.
+if isfield(route.std, 'model') && ~strcmp(char(string(route.std.model)), 'product')
+    error('fig_STD_strength_matching:NotProductRoute', ...
+        ['Preset ''%s'', condition ''%s'': the E->E route has std.model = ''%s''. ' ...
+         'This figure studies strength matching of PRODUCT depression only; ' ...
+         'fig_STD_steady_state draws chained depression.'], ...
+        preset_name, cond_name, char(string(route.std.model)));
+end
 v = struct('preset', preset_name, 'cond', cond_name, 'tau_rec', route.std.tau_rec(:)', ...
     'tau_rel', route.std.tau_rel(:)', 'scale', 1);
 v.rho = v.tau_rel ./ v.tau_rec;
