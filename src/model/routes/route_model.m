@@ -34,6 +34,13 @@ function model = route_model(name)
 %            nominal    the configured values, as rows
 %            signature  a struct that is isequal for two routes exactly
 %                       when they carry the same dynamics
+%            coupling   ns x ns logical: (m, k) is true where ds_m/dt can
+%                       depend on s_k, that is, where A(:, m, k) can be
+%                       nonzero. It must not understate: an entry stated
+%                       false is never read. Where it is diagonal (no
+%                       variable's derivative depends on another), the
+%                       class applies A in jacobian_times as ns products
+%                       and not ns^2.
 %          and the parameters the equations read, PER NEURON (npre x k),
 %          the nominal row replicated: a per-neuron spread fills in other
 %          values and needs no other code path.
@@ -43,12 +50,18 @@ function model = route_model(name)
 %   F  = output(s, P)          the output factor alone. s may be
 %                              npre x ns x nt (nt time points); F is then
 %                              npre x 1 x nt
-%   L  = linearize(s, r, P)    L.A  npre x ns x ns   d(ds_m)/d(s_k) at (i, m, k)
-%                              L.B  npre x ns        d(ds_m)/dr
-%                              L.F  npre x 1         the output factor
-%                              L.Fs npre x ns        dF/d(s_k)
+%   [A, B, F, Fs] = linearize(s, r, P)
+%                              A   npre x ns x ns   d(ds_m)/d(s_k) at (i, m, k)
+%                              B   npre x ns        d(ds_m)/dr
+%                              F   npre x 1         the output factor
+%                              Fs  npre x ns        dF/d(s_k)
 %   ss = steady_state(r, P)    closed form at a constant rate r (npre x 1,
 %                              or a scalar): ss.s npre x ns, ss.F npre x 1
+%
+% (Plan A section 4.0 has linearize return one struct L with these four as
+% fields. They are four outputs because building that struct costs about
+% 1.5 microseconds, which is a third of the whole call for the product
+% model, once per route in every jacobian_times.)
 %
 % F DEPENDS ON THE STATE ONLY, never on the rate: the class carries the
 % rate dependence of theta = r .* F.

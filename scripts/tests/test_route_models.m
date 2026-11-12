@@ -24,7 +24,7 @@
 %         derivative there is zero at r = 0
 %      c. rhs equals the per-neuron reference loop (derivative and F)
 %      d. linearize equals central differences of the model's OWN rhs and
-%         output: A = d(ds)/ds, B = d(ds)/dr, Fs = dF/ds; L.F equals output
+%         output: A = d(ds)/ds, B = d(ds)/dr, Fs = dF/ds; its F equals output
 %      e. steady_state: the derivative vanishes there, and a long
 %         integration from `initial` at constant rate arrives there
 %      f. parameters are per neuron: replacing one neuron's rows of P by
@@ -37,6 +37,12 @@
 %      F = 1; a scalar tau_rel / tau_fac / G is repeated; the signature
 %      tells routes apart; bad configurations error
 %      <prefix>:InvalidSynapseConfig.
+%   4. SRNNCellTypePairs.jacobian_times applies a route's A in two ways (its
+%      diagonal where the model states A is diagonal, the full per-neuron
+%      product otherwise): on a network with every kind of route, forcing
+%      the full way changes nothing and still equals J * Y. The one check
+%      here that builds a network; it is here because no model of today
+%      takes the full way.
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths.
 %
@@ -81,7 +87,7 @@ for c = 1:numel(cases)
     % a. shapes
     s0 = model.initial(P);
     [ds, F] = model.rhs(s, r, P);
-    L = model.linearize(s, r, P);
+    L = linearized(model, s, r, P);
     ss = model.steady_state(r, P);
     nt = 3;
     s3 = cat(3, s, cs.draw(npre, ns), cs.draw(npre, ns));
@@ -95,7 +101,8 @@ for c = 1:numel(cases)
         isequal(size(L.A, 1:3), [npre ns ns]) && isequal(size(L.B), [npre ns]) && ...
         isequal(size(L.F), [npre 1]) && isequal(size(L.Fs), [npre ns]) && ...
         isequal(size(ss.s), [npre ns]) && isequal(size(ss.F), [npre 1]) && ...
-        isstruct(P.nominal) && isstruct(P.signature);
+        isstruct(P.nominal) && isstruct(P.signature) && ...
+        islogical(P.coupling) && isequal(size(P.coupling), [ns ns]);
     all_passed = check('    shapes of P, initial, rhs, linearize, steady_state', ok) && all_passed;
     all_passed = check('    output on npre x ns x nt equals output page by page', by_page) && all_passed;
 
@@ -130,6 +137,11 @@ for c = 1:numel(cases)
     eF = rel_err(L.Fs, Fs_fd);
     all_passed = check(sprintf('    linearize equals central differences (A %.1e, B %.1e, Fs %.1e)', eA, eB, eF), ...
         max([eA, eB, eF]) <= tol_fd && isequal(L.F, F)) && all_passed;
+    % P.coupling may overstate what depends on what, never understate: where
+    % it says false, the derivative does not move at all (the differences
+    % are exactly zero) and A is exactly zero.
+    all_passed = check('    P.coupling does not understate: A is zero wherever it is false', ...
+        all(A_fd(:, ~P.coupling) == 0, 'all') && all(L.A(:, ~P.coupling) == 0, 'all')) && all_passed;
 
     % e. steady state
     d_ss = model.rhs(ss.s, r, P);
@@ -165,8 +177,8 @@ for c = 1:numel(cases)
         end
         [ds_q, F_q] = model.rhs(s, r, Q);
         [ds_a, F_a] = model.rhs(s, r, P_alt);
-        L_q = model.linearize(s, r, Q);
-        L_a = model.linearize(s, r, P_alt);
+        L_q = linearized(model, s, r, Q);
+        L_a = linearized(model, s, r, P_alt);
         others = setdiff(1:npre, i_alt);
         ok = n_moved > 0 && isequal(ds_q(i_alt, :), ds_a(i_alt, :)) && isequal(F_q(i_alt), F_a(i_alt)) && ...
             isequal(ds_q(others, :), ds(others, :)) && isequal(F_q(others), F(others)) && ...
@@ -220,7 +232,7 @@ all_passed = check('    zero floor on a route without depression is not in force
 empty = product.compile([], [], struct('npre', npre));
 empty2 = product.compile(struct(), struct(), struct('npre', npre));
 [ds_e, F_e] = product.rhs(zeros(npre, 0), r, empty);
-L_e = product.linearize(zeros(npre, 0), r, empty);
+L_e = linearized(product, zeros(npre, 0), r, empty);
 ok = empty.ns == 0 && isequal(empty, empty2) && isequal(size(ds_e), [npre 0]) && isequal(F_e, ones(npre, 1)) && ...
     isequal(size(L_e.A, 1:3), [npre 0 0]) && isequal(size(L_e.B), [npre 0]) && isequal(L_e.F, ones(npre, 1)) && ...
     isequal(size(L_e.Fs), [npre 0]) && isequal(size(product.initial(empty)), [1 0]) && ...
@@ -264,6 +276,39 @@ for k = 1:numel(bad)
         'SRNNCellTypePairs:InvalidSynapseConfig');
 end
 all_passed = check(sprintf('    %d bad configurations error <prefix>:InvalidSynapseConfig', numel(bad)), ok) && all_passed;
+
+%% 4. the class's two ways of applying A agree
+% jacobian_times applies a route's A = d(ds)/ds in one of two ways: only
+% its diagonal where the model states that A is diagonal (P.coupling), the
+% full per-neuron product otherwise. No model of today takes the second
+% way, so it is exercised here by telling the class that every route is
+% coupled: the product must not change, and must still be J * Y.
+fprintf('  SRNNCellTypePairs.jacobian_times, diagonal and full application of A\n');
+rng(3, 'twister');
+net = all_blocks_network();
+net.build();
+p = net.get_params();
+p_full = p;
+n_diagonal = 0;
+for k = 1:numel(p_full.route)
+    n_diagonal = n_diagonal + (p_full.route{k}.A_is_diagonal && p_full.route{k}.P.ns > 1);
+    p_full.route{k}.A_is_diagonal = false;
+end
+N = numel(net.S0);
+e_two = 0;
+e_J = 0;
+for trial = 1:3
+    S = net.S0 + 0.2 * rand(N, 1) .* (net.S0 > 0);        % b, g off their rest values
+    S(p.state_layout.x) = 0.5 * randn(p.n, 1);
+    Y = randn(N, 6);
+    Z_diag = SRNNCellTypePairs.jacobian_times(S, Y, p);
+    Z_full = SRNNCellTypePairs.jacobian_times(S, Y, p_full);
+    JY = SRNNCellTypePairs.compute_Jacobian_fast(S, p) * Y;
+    e_two = max(e_two, rel_err(Z_full, Z_diag));
+    e_J = max(e_J, rel_err(Z_full, JY));
+end
+all_passed = check(sprintf(['    %d multi-variable routes: full application equals the diagonal one (rel %.1e) ' ...
+    'and J * Y (rel %.1e)'], n_diagonal, e_two, e_J), n_diagonal >= 2 && e_two <= 1e-14 && e_J <= 1e-13) && all_passed;
 
 fprintf('\n');
 if all_passed
@@ -354,6 +399,30 @@ for l = 1:L
     ds(M + l) = (1 - g) / tau_dec + (G - g) * r / tau_fac;
     F = F * g;
 end
+end
+
+function L = linearized(model, s, r, P)
+% The four outputs of linearize, as one struct.
+[L.A, L.B, L.F, L.Fs] = model.linearize(s, r, P);
+end
+
+function model = all_blocks_network()
+% Three cell types with every kind of product route: two depression
+% components, one, depression with two facilitation components,
+% facilitation alone, none; the geometric mean on one; the zero floor on.
+synapse_config = struct();
+synapse_config.E.E.std = struct('tau_rec', [0.3 1], 'tau_rel', 0.2, 'combine', 'geomean');
+synapse_config.E.PV.stf = struct('tau_dec', 0.5, 'tau_fac', 0.25, 'G', 2);
+synapse_config.E.SST.std = struct('tau_rec', 0.8, 'tau_rel', 0.25);
+synapse_config.E.SST.stf = struct('tau_dec', [0.4 1.2], 'tau_fac', [0.2 0.3], 'G', [1.5 2]);
+synapse_config.PV.PV.std = struct('tau_rec', 0.6, 'tau_rel', 0.3);
+synapse_config.SST.PV.stf = struct('tau_dec', 0.9, 'tau_fac', 0.4, 'G', 1.8);
+model = SRNNCellTypePairs( ...
+    'n', 12, 'indegree', 4, 'n_cellTypes', 3, 'cell_type_names', {'E', 'PV', 'SST'}, ...
+    'f', [0.5 0.3 0.2], 'mu_tilde_relative', [0.1 -0.2 -0.08], ...
+    'sigma_tilde_relative', [0.01 0.02 0.015], 'tau_a', {[0.25 1], [], 2}, ...
+    'c', [0.05 0 0.03], 'synapse_config', synapse_config, 'std_zero_floor', true, ...
+    'T_range', [0 0.1], 'fs', 200, 'lya_method', 'none', 'verbose', 'near-none');
 end
 
 function e = rel_err(A, B)

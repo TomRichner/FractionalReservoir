@@ -23,7 +23,7 @@ function model = route_product()
 %   ds_k/dt = (1 - s_k)/tau_rest_k + (target_k - s_k) r/tau_drive_k
 %
 % and that one line is what rhs evaluates. Nothing couples the components,
-% so the linearisation L.A is diagonal.
+% so the linearisation A = d(ds)/ds is diagonal.
 %
 % THE OUTPUT FACTOR is F = D * prod_l g_l, with the depression factor D
 % made from P_b = prod_m b_m in two optional steps:
@@ -119,6 +119,7 @@ P.tau_rest  = per_neuron([nominal.tau_rec, nominal.tau_dec], opts.npre);
 P.tau_drive = per_neuron([nominal.tau_rel, nominal.tau_fac], opts.npre);
 P.target    = per_neuron([zeros(1, P.n_b), nominal.G], opts.npre);
 P.geomean = strcmp(nominal.combine, 'geomean') && P.n_b > 1;
+P.coupling = logical(eye(P.ns));      % no component's derivative depends on another
 
 % The floor's p_min: the depression factor, before the floor, at the
 % steady state of r = 1.
@@ -142,29 +143,35 @@ F = output(s, P);
 end
 
 function F = output(s, P)
-F = depression(prod(s(:, 1:P.n_b, :), 2), P);
-if P.n_g > 0
-    F = F .* prod(s(:, P.n_b + 1:end, :), 2);
+if P.n_g == 0                 % every column is a b
+    F = depression(prod(s, 2), P);
+else
+    F = depression(prod(s(:, 1:P.n_b, :), 2), P) .* prod(s(:, P.n_b + 1:end, :), 2);
 end
 end
 
-function L = linearize(s, r, P)
+function [A, B, F, Fs] = linearize(s, r, P)
 npre = size(s, 1);
 ns = P.ns;
 A = zeros(npre, ns * ns);
 A(:, 1:ns + 1:end) = -1 ./ P.tau_rest - r ./ P.tau_drive;    % the diagonal (m, m)
-L.A = reshape(A, npre, ns, ns);
-L.B = (P.target - s) ./ P.tau_drive;
+A = reshape(A, npre, ns, ns);
+B = (P.target - s) ./ P.tau_drive;
 
 % F = D(P_b) prod(g), so
 %   dF/db_m = (dD/dP_b) (the product of the other b) prod(g)
 %   dF/dg_l = D (the product of the other g)
-b = s(:, 1:P.n_b);
-g = s(:, P.n_b + 1:end);
-[D, dD_dP] = depression(prod(b, 2), P);
-facilitation = prod(g, 2);
-L.F = D .* facilitation;
-L.Fs = [(dD_dP .* facilitation) .* product_of_others(b), D .* product_of_others(g)];
+if P.n_g == 0                 % every column is a b: the same lines without g
+    [F, dD_dP] = depression(prod(s, 2), P);
+    Fs = dD_dP .* product_of_others(s);
+else
+    b = s(:, 1:P.n_b);
+    g = s(:, P.n_b + 1:end);
+    [D, dD_dP] = depression(prod(b, 2), P);
+    facilitation = prod(g, 2);
+    F = D .* facilitation;
+    Fs = [(dD_dP .* facilitation) .* product_of_others(b), D .* product_of_others(g)];
+end
 end
 
 function ss = steady_state(r, P)
@@ -218,10 +225,18 @@ end
 function Q = product_of_others(v)
 % Q(:, m) = the product of every column of v except m (ones where v has
 % one column; npre x 0 where it has none).
+% One and two columns, the usual counts, are written out: this is inside
+% every jacobian_times call.
 k = size(v, 2);
-Q = zeros(size(v));
-for m = 1:k
-    Q(:, m) = prod(v(:, [1:m - 1, m + 1:k]), 2);
+if k == 1
+    Q = ones(size(v));
+elseif k == 2
+    Q = v(:, [2 1]);
+else
+    Q = zeros(size(v));
+    for m = 1:k
+        Q(:, m) = prod(v(:, [1:m - 1, m + 1:k]), 2);
+    end
 end
 end
 
