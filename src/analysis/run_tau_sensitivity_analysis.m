@@ -5,11 +5,14 @@ function out_dir = run_tau_sensitivity_analysis(ctx)
 %   out_dir = RUN_TAU_SENSITIVITY_ANALYSIS()       % standalone, class defaults
 %
 % Vector-parameter sweep: tau_a_E is a length-3 logspaced vector and the LAST
-% (largest) element is swept from 1 to 30 s, under the SFA+STD condition only.
+% (largest) element is swept from 1 to 30 s, under the fully-adapted
+% condition(s) only: every condition full_adaptation_conditions returns (one
+% for a preset with one such regime; the chained and the product MTS for the
+% mu7chain presets, FD-006), all in one PSA.
 %
 % ctx comes from resolve_run_context('tau_sensitivity', ...).
 %
-% WHY ONE CONDITION, AND WHAT THAT COSTS -- three limitations that are all the
+% WHY ONLY THE FULLY-ADAPTED REGIME(S), AND WHAT THAT COSTS -- three limitations that are all the
 % same underlying fact: a VECTOR grid parameter is configured once per PSA,
 % while the number of SFA timescales is a property of each CONDITION.
 %
@@ -80,11 +83,31 @@ note = 'tau_timescales';
 % here with "No condition named 'sfa_and_std'" -- twice, since a two-name list
 % was only a wider guess. full_adaptation_condition errors if nothing conforms
 % rather than falling back to a positional guess.
+%
+% EVERY FULLY-ADAPTED CONDITION (FD-006, Tom 2026-11-11). A preset may carry
+% two regimes at the top adaptation count that differ only in the FORM of their
+% depression: the mu7chain bundle's sfa3_stdc2 (chained vesicle pools) and
+% sfa3_std2 (the product of two pools). full_adaptation_conditions returns all
+% of them, chain first, and all are swept in ONE PSA, so each grid point uses
+% the same network seed under both (paired). A preset with one such regime
+% (every preset before the chain) yields exactly the one condition it swept
+% before, so those runs are unchanged. Sweeping several is safe only because
+% they share one SFA ladder (the grid axis overwrites tau_a identically for
+% each); that is asserted below rather than assumed.
 cond_names = cellfun(@(c) c.name, ctx.conditions, 'UniformOutput', false);
-full_name  = full_adaptation_condition(ctx.conditions);
-idx        = find(strcmp(cond_names, full_name), 1);
+full_names = full_adaptation_conditions(ctx.conditions);
+[~, idx]   = ismember(full_names, cond_names);
 condition  = ctx.conditions(idx);
-vprintf(ctx.verbose, 'verbose', 'Condition: %s (the full-adaptation regime)\n', full_name);
+for k = 2:numel(condition)
+    if ~isfield(condition{k}, 'tau_a') || ~isfield(condition{1}, 'tau_a') || ...
+            ~isequal(condition{k}.tau_a, condition{1}.tau_a)
+        error('run_tau_sensitivity_analysis:LadderMismatch', ...
+            ['The fully-adapted conditions %s and %s carry different SFA ladders; ' ...
+             'one tau sweep cannot vary both (its grid axis writes one ladder).'], ...
+            full_names{1}, full_names{k});
+    end
+end
+vprintf(ctx.verbose, 'verbose', 'Condition(s): %s (the full-adaptation regime)\n', strjoin(full_names, ', '));
 
 %% tau_a_E(end) sweep -- vector parameter
 vprintf(ctx.verbose, 'verbose', '\n========================================\n');
@@ -164,19 +187,24 @@ copyfile([mfilename('fullpath') '.m'], psa.output_dir);
 % successful job per level, into tau_levels.mat and tau_levels.md.
 write_tau_levels(psa, tau_axis, ctx.model_class);
 
+% Only the figures drawn here are saved and closed: this used to save every
+% open figure and then 'close all', which reached figures that were not its own.
+before = findall(groot, 'Type', 'figure');
 psa.plot_sensitivity('metric', 'LLE', 'hist_range', [-0.3, 0.1]);
 psa.plot_sensitivity('metric', 'mean_rate');
+after = findall(groot, 'Type', 'figure');
+made  = after(~ismember(after, before));
 
 % run() writes psa_object.mat itself, always under the name `psa`. This script
 % used to save it again as `psa_tau_a`, which is why readers had to guess the
 % variable name -- and why Fig_sfa_EOC's original loader broke on newer runs.
 
-if ctx.save_figs
+if ctx.save_figs && ~isempty(made)   % never [] -- that means "every open figure"
     fig_dir = fullfile(psa.output_dir, 'figures');
-    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_a', [], {'fig', 'png'});
+    save_some_figs_to_folder_2(fig_dir, 'tau_sensitivity_tau_a', sort([made.Number]), {'fig', 'png'});
     vprintf(ctx.verbose, 'verbose', 'Figures saved to %s\n', fig_dir);
 end
-close all;
+close(made);
 
 out_dir = psa.output_dir;
 
@@ -201,14 +229,58 @@ function write_tau_levels(psa, tau_axis, model_class)
 % gives the swept vector; the other type's ladder comes from the condition),
 % and record them. A row per level: index, the swept vector, tau_a{1},
 % tau_a{2} (SRNNCellTypePairs) or tau_a_E (SRNNModel2).
+%
+% SEVERAL CONDITIONS (FD-006): the ladders are resolved for EVERY swept
+% condition and must agree level by level (the grid axis writes one ladder
+% into each); a disagreement is an error, since the table would then describe
+% only one of them. The table therefore holds one row per level for all of
+% them, and the header names them all. tau_levels.mat gains `conditions`, the
+% swept condition names in the PSA's order. With one condition the .md is
+% byte-for-byte what it was.
 lookup = psa.vector_param_lookup.(tau_axis);
 n_lev  = numel(lookup);
+conditions = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
+levels = [];
+for ci = 1:numel(psa.conditions)
+    lv = ladders_for(psa, psa.conditions{ci}, tau_axis, model_class, lookup);
+    if ci == 1
+        levels = lv;
+    elseif ~isequal(lv, levels)
+        error('run_tau_sensitivity_analysis:LevelMismatch', ...
+            ['The resolved SFA ladders of condition %s differ from those of %s at ' ...
+             'some level; tau_levels cannot describe both with one table.'], ...
+            conditions{ci}, conditions{1});
+    end
+end
+save(fullfile(psa.output_dir, 'tau_levels.mat'), 'levels', 'tau_axis', 'model_class', 'conditions');
+fid = fopen(fullfile(psa.output_dir, 'tau_levels.md'), 'w');
+if fid > 0
+    if isscalar(conditions)
+        cond_txt = sprintf('Condition: %s.', conditions{1});
+    else
+        cond_txt = sprintf(['Conditions: %s (swept in one PSA, same network seed per ' ...
+            'grid point; the ladders below were resolved for each and are identical).'], ...
+            strjoin(conditions, ', '));
+    end
+    fprintf(fid, '# tau sweep levels\n\nAxis: `%s` (model %s). %s\n\n', tau_axis, model_class, cond_txt);
+    fprintf(fid, '| level | swept vector | tau_a E | tau_a I |\n|---|---|---|---|\n');
+    for k = 1:n_lev
+        fprintf(fid, '| %d | %s | %s | %s |\n', k, mat2str(levels(k).swept, 4), ...
+            mat2str(levels(k).tau_a_E, 4), mat2str(levels(k).tau_a_I, 4));
+    end
+    fclose(fid);
+end
+end
+
+function levels = ladders_for(psa, cond, tau_axis, model_class, lookup)
+% The ladders one condition ran at every level, by constructing the model
+% each of its jobs would have built (construction only: no build, no run).
+n_lev  = numel(lookup);
 levels = struct('level', num2cell(1:n_lev), 'swept', reshape(lookup, 1, []), 'tau_a_E', cell(1, n_lev), 'tau_a_I', cell(1, n_lev));
-cond = psa.conditions{1};
 for k = 1:n_lev
     args = [struct2namevalue(psa.model_defaults), struct2namevalue(rmfield(cond, 'name')), ...
         {tau_axis, lookup{k}}];
-    m = feval(model_class, args{:});     % construction only: no build, no run
+    m = feval(model_class, args{:});
     if strcmp(model_class, 'SRNNCellTypePairs')
         levels(k).tau_a_E = m.tau_a{1};
         if numel(m.tau_a) >= 2; levels(k).tau_a_I = m.tau_a{2}; end
@@ -216,16 +288,5 @@ for k = 1:n_lev
         levels(k).tau_a_E = m.tau_a_E;
         levels(k).tau_a_I = [];
     end
-end
-save(fullfile(psa.output_dir, 'tau_levels.mat'), 'levels', 'tau_axis', 'model_class');
-fid = fopen(fullfile(psa.output_dir, 'tau_levels.md'), 'w');
-if fid > 0
-    fprintf(fid, '# tau sweep levels\n\nAxis: `%s` (model %s). Condition: %s.\n\n', tau_axis, model_class, cond.name);
-    fprintf(fid, '| level | swept vector | tau_a E | tau_a I |\n|---|---|---|---|\n');
-    for k = 1:n_lev
-        fprintf(fid, '| %d | %s | %s | %s |\n', k, mat2str(levels(k).swept, 4), ...
-            mat2str(levels(k).tau_a_E, 4), mat2str(levels(k).tau_a_I, 4));
-    end
-    fclose(fid);
 end
 end

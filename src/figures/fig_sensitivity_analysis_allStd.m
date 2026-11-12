@@ -26,8 +26,18 @@ function out = fig_sensitivity_analysis_allStd(cfg)
 % figures -- but in a batch it destroys the previous figure's output before the
 % caller can collect it. Explicitly named handles are saved instead.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006). A cell of condition
+% names, one column each, LEFT TO RIGHT IN THE ORDER GIVEN; empty (the
+% default) draws every condition the sweeps hold, in their order, exactly as
+% before the option existed. Resolved by select_conditions inside
+% replot_sensitivity against each sweep's own PSA object, so a name a sweep
+% lacks is an error, not a missing column. Column titles come from
+% srnn_condition_titles by NAME (plot_sensitivity). The sheets are R x N;
+% plot_sensitivity sizes each row 350 px per column, and the column dividers
+% below are found from the axes, so N = 3 and N = 4 lay out alike.
+%
 % See also: resolve_run_dir, replot_sensitivity, assemble_sensitivity_figure,
-%           preset_default_values, fig_sensitivity_medians
+%           preset_default_values, fig_sensitivity_medians, select_conditions
 
 arguments
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
@@ -36,6 +46,7 @@ arguments
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
+    cfg.conditions                = {}          % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -156,7 +167,8 @@ default_mark_frac  = 0.05;              % height as a fraction of the y-range
 
 % Regenerate the per-param figures. One call produces BOTH the LLE and the
 % mean_rate figures for every swept parameter (replot_sensitivity plots both).
-replot_dir = replot_sensitivity(run_dir, lle_range, n_bins, n_bins);
+replot_dir = replot_sensitivity(run_dir, lle_range, n_bins, n_bins, ...
+    'conditions', cfg.conditions, 'verbose', cfg.verbose);
 
 % --- One combined figure per metric per sheet ------------------------------
 % assemble_sensitivity_figure matches the per-param figs by their Name prefix
@@ -182,6 +194,8 @@ metric_specs = struct( ...
     'yticks',    {specs_all.yticks});
 
 made_tags = {};
+made_figs = gobjects(0);   % returned, so the caller (make_all_paper_figures) closes them
+wrap_titles = ~isempty(cfg.conditions);   % see the title-lifting step below
 for mi = 1:numel(metric_specs)
     spec = metric_specs(mi);
 
@@ -200,7 +214,10 @@ for si = 1:numel(sheets)
     end
     combined_fig_path = fullfile(replot_dir, 'figures', ...
         sprintf('sensitivity_%s_combined_%s.fig', spec.name, sheet.tag));
-    cf = openfig(combined_fig_path, 'visible');
+    % Opened hidden when the caller asked for hidden figures (a batch run):
+    % a visible window raises itself and takes focus.
+    if cfg.visible, vis = 'visible'; else, vis = 'invisible'; end
+    cf = openfig(combined_fig_path, vis);
 
     % --- Reshape the whole figure -----------------------------------------
     % Make it ~15% narrower and ~5% taller so the imagesc panels are less wide
@@ -316,6 +333,13 @@ for si = 1:numel(sheets)
         if ~isempty(get(t, 'String'))
             set(t, 'Units', 'normalized', 'Position', [0.5, title_y, 0], ...
                 'VerticalAlignment', 'bottom', 'FontSize', title_fs);
+            % With a condition selection (the figure sets of FD-006), long
+            % titles are broken onto two lines: at 20 pt the full condition
+            % titles overrun their columns and print over each other. Only
+            % then, so a run with no selection draws exactly what it drew.
+            if wrap_titles
+                set(t, 'String', two_lines(get(t, 'String')));
+            end
         end
     end
 
@@ -352,6 +376,7 @@ for si = 1:numel(sheets)
     fig_tag = sprintf('%s_%s', spec.fig_tag, sheet.tag);
     save_figure_stable(out_dir, fig_tag, cf);
     made_tags(end+1) = {fig_tag};
+    made_figs(end+1) = cf; %#ok<AGROW>
 end
 end
 
@@ -363,7 +388,7 @@ if isfolder(replot_dir)
     rmdir(replot_dir, 's');
 end
 
-out = struct('figs', gobjects(0), 'files', {{}}, 'source', run_dir);
+out = struct('figs', made_figs, 'files', {{}}, 'source', run_dir);
 if cfg.save
     for k = 1:numel(made_tags)
         out.files = [out.files, existing_outputs(out_dir, made_tags{k})];
@@ -373,6 +398,18 @@ if cfg.save
 
 
 end
+end
+
+function s = two_lines(s)
+% Break a long single-line title at the space nearest its middle; a title of
+% 16 characters or fewer, or one already on several lines, is left alone.
+if ~ischar(s) || size(s, 1) > 1 || numel(s) <= 16
+    return
+end
+sp = find(s == ' ');
+if isempty(sp); return; end
+[~, k] = min(abs(sp - numel(s) / 2));
+s = {s(1:sp(k) - 1), s(sp(k) + 1:end)};
 end
 
 

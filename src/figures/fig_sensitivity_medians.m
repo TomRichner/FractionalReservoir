@@ -31,8 +31,17 @@ function out = fig_sensitivity_medians(cfg)
 %      medians are computed straight off the saved PSA objects, from the same
 %      ParamSpaceAnalysis2.collect_level_values that plot_sensitivity uses.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006). Empty (the default):
+% the PRESET's conditions, in its order, exactly as before the option
+% existed. A cell of names: those conditions, overlaid and listed in the
+% legend IN THE ORDER GIVEN (the first is drawn first, so it lies underneath).
+% The selection is resolved by select_conditions against the conditions the
+% run's sweeps actually hold (the intersection over the six sweeps), so a
+% name the run lacks is an error rather than a missing curve. Colours and
+% legend text come from manuscript_style by condition NAME.
+%
 % See also: fig_sensitivity_analysis_allStd, resolve_run_dir,
-%           preset_default_values, manuscript_style
+%           preset_default_values, manuscript_style, select_conditions
 
 arguments
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
@@ -41,6 +50,7 @@ arguments
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
+    cfg.conditions                = {}          % names to draw, in order; empty = the preset's (select_conditions)
 end
 
 setup_paths();
@@ -111,12 +121,11 @@ default_value = preset_default_values(run_dir, panel_params);
 % Driven by the PRESET's conditions, in its order, rather than a hardcoded four.
 % A 7-regime preset would otherwise have plotted only the four this list knew
 % about, with no indication that three were missing.
+% With a selection (cfg.conditions), the list is the selection instead; it is
+% resolved against the run once the sweeps are loaded (below), and cond_spec
+% is built there.
 [~, ~, preset_conditions] = srnn_param_preset(cfg.preset_name);
 cond_names = cellfun(@(c) c.name, preset_conditions, 'UniformOutput', false);
-cond_spec  = struct( ...
-    'name',    cond_names, ...
-    'display', cellfun(@(n) st.condition_title(n), cond_names, 'UniformOutput', false), ...
-    'color',   cellfun(@(n) st.condition_color(n), cond_names, 'UniformOutput', false));
 
 %% -------------------- Percentiles --------------------
 % pcts(median_col) is the curve that gets drawn; band_pcts the shaded IQR.
@@ -182,6 +191,23 @@ if ~isempty(missing)
         ['No 1D_sensitivity_* sweep found for: %s\n' ...
          'Source run: %s'], strjoin(missing, ', '), run_dir);
 end
+
+% The selection: checked against what EVERY drawn sweep holds (a condition
+% one sweep lacks would leave a panel without its curve), in the requested
+% order. Empty keeps the preset's list, unchanged.
+if ~isempty(cfg.conditions) && ~(((ischar(cfg.conditions) || isstring(cfg.conditions))) ...
+        && all(strlength(cfg.conditions) == 0))
+    held = cellfun(@(c) c.name, psa_of_param(panel_params{1}).conditions, 'UniformOutput', false);
+    for pi = 2:numel(panel_params)
+        cn = cellfun(@(c) c.name, psa_of_param(panel_params{pi}).conditions, 'UniformOutput', false);
+        held = held(ismember(held, cn));
+    end
+    cond_names = select_conditions(held, cfg.conditions);
+end
+cond_spec  = struct( ...
+    'name',    cond_names, ...
+    'display', cellfun(@(n) st.condition_title(n), cond_names, 'UniformOutput', false), ...
+    'color',   cellfun(@(n) st.condition_color(n), cond_names, 'UniformOutput', false));
 
 %% -------------------- Collect the percentile curves --------------------
 % curves.(param).x                     : 1 x n_levels swept-parameter values

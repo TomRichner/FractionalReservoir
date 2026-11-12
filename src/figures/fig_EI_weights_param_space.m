@@ -42,8 +42,19 @@ function out = fig_EI_weights_param_space(cfg)
 % each is a scalar multiplying all of W, so it cancels between numerator and
 % denominator. What moves this axis is f and the mu blocks.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006). A cell of condition
+% names, one column each, LEFT TO RIGHT IN THE ORDER GIVEN; empty (the
+% default) draws every condition the param-space sample holds, in its order,
+% exactly as before the option existed. It is passed to
+% load_and_make_unit_histograms as 'Conditions', which resolves it with
+% select_conditions against the run's own PSA object (a name the run lacks is
+% an error). The column-title map below, which used to be built from the
+% PRESET's conditions, is built from the drawn ones. Titles come from
+% srnn_condition_titles by NAME. Networks of unselected conditions are not
+% rebuilt.
+%
 % See also: fig_EI_param_space, ParamSpaceAnalysis2/rebuild_model,
-%           load_and_make_unit_histograms, resolve_run_dir
+%           load_and_make_unit_histograms, resolve_run_dir, select_conditions
 
 arguments
     cfg.verbose     (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
@@ -52,6 +63,7 @@ arguments
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
+    cfg.conditions                = {}          % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -99,10 +111,11 @@ vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] rebuilding network
 t_rebuild = tic;
 specs = sweep_metrics();
 specs = specs([specs.in_sheets]);
-[~, ~] = load_and_make_unit_histograms(ps_dir, ...
+[psa_ps, ~] = load_and_make_unit_histograms(ps_dir, ...
     'Metrics', {specs.key}, 'NormalizeMode', 'probability', 'LLERange', [-1.5, 1.5], ...
     'ColorBy', 'E:I weight balance', 'ColorFcn', color_fcn, 'CLim', W_CLIM, ...
-    'ColorLabel', 'excitatory weight fraction');
+    'ColorLabel', 'excitatory weight fraction', ...
+    'Conditions', cfg.conditions, 'Verbose', cfg.verbose);
 vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] %d networks rebuilt in %.1f s\n', ...
     cache.Count, toc(t_rebuild));
 
@@ -121,8 +134,15 @@ tags = cell(1, numel(specs));
 % Column titles keep the full condition titles; the overlap was the 20-pt font,
 % fixed by title_fs 14 (2026-09-14). The short labels were tried and mix
 % legacy keys ("SFA+STD") with full names, so the map below is an identity.
-[~, ~, preset_conditions] = srnn_param_preset(cfg.preset_name);
-cnames = cellfun(@(c) c.name, preset_conditions, 'UniformOutput', false);
+% Built from the conditions drawn: the preset's with no selection (as
+% before), else the selection, resolved against the run.
+if isempty(cfg.conditions)
+    [~, ~, preset_conditions] = srnn_param_preset(cfg.preset_name);
+    cnames = cellfun(@(c) c.name, preset_conditions, 'UniformOutput', false);
+else
+    cnames = select_conditions(cellfun(@(c) c.name, psa_ps.conditions, 'UniformOutput', false), ...
+        cfg.conditions);
+end
 short_of = containers.Map( ...
     cellfun(@(c) st.condition_title(c), cnames, 'UniformOutput', false), ...
     cellfun(@(c) st.condition_title(c), cnames, 'UniformOutput', false));
