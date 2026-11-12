@@ -1362,6 +1362,56 @@ switch name
             struct('name','sfa1_std0','tau_a',{on},'synapse_config',struct()), ...
             struct('name','sfa0_std1','tau_a',{off},'synapse_config',sc)};
 
+    case 'regression_stable_steps_noise0p025_dualStd_3cond'
+        % STABLE NETWORK OF THE TOLERANCE REGRESSION TIER (2026-11-11, FD-020).
+        % Within the regression bundle: the stimulus-staircase twin of the
+        % regression preset with the gain lowered until all three conditions
+        % are stable with a clear margin, at a size where the full-spectrum QR
+        % estimator is affordable. Changed from
+        % regression_pairs_steps5s_noise0p025_dualStd_3cond:
+        %   level_of_chaos  1.0 -> 0.2
+        %   n               100 -> 40
+        %   indegree        20  -> 8     (same connection density, alpha = 0.2)
+        %   F_ref_n / F_ref_indegree  100 / 20 -> 40 / 8
+        % Everything else, the three conditions included, is the parent's.
+        %
+        % WHY IT EXISTS. A tolerance can be applied to a trajectory only if the
+        % trajectory does not amplify round-off, so the end-to-end layer of the
+        % tolerance tier (regression_tol_run) needs networks whose every
+        % Lyapunov exponent is negative. The staircase (a new random step per
+        % neuron, never returning to zero) still drives rates over the whole
+        % range of the nonlinearity and depression deep, so the arithmetic is
+        % exercised widely although nothing is chaotic.
+        %
+        % THE MARGINS are tabulated in regression_tol_run's header, measured
+        % with its settings. In short: no estimator (top-K, Benettin, QR) finds
+        % a positive exponent in any condition, the local growth rate of the
+        % leading direction never comes near zero, lya_K_auto never retries,
+        % and no SFA ladder is clipped. The adapting conditions cannot be
+        % pushed further from zero by the gain: their leading exponent is the
+        % decay rate of the slowest adaptation variable (about -1/tau, tau up
+        % to 10 s and its per-neuron spread). The margin that matters for the
+        % tier is against round-off, which is ten orders smaller.
+        %
+        % DO NOT RETUNE IT, for the same reason as its parent: the tolerance
+        % tier's anchor was captured from this network on the model class as
+        % it stood before Plan A touched it.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'regression_pairs_steps5s_noise0p025_dualStd_3cond');
+        d.level_of_chaos = 0.2;
+        d.n = 40;
+        d.indegree = 8;
+        d.F_ref_n = 40;
+        d.F_ref_indegree = 8;
+
+    case 'regression_stable_steps_noise0_dualStd_3cond'
+        % Noise-free twin of the stable regression network: Wiener process
+        % off, for the deterministic integrator, the QR estimator and memory
+        % capacity. Same bundle, chained under the within-bundle rule.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'regression_stable_steps_noise0p025_dualStd_3cond');
+        d.sigma_u_noise = 0;
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p05_noise0p025_dualStd_3cond_mu8p25'
         % As ..._sfaEI_Sc0p2sig0p1_noise0p025_dualStd_3cond_mu8p25 with ONE
         % change (TR, 2026-09-12): PER-NEURON SFA LADDERS, tau_a_spread
@@ -1911,7 +1961,10 @@ names = {'default', 'overconnected', ...
     'regression_pairs_noStim_noise0p025_dualStd_3cond', ...
     'regression_pairs_noStim_noise0_dualStd_3cond', ...
     'regression_pairs_steps5s_noise0p025_dualStd_3cond', ...
-    'single_neuron_regression'};
+    'single_neuron_regression', ...
+    ... % the tolerance tier's stable networks (regression_tol_run), same bundle
+    'regression_stable_steps_noise0p025_dualStd_3cond', ...
+    'regression_stable_steps_noise0_dualStd_3cond'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
