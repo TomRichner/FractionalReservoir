@@ -203,15 +203,17 @@ def load(path: Path) -> tuple[dict, list[dict], list[Task]]:
             if not t.get("estimate_of_record_source"):
                 errors.append(f"{tid}: estimate_of_record needs estimate_of_record_source "
                               f"(where the estimate was recorded before the task ran)")
-            if st in ("planned", "tom"):
+            if st == "planned" or (st == "tom" and "start" not in t):
                 errors.append(f"{tid}: estimate_of_record is frozen when a task starts; "
-                              f"a {st} task has only 'estimate'")
+                              f"a task that has not started has only 'estimate'")
         if st == "running" and "start" not in t:
             errors.append(f"{tid}: running but without an actual start time")
         if st != "done" and est is None:
             errors.append(f"{tid}: not done, so it needs an estimate (minutes)")
-        if st in ("planned", "tom") and ("start" in t or "end" in t):
-            errors.append(f"{tid}: {st} tasks are placed by the scheduler; remove start/end")
+        if st == "planned" and ("start" in t or "end" in t):
+            errors.append(f"{tid}: planned tasks are placed by the scheduler; remove start/end")
+        if st == "tom" and "end" in t:
+            errors.append(f"{tid}: a task waiting on Tom has no end; mark it done when it ends")
         if "start" in t and "end" in t and isinstance(t["start"], datetime) \
                 and isinstance(t["end"], datetime) and t["end"] <= t["start"]:
             errors.append(f"{tid}: end is not after start")
@@ -226,8 +228,8 @@ def load(path: Path) -> tuple[dict, list[dict], list[Task]]:
                 ds = by_id[d].status
                 if t.status == "done" and ds != "done":
                     errors.append(f"{t.id}: done, but depends on {d}, which is {ds}")
-                if t.status == "running" and ds != "done":
-                    errors.append(f"{t.id}: running, but depends on {d}, which is {ds}")
+                if started(t) and ds != "done":
+                    errors.append(f"{t.id}: started, but depends on {d}, which is {ds}")
     if errors:
         raise DataError("\n".join(errors))
     cycle = find_cycle(tasks)
@@ -265,6 +267,11 @@ def find_cycle(tasks: list[Task]) -> list[str] | None:
 
 # ------------------------------------------------------------------ schedule
 
+def started(t: Task) -> bool:
+    """Under way: running, or waiting on Tom with a recorded start."""
+    return t.status == "running" or (t.status == "tom" and t.start is not None)
+
+
 def schedule(tasks: list[Task], now: datetime) -> None:
     by_id = {t.id: t for t in tasks}
     now_q = ceil_q(now)
@@ -278,7 +285,7 @@ def schedule(tasks: list[Task], now: datetime) -> None:
         if t.status == "done":
             t.s = floor_q(t.start)
             t.e = max(ceil_q(t.end), t.s + Q)
-        elif t.status == "running":
+        elif started(t):
             t.s = floor_q(t.start)
             t.est_end = t.s + timedelta(minutes=t.estimate)
             if t.est_end > now:
@@ -298,7 +305,7 @@ def schedule(tasks: list[Task], now: datetime) -> None:
 def remaining(t: Task, now: datetime) -> timedelta:
     if t.status == "done":
         return timedelta(0)
-    if t.status == "running":
+    if started(t):
         return max(t.e - ceil_q(now), timedelta(0))
     return t.e - t.s
 
@@ -391,7 +398,7 @@ def task_info(t: Task, by_id: dict[str, Task], now: datetime, tz: timezone) -> d
     if t.estimate_of_record:
         info["prior"] = (f"{t.estimate_of_record_text or fmt_dur(timedelta(minutes=t.estimate_of_record))}"
                          f" (recorded before it ran: {t.estimate_of_record_source})")
-    elif t.status in ("done", "running"):
+    elif t.status == "done" or started(t):
         info["prior"] = "no prior estimate"
     else:
         info["prior"] = ""
@@ -405,7 +412,7 @@ def task_info(t: Task, by_id: dict[str, Task], now: datetime, tz: timezone) -> d
         if t.estimate_of_record:
             r = t.took_min / t.estimate_of_record
             info["timing"] += f" Actual / estimate = {r:.2f}."
-    elif t.status == "running":
+    elif started(t):
         a = t.start.astimezone(tz)
         est = fmt_dur(timedelta(minutes=t.estimate))
         info["timing"] = (f"Started {a:%Y-%m-%d %H:%M}"
@@ -540,7 +547,7 @@ def build_html(meta: dict, blocks: list[dict], tasks: list[Task], now: datetime)
                  f'aria-label="{esc(t.id + " " + t.name + ", " + STATUSES[t.status])}">')
         c.append(f'<rect class="{cls}" x="{x0:.1f}" y="{by}" width="{max(x1 - x0, 3):.1f}" '
                  f'height="{bh}" rx="3"/>')
-        if t.status == "running" and t.overran and t.est_end:
+        if started(t) and t.overran and t.est_end:
             xe = axis.x(t.est_end)
             c.append(f'<line class="estmark" x1="{xe:.1f}" y1="{by - 2}" x2="{xe:.1f}" '
                      f'y2="{by + bh + 2}"/>')
@@ -626,8 +633,12 @@ def build_html(meta: dict, blocks: list[dict], tasks: list[Task], now: datetime)
             f"{esc(t.estimate_of_record_text or fmt_dur(timedelta(minutes=t.estimate_of_record)))}, "
             f"took {esc(fmt_dur(timedelta(minutes=t.took_min)))} "
             f"(ratio {t.took_min / t.estimate_of_record:.2f})</li>" for t in pairs)
-        accuracy = (f"<p>{k} of {n_done} finished tasks had an estimate recorded before they ran. "
-                    f"Actual / estimate: median {med:.2f}, range {rng}.</p><ul>{lines}</ul>")
+        if k >= 3:
+            stat = f" Actual / estimate: median {med:.2f}, range {rng}."
+        else:   # too few for a median or a range to mean anything
+            stat = " Actual / estimate: " + ", ".join(f"{r:.2f}" for r in ratios) + "."
+        accuracy = (f"<p>{k} of {n_done} finished tasks had an estimate recorded before they ran."
+                    f"{stat}</p><ul>{lines}</ul>")
     else:
         accuracy = (f"<p>None of the {n_done} finished tasks had an estimate recorded before "
                     f"they ran.</p>")

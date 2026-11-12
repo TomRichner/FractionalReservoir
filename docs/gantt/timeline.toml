@@ -464,14 +464,15 @@ group = "Plan A: the chain, facilitation and spread (steps 1, 5, 8, 9)"
 name = "Lead's gates on the spread merge"
 who = "lead"
 issue = "FD-015"
-status = "running"
+status = "done"
 what = "Four tolerance suites (about 25 s each), the quick suite (about 10 min) and the stages tier (2 min) on merged main."
-gate = "All pass."
+gate = "The anchor passes; the chain, facilitation and spread suites pass at exact equality; quick suite 69 of 69; stages tier exact."
 depends = ["A_9_B"]
-estimate = 15
 start = 2026-11-12T10:20:32-06:00
-approx_start = true
-source = "start: merge b466a98; estimate from the lead"
+end = 2026-11-12T10:43:48-06:00
+took_min = 23
+rule = "merge to gates commit; start: merge b466a98; end: d563f2c (ISSUES: FD-015 done with the lead's gates)"
+note = "The lead states the gates themselves finished at about 10:35, so about 15 min; the measured 23 min runs to the commit recording them. No estimate of record: the brief's 'about 15 min' was written while the gates ran."
 
 # ---------------------------------------------------------------- block A, presets and display
 
@@ -704,20 +705,26 @@ what = "Before any long run, the lead runs the example time series for a few see
 gate = "Tom says go."
 depends = ["A_10_B", "A_9_T"]
 estimate = 45
-note = "The lead's estimate is 30 to 60 min of Tom's time; drawn at 45. It is uncertain, and the projection does not include waiting for Tom to be available."
+start = 2026-11-12T10:39:00-06:00
+approx_start = true
+source = "start: the lead's statement (about 10:39): example time series for three seeds run and shown in Tom's MATLAB"
+estimate_of_record = 45
+estimate_of_record_text = "30 to 60 min (drawn as 45 min)"
+estimate_of_record_source = "the lead's list of remaining steps in its brief for this timeline, frozen when the hold point began"
+note = "Under way: the lead has shown the example traces for three seeds; Tom is looking and may tune the connectivity. It is Tom's time and uncertain; the projection does not include waiting for Tom to be available."
 
 [[task]]
 id = "A_10_T2"
 block = "A"
 group = "Plan A: finishing (steps 10 to 12) and after"
-name = "Full regression tier"
+name = "Quick suite, then full regression tier"
 who = "lead"
 status = "planned"
-what = "Reruns every stage and all 36 figures of the small copy of the manuscript bundle and compares with the stored references, about 50 min. The milestone check that the finished model still reproduces the paper's pipeline."
-gate = "No difference beyond the recorded ignore patterns."
+what = "First the quick test suite (about 10 min) on the preset commit fd1fb99, which so far was checked by six targeted tests only. Then the full tier: reruns every stage and all 36 figures of the small copy of the manuscript bundle and compares with the stored references, about 50 min. The milestone check that the finished model still reproduces the paper's pipeline."
+gate = "Quick suite passes; full tier: no difference beyond the recorded ignore patterns."
 depends = ["A_10_T1"]
 estimate = 60
-note = "About 50 min, drawn as 60 because bars are whole quarter-hours. Needs the desktop MATLAB."
+note = "About 10 + 50 min. The full tier needs the desktop MATLAB."
 
 [[task]]
 id = "A_10_T3"

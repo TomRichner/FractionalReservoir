@@ -135,7 +135,10 @@ Run from `docs/gantt/`. Do not start MATLAB; this needs only git and uv.
    shows it; `approx_start = true` if inferred), and copy its current
    `estimate` into `estimate_of_record` with `estimate_of_record_source`
    saying where that estimate was recorded. If no estimate existed before
-   it began, leave `estimate_of_record` out.
+   it began, leave `estimate_of_record` out. A task that is under way but
+   waiting on Tom (a hold point, his own run) keeps `status = "tom"` and
+   gets a `start` and a frozen estimate the same way; it is then drawn
+   like a running task.
 3. **Mark what finished.** `status = "done"`, `end =` the merge (or the
    lead's gates commit for a test), `took_min =` end - start in minutes,
    `rule =` which of the rules above gave the times, `merge`, `commits`.
