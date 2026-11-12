@@ -176,7 +176,7 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 %   stable.extra.chain, stable.extra.mixed   transient gain in its three
 %        variants and the finite-difference Jacobian, noise on
 %   stable.estimators.chain, .mixed   Benettin (noise on) and QR (noise
-%        off) on reduced networks (n = 20)
+%        off) on reduced networks (chain n = 12, mixed n = 10)
 %   stable.sweep        an 8-job serial ParamSpaceAnalysis2 sweep: two
 %        gains x two reps x two conditions, chain_all (the chain network)
 %        and chain_EE (one SFA timescale, a chain on E->E beside one-
@@ -404,10 +404,10 @@ function [R, seconds] = chain_suite(ref_data)
 % HOW STABLE the layer-2 networks are (measured 2026-11-12 with the
 % settings below; exponents in 1/s; noise off / noise on):
 %              top-K lambda_1     its largest       Benettin   QR, largest
-%                                 LOCAL rate        (n = 20)   (n = 20)
-%   chain      -0.167 / -0.166    -0.125 / -0.122   -0.218     -0.075
-%   mixed      -0.326 / -0.325    -0.282 / -0.281   -0.430     -0.250
-% No estimator finds a positive exponent (QR: none of 160 and 124), the
+%                                 LOCAL rate        (reduced)  (reduced)
+%   chain      -0.167 / -0.166    -0.125 / -0.122   -0.290     -0.077
+%   mixed      -0.326 / -0.325    -0.282 / -0.281   -0.479     -0.250
+% No estimator finds a positive exponent (QR: none of 96 and 62), the
 % leading direction's local rate never reaches zero, lya_K_auto never
 % retries (K stays 10) and no SFA ladder is clipped. The 8 sweep jobs have
 % lambda_1 between -0.42 and -0.21. As in the base suite the leading
@@ -536,7 +536,10 @@ for q = 1:numel(nets)
 end
 
 %% Layer 2c. The other two Lyapunov estimators, on reduced stable networks
-small = {'n', 20, 'indegree', 4, 'F_ref_n', 20, 'F_ref_indegree', 4};
+% Smaller than the base suite's n = 20: QR integrates N^2 variational
+% equations with ode45, and at n = 20 these two runs were two thirds of
+% the suite's time (N = 160 and 124; here 96 and 62).
+small = {'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4};
 small_run = {'rng_seeds', [5 6], 'T_range', [0 3], 'fs', 200, 'lya_T_interval', [1.5 3], ...
     'lya_warmup', 1, 'verbose', 'near-none'};
 for q = 1:numel(nets)
@@ -548,8 +551,8 @@ for q = 1:numel(nets)
             mq = build_from_preset(P_stable.rk4_noise_off, full_cond, small{:}, small_run{:}, ...
                 'ode_solver', 'rk4', 'lya_method', 'qr', 'synapse_config', sc4);
         else
-            mb = mixed_model(0.2, 'sra1', [{'n', 20, 'indegree', 5}, small_run, {'lya_method', 'benettin'}]);
-            mq = mixed_model(0.2, 'rk4',  [{'n', 20, 'indegree', 5}, small_run, {'lya_method', 'qr'}]);
+            mb = mixed_model(0.2, 'sra1', [{'n', 10, 'indegree', 4}, small_run, {'lya_method', 'benettin'}]);
+            mq = mixed_model(0.2, 'rk4',  [{'n', 10, 'indegree', 4}, small_run, {'lya_method', 'qr'}]);
         end
         mb.run();
         mq.run();
