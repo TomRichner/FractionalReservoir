@@ -336,7 +336,36 @@ model's arithmetic.
   parameters"). Allowed on all three kinds of route: chain, one-component
   and multi-component product (Tom, 2026-11-11). Set in the
   preset, not in a condition (Tom, 2026-11-11). Built after chained
-  facilitation, so it also covers `stf_spread`.
+  facilitation, so it also covers `stf_spread`. **In progress** (briefed
+  to `matlab-fable-1`, the last step on the model lane).
+  **Decisions by the lead in the brief:**
+  1. *The ordering rule on a chain route moves the reserve refill only.*
+     Plan A 4.3 copies the SFA rule: where a neuron's two refill times
+     come closer than a quarter of the nominal log-span, push them apart
+     symmetrically about their log-midpoint. Applied to the chain, that
+     would move the releasable-pool refill `tau_rec1` on the chained
+     condition and not on 1TS, breaking a decision Tom confirmed: 1TS is
+     jittered with the same `tau_rec1` and `tau_rel` draws as MTS, so the
+     releasable-pool equation is identical between the two neuron by
+     neuron. So the floor keeps `tau_rec1` as drawn and raises `tau_rec2`
+     alone until the gap equals the floor; the count still goes in
+     `std_clipped`.
+  2. *Column order of the facilitation draws*: decay, build-up, calcium
+     trace, ceiling excess `G - 1`, then decay, build-up and excess of any
+     further product components. As for depression, every column is
+     drawn for every neuron whatever its routes use.
+  3. *The draws are independent per quantity for facilitation too.* Tom
+     tied `tau_fac` to `tau_rel` in the PRESET (their nominal values are
+     equal); the per-neuron values are jittered independently, as he
+     confirmed for the four depression quantities. A per-neuron tie would
+     be a different model (one release probability per neuron setting
+     three numbers) and was not asked for.
+  4. *The spread gets a tolerance suite and mutation checks of its own,
+     and spread cases are added to the exact chain tier* (Plan A step 5
+     asked for the chain's exact reference "with and without the
+     spread"). Adding cases to `rapid_chain` means replacing its
+     reference deliberately; the condition is that every existing leaf
+     is unchanged.
 - **Serves:** block A
 - **What:** a per-neuron log-normal spread on the chain's time constants
   (releasable-pool refill and release, reserve refill) and on the reserve
@@ -468,7 +497,7 @@ model's arithmetic.
 
 ### FD-018 Chained facilitation, after chained depression
 
-- **Status:** in progress (step 8 briefed to `matlab-fable-1`; decided by
+- **Status:** done (2026-11-12; commits `43d6a91`..`87f51c0`, merge `2b455ff`; on merged main the anchor passes, the chain reference at zero tolerance has no leaf moved, the lead's capture is bit-identical to the committed `stf_chain` reference, quick 67 of 67; the lead's decisions on it are in the merge commit). Was: in progress (step 8 briefed to `matlab-fable-1`; decided by
   Tom 2026-11-11; design written and reviewed, Plan A section 4.6;
   parameter values chosen).
   **Its gate, the chain's own references (Plan A step 5), is in place:**
