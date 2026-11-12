@@ -63,4 +63,47 @@ assert(any(cellfun(@(s) contains(strjoin(cellstr(s), ' '), 'No external input'),
     'no-input figure must say so');
 close(out2.figs);
 
+%% The lambda row: top-K exponents, and only the named columns sharing a y axis
+three = {'preset_name', preset, 'rng_seeds', seeds, 'T_range', T, ...
+    'save', false, 'visible', false, 'verbose', 'near-none'};
+K = 6;
+out3 = fig_example_timeseries(three{:}, 'lambda_K', K, 'lambda_link', [2 3]);
+assert(isscalar(out3.figs) && numel(out3.cond_names) == 3, 'three conditions, one figure');
+ax = findall(out3.figs, 'Type', 'axes');
+% The lambda row is the bottom row: the three axes with the lowest position,
+% taken left to right.
+pos = cell2mat(arrayfun(@(a) a.Position, ax(:), 'UniformOutput', false));
+in_row = abs(pos(:, 2) - min(pos(:, 2))) < 1e-6;
+bottom = ax(in_row);
+[~, order] = sort(pos(in_row, 1));
+bottom = bottom(order);
+assert(numel(bottom) == 3, 'expected three axes in the lambda row, found %d', numel(bottom));
+for k = 1:3
+    n_lines = numel(findall(bottom(k), 'Type', 'Line'));
+    assert(n_lines == K, 'column %d of the lambda row draws %d exponent lines, expected %d', k, n_lines, K);
+end
+% Columns 2 and 3 are linked; column 1 is not linked to them.
+ylim(bottom(2), [-3 7]); drawnow;
+assert(isequal(bottom(3).YLim, [-3 7]), 'columns 2 and 3 must share their y axis');
+assert(~isequal(bottom(1).YLim, [-3 7]), 'column 1 must keep its own y axis');
+% lambda_1 does not depend on K: the same as the default K = 15 call.
+out4 = fig_example_timeseries(three{:});
+assert(max(abs(out3.lambda_1 - out4.lambda_1)) < 1e-9, ...
+    'lambda_1 moved with lambda_K: %s vs %s', mat2str(out3.lambda_1, 6), mat2str(out4.lambda_1, 6));
+% Default: every column of the lambda row shares one y axis, as before.
+ax4 = findall(out4.figs, 'Type', 'axes');
+pos4 = cell2mat(arrayfun(@(a) a.Position, ax4(:), 'UniformOutput', false));
+bottom4 = ax4(abs(pos4(:, 2) - min(pos4(:, 2))) < 1e-6);
+ylim(bottom4(1), [-2 9]); drawnow;
+assert(all(arrayfun(@(a) isequal(a.YLim, [-2 9]), bottom4)), 'default lambda row must stay linked across all columns');
+close([out3.figs, out4.figs]);
+% A column that does not exist is refused.
+threw = false;
+try
+    fig_example_timeseries(three{:}, 'lambda_link', [2 9]);
+catch err
+    threw = strcmp(err.identifier, 'fig_example_timeseries:LambdaLink');
+end
+assert(threw, 'lambda_link naming a missing column must be refused');
+
 fprintf('test_example_timeseries_extras: PASS\n');

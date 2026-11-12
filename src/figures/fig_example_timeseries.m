@@ -83,6 +83,23 @@ function out = fig_example_timeseries(cfg)
 %   fig_example_timeseries('preset_name', p, 'save', false, ...
 %       'show_stimulus', true, 'show_W_spectrum', true)
 %
+% Two options for the lambda row (2026-11-12), both off by default, so a
+% default call draws and computes exactly what it did:
+%   cfg.lambda_K    0 (default): the row is the local rate and the
+%       accumulating lambda_1, from the sweeps' K = 15 estimator. K > 0:
+%       the estimator is asked for the top K exponents (lya_K = K) and the
+%       row draws ALL K accumulating finite-time exponents, lambda_1 thick
+%       in the condition's colour and lambda_2..K thin beneath it, with the
+%       final lambda_1 and how many of the K ended positive printed in the
+%       corner. The local rate is not drawn in that form. Spectra nest
+%       across K, so lambda_1 is the K = 15 value.
+%   cfg.lambda_link   [] (default): the row's y axis is shared by every
+%       column, like the other rows. A vector of column numbers: only those
+%       columns share their y axis and every other column keeps its own
+%       scale. [2 3 4] on a four-condition preset leaves the no-adaptation
+%       column, whose exponents are an order of magnitude larger, on its
+%       own scale so the three adapting columns can be read.
+%
 % See also: paper_config, srnn_param_preset, SRNNCellTypePairs,
 %           plot_local_and_finite_lle, fig_lyapunov_spectrum
 
@@ -102,6 +119,8 @@ arguments
     cfg.model_args  (1,:) cell    = {}      % name-value overrides of the preset, for interactive looks (header)
     cfg.show_stimulus   (1,1) logical = false   % extra figure: the external input u (header)
     cfg.show_W_spectrum (1,1) logical = false   % extra figure: eigenvalues of the simulated W (header)
+    cfg.lambda_K    (1,1) double {mustBeInteger, mustBeNonnegative} = 0   % > 0: the lambda row draws the top K exponents (header)
+    cfg.lambda_link (1,:) double {mustBeInteger, mustBePositive} = []    % columns sharing the lambda row's y axis; [] = all (header)
 end
 
 setup_paths();
@@ -124,15 +143,21 @@ if ~isempty(cfg.condition)
 end
 cond_names = select_conditions(cond_names, cfg.conditions);
 n_cond = numel(cond_names);
+if any(cfg.lambda_link > n_cond)
+    error('fig_example_timeseries:LambdaLink', ...
+        'lambda_link names column %d; the figure has %d column(s).', max(cfg.lambda_link), n_cond);
+end
 
 %% Simulate: one network, every condition, the sweeps' Lyapunov estimator
 T = cfg.T_range(2);
 lya_T_interval = [min(5, T / 2), T];
+lya_K = 15;                                   % the sweeps' K
+if cfg.lambda_K > 0, lya_K = cfg.lambda_K; end
 models = cell(1, n_cond);
 for i = 1:n_cond
     models{i} = build_from_preset(cfg.preset_name, cond_names{i}, ...
         'rng_seeds', cfg.rng_seeds, 'T_range', cfg.T_range, 'fs', 400, ...
-        'lya_method', 'topk', 'lya_K', 15, 'lya_K_auto', false, 'lya_dt', 0.05, ...
+        'lya_method', 'topk', 'lya_K', lya_K, 'lya_K_auto', false, 'lya_dt', 0.05, ...
         'lya_T_interval', lya_T_interval, 'lya_warmup', min(5, T / 4), ...
         'verbose', cfg.verbose, cfg.model_args{:});
     models{i}.run();
@@ -264,9 +289,13 @@ for i = 1:n_cond
     end
     hold(ax, 'off');
 
-    % (f) local and finite-time lambda_1 ---------------------------------------
+    % (f) local and finite-time lambda_1, or the top-K accumulating exponents ---
     ax = nexttile(tl); ax_all(6, i) = ax;
-    plot_local_and_finite_lle(ax, m.lya_results, cond_col);
+    if cfg.lambda_K > 0
+        lambda_spectrum_row(ax, m.lya_results, cond_col, cfg.lambda_K);
+    else
+        plot_local_and_finite_lle(ax, m.lya_results, cond_col);
+    end
     xlabel(ax, 'time (s)', 'FontSize', st.label_fs);
 end
 
@@ -279,8 +308,14 @@ for row = 1:n_rows
         if i == 1, ylabel(ax, row_names{row}, 'FontSize', st.label_fs - 2); end
         if row < n_rows, set(ax, 'XTickLabel', []); end
     end
-    if n_cond > 1
-        linkaxes(ax_all(row, :), 'y');
+    % Every row shares its y axis across the columns, except the lambda row
+    % when lambda_link names the columns that do (the rest keep their own).
+    link_cols = 1:n_cond;
+    if row == n_rows && ~isempty(cfg.lambda_link)
+        link_cols = unique(cfg.lambda_link);
+    end
+    if numel(link_cols) > 1
+        linkaxes(ax_all(row, link_cols), 'y');
     end
 end
 title(tl, sprintf('%s   (seeds %s, T = %g s, %d E + %d I of %d neurons shown)', ...
@@ -315,6 +350,51 @@ if cfg.show_W_spectrum
         save_figure_stable(out_dir, 'fig_example_W_spectrum', fig_w);
         out.files = [out.files, existing_outputs(out_dir, 'fig_example_W_spectrum')];
     end
+end
+end
+
+% =========================================================================
+function lambda_spectrum_row(ax, lya_results, colour, K)
+% The accumulating finite-time exponents of the top K directions against
+% time (cfg.lambda_K): lambda_1 thick in the condition's colour, lambda_2..K
+% thin beneath it, a zero line, and in the corner the final lambda_1 and how
+% many of the K ended positive. Needs the top-K estimator's
+% finite_LE_spectrum_t (n_t x K, NaN before accumulation starts).
+if ~isfield(lya_results, 'finite_LE_spectrum_t')
+    error('fig_example_timeseries:NoSpectrum', ...
+        'lambda_K needs the top-K estimator''s finite_LE_spectrum_t; this result has none.');
+end
+F = lya_results.finite_LE_spectrum_t;
+t = lya_results.t_lya(:);
+n = min(numel(t), size(F, 1));
+K = min(K, size(F, 2));
+t = t(1:n); F = F(1:n, 1:K);
+ok = isfinite(F(:, 1));
+hold(ax, 'on');
+% lambda_K first and lambda_1 last, so the leading exponents lie on top.
+pale = colour + 0.6 * (1 - colour);
+for k = K:-1:2
+    plot(ax, t(ok), F(ok, k), '-', 'Color', pale, 'LineWidth', 0.5);
+end
+plot(ax, t(ok), F(ok, 1), '-', 'Color', colour, 'LineWidth', 2.0);
+yline(ax, 0, ':', 'Color', [0.3 0.3 0.3]);
+hold(ax, 'off');
+ylabel(ax, '\lambda (s^{-1})');
+% Limits from the settled part: the first fifth of the accumulation is the
+% estimator converging, and it would set the scale for everything after.
+i_ok = find(ok);
+if ~isempty(i_ok)
+    settled = i_ok(max(1, round(0.2 * numel(i_ok))):end);
+    lo = min(F(settled, :), [], 'all'); hi = max(F(settled, :), [], 'all');
+    lo = min(lo, 0); hi = max(hi, 0);
+    pad = 0.08 * max(hi - lo, eps);
+    ylim(ax, [lo - pad, hi + pad]);
+    final = F(i_ok(end), :);
+    % Just above the axes' top-right corner, as the depression panel's note:
+    % inside, it would sit on the lambda_1 trace in one column or another.
+    text(ax, 1, 1.01, sprintf('top %d:  \\lambda_1 = %+.3f,  %d > 0', K, final(1), nnz(final > 0)), ...
+        'Units', 'normalized', 'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom', ...
+        'FontSize', 8, 'Color', colour, 'Clipping', 'off');
 end
 end
 
