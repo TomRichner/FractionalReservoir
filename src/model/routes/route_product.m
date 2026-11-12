@@ -140,28 +140,33 @@ P.signature = nominal;
 P.signature.model = P.model;
 P.signature.zero_floor = nominal.zero_floor && P.n_b > 0;    % in force, not merely asked for
 
-% Per neuron: the nominal row replicated, or with a spread each value times
-% exp(sigma z) from its own column of the presynaptic neuron's draws (the
-% header says which). Of a ceiling, the excess over 1 is what is jittered.
-npre = opts.npre;
+% Per neuron, the nominal row replicated.
+P.tau_rest  = per_neuron([nominal.tau_rec, nominal.tau_dec], opts.npre);
+P.tau_drive = per_neuron([nominal.tau_rel, nominal.tau_fac], opts.npre);
+P.target    = per_neuron([zeros(1, P.n_b), nominal.G], opts.npre);
+% The per-neuron spread: each value times exp(sigma z) from its own column
+% of the presynaptic neuron's draws (the header says which); of a ceiling,
+% the excess over 1. Without a spread nothing here runs, and the columns
+% stay the nominal row exactly.
 m = 1:P.n_b;
 rec_col = 2 * m - 1 + (m >= 3);            % 1, 3, 6, 8, ...; tau_rel is the next column
 l = 1:P.n_g;
 dec_col = 3 * l - 2 + (l >= 2);            % 1, 5, 8, ...; tau_fac is the next column
 G_col = dec_col + 2 + (l == 1);            % 4, 7, 10, ...
-z_std = spread_draws(opts, 'std', P.n_b > 0, npre, max([rec_col + 1, 0]));
-z_stf = spread_draws(opts, 'stf', P.n_g > 0, npre, max([G_col, 0]));
-tau_rec = jittered(nominal.tau_rec, opts.std_sigma, z_std, rec_col, npre);
-tau_rel = jittered(nominal.tau_rel, opts.std_sigma, z_std, rec_col + 1, npre);
-tau_dec = jittered(nominal.tau_dec, opts.stf_sigma, z_stf, dec_col, npre);
-tau_fac = jittered(nominal.tau_fac, opts.stf_sigma, z_stf, dec_col + 1, npre);
-G = per_neuron(nominal.G, npre);           % with no spread exactly the nominal, not 1 + (G - 1)
-if ~isempty(z_stf)
-    G = 1 + jittered(nominal.G - 1, opts.stf_sigma, z_stf, G_col, npre);
+z_std = spread_draws(opts, 'std', P.n_b > 0, max([rec_col + 1, 0]));
+z_stf = spread_draws(opts, 'stf', P.n_g > 0, max([G_col, 0]));
+if ~isempty(z_std)
+    e = exp(opts.std_sigma .* z_std);
+    P.tau_rest(:, m)  = P.tau_rest(:, m) .* e(:, rec_col);
+    P.tau_drive(:, m) = P.tau_drive(:, m) .* e(:, rec_col + 1);
 end
-P.tau_rest  = [tau_rec, tau_dec];
-P.tau_drive = [tau_rel, tau_fac];
-P.target    = [zeros(npre, P.n_b), G];
+if ~isempty(z_stf)
+    e = exp(opts.stf_sigma .* z_stf);
+    g = P.n_b + l;
+    P.tau_rest(:, g)  = P.tau_rest(:, g) .* e(:, dec_col);
+    P.tau_drive(:, g) = P.tau_drive(:, g) .* e(:, dec_col + 1);
+    P.target(:, g)    = 1 + (P.target(:, g) - 1) .* e(:, G_col);
+end
 % Whether any per-neuron value of this route was drawn. Display code that
 % holds fewer rows than the route has neurons cannot then be served
 % (SRNNCellTypePairs.std_route_factor checks it).
@@ -341,7 +346,7 @@ function M = per_neuron(row, npre)
 M = repmat(reshape(row, 1, []), npre, 1);
 end
 
-function z = spread_draws(opts, mechanism, present, npre, n_cols)
+function z = spread_draws(opts, mechanism, present, n_cols)
 % The route's rows of its presynaptic type's standard normals for one
 % mechanism ('std' or 'stf'), or [] when that mechanism has no spread on
 % this route (sigma zero, or the route has no such variables).
@@ -351,22 +356,13 @@ if ~present || sigma == 0
     return;
 end
 name = [mechanism '_z'];
-if ~isfield(opts, name) || size(opts.(name), 1) ~= npre || size(opts.(name), 2) < n_cols
+if ~isfield(opts, name) || size(opts.(name), 1) ~= opts.npre || size(opts.(name), 2) < n_cols
     error([opts.err_id_prefix ':SpreadDraws'], ...
         ['Route %s has a per-neuron spread (opts.%s_sigma = %g) and needs opts.%s: one row of ' ...
         'standard normals per presynaptic neuron (%d rows) with at least %d columns.'], ...
-        opts.label, mechanism, sigma, name, npre, n_cols);
+        opts.label, mechanism, sigma, name, opts.npre, n_cols);
 end
 z = opts.(name);
-end
-
-function M = jittered(row, sigma, z, cols, npre)
-% One column per value of ROW: the nominal replicated when Z is empty (no
-% spread: exactly the nominal), else nominal * exp(sigma * z(:, column)).
-M = per_neuron(row, npre);
-if ~isempty(z) && ~isempty(row)
-    M = M .* exp(sigma .* z(:, cols));
-end
 end
 
 function value = positive_row(value, count, field_name, mechanism, label, err_id)

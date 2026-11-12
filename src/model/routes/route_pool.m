@@ -401,44 +401,60 @@ P.coupling = coupling(present, present);
 % r = 0; the calcium trace starts at 0, likewise.
 P.s0 = [ones(1, P.n_b + P.has_g), zeros(1, P.has_h)];
 
-% Per neuron, only what the variant has: the nominal value replicated, or
-% with a spread the nominal times exp(sigma z) from the value's own column
-% of the presynaptic neuron's draws (the header says which).
+% Per neuron, the nominal value replicated; only what the variant has.
 npre = opts.npre;
-s_std = opts.std_sigma;
-s_stf = opts.stf_sigma;
-z_std = spread_draws(opts, 'std', P.n_b >= 1, npre, 2 + 3 * (P.n_b == 2));
-z_stf = spread_draws(opts, 'stf', P.has_g, npre, 4);
-P.jittered = ~isempty(z_std) || ~isempty(z_stf);
-P.clipped = false(npre, 1);
 if P.n_b >= 1
-    P.tau_rec1 = jittered(nominal.tau_rec(1), s_std, z_std, 1, npre);
-    P.tau_rel  = jittered(nominal.tau_rel, s_std, z_std, 2, npre);
+    P.tau_rec1 = repmat(nominal.tau_rec(1), npre, 1);
+    P.tau_rel  = repmat(nominal.tau_rel, npre, 1);
 end
 if P.n_b == 2
-    P.tau_rec2 = jittered(nominal.tau_rec(2), s_std, z_std, 3, npre);
-    P.n2       = jittered(nominal.n2, s_std, z_std, 5, npre);
-    % The ordering rule (header): the reserve stays the slower pool by at
-    % least a quarter of the nominal log-span. Only tau_rec2 moves.
-    span = log(nominal.tau_rec(2)) - log(nominal.tau_rec(1));
-    if ~isempty(z_std) && span > 0
-        floor_gap = span / 4;
-        gap = span + s_std .* (z_std(:, 3) - z_std(:, 1));
-        short = gap < floor_gap;
-        P.tau_rec2(short) = P.tau_rec1(short) .* exp(floor_gap);
-        P.clipped = short;
-    end
+    P.tau_rec2 = repmat(nominal.tau_rec(2), npre, 1);
+    P.n2       = repmat(nominal.n2, npre, 1);
 end
 if P.has_g
-    P.tau_dec = jittered(nominal.tau_dec, s_stf, z_stf, 1, npre);
-    P.tau_fac = jittered(nominal.tau_fac, s_stf, z_stf, 2, npre);
-    P.G       = repmat(nominal.G, npre, 1);   % with no spread exactly the nominal, not 1 + (G - 1)
-    if ~isempty(z_stf)
-        P.G = 1 + jittered(nominal.G - 1, s_stf, z_stf, 4, npre);
-    end
+    P.tau_dec = repmat(nominal.tau_dec, npre, 1);
+    P.tau_fac = repmat(nominal.tau_fac, npre, 1);
+    P.G       = repmat(nominal.G, npre, 1);
 end
 if P.has_h
-    P.tau_h = jittered(nominal.tau_h, s_stf, z_stf, 3, npre);
+    P.tau_h = repmat(nominal.tau_h, npre, 1);
+end
+
+% The per-neuron spread: each value times exp(sigma z) from its own column
+% of the presynaptic neuron's draws (the header says which); of the
+% ceiling, the excess over 1. Without a spread nothing here runs, and the
+% values stay the nominal exactly.
+z_std = spread_draws(opts, 'std', P.n_b >= 1, 2 + 3 * (P.n_b == 2));
+z_stf = spread_draws(opts, 'stf', P.has_g, 4);
+P.jittered = ~isempty(z_std) || ~isempty(z_stf);
+P.clipped = false(npre, 1);
+if ~isempty(z_std)
+    e = exp(opts.std_sigma .* z_std);
+    P.tau_rec1 = P.tau_rec1 .* e(:, 1);
+    P.tau_rel  = P.tau_rel .* e(:, 2);
+    if P.n_b == 2
+        P.tau_rec2 = P.tau_rec2 .* e(:, 3);
+        P.n2       = P.n2 .* e(:, 5);
+        % The ordering rule (header): the reserve stays the slower pool by
+        % at least a quarter of the nominal log-span. Only tau_rec2 moves.
+        span = log(nominal.tau_rec(2)) - log(nominal.tau_rec(1));
+        if span > 0
+            floor_gap = span / 4;
+            gap = span + opts.std_sigma .* (z_std(:, 3) - z_std(:, 1));
+            short = gap < floor_gap;
+            P.tau_rec2(short) = P.tau_rec1(short) .* exp(floor_gap);
+            P.clipped = short;
+        end
+    end
+end
+if ~isempty(z_stf)
+    e = exp(opts.stf_sigma .* z_stf);
+    P.tau_dec = P.tau_dec .* e(:, 1);
+    P.tau_fac = P.tau_fac .* e(:, 2);
+    P.G       = 1 + (P.G - 1) .* e(:, 4);
+    if P.has_h
+        P.tau_h = P.tau_h .* e(:, 3);
+    end
 end
 end
 
@@ -621,7 +637,7 @@ tf = ((ischar(value) && isrow(value)) || (isstring(value) && isscalar(value))) &
     strcmp(char(value), name);
 end
 
-function z = spread_draws(opts, mechanism, present, npre, n_cols)
+function z = spread_draws(opts, mechanism, present, n_cols)
 % The route's rows of its presynaptic type's standard normals for one
 % mechanism ('std' or 'stf'), or [] when that mechanism has no spread on
 % this route (sigma zero, or the route has no such variables).
@@ -631,22 +647,13 @@ if ~present || sigma == 0
     return;
 end
 name = [mechanism '_z'];
-if ~isfield(opts, name) || size(opts.(name), 1) ~= npre || size(opts.(name), 2) < n_cols
+if ~isfield(opts, name) || size(opts.(name), 1) ~= opts.npre || size(opts.(name), 2) < n_cols
     error([opts.err_id_prefix ':SpreadDraws'], ...
         ['Route %s has a per-neuron spread (opts.%s_sigma = %g) and needs opts.%s: one row of ' ...
         'standard normals per presynaptic neuron (%d rows) with at least %d columns.'], ...
-        opts.label, mechanism, sigma, name, npre, n_cols);
+        opts.label, mechanism, sigma, name, opts.npre, n_cols);
 end
 z = opts.(name);
-end
-
-function v = jittered(nominal, sigma, z, col, npre)
-% One value per neuron: the nominal replicated when Z is empty (no spread:
-% exactly the nominal), else nominal * exp(sigma * z(:, col)).
-v = repmat(nominal, npre, 1);
-if ~isempty(z)
-    v = v .* exp(sigma .* z(:, col));
-end
 end
 
 function tf = is_positive(value)
