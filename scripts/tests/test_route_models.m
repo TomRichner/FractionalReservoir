@@ -37,12 +37,20 @@
 %      F = 1; a scalar tau_rel / tau_fac / G is repeated; the signature
 %      tells routes apart; bad configurations error
 %      <prefix>:InvalidSynapseConfig.
-%   4. SRNNCellTypePairs.jacobian_times applies a route's A in two ways (its
+%   3b. route_pool in particular: the steady state against the roots of
+%      its quadratic and, at a very large reserve, against the single
+%      pool; it is accurate where the reserve is nearly empty; the
+%      sustained output rises to its ceiling; the pools' derivatives point
+%      inward on the boundary of [0, 1]^2; the 2 x 2 is full and not
+%      symmetric; the signature tells n2 apart and a chain from a product
+%      with the same time constants; each refusal has its own identifier.
+%   4.SRNNCellTypePairs.jacobian_times applies a route's A in two ways (its
 %      diagonal where the model states A is diagonal, the full per-neuron
 %      product otherwise): on a network with every kind of route, forcing
 %      the full way changes nothing and still equals J * Y. The one check
-%      here that builds a network; it is here because no model of today
-%      takes the full way.
+%      here that builds a network. The product model never takes the full
+%      way; the pool model always does, and test_std_chain_model checks
+%      that on a network of its own.
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths.
 %
@@ -277,12 +285,129 @@ for k = 1:numel(bad)
 end
 all_passed = check(sprintf('    %d bad configurations error <prefix>:InvalidSynapseConfig', numel(bad)), ok) && all_passed;
 
+%% 3b. route_pool in particular
+fprintf('  route_pool\n');
+pool = route_model('pool');
+chain_cfg = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
+r = [rates; 3; 30];                          % beyond the rate's range too: the formula is general
+P = pool.compile(chain_cfg, [], struct('npre', numel(r)));
+ss = pool.steady_state(r, P);
+% (C4) from the quadratic k2 b1^2 - (1 + k1 + k2) b1 + 1 = 0, by roots().
+e_root = 0;
+for i = 1:numel(r)
+    k1 = r(i) * 2 / 0.25;
+    k2 = r(i) * 5 / (2 * 0.25);
+    if k2 == 0
+        b1 = 1 / (1 + k1);
+    else
+        b1 = min(roots([k2, -(1 + k1 + k2), 1]));        % the root in [0, 1]
+    end
+    e_root = max([e_root, abs(ss.s(i, 1) - b1), abs(ss.s(i, 2) - (1 - k2 * b1))]);
+end
+all_passed = check(sprintf('    steady state equals the root of the quadratic in [0, 1], and b2 = 1 - k2 b1 (max %.1e)', e_root), ...
+    e_root <= 1e-14 && all(ss.s(:) >= 0 & ss.s(:) <= 1)) && all_passed;
+% The values Plan A section 1 quotes for these parameters.
+quoted = pool.steady_state([0.1; 0.25; 0.5; 1], pool.compile(chain_cfg, [], struct('npre', 4))).s(:, 1);
+all_passed = check('    b1 at r = 0.1, 0.25, 0.5, 1 is 0.420, 0.200, 0.106, 0.054', ...
+    isequal(round(quoted, 3), [0.420; 0.200; 0.106; 0.054])) && all_passed;
+
+% A very large reserve is the single pool.
+big = chain_cfg;
+big.n2 = 1e12;
+ss_big = pool.steady_state(r, pool.compile(big, [], struct('npre', numel(r))));
+single = 1 ./ (1 + r * 2 / 0.25);
+e_single = max(abs(ss_big.s(:, 1) - single) ./ single);
+all_passed = check(sprintf('    n2 = 1e12: b1 is the single pool''s 1/(1 + k1) (rel %.1e), b2 within 1e-9 of 1', e_single), ...
+    e_single <= 1e-10 && all(abs(ss_big.s(:, 2) - 1) <= 1e-9)) && all_passed;
+% A reserve that is nearly empty (k2 large against 1 + k1): b2 is small,
+% and still satisfies (C1) = 0 to round-off relative to its own size.
+slow = struct('model', 'chain', 'tau_rec', [0.05 400], 'tau_rel', 0.25, 'n2', 0.5);
+r_slow = [0.25; 1; 30];
+ss_slow = pool.steady_state(r_slow, pool.compile(slow, [], struct('npre', 3)));
+k1 = r_slow * 0.05 / 0.25;
+k2 = r_slow * 400 / (0.5 * 0.25);
+e_b2 = max(abs(ss_slow.s(:, 2) .* (1 - ss_slow.s(:, 1)) - k1 .* ss_slow.s(:, 1)) ./ (k1 .* ss_slow.s(:, 1)));
+all_passed = check(sprintf('    reserve nearly empty (b2 down to %.1e): b2 (1 - b1) = k1 b1 holds (rel %.1e)', ...
+    min(ss_slow.s(:, 2)), e_b2), all(k2 > 1 + k1) && e_b2 <= 1e-13 && all(ss_slow.s(:, 2) > 0)) && all_passed;
+
+% The sustained output r b1 rises with the rate to
+% 1/(tau_rec1/tau_rel + tau_rec2/(n2 tau_rel)) = 1/18.
+r_up = [0.01 0.05 0.1 0.25 0.5 1 10 1e3 1e6]';
+out = r_up .* pool.steady_state(r_up, pool.compile(chain_cfg, [], struct('npre', numel(r_up)))).F;
+all_passed = check(sprintf('    sustained output rises with the rate to its ceiling 1/18 (at r = 1e6: 1/%.4f)', 1 / out(end)), ...
+    all(diff(out) > 0) && out(end) < 1 / 18 && abs(out(end) - 1 / 18) <= 1e-6) && all_passed;
+
+% The derivative points inward on the boundary of [0, 1]^2.
+edge = rand(50, 1);
+rr = rand(50, 1);
+P50 = pool.compile(chain_cfg, [], struct('npre', 50));
+d_b1_0 = pool.rhs([zeros(50, 1), edge], rr, P50);
+d_b1_1 = pool.rhs([ones(50, 1), edge], rr, P50);
+d_b2_0 = pool.rhs([edge, zeros(50, 1)], rr, P50);
+d_b2_1 = pool.rhs([edge, ones(50, 1)], rr, P50);
+all_passed = check('    the pools cannot leave [0, 1]: the derivative points inward on each edge', ...
+    all(d_b1_0(:, 1) >= 0) && all(d_b1_1(:, 1) <= 0) && all(d_b2_0(:, 2) > 0) && all(d_b2_1(:, 2) <= 0)) && all_passed;
+
+% The 2 x 2 is full and not symmetric, and the model says so.
+[A, B, ~, Fs] = pool.linearize([0.4 0.7], 0.3, pool.compile(chain_cfg, [], struct()));
+A = reshape(A, 2, 2);
+all_passed = check('    A is a full 2 x 2, not symmetric; P.coupling is full; the rate and the output touch b1 only', ...
+    all(A(:) ~= 0) && A(1, 2) ~= A(2, 1) && isequal(P.coupling, true(2)) && B(2) == 0 && B(1) ~= 0 && ...
+    isequal(Fs, [1 0])) && all_passed;
+all_passed = check('    depression(b, P) is the releasable pool, with the shape of prod(b, 2)', ...
+    isequal(pool.depression(cat(3, [0.4 0.7; 0.2 0.9], [0.1 0.3; 0.5 0.6]), P), ...
+    cat(3, [0.4; 0.2], [0.1; 0.5])) && isequal(pool.initial(P), [1 1]) && P.n_b == 2 && P.n_g == 0) && all_passed;
+
+sig = @(cfg, varargin) pool.compile(cfg, [], varargin{:}).signature;
+other_n2 = chain_cfg;
+other_n2.n2 = 3;
+other_tau = chain_cfg;
+other_tau.tau_rec = [2 6];
+as_product = product.compile(struct('tau_rec', [2 5], 'tau_rel', 0.25), []).signature;
+ok = isequal(sig(chain_cfg), sig(chain_cfg, struct('npre', 7))) && ~isequal(sig(chain_cfg), sig(other_n2)) && ...
+    ~isequal(sig(chain_cfg), sig(other_tau)) && ~isequal(sig(chain_cfg), as_product);
+all_passed = check('    the signature tells n2 and the time constants apart, a chain from a product, and ignores npre', ok) && all_passed;
+
+without = @(name) rmfield(chain_cfg, name);
+with = @(name, value) setfield(chain_cfg, name, value);
+stf_cfg = struct('tau_dec', 1.5, 'tau_fac', 0.25, 'G', 3);
+refusals = { ...
+    {with('tau_rec', 2), [], struct(), 'ChainTauRecCount'}, ...
+    {with('tau_rec', [2 5 9]), [], struct(), 'ChainTauRecCount'}, ...
+    {with('tau_rel', [0.25 0.4]), [], struct(), 'ChainTauRelNotScalar'}, ...
+    {without('n2'), [], struct(), 'ChainMissingN2'}, ...
+    {with('n2', 0), [], struct(), 'ChainInvalidN2'}, ...
+    {with('n2', Inf), [], struct(), 'ChainInvalidN2'}, ...
+    {with('n2', [2 3]), [], struct(), 'ChainInvalidN2'}, ...
+    {with('combine', 'geomean'), [], struct(), 'ChainCombine'}, ...
+    {with('combine', 'product'), [], struct(), 'ChainCombine'}, ...
+    {chain_cfg, [], struct('zero_floor', true), 'ChainZeroFloor'}, ...
+    {chain_cfg, stf_cfg, struct(), 'ChainStfNotBuilt'}, ...
+    {with('tau_rec', [2 -5]), [], struct(), 'InvalidSynapseConfig'}, ...
+    {with('tau_rel', 0), [], struct(), 'InvalidSynapseConfig'}, ...
+    {without('tau_rel'), [], struct(), 'InvalidSynapseConfig'}, ...
+    {with('tau', 3), [], struct(), 'InvalidSynapseConfig'}, ...
+    {with('model', 'product'), [], struct(), 'InvalidSynapseConfig'}, ...
+    {[], [], struct(), 'InvalidSynapseConfig'}};
+ok = true;
+for k = 1:numel(refusals)
+    bad_k = refusals{k};
+    as_class = bad_k{3};
+    as_class.err_id_prefix = 'SRNNCellTypePairs';
+    ok_k = throws_id(@() pool.compile(bad_k{1}, bad_k{2}, bad_k{3}), ['route_pool:' bad_k{4}]) && ...
+        throws_id(@() pool.compile(bad_k{1}, bad_k{2}, as_class), ['SRNNCellTypePairs:' bad_k{4}]);
+    if ~ok_k, fprintf('      refusal %d (%s) did not raise its identifier\n', k, bad_k{4}); end
+    ok = ok && ok_k;
+end
+all_passed = check(sprintf('    %d bad chain configurations each raise their own <prefix>:<identifier>', numel(refusals)), ok) && all_passed;
+
 %% 4. the class's two ways of applying A agree
 % jacobian_times applies a route's A = d(ds)/ds in one of two ways: only
 % its diagonal where the model states that A is diagonal (P.coupling), the
-% full per-neuron product otherwise. No model of today takes the second
-% way, so it is exercised here by telling the class that every route is
-% coupled: the product must not change, and must still be J * Y.
+% full per-neuron product otherwise. The product model never takes the
+% second way, so its routes are put through it here by telling the class
+% that every route is coupled: the product must not change, and must still
+% be J * Y. (The pool model always takes it: test_std_chain_model.)
 fprintf('  SRNNCellTypePairs.jacobian_times, diagonal and full application of A\n');
 rng(3, 'twister');
 net = all_blocks_network();
@@ -368,6 +493,37 @@ stf3 = struct('tau_dec', [1 2 4], 'tau_fac', [0.25 0.5 1], 'G', [3 2 1.5]);
 stf3_alt = struct('tau_dec', [1.5 3 5], 'tau_fac', [0.5 0.25 2], 'G', [2 4 3]);
 cases = add(cases, 'three depression (geometric mean, zero floor), three facilitation', ...
     std3, stf3, floor_on, std3_alt, stf3_alt, 3, 3, 350);
+
+% The pool model: the chain, a releasable pool and its reserve, both in
+% [0, 1]. The paper's values, then a reserve smaller than the releasable
+% pool that refills faster than it, so no ordering of the two is assumed.
+draw_pool = @(npre, ns) 0.05 + 0.9 * rand(npre, ns);
+add_pool = @(cases, label, std_cfg, std_alt, T) [cases, struct( ...
+    'label', ['pool: ' label], 'model', 'pool', 'std', std_cfg, 'stf', none, 'opts', struct(), ...
+    'std_alt', std_alt, 'stf_alt', none, 'initial', [1 1], ...
+    'draw', draw_pool, 'reference', @chain_reference, 'T_settle', T)];
+chain = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
+chain_alt = struct('model', 'chain', 'tau_rec', [1.5 7], 'tau_rel', 0.4, 'n2', 3.5);
+small = struct('model', 'chain', 'tau_rec', [3 0.8], 'tau_rel', 0.3, 'n2', 0.5);
+small_alt = struct('model', 'chain', 'tau_rec', [2 1.2], 'tau_rel', 0.2, 'n2', 0.8);
+cases = add_pool(cases, 'chain, reserve twice the releasable pool', chain, chain_alt, 300);
+cases = add_pool(cases, 'chain, small fast reserve', small, small_alt, 200);
+end
+
+function [ds, F] = chain_reference(s, r, cs)
+% The chained pools for ONE neuron, from the equations (C1) to (C3) of
+% docs/Plan_A_chained_vessicles.md, section 1:
+%   db1/dt = b2 (1 - b1)/tau_rec1 - b1 r/tau_rel
+%   db2/dt = (1 - b2)/tau_rec2 - (1/n2) b2 (1 - b1)/tau_rec1
+%   F = b1
+tau_rec1 = cs.std.tau_rec(1);
+tau_rec2 = cs.std.tau_rec(2);
+b1 = s(1);
+b2 = s(2);
+ds = zeros(1, 2);
+ds(1) = b2 * (1 - b1) / tau_rec1 - b1 * r / cs.std.tau_rel;
+ds(2) = (1 - b2) / tau_rec2 - (1 / cs.std.n2) * b2 * (1 - b1) / tau_rec1;
+F = b1;
 end
 
 function [ds, F] = product_reference(s, r, cs)

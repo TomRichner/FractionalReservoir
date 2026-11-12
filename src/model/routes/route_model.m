@@ -2,6 +2,7 @@ function model = route_model(name)
 %ROUTE_MODEL The registry of route models: the one place a model name is resolved.
 %
 %   model = ROUTE_MODEL('product')    the model, a struct of function handles
+%   model = ROUTE_MODEL('pool')
 %   names = ROUTE_MODEL()             the valid names, a cell row
 %
 % A ROUTE is one (presynaptic type, postsynaptic type) pair of a
@@ -31,7 +32,12 @@ function model = route_model(name)
 %            n_b, n_g   columns of s that live in the state vector's
 %                       b-block and g-block, in that order (ns = n_b + n_g)
 %            ns, npre
-%            nominal    the configured values, as rows
+%            nominal    the configured values, as rows. It always has
+%                       tau_rec, tau_rel, tau_dec, tau_fac and G ([] where
+%                       the route has none): SRNNCellTypePairs copies them
+%                       into the params fields code outside the class
+%                       reads. A model adds its own (the product's
+%                       combine; the pool's n2 and std_model)
 %            signature  a struct that is isequal for two routes exactly
 %                       when they carry the same dynamics
 %            coupling   ns x ns logical: (m, k) is true where ds_m/dt can
@@ -66,13 +72,31 @@ function model = route_model(name)
 % F DEPENDS ON THE STATE ONLY, never on the rate: the class carries the
 % rate dependence of theta = r .* F.
 %
-% ADDING A MODEL: write route_<name>.m returning such a struct, add its
-% case here and its entry to scripts/tests/test_route_models.m. Nothing in
-% SRNNCellTypePairs changes.
+% THE MODELS, and how a route gets one (SRNNCellTypePairs.compile_route):
+%   'product'  route_product: product depression times output-only
+%              facilitation; also the route with no synapse dynamics. What
+%              a route gets unless it asks otherwise.
+%   'pool'     route_pool: vesicle pools in series. A route asks for it
+%              with std.model = 'chain'.
 %
-% See also: route_product, SRNNCellTypePairs, test_route_models
+% ONE OPTIONAL HANDLE, for display code that holds a route's b array and
+% not its whole state:
+%   D = depression(b, P)       the depression factor from the b-block alone
+%                              (b npre x n_b, or npre x n_b x nt; D has the
+%                              shape of prod(b, 2)). route_pool has it;
+%                              route_product has `combine` and `zero_floor`
+%                              instead, which predate it.
+%                              SRNNCellTypePairs.std_route_factor is the
+%                              caller.
+%
+% ADDING A MODEL: write route_<name>.m returning such a struct, add its
+% case here and its entry to scripts/tests/test_route_models.m, and say in
+% SRNNCellTypePairs.compile_route which configuration selects it. Nothing
+% else in SRNNCellTypePairs changes.
+%
+% See also: route_product, route_pool, SRNNCellTypePairs, test_route_models
 
-names = {'product'};
+names = {'product', 'pool'};
 if nargin == 0
     model = names;
     return;
@@ -80,6 +104,8 @@ end
 switch char(name)
     case 'product'
         model = route_product();
+    case 'pool'
+        model = route_pool();
     otherwise
         error('route_model:UnknownModel', 'Unknown route model ''%s''. Valid: %s.', ...
             char(string(name)), strjoin(names, ', '));
