@@ -28,9 +28,10 @@ function cfg = mu7chain_config(run_mode, figure_set)
 %     is called once per set (mu7chain_run).
 %
 % cfg.conditions is the option's fixed name (Plan A 4.4): a cell of condition
-% names to draw, in order. make_all_paper_figures does not read it yet (the
-% display workers add that next, FD-006), so until then both passes draw every
-% condition the run has and differ only in where they write.
+% names to draw, in order; make_all_paper_figures passes it to every entry as
+% 'conditions'. The single-neuron figure is the exception: its run holds the
+% single-neuron preset's conditions, so its entry names its own list per set
+% (cfg.single_neuron_conditions, below), which overrides the bundle's.
 %
 % WHY THE REGISTRY IS BUILT PER SET. grouped_figure_registry bakes the figure
 % root into its entries (the grouped figures read their source figures from
@@ -140,7 +141,21 @@ F = {};
 F = add(F, 'fig_introductory_concepts',       @fig_introductory_concepts,       true, ...
         {'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas});
 F = add(F, 'fig_FI_curve',                    @fig_FI_curve,                    true, {});
-F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, false, {});
+% The single-neuron figure has its OWN condition list in each set (the
+% lead's decision, 2026-11-12): its run holds the single-neuron preset's
+% conditions, not the network's. The paper's version keeps its three columns
+% (no adaptation, one SFA timescale, one depression pool); the review version
+% adds chained depression alone. An entry's own args follow the bundle-wide
+% 'conditions' in the call, so these override cfg.conditions.
+switch figure_set
+    case '3cond'
+        sn_conditions = {'no_adaptation', 'sfa1_std0', 'sfa0_std1'};
+    case '4cond'
+        sn_conditions = {'no_adaptation', 'sfa1_std0', 'sfa0_std1', 'sfa0_stdc2'};
+end
+cfg.single_neuron_conditions = sn_conditions;
+F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, false, ...
+        {'conditions', sn_conditions});
 F = add(F, 'fig_adaptation_methods_stf',      @fig_adaptation_methods,          false, ...
         {'variant', 'sfa_std_stf', 'preset_name', cfg.stf_preset});
 F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            false, ...

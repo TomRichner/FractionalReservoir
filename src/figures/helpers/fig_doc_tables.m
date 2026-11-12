@@ -30,6 +30,9 @@ arguments
     cfg.preset_name (1,:) char    = 'celltype_pairs_Sc0p2_noise0p025_dualStd_7cond'
     cfg.save        (1,1) logical = true  % unused; writing IS the work
     cfg.visible     (1,1) logical = true  % unused; no figures are drawn
+    % Condition names the tables cover; empty = all the preset's. Passed on to
+    % write_manuscript_tables, whose header says what a selection changes.
+    cfg.conditions                = {}
 end
 
 setup_paths();
@@ -37,7 +40,8 @@ setup_paths();
 paths = write_manuscript_tables( ...
     'preset_name', cfg.preset_name, ...
     'out_dir',     cfg.out_dir, ...
-    'verbose',     cfg.verbose);
+    'verbose',     cfg.verbose, ...
+    'conditions',  cfg.conditions);
 
 % File NAMES, matching what the figures return via existing_outputs, so the
 % master's "did anything land on disk" check and the manifest read alike.
