@@ -458,8 +458,9 @@ model's arithmetic.
 
 ### FD-021 Refactor behind one route interface
 
-- **Status:** in progress (step 0d briefed to `matlab-fable-1`; interface
-  design approved by Tom; Plan A sections 2.1 and 4.0)
+- **Status:** merged and gated (2026-11-11); set to done when the third
+  exact reference, the full one, is re-captured (its run is under way).
+  Interface design approved by Tom; Plan A sections 2.1 and 4.0.
 - **Serves:** block A
 - **What:** product depression and today's facilitation move behind the
   route interface of Plan A section 4.0, as `src/model/routes/route_product`
@@ -482,7 +483,42 @@ model's arithmetic.
   lead re-captures the three exact references once, with the reason in the
   commit.
 - **Depends on:** FD-020.
-- **Result:** _(pending)_
+- **Result:** worker `matlab-fable-1`, commits `d3d1e82`..`964e8b2`, merged
+  `7d49430`. `src/model/routes/route_model.m` and `route_product.m`;
+  `test_route_models`; `regression_time_model`;
+  `regression_tol_mutations_post_refactor`. On merged main, lead's
+  MATLAB: tolerance tier pass against the anchor (240 of 1749 float
+  leaves moved; worst pointwise 4.8e-16 against 1e-12; QR 7.6e-8 against
+  1e-5) and against the pre-edit capture; quick 55 pass with
+  `test_regression_rapid` the one expected failure; band checks of the
+  old rapid and stages references, no structural difference; 71 of 71
+  post-refactor mutations caught by values (worker). Ultrarapid reference
+  re-captured `8d7d2c9`, stages `dfc93f0` (which now ignores
+  `settings.n_workers`, so it passes on a pool of any size).
+  **Decisions by the lead** (reasons in the merge commit and Plan A 4.0):
+  1. *Three departures from the interface as designed are accepted*
+     (`params.route` a cell; `linearize` with four outputs; a model
+     declares `P.coupling`). Each was made for measured speed; without
+     the third `jacobian_times` was 30 % slower at n = 100.
+  2. *Timing is accepted, nothing to fix.* After over before, measured by
+     alternating the class with a copy of the pre-edit class: between
+     0.97 and 1.05 for `dynamics_fast`, the assembled Jacobian,
+     `jacobian_times` (K = 15) and build plus `get_params`, at n = 100 and
+     n = 500. The same code against itself reads 0.98 to 1.05, so this is
+     noise.
+  3. *`active_routes` is accepted as a workaround.* Three existing tests
+     switch `std_zero_floor` on the `params` struct after `get_params`,
+     and the floor is now compiled into each route, so the routes are
+     recompiled when the two disagree. The cleaner fix is for those tests
+     to set the property before `build`; **suggested as a later tidy-up,
+     not done** (the refactor had to pass the suite unedited).
+  4. *The full reference is re-captured from a run compared loosely
+     against the old one first* (tag `reference_fd021`), as the other two
+     were.
+  **Carried into step 1** (Plan A 4.0, "What step 1 inherits"): the
+  full-`A` branch of `jacobian_times` is under no tier case until the
+  chain's reference exists; `route_fields` cannot yet tell a chain from a
+  product route; the legacy delegations are product-only.
 
 ### FD-022 Remove the remnants of resuming a `ParamSpaceAnalysis2` run
 
