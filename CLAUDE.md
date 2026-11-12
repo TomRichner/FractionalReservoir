@@ -222,8 +222,9 @@ sections 2 and 6; built 2026-11-11). **Its tolerances are fixed** (Tom,
 2026-11-11) after the mutation checks: 55 deliberate errors in the model
 and reservoir classes, every one caught by compared values
 (`docs/notes/Tolerance_tier_mutation_checks_2026-11-11.md`; the harness
-is `regression_tol_mutate`, and the list is rewritten and re-run for the
-refactored code and for each new route model):
+is `regression_tol_mutate`). Those checks calibrated the tolerances and
+that job is finished; see "When to run mutation checks" below the table
+for what they are used for now:
 
 | Run it with | Time | What it covers |
 |---|---|---|
@@ -239,6 +240,28 @@ need a looser one with the measured reason for each, is in
 `regression_tol_settings`. The tier stores physics, never the `params`
 struct, so it survives a refactor of the model; leaves that exist only in
 a new run are reported, not failed.
+
+**When to run mutation checks (Tom, 2026-11-12).** The normal standard
+for a change is: unit tests of the equations (finite-difference
+Jacobians, closed forms), the tolerance tier within its tolerances, and
+the lead's review of the diff. When those hold, proceed to the next
+step. Mutation checks are not part of that standard. They say nothing
+about whether the equations are right; they only show whether a
+reference would notice a later error, and they are slow (the spread's 57
+mutations, run twice, took about two hours on the critical path and
+found two low-stakes gaps). So:
+
+- Run them only for a change that adds **new arithmetic to the dynamics
+  or the Jacobian** (a new route model, a new term), not for
+  parameter plumbing, draws, configs or display code.
+- Keep the list **short and targeted: 10 to 15, one per kind of site**
+  (a term's sign, a dropped Jacobian block, a parameter off by 1e-6, one
+  function of the four computing with different values from the others).
+  Near-duplicates of a kind already covered are left out.
+- When a reference changes, **re-run only the mutations that the change
+  affects**, not the whole list.
+- The lists already written (`regression_tol_mutations_*.m`) are kept as
+  they are and are not re-run as a matter of routine.
 
 **The anchor**, `scripts/tests/fixtures/regression_tol_anchor.mat`
 (8.7 MB), was captured from the model class before it was touched (blob
@@ -271,11 +294,11 @@ undepressed route. And an exact tier, `rapid_chain`
 `make_regression_reference('rapid_chain')`). Both are in the quick suite,
 about 20 s each. A pre-edit capture of a suite other than the base one is
 `make_regression_tol_reference('<name>', 'suite', 'chain')`. Each route
-model added after the chain gets a suite and a mutation list the same
-way (`regression_tol_mutations_*.m`, run with `regression_tol_mutate`):
+model added after the chain gets a suite of its own the same way:
 release-coupled facilitation has the suite `stf_chain`
 (`regression_tol_stf_chain.mat`, `test_regression_tolerance_stf_chain`,
-2026-11-12).
+2026-11-12). Whether it also gets a mutation list, and how long a one,
+is decided by "When to run mutation checks" above.
 
 **Route models, in one paragraph** (Plan A, sections 4.0 and 4.6; the
 equations are in `Equations_stability_paper.md`). Depression and

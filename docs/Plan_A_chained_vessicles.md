@@ -1317,6 +1317,12 @@ Workers start with no memory of this conversation. Each brief gives:
 12. **Mutation checks are repeated** on the refactored code after step 0d
     and on the chain in step 5, with the list adapted, so the tier is known
     to catch errors in the code it guards. (An addition to step 0c.)
+    **Narrowed by Tom, 2026-11-12:** after the spread's list (57
+    mutations, about two hours, not asked for by step 9) mutation checks
+    are no longer repeated as a matter of course. Unit tests, the
+    tolerance tier and review are the standard; a short targeted list is
+    written only for new arithmetic in the dynamics or the Jacobian. The
+    rule is in `CLAUDE.md`, "When to run mutation checks".
 
 **Still under discussion (the lead's recommendation in each):**
 
