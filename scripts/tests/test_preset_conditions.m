@@ -119,16 +119,20 @@ all_passed = check('no_adaptation is identical across the 3- and 7-cond presets'
     isequaln(three{strcmp(got3, 'no_adaptation')}, ...
              seven{strcmp(got7, 'no_adaptation')})) && all_passed;
 
-% Titles are mostly structural, with these two deliberate exceptions: they are
-% the 3-condition preset's adapting regimes, i.e. the paper's comparison, so they
-% are titled in the manuscript's words rather than by their counts.
+% Titles are mostly structural, with deliberate exceptions: the paper's adapting
+% regimes are titled in the manuscript's words rather than by their counts.
+% Since 2026-11-12 (FD-007) the paper's MTS is the CHAIN, sfa3_stdc2, which
+% took "Multiple-Timescale Adaptation" over from the product sfa3_std2; the
+% product's title says what it is.
 t = srnn_condition_titles();
 all_passed = check(sprintf('sfa1_std1 -> "%s"', t('sfa1_std1')), ...
     strcmp(t('sfa1_std1'), 'Single-Timescale Adaptation')) && all_passed;
+all_passed = check(sprintf('sfa3_stdc2 -> "%s"', t('sfa3_stdc2')), ...
+    strcmp(t('sfa3_stdc2'), 'Multiple-Timescale Adaptation')) && all_passed;
 all_passed = check(sprintf('sfa3_std2 -> "%s"', t('sfa3_std2')), ...
-    strcmp(t('sfa3_std2'), 'Multiple-Timescale Adaptation')) && all_passed;
-all_passed = check('the two adapting regimes are titled differently', ...
-    ~strcmp(t('sfa1_std1'), t('sfa3_std2'))) && all_passed;
+    strcmp(t('sfa3_std2'), 'Multiple-Timescale Adaptation (product)')) && all_passed;
+all_passed = check('the three adapting regimes are titled differently', ...
+    numel(unique({t('sfa1_std1'), t('sfa3_stdc2'), t('sfa3_std2')})) == 3) && all_passed;
 % Legacy names stay in the map, or a figure regenerated from a run saved before
 % the rename falls back to raw snake_case panel titles.
 all_passed = check('legacy names still resolve to titles', ...
@@ -217,6 +221,26 @@ mis = cnd_p{2};                       % genuinely sfa1_std1
 mis.name = 'sfa3_std2';               % now a lie
 [claim_m, actual_m] = name_vs_counts(mis, cls_p);
 all_passed = check('a deliberately mis-named condition is caught', ...
+    ~isequal(claim_m, actual_m)) && all_passed;
+
+% The same for the chain marker, both ways: a chain condition named as a
+% product, and a product condition named as a chain, each with the right
+% counts, so only the 'c' can make them fail.
+[~, cls_c, cnd_c] = srnn_param_preset( ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain');
+nm_c = name_of(cnd_c);
+chain_c = cnd_c{strcmp(nm_c, 'sfa3_stdc2')};
+prod_c  = cnd_c{strcmp(nm_c, 'sfa3_std2')};
+[claim_ok, actual_ok] = name_vs_counts(chain_c, cls_c);
+all_passed = check('sfa3_stdc2 parses as [3 2 0 chain] and tells the truth', ...
+    isequal(claim_ok, [3 2 0 1]) && isequal(claim_ok, actual_ok)) && all_passed;
+mis = chain_c; mis.name = 'sfa3_std2';
+[claim_m, actual_m] = name_vs_counts(mis, cls_c);
+all_passed = check('a chain condition named sfaX_stdY is caught', ...
+    ~isequal(claim_m, actual_m)) && all_passed;
+mis = prod_c; mis.name = 'sfa3_stdc2';
+[claim_m, actual_m] = name_vs_counts(mis, cls_c);
+all_passed = check('a product condition named sfaX_stdcY is caught', ...
     ~isequal(claim_m, actual_m)) && all_passed;
 
 %% No preset may carry tau_a: it is condition-owned
@@ -342,32 +366,42 @@ end
 end
 
 function [claim, actual] = name_vs_counts(cond, model_class)
-% What a sfaX_stdY[_stfZ] name CLAIMS, and what the condition actually carries,
-% as [n_sfa n_std n_stf]. claim is [] for a name that does not match the pattern,
-% which is how non-conforming names opt out of the check entirely.
-% Two exact patterns, not one with an optional trailing group: MATLAB's regexp
+% What a sfaX_stdY[_stfZ] or sfaX_stdcY name CLAIMS, and what the condition
+% actually carries, as [n_sfa n_std n_stf chain]. claim is [] for a name that
+% does not match a pattern, which is how non-conforming names opt out of the
+% check entirely.
+%
+% chain is 1 for an stdc name and 0 for an std name; the actual value is 1 when
+% EVERY depressing route is a chain (std.model = 'chain'), 0 when none is, and
+% 0.5 when they are mixed, so a mixed condition can never pass. For a chain
+% route n_std counts its pools, numel(tau_rec) = 2 (releasable and reserve).
+%
+% Exact patterns, not one with an optional trailing group: MATLAB's regexp
 % does not return a token for a trailing optional group even when it matches, so
 % '_stf1' silently parsed as zero. This test caught that bug in
 % full_adaptation_condition, which had the same defect.
 claim = []; actual = [];
 t3 = regexp(cond.name, '^sfa(\d+)_std(\d+)_stf(\d+)$', 'tokens', 'once');
 t2 = regexp(cond.name, '^sfa(\d+)_std(\d+)$', 'tokens', 'once');
+tc = regexp(cond.name, '^sfa(\d+)_stdc(\d+)$', 'tokens', 'once');
 if ~isempty(t3)
-    claim = cellfun(@str2double, t3);
+    claim = [cellfun(@str2double, t3), 0];
 elseif ~isempty(t2)
-    claim = [cellfun(@str2double, t2), 0];
+    claim = [cellfun(@str2double, t2), 0, 0];
+elseif ~isempty(tc)
+    claim = [cellfun(@str2double, tc), 0, 1];
 else
     return
 end
 
 if strcmp(model_class, 'SRNNModel2')
-    % This class speaks COUNTS directly, and has no facilitation.
-    actual = [cond.n_a_E, cond.n_b_E, 0];
+    % This class speaks COUNTS directly, and has neither facilitation nor chains.
+    actual = [cond.n_a_E, cond.n_b_E, 0, 0];
     return
 end
 
 n_sfa = numel(cond.tau_a{1});
-n_std = 0; n_stf = 0;
+n_std = 0; n_stf = 0; n_chain = 0; n_routes = 0;
 sc = cond.synapse_config;
 if isstruct(sc) && ~isempty(fieldnames(sc))
     pre = fieldnames(sc);
@@ -375,12 +409,25 @@ if isstruct(sc) && ~isempty(fieldnames(sc))
         post = fieldnames(sc.(pre{a}));
         for b = 1:numel(post)
             r = sc.(pre{a}).(post{b});
-            if isfield(r, 'std'); n_std = max(n_std, numel(r.std.tau_rec)); end
+            if isfield(r, 'std')
+                n_std = max(n_std, numel(r.std.tau_rec));
+                n_routes = n_routes + 1;
+                if isfield(r.std, 'model') && strcmp(r.std.model, 'chain')
+                    n_chain = n_chain + 1;
+                end
+            end
             if isfield(r, 'stf'); n_stf = max(n_stf, numel(r.stf.tau_fac)); end
         end
     end
 end
-actual = [n_sfa, n_std, n_stf];
+if n_routes == 0 || n_chain == 0
+    chain = 0;
+elseif n_chain == n_routes
+    chain = 1;
+else
+    chain = 0.5;
+end
+actual = [n_sfa, n_std, n_stf, chain];
 end
 
 function n = std_count(sc)
@@ -432,5 +479,10 @@ names = {'celltype_pairs_Sc0p2_noise0p025_dualStd_3cond', ...
          'single_neuron_regression', ...
          ... % the tolerance tier's stable networks (regression_tol_run), added 2026-11-11
          'regression_stable_steps_noise0p025_dualStd_3cond', ...
-         'regression_stable_steps_noise0_dualStd_3cond'};
+         'regression_stable_steps_noise0_dualStd_3cond', ...
+         ... % the mu7chain bundle (mu7chain_config), added 2026-11-12, FD-007
+         'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain', ...
+         'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain', ...
+         'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain', ...
+         'single_neuron_mu7chain'};
 end

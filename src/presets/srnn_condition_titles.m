@@ -32,7 +32,9 @@ function titles = srnn_condition_titles()
 % adapting regimes, i.e. the paper's actual comparison, and are titled
 % "Single-Timescale Adaptation" and "Multiple-Timescale Adaptation" because that
 % is the claim being made; the counts are how it is implemented, not what it
-% means.
+% means. Since 2026-11-12 (FD-007) the multiple-timescale words belong to
+% sfa3_stdc2, the chained vesicle-pool depression, and sfa3_std2 (the product
+% of two independent pools) is "Multiple-Timescale Adaptation (product)".
 %
 % That those two words survive a rename is the point of keeping this map keyed by
 % NAME rather than putting a title inside each condition: the wording changed
@@ -62,7 +64,17 @@ current = { ...
     ... % Accepted: the 7-condition set is exploratory and not in the paper.
     'sfa1_std1',        'Single-Timescale Adaptation'; ...
     'sfa3_std1',        'SFA 3\tau + STD 1\tau'; ...
-    'sfa3_std2',        'Multiple-Timescale Adaptation'; ...
+    ... % CHAINED DEPRESSION (2026-11-12, FD-007). 'stdc' marks a chained
+    ... % vesicle-pool route; the count after it is the number of pools (2: the
+    ... % releasable pool and its reserve). The chained MTS takes over the
+    ... % manuscript's words from the product MTS, because the chain is now the
+    ... % paper's multiple-timescale depression; the product keeps a title that
+    ... % says what it is. Figures regenerated from runs made before this
+    ... % change therefore title their sfa3_std2 column "(product)": correct,
+    ... % but different from the manuscript's figures of that time.
+    'sfa3_stdc2',       'Multiple-Timescale Adaptation'; ...
+    'sfa3_std2',        'Multiple-Timescale Adaptation (product)'; ...
+    'sfa0_stdc2',       'STD chain (2 pools)'; ...
     'sfa3_std3',        'SFA 3\tau + STD 3\tau'; ...
     ... % single_neuron_stf only -- the one preset with facilitation. Without the
     ... % suffix its regimes would be sfa0_std1 and sfa1_std1, and sfa1_std1 is
