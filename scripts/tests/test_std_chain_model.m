@@ -262,8 +262,8 @@ all_passed = check(sprintf(['7. rates from %.3f to %.3f: b1 in [%.4f, %.4f], b2 
 
 %% 8. the refusals
 chain = sc.E.E.std;
-with = @(name, value) setfield(chain, name, value); %#ok<SFLD>
-on_EE = @(std_cfg) setfield(sc, 'E', setfield(sc.E, 'E', struct('std', std_cfg))); %#ok<SFLD>
+with = @(name, value) setfield(chain, name, value);
+on_EE = @(std_cfg) setfield(sc, 'E', setfield(sc.E, 'E', struct('std', std_cfg)));
 with_stf = sc;
 with_stf.E.E.stf = struct('tau_dec', 1.5, 'tau_fac', 0.25, 'G', 3);
 refusals = { ...

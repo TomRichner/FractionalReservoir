@@ -369,7 +369,7 @@ ok = isequal(sig(chain_cfg), sig(chain_cfg, struct('npre', 7))) && ~isequal(sig(
 all_passed = check('    the signature tells n2 and the time constants apart, a chain from a product, and ignores npre', ok) && all_passed;
 
 without = @(name) rmfield(chain_cfg, name);
-with = @(name, value) setfield(chain_cfg, name, value); %#ok<SFLD>
+with = @(name, value) setfield(chain_cfg, name, value);
 stf_cfg = struct('tau_dec', 1.5, 'tau_fac', 0.25, 'G', 3);
 refusals = { ...
     {with('tau_rec', 2), [], struct(), 'ChainTauRecCount'}, ...
