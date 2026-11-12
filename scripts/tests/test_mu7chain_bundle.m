@@ -100,10 +100,14 @@ end
 assert(strcmp(cls, 'SRNNCellTypePairs'));
 assert(isequal(name_of(cnd), four_names), 'conditions: %s', strjoin(name_of(cnd), ', '));
 
-% The network is the manuscript's, value for value; the shared names are the
-% manuscript preset's structs exactly.
+% The network is the manuscript's, value for value, plus the per-neuron
+% depression spread its name states (stdSpread0p25, FD-015); the shared
+% names are the manuscript preset's structs exactly.
 [d_ref, ~, cnd_ref] = srnn_param_preset(ref_name);
-assert(isequaln(d, d_ref), 'the mu7chain network differs from mu7revisedMedium');
+assert(isequal(d.std_spread, [0.25 0.25]), 'the mu7chain network must set std_spread = [0.25 0.25]');
+assert(~isfield(d_ref, 'std_spread'), 'the manuscript preset has no depression spread');
+assert(isequaln(rmfield(d, 'std_spread'), d_ref), ...
+    'the mu7chain network differs from mu7revisedMedium in more than std_spread');
 for nm = {'no_adaptation', 'sfa1_std1', 'sfa3_std2'}
     assert(isequaln(cnd{strcmp(name_of(cnd), nm{1})}, cnd_ref{strcmp(name_of(cnd_ref), nm{1})}), ...
         '%s differs from mu7revisedMedium''s', nm{1});

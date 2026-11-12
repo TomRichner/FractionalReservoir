@@ -39,9 +39,9 @@ function cfg = mu7chain_config(run_mode, figure_set)
 % have the grouped figures read the wrong pass's outputs, or none
 % (inventory R6). Each call here builds the registry for its own fig_root.
 %
-% THE DEPRESSION SPREAD IS NOT IN YET. The preset's name says stdSpread0p25;
-% the property arrives with FD-015 and the lead adds it to the preset then.
-% A run made before that has no depression spread.
+% THE DEPRESSION SPREAD (stdSpread0p25 in the preset's name) is in the
+% preset since 2026-11-12: std_spread = [0.25 0.25] (FD-015). A run made
+% before that (data/mu7chain_fast_prelim and its copies) has none.
 %
 % See also: mu7chain_run, mu7revisedMedium_config, srnn_param_preset,
 %           run_all_paper_analyses, make_all_paper_figures

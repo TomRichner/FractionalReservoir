@@ -1259,17 +1259,19 @@ switch name
         % THE mu7chain BUNDLE'S NETWORK (2026-11-12, FD-007, Plan A step 3).
         % Belongs to scripts/paper/mu7chain_config.
         %
-        % THE NAME STATES A DEPRESSION SPREAD THIS CASE DOES NOT SET YET.
-        % 'stdSpread0p25' means std_spread = [0.25 0.25] (per-neuron log-normal
-        % jitter of the depression time constants and n2, shared draws across
-        % the three adapting conditions; Plan A section 4.3). The property
-        % arrives with FD-015 and does not exist on SRNNCellTypePairs today, so
-        % setting it here would fail validation. The lead adds it to THIS struct
-        % when FD-015 lands; until then the preset runs with no depression
-        % spread, and a run made before that is not the network the name says.
+        % 'stdSpread0p25' is std_spread = [0.25 0.25] (FD-015, Plan A section
+        % 4.3): every neuron has its own depression time constants and, on a
+        % chain route, its own reserve size n2, each the nominal value times
+        % exp(0.25 z). A neuron's draws are shared by its routes and by the
+        % conditions: on one network seed its releasable-pool refill and
+        % release time are the same in sfa1_std1, sfa3_stdc2 and sfa3_std2.
+        % The spread was added to this struct on 2026-11-12, when the property
+        % existed; A RUN MADE BEFORE THAT (data/mu7chain_fast_prelim and its
+        % copies) HAS NO DEPRESSION SPREAD and is not the network named here.
         %
-        % The network is the manuscript's baseline (..._3cond_mu7revisedMedium),
-        % value for value: n = 500, mu_tilde_relative 7 on every route, SFA on
+        % Otherwise the network is the manuscript's baseline
+        % (..._3cond_mu7revisedMedium), value for value: n = 500,
+        % mu_tilde_relative 7 on every route, SFA on
         % both cell types with per-neuron ladders (tau_a_spread 0.25), per-neuron
         % setpoints S_c_i = 0.2 + 0.1 randn, no external input, Wiener noise
         % 0.025. Written out in full rather than chained, because a preset may
@@ -1308,6 +1310,7 @@ switch name
             'sigma_S_c',            [0.1 0.1], ... % per-neuron spread, both types
             'c',                    [0.5, 0.5], ...     % TOTAL SFA budget, E AND I
             'tau_a_spread',         [0.25 0.25], ...    % per-neuron SFA ladders
+            'std_spread',           [0.25 0.25], ...    % per-neuron depression parameters (FD-015)
             'input_config',         struct('n_steps', 3, 'step_density', struct(), 'amp', 0.5, ...
                                            'no_stim_pattern', true(1, 3), 'intrinsic_drive', 0, ...
                                            'positive_only', false), ...
@@ -1383,9 +1386,9 @@ switch name
         d.n=1; d.indegree=1; d.n_cellTypes=1; d.cell_type_names={'E'};
         d.f=1; d.mu_tilde_relative=0; d.sigma_tilde_relative=0;
         d.c=d.c(1); d.sigma_S_c=0; d.tau_a_spread=0;
-        % No heterogeneity: once FD-015 gives the parent std_spread, it is
-        % switched off here like every other spread.
-        if isfield(d, 'std_spread'); d.std_spread = 0; end
+        % No heterogeneity: the parent's depression spread is switched off
+        % here like every other spread.
+        d.std_spread = 0;
         d.sigma_u_noise=0; d.x0_std=0;
         ref_names = cellfun(@(c) c.name, ref, 'UniformOutput', false);
         one   = ref{strcmp(ref_names, 'sfa1_std1')};
