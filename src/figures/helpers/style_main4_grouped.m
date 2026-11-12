@@ -1,13 +1,25 @@
 function style_main4_grouped(fig)
 % STYLE_MAIN4_GROUPED Presentation-only styling of the native grouped figure.
 % Also accepts an existing saved FIG, without recomputing data or statistics.
+%
+% CONDITIONS (FD-006). The figure holds six sensitivity panels (upper, from
+% fig_sensitivity_medians, the conditions overlaid) and one rate panel per
+% condition (lower, from fig_lle_vs_rate). Which conditions they are is read
+% from the figure itself: each rate panel's title and each legend entry is a
+% condition title (srnn_condition_titles), which grouped_condition_label
+% inverts to the condition NAME; colours come from the name. Nothing here
+% lists conditions, so three, four or any other number style alike. With
+% more than three rate panels the canvas widens in proportion (N/3); with
+% three it is the 910 x 807.5 canvas of before.
 st = manuscript_style();
-% Fixed70% width/85% height of the1300-by-950 creation baseline.
-fig.Units='pixels'; fig.Position=[40 40 910 807.5];
-set(findall(fig,'-property','FontSize'),'FontSize',14);
 axs = findall(fig,'Type','axes');
+n_rate = nnz(arrayfun(@(ax)ax.Position(2)<=.3,axs));
+assert(numel(axs)-n_rate==6 && n_rate>=1,'style_main4_grouped:Axes', ...
+    'Expected six sensitivity panels and at least one rate panel; found %d and %d.',numel(axs)-n_rate,n_rate);
+% Fixed70% width/85% height of the1300-by-950 creation baseline (three rate panels).
+fig.Units='pixels'; fig.Position=[40 40 910*max(1,n_rate/3) 807.5];
+set(findall(fig,'-property','FontSize'),'FontSize',14);
 set(axs,'LineWidth',1,'XTickLabelRotation',0);
-assert(numel(axs)==9,'style_main4_grouped:Axes','Expected six sensitivity and three rate panels.');
 for k=1:numel(axs)
     ax=axs(k);
     if ax.Position(2)>.3
@@ -21,21 +33,27 @@ for k=1:numel(axs)
         % The plain line is the saved rate-bin median; ConstantLine objects
         % are the separate zero references and retain their original styling.
         set(findall(ax,'Type','line'),'Color',[.5 .5 .5],'LineWidth',2.5);
-        names={'no_adaptation','sfa1_std1','sfa3_std2'};
-        for j=1:numel(names)
-            if strcmp(strrep(ax.Title.String,newline,' '),st.condition_title(names{j}))
-                ax.Title.Color=st.condition_color(names{j});
-            end
+        % The panel's condition, from its title (fig_lle_vs_rate titles by name).
+        name=grouped_condition_label(ax.Title.String,'name_of_title');
+        ax.Title.Color=st.condition_color(name{1});
+        % Long titles collide over narrow panels (four conditions, or the
+        % product's '(product)' title): those go on two lines. The paper's
+        % three titles fit on one, as before.
+        if n_rate>3 || numel(ax.Title.String)>30
+            lab=grouped_condition_label(name,'two_line'); ax.Title.String=lab{1};
         end
     end
 end
 lg=findall(fig,'Type','legend');
-names={'no_adaptation','sfa1_std1','sfa3_std2'};
-colored=cell(1,3);
-for j=1:3
-    colored{j}=sprintf('\\color[rgb]{%.6f,%.6f,%.6f}%s',st.condition_color(names{j}),st.condition_title(names{j}));
-end
 for j=1:numel(lg)
+    handles=lg(j).PlotChildren;
+    handles=handles(~arrayfun(@(h)isa(h,'matlab.graphics.chart.decoration.ConstantLine'),handles));
+    % The legend's condition entries, in their own order, by name.
+    names=grouped_condition_label(arrayfun(@(h)h.DisplayName,handles,'UniformOutput',false),'name_of_title');
+    colored=cell(1,numel(names));
+    for q=1:numel(names)
+        colored{q}=sprintf('\\color[rgb]{%.6f,%.6f,%.6f}%s',st.condition_color(names{q}),st.condition_title(names{q}));
+    end
     % Include the lambda_1 = 0 boundary in the shared legend. Reuse a native
     % reference line so its green dashed key matches the sensitivity panels.
     leg_ax=lg(j).Axes;
@@ -43,8 +61,6 @@ for j=1:numel(lg)
     zero_ref=refs(arrayfun(@(h)h.Value==0 && strcmp(h.LineStyle,'--'),refs));
     assert(~isempty(zero_ref),'style_main4_grouped:ZeroReference','Expected a zero-growth reference line.');
     zero_ref=zero_ref(1);
-    handles=lg(j).PlotChildren;
-    handles=handles(~arrayfun(@(h)isa(h,'matlab.graphics.chart.decoration.ConstantLine'),handles));
     zero_ref.HandleVisibility='on';
     zero_ref.DisplayName='Zero Growth';
     lg(j)=legend(leg_ax,[handles(:);zero_ref],[colored {'Zero Growth'}],'Interpreter','tex');
@@ -55,7 +71,8 @@ drawnow;
 for k=1:numel(lg)
     p=lg(k).Position; p(1)=.97-p(3); p(2)=.98-p(4);
     lg(k).Position=p;
-    % Reserve space for all four keys while keeping upper-row x labels in place.
+    % Reserve space for every key (the conditions and Zero Growth) while
+    % keeping upper-row x labels in place.
     upper=axs(arrayfun(@(ax)ax.Position(2)>.65,axs));
     for j=1:numel(upper)
         q=upper(j).Position;

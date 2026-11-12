@@ -3,6 +3,26 @@ function out = fig_grouped_main(group, cfg)
 % Groups 3--6 use saved numerical data. Legacy illustrative panels in groups
 % 1, 2 and 8 use explicitly supplied archived PNGs; never silently simulate.
 % Group 2 prefers the revised saved representative_dynamics stage.
+%
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names in the
+% left-to-right order of the columns; empty (the default) draws every
+% condition the stages hold, exactly as before the option existed. It is
+% passed to every inner figure a group builds (groups 2-6), so a grouped
+% figure is assembled from inner figures drawn for the SAME selection, and
+% each inner figure resolves it with select_conditions (an error on a name
+% the run lacks). Every title, tick label, legend entry and colour painted
+% here or in the style_main<k>_grouped helpers is looked up from the
+% condition NAME drawn in that place (grouped_condition_label,
+% manuscript_style), never from a positional list. Groups 1, 7 and 8 have no
+% network conditions to select (group 1's concept panel takes the preset's
+% most-adapted route inside fig_main1_concepts) and ignore the option.
+%
+% Layout with N conditions: groups 2 and 3 lay out N columns at the
+% three-column pitch, so the canvas widens by a column for a fourth; group 4
+% has six sensitivity panels and N rate panels; group 5 one margin panel and
+% N gain panels in one row; group 6 one timescale panel and one
+% leading-vector panel per condition the tau sweep holds, side by side. With
+% three conditions every geometry is the one used before FD-006.
 arguments
     group (1,1) double
     cfg.run_dir (1,:) char = ''
@@ -15,6 +35,7 @@ arguments
     cfg.save (1,1) logical = true
     cfg.visible (1,1) logical = false
     cfg.verbose (1,:) char = 'minimal'
+    cfg.conditions = {}   % names to draw, in order; empty = all the run holds (select_conditions)
 end
 setup_paths();
 root = fileparts(which('setup_paths'));
@@ -33,28 +54,38 @@ switch group
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 2
-        a=fig_main2_dynamics(cfg.run_dir,cfg.source_fig_root);
+        a=fig_main2_dynamics(cfg.run_dir,cfg.source_fig_root,cfg.conditions);
+        % N columns at the three-column pitch: the canvas widens with them.
+        fig.Position(3)=fig.Position(3)*a.width_scale;
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 3
-        a=fig_main3_stability(cfg.run_dir);
+        a=fig_main3_stability(cfg.run_dir,cfg.conditions);
+        fig.Position(3)=fig.Position(3)*a.width_scale;
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 4
-        a=fig_sensitivity_medians('run_dir',cfg.run_dir,'preset_name',cfg.preset_name,'save',false,'visible',false);
+        a=fig_sensitivity_medians('run_dir',cfg.run_dir,'preset_name',cfg.preset_name,'save',false,'visible',false, ...
+            'conditions',cfg.conditions);
         native(a.figs(1),[0 .34 1 .64]); close(a.figs);
-        a=fig_lle_vs_rate('run_dir',cfg.run_dir,'save',false,'visible',false);
+        a=fig_lle_vs_rate('run_dir',cfg.run_dir,'save',false,'visible',false,'conditions',cfg.conditions);
         native(a.figs(1),[0 .025 1 .29]); close(a.figs);
         sources{end+1}=cfg.run_dir;
         notes{end+1}='Medians and IQR are unchanged. Fixed sensitivity LLE display limits clip more negative/positive values; full distributions remain supplementary.';
     case 5
-        a=fig_transient_amplification('run_dir',cfg.run_dir,'save',false,'visible',false);
+        a=fig_transient_amplification('run_dir',cfg.run_dir,'save',false,'visible',false,'conditions',cfg.conditions);
         sources{end+1}=a.source;
-        axm=findall(a.figs(2),'Type','axes');
-        if isscalar(axm), axm.XTickLabel={'No adaptation','Single-timescale','Multiple-timescale'}; end
+        % The margin panel's boxes are in the order of the selection over the
+        % eig_heatmap stage's conditions; its tick labels are rewritten by
+        % name in style_main5_grouped (no literal list here: with four
+        % conditions a three-label overwrite cycled silently, inventory R5).
+        E=load(a.source,'cond_names'); margin_names=select_conditions(E.cond_names,cfg.conditions);
         native(a.figs(2),[0 .52 1 .46]); close(a.figs);
         f=fullfile(cfg.run_dir,'transient_gain','transient_gain_data.mat'); D=load(f); sources{end+1}=f;
-        pan=panel([0 .06 1 .43]); tl=tiledlayout(pan,1,3,'TileSpacing','compact','Padding','compact');
+        [gain_names,gidx]=select_conditions({D.results.name},cfg.conditions);
+        D.results=D.results(gidx);
+        n_gain=numel(D.results);
+        pan=panel([0 .06 1 .43]); tl=tiledlayout(pan,1,n_gain,'TileSpacing','compact','Padding','compact');
         keys={'G_worst','G_noise','G_ei_diff','G_ei_sum','G_lyap'};
         labels={'Worst case','Noise RMS','Excite E / inhibit I','Excite E / excite I','Lyapunov direction'};
         colors=[0 0 0;0 .45 .7;.85 .33 .1;0 .6 .5;.55 .2 .65]; styles={'-','--','-.',':','--'}; marks={'none','none','o','s','^'};
@@ -69,30 +100,32 @@ switch group
             end
             set(ax,'YScale','log');
             unity=yline(ax,1,'--','Color',[.5 .5 .5],'LineWidth',1.2,'DisplayName','Unity Gain');
-            title(ax,r.title,'FontWeight','normal'); xlabel(ax,'time after perturbation (s)'); box(ax,'off');
+            % Titled by NAME, not by the title the stage saved at compute time.
+            title(ax,grouped_condition_label(r.name,'title'),'FontWeight','normal'); xlabel(ax,'time after perturbation (s)'); box(ax,'off');
             % Only the first 2 s after the perturbation are shown (TR, 2026-09-15); the saved horizon is longer.
             set(ax,'XLim',[0 2],'XTick',[0 1 2]);
             if i==1, ylabel(ax,'active dendritic gain'); end
-            if i==2, lg=legend(ax,[hh unity],[labels {'Unity Gain'}],'NumColumns',3,'Box','off','FontSize',10); lg.Layout.Tile='south'; end
+            if i==min(2,n_gain), lg=legend(ax,[hh unity],[labels {'Unity Gain'}],'NumColumns',3,'Box','off','FontSize',10); lg.Layout.Tile='south'; end
         end
         linkaxes(gain_axes,'y');
         notes{end+1}=sprintf('Active propagator only, all five directions, regular-state medians. Saved horizon %g s, of which the first 2 s are shown (ticks 0, 1, 2 s); no extrapolation. Margin and gain stages do not sample matched states.',D.settings.horizon_s);
         notes{end+1}='Four panels in one row; 14-point fonts and axes linewidth 1.0. Condition labels/titles use manuscript colors. Margin display limits [0,100] assume the unspecified upper bound; ticks are 0,25,50,75. Gain panels retain shared logarithmic limits.';
     case 6
-        a=fig_sfa_EOC_allStd('run_dir',cfg.run_dir,'preset_name',cfg.preset_name,'save',false,'visible',false);
+        a=fig_sfa_EOC_allStd('run_dir',cfg.run_dir,'preset_name',cfg.preset_name,'save',false,'visible',false, ...
+            'conditions',cfg.conditions);
+        % The tau sweep holds only the fully-adapted conditions; the panels
+        % are the selection intersected with them, in the selection's order
+        % (fig_sfa_EOC_allStd's own rule). Their names title the panels.
+        tau_names=tau_drawn_conditions(a.source,cfg.conditions);
         % Keep both axes linear: setting log on an imagesc axis would distort its bins.
         for j=1:numel(a.figs)
             axs=findall(a.figs(j),'Type','axes'); set(axs,'XScale','linear');
             native(a.figs(j),[(j-1)*.5 .43 .5 .55]);
         end
         close(a.figs);
-        a=fig_memory_capacity('run_dir',cfg.run_dir,'save',false,'visible',false);
-        ma=findall(a.figs(1),'Type','axes');
-        for jj=1:numel(ma)
-            if any(contains(string(ma(jj).XTickLabel),'Adaptation'))
-                ma(jj).XTickLabel={'No adaptation','1TS','MTS'}; ma(jj).XTickLabelRotation=0;
-            end
-        end
+        % The memory-horizon ticks are relabelled by NAME in style_main6_grouped
+        % (a literal three-label overwrite here cycled with four, inventory R5).
+        a=fig_memory_capacity('run_dir',cfg.run_dir,'save',false,'visible',false,'conditions',cfg.conditions);
         native(a.figs(1),[0 .10 1 .31]); close(a.figs); sources{end+1}=cfg.run_dir;
         notes{end+1}='Slowest-timescale axes are both linear. LLE distribution display clipping and MC trial/statistics remain those of the source run.';
         notes{end+1}='14-point fonts and axes linewidth 1.0. Row-major groups: (A) timescale LLE, (B) leading-vector fractions, (C) cumulative memory capacity and reconstruction, (D) memory horizon. All five scientific axes are retained; B-D use sparse y ticks.';
@@ -119,18 +152,18 @@ close(fig); fig=flat;
 if ismember(group,[1 2 3 8])
     set(findall(fig,'-property','FontSize'),'FontSize',14);
     if group==2
-        tt=findall(fig,'Type','axes','-regexp','Tag','dynamics_r1_c[123]');
+        tt=findall(fig,'Type','axes','-regexp','Tag','^dynamics_r1_c\d+$');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
     elseif group==3
-        tt=findall(fig,'Type','axes','-regexp','Tag','stability_r1_c[123]');
+        tt=findall(fig,'Type','axes','-regexp','Tag','^stability_r1_c\d+$');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
     end
 else
     set(findall(fig,'Type','axes'),'FontSize',10);
 end
 if group==4, style_main4_grouped(fig); end
-if group==5, style_main5_grouped(fig); end
-if group==6, style_main6_grouped(fig); end
+if group==5, style_main5_grouped(fig,margin_names,gain_names); end
+if group==6, style_main6_grouped(fig,tau_names); end
 tag=sprintf('Fig_Main%d_Grouped',group);
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
@@ -171,6 +204,26 @@ end
     function banner(msg)
         ax=axes(fig,'Position',[.02 .955 .96 .04]); axis(ax,'off'); text(ax,.5,.5,msg,'Units','normalized','HorizontalAlignment','center','FontSize',13,'FontWeight','bold');
     end
+end
+function names=tau_drawn_conditions(tau_dir,requested)
+% The conditions fig_sfa_EOC_allStd drew from the tau sweep in tau_dir: every
+% condition the sweep holds when nothing is selected, else the selection
+% intersected with them in the selection's order (that figure's documented
+% rule). Read from the sweep's saved summary, so the panels can be titled by
+% NAME even when there is only one (fig_sfa_EOC_allStd leaves a single panel
+% untitled).
+f=fullfile(tau_dir,'param_space_summary.mat');
+if isfile(f)
+    S=load(f,'summary_data'); conds=S.summary_data.conditions;
+else
+    psa=ParamSpaceAnalysis2.from_dir(tau_dir); conds=psa.conditions;
+end
+held=cellfun(@(c)c.name,conds,'UniformOutput',false);
+if isempty(requested) || ((ischar(requested) || isstring(requested)) && all(strlength(requested)==0))
+    names=held; return
+end
+requested=cellstr(requested);
+names=requested(ismember(requested,held));
 end
 function tf=is_absolute(p)
 tf=startsWith(p,'/') || ~isempty(regexp(p,'^[A-Za-z]:','once'));

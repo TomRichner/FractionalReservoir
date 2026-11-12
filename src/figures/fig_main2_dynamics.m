@@ -1,11 +1,25 @@
-function out=fig_main2_dynamics(run_dir,source_fig_root)
+function out=fig_main2_dynamics(run_dir,source_fig_root,conditions)
 % FIG_MAIN2_DYNAMICS Seven-row dynamics sheet (input step first); no simulation in the plotter.
 % New runs use saved numeric representative_dynamics. Current mu7 archive has
 % only raster artwork: retain its trace pixels under calibrated native axes.
 % Never substitute a different network's native example or invent early LLEs.
+%
+% CONDITIONS (FD-006): one column per condition, in the order of
+% `conditions` (a cell of names; empty = every condition the stage saved, in
+% its order), resolved by select_conditions against the saved results' names,
+% so a name the run lacks is an error. Column titles and colours come from
+% the condition NAME (grouped_condition_label 'sentence', manuscript_style),
+% not from the title the stage saved. N columns keep the three-column pitch
+% (.30 of the three-column width) and the canvas widens with them;
+% out.width_scale is the canvas width relative to the three-column sheet
+% (1 for three columns, whose geometry is unchanged). The archived raster
+% (no numeric stage) holds exactly the three columns of the mu7 run it was
+% calibrated on, no_adaptation / sfa1_std1 / sfa3_std2, and is selected from
+% by the same rule.
 arguments
     run_dir char
     source_fig_root char
+    conditions = {}
 end
 root=fileparts(which('setup_paths'));
 if ~startsWith(source_fig_root,'/') && isempty(regexp(source_fig_root,'^[A-Za-z]:','once'))
@@ -15,7 +29,8 @@ f=fullfile(run_dir,'representative_dynamics','representative_dynamics_data.mat')
 numeric=isfile(f);
 if numeric
     D=load(f); window=D.settings.display_window; source=f;
-    assert(numel(D.results)==3,'fig_main2_dynamics:Conditions','Expected three saved conditions.');
+    [names,cidx]=select_conditions({D.results.name},conditions);
+    D.results=D.results(cidx);
     notes={'Native saved representative trajectories; neuron identity and E/I palettes preserved across state rows.'};
 else
     source=fullfile(source_fig_root,'fig_example_timeseries','fig_example_timeseries.png');
@@ -26,6 +41,8 @@ else
     assert(strcmpi(digest,'22c1371f18ae2938a0e6d7250dc7ee98eeb379e551e3cae4cf6e57a71380e2b9'), ...
         'fig_main2_dynamics:UncalibratedRaster','Raster calibration is valid only for the explicitly verified mu7 source.');
     artwork=imread(source); window=[0 20];
+    % The archived artwork's own columns, left to right (it predates the chain).
+    [names,cidx]=select_conditions({'no_adaptation','sfa1_std1','sfa3_std2'},conditions);
     notes={['Current mu7 source has no native FIG or saved x/SFA/STD trajectories. ' ...
         'Data traces remain raster artwork, calibrated to the original axes; labels/axes/legend/dividers are native. ' ...
         'No data values are digitized, interpolated into new estimates, or borrowed from another stage.'], ...
@@ -39,25 +56,29 @@ else
         'x row maps[-10,10]; rate/synaptic/SFA rows[0,1]; depression[0,1.02]. ' ...
         'LLE tick calibration: pixel5690.5=0,34.6 pixels per inverse second. Raster-coordinate precision is about one source pixel.']};
 end
-fig=figure('Visible','off','Color','w','Position',[40 40 1450 1200]);
+% N columns at the three-column pitch: x positions and widths below are the
+% three-column sheet's, scaled by 1/width_scale, so three columns are exactly
+% the sheet of before and a fourth adds .30 of its width.
+n_col=numel(names); width_scale=1+(n_col-3)*.30; s=1/width_scale;
+fig=figure('Visible','off','Color','w','Position',[40 40 1450*width_scale 1200]);
 % SEVEN rows, (A)-(G): the input step first, the local lambda(t) smoothed
 % by a 2-Hz low-pass, half of the saved neurons in the model's E/I colours
 % (excitatory_colormap / inhibitory_colormap in src/plotting, the palettes SRNNModel2.plot uses; TR, 2026-09-16).
-ax_all=gobjects(7,3);
+ax_all=gobjects(7,n_col);
 rows={'u','x','r','syn','sfa','std','lambda'};
 labels={'Input, $u_i$',{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
     {'Synaptic','output, $\theta_i$'},{'Spike-Frequency','Adaptation'}, ...
     {'Synaptic','Depression'},{'Lyapunov Exp.,','$\lambda_1$'}};
-titles={'No adaptation','Single-timescale adaptation','Multiple-timescale adaptation'};
-st=manuscript_style(); names={'no_adaptation','sfa1_std1','sfa3_std2'};
-for c=1:3
+titles=grouped_condition_label(names,'sentence');
+st=manuscript_style();
+for c=1:n_col
     for j=1:7
-        ax=axes(fig,'Position',[.105+(c-1)*.30 .085+(7-j)*.1225 .245 .092], ...
+        ax=axes(fig,'Position',[(.105+(c-1)*.30)*s .085+(7-j)*.1225 .245*s .092], ...
             'Tag',sprintf('dynamics_r%d_c%d',j,c)); ax_all(j,c)=ax; hold(ax,'on');
         if numeric
             draw_numeric(ax,D.results(c),rows{j});
         else
-            draw_artwork(ax,artwork,j,c);
+            draw_artwork(ax,artwork,j,cidx(c));
         end
         set(ax,'FontSize',14,'LineWidth',1,'Box','off','YDir','normal','XLim',window);
         ax.XAxis.Visible='off';
@@ -90,15 +111,15 @@ if numeric
 else
     tc=SRNNCellTypePairs.type_colors(2); ce=tc(1,:); ci=tc(2,:);
 end
-le=plot(ax_all(2,3),NaN,NaN,'Color',ce,'LineWidth',.5);
-li=plot(ax_all(2,3),NaN,NaN,'Color',ci,'LineWidth',.5);
-legend(ax_all(2,3),[le li],{'E','I'},'FontSize',14,'Box','off','Location','northeast');
+le=plot(ax_all(2,end),NaN,NaN,'Color',ce,'LineWidth',.5);
+li=plot(ax_all(2,end),NaN,NaN,'Color',ci,'LineWidth',.5);
+legend(ax_all(2,end),[le li],{'E','I'},'FontSize',14,'Box','off','Location','northeast');
 % Requested lower-left lambda panel, with explicit data coordinates.
 plot(ax_all(7,1),[5 15],[-4.8 -4.8],'k','LineWidth',4,'Tag','ten_second_bar');
 text(ax_all(7,1),10,-5.6,'10 seconds','FontSize',14,'HorizontalAlignment','center', ...
     'VerticalAlignment','top','Clipping','off','Tag','ten_second_label');
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
-for xpos=[.3775 .6775]
+for xpos=(.3775+(0:n_col-2)*.30)*s
     plot(sep,[xpos xpos],[.07 .945],'Color',[.88 .88 .88],'LineWidth',2.5);
 end
 uistack(sep,'bottom');
@@ -107,7 +128,8 @@ notes{end+1}=['Numeric rendering draws the first half of the saved neurons of ea
     'the colours SRNNModel2.plot uses). Row (A) is the uniform input step. Row (G): the local rate is low-pass filtered at 2 Hz ' ...
     '(2nd-order Butterworth, zero phase) for display only; the finite-time lambda_1 is unfiltered. ' ...
     'The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.'];
-out=struct('figs',fig,'files',{{}},'source',{{source}},'notes',{notes});
+notes{end+1}=sprintf('Columns, left to right: %s (titled and coloured by condition name).',strjoin(names,', '));
+out=struct('figs',fig,'files',{{}},'source',{{source}},'notes',{notes},'width_scale',width_scale);
 end
 function draw_numeric(ax,r,field)
 if strcmp(field,'lambda')
