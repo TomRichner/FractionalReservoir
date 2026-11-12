@@ -168,12 +168,29 @@ tag=sprintf('Fig_Main%d_Grouped',group);
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
+    % Remove this tag's previous outputs first, as save_figure_stable does.
+    for ext={'.png','.fig'}
+        old=fullfile(outdir,[tag ext{1}]);
+        if isfile(old), delete(old); end
+    end
     % PNG plus editable MATLAB figure: local-rate traces make SVG needlessly large.
     drawnow;
-    if ismember(group,[1 2 3 4 5 6 8])
-        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,'Padding',20);
-    else
-        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200);
+    if ismember(group,[1 2 3 4 5 6 8]), pad={'Padding',20}; else, pad={}; end
+    % exportgraphics was seen (2026-11-12, worker session, invisible figures,
+    % 3630 x 1222 monitor layout) to resize the figure to 1313 x 1008 during
+    % every other export, so every other PNG came out on a mostly blank
+    % canvas with small type and the .fig was saved at that size. Not
+    % reproduced at the start of the session; the cause was not found. Detect
+    % the resize, restore the size and export again.
+    pos=fig.Position;
+    for attempt=1:3
+        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,pad{:});
+        if isequal(fig.Position(3:4),pos(3:4)), break; end
+        fig.Position=pos; drawnow;
+        if attempt==3
+            warning('fig_grouped_main:ExportResized', ...
+                'exportgraphics resized %s on every attempt; the PNG may be on the wrong canvas.',tag);
+        end
     end
     savefig(fig,fullfile(outdir,[tag '.fig']));
     out.files=existing_outputs(outdir,tag);
