@@ -48,9 +48,16 @@ function verify_shared_build(esn_array, expected_to_differ, also_check_protected
     % ladders build() draws from it and how many were pushed to the ordering
     % floor), so they differ exactly when tau_a does; comparing them failed
     % every memory-capacity run of a tau_a_spread preset (2026-09-14).
+    % std_clipped is the same kind of thing for the depression spread
+    % (FD-015): how many neurons the chain's ordering rule moved, which
+    % depends on whether the condition's routes are chains. It differs
+    % between a chain condition and any other, and comparing it failed the
+    % first memory-capacity run of a std_spread preset (2026-11-12). The
+    % DRAWS, std_draws and stf_draws, are NOT skipped: every condition of a
+    % trial must have the same ones, or the trial is not paired.
     always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', 'verbose', ...
                    'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
-                   'noise_increments', 'tau_a_matrix', 'tau_a_clipped'};
+                   'noise_increments', 'tau_a_matrix', 'tau_a_clipped', 'std_clipped'};
 
     n_checked = 0;
     n_matched = 0;
