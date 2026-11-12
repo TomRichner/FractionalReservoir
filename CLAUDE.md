@@ -233,7 +233,13 @@ manuscript network at one fifth the size; do not retune them).
 
 Run the ultrarapid tier after every edit to the model, the reservoir or the
 sweep driver; the stages tier before committing a change to a stage or a
-figure; the full tier at milestones. The code is in
+figure; the full tier at milestones. **As of 2026-11-12 the full tier is
+deferred and its reference is stale** (Tom: skip it for now, proceed
+without it, possibly run it overnight from a checkout). The stored
+reference predates the retitled product condition, the spread fields in
+`resolved_defaults` and the stage selection of FD-023, so it gates
+nothing until a run against it has been looked at and the reference
+replaced deliberately; `docs/WORKLOG.md`, entry of 2026-11-12 16:30. The code is in
 `scripts/tests/regression/` and the references in `scripts/tests/fixtures/`
 (force-added). **A reference is replaced only deliberately**: delete the
 fixture, run `make_regression_reference(tier)` from a clean tree, and say in

@@ -34,6 +34,49 @@ Entry template:
 
 ---
 
+## 2026-11-12 16:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: Tom has seen the essential run; the full tier deferred; block B planning next)
+
+**Decision by Tom, 2026-11-12: the full regression tier is skipped for
+now, and the work proceeds without it.** The lead had it owed from Plan A
+step 10 and proposed running it (with the re-capture of its reference,
+about 65 min in the desktop MATLAB) before block B is planned. Tom: "I'd
+like you to skip the full tier. We can have that run overnight
+potentially by doing a checkout of the current commit. I want to proceed
+without it for now." The quick suite and the stages tier are run instead
+(about 13 min).
+
+What that leaves, so a later session knows:
+- **The full reference is stale and gates nothing until it is
+  re-captured.** `scripts/tests/fixtures/` holds the one captured after
+  the refactor (`cc51085`). Since then the product condition was
+  retitled, `resolved_defaults` gained the spread fields, and the entry
+  point gained the stage selection. A full-tier run against it is
+  expected to report those differences; they are to be looked at once,
+  then the reference replaced deliberately.
+- **Not confirmed by any run:** that a bundle which selects no stages
+  makes the same calls and the same `run_manifest` as before FD-023. It
+  holds by construction (the builder's and the lead's reading).
+- **To run it later, as Tom suggested:** check out the commit this entry
+  is made at (`d9cd4cf` plus this entry's own commit; see the commit
+  message) in a separate worktree, `pool_set(N)` in a MATLAB that is
+  free for an hour, `regression_check('tag', '<name>')` launched through
+  a timer with a plain function handle (CLAUDE.md, "Launching a long run
+  through a timer"), and read `data/regression_fast/<name>.result.txt`.
+  No date is set for it.
+
+**Also in this stretch** (after the 14:00 entry): three example scripts
+with their own folders under `scripts/examples/` (`62d4ea4`, `1423a1f`,
+`dbca1ce`, note `d9cd4cf`); `fig_example_timeseries` gained `lambda_K`
+and `lambda_link` (`4cfcc9c`, its test extended); the timeline updated
+(`fb838eb`).
+
+**Verified:** see the commit that follows this entry for the quick suite
+and the stages tier on main.
+
+**Next:** plan block B with Tom. Before that or beside it: the Plan A
+section 10 checklist, the to-do checkboxes, FD-007's closing line, a
+timeline update.
+
 ## 2026-11-12 14:00 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block A built; the essential run made; waiting to look at it with Tom)
 
 **Tom's instructions during this stretch** (all in CLAUDE.md, the to-do
