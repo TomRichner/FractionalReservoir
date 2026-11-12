@@ -243,8 +243,23 @@ model's arithmetic.
 
 ### FD-007 Chain presets and conditions
 
-- **Status:** in progress (briefed to `matlab-opus-2`, Plan A step 3).
-  **Decisions by the lead in the brief:**
+- **Status:** presets, name maps and config merged (`0df8b63`, `82d2e7a`,
+  merge `257e4f1`; stages reference re-captured `67de9b5`; quick 58 of 58
+  on merged main). Open until the bundle has run at `fast` with both
+  figure sets (Plan A step 6) and `std_spread` is set in the preset
+  (after FD-015).
+  **Decisions by the lead:**
+  5. **A preliminary `fast` run of the bundle's analyses is made now**,
+     ahead of the final one of Plan A step 6, by a worker
+     (`matlab-opus-3`) in its own checkout. Two reasons: the display
+     workers of step 4 need a real four-condition run to build figures
+     against, and several stages were written for product depression and
+     may fail or silently skip the chain condition, which is better found
+     now than at the end. It runs in a worker's checkout, not the main
+     one, because a run from the main checkout blocks every merge for its
+     duration. It does not replace step 6: the presets change again when
+     the spread is set, and the final run is the lead's, on the whole
+     machine. Cost: one extra `fast` run.
   1. The bundle is named `mu7chain`: `scripts/paper/mu7chain_config.m`
      and `mu7chain_run.m`, run directory `data/mu7chain_<run_mode>`,
      figure roots `figs/mu7chain_<run_mode>_3cond` and `_4cond`. The
