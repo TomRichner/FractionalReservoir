@@ -152,7 +152,7 @@ model's arithmetic.
 
 ### FD-004 Chained-pool depression in `SRNNCellTypePairs`
 
-- **Status:** open (decision made, implementation to be planned)
+- **Status:** in progress (step 1 briefed to `matlab-fable-1`, with FD-005)
 - **Serves:** block A
 - **What:** add the chained vesicle-pool model as an opt-in per route beside
   the current product, which stays the default and gives the same numbers
