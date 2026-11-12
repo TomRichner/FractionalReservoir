@@ -84,7 +84,9 @@ record of reasoning** (see "Scope" above).
 `Plan_Timeline.md` and a static page with an estimated Gantt chart of the
 high-level steps, at 15-minute resolution, every step of block A and
 blocks B, C and D roughly. Each task has a code, `<stage>_<step>_<kind>`
-with P for Plan, B for Build, T for Test (`A_0c_T`, `B_3_B`, `C_0_P`).
+with P for Plan, B for Build, T for Test (`A_0c_T`, `B_3_B`, `C_0_P`) and
+U for waiting on the user, or the user having a conversation before
+anything proceeds.
 **It is for visibility only.** Tom: "I don't want any calendar target
 dates. I just want estimates to aid in planning. I am not shooting for a
 specific done datetime. ... Agents which are building or testing are not
