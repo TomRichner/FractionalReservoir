@@ -306,9 +306,12 @@ model's arithmetic.
 
 - **Status:** presets, name maps and config merged (`0df8b63`, `82d2e7a`,
   merge `257e4f1`; stages reference re-captured `67de9b5`; quick 58 of 58
-  on merged main). Open until the bundle has run at `fast` with both
-  figure sets (Plan A step 6) and `std_spread` is set in the preset
-  (after FD-015).
+  on merged main). `std_spread = [0.25 0.25]` set in the preset and the
+  preset fixture regenerated (`fd1fb99`, 2026-11-12). Open until the
+  bundle has run at `fast` with both figure sets (Plan A step 6).
+  **Hold (Tom, 2026-11-12):** the `fast` run is not started until Tom has
+  looked at example time series run interactively and has had the chance
+  to hand-tune the connectivity.
   **Decisions by the lead:**
   5. **A preliminary `fast` run of the bundle's analyses is made now**,
      ahead of the final one of Plan A step 6, by a worker
@@ -362,8 +365,9 @@ model's arithmetic.
   parameters"). Allowed on all three kinds of route: chain, one-component
   and multi-component product (Tom, 2026-11-11). Set in the
   preset, not in a condition (Tom, 2026-11-11). Built after chained
-  facilitation, so it also covers `stf_spread`. **In progress** (briefed
-  to `matlab-fable-1`, the last step on the model lane).
+  facilitation, so it also covers `stf_spread`. **Done 2026-11-12**
+  (`matlab-fable-1`, `6a0129f`..`6d95077`, merge `b466a98`; spacing fix
+  `1a51e91`).
   **Decisions by the lead in the brief:**
   1. *The ordering rule on a chain route moves the reserve refill only.*
      Plan A 4.3 copies the SFA rule: where a neuron's two refill times
@@ -391,7 +395,21 @@ model's arithmetic.
      asked for the chain's exact reference "with and without the
      spread"). Adding cases to `rapid_chain` means replacing its
      reference deliberately; the condition is that every existing leaf
-     is unchanged.
+     is unchanged. **The mutation checks went beyond what step 9 asked**
+     (57 mutations, run twice, about two hours); Tom narrowed the rule
+     the same day (`CLAUDE.md`, "When to run mutation checks", `89ce3d4`).
+  **Decisions by the lead on the worker's report:**
+  5. *The ordering rule acts only where the nominal reserve is the slower
+     pool* (`tau_rec2 > tau_rec1`); with no nominal span nothing is
+     moved. The brief did not cover that case. Accepted.
+  6. *A spread switched on after `build()` compiles to the nominal values
+     without a message* until `build()` is called again, as the SFA
+     ladder's spread does; changing `n` or `f` after build raises
+     `StaleSpreadDraws`. Accepted as the class's convention.
+  7. *The exact chain tier takes about 45 s* (30 before). Accepted.
+  8. *A superseded 11.6 MB fixture stays in history* (`0daf9d0`); the
+     worker's hashes are cited in its note and commits, so the branch was
+     merged as it stood.
 - **Serves:** block A
 - **What:** a per-neuron log-normal spread on the chain's time constants
   (releasable-pool refill and release, reserve refill) and on the reserve
@@ -413,7 +431,33 @@ model's arithmetic.
   Jacobian product pass their tests with a nonzero spread; the regression
   gates pass for existing presets.
 - **Depends on:** FD-004, FD-005, FD-018.
-- **Result:** _(pending)_
+- **Result:** `std_spread`, `stf_spread` (1 x C by presynaptic type,
+  default zeros), `std_seed`, `stf_seed`; read-only `std_draws`,
+  `stf_draws`, `std_clipped`. The drawn values enter through each route
+  model's `compile` and nowhere else; `dynamics_fast`,
+  `compute_Jacobian_fast` and `jacobian_times` are untouched. Tolerance
+  suite `spread` (`regression_tol_spread.mat`, 11.6 MB,
+  `test_regression_tolerance_spread`); spread cases in the exact chain
+  tier, whose reference was replaced with its 834 existing leaves
+  unchanged and 957 added (the lead compared the old and new fixtures:
+  `extra` rows only); `test_std_spread` (34 checks).
+  **Lead's gates on merged main:** the anchor passes; `chain`,
+  `stf_chain` and `spread` pass at rtol 0 (the lead's MATLAB reproduces
+  the worker's references bit for bit); quick 69 of 69, which includes
+  both exact rapid tiers; the stages tier exact.
+  **The worker's record at n = 500, seed [1 2], 10 s:** with the spread
+  λ1 moved from +0.160 to +0.111 (1TS), from -0.142 to +0.071 (chain) and
+  from -0.142 to -0.141 (product); one short window on one seed, not a
+  result. The chain's ordering rule moved 6 E and 8 I neurons of 250.
+  Timing ratios against the pre-edit code 0.92 to 1.06.
+  **Reported by the worker, not fixed** (for Tom): the RNG restore after
+  the setpoint draw and after the SFA-ladder draw is unobservable to
+  their tests (the stock input generator reseeds the stream), as the
+  spread's was before one network of its suite got an unseeded
+  generator; `assert_route_redundancy` compares configuration only, so a
+  route reading another neuron's draws would pass it; the `'twister'` pin
+  cannot be tested in the client; `pick_pool_states` builds its made
+  states from the nominal ceiling.
 
 ### FD-016 A seed for the joint parameter-space sample
 
