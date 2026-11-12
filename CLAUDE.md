@@ -173,8 +173,12 @@ no number** (the pool module, configs, figures, plumbing). They cannot
 gate a rewrite of the model's arithmetic, where a reordered expression
 changes the last bit, and a tolerance cannot be applied to their chaotic
 trajectories. For that there is a **tolerance tier** (FD-020, Plan A
-sections 2 and 6; built 2026-11-11, its tolerances still proposed until
-the mutation checks of step 0c fix them):
+sections 2 and 6; built 2026-11-11). **Its tolerances are fixed** (Tom,
+2026-11-11) after the mutation checks: 55 deliberate errors in the model
+and reservoir classes, every one caught by compared values
+(`docs/notes/Tolerance_tier_mutation_checks_2026-11-11.md`; the harness
+is `regression_tol_mutate`, and the list is rewritten and re-run for the
+refactored code and for each new route model):
 
 | Run it with | Time | What it covers |
 |---|---|---|
