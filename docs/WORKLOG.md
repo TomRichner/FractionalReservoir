@@ -70,8 +70,11 @@ with their own folders under `scripts/examples/` (`62d4ea4`, `1423a1f`,
 and `lambda_link` (`4cfcc9c`, its test extended); the timeline updated
 (`fb838eb`).
 
-**Verified:** see the commit that follows this entry for the quick suite
-and the stages tier on main.
+**Verified (lead's MATLAB, code at `d9cd4cf`, 6 pool workers):** quick
+suite 71 of 71 (673 s), which includes both ultrarapid tiers and the
+four tolerance suites; stages tier exact (123 s). These cover everything
+merged since `b466a98`: the spread in the preset, the changes to
+`fig_example_timeseries`, and FD-023.
 
 **Next:** plan block B with Tom. Before that or beside it: the Plan A
 section 10 checklist, the to-do checkboxes, FD-007's closing line, a
