@@ -273,9 +273,7 @@ model's arithmetic.
 
 ### FD-017 One place for the parallel pool: `pool_*` functions and a session allocation
 
-- **Status:** in progress (briefed to `matlab-fable-1`, Plan A step 0a;
-  decided by Tom 2026-11-11). **First job, before Plan A
-  step 1**: no worker should run a sweep or a stage until it exists.
+- **Status:** done (2026-11-11; Plan A step 0a).
 - **Serves:** every block; the multi-agent working arrangement
 - **What:** a small module in `src/util/` through which all pool handling
   goes, so that no code opens the default profile or a hard-coded size.
@@ -337,11 +335,28 @@ model's arithmetic.
   lists two concurrent sessions correctly; the stages and full regression
   tiers pass unchanged (pool handling must not move a number).
 - **Depends on:** nothing.
-- **Result:** _(pending)_
+- **Result:** commit `ce771b7` (worker `matlab-fable-1`), merged as
+  `ff0bd02`. `src/util/pool_{set,ensure,restart,release,status}.m` with
+  `pool_config` and `pool_registry` behind them; `restart_parpool`
+  deleted; the only `parpool(` call left is in `pool_ensure`. On merged
+  main: quick 53 of 53; `test_pool_module` pass (slow list, about 50 s);
+  two sessions listed correctly by `pool_status` (lead 10, worker 2);
+  stages tier pass with `settings.n_workers` ignored; **the analysis half
+  of the full tier (tag `fd017`, 38 min on 9 workers, run after FD-016
+  was merged too) shows no value difference**: one row, the file
+  `memory_capacity/working_changes.patch`, which is in the reference only
+  because that stage of the reference run was made with uncommitted
+  changes in the tree (its `git_provenance.txt` says `dirty: true`; the
+  patch is empty). The figure half was not run, by agreement with Tom: the
+  module changes no figure code beyond the refusal `test_pool_module`
+  covers. Found on the way, and now in `CLAUDE.md`: serial runs differ
+  from pool runs at round-off; `settings.n_workers` is a compared leaf
+  captured at 14. Not tested: the non-Windows paths.
 
 ### FD-018 Chained facilitation, after chained depression
 
-- **Status:** open (decided by Tom 2026-11-11; design to be confirmed)
+- **Status:** open (decided by Tom 2026-11-11; design written and reviewed,
+  Plan A section 4.6; parameter values chosen)
 - **Serves:** a later paper. **Facilitation does not appear in this one.**
   Built now so the model does not have to be refactored twice.
 - **What:** the release-coupled, serial form: option C (section 5) of
