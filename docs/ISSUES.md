@@ -385,11 +385,9 @@ model's arithmetic.
 
 ### FD-020 Tolerance regression tier
 
-- **Status:** in progress. Steps 0b and 0c are merged and **Tom fixed the
-  tolerances as proposed (2026-11-11)**. One job remains before the model
-  class is touched: two cases added to the anchor (see Result). Acceptance
-  test agreed with Tom in the execution plan; Plan A sections 2.2 and
-  7.3, steps 0b and 0c.
+- **Status:** done (2026-11-11). Steps 0b and 0c are merged and **Tom
+  fixed the tolerances as proposed**. Acceptance test agreed with Tom in
+  the execution plan; Plan A sections 2.2 and 7.3, steps 0b and 0c.
 - **Serves:** block A; every later edit to the model's arithmetic
 - **What:** in `scripts/tests/regression/`: `regression_tol_run` (builds
   the cases, returns raw arrays), `regression_tol_compare` (element-wise;
@@ -440,24 +438,28 @@ model's arithmetic.
   minute; fixture size reported (target under about 20 MB, sparse
   Jacobians).
 - **Depends on:** FD-017. Comes before any edit to the model class.
-- **Result (so far):** step 0b `85bda9b`, `222a43c`, `6eeb904`, `dfc5da2`
+- **Result:** step 0b `85bda9b`, `222a43c`, `6eeb904`, `dfc5da2`
   (merged `4dc3d84`): the tier, two stable presets, the anchor (8.7 MB,
   2370 leaves, from model-class blob `2b0118d4`); the lead's capture on
   merged main is bit-identical to it. Step 0c `988feae` (merged
   `24e515b`): 55 mutations, all caught by compared values; note
   `docs/notes/Tolerance_tier_mutation_checks_2026-11-11.md`. Tolerances
   fixed by Tom as proposed: pointwise 1e-12, stable 1e-9, QR 1e-5, memory
-  capacity 1e-6, finite-difference Jacobian 1e-7. **Still to do, briefed:**
-  the two thin spots the mutation checks found are closed while the model
-  class is still untouched (the last moment an anchor case can be added):
-  a direct witness of the reservoir's state trajectory, and a second
-  witness of the assembled Jacobian's facilitation and geomean blocks;
-  then the anchor is re-captured and every mutation re-run.
+  capacity 1e-6, finite-difference Jacobian 1e-7. **Left as they are, by
+  Tom's decision:** the two thin spots the mutation checks found. The
+  reservoir class is guarded only by memory capacity (at 1e-6), and the
+  assembled Jacobian's facilitation and geomean blocks have one witness,
+  the stored pointwise Jacobian. The lead proposed adding anchor cases
+  for both before the refactor; Tom did not take that up and said to
+  proceed to step 0d. (The lead misread "proceed" as approval and started
+  a worker on it; the worker was stopped with nothing committed.) Both
+  are recorded in the note's "thin spots". An anchor case can no longer
+  be added from the untouched model class once step 0d merges.
 
 ### FD-021 Refactor behind one route interface
 
-- **Status:** open (interface design approved by Tom; Plan A sections 2.1
-  and 4.0, step 0d)
+- **Status:** in progress (step 0d briefed to `matlab-fable-1`; interface
+  design approved by Tom; Plan A sections 2.1 and 4.0)
 - **Serves:** block A
 - **What:** product depression and today's facilitation move behind the
   route interface of Plan A section 4.0, as `src/model/routes/route_product`
