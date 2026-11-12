@@ -48,6 +48,16 @@ function out = fig_example_timeseries(cfg)
 % given, resolved by select_conditions against the preset's conditions;
 % only the selected conditions are simulated. Give one or the other.
 %
+% cfg.model_args (2026-11-12) is a cell of name-value pairs handed to
+% build_from_preset after this figure's own settings, so they override the
+% preset for every condition drawn. It is for looking at a network
+% interactively before a long run (another mu_tilde_relative, a stimulus
+% in place of the preset's none) without adding a preset for each try:
+%   fig_example_timeseries('preset_name', p, 'save', false, ...
+%       'model_args', {'mu_tilde_relative', [6 -6; 6 -6]})
+% Empty, the default, changes nothing. A figure made with it is not the
+% preset's network; the registry never sets it.
+%
 % See also: paper_config, srnn_param_preset, SRNNCellTypePairs,
 %           plot_local_and_finite_lle, fig_lyapunov_spectrum
 
@@ -64,6 +74,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''      % unused; accepted for a uniform call
     cfg.conditions                = {}      % names to draw, in order; empty = all the preset holds (select_conditions)
+    cfg.model_args  (1,:) cell    = {}      % name-value overrides of the preset, for interactive looks (header)
 end
 
 setup_paths();
@@ -96,7 +107,7 @@ for i = 1:n_cond
         'rng_seeds', cfg.rng_seeds, 'T_range', cfg.T_range, 'fs', 400, ...
         'lya_method', 'topk', 'lya_K', 15, 'lya_K_auto', false, 'lya_dt', 0.05, ...
         'lya_T_interval', lya_T_interval, 'lya_warmup', min(5, T / 4), ...
-        'verbose', cfg.verbose);
+        'verbose', cfg.verbose, cfg.model_args{:});
     models{i}.run();
     vprintf(cfg.verbose, 'verbose', '  [example_timeseries] %-14s lambda_1 = %+.4f\n', ...
         cond_names{i}, models{i}.lya_results.LLE);
