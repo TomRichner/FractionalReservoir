@@ -1229,3 +1229,293 @@ blob restored. After the last, `git status --porcelain` was empty,
 and `run_all_tests('quick')` passed 63 of 63 with a pool of 4, the
 byte-exact `test_regression_rapid` and `test_regression_rapid_chain`
 among them.
+
+# The spread suite: mutation checks on the per-neuron synapse parameters (2026-11-12, FD-015)
+
+`std_spread` and `stf_spread` give each presynaptic neuron its own
+depression and facilitation parameters: `nominal * exp(spread * z)`, a
+ceiling as `1 + (G - 1) * exp(spread * z)`, from one row of standard
+normals per neuron and mechanism, read by every route of the neuron from
+fixed columns (`route_model`, "THE SPREAD"). None of the three earlier
+references holds a spread, so they say "with no spread nothing moved"
+and nothing about the spread. This section records what the suite built
+for it was shown to catch, and that the chain and stf_chain suites still
+catch what they caught.
+
+- Code under test: commit `c3d79b1`. `src/model/SRNNCellTypePairs.m` at
+  blob `d9b10f8`, `route_pool.m` at `cf3bde3`, `route_product.m` at
+  `1c91662`, `route_model.m` at `de85505`.
+- The suite: `regression_tol_run(ref, 'spread')`, reference
+  `scripts/tests/fixtures/regression_tol_spread.mat` (11.6 MB, 14
+  threads), run with `regression_tol_check('spread')`. 3641 leaves, 2778
+  of them floating point: 2036 pointwise, 742 stable. Three networks:
+  `schain`, the regression network with four chain routes and
+  `std_spread [0.25 0.25]` (what the manuscript's preset will set), with
+  and without the staircase, noise off and on, and its stable twin;
+  `smixed`, four cell types with a spread on every kind of route (chain,
+  single pool, one and two product components, the geometric mean, `g`
+  with and without `h`, output-only facilitation with one and two
+  components), `std_spread [0.25 0.4 0 0.3]` and `stf_spread
+  [0.3 0 0.25 0.15]`, so the spreads differ between types and each
+  mechanism has a type with none; and `sfloor`, product routes with the
+  zero floor, whose `p_min` is then per neuron, fed by an input
+  generator that does not seed the random stream. The view of a case
+  holds the draws, `std_clipped`, and per route the value each neuron has
+  of every parameter, whom the ordering rule moved, and the route's
+  `jittered` flag. The ordering rule acts in `schain` at n = 100 (two E
+  and two I neurons), in its stable twin (one) and in `smixed` (two PV,
+  one VIP). The tolerances are the tier's, unchanged; no override was
+  added; `std_clipped` joined `tau_a_clipped` on the discrete list.
+- The list: `regression_tol_mutations_spread`, 57 one-site errors, and
+  its leaf groups.
+- To repeat: `regression_tol_mutate(regression_tol_mutations_spread(),
+  'reference', 'spread', 'groups',
+  regression_tol_mutations_spread('groups'))`, a median of 20 s per
+  mutation (68 s at most) with one other MATLAB session running; it was
+  run in three parts with `save_dir`.
+- Background: the unmutated code matches the reference **exactly**
+  (`'rtol', 0`: no leaf moved), so a factor below is all mutation.
+
+## Result for the spread
+
+**All 57 mutations fail the suite, and every one fails by compared
+values.** One of them also had cases that threw.
+
+| | Mutations |
+|---|---|
+| Run | 57 |
+| Caught | 57 |
+| Caught by compared values | 57 |
+| Caught only by a thrown case | 0 |
+| Had a case that threw | 1 (`class_std_rows_wrong_type`, 9 cases, beside the `schain` cases failing by value) |
+| Caught by the pointwise layer | 57 |
+| Caught by the stable layer | 52 |
+| Caught ONLY by the pointwise layer | 5 (`pool_jittered_false`, `product_jittered_std_only`, `class_route_fields_post_spread`, `class_route_fields_stf_everywhere`, `class_params_std_spread_is_stf`: flags and reported spreads that no arithmetic reads) |
+| Caught ONLY by the stable layer | 0 |
+| Caught ONLY by overridden leaves | 0 |
+| Made an exact (discrete, logical or text) leaf change | 45 |
+
+**It was 56 of 57 on the first pass.** `class_rng_not_restored` (the
+global random stream not put back after the draws) passed every case.
+See "What the first pass found" below: the suite was changed, the
+mutation was not dropped.
+
+## Every spread mutation
+
+Pointwise and stable: the number of leaves failing or missing, and the
+weakest / strongest factor by which a failing float leaf exceeded its
+tolerance ("-" where only exact leaves failed, or a leaf that is zero in
+the reference became nonzero). The last column says which kinds of leaf
+saw the error, with counts: `pw_realised` the per-neuron values in the
+view, `pw_clipped` the ordering rule's counts and flags, `pw_draws` the
+standard normals, `pw_route_fields` what `route_fields` reports, `st_*`
+the stable layer's groups, `ov_*` the overridden groups. What each one
+is: the `what` field of the list.
+
+| Mutation | Pointwise | weakest / strongest | Stable | weakest / strongest | Exact leaf changed | Caught by | Cases that threw | Leaves that saw it |
+|---|---|---|---|---|---|---|---|---|
+| `pool_col_tau_rec1` | 191 | 2.7e9 / 1.1e12 | 388 | 1.3e3 / 1.6e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_realised 74, pw_dS 9, pw_J 99, pw_JY 9, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 72, st_gain 12, st_benettin 6, st_sweep 96 |
+| `pool_col_tau_rel` | 162 | 9.1e9 / 6.9e11 | 389 | 1.7e3 / 9.2e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_realised 45, pw_dS 9, pw_J 99, pw_JY 9, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 73, st_gain 12, st_benettin 6, st_sweep 96 |
+| `pool_col_tau_rec2` | 156 | 1.5e9 / 7.1e11 | 389 | 5e2 / 6.5e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_realised 39, pw_dS 9, pw_J 99, pw_JY 9, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 73, st_gain 12, st_benettin 6, st_sweep 96 |
+| `pool_col_n2` | 156 | 1.4e9 / 7.1e11 | 388 | 7e2 / 1.2e11 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_realised 39, pw_dS 9, pw_J 99, pw_JY 9, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 72, st_gain 12, st_benettin 6, st_sweep 96 |
+| `pool_col_tau_dec` | 57 | 1e10 / 8.3e11 | 204 | 1.7e3 / 1.4e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 18, pw_dS 3, pw_J 33, pw_JY 3, st_trajectory 104, st_std_factor 26, st_stf_factor 22, st_topk 38, st_gain 6, st_benettin 3 |
+| `pool_col_tau_fac` | 57 | 2.4e11 / 7.4e11 | 204 | 1.9e3 / 1.2e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 18, pw_dS 3, pw_J 33, pw_JY 3, st_trajectory 104, st_std_factor 26, st_stf_factor 22, st_topk 38, st_gain 6, st_benettin 3 |
+| `pool_col_G` | 54 | 1.4e11 / 1.2e12 | 204 | 1.2e3 / 1.3e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 15, pw_dS 3, pw_J 33, pw_JY 3, st_trajectory 104, st_std_factor 26, st_stf_factor 22, st_topk 38, st_gain 6, st_benettin 3 |
+| `pool_col_tau_h` | 48 | 1.3e11 / 5.1e11 | 204 | 1.8e4 / 8.1e8 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 9, pw_dS 3, pw_J 33, pw_JY 3, st_trajectory 104, st_std_factor 26, st_stf_factor 22, st_topk 38, st_gain 6, st_benettin 3 |
+| `pool_std_sigma_1e-6` | 285 | 1.8e4 / 1e6 | 355 | 1 / 2e4 | no | values | 0 | ov_fd_jacobian 1, pw_realised 168, pw_dS 9, pw_J 99, pw_JY 9, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 63, st_gain 9, st_benettin 4, st_sweep 88 |
+| `pool_stf_sigma_1e-6` | 99 | 8.2e4 / 8.9e5 | 194 | 1.3 / 3.3e3 | no | values | 0 | ov_fd_jacobian 1, pw_realised 60, pw_dS 3, pw_J 33, pw_JY 3, st_trajectory 102, st_std_factor 26, st_stf_factor 20, st_topk 36, st_gain 6, st_benettin 3 |
+| `pool_G_not_excess` | 57 | 2.9e10 / 3.9e11 | 206 | 2.5e3 / 4.1e8 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 18, pw_dS 3, pw_J 33, pw_JY 3, st_trajectory 106, st_std_factor 26, st_stf_factor 24, st_topk 36, st_gain 6, st_benettin 3 |
+| `pool_floor_omitted` | 184 | 2e8 / 3.5e11 | 330 | 2.9 / 1.8e9 | yes | values | 0 | ov_fd_jacobian 2, ov_mc 2, pw_clipped 38, pw_realised 29, pw_dS 9, pw_J 99, pw_JY 9, st_clipped 4, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 72, st_gain 12, st_sweep 48 |
+| `pool_floor_half_span` | 192 | 3.2e8 / 1.5e11 | 377 | 1e3 / 8.2e9 | yes | values | 0 | ov_fd_jacobian 2, ov_mc 2, pw_clipped 39, pw_realised 36, pw_dS 9, pw_J 99, pw_JY 9, st_clipped 4, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 71, st_gain 12, st_sweep 96 |
+| `pool_floor_wrong_columns` | 192 | 9e8 / 2.9e11 | 352 | 4.5e2 / 2.9e9 | yes | values | 0 | ov_fd_jacobian 2, pw_clipped 42, pw_realised 33, pw_dS 9, pw_J 99, pw_JY 9, st_clipped 4, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 72, st_gain 12, st_sweep 72 |
+| `pool_floor_symmetric` | 175 | 1.7e8 / 3.4e11 | 326 | 12 / 9.2e8 | yes | values | 0 | ov_fd_jacobian 2, ov_mc 2, pw_realised 58, pw_dS 9, pw_J 99, pw_JY 9, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 72, st_gain 12, st_sweep 48 |
+| `pool_floor_moves_tau_rec1` | 175 | 3.3e8 / 5.7e11 | 326 | 24 / 2.4e9 | yes | values | 0 | ov_fd_jacobian 2, ov_mc 2, pw_realised 58, pw_dS 9, pw_J 99, pw_JY 9, st_trajectory 134, st_std_factor 34, st_stf_factor 22, st_topk 72, st_gain 12, st_sweep 48 |
+| `pool_clipped_not_recorded` | 38 | - | 4 | - | yes | values | 0 | pw_clipped 38, st_clipped 4 |
+| `pool_jittered_false` | 51 | - | 0 | - | yes | values | 0 | pw_realised 51 |
+| `pool_linearize_nominal_tau_rel` | 36 | 7.2e9 / 3.3e11 | 46 | 1.8e3 / 7.9e8 | yes | values | 0 | ov_qr 4, pw_J 33, pw_JY 3, st_topk 38, st_gain 4 |
+| `pool_linearize_nominal_tau_rec2` | 108 | 8.6e8 / 1.4e10 | 168 | 14 / 3.9e10 | yes | values | 0 | ov_qr 8, pw_J 99, pw_JY 9, st_topk 72, st_gain 8, st_sweep 80 |
+| `product_col_tau_rec` | 80 | 1.8e10 / 8.6e11 | 299 | 1.7e3 / 1.3e10 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 24, pw_dS 4, pw_J 42, pw_JY 4, pw_rate_theta 3, pw_std_factor 3, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 55, st_gain 6, st_benettin 3, st_sweep 48 |
+| `product_col_tau_rel` | 80 | 1.9e10 / 9.5e11 | 300 | 1.2e3 / 1.9e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 24, pw_dS 4, pw_J 42, pw_JY 4, pw_rate_theta 3, pw_std_factor 3, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3, st_sweep 48 |
+| `product_col_second_component` | 82 | 1.1e10 / 8.6e11 | 252 | 8.5e2 / 1.3e10 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 30, pw_dS 4, pw_J 42, pw_JY 4, pw_rate_theta 1, pw_std_factor 1, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `product_col_tau_dec` | 62 | 3.8e10 / 3.1e11 | 250 | 2.4e3 / 3.6e8 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 12, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 54, st_gain 6, st_benettin 3 |
+| `product_col_tau_fac` | 62 | 2.5e10 / 4.4e11 | 251 | 3.4e3 / 1.2e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 12, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 55, st_gain 6, st_benettin 3 |
+| `product_col_G` | 62 | 1.3e10 / 2.6e11 | 250 | 2.1e2 / 1.6e8 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 12, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 54, st_gain 6, st_benettin 3 |
+| `product_std_sigma_1e-6` | 92 | 1.6e4 / 8.8e5 | 235 | 1 / 4.2e3 | no | values | 0 | pw_realised 36, pw_dS 4, pw_J 42, pw_JY 4, pw_rate_theta 3, pw_std_factor 3, st_trajectory 107, st_std_factor 23, st_stf_factor 16, st_topk 45, st_benettin 3, st_sweep 41 |
+| `product_stf_sigma_1e-6` | 86 | 3e4 / 7.9e5 | 183 | 1 / 3.8e2 | no | values | 0 | ov_fd_jacobian 1, pw_realised 36, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 108, st_std_factor 23, st_stf_factor 17, st_topk 30, st_gain 1, st_benettin 3 |
+| `product_G_not_excess` | 62 | 1.8e10 / 4e11 | 251 | 2.2e3 / 1.2e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 12, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 55, st_gain 6, st_benettin 3 |
+| `product_jittered_std_only` | 5 | - | 0 | - | yes | values | 0 | pw_realised 5 |
+| `product_p_min_nominal` | 29 | 1.8e10 / 5.4e11 | 48 | 6.6e5 / 3e8 | no | values | 0 | pw_realised 12, pw_dS 1, pw_J 9, pw_JY 1, pw_rate_theta 3, pw_std_factor 3, st_trajectory 24, st_std_factor 3, st_stf_factor 3, st_topk 18 |
+| `product_p_min_first_neuron` | 16 | 3e10 / 2.6e11 | 48 | 5.2e4 / 2.5e8 | no | values | 0 | pw_dS 1, pw_J 8, pw_JY 1, pw_rate_theta 3, pw_std_factor 3, st_trajectory 24, st_std_factor 3, st_stf_factor 3, st_topk 18 |
+| `class_std_sigma_wrong_type` | 180 | 1.4e10 / 6.4e11 | 254 | 3.9e3 / 1.2e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_clipped 12, pw_realised 114, pw_dS 4, pw_J 42, pw_JY 4, pw_rate_theta 2, pw_std_factor 2, st_clipped 2, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `class_stf_sigma_wrong_type` | 152 | 3.7e10 / 1e12 | 252 | 1.8e3 / 1.2e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 102, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `class_std_rows_wrong_type` | 2020 | 4.5e10 / 7.7e11 | 646 | 5.2e3 / 2.2e10 | yes | values | 9 | ov_orth_defect 6, ov_fd_jacobian 2, ov_qr 11, ov_mc 2, pw_draws 8, pw_clipped 63, pw_realised 411, pw_route_fields 1137, pw_view 75, pw_dS 10, pw_J 112, pw_JY 10, pw_rate_theta 72, pw_std_factor 57, pw_stf_factor 57, pw_other 8, st_clipped 5, st_trajectory 215, st_std_factor 49, st_stf_factor 41, st_topk 159, st_gain 51, st_benettin 9, st_sweep 96 |
+| `class_std_rows_reversed` | 367 | 2.4e10 / 6.6e11 | 438 | 2.9e3 / 5.3e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_clipped 29, pw_realised 204, pw_dS 10, pw_J 108, pw_JY 10, pw_rate_theta 3, pw_std_factor 3, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 92, st_gain 12, st_benettin 6, st_sweep 96 |
+| `class_stf_rows_reversed` | 146 | 8.5e9 / 1e12 | 252 | 1.8e3 / 1.2e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 96, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `class_std_sigma_1e-6` | 338 | 1.8e4 / 1e6 | 406 | 1.4 / 2e4 | no | values | 0 | ov_fd_jacobian 1, pw_realised 204, pw_dS 10, pw_J 108, pw_JY 10, pw_rate_theta 3, pw_std_factor 3, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 82, st_gain 9, st_benettin 6, st_sweep 88 |
+| `class_stf_sigma_1e-6` | 146 | 3.5e4 / 8.9e5 | 243 | 1.8 / 3.3e3 | no | values | 0 | ov_fd_jacobian 1, pw_realised 96, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 51, st_gain 6, st_benettin 3 |
+| `class_std_route_redraws` | 277 | 2.3e10 / 7.6e11 | 442 | 3.3e3 / 1.9e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_clipped 25, pw_realised 120, pw_dS 10, pw_J 108, pw_JY 10, pw_rate_theta 2, pw_std_factor 2, st_clipped 4, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 92, st_gain 12, st_benettin 6, st_sweep 96 |
+| `class_stf_route_redraws` | 134 | 6.7e10 / 1.6e12 | 252 | 1.7e3 / 1.7e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 84, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `class_std_columns_1_2_exchanged` | 338 | 2.2e10 / 1.1e12 | 440 | 2.7e3 / 6e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_clipped 42, pw_realised 162, pw_dS 10, pw_J 108, pw_JY 10, pw_rate_theta 3, pw_std_factor 3, st_clipped 4, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 90, st_gain 12, st_benettin 6, st_sweep 96 |
+| `class_stf_columns_3_4_exchanged` | 86 | 6.5e10 / 1.2e12 | 252 | 4.2e4 / 1.1e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_realised 36, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `class_std_seed_is_stf` | 386 | 3.7e10 / 1.4e12 | 442 | 6.4e3 / 8.5e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_draws 10, pw_clipped 38, pw_realised 204, pw_dS 10, pw_J 108, pw_JY 10, pw_rate_theta 3, pw_std_factor 3, st_clipped 4, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 92, st_gain 12, st_benettin 6, st_sweep 96 |
+| `class_stf_seed_is_std` | 150 | 5.7e10 / 1.4e12 | 252 | 4.7e4 / 9.7e8 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_draws 4, pw_realised 96, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `class_std_seed_is_tau_a` | 386 | 4e10 / 1.4e12 | 443 | 1.4e3 / 7.1e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_draws 10, pw_clipped 38, pw_realised 204, pw_dS 10, pw_J 108, pw_JY 10, pw_rate_theta 3, pw_std_factor 3, st_clipped 4, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 93, st_gain 12, st_benettin 6, st_sweep 96 |
+| `class_std_draw_row_major` | 386 | 3.1e10 / 1.5e12 | 442 | 4.1e3 / 1.9e10 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_draws 10, pw_clipped 38, pw_realised 204, pw_dS 10, pw_J 108, pw_JY 10, pw_rate_theta 3, pw_std_factor 3, st_clipped 4, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 92, st_gain 12, st_benettin 6, st_sweep 96 |
+| `class_stf_draw_row_major` | 150 | 7.1e10 / 1.8e12 | 252 | 5.1e4 / 2.3e9 | yes | values | 0 | ov_fd_jacobian 1, ov_qr 4, pw_draws 4, pw_realised 96, pw_dS 4, pw_J 42, pw_JY 4, st_trajectory 128, st_std_factor 29, st_stf_factor 25, st_topk 56, st_gain 6, st_benettin 3 |
+| `class_rng_not_restored` | 1 | 1.5e12 / 1.5e12 | 53 | 1.9e7 / 2.2e9 | yes | values | 0 | pw_dS 1, st_trajectory 28, st_std_factor 3, st_stf_factor 3, st_topk 19 |
+| `class_clipped_counts_routes` | 9 | - | 4 | - | yes | values | 0 | pw_clipped 9, st_clipped 4 |
+| `class_dynamics_nominal` | 10 | 2.7e10 / 9.3e11 | 436 | 2.4e3 / 5.8e9 | yes | values | 0 | ov_fd_jacobian 2, ov_qr 8, ov_mc 2, pw_dS 10, st_trajectory 158, st_std_factor 37, st_stf_factor 25, st_topk 90, st_gain 12, st_benettin 6, st_sweep 96 |
+| `class_jacobian_nominal` | 108 | 5.2e10 / 1.1e12 | 8 | 2.4e3 / 5.4e4 | yes | values | 0 | ov_qr 8, pw_J 108 |
+| `class_jacobian_times_nominal` | 10 | 2.9e10 / 3.8e11 | 178 | 6e4 / 2e10 | yes | values | 0 | pw_JY 10, st_topk 90, st_gain 8, st_sweep 80 |
+| `class_unpack_nominal` | 3 | 1.1e11 / 3.6e11 | 3 | 1.4e8 / 3e8 | no | values | 0 | pw_rate_theta 3, st_trajectory 3 |
+| `class_route_fields_post_spread` | 28 | 1.7e11 / 1e12 | 0 | - | no | values | 0 | pw_route_fields 28 |
+| `class_route_fields_stf_everywhere` | 15 | - | 0 | - | no | values | 0 | pw_route_fields 15 |
+| `class_params_std_spread_is_stf` | 66 | 2e11 / 1e12 | 0 | - | no | values | 0 | pw_route_fields 66 |
+
+## What the spread suite sees, and through which leaves
+
+1. **A quantity reading another quantity's draw column is a gross
+   error**, in either model and for every quantity (the sixteen `_col_`
+   entries and the two exchanged-column entries at the class): the
+   weakest failing pointwise leaf is at 1e9 or above. The view's
+   realised values fail for the quantity that is wrong, and `dS`, `J` and
+   `JY` of every case that has a route of that kind.
+2. **sigma off by 1e-6 is caught at about 1e4 to 1e6 in the pointwise
+   layer** (the realised values at 1e6: a value moves by 1e-6 * sigma *
+   z relative, against 1e-12) and by 180 to 410 stable leaves. **In the
+   stable layer the weakest failing leaf is at a factor of 1 to 2**: the
+   stable tolerance is 1e-9 and such an error moves a trajectory by 1e-7
+   at most, so the stable layer alone would hold this error only just.
+   The pointwise layer is what carries it.
+3. **The ceiling jittered as G and not as G - 1** fails the realised
+   ceilings and everything downstream, in both models (1e10 and above).
+4. **The spread of the wrong type, or the rows of the wrong type's
+   neurons, or a type's rows in reverse order**, each mechanism
+   separately. `class_std_sigma_wrong_type` is invisible in `schain`
+   (both types have 0.25) and caught through `smixed`, which is why its
+   spreads differ between types.
+5. **The draw no longer shared by a neuron's routes** (a route reading
+   other neurons' rows) fails the realised values of every route after
+   the first, `dS`, `J`, `JY` and the stable layer. Note what does NOT
+   catch it: `SRNN_ESN_reservoir.assert_route_redundancy` compares the
+   routes' CONFIGURATION, which is still equal, so the memory-capacity
+   case does not throw; it fails by value (`ov_mc`). The redundancy
+   check rests on "equal configuration and equal draws give equal
+   routes", and it is this suite's realised leaves and
+   `test_std_spread`, check 4, that hold the second half.
+6. **The ordering rule**: omitted, at half the span, testing the wrong
+   columns, pushing symmetrically, lowering `tau_rec1`. All five fail
+   the realised refill times and `dS`, `J`, `JY`; the first three also
+   change who is counted (`pw_clipped`, `st_clipped`). The symmetric
+   push and the one that moves `tau_rec1` leave the counts right and
+   fail the realised `tau_rec1` (58 leaves): that is the leaf that says
+   "the releasable pool's refill is not what the single-timescale
+   condition has". Their weakest stable factor is 12 and 24, and the
+   omitted rule's 2.9, because the rule moves one neuron of the stable
+   `schain` network and three of `smixed`; the pointwise layer has all
+   five at 1e8.
+7. **Bookkeeping that no arithmetic reads is caught by the leaves made
+   for it and nothing else**: whom the rule moved not recorded
+   (`pool_clipped_not_recorded`: 38 pointwise and 4 stable exact
+   leaves), a neuron counted once per route
+   (`class_clipped_counts_routes`: 9 and 4), the `jittered` flag (51 and
+   5 leaves of the view), `route_fields` reporting the postsynaptic
+   type's spread or a spread on a route without the mechanism, and
+   `params.std_spread` holding the wrong row.
+8. **Each routine alone computing with the nominal parameters** is
+   caught through exactly the leaves that routine feeds:
+   `dynamics_fast` through the ten `dS` leaves and 436 stable leaves;
+   `compute_Jacobian_fast` through the 108 `J` leaves and, in the
+   stable layer, only the QR estimator (8 leaves, at 2.4e3 to 5.4e4 of
+   its loose override); `jacobian_times` through the ten `JY` leaves,
+   top-K, the gain and the sweep; the unpacking through the six
+   `synaptic_output` leaves of `sfloor`, the only network whose output
+   factor reads a per-neuron parameter (the zero floor's `p_min`).
+9. **The zero floor's `p_min` from the nominal values, or from the first
+   neuron** (`sfloor` only): 29 and 16 pointwise leaves, 48 stable.
+10. **The seeds and the fill order**: either stream on the other's
+    offset, the depression stream on the SFA ladder's, and the draw
+    filled row by row all fail the draws themselves (`pw_draws`) and
+    everything computed from them.
+
+## What the first pass found
+
+Two holes, both closed in the suite before the reference of this
+section was captured (commit `6c44452`).
+
+1. **Dropping the restore of the global random stream after the draws
+   was not caught by anything**, and `test_std_spread`'s first form of
+   "the RNG state after build() is untouched" would not have caught it
+   either. The cause is not in the spread. The stock input generator
+   seeds the stream itself (`generate_external_input`: `rng(rng_seed)`)
+   and `x0` is drawn after it, so nothing a model produces depends on
+   the state `build_network` leaves behind. **The same holds for the
+   setpoint draw and the SFA-ladder draw**: their tests assert that `W`,
+   the stimulus and `S0` are untouched, which is true whether or not
+   the stream is restored. The restore matters with a custom input
+   generator that does not seed. `sfloor` now has one
+   (`unseeded_staircase`), the mutation fails 54 leaves (`dS` at
+   1.5e12, 53 stable leaves), and `test_std_spread` has a check with
+   such a generator.
+2. **A route's `jittered` flag was in no leaf.** It steers only the row
+   check of the display statics. It is in the view now, with two
+   mutations.
+
+## What the spread suite cannot see, and what is thin
+
+| Not reached | What covers it |
+|---|---|
+| The `'twister'` pin dropped from `rng(seed, 'twister')`. The client's generator is the Mersenne twister already, so nothing changes in the client, where every suite runs. It matters on a parallel worker. | Nothing in this repository runs a tolerance suite on a worker. `test_std_spread` checks the draws against `rng(seed, 'twister'); randn(n, Q)` in the client only. The same is true of `tau_a_seed`. |
+| The row check of `std_route_factor` / `stf_route_factor` (`RouteFactorRows`). The suite hands them whole routes. | `test_std_spread`, check 9. |
+| `steady_state` with per-neuron parameters. No network code calls it. | `test_route_models`, 2g. |
+| `StaleSpreadDraws`, the `SpreadDraws` refusal, the validation of the spreads and seeds. | `test_std_spread`, check 9; `test_route_models`, 3d. |
+| A product route with three or more depression components under a spread (columns 6 and 7). No network of the suite has one. | `test_route_models`, 2g (the three-component case) and 3d. |
+| The restore of the stream by the SETPOINT and SFA-LADDER draws. `sfloor` has neither a setpoint spread nor a ladder spread. | Nothing. Reported to the lead; not in this job's files. |
+
+Thin, though caught: **sigma off by 1e-6 in the stable layer** (item 2),
+and **the unpacking with nominal parameters**, which six leaves see, all
+in `sfloor`.
+
+## Round-off floor of the spread suite
+
+Measured on the same day, nothing committed:
+
+- **Thread count.** Captured at 14 threads; at 1 and at 4 threads 24 of
+  2778 float leaves move, none in the pointwise layer, none of them an
+  exact leaf, and all 24 under existing overrides (QR, memory capacity,
+  the top-K orthonormality defect; the closest: a QR leaf at 1.2e-3 of
+  its override).
+- **Harmless reorderings in the spread's own lines** (through the
+  harness, as three "mutations" that must NOT be caught): the floor
+  written as `exp(log(tau_rec1) + floor_gap)`, the multiplier as
+  `exp(sigma / 2 * z) ^ 2`, and the ceiling as
+  `G * e + (1 - e)`. None is caught and none changes an exact leaf. They
+  move 131, 639 and 274 float leaves; the closest to its tolerance is
+  `stable.sweep.chain_all{1}.lambda_gap` at 2.3e-2 of 1e-9 (**43 times
+  inside**), then a Benettin local rate at 3e-3. In the pointwise layer
+  the realised values move by 3e-16 at most, `dS` by 9e-17, `J` and
+  `JY` by 1e-16.
+
+## The chain and stf_chain suites still catch what they caught
+
+The spread is applied in `compile` after the lines that replicate the
+nominal values, which were kept as they were so that the entries of the
+three earlier lists still find their text (commit `d963f29`: the first
+version of the spread rewrote those lines and twelve entries no longer
+applied; none of the lists was edited). `regression_tol_mutations_chain`
+against the chain reference: **52 of 52 caught, all by compared values,
+no case threw**. `regression_tol_mutations_stf_chain` against the
+stf_chain reference: **91 of 91 caught, all by compared values**, one
+with cases that threw as before (`stf_registry_product`). For every one
+of the 143 the number of failing leaves in each layer is the number in
+this note's earlier tables. The unmutated code passes both references at
+`'rtol', 0` with no leaf moved. The post-refactor list was not re-run
+(it is the lead's, against the anchor); all 71 of its texts are found
+exactly once.
+
+## How the restore was checked
+
+All 203 runs (57 + 52 + 91 + the three probes) reported the mutated
+file's blob restored. After the last, `git status --porcelain -- src/`
+was empty and `regression_tol_check('spread', 'rtol', 0)` passed with no
+leaf moved.
