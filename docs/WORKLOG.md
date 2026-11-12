@@ -34,6 +34,77 @@ Entry template:
 
 ---
 
+## 2026-11-11 19:45 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: steps 0a to 0c closed, 0d running)
+
+**Issues touched:** FD-017 -> done; FD-016 -> done; FD-020 -> done;
+FD-021 open -> in progress (step 0d briefed); FD-022 created (remove the
+remnants of resuming a PSA run; open, not scheduled).
+
+**Commits (this repo):** `68da56f` FD-016 (worker `matlab-fable-2`),
+merged `fafd990`; `85bda9b`, `222a43c`, `6eeb904`, `dfc5da2` the tolerance
+tier and its anchor (worker `matlab-fable-1`), merged `4dc3d84`; `988feae`
+the mutation checks, merged `24e515b`; `ac4ab98`, `d1f1a0f` CLAUDE.md for
+the sample seed, the timer lesson and the tolerance tier; `2054f0e`
+FD-022; `5864ac2`, `d87ea6e`, `aa95aca`, `429101d` issue statuses, the
+last one correcting `aa95aca`.
+**Commits (manuscript repo):** `f409f1b` tolerances fixed.
+
+**Done:**
+- FD-016: `ParamSpaceAnalysis2.sample_seed`, set by `cfg.param_space_seed`.
+- FD-020: the tolerance tier (`regression_tol_*`, 2370 leaves, 24 s, in
+  the quick suite), two stable presets, the anchor; 55 mutations all
+  caught by compared values; **tolerances fixed by Tom as proposed**.
+- Tom's further decisions: short labels "SFA+STD" / "SFA+prodSTD"; figure
+  layout is not a question for him; resume of a PSA run is not needed.
+
+**Verified (lead's MATLAB, merged main):**
+- After FD-017 and FD-016: quick 54 of 54; stages tier pass
+  (`settings.n_workers` ignored); **analysis half of the full tier, tag
+  `fd017`, 38 min on 9 workers: no value difference.** Its one row is the
+  file `memory_capacity/working_changes.patch`, in the reference only
+  because that stage of the reference run had a dirty tree.
+- After the tolerance tier: quick 55 of 55 (314 s); the lead's capture is
+  `isequaln` to the worker's anchor; zero-tolerance check passes on all
+  leaves. Anchor blob `8f071b7a`; model class still blob `2b0118d4`.
+
+**Not verified / known gaps:**
+- The figure half of the full tier has not been run since FD-017.
+- Two thin spots of the tolerance tier, left open by Tom's decision: the
+  reservoir class is guarded only by memory capacity (1e-6), and the
+  assembled Jacobian's facilitation and geomean blocks have one witness
+  (the stored pointwise Jacobian). After step 0d merges, an anchor case
+  can no longer be added from the untouched model class.
+- The harness `regression_tol_mutate` was run 70 times by the worker and
+  read by the lead, not run by the lead.
+
+**Mistakes by the lead this session, so they are not repeated:**
+- The first launch of the full tier did nothing for 30 minutes (a
+  TimerFcn that used `evalc` with a `catch ME` inside an anonymous
+  function). The right way is in CLAUDE.md.
+- Tom answered one of two questions and said "proceed"; the lead took
+  that as approval of its own recommendation to add anchor cases and
+  briefed a worker. Tom corrected it; the worker was stopped, its
+  worktree discarded, nothing committed. "Proceed" means the next step of
+  the agreed plan.
+
+**Raised, not acted on:** the rapid digest stores a copy of `params`
+inside `lya_results`, so after the refactor the rapid reference will show
+`missing` / `extra` keys as well as last-bit differences; handle at the
+re-capture. `assert_route_redundancy`'s error message rounds the values
+it prints, so two routes that differ by 1e-6 look identical. The earlier
+entry's list still stands.
+
+**Next:** when `matlab-fable-1` reports on step 0d (FD-021): read the
+whole diff against Plan A 4.0; merge; `clear classes`; tolerance tier
+against the anchor; quick suite (the ultrarapid tier is expected to fail
+there, and only there); the timing table, to Tom if any path is more than
+10 % slower; the loose-band check of the old exact references; then
+re-capture the three exact references once from a clean tree, with
+`settings\.n_workers$` stored as an ignore pattern, and say why in the
+commit. Then step 1 (the chain, FD-004 and FD-005).
+
+---
+
 ## 2026-11-11 17:10 (session cc2136bc-6794-4ea6-962d-9eb831682265, Plan A execution begins; entry written mid-session)
 
 **Issues touched:** FD-017 open -> in progress -> merged (set to done when
