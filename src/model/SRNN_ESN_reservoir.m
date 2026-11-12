@@ -1048,13 +1048,31 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             end
             num = @SRNN_ESN_reservoir.number_text;
             parts = {};
+            coupled = false;
             if strcmp(model, 'pool')
-                % A chain: tau_rec holds [releasable-pool refill, reserve
-                % refill] and tau_rel ONE value, the releasable pool's.
-                parts{end+1} = sprintf(['chained STD(releasable-pool refill tau_rec1=%s, ' ...
-                    'reserve refill tau_rec2=%s, release tau_rel=%s, n2=%s)'], ...
-                    num(sig.tau_rec(1)), num(sig.tau_rec(2)), num(sig.tau_rel), ...
-                    num(sig.signature.n2));
+                % A vesicle-pool route (route_pool). Its depression is the
+                % chain, a single pool or absent, and its facilitation, if
+                % any, release-coupled; the model's signature says which
+                % (std_model, stf_model). Until 2026-11-12 every pool route
+                % was described as a chain, reading tau_rec(2) and n2,
+                % which a single pool and a route without depression do
+                % not have: two such routes that differed made the
+                % redundancy check throw MATLAB:badsubscript from here
+                % where it should have raised AmbiguousSynapticOutput.
+                std_model = 'none';
+                if isfield(sig.signature, 'std_model'), std_model = sig.signature.std_model; end
+                coupled = isfield(sig.signature, 'stf_model') && strcmp(sig.signature.stf_model, 'chain');
+                if strcmp(std_model, 'chain')
+                    % tau_rec holds [releasable-pool refill, reserve
+                    % refill] and tau_rel ONE value, the releasable pool's.
+                    parts{end+1} = sprintf(['chained STD(releasable-pool refill tau_rec1=%s, ' ...
+                        'reserve refill tau_rec2=%s, release tau_rel=%s, n2=%s)'], ...
+                        num(sig.tau_rec(1)), num(sig.tau_rec(2)), num(sig.tau_rel), ...
+                        num(sig.signature.n2));
+                elseif sig.n_b > 0
+                    parts{end+1} = sprintf('single-pool STD(refill tau_rec=%s, release tau_rel=%s)', ...
+                        num(sig.tau_rec), num(sig.tau_rel));
+                end
             elseif sig.n_b > 0
                 extra = '';
                 if sig.std_geomean
@@ -1067,7 +1085,16 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 parts{end+1} = sprintf('product STD(tau_rec=%s, tau_rel=%s%s)', ...
                     num(sig.tau_rec), num(sig.tau_rel), extra);
             end
-            if sig.n_g > 0
+            if coupled
+                % Release-coupled: one g, and a calcium trace where the
+                % route has one (n_g is then 2 and tau_h is stated).
+                trace = '';
+                if isfield(sig.signature, 'tau_h') && ~isempty(sig.signature.tau_h)
+                    trace = sprintf(', calcium trace tau_h=%s', num(sig.signature.tau_h));
+                end
+                parts{end+1} = sprintf('release-coupled STF(tau_dec=%s, tau_fac=%s, G=%s%s)', ...
+                    num(sig.tau_dec), num(sig.tau_fac), num(sig.G), trace);
+            elseif sig.n_g > 0
                 parts{end+1} = sprintf('STF(tau_dec=%s, tau_fac=%s, G=%s)', ...
                     num(sig.tau_dec), num(sig.tau_fac), num(sig.G));
             end

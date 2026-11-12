@@ -55,12 +55,30 @@ function model = route_product()
 %   nominal    tau_rec, tau_rel, tau_dec, tau_fac, G as configured rows
 %              ([] where absent), combine, zero_floor
 %
+% THE PER-NEURON SPREAD (route_model: "THE SPREAD"). With opts.std_sigma or
+% opts.stf_sigma above zero the per-neuron columns hold drawn values and
+% not the nominal row: value = nominal * exp(sigma * z), z the value's
+% column of the presynaptic neuron's standard normals, and for a ceiling
+% G = 1 + (G_nominal - 1) * exp(sigma * z), which keeps G >= 1. The columns
+% of the draws this model reads, component by component:
+%   depression    tau_rec_m, tau_rel_m:  (1, 2), (3, 4), (6, 7), (8, 9), ...
+%                 (column 5 is the chain's n2 and no product route reads it)
+%   facilitation  tau_dec_l, tau_fac_l, G_l - 1:  (1, 2, 4), (5, 6, 7),
+%                 (8, 9, 10), ... (column 3 is the pool model's tau_h)
+% The components are jittered independently and no ordering is kept
+% between them: the product is symmetric in its components. p_min, the
+% zero floor's, is then per neuron too, from each neuron's own values.
+% At sigma = 0 every column is the nominal row replicated, exactly.
+%
 % `depression` (the interface's handle for display code) is D from a b array:
 %   D = depression(b, P)   b npre x M, or npre x M x nt; D has the shape of
 %                          prod(b, 2): the product of the components, then
 %                          the combine, then the zero floor. It is what
 %                          SRNNCellTypePairs.std_route_factor returns for
 %                          code that holds a b array and no g.
+% `facilitation` likewise is the factor facilitation puts on the output
+% from a g array, the product of its columns (every g multiplies the
+% output): what SRNNCellTypePairs.stf_route_factor returns.
 %
 % TWO HANDLES BEYOND THE INTERFACE, `combine` and `zero_floor`, are the
 % two steps above. They exist so that SRNNCellTypePairs.combine_std_pair,
@@ -73,7 +91,8 @@ function model = route_product()
 model = struct('name', 'product', ...
     'compile', @compile, 'initial', @initial, 'rhs', @rhs, 'output', @output, ...
     'linearize', @linearize, 'steady_state', @steady_state, ...
-    'depression', @depression_of_b, 'combine', @combine, 'zero_floor', @zero_floor);
+    'depression', @depression_of_b, 'facilitation', @facilitation_of_g, ...
+    'combine', @combine, 'zero_floor', @zero_floor);
 end
 
 %% The interface
@@ -81,8 +100,8 @@ end
 function P = compile(std_cfg, stf_cfg, opts)
 if nargin < 3, opts = struct(); end
 opts = fill_defaults(opts, struct('npre', 1, 'zero_floor', false, 'label', 'route', ...
-    'err_id_prefix', 'route_product'));
-err_id = [opts.err_id_prefix ':InvalidSynapseConfig'];
+    'err_id_prefix', 'route_product', 'std_sigma', 0, 'stf_sigma', 0));
+err_id =[opts.err_id_prefix ':InvalidSynapseConfig'];
 nominal = struct('tau_rec', [], 'tau_rel', [], 'tau_dec', [], 'tau_fac', [], 'G', [], ...
     'combine', 'product', 'zero_floor', logical(opts.zero_floor));
 
@@ -121,10 +140,32 @@ P.signature = nominal;
 P.signature.model = P.model;
 P.signature.zero_floor = nominal.zero_floor && P.n_b > 0;    % in force, not merely asked for
 
-% Per neuron, the nominal row replicated.
-P.tau_rest  = per_neuron([nominal.tau_rec, nominal.tau_dec], opts.npre);
-P.tau_drive = per_neuron([nominal.tau_rel, nominal.tau_fac], opts.npre);
-P.target    = per_neuron([zeros(1, P.n_b), nominal.G], opts.npre);
+% Per neuron: the nominal row replicated, or with a spread each value times
+% exp(sigma z) from its own column of the presynaptic neuron's draws (the
+% header says which). Of a ceiling, the excess over 1 is what is jittered.
+npre = opts.npre;
+m = 1:P.n_b;
+rec_col = 2 * m - 1 + (m >= 3);            % 1, 3, 6, 8, ...; tau_rel is the next column
+l = 1:P.n_g;
+dec_col = 3 * l - 2 + (l >= 2);            % 1, 5, 8, ...; tau_fac is the next column
+G_col = dec_col + 2 + (l == 1);            % 4, 7, 10, ...
+z_std = spread_draws(opts, 'std', P.n_b > 0, npre, max([rec_col + 1, 0]));
+z_stf = spread_draws(opts, 'stf', P.n_g > 0, npre, max([G_col, 0]));
+tau_rec = jittered(nominal.tau_rec, opts.std_sigma, z_std, rec_col, npre);
+tau_rel = jittered(nominal.tau_rel, opts.std_sigma, z_std, rec_col + 1, npre);
+tau_dec = jittered(nominal.tau_dec, opts.stf_sigma, z_stf, dec_col, npre);
+tau_fac = jittered(nominal.tau_fac, opts.stf_sigma, z_stf, dec_col + 1, npre);
+G = per_neuron(nominal.G, npre);           % with no spread exactly the nominal, not 1 + (G - 1)
+if ~isempty(z_stf)
+    G = 1 + jittered(nominal.G - 1, opts.stf_sigma, z_stf, G_col, npre);
+end
+P.tau_rest  = [tau_rec, tau_dec];
+P.tau_drive = [tau_rel, tau_fac];
+P.target    = [zeros(npre, P.n_b), G];
+% Whether any per-neuron value of this route was drawn. Display code that
+% holds fewer rows than the route has neurons cannot then be served
+% (SRNNCellTypePairs.std_route_factor checks it).
+P.jittered = ~isempty(z_std) || ~isempty(z_stf);
 P.geomean = strcmp(nominal.combine, 'geomean') && P.n_b > 1;
 P.coupling = logical(eye(P.ns));      % no component's derivative depends on another
 
@@ -213,6 +254,11 @@ function D = depression_of_b(b, P)
 D = zero_floor(combine(prod(b, 2), P), P);
 end
 
+function Fg = facilitation_of_g(g, P) %#ok<INUSD>
+%FACILITATION_OF_G The `facilitation` handle: every g multiplies the output.
+Fg = prod(g, 2);
+end
+
 function [D, dD_dP] = combine(P_b, P)
 %COMBINE The depression factor D from P_b = prod_m b_m, and dD/dP_b.
 % b_m > 0 always (db/dt = 1/tau_rec at b = 0), so P_b > 0.
@@ -293,6 +339,34 @@ end
 function M = per_neuron(row, npre)
 % The nominal row, one copy per presynaptic neuron (npre x 0 when empty).
 M = repmat(reshape(row, 1, []), npre, 1);
+end
+
+function z = spread_draws(opts, mechanism, present, npre, n_cols)
+% The route's rows of its presynaptic type's standard normals for one
+% mechanism ('std' or 'stf'), or [] when that mechanism has no spread on
+% this route (sigma zero, or the route has no such variables).
+z = [];
+sigma = opts.([mechanism '_sigma']);
+if ~present || sigma == 0
+    return;
+end
+name = [mechanism '_z'];
+if ~isfield(opts, name) || size(opts.(name), 1) ~= npre || size(opts.(name), 2) < n_cols
+    error([opts.err_id_prefix ':SpreadDraws'], ...
+        ['Route %s has a per-neuron spread (opts.%s_sigma = %g) and needs opts.%s: one row of ' ...
+        'standard normals per presynaptic neuron (%d rows) with at least %d columns.'], ...
+        opts.label, mechanism, sigma, name, npre, n_cols);
+end
+z = opts.(name);
+end
+
+function M = jittered(row, sigma, z, cols, npre)
+% One column per value of ROW: the nominal replicated when Z is empty (no
+% spread: exactly the nominal), else nominal * exp(sigma * z(:, column)).
+M = per_neuron(row, npre);
+if ~isempty(z) && ~isempty(row)
+    M = M .* exp(sigma .* z(:, cols));
+end
 end
 
 function value = positive_row(value, count, field_name, mechanism, label, err_id)
