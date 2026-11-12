@@ -94,6 +94,38 @@ reference was digested from a copy of the run without one locked folder.
   one run; the next full run (step 10) is the second.
 - The chain has no regression reference yet (step 5, running).
 
+**Added 03:55, same session.** Merged since this entry was written: the
+reservoir class (`4ebf27c`), the `mu7chain` presets and name maps
+(`257e4f1`, stages reference `67de9b5`), `cfg.conditions` and
+`select_conditions` (`3e1bd04`), the sweep figures and the two-condition
+tau sweep (`1debb64`). Quick suite 59 of 59 after `3e1bd04`. Running:
+the chain references (`matlab-fable-1`), the stage-data figures
+(`matlab-opus-2`), and the preliminary `fast` run of the `mu7chain`
+analyses (`matlab-opus-3`, second attempt, into
+`data/mu7chain_fast_prelim`; the first died 25 minutes in because the
+worker waited on a background task and its MATLAB exited; the worker
+prompts now forbid that, `15813bb`).
+
+**FOR TOM, a first look at the science, from the preliminary run.
+Preliminary: `fast` mode (5 levels, 5 reps per level), the depression
+spread not yet set, one run.** The 1-D sweep medians of the leading
+exponent (`figs/prelim_wp1b/full_4cond/fig_sensitivity_medians/`) show
+the chained MTS and the product MTS behaving differently:
+- the product MTS (green) sits near -0.1 across almost every sweep, as in
+  the current manuscript;
+- **the chained MTS (blue) sits near 0 at the baseline network and goes
+  positive in two sweeps**: toward +0.7 at low E:I neuron ratio, and to
+  about +1.2 when the E-to-I weights are raised by 50 %. Elsewhere it
+  stays within about 0.1 of zero and is flatter than 1TS.
+- 1TS is at about +0.3 at the baseline in this run and -0.5 away from it.
+So on this first evidence the chain holds the network near the transition
+over much of the range but is less uniformly contracting than the
+product, which is the direction the to-do list anticipated ("MTS results
+may therefore differ from the current ones when rerun"; the chain's
+depression is shallower than the product's at every rate). Whether the
+paper's claim survives is for the `medium` runs and for Tom; nothing was
+changed on account of this.
+
 **Raised, not acted on:** the cleaner fix for `active_routes` (three
 tests set `std_zero_floor` on the params struct); `route_pool` and
 `route_product` each carry a copy of two small helpers; seven stages save
