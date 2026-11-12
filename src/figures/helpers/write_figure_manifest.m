@@ -14,6 +14,13 @@ function path = write_figure_manifest(fig_root, cfg, run_dir, root_mode, results
 % and none recorded the DATA. A manifest naming one run directory is what makes
 % that visible.
 %
+% THE CONDITIONS (FD-006). A "Conditions" row gives cfg.conditions, the
+% selection requested for the pass (empty = all the run holds), so a _3cond and
+% a _4cond folder built from one run say which they are; the entries table says
+% per entry whether the selection was applied (results.conditions_applied), and
+% a note names every entry that drew all conditions because its function does
+% not declare the option.
+%
 % Written after the loop regardless of failures, so a partial run still describes
 % itself -- a manifest listing what did NOT build is more useful than no manifest.
 %
@@ -36,7 +43,7 @@ fid = fopen(path, 'w');
 if fid < 0
     error('write_figure_manifest:CannotOpen', 'Could not open %s', path);
 end
-closer = onCleanup(@() fclose(fid)); %#ok<NASGU>
+closer = onCleanup(@() fclose(fid));
 
 n_ok    = sum([results.ok]);
 n_paper = sum([results.in_paper]);
@@ -50,6 +57,7 @@ fprintf(fid, '| | |\n|---|---|\n');
 fprintf(fid, '| Run directory | `%s` |\n', or_none(run_dir));
 fprintf(fid, '| Preset | `%s` |\n', cfg.preset_name);
 fprintf(fid, '| Run mode | `%s` |\n', cfg.run_mode);
+fprintf(fid, '| Conditions | %s |\n', conditions_text(cfg));
 fprintf(fid, '| Figure root | `%s` (%s) |\n', fig_root, root_mode);
 fprintf(fid, '| Result | %d/%d succeeded, %d/%d in-paper |\n', n_ok, numel(results), n_pok, n_paper);
 fprintf(fid, '| Elapsed | %.1f min |\n\n', minutes);
@@ -59,15 +67,34 @@ if isempty(run_dir)
         'failed; analytic and self-simulating ones will not.\n\n']);
 end
 
+% Per entry, whether the condition selection was applied: "yes", "**no**"
+% (the function does not declare 'conditions' and drew every condition), or
+% "--" (nothing selected, or the entry failed first). Results from callers
+% predating the field read as "--".
+has_sel = isfield(results, 'conditions_applied');
+not_applied = {};
 fprintf(fid, '## Entries\n\n');
-fprintf(fid, '| Entry | In paper | Files | Seconds | Result |\n|---|---|---:|---:|---|\n');
+fprintf(fid, '| Entry | In paper | Files | Seconds | Conditions applied | Result |\n|---|---|---:|---:|---|---|\n');
 for k = 1:numel(results)
     r = results(k);
     if r.ok; verdict = 'ok'; else; verdict = ['**FAILED** -- ' one_line(r.err)]; end
-    fprintf(fid, '| `%s` | %s | %d | %.1f | %s |\n', ...
-        r.name, tick(r.in_paper), r.n_files, r.seconds, verdict);
+    ca = '--';
+    if has_sel
+        switch r.conditions_applied
+            case 'yes', ca = 'yes';
+            case 'no',  ca = '**no** (all drawn)'; not_applied{end+1} = r.name; %#ok<AGROW>
+        end
+    end
+    fprintf(fid, '| `%s` | %s | %d | %.1f | %s | %s |\n', ...
+        r.name, tick(r.in_paper), r.n_files, r.seconds, ca, verdict);
 end
 fprintf(fid, '\n');
+if ~isempty(not_applied)
+    fprintf(fid, ['> **The condition selection was NOT applied to %d entr%s** (the function ' ...
+        'does not declare `conditions`, so it drew every condition the run holds): %s.\n\n'], ...
+        numel(not_applied), plural_y(numel(not_applied)), ...
+        strjoin(strcat('`', not_applied, '`'), ', '));
+end
 
 % Name the files, so the manifest says what is actually on disk rather than what
 % was intended. existing_outputs feeds these, and it globs the directory.
@@ -87,6 +114,27 @@ end
 %% ------------------------------------------------------------------------
 function s = tick(tf)
 if tf; s = 'yes'; else; s = '--'; end
+end
+
+function s = conditions_text(cfg)
+% The selection requested for the pass (cfg.conditions; empty = all).
+c = {};
+if isfield(cfg, 'conditions') && ~isempty(cfg.conditions)
+    c = cellstr(cfg.conditions);
+end
+if isempty(c) || isequal(c, {''})
+    s = 'all the run holds (none selected)';
+else
+    s = strjoin(strcat('`', c, '`'), ', ');
+    s = sprintf('%s (in this order)', s);
+end
+if isfield(cfg, 'figure_set') && ~isempty(cfg.figure_set)
+    s = sprintf('%s; figure set `%s`', s, cfg.figure_set);
+end
+end
+
+function s = plural_y(k)
+if k == 1; s = 'y'; else; s = 'ies'; end
 end
 
 function s = or_none(s)

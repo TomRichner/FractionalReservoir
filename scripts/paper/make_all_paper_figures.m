@@ -36,7 +36,16 @@ function results = make_all_paper_figures(cfg)
 % explicitly named handles), but the intermediate folder was wrong, and a future
 % figure that globs a prep folder would inherit the mess.
 %
-% See also: paper_config, run_all_paper_analyses, resolve_run_dir
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006). A cell of condition
+% names, in the order the figures lay them out; absent or empty means every
+% condition the run holds. When non-empty it is passed to every entry as
+% 'conditions', and each figure resolves it with select_conditions (an error on
+% a name the run lacks). An entry whose function does not declare the option is
+% built without it, drawing every condition; that is printed as one minimal
+% line after the pass and recorded per entry in the manifest
+% (results(k).conditions_applied = 'yes' | 'no' | '').
+%
+% See also: paper_config, run_all_paper_analyses, resolve_run_dir, select_conditions
 
 arguments
     cfg = paper_config()
@@ -74,6 +83,23 @@ end
 % here, before the run directory is reported.
 if ~isfield(cfg, 'verbose'), cfg.verbose = 'minimal'; end
 verbose = cfg.verbose;
+
+% Which conditions the figures draw (FD-006). cfg.conditions is a cell of
+% condition names, in the left-to-right order the figures lay them out; absent
+% or empty means every condition the run holds, which is what every figure
+% drew before the option existed. It is passed to each entry as 'conditions'
+% ONLY when non-empty, so a bundle without it calls every figure exactly as
+% before. Each figure resolves it through select_conditions, which errors on a
+% name the run lacks. An entry whose function does not declare the option is
+% built without it (all conditions) and reported, never silently.
+if ~isfield(cfg, 'conditions'), cfg.conditions = {}; end
+want_conditions = cfg.conditions;
+if isempty(want_conditions) || ((ischar(want_conditions) || isstring(want_conditions)) && ...
+        all(strlength(want_conditions) == 0))
+    want_conditions = {};                    % {}, [], '' and "" mean all, as in select_conditions
+end
+want_conditions = cellstr(want_conditions);  % char / string / cell -> cellstr
+cfg.conditions = want_conditions;            % the manifest reads the normalised list
 
 want_run_dir = cfg.run_dir;
 if ~isempty(want_run_dir) && ~is_absolute_path(want_run_dir)
@@ -148,20 +174,40 @@ n = numel(figs);
 
 vprintf(verbose, 'verbose', '\n========================================================\n');
 vprintf(verbose, 'minimal', 'PAPER FIGURES  (%d entries, preset %s)  start %s\n', n, cfg.preset_name, datetime('now'));
+if isempty(want_conditions)
+    vprintf(verbose, 'minimal', 'Conditions:    all the run holds (none selected)\n');
+else
+    vprintf(verbose, 'minimal', 'Conditions:    %s\n', strjoin(want_conditions, ', '));
+end
 vprintf(verbose, 'verbose', '========================================================\n');
 t_all = tic;
 
+% conditions_applied: 'yes' (the entry took the selection), 'no' (its function
+% does not declare 'conditions', so it drew every condition), or '' (no
+% selection requested, or the entry failed before that was known).
 results = struct('name', {}, 'ok', {}, 'in_paper', {}, 'n_files', {}, ...
-                 'seconds', {}, 'files', {}, 'err', {});
+                 'seconds', {}, 'files', {}, 'err', {}, 'conditions_applied', {});
 
 for k = 1:n
     f = figs{k};
     vprintf(verbose, 'minimal', '---- [%d/%d] %s%s\n', k, n, f.name, paper_tag(f.in_paper));
     t0 = tic;
     try
-        args = [{'run_dir', run_dir, 'out_dir', fullfile(fig_root, f.name), ...
-                 'save', true, 'visible', visible_figures, 'verbose', verbose}, f.args];
-        out  = call_figure(f.fn, args);
+        args = {'run_dir', run_dir, 'out_dir', fullfile(fig_root, f.name), ...
+                'save', true, 'visible', visible_figures, 'verbose', verbose};
+        if ~isempty(want_conditions)
+            args = [args, {'conditions', want_conditions}]; %#ok<AGROW>
+        end
+        args = [args, f.args]; %#ok<AGROW>
+        [out, applied] = call_figure(f.fn, args);
+        if isempty(applied)
+            cond_status = '';
+        elseif applied
+            cond_status = 'yes';
+        else
+            cond_status = 'no';
+            vprintf(verbose, 'verbose', '     does not declare ''conditions'': built with every condition\n');
+        end
 
         n_files = numel(out.files);
         ok = n_files > 0;
@@ -176,7 +222,7 @@ for k = 1:n
         end
         results(end+1) = struct('name', f.name, 'ok', ok, 'in_paper', f.in_paper, ...
             'n_files', n_files, 'seconds', toc(t0), 'files', {out.files}, ...
-            'err', err); %#ok<AGROW>
+            'err', err, 'conditions_applied', cond_status); %#ok<AGROW>
 
         % Close only THIS entry's handles, now that it is verified. See header.
         close_figs(out.figs);
@@ -187,7 +233,8 @@ for k = 1:n
         end
         results(end+1) = struct('name', f.name, 'ok', false, 'in_paper', f.in_paper, ...
             'n_files', 0, 'seconds', toc(t0), 'files', {{}}, ...
-            'err', sprintf('%s: %s', ME.identifier, ME.message)); %#ok<AGROW>
+            'err', sprintf('%s: %s', ME.identifier, ME.message), ...
+            'conditions_applied', ''); %#ok<AGROW>
     end
 end
 
@@ -246,6 +293,16 @@ for k = 1:numel(results)
     vprintf(verbose, 'minimal', '  %s  %-32s %2d files %6.1f s%s\n', tag, r.name, r.n_files, ...
         r.seconds, paper_tag(r.in_paper));
 end
+% The selection is never dropped silently: one line naming every entry that
+% was built with all conditions because its function does not declare the
+% option (the manifest records the same per entry).
+not_applied = {results(strcmp({results.conditions_applied}, 'no')).name};
+if ~isempty(not_applied)
+    vprintf(verbose, 'minimal', ['  conditions {%s} NOT applied (figure does not declare ' ...
+        '''conditions''; drew every condition) in %d entr%s: %s\n'], ...
+        strjoin(want_conditions, ', '), numel(not_applied), ...
+        plural_y(numel(not_applied)), strjoin(not_applied, ', '));
+end
 bad = results(~[results.ok]);
 if ~isempty(bad)
     vprintf(verbose, 'minimal', '--------------------------------------------------------\n');
@@ -267,16 +324,56 @@ tf = startsWith(p, filesep) || startsWith(p, '/') || ...
      ~isempty(regexp(p, '^[A-Za-z]:[\\/]', 'once'));
 end
 
-function out = call_figure(fn, args)
-% Call a figure function, tolerating one that does not accept run_dir.
+function [out, applied] = call_figure(fn, args)
+% Call a figure function, tolerating one that does not accept run_dir, or one
+% that does not (yet) declare 'conditions'.
 %
 % Every converted figure declares run_dir in its arguments block precisely so
 % this call can be uniform -- but a newly added one might not, and failing the
 % whole sheet over an unused argument would be a poor trade.
+%
+% 'conditions' (FD-006) is passed only when a selection was requested. A figure
+% whose arguments block does not declare it is called again WITHOUT it and so
+% draws every condition the run holds; `applied` comes back false so the
+% caller can say so (one minimal line, and the manifest). The retry is taken
+% only on MATLAB's own rejection of the argument NAME ("Invalid argument name
+% 'conditions'", raised before the function body runs), never on an error the
+% figure raises itself -- a figure that declares the option and is asked for a
+% condition the run lacks must FAIL (select_conditions:NoSuchCondition), not
+% fall back to drawing everything. A wrapper that forwards to an inner figure
+% that does not declare it is caught the same way, and is likewise recorded as
+% not applied.
+%
+% `applied` is true when 'conditions' was passed and accepted, false when it
+% had to be dropped, and [] when it was not passed (nothing requested).
+has_cond = any(strcmp(args(1:2:end), 'conditions'));
+if has_cond; applied = true; else; applied = []; end
+try
+    out = call_tolerating_run_dir(fn, args);
+catch ME
+    if has_cond && rejects_argument_name(ME, 'conditions')
+        keep = true(1, numel(args));
+        idx = find(strcmp(args, 'conditions'), 1);
+        keep(idx:idx+1) = false;
+        out = call_tolerating_run_dir(fn, args(keep));
+        applied = false;
+    else
+        rethrow(ME);
+    end
+end
+end
+
+function out = call_tolerating_run_dir(fn, args)
+% The original call_figure: retry once without run_dir. The one addition: a
+% rejection of 'conditions' is passed up to call_figure untouched (its message
+% lists the declared names, run_dir among them, which would otherwise read as
+% a run_dir problem here).
 try
     out = fn(args{:});
 catch ME
-    if strcmp(ME.identifier, 'MATLAB:UndefinedFunction') || ...
+    if rejects_argument_name(ME, 'conditions')
+        rethrow(ME);
+    elseif strcmp(ME.identifier, 'MATLAB:UndefinedFunction') || ...
        contains(ME.message, 'run_dir')
         keep = true(1, numel(args));
         idx = find(strcmp(args, 'run_dir'), 1);
@@ -286,6 +383,20 @@ catch ME
         rethrow(ME);
     end
 end
+end
+
+function tf = rejects_argument_name(ME, name)
+% True when ME is an arguments-block (or inputParser) rejection of `name`.
+% Measured in R2025: identifier MATLAB:TooManyInputs, message "Invalid
+% argument name 'conditions'. Use one of: ...".
+tf = (strcmp(ME.identifier, 'MATLAB:TooManyInputs') && ...
+      contains(ME.message, sprintf('argument name ''%s''', name))) || ...
+     (strcmp(ME.identifier, 'MATLAB:InputParser:UnmatchedParameter') && ...
+      contains(ME.message, sprintf('''%s''', name)));
+end
+
+function s = plural_y(k)
+if k == 1; s = 'y'; else; s = 'ies'; end
 end
 
 function s = paper_tag(in_paper)
