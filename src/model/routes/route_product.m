@@ -101,7 +101,7 @@ function P = compile(std_cfg, stf_cfg, opts)
 if nargin < 3, opts = struct(); end
 opts = fill_defaults(opts, struct('npre', 1, 'zero_floor', false, 'label', 'route', ...
     'err_id_prefix', 'route_product', 'std_sigma', 0, 'stf_sigma', 0));
-err_id =[opts.err_id_prefix ':InvalidSynapseConfig'];
+err_id = [opts.err_id_prefix ':InvalidSynapseConfig'];
 nominal = struct('tau_rec', [], 'tau_rel', [], 'tau_dec', [], 'tau_fac', [], 'G', [], ...
     'combine', 'product', 'zero_floor', logical(opts.zero_floor));
 

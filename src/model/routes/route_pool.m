@@ -213,7 +213,7 @@ function P = compile(std_cfg, stf_cfg, opts)
 if nargin < 3, opts = struct(); end
 opts = fill_defaults(opts, struct('npre', 1, 'zero_floor', false, 'label', 'route', ...
     'err_id_prefix', 'route_pool', 'std_sigma', 0, 'stf_sigma', 0));
-prefix =opts.err_id_prefix;
+prefix = opts.err_id_prefix;
 label = opts.label;
 err_id = [prefix ':InvalidSynapseConfig'];
 has_std = ~is_absent(std_cfg);
