@@ -272,7 +272,27 @@ undepressed route. And an exact tier, `rapid_chain`
 about 20 s each. A pre-edit capture of a suite other than the base one is
 `make_regression_tol_reference('<name>', 'suite', 'chain')`. Each route
 model added after the chain gets a suite and a mutation list the same
-way (`regression_tol_mutations_*.m`, run with `regression_tol_mutate`).
+way (`regression_tol_mutations_*.m`, run with `regression_tol_mutate`):
+release-coupled facilitation has the suite `stf_chain`
+(`regression_tol_stf_chain.mat`, `test_regression_tolerance_stf_chain`,
+2026-11-12).
+
+**Route models, in one paragraph** (Plan A, sections 4.0 and 4.6; the
+equations are in `Equations_stability_paper.md`). Depression and
+facilitation of a route live in `src/model/routes/`: `route_product`
+(independent pools multiplied, with the geometric mean and the zero
+floor, times output-only facilitation; the default) and `route_pool`
+(vesicle pools: `std.model = 'chain'` for a releasable pool and a
+reserve; `stf.model = 'chain'` for release-coupled facilitation, with
+`tau_h` for a calcium trace). `route_model(name)` is the registry.
+`dynamics_fast`, `compute_Jacobian_fast`, `jacobian_times` and
+`unpack_and_compute_states` call a route's model once and hold no
+depression or facilitation arithmetic. **A new mechanism is a new or
+extended route model, never a branch in those four functions.** Display
+code asks the model: `SRNNCellTypePairs.std_route_factor` and
+`stf_route_factor` for a route's factors, the model's `steady_state` for
+the closed form; nothing outside `src/model/routes/` writes `prod(b)` or
+`1/(1 + r tau_rec/tau_rel)`.
 
 Two things to know. The full tier runs longer than the MATLAB MCP client
 waits (a call silent for 30 minutes is dropped, though MATLAB carries on):

@@ -255,6 +255,53 @@ where $G$ is the ceiling the facilitated gain approaches. Like depression,
 facilitation is driven by the raw rate $r_i$ and enters presynaptically; each
 $g_{in}$ rests at 1, so an absent mechanism contributes an empty product of one.
 
+That is the **output-only** form (`stf.model` absent or `'product'`): $g$
+multiplies what the synapse transmits and nothing else, so a facilitated synapse
+transmits more without using its resources faster.
+
+### Release-coupled facilitation on the vesicle pools (opt-in per route)
+
+Added 2026-11-12 (FD-018). **Not used in the current paper**; built so the pool
+model is complete. On a route served by the pool model, facilitation is a
+**release probability** $g_i$ relative to rest, which multiplies both the
+synaptic output and the rate at which the releasable pool is used:
+
+$$
+\begin{aligned}
+\frac{db_{i1}}{dt} &= \frac{b_{i2}\,(1 - b_{i1})}{\tau_{rec_1}} - \frac{g_i\, b_{i1}\, r_i}{\tau_{rel}} \\[8pt]
+\frac{dg_i}{dt} &= \frac{1 - g_i}{\tau_{dec}} + \frac{(G - g_i)\, d_i}{\tau_{fac}} \\[8pt]
+\frac{dh_i}{dt} &= \frac{r_i - h_i}{\tau_h} \\[8pt]
+\theta_i &= r_i\, g_i\, b_{i1}
+\end{aligned}
+$$
+
+with the reserve equation unchanged. The drive $d_i$ is the **calcium trace**
+$h_i$ when the route has one (`stf.tau_h` given), and the rate $r_i$ when it does
+not; in that single-variable form $h$ is not carried at all. So facilitation
+nests as depression does: the one-variable form is the equation of the previous
+paragraph plus the coupling, and the two-variable form adds one variable that
+changes one term. Likewise a route may have no reserve ($b_{i2}$ dropped, the
+refill as if it were 1) or no depression at all (then $\theta_i = r_i g_i$).
+$g$ starts at 1 and stays in $[1, G]$; $h$ starts at 0 and stays in $[0, 1]$.
+
+```matlab
+synapse_config.<pre>.<post>.stf = struct('model', 'chain', ...
+    'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5, ...   % G >= 1: the ceiling of g
+    'tau_h', 0.5);                                 % omit for the one-variable form
+```
+
+**Steady state at constant rate.** $h = r$ and
+$g = (1 + G\kappa r)/(1 + \kappa r)$ with $\kappa = \tau_{dec}/\tau_{fac}$, with or
+without the calcium trace; the pools are the chain's steady state evaluated at
+the **effective rate** $g\,r$. So at steady state coupled facilitation stretches
+the rate axis and nothing else: it moves the sustained output toward the
+depression ceiling at lower rates and does not raise the ceiling. The calcium
+trace changes the time course only (it delays $g$, and removes the overshoot of
+the output after a rate step). A coupled `stf` requires the route's depression to
+be absent, a single pool or the chain; it is refused beside a product of two or
+more pools, `std.combine` or the zero floor, and a chain route refuses the
+output-only form.
+
 Facilitation is configured per presynaptic-to-postsynaptic route rather than per
 neuron — `synapse_config.<pre>.<post>.stf`, with fields `tau_dec`, `tau_fac` and
 `G`. See [`cell_type_pair_equations.md`](cell_type_pair_equations.md) for the
