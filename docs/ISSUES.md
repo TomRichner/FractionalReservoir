@@ -308,10 +308,15 @@ model's arithmetic.
   merge `257e4f1`; stages reference re-captured `67de9b5`; quick 58 of 58
   on merged main). `std_spread = [0.25 0.25]` set in the preset and the
   preset fixture regenerated (`fd1fb99`, 2026-11-12). Open until the
-  bundle has run at `fast` with both figure sets (Plan A step 6).
-  **Hold (Tom, 2026-11-12):** the `fast` run is not started until Tom has
-  looked at example time series run interactively and has had the chance
-  to hand-tune the connectivity.
+  bundle has run end to end. **That run is the `essential` run of FD-023,
+  in the four-condition figure set, in place of the `fast` run with both
+  figure sets** (Tom, 2026-11-12). The bundle has not been run at `fast`
+  with the spread in the preset; the preliminary `fast` run predates it.
+  **Hold (Tom, 2026-11-12), closed the same day:** no long run until Tom
+  had looked at example time series run interactively. He looked at four
+  seeds, one with a step stimulus, with separate plots of the stimulus
+  and of the eigenvalues of W (`0bc35ca`, merge `9c9c1f1`), did not
+  change the connectivity, and asked for the essential run.
   **Decisions by the lead:**
   5. **A preliminary `fast` run of the bundle's analyses is made now**,
      ahead of the final one of Plan A step 6, by a worker
@@ -354,7 +359,8 @@ model's arithmetic.
   (today it would silently return `sfa1_std1` for the paper's three
   conditions); the SFA-timescale sweep runs both MTS conditions (Tom);
   regenerate the preset fixture. Plan A section 4.4.
-- **Done when:** the bundle runs at `fast`; preset tests pass.
+- **Done when:** the bundle runs at `fast`; preset tests pass. (Changed
+  by Tom, 2026-11-12: the bundle runs at `essential`, FD-023.)
 - **Depends on:** FD-004.
 - **Result:** _(pending)_
 
@@ -845,7 +851,9 @@ becomes an issue with an acceptance test.
 - **FD-009 MTS reruns at `medium` or better** (block A): sweeps, memory
   capacity, stability and transient stages on the chain preset. **Agents do
   not run these**: only Tom starts them and says when they are done (Tom,
-  2026-11-11). Plan A ends with one `fast` run on four conditions.
+  2026-11-11). Plan A was to end with one `fast` run on four conditions;
+  since 2026-11-12 it ends with one `essential` run (FD-023), and **no
+  `medium` run is made before block C is done** (Tom, 2026-11-12).
 - **FD-010 Gain sweep of growth rate and memory capacity** (block C),
   including the no-adaptation pilot and the 3:2 and 2:3 networks.
 - **FD-011 Stimulation: adaptation is necessary** (block B): the 2 × 2 plus
