@@ -227,7 +227,9 @@ model's arithmetic.
 
 ### FD-006 Display and reservoir code for the chain
 
-- **Status:** open
+- **Status:** in progress (the reservoir class is briefed to
+  `matlab-fable-2`, Plan A step 3; the figures and tables follow in
+  step 4, after the presets merge)
 - **Serves:** block A
 - **What:** code outside the dynamics that recomputes the product itself:
   the reservoir class's route signature and time-series plot, the STD
@@ -241,7 +243,27 @@ model's arithmetic.
 
 ### FD-007 Chain presets and conditions
 
-- **Status:** open
+- **Status:** in progress (briefed to `matlab-opus-2`, Plan A step 3).
+  **Decisions by the lead in the brief:**
+  1. The bundle is named `mu7chain`: `scripts/paper/mu7chain_config.m`
+     and `mu7chain_run.m`, run directory `data/mu7chain_<run_mode>`,
+     figure roots `figs/mu7chain_<run_mode>_3cond` and `_4cond`. The
+     config takes the run mode as an argument, default `fast`, so Tom
+     starts a `medium` run from the same file.
+  2. The preset names carry `stdSpread0p25` from the start, although the
+     property `std_spread` does not exist until FD-015 and the lead adds
+     the line then. The alternative, renaming the presets later, means a
+     second fixture regeneration and a config that changes name. A comment
+     at the top of the case block says the spread is not yet set. **Until
+     FD-015 lands the name states a spread the preset does not have.**
+  3. The single-neuron preset's fourth condition is chain depression
+     alone, `sfa0_stdc2`, beside `no_adaptation`, `sfa1_std0`,
+     `sfa0_std1` (the lead's reading of Tom's "four conditions too",
+     put to him on 2026-11-11 and not contradicted).
+  4. Retitling and recolouring `sfa3_std2` changes text that several
+     stages save with their data, so the stages and full exact references
+     will differ in title leaves; the lead re-captures them (stages after
+     this merge, full at the planned full run of step 10).
 - **Serves:** block A
 - **What:** a preset bundle on the current baseline network with the MTS
   condition using the chain (reserve size 2, reserve refill 5 s), named

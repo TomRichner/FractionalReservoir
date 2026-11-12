@@ -34,6 +34,83 @@ Entry template:
 
 ---
 
+## 2026-11-12 01:40 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: refactor and chain merged; steps 3 and 5 running)
+
+**Standing instructions from Tom during this stretch** (in CLAUDE.md,
+"Current work"): the lead carries Plan A through to completion without
+stopping to ask, deciding and recording decisions in ISSUES.md or here;
+rules written in advance are guides for judgement, so a tolerance may be
+adjusted after an investigation that explains it, with the reason
+documented.
+
+**Issues touched:** FD-021 -> done; FD-004 -> done; FD-005 -> done;
+FD-006 -> in progress (reservoir part); FD-007 -> in progress.
+
+**Commits (this repo):** FD-021 `d3d1e82`..`964e8b2` merged `7d49430`;
+references re-captured: ultrarapid `8d7d2c9`, stages `dfc93f0`, full
+`cc51085`; FD-004 / FD-005 `2b5f6c2`..`97aad1c` merged in the commit
+before `f5759cd`; `f5759cd` the equations file and the issue results;
+`6727ee5`, `b05a94e` Tom's two standing instructions; `da9cd86`,
+`08fa37a` Plan A 4.0 as built and the lead's decisions on the refactor.
+
+**Done:**
+- Step 0d: product depression and facilitation behind the route interface
+  (`src/model/routes/route_model.m`, `route_product.m`).
+- The three exact references re-captured once, each after the tolerance
+  evidence and a loose comparison with the old one.
+- Step 1: the chain as `route_pool`, its tests, `std_route_factor`.
+- `Equations_stability_paper.md` states the chain.
+
+**Verified (lead's MATLAB, merged main):**
+- Refactor: tolerance tier pass against the anchor (worst pointwise
+  4.8e-16 against 1e-12) and the pre-edit capture; quick 55 pass with the
+  ultrarapid tier the one expected failure; band checks of the old rapid
+  and stages references structurally clean.
+- Full bundle on the refactored code (40.5 min analyses, 36 of 36
+  figures): against the old full reference no structural difference; 605
+  of 4583 leaves moved, median 5.7e-16; the 13 rows above 1e-9 were
+  looked into and are eigenvalue ordering (the sets agree to 5.5e-11) and
+  a 1e-12 quantity moving in its fourth digit.
+- Chain: tolerance tier pass against the anchor; quick 57 of 57 with the
+  ultrarapid tier byte-exact.
+
+**Decisions by the lead** (details under the issues): the refactor's
+three departures from the designed interface, its timing (0.97 to 1.05,
+noise) and the `active_routes` workaround are accepted; the chain's STD
+panel and its check 9 as built; the bundle is `mu7chain`, its presets
+carry `stdSpread0p25` in their names before the spread exists; the full
+reference was digested from a copy of the run without one locked folder.
+
+**Not verified / known gaps:**
+- **A file is locked by a process the lead could not identify:**
+  `data/regression_fast/reference_fd021/replot_sensitivity_nov_12_26_00_39/figures/sensitivity_mu_EI_relative_f_3.fig`.
+  It made `fig_sensitivity_analysis_allStd` fail its cleanup once (the
+  figure pass was re-run and passed). Not the lead's MATLAB (no open file
+  identifiers) and not its pool (released, still locked). The folder is
+  left in place; delete `data/regression_fast/reference_fd021` when the
+  lock is gone. If it recurs, look at what else reads `data/` (indexer,
+  antivirus, another MATLAB).
+- The full reference's reproducibility on the refactored code rests on
+  one run; the next full run (step 10) is the second.
+- The chain has no regression reference yet (step 5, running).
+
+**Raised, not acted on:** the cleaner fix for `active_routes` (three
+tests set `std_zero_floor` on the params struct); `route_pool` and
+`route_product` each carry a copy of two small helpers; seven stages save
+display titles with their data, so a retitled condition changes exact
+references.
+
+**Next:** review and merge, as they report: the reservoir class
+(`matlab-fable-2`), the presets and bundle (`matlab-opus-2`; then
+re-capture the stages reference for the retitled product condition), the
+chain references (`matlab-fable-1`; re-capture on main, require
+bit-identity). Then step 8 (chained facilitation, design in Plan A 4.6)
+on the model lane, with the display work (FD-006, three Opus workers,
+packages in the inventory note) beside it. Then FD-015, step 10, the
+`fast` four-condition run, FD-014.
+
+---
+
 ## 2026-11-11 19:45 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: steps 0a to 0c closed, 0d running)
 
 **Issues touched:** FD-017 -> done; FD-016 -> done; FD-020 -> done;
