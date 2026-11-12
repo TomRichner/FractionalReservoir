@@ -31,8 +31,22 @@ function out = fig_lle_vs_rate(cfg)
 % points beyond it simply fall outside the axes (no clamping, no triangles;
 % TR, 2026-09-15). The grey line under the points is the median per rate bin.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006; the pattern every figure
+% follows). A cell of condition names, drawn as one panel each, LEFT TO RIGHT
+% IN THE ORDER GIVEN; empty (the default) draws every condition the run holds,
+% in the run's order, exactly as before the option existed. The list is
+% resolved by select_conditions against the conditions the run's PSA objects
+% hold, so a name the run lacks is an error (select_conditions:NoSuchCondition)
+% rather than a missing panel, and a selected condition with no successful job
+% is an error too (fig_lle_vs_rate:NoJobs). Unselected conditions are not
+% loaded. The layout is 1 x N for N selected conditions (figure width grows
+% with N); each panel's title comes from manuscript_style's condition_title,
+% keyed by the condition NAME, never by position. make_all_paper_figures
+% passes cfg.conditions as 'conditions'. The table lists the drawn conditions
+% in the same order, and says which were requested when a selection was made.
+%
 % See also: fig_EI_weights_param_space, fig_local_vs_finite_lle,
-%           sweep_metrics, ParamSpaceAnalysis2.rebuild_model
+%           sweep_metrics, ParamSpaceAnalysis2.rebuild_model, select_conditions
 
 arguments
     cfg.verbose        (1,:) char    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (see verbose_level)
@@ -47,6 +61,7 @@ arguments
     cfg.quiet_rate     (1,1) double  = 0.02   % table only
     cfg.saturated_rate (1,1) double  = 0.9    % table only
     cfg.lle_clamp      (1,1) double  = 5      % y window bound; points are NOT clamped
+    cfg.conditions                   = {}     % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -78,6 +93,15 @@ if cfg.include_sweeps
     sl = sl([sl.isdir]);
     for k = 1:numel(sl); dirs{end + 1} = fullfile(sl(k).folder, sl(k).name); end %#ok<AGROW>
 end
+% A selection is resolved by select_conditions after loading, against every
+% condition the run's PSA objects hold; only the selected ones are loaded.
+requested = cfg.conditions;
+if isempty(requested) || ((ischar(requested) || isstring(requested)) && all(strlength(requested) == 0))
+    requested = {};                    % {}, [], '' and "" mean all, as in select_conditions
+end
+requested = cellstr(requested);        % char / string / cell -> cellstr
+selecting = ~isempty(requested);
+held = {};   % every condition name the run holds, in first-seen order
 t_load = tic;
 n_rebuilt = 0;
 for d = 1:numel(dirs)
@@ -86,6 +110,8 @@ for d = 1:numel(dirs)
     if d > 1; sweep_names{end + 1} = strjoin(setdiff(psa.grid_params, {'reps'}, 'stable'), ','); end %#ok<AGROW>
     cache = containers.Map('KeyType', 'double', 'ValueType', 'double');   % per PSA: config_idx is per grid
     cn = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
+    held = [held, cn(~ismember(cn, held))]; %#ok<AGROW>
+    if selecting; cn = cn(ismember(cn, requested)); end   % skip loading what is not drawn
     for c = 1:numel(cn)
         name = cn{c};
         if ~isfield(psa.results, name); continue; end
@@ -106,7 +132,18 @@ for d = 1:numel(dirs)
     n_rebuilt = n_rebuilt + cache.Count;
     src_id = src_id + 1;
 end
-cond_names = fieldnames(lle)';
+if selecting
+    % Requested order; a name no PSA holds errors here (NoSuchCondition).
+    cond_names = select_conditions(held, requested);
+    no_jobs = cond_names(~isfield(lle, cond_names));
+    if ~isempty(no_jobs)
+        error('fig_lle_vs_rate:NoJobs', ...
+            'Selected condition(s) with no successful job under %s: {%s}.', ...
+            cfg.run_dir, strjoin(no_jobs, ', '));
+    end
+else
+    cond_names = fieldnames(lle)';   % the run's order, as before the option existed
+end
 n_cond = numel(cond_names);
 if n_cond == 0
     error('fig_lle_vs_rate:NoJobs', 'No successful jobs found under %s.', cfg.run_dir);
@@ -178,6 +215,10 @@ if cfg.save
         fprintf(fid, '# lambda_1 vs mean firing rate\n\nRun: `%s`. Sources: param_space sample%s. Spearman rank correlation with a %d-sample bootstrap 95%% CI; Pearson deliberately not used (nonlinear, saturating relation). Quiet: mean rate < %.2g; saturated: > %.2g.\n\n', ...
             cfg.run_dir, tern(cfg.include_sweeps, [' + 1-D sweeps (' strjoin(sweep_names, ', ') ')'], ''), ...
             cfg.n_boot, cfg.quiet_rate, cfg.saturated_rate);
+        if selecting
+            fprintf(fid, 'Conditions drawn (selected, in this order): %s. The run holds: %s.\n\n', ...
+                strjoin(cond_names, ', '), strjoin(held, ', '));
+        end
         fprintf(fid, '%s\n%s\n', hdr, sep);
         fprintf(fid, '%s\n', rows{:});
         fclose(fid);
