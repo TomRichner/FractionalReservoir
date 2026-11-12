@@ -26,8 +26,9 @@ function model = route_model(name)
 %          of synapse_config.<pre>.<post>; [] or a struct with no fields
 %          means absent) and returns the route's parameters. opts may hold
 %          npre (default 1), label (the route's name in error messages,
-%          'E->I'), err_id_prefix (the class named in error identifiers)
-%          and model options. P always has
+%          'E->I'), err_id_prefix (the class named in error identifiers),
+%          the per-neuron spread (std_sigma, std_z, stf_sigma, stf_z: see
+%          THE SPREAD below) and model options. P always has
 %            model      the model's name
 %            n_b, n_g   columns of s that live in the state vector's
 %                       b-block and g-block, in that order (ns = n_b + n_g)
@@ -47,9 +48,12 @@ function model = route_model(name)
 %                       variable's derivative depends on another), the
 %                       class applies A in jacobian_times as ns products
 %                       and not ns^2.
-%          and the parameters the equations read, PER NEURON (npre x k),
-%          the nominal row replicated: a per-neuron spread fills in other
-%          values and needs no other code path.
+%            jittered   logical: some per-neuron value of the route was
+%                       drawn (a spread is in force on it)
+%          and the parameters the equations read, PER NEURON (npre x k):
+%          the nominal row replicated, or with a spread the drawn values.
+%          rhs, output, linearize and steady_state read those columns and
+%          never the nominal, so the spread has no code path of its own.
 %   s0 = initial(P)            1 x ns, the state every neuron starts in
 %   [ds, F] = rhs(s, r, P)     ds npre x ns, the state's time derivative;
 %                              F npre x 1, the output factor
@@ -73,17 +77,45 @@ function model = route_model(name)
 %                              SRNNCellTypePairs.std_route_factor, which
 %                              calls it for every model and returns []
 %                              itself for a route without depression.
-%   Fg = facilitation(g, P)    OPTIONAL. The factor facilitation puts on
-%                              the output, from the route's g-block alone
+%   Fg = facilitation(g, P)    The factor facilitation puts on the output,
+%                              from the route's g-block alone
 %                              (g npre x n_g, or npre x n_g x nt, n_g >= 1;
-%                              Fg has the shape of prod(g, 2)). A model
-%                              WITHOUT this handle has the product of its
-%                              g-block columns (route_product: every g
-%                              multiplies the output). The pool's is g, its
-%                              first column, and not g h: the calcium trace
-%                              is in the g-block and is no factor of the
-%                              output. The one caller is
-%                              SRNNCellTypePairs.stf_route_factor.
+%                              Fg has the shape of prod(g, 2)). The
+%                              product's is the product of the g-block's
+%                              columns (every g multiplies the output). The
+%                              pool's is g, its first column, and not g h:
+%                              the calcium trace is in the g-block and is
+%                              no factor of the output. The one caller is
+%                              SRNNCellTypePairs.stf_route_factor, which
+%                              calls it for every model and returns []
+%                              itself for a route without facilitation.
+% In `depression`, `facilitation`, `output` and `steady_state` the arrays
+% have ONE ROW PER PRESYNAPTIC NEURON OF THE ROUTE (npre rows) whenever
+% P.jittered: a parameter is then indexed by row.
+%
+% THE SPREAD (FD-015). SRNNCellTypePairs.std_spread and stf_spread give
+% each presynaptic neuron its own depression and facilitation parameters.
+% The class draws, per mechanism, one row of standard normals per neuron
+% (std_draws, stf_draws) and hands a route its presynaptic type's rows:
+%   opts.std_sigma, opts.stf_sigma   the type's spreads (default 0)
+%   opts.std_z, opts.stf_z           npre x Q standard normals, needed
+%                                    only where the sigma is above zero
+% A jittered value is nominal * exp(sigma * z): positive, the nominal its
+% median. A ceiling is jittered on its excess, G = 1 + (G - 1) exp(sigma z).
+% With sigma = 0 a value is EXACTLY the nominal. THE COLUMNS OF z ARE THE
+% SAME FOR EVERY MODEL, so that a neuron has the same value of a quantity
+% whichever model its route carries, and the same on all its routes:
+%   depression    1 tau_rec_1   2 tau_rel_1   3 tau_rec_2   4 tau_rel_2
+%                 5 n2 (the chain's reserve size)
+%                 6, 7 tau_rec_3, tau_rel_3   8, 9 the fourth's, ...
+%   facilitation  1 tau_dec_1   2 tau_fac_1   3 tau_h (the calcium trace)
+%                 4 G_1 - 1
+%                 5, 6, 7 tau_dec_2, tau_fac_2, G_2 - 1   8, 9, 10 ...
+% A model reads the columns of the quantities it has (route_product,
+% route_pool: their headers) and ignores the rest. A model that orders
+% two of its values (the chain's reserve refill above its releasable
+% pool's) says so in its header and reports the neurons it moved in
+% P.clipped (npre x 1 logical).
 %
 % (Plan A section 4.0 has linearize return one struct L with these four as
 % fields. They are four outputs because building that struct costs about
@@ -91,7 +123,8 @@ function model = route_model(name)
 % model, once per route in every jacobian_times. `depression` is not in
 % that section's table: it came with the chain, whose factor is not
 % prod(b); `facilitation` came with release-coupled facilitation, whose
-% g-block holds a calcium trace that is not a factor of the output.)
+% g-block holds a calcium trace that is not a factor of the output, and
+% was optional until every model had it.)
 %
 % F DEPENDS ON THE STATE ONLY, never on the rate: the class carries the
 % rate dependence of theta = r .* F.

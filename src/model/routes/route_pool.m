@@ -175,8 +175,28 @@ function model = route_pool()
 %                            the calcium trace acts only through g.
 %                            SRNNCellTypePairs.stf_route_factor calls it.
 %
-% WHAT COMES NEXT (FD-015): the per-neuron spread fills P's per-neuron
-% columns with drawn values (std_spread, stf_spread). Nothing here changes.
+% THE PER-NEURON SPREAD (route_model: "THE SPREAD"; FD-015). With
+% opts.std_sigma or opts.stf_sigma above zero the per-neuron columns hold
+% drawn values and not the nominal: value = nominal * exp(sigma * z), z the
+% value's column of the presynaptic neuron's standard normals. The columns
+% this model reads:
+%   depression (opts.std_z)     tau_rec1 1, tau_rel 2, tau_rec2 3, n2 5
+%                               (column 4 is a product route's tau_rel_2)
+%   facilitation (opts.stf_z)   tau_dec 1, tau_fac 2, tau_h 3, and 4 for
+%                               the ceiling, jittered on its excess:
+%                               G = 1 + (G_nominal - 1) * exp(sigma * z),
+%                               so G >= 1 for every neuron
+% The single pool reads the chain's columns 1 and 2, so a neuron has the
+% same tau_rec1 and tau_rel whether its route is a single pool or a chain
+% (and the same as on a product route's first component): equation (C1)
+% is the same between them neuron by neuron.
+% THE ORDERING RULE, chain only, where the nominal reserve is the slower
+% pool (tau_rec2 > tau_rec1): a neuron whose log(tau_rec2 / tau_rec1)
+% falls below a quarter of the nominal log-span has ITS RESERVE REFILL
+% tau_rec2 raised until the gap equals that floor. tau_rec1 is never
+% moved: it must stay the value the single pool has. P.clipped (npre x 1
+% logical) says which neurons were moved. At sigma = 0 every column is
+% the nominal replicated, exactly, and nothing is clipped.
 %
 % See also: route_model, route_product, SRNNCellTypePairs,
 %           test_route_models, test_std_chain_model, test_stf_chain_model
@@ -192,8 +212,8 @@ end
 function P = compile(std_cfg, stf_cfg, opts)
 if nargin < 3, opts = struct(); end
 opts = fill_defaults(opts, struct('npre', 1, 'zero_floor', false, 'label', 'route', ...
-    'err_id_prefix', 'route_pool'));
-prefix = opts.err_id_prefix;
+    'err_id_prefix', 'route_pool', 'std_sigma', 0, 'stf_sigma', 0));
+prefix =opts.err_id_prefix;
 label = opts.label;
 err_id = [prefix ':InvalidSynapseConfig'];
 has_std = ~is_absent(std_cfg);
@@ -399,6 +419,43 @@ end
 if P.has_h
     P.tau_h = repmat(nominal.tau_h, npre, 1);
 end
+
+% The per-neuron spread: each value times exp(sigma z) from its own column
+% of the presynaptic neuron's draws (the header says which); of the
+% ceiling, the excess over 1. Without a spread nothing here runs, and the
+% values stay the nominal exactly.
+z_std = spread_draws(opts, 'std', P.n_b >= 1, 2 + 3 * (P.n_b == 2));
+z_stf = spread_draws(opts, 'stf', P.has_g, 4);
+P.jittered = ~isempty(z_std) || ~isempty(z_stf);
+P.clipped = false(npre, 1);
+if ~isempty(z_std)
+    e = exp(opts.std_sigma .* z_std);
+    P.tau_rec1 = P.tau_rec1 .* e(:, 1);
+    P.tau_rel  = P.tau_rel .* e(:, 2);
+    if P.n_b == 2
+        P.tau_rec2 = P.tau_rec2 .* e(:, 3);
+        P.n2       = P.n2 .* e(:, 5);
+        % The ordering rule (header): the reserve stays the slower pool by
+        % at least a quarter of the nominal log-span. Only tau_rec2 moves.
+        span = log(nominal.tau_rec(2)) - log(nominal.tau_rec(1));
+        if span > 0
+            floor_gap = span / 4;
+            gap = span + opts.std_sigma .* (z_std(:, 3) - z_std(:, 1));
+            short = gap < floor_gap;
+            P.tau_rec2(short) = P.tau_rec1(short) .* exp(floor_gap);
+            P.clipped = short;
+        end
+    end
+end
+if ~isempty(z_stf)
+    e = exp(opts.stf_sigma .* z_stf);
+    P.tau_dec = P.tau_dec .* e(:, 1);
+    P.tau_fac = P.tau_fac .* e(:, 2);
+    P.G       = 1 + (P.G - 1) .* e(:, 4);
+    if P.has_h
+        P.tau_h = P.tau_h .* e(:, 3);
+    end
+end
 end
 
 function s0 = initial(P)
@@ -578,6 +635,25 @@ end
 function tf = is_name(value, name)
 tf = ((ischar(value) && isrow(value)) || (isstring(value) && isscalar(value))) && ...
     strcmp(char(value), name);
+end
+
+function z = spread_draws(opts, mechanism, present, n_cols)
+% The route's rows of its presynaptic type's standard normals for one
+% mechanism ('std' or 'stf'), or [] when that mechanism has no spread on
+% this route (sigma zero, or the route has no such variables).
+z = [];
+sigma = opts.([mechanism '_sigma']);
+if ~present || sigma == 0
+    return;
+end
+name = [mechanism '_z'];
+if ~isfield(opts, name) || size(opts.(name), 1) ~= opts.npre || size(opts.(name), 2) < n_cols
+    error([opts.err_id_prefix ':SpreadDraws'], ...
+        ['Route %s has a per-neuron spread (opts.%s_sigma = %g) and needs opts.%s: one row of ' ...
+        'standard normals per presynaptic neuron (%d rows) with at least %d columns.'], ...
+        opts.label, mechanism, sigma, name, opts.npre, n_cols);
+end
+z = opts.(name);
 end
 
 function tf = is_positive(value)

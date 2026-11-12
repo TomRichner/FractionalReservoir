@@ -84,7 +84,7 @@ T = struct();
 T.rtol = struct('pointwise', 1e-12, 'stable', 1e-9, 'band', 0.1);
 T.floor_frac = 1;
 T.discrete = {['(^|\.)(n_positive|n_positive_at_K|K_used|K|K_requested|retries|D_KY_resolved|' ...
-    'sort_idx|tau_a_clipped|hold_len|config_idx|network_seed|i_peak|N|n_per_type|n_b|n_g|reps)$']};
+    'sort_idx|tau_a_clipped|std_clipped|hold_len|config_idx|network_seed|i_peak|N|n_per_type|n_b|n_g|reps)$']};
 T.override = { ...
     ... % The largest departure of the top-K basis from orthonormality: a
     ... % measurement OF round-off (about 1e-15), so it moves by tens of

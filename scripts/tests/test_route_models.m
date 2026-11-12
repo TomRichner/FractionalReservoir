@@ -30,6 +30,13 @@
 %      f. parameters are per neuron: replacing one neuron's rows of P by
 %         another configuration's changes that neuron's derivative and
 %         output to the other configuration's, and no other neuron's
+%      g. the per-neuron spread (opts.std_sigma, std_z, stf_sigma, stf_z):
+%         with parameters that differ from neuron to neuron, rhs, output
+%         and steady_state are, neuron by neuron, those of a route
+%         configured with that neuron's values (jittered_config, written
+%         from route_model's rule and column table), and linearize equals
+%         central differences; a zero spread compiles to exactly the route
+%         without one
 %   3. route_product in particular: the geometric-mean combine has the
 %      one-component steady state at every rate and the product its
 %      square; the zero floor maps the steady state of r = 1 to F = 0 and
@@ -55,6 +62,16 @@
 %      one component; the display factors are b1 and g (not g h); the
 %      signature tells every variant apart; each refusal has its own
 %      identifier.
+%   3d. the per-neuron spread across the models: tau_rec_1 and tau_rel_1
+%      are the same per neuron on a one-component route, a product, a
+%      single pool and a chain, and tau_rec_2 comes from one standard
+%      normal on the product and the chain; every quantity reads its
+%      documented column; G = 1 + (G - 1) exp(sigma z) >= 1; values are
+%      positive with the nominal as median and sigma as log-spread; the
+%      chain's ordering rule raises tau_rec_2 alone, to exactly the floor,
+%      and acts nowhere else; the zero floor's p_min and the two display
+%      handles (both models have `facilitation`) go by row; a spread
+%      without usable draws errors <prefix>:SpreadDraws.
 %   4.SRNNCellTypePairs.jacobian_times applies a route's A in two ways (its
 %      diagonal where the model states A is diagonal, the full per-neuron
 %      product otherwise): on a network with every kind of route, forcing
@@ -206,6 +223,71 @@ for c = 1:numel(cases)
             isequal(L_q.Fs(i_alt, :), L_a.Fs(i_alt, :)) && isequal(L_q.A(others, :, :), L.A(others, :, :));
         all_passed = check(sprintf('    one neuron given another configuration''s rows (%d matrices): only it changes', ...
             n_moved), ok) && all_passed;
+    end
+
+    % g. the per-neuron spread: every neuron its own parameters. The route
+    % is compiled with a spread on both mechanisms and fixed standard
+    % normals; neuron i must then behave as a route configured with the
+    % values the documented rule gives it (jittered_config below, written
+    % from route_model's column table and not from the models), through
+    % the same per-neuron reference loop as check c.
+    if ns > 0
+        sig_std = 0.3;
+        sig_stf = 0.2;
+        z_std = randn(npre, 9);
+        z_stf = randn(npre, 10);
+        opts_j = cs.opts;
+        opts_j.npre = npre;
+        opts_j.std_sigma = sig_std; opts_j.std_z = z_std;
+        opts_j.stf_sigma = sig_stf; opts_j.stf_z = z_stf;
+        Pj = model.compile(cs.std, cs.stf, opts_j);
+        [ds_j, F_j] = model.rhs(s, r, Pj);
+        ds_ref = zeros(npre, ns);
+        F_ref = zeros(npre, 1);
+        ss_ref = zeros(npre, ns);
+        for i = 1:npre
+            cs_i = jittered_config(cs, sig_std, z_std(i, :), sig_stf, z_stf(i, :));
+            [ds_ref(i, :), F_ref(i)] = cs.reference(s(i, :), r(i), cs_i);
+            % the same neuron as a route of its own, at its nominal values
+            opts_i = cs.opts;
+            P_i = model.compile(cs_i.std, cs_i.stf, opts_i);
+            ss_i = model.steady_state(r(i), P_i);
+            ss_ref(i, :) = ss_i.s;
+        end
+        e = max([abs(ds_j(:) - ds_ref(:)); abs(F_j - F_ref); abs(model.output(s, Pj) - F_ref)]);
+        L_j = linearized(model, s, r, Pj);
+        A_fd = zeros(npre, ns, ns);
+        Fs_fd = zeros(npre, ns);
+        for k = 1:ns
+            dk = zeros(1, ns);
+            dk(k) = h;
+            A_fd(:, :, k) = (model.rhs(s + dk, r, Pj) - model.rhs(s - dk, r, Pj)) / (2 * h);
+            Fs_fd(:, k) = (model.output(s + dk, Pj) - model.output(s - dk, Pj)) / (2 * h);
+        end
+        B_fd = (model.rhs(s, r + h, Pj) - model.rhs(s, r - h, Pj)) / (2 * h);
+        e_lin = max([rel_err(L_j.A, A_fd), rel_err(L_j.B, B_fd), rel_err(L_j.Fs, Fs_fd)]);
+        ss_j = model.steady_state(r, Pj);
+        d_ss = model.rhs(ss_j.s, r, Pj);
+        e_ss = max(abs(ss_j.s(:) - ss_ref(:)));
+        differ = ~isequal(ds_j(2:end, :), ds(2:end, :));       % (row 1 has r = 0)
+        all_passed = check(sprintf(['    with a spread: rhs and output equal the reference loop on each neuron''s own ' ...
+            'values (max %.1e); linearize equals central differences (%.1e)'], e, e_lin), ...
+            Pj.jittered && ~P.jittered && differ && e <= tol_rhs && e_lin <= tol_fd && isequal(L_j.F, F_j)) && all_passed;
+        all_passed = check(sprintf(['    with a spread: steady_state is each neuron''s own (max %.1e) and the ' ...
+            'derivative vanishes there (max %.1e)'], e_ss, max(abs(d_ss(:)))), ...
+            e_ss <= 1e-13 && max(abs(d_ss(:))) <= 1e-13 && isequal(ss_j.F, model.output(ss_j.s, Pj))) && all_passed;
+        % A zero spread is the route without one, to the last bit, with
+        % or without draws handed in; and the two mechanisms are separate.
+        opts_0 = opts_j;
+        opts_0.std_sigma = 0; opts_0.stf_sigma = 0;
+        P0 = model.compile(cs.std, cs.stf, opts_0);
+        opts_s = opts_j; opts_s.stf_sigma = 0;
+        opts_f = opts_j; opts_f.std_sigma = 0;
+        Ps = model.compile(cs.std, cs.stf, opts_s);
+        Pf = model.compile(cs.std, cs.stf, opts_f);
+        only_std = Ps.jittered == (P.n_b > 0) && Pf.jittered == (P.n_g > 0);
+        all_passed = check('    a zero spread compiles to the route without one, exactly; each spread is in force only where the route has the mechanism', ...
+            isequaln(P0, P) && only_std) && all_passed;
     end
 end
 
@@ -595,6 +677,110 @@ all_passed = check(sprintf(['    %d bad configurations with facilitation each ra
     'the zero floor on a route without depression is not in force and not refused'], numel(refusals)), ...
     ok && floor_free.n_b == 0 && floor_free.n_g == 2) && all_passed;
 
+%% 3d. the per-neuron spread across the models
+% What section 2g cannot see case by case: that a quantity has the SAME
+% value whichever model the route carries; the chain's ordering rule; the
+% ceiling; what a model refuses.
+fprintf('  the per-neuron spread\n');
+product = route_model('product');
+pool = route_model('pool');
+nn = 4000;
+rng(77, 'twister');
+zs = randn(nn, 7);
+zf = randn(nn, 7);
+sg = 0.25;
+o = struct('npre', nn, 'std_sigma', sg, 'std_z', zs, 'stf_sigma', sg, 'stf_z', zf);
+one = struct('tau_rec', 2, 'tau_rel', 0.25);
+two = struct('tau_rec', [2 5], 'tau_rel', [0.25 0.4]);
+three = struct('tau_rec', [2 5 9], 'tau_rel', [0.25 0.4 0.3]);
+chain_cfg = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
+fac_cfg = struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5, 'tau_h', 0.5);
+fac_out = struct('tau_dec', [1.5 4], 'tau_fac', [0.25 1], 'G', [5 1.5]);
+P1 = product.compile(one, [], o);
+P2 = product.compile(two, [], o);
+P3 = product.compile(three, [], o);
+Pc = pool.compile(chain_cfg, [], o);
+Ps1 = pool.compile(one, rmfield(fac_cfg, 'tau_h'), o);
+Pcf = pool.compile(chain_cfg, fac_cfg, o);
+Pfo = product.compile([], fac_out, o);
+% the same releasable-pool refill and release time under every model
+same_first = isequal(P1.tau_rest, P2.tau_rest(:, 1), P3.tau_rest(:, 1), Pc.tau_rec1, Ps1.tau_rec1, Pcf.tau_rec1) && ...
+    isequal(P1.tau_drive, P2.tau_drive(:, 1), P3.tau_drive(:, 1), Pc.tau_rel, Ps1.tau_rel, Pcf.tau_rel) && ...
+    isequal(P1.tau_rest, 2 * exp(sg * zs(:, 1))) && isequal(P1.tau_drive, 0.25 * exp(sg * zs(:, 2)));
+all_passed = check(['    tau_rec_1 and tau_rel_1 are the same per neuron on a one-component route, a product of ' ...
+    'two and of three, a single pool and a chain'], same_first) && all_passed;
+% the second refill time: one standard normal for the product and the chain
+free = ~Pc.clipped;
+same_second = isequal(P2.tau_rest(:, 2), 5 * exp(sg * zs(:, 3))) && isequal(P3.tau_rest(:, 2), P2.tau_rest(:, 2)) && ...
+    isequal(Pc.tau_rec2(free), P2.tau_rest(free, 2)) && isequal(Pcf.tau_rec2, Pc.tau_rec2);
+cols_ok = isequal(P2.tau_drive(:, 2), 0.4 * exp(sg * zs(:, 4))) && isequal(Pc.n2, 2 * exp(sg * zs(:, 5))) && ...
+    isequal(P3.tau_rest(:, 3), 9 * exp(sg * zs(:, 6))) && isequal(P3.tau_drive(:, 3), 0.3 * exp(sg * zs(:, 7)));
+all_passed = check(['    tau_rec_2 comes from one standard normal on the product and on the chain; tau_rel_2, n2 ' ...
+    'and a third component read columns 4, 5 and 6, 7'], same_second && cols_ok) && all_passed;
+% facilitation's columns, and the ceiling
+fcols = isequal(Pcf.tau_dec, 1.5 * exp(sg * zf(:, 1))) && isequal(Pcf.tau_fac, 0.25 * exp(sg * zf(:, 2))) && ...
+    isequal(Pcf.tau_h, 0.5 * exp(sg * zf(:, 3))) && isequal(Pcf.G, 1 + 4 * exp(sg * zf(:, 4))) && ...
+    isequal(Pfo.tau_rest, [Pcf.tau_dec, 4 * exp(sg * zf(:, 5))]) && ...
+    isequal(Pfo.tau_drive, [Pcf.tau_fac, 1 * exp(sg * zf(:, 6))]) && ...
+    isequal(Pfo.target, [Pcf.G, 1 + 0.5 * exp(sg * zf(:, 7))]) && isequal(Ps1.G, Pcf.G);
+G_one = pool.compile([], struct('model', 'chain', 'tau_dec', 1, 'tau_fac', 1, 'G', 1), o);
+all_passed = check(['    facilitation: tau_dec, tau_fac, tau_h and G - 1 read columns 1 to 4, a second component ' ...
+    '5 to 7; G >= 1 for every neuron and G = 1 stays 1'], ...
+    fcols && all(Pcf.G >= 1) && all(Pfo.target(:) >= 1) && all(G_one.G == 1)) && all_passed;
+% every drawn value positive, with the nominal as its median and sigma as its log-spread
+lg = @(v, nominal) [mean(log(v / nominal)), std(log(v / nominal))];
+stats = [lg(Pc.tau_rec1, 2); lg(Pc.tau_rel, 0.25); lg(Pc.n2, 2); lg(P2.tau_rest(:, 2), 5); ...
+    lg(Pcf.tau_dec, 1.5); lg(Pcf.tau_h, 0.5); lg(Pcf.G - 1, 4)];
+se = sg / sqrt(nn);
+all_passed = check(sprintf(['    drawn values are positive; log-mean within 4 standard errors of the nominal ' ...
+    '(max %.2g of %.2g) and log-spread within 5%% of sigma'], max(abs(stats(:, 1))), 4 * se), ...
+    all([Pc.tau_rec1; Pc.tau_rel; Pc.tau_rec2; Pc.n2; Pcf.tau_dec; Pcf.tau_fac; Pcf.tau_h] > 0) && ...
+    all(abs(stats(:, 1)) <= 4 * se) && all(abs(stats(:, 2) / sg - 1) <= 0.05)) && all_passed;
+% the ordering rule: the reserve refill alone is raised to the floor
+span = log(5 / 2);
+gap_drawn = span + sg * (zs(:, 3) - zs(:, 1));
+should = gap_drawn < span / 4;
+gap = log(Pc.tau_rec2 ./ Pc.tau_rec1);
+ok = isequal(Pc.clipped, should) && nnz(should) > 20 && nnz(should) < 0.06 * nn && ...
+    all(gap >= span / 4 - 1e-12) && max(abs(gap(should) - span / 4)) <= 1e-12 && ...
+    isequal(Pc.tau_rec1, 2 * exp(sg * zs(:, 1))) && all(Pc.tau_rec2(should) > 5 * exp(sg * zs(should, 3)));
+all_passed = check(sprintf(['    the chain''s ordering rule: %d of %d neurons below a quarter of the nominal log-span ' ...
+    'have tau_rec_2 raised to it exactly; tau_rec_1 is as drawn for all'], nnz(should), nn), ok) && all_passed;
+% no ordering where the nominal reserve is the faster pool, on a product route or with no spread
+fast_reserve = pool.compile(struct('model', 'chain', 'tau_rec', [3 0.8], 'tau_rel', 0.3, 'n2', 0.5), [], o);
+o_zero = o; o_zero.std_sigma = 0;
+unspread = pool.compile(chain_cfg, [], o_zero);
+all_passed = check('    no neuron is moved where the nominal reserve is the faster pool, nor with no spread; a product route has no ordering', ...
+    ~any(fast_reserve.clipped) && isequal(fast_reserve.tau_rec2, 0.8 * exp(sg * zs(:, 3))) && ...
+    ~any(unspread.clipped) && all(unspread.tau_rec2 == 5) && ~isfield(P2, 'clipped') && ...
+    any(P2.tau_rest(:, 2) < P2.tau_rest(:, 1))) && all_passed;
+% the display factors take per-neuron parameters as they come
+b = 0.2 + 0.7 * rand(nn, 2, 3);
+o_floor = o; o_floor.zero_floor = true;
+Pfl = product.compile(two, [], o_floor);
+k = Pfl.tau_rest ./ Pfl.tau_drive;
+p_min = prod(1 ./ (1 + k), 2);
+D = product.depression(b, Pfl);
+g = 1 + rand(nn, 2, 3);
+ok = max(abs(Pfl.p_min - p_min)) <= 1e-15 && std(p_min) > 0.1 * mean(p_min) && ...
+    max(abs(D - (prod(b, 2) - p_min) ./ (1 - p_min)), [], 'all') <= 1e-14 && ...
+    isequal(product.facilitation(g, Pfo), prod(g, 2)) && isequal(pool.facilitation(g, Pcf), g(:, 1, :)) && ...
+    isequal(pool.depression(b, Pc), b(:, 1, :));
+all_passed = check('    the zero floor''s p_min is each neuron''s own, and depression and facilitation (both models have the handle) use it by row', ...
+    ok) && all_passed;
+% refusals
+o_none = rmfield(o, 'std_z');
+o_short = o; o_short.std_z = zs(1:10, :);
+o_narrow = o; o_narrow.std_z = zs(:, 1:4);
+ok = throws_id(@() product.compile(one, [], o_none), 'route_product:SpreadDraws') && ...
+    throws_id(@() pool.compile(chain_cfg, [], o_short), 'route_pool:SpreadDraws') && ...
+    throws_id(@() pool.compile(chain_cfg, [], o_narrow), 'route_pool:SpreadDraws') && ...
+    throws_id(@() product.compile(three, [], o_narrow), 'route_product:SpreadDraws') && ...
+    ~throws_id(@() product.compile(two, [], o_narrow), 'route_product:SpreadDraws') && ...
+    ~throws_id(@() product.compile([], fac_out, o_none), 'route_product:SpreadDraws');
+all_passed = check('    a spread without draws, with too few rows or too few columns errors <prefix>:SpreadDraws; a mechanism the route lacks needs none', ...
+    ok) && all_passed;
+
 %% 4. the class's two ways of applying A agree
 % jacobian_times applies a route's A = d(ds)/ds in one of two ways: only
 % its diagonal where the model states that A is diagonal (P.coupling), the
@@ -832,6 +1018,61 @@ for l = 1:L
     g = s(M + l);
     ds(M + l) = (1 - g) / tau_dec + (G - g) * r / tau_fac;
     F = F * g;
+end
+end
+
+function cs = jittered_config(cs, sig_std, z_std, sig_stf, z_stf)
+% The configuration ONE neuron has under a per-neuron spread, from its row
+% of standard normals: written from the rule and the column table in
+% route_model's header ("THE SPREAD"), not from the models.
+%   value = nominal * exp(sigma * z(column));  G = 1 + (G - 1) * exp(sigma * z(column))
+%   depression    1 tau_rec_1, 2 tau_rel_1, 3 tau_rec_2, 4 tau_rel_2, 5 n2,
+%                 6, 7 tau_rec_3, tau_rel_3, ...
+%   facilitation  1 tau_dec_1, 2 tau_fac_1, 3 tau_h, 4 G_1 - 1,
+%                 5, 6, 7 tau_dec_2, tau_fac_2, G_2 - 1, ...
+% and the chain's ordering rule: where log(tau_rec_2 / tau_rec_1) falls
+% below a quarter of the nominal log-span (nominal reserve the slower),
+% tau_rec_2 alone is raised to that floor.
+is_chain = ~isempty(cs.std) && isfield(cs.std, 'model') && strcmp(cs.std.model, 'chain');
+if ~isempty(cs.std)
+    nominal = cs.std;
+    M = numel(nominal.tau_rec);
+    tau_rel = nominal.tau_rel .* ones(1, M);
+    if is_chain
+        tau_rel = nominal.tau_rel;                 % one release time
+    end
+    for m = 1:M
+        if m <= 2, col = 2 * m - 1; else, col = 2 * m; end
+        cs.std.tau_rec(m) = nominal.tau_rec(m) * exp(sig_std * z_std(col));
+        if m <= numel(tau_rel)
+            tau_rel(m) = tau_rel(m) * exp(sig_std * z_std(col + 1));
+        end
+    end
+    cs.std.tau_rel = tau_rel;
+    if is_chain
+        cs.std.n2 = nominal.n2 * exp(sig_std * z_std(5));
+        span = log(nominal.tau_rec(2) / nominal.tau_rec(1));
+        if span > 0 && log(cs.std.tau_rec(2) / cs.std.tau_rec(1)) < span / 4
+            cs.std.tau_rec(2) = cs.std.tau_rec(1) * exp(span / 4);
+        end
+    end
+end
+if ~isempty(cs.stf)
+    nominal = cs.stf;
+    L = numel(nominal.tau_dec);
+    tau_fac = nominal.tau_fac .* ones(1, L);
+    G = nominal.G .* ones(1, L);
+    for l = 1:L
+        if l == 1, cols = [1 2 4]; else, cols = 3 * l - 1 + (0:2); end
+        cs.stf.tau_dec(l) = nominal.tau_dec(l) * exp(sig_stf * z_stf(cols(1)));
+        tau_fac(l) = tau_fac(l) * exp(sig_stf * z_stf(cols(2)));
+        G(l) = 1 + (G(l) - 1) * exp(sig_stf * z_stf(cols(3)));
+    end
+    cs.stf.tau_fac = tau_fac;
+    cs.stf.G = G;
+    if isfield(nominal, 'tau_h')
+        cs.stf.tau_h = nominal.tau_h * exp(sig_stf * z_stf(3));
+    end
 end
 end
 

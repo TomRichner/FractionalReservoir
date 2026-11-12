@@ -44,13 +44,29 @@ function [out_dir, seconds] = regression_rapid_chain_run(out_dir)
 %         +0.2 to +0.5), top-K and Benettin over [4, 12] s. The full-spectrum
 %         QR is left out: on a chaotic network of this kind it took 14
 %         minutes at n = 40.
+%      e. WITH THE PER-NEURON SPREAD (FD-015; Plan A step 5 asked for the
+%         chain's exact reference "with and without the spread"; added
+%         2026-11-12, when the spread was built). Every case above except
+%         the chaotic pair, again with the spread on, under keys of their
+%         own: chain_spread (1a with std_spread [0.25 0.25], the
+%         manuscript's setting; the ordering rule moves two E and two I
+%         neurons) and mixed_spread (1b with std_spread [0.25 0.4 0.1 0.3]
+%         and stf_spread on its one facilitated type), both integrators,
+%         the same quantities plus the standard normals drawn, std_clipped
+%         and the value each neuron has of every route parameter;
+%         estimators_spread (1c); and in 2 and 3 a second sweep with the
+%         spread as a model default (sweep_spread) and a second
+%         memory-capacity run (mc.chain_spread). The cases without the
+%         spread are computed first and exactly as before: adding these
+%         changed no leaf the reference already held.
 %   2. ParamSpaceAnalysis2: an 8-job serial sweep (two gains x two reps x
 %      two conditions) at n = 40. The conditions are made here: chain_all
 %      (the chain network) and chain_EE (one SFA timescale, a chain on
-%      E->E beside one-component product routes).
+%      E->E beside one-component product routes). Then the same sweep
+%      with the spread (1e).
 %   3. SRNN_ESN_reservoir: a short memory-capacity run with the synaptic
 %      readout on the noise-free chain network (four identical chains, so
-%      the readout is defined).
+%      the readout is defined). Then the same with the spread (1e).
 %
 % What it writes: OUT_DIR/rapid_chain_model.mat, rapid_chain_extra.mat,
 % rapid_chain_sweep.mat, rapid_chain_mc.mat. regression_digest reduces
@@ -98,13 +114,24 @@ integrators = struct('name', {'rk4_noise_off', 'sra1_noise_on'}, ...
     'args', {{'sigma_u_noise', 0, 'ode_solver', 'rk4'}, {'ode_solver', 'sra1'}});
 model = struct();
 extra = struct();
-nets = {'chain', 'mixed'};
+% The last two are the first two with the per-neuron spread on (section 1e
+% of the header). They come after, and add keys; nothing of the first two
+% depends on them.
+nets = {'chain', 'mixed', 'chain_spread', 'mixed_spread'};
+spread_chain = {'std_spread', [0.25 0.25]};
+spread_mixed = {'std_spread', [0.25 0.4 0.1 0.3], 'stf_spread', [0 0 0.3 0]};
 for q = 1:numel(nets)
     for s = 1:numel(integrators)
-        if q == 1
-            m = build_from_preset(P, full_cond, run_args{:}, integrators(s).args{:}, 'synapse_config', sc4);
-        else
-            m = mixed_model(integrators(s).args{end}, run_args);
+        switch q
+            case 1
+                m = build_from_preset(P, full_cond, run_args{:}, integrators(s).args{:}, 'synapse_config', sc4);
+            case 2
+                m = mixed_model(integrators(s).args{end}, run_args);
+            case 3
+                m = build_from_preset(P, full_cond, run_args{:}, integrators(s).args{:}, 'synapse_config', sc4, ...
+                    spread_chain{:});
+            case 4
+                m = mixed_model(integrators(s).args{end}, [run_args, spread_mixed]);
         end
         m.run();
         p = m.get_params();
@@ -135,6 +162,14 @@ for q = 1:numel(nets)
             r.JY{k} = SRNNCellTypePairs.jacobian_times(S, Y, p);
             r.max_real_eig(k) = max(real(eig(full(J))));
             r.dS{k} = SRNNCellTypePairs.dynamics_fast(m.t_out(idx(k)), S, p);
+        end
+        if q >= 3
+            % What the spread drew, whom the ordering rule moved, and the
+            % value each neuron has of every route parameter.
+            r.std_draws = m.std_draws;
+            r.stf_draws = m.stf_draws;
+            r.std_clipped = m.std_clipped;
+            r.realised = realised_parameters(m, p);
         end
         model.(nets{q}).(integrators(s).name) = r;
 
@@ -172,6 +207,13 @@ mb.run();
 mq = build_from_preset(P, full_cond, small{:}, 'sigma_u_noise', 0, 'ode_solver', 'rk4', 'lya_method', 'qr');
 mq.run();
 estimators = struct('benettin', mb.lya_results, 'qr', mq.lya_results);
+% ... and the same two with the spread on (1e).
+mb = build_from_preset(P, full_cond, small{:}, 'ode_solver', 'sra1', 'lya_method', 'benettin', spread_chain{:});
+mb.run();
+mq = build_from_preset(P, full_cond, small{:}, 'sigma_u_noise', 0, 'ode_solver', 'rk4', 'lya_method', 'qr', ...
+    spread_chain{:});
+mq.run();
+estimators_spread = struct('benettin', mb.lya_results, 'qr', mq.lya_results);
 
 %% 1d. A chain network that is clearly chaotic: top-K and Benettin
 % Gain 2 on the n = 100 chain network, noise off (measured 2026-11-12:
@@ -189,8 +231,9 @@ chaotic = struct('topk', mt.lya_results, 'topk_summary', mt.lya_summary(), 'bene
 
 extra = results_only(extra);
 estimators = results_only(estimators);
+estimators_spread = results_only(estimators_spread);
 chaotic = results_only(chaotic);
-save(fullfile(out_dir, 'rapid_chain_extra.mat'), 'extra', 'estimators', 'chaotic', '-v7');
+save(fullfile(out_dir, 'rapid_chain_extra.mat'), 'extra', 'estimators', 'estimators_spread', 'chaotic', '-v7');
 
 %% 2. A sweep with chain conditions, set up as the sweep stages set theirs up
 ctx = resolve_run_context('param_space', 'preset_name', P, 'run_mode', 'fast', 'verbose', 'near-none');
@@ -222,7 +265,26 @@ end
 % the object, and are not what is being compared.
 rmdir(psa.output_dir, 's');
 sweep = results_only(sweep);
-save(fullfile(out_dir, 'rapid_chain_sweep.mat'), 'sweep', '-v7');
+
+% The same sweep with the spread as a model default, as a preset carries it (1e).
+d.std_spread = spread_chain{2};
+psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 4, 'note', 'regression_rapid_chain_spread', ...
+    'randomize_order', false, 'verbose', 'near-none', 'use_parallel', false);
+psa.model_class    = ctx.model_class;
+psa.integer_params = ctx.integer_params;
+psa.model_defaults = d;
+psa.output_dir     = fullfile(out_dir, 'sweep_scratch');
+psa.set_conditions(sweep_conditions);
+psa.add_grid_parameter('level_of_chaos', [0.5, 1.5]);
+psa.add_grid_parameter('reps', 1:2);
+psa.run();
+sweep_spread = struct();
+for i = 1:numel(sweep_conditions)
+    sweep_spread.(sweep_conditions{i}.name) = psa.results.(sweep_conditions{i}.name);
+end
+rmdir(psa.output_dir, 's');
+sweep_spread = results_only(sweep_spread);
+save(fullfile(out_dir, 'rapid_chain_sweep.mat'), 'sweep', 'sweep_spread', '-v7');
 
 %% 3. Memory capacity through the reservoir class, four identical chains
 [preset_mc, ~, conditions_mc] = srnn_param_preset(P_mc);
@@ -240,6 +302,17 @@ esn.build();
 mc = struct();
 mc.chain = struct('MC', MC, 'R2', R2, 'delay_s', res.delay_s, ...
     'hold_len', res.hold_len, 'W', esn.W, 'W_in', esn.W_in);
+% ... and with the spread on: four routes that stay identical neuron by
+% neuron, so the synaptic readout is still defined (1e).
+esn = SRNN_ESN_reservoir(base_args{:}, 'fs', fs, 'ode_solver', 'sra1', 'rng_seeds', [3 4], ...
+    'input_type', 'sample_hold', 'T_hold', 0.3, ...
+    'T_wash', 5 * fs, 'T_train', 30 * fs, 'T_test', 15 * fs, 'd_max', 3 * fs, cargs{:}, spread_chain{:});
+esn.build();
+[MC, R2, res] = esn.run_memory_capacity('readout_signal', 'synaptic', ...
+    'verbose', false, 'store_timeseries', false);
+mc.chain_spread = struct('MC', MC, 'R2', R2, 'delay_s', res.delay_s, ...
+    'hold_len', res.hold_len, 'W', esn.W, 'W_in', esn.W_in, 'std_draws', esn.std_draws, ...
+    'std_clipped', esn.std_clipped);
 save(fullfile(out_dir, 'rapid_chain_mc.mat'), 'mc', '-v7');
 
 seconds = toc(t_all);
@@ -273,6 +346,29 @@ m = SRNNCellTypePairs('n', 40, 'indegree', 10, 'n_cellTypes', 4, ...
         'no_stim_pattern', false(1, 6), 'intrinsic_drive', 0, 'positive_only', false), ...
     run_args{:}, 'sigma_u_noise', noise, 'ode_solver', solver);
 m.build();
+end
+
+function realised = realised_parameters(m, p)
+% Per route, every per-neuron array of the route model's parameters (the
+% value each neuron has; `clipped`, whom the chain's ordering rule moved),
+% under the model's own field names. Routes without state have none.
+names = m.cell_type_names;
+realised = struct();
+for pre = 1:numel(names)
+    for post = 1:numel(names)
+        P = p.route{pre, post}.P;
+        fields = fieldnames(P);
+        route = struct('jittered', P.jittered);
+        for k = 1:numel(fields)
+            v = P.(fields{k});
+            if (isnumeric(v) || islogical(v)) && size(v, 1) == P.npre && ~isempty(v) && ...
+                    ~any(strcmp(fields{k}, {'npre', 'ns', 'n_b', 'n_g', 'jittered'}))
+                route.(fields{k}) = v;
+            end
+        end
+        realised.([names{pre} '_to_' names{post}]) = route;
+    end
+end
 end
 
 function v = results_only(v)

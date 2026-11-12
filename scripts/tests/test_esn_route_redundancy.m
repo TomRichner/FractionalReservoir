@@ -221,6 +221,58 @@ evalc('esn_t.build()');
 all_passed = report(no_error(@() SRNN_ESN_reservoir.assert_route_redundancy( ...
     esn_t.cached_params)), 'accepts E->* chain with I->* two-component product') && all_passed;
 
+% f. EVERY VARIANT of the pool model is described, not only the chain. A
+%    pool route is also a single pool or has no depression at all (beside
+%    release-coupled facilitation, stf.model = 'chain'). describe_route
+%    read tau_rec(2) and n2 on every pool route, so two such routes that
+%    differed made the check throw MATLAB:badsubscript where it must raise
+%    AmbiguousSynapticOutput (found 2026-11-12, fixed with FD-015).
+fprintf('\n--- 7b. non-identical pool routes with a single pool or no depression ---\n');
+fac = struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5);
+fac_h = struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5, 'tau_h', 0.5);
+single = struct('tau_rec', 2, 'tau_rel', 0.25);
+% single pool with g on both routes, G differing
+sc_single = struct();
+sc_single.E.E.std = single;  sc_single.E.E.stf = fac;
+sc_single.E.I.std = single;  sc_single.E.I.stf = fac;
+sc_single.E.I.stf.G = 4;
+msg = refusal(base, plain, sc_single);
+all_passed = report(strcmp(msg.id, amb) && shows_difference(msg.text) && ...
+    contains(msg.text, 'single-pool STD(refill tau_rec=2, release tau_rel=0.25)') && ...
+    contains(msg.text, 'release-coupled STF(tau_dec=1.5, tau_fac=0.25, G=5)') && contains(msg.text, 'G: 5 vs 4'), ...
+    'two single-pool routes with coupled facilitation, G differing: refused, each described as a single pool') && all_passed;
+% no depression: g alone against g with a calcium trace
+sc_nodep = struct();
+sc_nodep.E.E.stf = fac;
+sc_nodep.E.I.stf = fac_h;
+msg = refusal(base, plain, sc_nodep);
+all_passed = report(strcmp(msg.id, amb) && shows_difference(msg.text) && ...
+    contains(msg.text, 'calcium trace tau_h=0.5') && ~contains(msg.text, 'STD('), ...
+    'two facilitating routes without depression, one with a calcium trace: refused, the trace is named') && all_passed;
+% a single pool against a chain, both with g
+sc_mix = struct();
+sc_mix.E.E.std = single;  sc_mix.E.E.stf = fac;
+sc_mix.E.I.std = chain;   sc_mix.E.I.stf = fac;
+msg = refusal(base, plain, sc_mix);
+all_passed = report(strcmp(msg.id, amb) && shows_difference(msg.text) && ...
+    contains(msg.text, 'single-pool STD(') && contains(msg.text, 'chained STD('), ...
+    'a single pool against a chain, both facilitated: refused, one described as each') && all_passed;
+% a facilitating route without depression against one with no synapse dynamics
+sc_bare = struct();
+sc_bare.E.I.stf = fac_h;
+msg = refusal(base, plain, sc_bare);
+all_passed = report(strcmp(msg.id, amb) && shows_difference(msg.text) && ...
+    contains(msg.text, 'no short-term plasticity'), ...
+    'a facilitating pool route against a route with no synapse dynamics: refused') && all_passed;
+% and identical pool routes of each variant are accepted
+sc_ok = struct();
+sc_ok.E.E.std = single;  sc_ok.E.E.stf = fac_h;
+sc_ok.E.I.std = single;  sc_ok.E.I.stf = fac_h;
+sc_ok.I.E.stf = fac;     sc_ok.I.I.stf = fac;
+msg = refusal(base, plain, sc_ok);
+all_passed = report(isempty(msg.id), ...
+    'identical single pools with g and h from E, identical g alone from I: accepted') && all_passed;
+
 %% ------------------------------------------------------------------------
 %  8. Memory capacity runs on chain networks.
 %% ------------------------------------------------------------------------

@@ -28,6 +28,11 @@ classdef SRNNCellTypePairs < handle
     % model with release-coupled facilitation (a release probability g,
     % optionally driven by a calcium trace h; theta = r g b1).
     % compile_route is the one place that choice is made.
+    % Every route model keeps its parameters PER PRESYNAPTIC NEURON. They
+    % are the configured values replicated unless std_spread / stf_spread
+    % give the neurons of a type their own (drawn once per neuron by
+    % build(), shared by the neuron's routes); the dynamics and the
+    % Jacobians read the per-neuron values either way.
     %
     % Example:
     %   model = SRNNCellTypePairs( ...
@@ -149,6 +154,53 @@ classdef SRNNCellTypePairs < handle
         % (route_product). Refused when any route with depression is a
         % vesicle-pool route (std.model or stf.model = 'chain').
         std_zero_floor = false
+        % PER-NEURON SPREAD OF THE SYNAPSE PARAMETERS (FD-015), the
+        % counterpart of tau_a_spread for depression and facilitation.
+        % One dimensionless number per PRESYNAPTIC cell type (1 x C; a
+        % scalar is broadcast; [] = zeros = every neuron of a type shares
+        % the configured values exactly, the default, and every result is
+        % what it was without these properties).
+        %   std_spread  depression: every pool's time constants (tau_rec,
+        %               tau_rel of each component; the chain's two refill
+        %               times and its release time) and the chain's
+        %               reserve size n2
+        %   stf_spread  facilitation: tau_dec, tau_fac, the calcium
+        %               trace's tau_h, and the ceiling G
+        % With a nonzero spread build() draws each neuron ONE row of
+        % independent standard normals per mechanism (std_draws,
+        % stf_draws, below) and every route of that neuron reads it:
+        %   value = nominal * exp(spread * z)        positive; the nominal
+        %                                            is the median
+        %   G     = 1 + (G_nominal - 1) * exp(spread * z)     so G >= 1
+        % The column of z a quantity reads is fixed and the same for
+        % every route model (route_model, "THE SPREAD"): tau_rec_1 and
+        % tau_rel_1 are columns 1 and 2 whether the route has one
+        % depression component, a product of several or the chain. So ON
+        % ONE NETWORK SEED a neuron has the same releasable-pool refill
+        % and release time in a single-timescale condition, in the chained
+        % one and in the product one, and the same standard normal behind
+        % its second refill time in the last two. A neuron's routes with
+        % the same configuration stay identical (routes_identical, the
+        % reservoir's synaptic readout).
+        % ORDERING, chain routes only (route_pool): a neuron whose reserve
+        % refill comes closer to its releasable-pool refill than a quarter
+        % of the nominal log-span has the RESERVE refill raised to that
+        % floor; the releasable pool's is never moved. std_clipped counts
+        % the neurons moved. Product components and facilitation have no
+        % ordering to keep.
+        % The realised values are in get_params().route{pre, post}.P, per
+        % neuron; the params fields tau_b_rec, tau_b_rel, std_n2,
+        % tau_g_dec, tau_g_fac, G and stf_tau_h stay the NOMINAL values.
+        std_spread = []
+        stf_spread = []
+        % Seeds for the two draws. Empty derives each from rng_seeds(1)
+        % with its own offset (32452843 and 49979687), so a sweep over
+        % network seeds also varies the synapse parameters while the draws
+        % stay off the streams that generate W, the setpoints, the SFA
+        % ladders and the noise, and off each other. Pinned to 'twister'
+        % so a parallel worker draws what the client draws.
+        std_seed = []
+        stf_seed = []
         % VERBOSE Console verbosity: 'verbose' (every build/run/Lyapunov line),
         % 'minimal' (DEFAULT: the class prints nothing; stages and drivers print
         % one line per step) or 'near-none'. Logical true/false also accepted.
@@ -344,6 +396,25 @@ classdef SRNNCellTypePairs < handle
         % minimum log-separation floor by the last build (see
         % build_tau_a_matrix). Zeros when no spread was drawn.
         tau_a_clipped = []
+
+        % What build_synapse_spread() drew for std_spread / stf_spread:
+        % the standard normals, n x Q, one ROW PER NEURON (all neurons, in
+        % network order) and one column per quantity in the fixed order of
+        % route_model ("THE SPREAD"). Every column is drawn for every
+        % neuron whatever its routes use, and randn fills column by
+        % column, so the leading columns are the same numbers whatever Q
+        % is: Q is max(5, 2 M + 1) for depression and max(4, 3 L + 1) for
+        % facilitation, M and L the largest numbers of depression and
+        % facilitation components on any route of the model (so 5 and 4
+        % unless a product route has three or more components, or two or
+        % more facilitation components). EMPTY when the mechanism's spread
+        % is zero for every type: nothing is drawn.
+        std_draws = []
+        stf_draws = []
+        % Per presynaptic type, how many neurons the chain's ordering rule
+        % moved on at least one of the type's routes in the last build.
+        % Zeros when nothing was drawn.
+        std_clipped = []
 
         % Pre-generated Wiener increments for the current run, or empty. Built
         % at the top of run(), kept alive through compute_lyapunov so Benettin
@@ -961,7 +1032,15 @@ classdef SRNNCellTypePairs < handle
             % routes, kept under the names code outside the class reads
             % (SRNN_ESN_reservoir, route_fields, figures, tests). Nothing
             % in the class computes with them.
+            % The fields are NOMINAL also under a per-neuron spread
+            % (std_spread, stf_spread): what each neuron has is in
+            % params.route{pre, post}.P, where the drawn values go in
+            % through the route model's compile and nowhere else. The two
+            % spreads are recorded here because a route's comparable data
+            % includes them (route_fields).
             pair = obj.compile_synapse_config(obj.n_per_type);
+            params.std_spread = obj.std_spread;
+            params.stf_spread = obj.stf_spread;
             params.n_b_pairs = pair.n_b;
             params.tau_b_rec = pair.tau_b_rec;
             params.tau_b_rel = pair.tau_b_rel;
@@ -1232,6 +1311,17 @@ classdef SRNNCellTypePairs < handle
             end
             obj.tau_a_spread = reshape(obj.tau_a_spread, 1, []);
 
+            % Synapse-parameter spreads: the same broadcasting.
+            for name = {'std_spread', 'stf_spread'}
+                value = obj.(name{1});
+                if isempty(value)
+                    value = zeros(1, C);
+                elseif isscalar(value)
+                    value = repmat(value, 1, C);
+                end
+                obj.(name{1}) = reshape(value, 1, []);
+            end
+
             % tau_a defaults to NO adaptation on any type. It is no longer
             % auto-filled from a count: the count is now derived from it, and
             % inventing timescales from an integer is what this refactor
@@ -1353,6 +1443,20 @@ classdef SRNNCellTypePairs < handle
                 error('SRNNCellTypePairs:InvalidParams', ...
                     'tau_a_seed must be empty or a finite scalar.');
             end
+            for name = {'std', 'stf'}
+                spread = obj.([name{1} '_spread']);
+                if numel(spread) ~= C || ~isnumeric(spread) || ...
+                        any(~isfinite(spread)) || any(spread < 0)
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        ['%s_spread must be empty, a scalar, or a finite nonnegative ' ...
+                        '1 x %d row (one log-normal spread per presynaptic cell type).'], name{1}, C);
+                end
+                seed = obj.([name{1} '_seed']);
+                if ~isempty(seed) && ~(isscalar(seed) && isnumeric(seed) && isfinite(seed))
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        '%s_seed must be empty or a finite scalar.', name{1});
+                end
+            end
             % Ordering is enforced in build_tau_a_matrix by a minimum log-
             % separation floor (TR, 2026-09-14), not refused here: a spread of
             % any size builds, and neurons whose two end draws would fall
@@ -1447,6 +1551,13 @@ classdef SRNNCellTypePairs < handle
             %   pair = obj.compile_synapse_config(counts)    per-neuron parameters,
             %                                                counts(pre) rows each
             %
+            % The second form is the one get_params uses, with
+            % counts = n_per_type, and the one that carries the per-neuron
+            % spread: each route is handed its presynaptic type's spreads
+            % and that type's rows of std_draws / stf_draws, once build()
+            % has drawn them. (Before build, and in the first form, every
+            % neuron has the nominal values.)
+            %
             % The class checks the shape of synapse_config and the route's
             % scale. Everything inside a route's `std` and `stf` belongs to
             % the route's model (src/model/routes; see route_model), whose
@@ -1480,8 +1591,24 @@ classdef SRNNCellTypePairs < handle
                         'Unknown presynaptic type: %s.', unknown_pre{1});
                 end
             end
+            % The per-neuron spread: only with one row per neuron, and only
+            % once the draws exist.
+            with_std = nargin >= 2 && ~isempty(obj.std_draws);
+            with_stf = nargin >= 2 && ~isempty(obj.stf_draws);
+            if with_std || with_stf
+                type_rows = obj.spread_type_rows(counts);
+            end
             for pre = 1:C
                 pre_name = names{pre};
+                spread = struct('std_sigma', 0, 'std_z', [], 'stf_sigma', 0, 'stf_z', []);
+                if with_std && obj.std_spread(pre) > 0
+                    spread.std_sigma = obj.std_spread(pre);
+                    spread.std_z = obj.std_draws(type_rows{pre}, :);
+                end
+                if with_stf && obj.stf_spread(pre) > 0
+                    spread.stf_sigma = obj.stf_spread(pre);
+                    spread.stf_z = obj.stf_draws(type_rows{pre}, :);
+                end
                 targets = struct();
                 if ~isempty(config) && isfield(config, pre_name)
                     targets = config.(pre_name);
@@ -1536,7 +1663,9 @@ classdef SRNNCellTypePairs < handle
                     compiled = SRNNCellTypePairs.compile_route(cfg, struct( ...
                         'npre', counts(pre), 'zero_floor', obj.std_zero_floor, ...
                         'label', [pre_name '->' post_name], ...
-                        'err_id_prefix', 'SRNNCellTypePairs'));
+                        'err_id_prefix', 'SRNNCellTypePairs', ...
+                        'std_sigma', spread.std_sigma, 'std_z', spread.std_z, ...
+                        'stf_sigma', spread.stf_sigma, 'stf_z', spread.stf_z));
                     pair.route{pre, post} = compiled;
 
                     nominal = compiled.P.nominal;
@@ -1630,6 +1759,98 @@ classdef SRNNCellTypePairs < handle
             % vector exists before build_stimulus() and get_params().
             obj.build_setpoints();
             obj.build_tau_a_matrix();
+            obj.build_synapse_spread();
+        end
+
+        function build_synapse_spread(obj)
+            % BUILD_SYNAPSE_SPREAD Draw the per-neuron standard normals behind
+            % std_spread and stf_spread (std_draws, stf_draws) and count the
+            % neurons the chain's ordering rule moved (std_clipped).
+            %
+            % See the std_spread property for the rule and route_model
+            % ("THE SPREAD") for the columns. Leaves the draws EMPTY for a
+            % mechanism whose spread is zero on every type: every route then
+            % compiles to the nominal values replicated, exactly as without
+            % this feature.
+            %
+            % Each mechanism has its own seeded stream, pinned to 'twister'
+            % (see build_tau_a_matrix), and the global RNG state is saved
+            % and restored, so W, the setpoints, the SFA ladders, the
+            % stimulus and x0 are bit-identical with or without the draws
+            % and the two draws do not depend on each other. The draw is
+            % n x Q for ALL neurons, every column whatever the routes use;
+            % only Q depends on the network (the std_draws property says
+            % how), and the leading columns do not depend on Q.
+            C = obj.n_cellTypes;
+            obj.std_draws = [];
+            obj.stf_draws = [];
+            obj.std_clipped = zeros(1, C);
+            draw_std = any(obj.std_spread > 0);
+            draw_stf = any(obj.stf_spread > 0);
+            if ~draw_std && ~draw_stf
+                return;
+            end
+            pair = obj.compile_synapse_config();
+            stream_state = rng;
+            if draw_std
+                seed_std = obj.std_seed;
+                if isempty(seed_std)
+                    seed_std = obj.rng_seeds(1) + 32452843;
+                end
+                Q = max(5, 2 * max(cellfun(@numel, pair.tau_b_rec(:))) + 1);
+                rng(seed_std, 'twister');
+                obj.std_draws = randn(obj.n, Q);
+            end
+            if draw_stf
+                seed_stf = obj.stf_seed;
+                if isempty(seed_stf)
+                    seed_stf = obj.rng_seeds(1) + 49979687;
+                end
+                Q = max(4, 3 * max(cellfun(@numel, pair.tau_g_dec(:))) + 1);
+                rng(seed_stf, 'twister');
+                obj.stf_draws = randn(obj.n, Q);
+            end
+            rng(stream_state);
+
+            % What the ordering rule moved: a neuron counts once however
+            % many of its routes are chains.
+            if draw_std
+                counts = obj.n_per_type;
+                pair = obj.compile_synapse_config(counts);
+                for pre = 1:C
+                    moved = false(counts(pre), 1);
+                    for post = 1:C
+                        P = pair.route{pre, post}.P;
+                        if isfield(P, 'clipped')
+                            moved = moved | P.clipped;
+                        end
+                    end
+                    obj.std_clipped(pre) = nnz(moved);
+                end
+                vprintf(obj.verbose, 'verbose', ['Per-neuron depression parameters drawn (seed %d, ' ...
+                    '%d columns): spread %s, reserve refill raised to the floor on %s neurons\n'], ...
+                    seed_std, size(obj.std_draws, 2), mat2str(obj.std_spread), mat2str(obj.std_clipped));
+            end
+            if draw_stf
+                vprintf(obj.verbose, 'verbose', ['Per-neuron facilitation parameters drawn (seed %d, ' ...
+                    '%d columns): spread %s\n'], seed_stf, size(obj.stf_draws, 2), mat2str(obj.stf_spread));
+            end
+        end
+
+        function rows = spread_type_rows(obj, counts)
+            % The rows of std_draws / stf_draws that belong to each cell
+            % type, checked against the model as it is now: the draws are
+            % made by build(), and a model changed since (another n, f or
+            % spread row) must be built again before its parameters are read.
+            C = obj.n_cellTypes;
+            n_drawn = max(size(obj.std_draws, 1), size(obj.stf_draws, 1));
+            if ~isequal(reshape(counts, 1, []), obj.n_per_type) || n_drawn ~= obj.n || ...
+                    numel(obj.std_spread) ~= C || numel(obj.stf_spread) ~= C
+                error('SRNNCellTypePairs:StaleSpreadDraws', ...
+                    ['The per-neuron synapse draws (std_draws, stf_draws) were made for another ' ...
+                    'network (n, f or the spreads changed since build()). Call build() again.']);
+            end
+            rows = obj.type_indices;
         end
 
         function build_tau_a_matrix(obj)
@@ -2454,6 +2675,15 @@ classdef SRNNCellTypePairs < handle
             % does not form prod(b, 2) itself, so that it is right for every
             % route model. The arithmetic is the model's: its `depression`
             % handle (route_model), one call for every model.
+            %
+            % ONE ROW PER PRESYNAPTIC NEURON OF THE ROUTE, all of them and
+            % in order, when the route's parameters differ per neuron
+            % (std_spread or stf_spread on its presynaptic type): a
+            % parameter is then indexed by row (the zero floor's p_min is
+            % one), and an array with other rows would be given other
+            % neurons' values. That raises
+            % SRNNCellTypePairs:RouteFactorRows. Take the factor of the
+            % whole route and select rows from the result.
             if isempty(b)
                 D = [];
                 return;
@@ -2465,7 +2695,21 @@ classdef SRNNCellTypePairs < handle
                     'Route (%d, %d) has %d depression variable(s); b has %d column(s).', ...
                     pre, post, R.P.n_b, size(b, 2));
             end
+            SRNNCellTypePairs.check_route_rows(b, R.P, pre, post, 'b');
             D = R.model.depression(b, R.P);
+        end
+
+        function check_route_rows(v, P, pre, post, what)
+            % A route's array handed to std_route_factor / stf_route_factor
+            % must have one row per presynaptic neuron once the route's
+            % parameters differ per neuron (see std_route_factor).
+            if P.jittered && size(v, 1) ~= P.npre
+                error('SRNNCellTypePairs:RouteFactorRows', ...
+                    ['Route (%d, %d) has per-neuron parameters (std_spread or stf_spread) and ' ...
+                    '%d presynaptic neurons; %s has %d row(s). Pass the whole route''s array, one ' ...
+                    'row per presynaptic neuron, and select rows from the result.'], ...
+                    pre, post, P.npre, what, size(v, 1));
+            end
         end
 
         function Fg = stf_route_factor(g, params, pre, post)
@@ -2490,8 +2734,10 @@ classdef SRNNCellTypePairs < handle
             % CODE THAT DISPLAYS OR USES A ROUTE'S FACILITATION CALLS THIS
             % and does not form prod(g, 2) itself, as std_route_factor is
             % for depression. The arithmetic is the model's: its
-            % `facilitation` handle where it has one (route_model), and the
-            % product of the g-block's columns where it has none.
+            % `facilitation` handle (route_model), one call for every
+            % model. As for std_route_factor, g has one row per
+            % presynaptic neuron of the route when the route's parameters
+            % differ per neuron (SRNNCellTypePairs:RouteFactorRows).
             if isempty(g)
                 Fg = [];
                 return;
@@ -2502,11 +2748,8 @@ classdef SRNNCellTypePairs < handle
                     'Route (%d, %d) has %d facilitation variable(s); g has %d column(s).', ...
                     pre, post, R.P.n_g, size(g, 2));
             end
-            if isfield(R.model, 'facilitation')
-                Fg = R.model.facilitation(g, R.P);
-            else
-                Fg = prod(g, 2);
-            end
+            SRNNCellTypePairs.check_route_rows(g, R.P, pre, post, 'g');
+            Fg = R.model.facilitation(g, R.P);
         end
 
         % The next three predate the route models and are kept for callers
@@ -2869,7 +3112,9 @@ classdef SRNNCellTypePairs < handle
             %
             % Compares STD (n_b, tau_rec, tau_rel), STF (n_g, tau_dec, tau_fac,
             % G), the route model's signature (which model, and what only it
-            % has: a chain's n2) and the route scale of every route against route (1, 1), across
+            % has: a chain's n2), the per-neuron spread of the route's
+            % presynaptic type (std_spread, stf_spread, for the mechanisms
+            % the route has) and the route scale of every route against route (1, 1), across
             % ALL presynaptic types -- the same fields SRNN_ESN_reservoir.
             % route_signature compares, but as a logical rather than an error
             % and globally rather than per presynaptic type. When true, every
@@ -2915,6 +3160,20 @@ classdef SRNNCellTypePairs < handle
             % the same time constants, nor two chains with different n2.
             if isfield(params, 'route')
                 sig.signature = params.route{pre, post}.P.signature;
+            end
+            % The per-neuron spread of the route's PRESYNAPTIC type, of each
+            % mechanism the route has (0 where it has none, or no spread).
+            % Two routes of one presynaptic type with the same
+            % configuration read the same draws with the same spread, so
+            % they stay identical neuron by neuron; routes of types with
+            % different spreads do not carry the same dynamics.
+            sig.std_spread = 0;
+            sig.stf_spread = 0;
+            if sig.n_b > 0 && isfield(params, 'std_spread') && ~isempty(params.std_spread)
+                sig.std_spread = params.std_spread(pre);
+            end
+            if sig.n_g > 0 && isfield(params, 'stf_spread') && ~isempty(params.stf_spread)
+                sig.stf_spread = params.stf_spread(pre);
             end
         end
 
