@@ -106,9 +106,30 @@ the plan is shaping up." So:
 
 Working arrangement (TR, 2026-11-10, revised the same day): **a lead agent
 orchestrates and worker agents build.** The lead writes the briefs, reviews
-every diff, runs the regression gates and handles the merges, so it keeps
-the architecture in view; it was first planned that one agent would do all
-the building, and that was dropped. Up to two Fable 5.2 workers at medium
+every diff, sees that the regression gates are run and handles the merges,
+so it keeps the architecture in view; it was first planned that one agent
+would do all the building, and that was dropped.
+
+**The lead runs nothing in MATLAB that takes more than roughly 30 seconds
+(Tom, 2026-11-12).** "Your main job is orchestration, merging, planning
+and decisions"; "I don't want you launching matlab yourself or being
+blocked. You should be orchestrating agents and planning with me." Until
+then the lead ran the gates and several runs in the desktop MATLAB, which
+tied up both the lead and Tom's session. So:
+
+- **Runs, gates and anything that waits go to a worker**, in its own
+  MATLAB session: the quick suite, the stages and full tiers, tolerance
+  suites, bundle runs, example scripts that simulate for minutes. The
+  brief says what to run, what a pass looks like and what to report; the
+  worker launches, watches, and relaunches if that is needed.
+- **A worker also watches a job already running** (through its log,
+  marker files and process CPU time), so the lead never sits on one.
+- The lead's own MATLAB calls are short look-ups: reading a value off a
+  model or a saved file, a config's fields, `which`, a single fast test.
+  If a call might run past half a minute, it is a worker's.
+- The desktop MATLAB (the `matlab` MCP server) is Tom's interactive
+  session. A worker cannot reach it; figures Tom should see there are
+  opened by the lead with a short call, or Tom is given the script. Up to two Fable 5.2 workers at medium
 effort take the difficult work (re-implementing classes, numerical methods,
 equations in code); up to three Opus 5.5 workers at medium effort take the
 straightforward work (configs, scripts, plots). The workers are the six
