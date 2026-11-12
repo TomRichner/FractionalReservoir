@@ -547,23 +547,9 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function S = integrate_route(model, P, r_t, dt)
-% Classical RK4 on the route's own equations (model.rhs), the rate held at
-% r_t(i) over step i (the rate changes only at step boundaries). S is
-% nt x ns: the state at the END of each step, matching t = (1:nt)*dt.
-nt = numel(r_t);
-S = zeros(nt, P.ns);
-s = model.initial(P);
-for i = 1:nt
-    ri = r_t(i);
-    k1 = model.rhs(s, ri, P);
-    k2 = model.rhs(s + 0.5 * dt * k1, ri, P);
-    k3 = model.rhs(s + 0.5 * dt * k2, ri, P);
-    k4 = model.rhs(s + dt * k3, ri, P);
-    s = s + (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
-    S(i, :) = s;
-end
-end
+% integrate_route (classical RK4 on the route's rhs, the rate held at r_t(i)
+% over step i; S nt x ns, the state at the END of each step) is shared with
+% fig_std_1TS_vs_MTS: src/figures/helpers/integrate_route.m.
 
 function P = compile_n(route_cfg, opts, n)
 % The route compiled for n neurons (n rates evaluated at once).

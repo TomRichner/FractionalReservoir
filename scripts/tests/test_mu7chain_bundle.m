@@ -67,10 +67,17 @@ for c = {cfg3, cfg4}
             grouped{g}.name, src, k.fig_root);
     end
 end
-% The same registry as the manuscript bundle's, entry for entry.
+% The same registry as the manuscript bundle's, entry for entry, plus the
+% chain's own comparison figure (FD-014), in both sets and in the paper.
 ref_cfg = mu7revisedMedium_config();
-assert(isequal(cellfun(@(f) f.name, cfg3.figures, 'UniformOutput', false), ...
-               cellfun(@(f) f.name, ref_cfg.figures, 'UniformOutput', false)));
+chain_only = {'fig_std_1TS_vs_MTS'};
+for c = {cfg3, cfg4}
+    nm = cellfun(@(f) f.name, c{1}.figures, 'UniformOutput', false);
+    assert(isequal(nm(~ismember(nm, chain_only)), ...
+                   cellfun(@(f) f.name, ref_cfg.figures, 'UniformOutput', false)));
+    e = c{1}.figures{strcmp(nm, 'fig_std_1TS_vs_MTS')};
+    assert(e.in_paper && isequal(e.args, {'preset_name', main_name}));
+end
 
 % FD-016: a fixed sample seed, valid for run_all_paper_analyses.
 s = cfg.param_space_seed;
