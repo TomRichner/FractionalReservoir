@@ -21,15 +21,19 @@ function [ok, leaves, info] = regression_tol_check(name, opts)
 %          route_pool: with facilitation off, the chain is unchanged).
 %          'stf_chain': .../fixtures/regression_tol_stf_chain.mat, networks
 %          with release-coupled facilitation as first built (the gate for
-%          the per-neuron spread and any later edit to it). Any
+%          the per-neuron spread and any later edit to it). 'spread':
+%          .../fixtures/regression_tol_spread.mat, networks whose
+%          depression and facilitation parameters differ per neuron
+%          (std_spread, stf_spread) as first built. Any
 %          other name: a pre-edit reference made by
 %          make_regression_tol_reference(NAME), in data/regression_tol/.
 %          The reference says which suite of cases it holds
-%          (regression_tol_run: 'base', 'chain' or 'stf_chain') and that
-%          suite is run; 'anchor', 'chain' and 'stf_chain' are run one
-%          after the other by test_regression_tolerance,
-%          test_regression_tolerance_chain and
-%          test_regression_tolerance_stf_chain.
+%          (regression_tol_run: 'base', 'chain', 'stf_chain' or 'spread')
+%          and that suite is run; 'anchor', 'chain', 'stf_chain' and
+%          'spread' are run one after the other by
+%          test_regression_tolerance, test_regression_tolerance_chain,
+%          test_regression_tolerance_stf_chain and
+%          test_regression_tolerance_spread.
 %
 %   - OK true: every leaf of the reference is within tolerance. The
 %     printout says how close the worst leaf of each layer was.

@@ -6,9 +6,13 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 %   R = regression_tol_run([], 'chain') % the CHAIN suite (below), capture
 %   R = regression_tol_run(ref_data, 'chain')
 %   R = regression_tol_run([], 'stf_chain')   % the STF_CHAIN suite (below)
+%   R = regression_tol_run([], 'spread')      % the SPREAD suite (last in this header)
 %   [R, seconds] = regression_tol_run(...)
 %
-% THREE SUITES, each with a reference of its own. SUITE 'base' (the
+% FOUR SUITES, each with a reference of its own. The fourth, 'spread'
+% (networks with a per-neuron spread on the synapse parameters; reference
+% regression_tol_spread.mat), is described at the end of this header; the
+% first three are these. SUITE 'base' (the
 % default) is everything described from here to "THE CHAIN SUITE": the
 % networks the model class had before Plan A touched it, whose reference is
 % the anchor. SUITE 'chain' is the same two layers on networks with chained
@@ -239,18 +243,79 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 % leading direction's LOCAL rate is positive at times at any gain, because
 % a coupled route's own block is non-normal.
 %
+% THE SPREAD SUITE (FD-015; 2026-11-12). std_spread and stf_spread give
+% each presynaptic neuron its own depression and facilitation parameters:
+% nominal * exp(spread * z), a ceiling as 1 + (G - 1) exp(spread * z), from
+% one row of standard normals per neuron and mechanism (std_draws,
+% stf_draws), read by every route of the neuron from fixed columns
+% (route_model, "THE SPREAD"). No other suite has a spread (and all three
+% must go on passing unchanged: with no spread a parameter is exactly the
+% nominal). The suite has the pool suites' structure on three networks:
+%   schain  the regression network in its sfa3_std2 condition with all four
+%           routes the chain (the chain suite's network) and
+%           std_spread [0.25 0.25]: what the manuscript's preset will set
+%   smixed  the stf_chain suite's fmixed network (every pool variant with
+%           facilitation, beside product routes) plus SST->VIP, a plain
+%           one-component product route; PV->VIP, a chain with close
+%           refill times (tau_rec [2 3]) on which the ordering rule acts;
+%           and VIP->PV, a geometric-mean product with output-only
+%           facilitation. std_spread [0.25 0.4 0 0.3], stf_spread
+%           [0.3 0 0.25 0.15]: the spreads differ between the cell types
+%           and each mechanism has one type with none, whose routes must
+%           keep the nominal exactly beside spread ones. So a spread sits
+%           on a chain, a single pool, one and two product components,
+%           the geometric mean, g with and without h, and output-only
+%           facilitation with one and two components.
+%   sfloor  the base suite's stable options network (product routes: the
+%           geometric mean, one component, facilitation, a route scale,
+%           and the ZERO FLOOR, which a pool route refuses) with
+%           std_spread [0.3 0.2 0.25], stf_spread [0.2 0.3 0.1]: the
+%           floor's p_min is then each neuron's own.
+% LAYER 1, POINTWISE: schain_noStim.<integrator>, schain_steps.<integrator>,
+% smixed_gain1, schain_stable.<integrator>, smixed_stable.<integrator>,
+% sfloor_stable; the states of the stf_chain suite (pick_pool_states: its
+% two made states take g up to the route's NOMINAL ceiling, which a neuron
+% with a lower drawn ceiling never reaches; a single evaluation does not
+% mind). A case holds what an stf_chain-suite case holds and, in its
+% view: std_draws, stf_draws, std_clipped, and under realised.<route> every
+% per-neuron array of the route model's parameters (the value each neuron
+% has, and `clipped`, which neurons the ordering rule moved). route_fields
+% carries the route's std_spread and stf_spread.
+% LAYER 2, STABLE END TO END (gain 0.2, staircase): stable.model.schain,
+% .smixed (noise off and on) and .sfloor (one run), each with std_factor,
+% stf_factor and std_clipped; stable.extra.schain, .smixed;
+% stable.estimators.schain (n = 12), .smixed (n = 6); stable.sweep (8 jobs,
+% the chain suite's two conditions with std_spread [0.25 0.25] as a model
+% default, as a preset would carry it: chain_all, and chain_EE with a chain
+% on E->E beside one-component routes); stable.mc.schain (memory capacity,
+% synaptic readout, four identical spread chain routes).
+% HOW STABLE (measured 2026-11-12; exponents in 1/s; noise off / noise on):
+%              top-K lambda_1     its largest       Benettin   QR, largest
+%                                 LOCAL rate        (reduced)  (reduced)
+%   schain     -0.162 / -0.161    -0.124 / -0.122   -0.426     -0.074
+%   smixed     -0.565 / -0.560    -0.398 / -0.397   -0.665     -0.388
+%   sfloor     -0.767             -0.653
+% No estimator finds a positive exponent (QR: none of 96 and 72),
+% lya_K_auto never retries and no SFA ladder is clipped. The 8 sweep jobs
+% have lambda_1 between -0.42 and -0.21. The ordering rule acts in the
+% stable networks on one I neuron of schain (n = 40) and on two PV
+% neurons and one VIP neuron of smixed.
+%
 % See also: regression_tol_compare, regression_tol_check,
 %           make_regression_tol_reference, regression_tol_settings,
 %           regression_tol_band_check, regression_rapid_run
 arguments
     ref_data = []
-    suite (1,:) char {mustBeMember(suite, {'base', 'chain', 'stf_chain'})} = 'base'
+    suite (1,:) char {mustBeMember(suite, {'base', 'chain', 'stf_chain', 'spread'})} = 'base'
 end
 if strcmp(suite, 'chain')
     [R, seconds] = pool_suite(ref_data, chain_spec());
     return;
 elseif strcmp(suite, 'stf_chain')
     [R, seconds] = pool_suite(ref_data, stf_chain_spec());
+    return;
+elseif strcmp(suite, 'spread')
+    [R, seconds] = pool_suite(ref_data, spread_spec());
     return;
 end
 t_all = tic;
@@ -508,7 +573,7 @@ for q = 1:numel(sets)
         key = {'pointwise', sets(q).name, integrators(s).name};
         try
             m = build_from_preset(sets(q).preset, full_cond, chaos_args{:}, integrators(s).args{:}, ...
-                'synapse_config', sc4);
+                'synapse_config', sc4, spec.uniform_args{:});
             if capture
                 m.run();
                 [S, t] = spec.pick(m);
@@ -553,7 +618,7 @@ for q = 1:numel(nets)
             if q == 1
                 % The preset states the noise; only the integrator is named here.
                 m = build_from_preset(P_stable.(integrators(s).name), full_cond, stable_args{:}, ...
-                    'ode_solver', solver, 'synapse_config', sc4);
+                    'ode_solver', solver, 'synapse_config', sc4, spec.uniform_args{:});
             else
                 m = spec.mixed_model(0.2, solver, {});
             end
@@ -594,6 +659,28 @@ for q = 1:numel(nets)
     end
 end
 
+%% Layer 2a'. A third stable network, where the suite has one
+% (the spread suite: product routes with the zero floor, whose p_min is
+% then per neuron; a pool route refuses the floor, so the two networks
+% above cannot carry it). One run, end to end and pointwise.
+if ~isempty(spec.third)
+    key_run = {'stable', 'model', spec.third.name};
+    key_pw  = {'pointwise', [spec.third.name '_stable']};
+    try
+        m = spec.third.model();
+        m.run();
+        R = setfield(R, key_run{:}, spec.along_run(end_to_end(m), m));
+        if capture
+            [S, t] = spec.pick(m);
+        else
+            [S, t] = stored_states(ref_data, key_pw(2:end));
+        end
+        R = setfield(R, key_pw{:}, spec.pointwise(m, S, t));
+    catch err
+        [R, errors] = failed(R, errors, capture, err, key_run, key_pw);
+    end
+end
+
 %% Layer 2c. The other two Lyapunov estimators, on reduced stable networks
 % Smaller than the base suite's n = 20: QR integrates N^2 variational
 % equations with ode45, and at n = 20 these two runs were two thirds of
@@ -607,9 +694,9 @@ for q = 1:numel(nets)
     try
         if q == 1
             mb = build_from_preset(P_stable.sra1_noise_on, full_cond, small{:}, small_run{:}, ...
-                'ode_solver', 'sra1', 'lya_method', 'benettin', 'synapse_config', sc4);
+                'ode_solver', 'sra1', 'lya_method', 'benettin', 'synapse_config', sc4, spec.uniform_args{:});
             mq = build_from_preset(P_stable.rk4_noise_off, full_cond, small{:}, small_run{:}, ...
-                'ode_solver', 'rk4', 'lya_method', 'qr', 'synapse_config', sc4);
+                'ode_solver', 'rk4', 'lya_method', 'qr', 'synapse_config', sc4, spec.uniform_args{:});
         else
             mb = spec.mixed_model(0.2, 'sra1', [spec.small_mixed, small_run, {'lya_method', 'benettin'}]);
             mq = spec.mixed_model(0.2, 'rk4',  [spec.small_mixed, small_run, {'lya_method', 'qr'}]);
@@ -634,6 +721,12 @@ try
     sweep_conditions = spec.sweep_conditions(ctx, sc4);
     d = ctx.model_defaults;
     d.T_range = [0 4]; d.lya_T_interval = [2 4]; d.lya_warmup = 1;
+    % What the suite's uniform network sets beside its routes (the spread
+    % suite: std_spread) is a model default of the sweep, as a preset
+    % would carry it. Nothing for the chain and stf_chain suites.
+    for k = 1:2:numel(spec.uniform_args)
+        d.(spec.uniform_args{k}) = spec.uniform_args{k + 1};
+    end
     psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 4, 'note', spec.sweep_note, ...
         'randomize_order', false, 'verbose', 'near-none', 'use_parallel', false);
     psa.model_class    = ctx.model_class;
@@ -667,7 +760,8 @@ try
     esn = SRNN_ESN_reservoir(base_args{:}, ...
         'fs', fs, 'ode_solver', 'sra1', 'rng_seeds', [3 4], ...
         'input_type', 'sample_hold', 'T_hold', 0.3, ...
-        'T_wash', 5 * fs, 'T_train', 30 * fs, 'T_test', 15 * fs, 'd_max', 3 * fs, cargs{:});
+        'T_wash', 5 * fs, 'T_train', 30 * fs, 'T_test', 15 * fs, 'd_max', 3 * fs, cargs{:}, ...
+        spec.uniform_args{:});
     esn.build();
     [MC, R2, res] = esn.run_memory_capacity('readout_signal', 'synaptic', ...
         'verbose', false, 'store_timeseries', false);
@@ -683,12 +777,131 @@ end
 seconds = toc(t_all);
 end
 
+function spec = spread_spec()
+% The spread suite (see the header): what pool_suite runs for it.
+%
+% HOW STABLE its layer-2 networks are (measured 2026-11-12 with
+% pool_suite's settings; exponents in 1/s; noise off / noise on): see the
+% table in the header's section on this suite.
+chain = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
+sc4 = struct();
+sc4.E.E.std = chain; sc4.E.I.std = chain; sc4.I.E.std = chain; sc4.I.I.std = chain;
+spec = struct('uniform', 'schain', 'mixed', 'smixed', 'sc4', sc4, ...
+    'uniform_args', {{'std_spread', [0.25 0.25]}}, ...
+    'third', struct('name', 'sfloor', 'model', @() options_model(0.2, true, ...
+        {'std_spread', [0.3 0.2 0.25], 'stf_spread', [0.2 0.3 0.1]})), ...
+    'mixed_model', @spread_mixed_model, 'pick', @pick_pool_states, 'pointwise', @spread_pointwise, ...
+    'along_run', @spread_along_run, ...
+    'small_uniform', {{'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4}}, ...
+    'small_mixed', {{'n', 6, 'indegree', 3}}, ...
+    'small_window', {{'T_range', [0 2], 'lya_T_interval', [1 2], 'lya_warmup', 0.5}}, ...
+    'sweep_conditions', @chain_sweep_conditions, 'sweep_note', 'regression_tol_spread');
+end
+
+function m = spread_mixed_model(gain, solver, extra_args)
+% The mixed network of the spread suite: the stf_chain suite's fmixed
+% network (every variant of the pool model that has facilitation, beside
+% product routes) with three routes added so that every kind of route a
+% spread can sit on is there, and with spreads that differ between the
+% four cell types and are zero for one type each:
+%   SST->VIP  one depression component, a product route (nothing else on it)
+%   PV->VIP   a chain whose two refill times are close (tau_rec [2 3]), so
+%             the ordering rule moves a good share of its neurons
+%   VIP->PV   two depression components combined by the geometric mean,
+%             with output-only facilitation
+%   std_spread [0.25 0.4 0 0.3]    (SST's depression is not spread)
+%   stf_spread [0.3 0 0.25 0.15]   (PV's facilitation is not spread)
+% Under a step staircase always; noise on with 'sra1', off with 'rk4'.
+% EXTRA_ARGS are applied last.
+chain = @(tau_rec, tau_rel, n2) struct('model', 'chain', 'tau_rec', tau_rec, 'tau_rel', tau_rel, 'n2', n2);
+fac = @(tau_dec, tau_fac, G) struct('model', 'chain', 'tau_dec', tau_dec, 'tau_fac', tau_fac, 'G', G);
+fac_h = @(tau_dec, tau_fac, G, tau_h) struct('model', 'chain', 'tau_dec', tau_dec, 'tau_fac', tau_fac, ...
+    'G', G, 'tau_h', tau_h);
+sc = struct();
+sc.E.E.std     = chain([2 5], 0.25, 2);
+sc.E.E.stf     = fac_h(1.5, 0.25, 5, 0.5);
+sc.E.PV.std    = struct('tau_rec', 2, 'tau_rel', 0.25);
+sc.E.PV.stf    = fac(1.5, 0.25, 5);
+sc.E.SST.stf   = fac_h(1.5, 0.25, 5, 0.5);
+sc.E.VIP.std   = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+sc.E.VIP.stf   = struct('tau_dec', [0.4 1.2], 'tau_fac', [0.2 0.3], 'G', [1.5 2]);
+sc.PV.E.std    = chain([1 3], 0.3, 1.5);
+sc.PV.E.stf    = fac(0.9, 0.4, 2.86);
+sc.PV.E.scale  = 1.3;
+sc.PV.PV.std   = struct('tau_rec', 0.6, 'tau_rel', 0.3);
+sc.PV.PV.stf   = fac_h(0.9, 0.4, 2.86, 0.2);
+sc.PV.SST.stf  = fac(0.9, 0.4, 2.86);
+sc.PV.VIP.std  = chain([2 3], 0.25, 2);
+sc.SST.E.std   = chain([2 5], 0.25, 2);
+sc.SST.PV.stf  = struct('tau_dec', 0.9, 'tau_fac', 0.4, 'G', 1.8);
+sc.SST.SST.std = struct('tau_rec', 0.8, 'tau_rel', 0.25);
+sc.SST.SST.stf = fac(2, 1, 1);
+sc.SST.VIP.std = struct('tau_rec', 0.8, 'tau_rel', 0.25);
+sc.VIP.E.std   = struct('tau_rec', [0.3 1], 'tau_rel', 0.2, 'combine', 'geomean');
+sc.VIP.PV.std  = struct('tau_rec', [0.5 2], 'tau_rel', [0.2 0.4], 'combine', 'geomean');
+sc.VIP.PV.stf  = struct('tau_dec', 0.9, 'tau_fac', 0.4, 'G', 1.8);
+sc.VIP.SST.std = chain([0.5 8], 0.2, 0.5);
+sc.VIP.SST.stf = fac_h(3, 0.1, 8, 0.05);
+sc.VIP.VIP.std = chain([1.5 4], 0.4, 1e6);
+sc.VIP.VIP.stf = fac(0.5, 2, 1.5);
+if strcmp(solver, 'sra1'); noise = 0.025; else; noise = 0; end
+args = {'n', 40, 'indegree', 10, 'n_cellTypes', 4, 'cell_type_names', {'E', 'PV', 'SST', 'VIP'}, ...
+    'f', [0.4 0.2 0.2 0.2], 'mu_tilde_relative', [3 -4 -2 -1.5], 'sigma_tilde_relative', [1 1 1 1], ...
+    'tau_a', {[0.25 1], [], 2, 1}, 'c', [0.3 0 0.2 0.1], 'synapse_config', sc, ...
+    'std_spread', [0.25 0.4 0 0.3], 'stf_spread', [0.3 0 0.25 0.15], ...
+    'level_of_chaos', gain, 'sigma_u_noise', noise, 'ode_solver', solver, ...
+    'input_config', struct('n_steps', 6, 'step_density', struct(), 'amp', 0.5, ...
+        'no_stim_pattern', false(1, 6), 'intrinsic_drive', 0, 'positive_only', false), ...
+    'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, ...
+    'lya_method', 'topk', 'lya_K', 10, 'lya_K_auto', true, 'lya_dt', 0.05, ...
+    'lya_T_interval', [1.5 5], 'lya_warmup', 1.5, 'store_full_state', true, 'verbose', 'near-none'};
+m = SRNNCellTypePairs(args{:}, extra_args{:});
+m.build();
+end
+
+function c = spread_pointwise(m, S, t)
+% stf_pointwise, and what only a network with a per-neuron spread has, in
+% the view: the standard normals drawn, the ordering rule's count, and
+% per route the values each neuron actually has (every per-neuron array
+% of the route model's parameters P, under the model's own field names,
+% and which neurons the ordering rule moved). The right-hand side and the
+% Jacobians compute with those values, so an error in them moves dS, J
+% and JY too; these leaves say WHICH value is wrong, and they are the
+% only ones that see a value no stored state exercises.
+c = stf_pointwise(m, S, t);
+p = m.get_params();
+c.view.std_draws = m.std_draws;
+c.view.stf_draws = m.stf_draws;
+c.view.std_clipped = m.std_clipped;
+names = m.cell_type_names;
+for pre = 1:numel(names)
+    for post = 1:numel(names)
+        P = p.route{pre, post}.P;
+        fields = fieldnames(P);
+        realised = struct();
+        for k = 1:numel(fields)
+            v = P.(fields{k});
+            if (isnumeric(v) || islogical(v)) && size(v, 1) == P.npre && ~isempty(v) && ...
+                    ~any(strcmp(fields{k}, {'npre', 'ns', 'n_b', 'n_g'}))
+                realised.(fields{k}) = v;
+            end
+        end
+        c.view.realised.([names{pre} '_to_' names{post}]) = realised;
+    end
+end
+end
+
+function e2e = spread_along_run(e2e, m)
+e2e = stf_along_run(e2e, m);
+e2e.std_clipped = m.std_clipped;
+end
+
 function spec = chain_spec()
 % The chain suite (see the header): what pool_suite runs for it.
 chain = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
 sc4 = struct();
 sc4.E.E.std = chain; sc4.E.I.std = chain; sc4.I.E.std = chain; sc4.I.I.std = chain;
-spec = struct('uniform', 'chain', 'mixed', 'mixed', 'sc4', sc4, ...
+spec = struct('uniform', 'chain', 'mixed', 'mixed', 'sc4', sc4, 'uniform_args', {{}}, 'third', [], ...
     'mixed_model', @mixed_model, 'pick', @pick_chain_states, 'pointwise', @chain_pointwise, ...
     'along_run', @chain_along_run, ...
     'small_uniform', {{'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4}}, ...
@@ -742,7 +955,7 @@ route = struct('std', struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25
     'stf', struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5, 'tau_h', 0.5));
 sc4 = struct();
 sc4.E.E = route; sc4.E.I = route; sc4.I.E = route; sc4.I.I = route;
-spec = struct('uniform', 'facil', 'mixed', 'fmixed', 'sc4', sc4, ...
+spec = struct('uniform', 'facil', 'mixed', 'fmixed', 'sc4', sc4, 'uniform_args', {{}}, 'third', [], ...
     'mixed_model', @stf_mixed_model, 'pick', @pick_pool_states, 'pointwise', @stf_pointwise, ...
     'along_run', @stf_along_run, ...
     'small_uniform', {{'n', 6, 'indegree', 3, 'F_ref_n', 6, 'F_ref_indegree', 3}}, ...
@@ -1015,11 +1228,13 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function m = options_model(gain, staircase)
+function m = options_model(gain, staircase, extra_args)
 % The three-cell-type network of regression_rapid_run, section 1d: every
 % synapse option the paper's presets leave off. GAIN = 1 without a
 % staircase is that network exactly (chaotic); gain 0.2 with a staircase is
 % its stable variant, driven so that rates and the route variables move.
+% EXTRA_ARGS (the spread suite's spreads) are applied last.
+if nargin < 3, extra_args = {}; end
 sc = struct();
 sc.E.E.std   = struct('tau_rec', [0.3 1], 'tau_rel', 0.2, 'combine', 'geomean');
 sc.E.PV.stf  = struct('tau_dec', 0.5, 'tau_fac', 0.25, 'G', 2);
@@ -1038,7 +1253,7 @@ if staircase
     args = [args, {'input_config', struct('n_steps', 6, 'step_density', struct(), 'amp', 0.5, ...
         'no_stim_pattern', false(1, 6), 'intrinsic_drive', 0, 'positive_only', false)}];
 end
-m = SRNNCellTypePairs(args{:});
+m = SRNNCellTypePairs(args{:}, extra_args{:});
 m.build();
 end
 

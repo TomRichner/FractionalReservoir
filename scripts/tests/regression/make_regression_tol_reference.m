@@ -4,6 +4,7 @@ function out_file = make_regression_tol_reference(name, opts)
 %   out_file = make_regression_tol_reference('anchor')
 %   out_file = make_regression_tol_reference('chain')
 %   out_file = make_regression_tol_reference('stf_chain')
+%   out_file = make_regression_tol_reference('spread')
 %   out_file = make_regression_tol_reference('before_jacobian_edit')
 %   out_file = make_regression_tol_reference('before_jacobian_edit', 'overwrite', true)
 %   out_file = make_regression_tol_reference('before_facilitation', 'suite', 'chain')
@@ -12,14 +13,15 @@ function out_file = make_regression_tol_reference(name, opts)
 % client, no pool needed) and saves what it returned with a description of
 % the code and machine it came from.
 %
-% THE TIER HAS THREE SUITES of cases (regression_tol_run): 'base', the
+% THE TIER HAS FOUR SUITES of cases (regression_tol_run): 'base', the
 % networks the model class had before Plan A; 'chain', networks with
-% chained vesicle-pool depression; and 'stf_chain', networks with
-% release-coupled facilitation on the same route model. A reference holds
-% one suite and records which (meta.suite); regression_tol_check reads it
-% from there.
+% chained vesicle-pool depression; 'stf_chain', networks with
+% release-coupled facilitation on the same route model; and 'spread',
+% networks whose depression and facilitation parameters differ per neuron
+% (std_spread, stf_spread). A reference holds one suite and records which
+% (meta.suite); regression_tol_check reads it from there.
 %
-% FOUR KINDS OF REFERENCE (Plan A, sections 2.2 and 7.3 steps 5 and 8):
+% FIVE KINDS OF REFERENCE (Plan A, sections 2.2 and 7.3 steps 5 and 8):
 %
 %   'anchor'   scripts/tests/fixtures/regression_tol_anchor.mat, kept in git
 %              (force-added). The BASE suite. It describes the model class
@@ -51,6 +53,13 @@ function out_file = make_regression_tol_reference(name, opts)
 %              the coupled routes must go on agreeing with it. Replaced
 %              only deliberately, exactly as 'chain' is.
 %
+%   'spread'   scripts/tests/fixtures/regression_tol_spread.mat, kept in
+%              git (force-added). The SPREAD suite, captured when the
+%              per-neuron spread on the synapse parameters was first built
+%              (FD-015): the draws, the values each neuron has, and the
+%              networks that run on them. Replaced only deliberately,
+%              exactly as 'chain' is.
+%
 %   any other name   data/regression_tol/<name>.mat, gitignored, never
 %              committed. A PRE-EDIT reference of any suite ('suite',
 %              default 'base'): capture one before a critical edit (the
@@ -75,13 +84,13 @@ function out_file = make_regression_tol_reference(name, opts)
 % (The anchor predates meta.suite and the route files' blobs; a reference
 % without meta.suite is the base suite.)
 %
-% The three fixtures need `git add -f` (*.mat is gitignored repo-wide).
+% The four fixtures need `git add -f` (*.mat is gitignored repo-wide).
 %
 % See also: regression_tol_run, regression_tol_check, regression_tol_settings
 arguments
     name (1,:) char {mustBeNonempty}
     opts.overwrite (1,1) logical = false
-    opts.suite (1,:) char {mustBeMember(opts.suite, {'', 'base', 'chain', 'stf_chain'})} = ''
+    opts.suite (1,:) char {mustBeMember(opts.suite, {'', 'base', 'chain', 'stf_chain', 'spread'})} = ''
 end
 if isempty(regexp(name, '^[A-Za-z0-9_\-]+$', 'once'))
     error('make_regression_tol_reference:BadName', ...
@@ -89,9 +98,9 @@ if isempty(regexp(name, '^[A-Za-z0-9_\-]+$', 'once'))
 end
 project_root = fileparts(which('setup_paths'));
 [out_file, committed] = regression_tol_reference_file(name);
-% The three committed references each belong to one suite.
+% The four committed references each belong to one suite.
 suite = opts.suite;
-fixed_suite = struct('anchor', 'base', 'chain', 'chain', 'stf_chain', 'stf_chain');
+fixed_suite = struct('anchor', 'base', 'chain', 'chain', 'stf_chain', 'stf_chain', 'spread', 'spread');
 if committed
     if ~isempty(suite) && ~strcmp(suite, fixed_suite.(name))
         error('make_regression_tol_reference:BadSuite', ...
@@ -122,7 +131,7 @@ commit = strtrim(commit);
 [~, dirty] = system(sprintf('git -C "%s" status --porcelain --untracked-files=no', project_root));
 dirty = strtrim(dirty);
 if committed
-    % Replacing the chain or the stf_chain reference means deleting the tracked fixture
+    % Replacing the chain, the stf_chain or the spread reference means deleting the tracked fixture
     % first, which git reports as a change; that one line is this
     % function's own business. (Not so for the anchor: a deleted anchor
     % leaves the tree dirty and is refused, as it always was.)
