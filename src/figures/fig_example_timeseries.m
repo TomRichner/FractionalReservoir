@@ -58,6 +58,31 @@ function out = fig_example_timeseries(cfg)
 % Empty, the default, changes nothing. A figure made with it is not the
 % preset's network; the registry never sets it.
 %
+% Two opt-in extras (2026-11-12), each a SEPARATE figure appended to
+% out.figs after the main one and saved under its own tag. Both default
+% false, so a default call and every registry entry make one figure, named
+% as before. Both are drawn from the first condition's model: one seed
+% gives every condition the same input and the same W.
+%   cfg.show_stimulus   -> 'fig_example_stimulus': the external input u
+%       (u_ex, which includes any intrinsic_drive). An image of u, neurons
+%       by time with the types stacked in type order (E above I), zero
+%       white; below it the trace of every stimulated neuron (u nonzero at
+%       any sample) in its type's shades. The titles give the count and
+%       fraction stimulated per type, the on intervals and max |u|.
+%       out.stimulus holds the counts. With no input at all the figure
+%       says so in words instead of drawing an empty axis.
+%   cfg.show_W_spectrum -> 'fig_example_W_spectrum': eig of the W that is
+%       simulated (get_params().W: level_of_chaos and any route scale
+%       folded in), with the class's bulk radius R and outliers lambda_O,
+%       and the spectral abscissa and radius in the title. R and lambda_O
+%       describe the matrix before route scales, so they are left out (and
+%       the title says why) when a scale or rescale_by_abscissa is on. If
+%       the simulated W differs between the conditions drawn, the title
+%       says so and the first is drawn. out.W_spectrum holds the numbers.
+% For example, everything for one seed:
+%   fig_example_timeseries('preset_name', p, 'save', false, ...
+%       'show_stimulus', true, 'show_W_spectrum', true)
+%
 % See also: paper_config, srnn_param_preset, SRNNCellTypePairs,
 %           plot_local_and_finite_lle, fig_lyapunov_spectrum
 
@@ -75,6 +100,8 @@ arguments
     cfg.run_dir     (1,:) char    = ''      % unused; accepted for a uniform call
     cfg.conditions                = {}      % names to draw, in order; empty = all the preset holds (select_conditions)
     cfg.model_args  (1,:) cell    = {}      % name-value overrides of the preset, for interactive looks (header)
+    cfg.show_stimulus   (1,1) logical = false   % extra figure: the external input u (header)
+    cfg.show_W_spectrum (1,1) logical = false   % extra figure: eigenvalues of the simulated W (header)
 end
 
 setup_paths();
@@ -269,4 +296,192 @@ if cfg.save
     save_figure_stable(out_dir, 'fig_example_timeseries', fig);
     out.files = existing_outputs(out_dir, 'fig_example_timeseries');
 end
+
+%% Opt-in extras: each its own figure, appended after the main one. Their
+% tags are not prefixes of 'fig_example_timeseries' nor it of them, because
+% save_figure_stable deletes <out_dir>/<tag>* before saving.
+if cfg.show_stimulus
+    [fig_s, out.stimulus] = stimulus_figure(models{1}, cfg, st);
+    out.figs(end+1) = fig_s;
+    if cfg.save
+        save_figure_stable(out_dir, 'fig_example_stimulus', fig_s);
+        out.files = [out.files, existing_outputs(out_dir, 'fig_example_stimulus')];
+    end
+end
+if cfg.show_W_spectrum
+    [fig_w, out.W_spectrum] = W_spectrum_figure(models, cond_names, cfg, st);
+    out.figs(end+1) = fig_w;
+    if cfg.save
+        save_figure_stable(out_dir, 'fig_example_W_spectrum', fig_w);
+        out.files = [out.files, existing_outputs(out_dir, 'fig_example_W_spectrum')];
+    end
+end
+end
+
+% =========================================================================
+function [fig, info] = stimulus_figure(m, cfg, st)
+% The external input u of the first model drawn (one seed: the same input
+% under every condition). Top: image of u, neurons by time, types stacked
+% in type order (E above I), zero white. Bottom: u of every stimulated
+% neuron, in its type's shades. A neuron counts as stimulated when its u is
+% nonzero at any sample, so a constant intrinsic_drive counts too; the
+% title then says the input carries one.
+t     = m.t_ex(:)';                      % 1 x nt
+U     = m.u_ex;                          % n x nt
+names = m.cell_type_names;
+C     = numel(names);
+tcol  = SRNNCellTypePairs.type_colors(C);
+idx   = m.type_indices;
+vis   = 'on'; if ~cfg.visible, vis = 'off'; end
+fig   = figure('Color', 'w', 'Visible', vis, 'Position', [80 60 1000 720]);
+
+stim = any(U ~= 0, 2);
+n_stim = cellfun(@(ix) nnz(stim(ix)), idx);
+n_type = cellfun(@numel, idx);
+on = any(U ~= 0, 1);
+info = struct('n_stimulated', nnz(stim), 'n_stimulated_per_type', n_stim, ...
+    'n_per_type', n_type, 'type_names', {names}, 'on_intervals', on_intervals(t, on), ...
+    'max_abs_u', max(abs(U(:))));
+
+parts = arrayfun(@(q) sprintf('%s %d of %d (%.1f%%)', names{q}, n_stim(q), n_type(q), ...
+    100 * n_stim(q) / max(n_type(q), 1)), 1:C, 'UniformOutput', false);
+if ~any(stim)
+    ax = axes(fig); axis(ax, 'off');
+    text(ax, 0.5, 0.5, sprintf(['No external input: u = 0 for all %d neurons over [%g, %g] s.\n' ...
+        '(the preset''s input; give model\\_args {''input\\_config'', ...} to add one)'], ...
+        m.n, t(1), t(end)), 'Units', 'normalized', 'HorizontalAlignment', 'center', ...
+        'FontSize', st.label_fs - 2);
+    title(ax, 'External input u', 'FontWeight', 'normal', 'FontSize', st.title_fs);
+    return;
+end
+
+const_drive = any(all(U ~= 0, 2) & max(U, [], 2) == min(U, [], 2));
+iv = info.on_intervals;
+iv_txt = strjoin(arrayfun(@(k) sprintf('%.2f-%.2f s', iv(k, 1), iv(k, 2)), ...
+    1:size(iv, 1), 'UniformOutput', false), ', ');
+
+tl = tiledlayout(fig, 3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+% (top) image of u, types stacked in type order
+ax1 = nexttile(tl, [2 1]);
+order = vertcat(idx{:});
+umax = max(abs(U(:)));
+imagesc(ax1, t, 1:m.n, U(order, :));
+colormap(ax1, redwhiteblue_colormap(256));
+clim(ax1, [-umax umax]);
+cb = colorbar(ax1); cb.Label.String = 'u';
+hold(ax1, 'on');
+edges = cumsum(n_type);
+for q = 1:C - 1
+    yline(ax1, edges(q) + 0.5, 'k-', 'LineWidth', 1);
+end
+hold(ax1, 'off');
+set(ax1, 'YTick', edges - n_type / 2, 'YTickLabel', names, 'FontSize', st.tick_fs - 3);
+ylabel(ax1, 'neuron (by type)', 'FontSize', st.label_fs - 2);
+set(ax1, 'XTickLabel', []);
+title(ax1, sprintf('Stimulated: %s.  On: %s', strjoin(parts, ',  '), iv_txt), ...
+    'FontWeight', 'normal', 'FontSize', st.title_fs - 3);
+
+% (bottom) u of each stimulated neuron, in its type's shades
+ax2 = nexttile(tl); hold(ax2, 'on');
+hl = gobjects(1, C);
+for q = SRNNCellTypePairs.draw_order(C)
+    ks = idx{q}(stim(idx{q}));
+    shades = SRNNCellTypePairs.neuron_colors(tcol(q, :), max(numel(ks), 1));
+    for j = 1:numel(ks)
+        plot(ax2, t, U(ks(j), :), '-', 'Color', shades(j, :), 'LineWidth', 0.75);
+    end
+end
+for q = 1:C
+    hl(q) = plot(ax2, NaN, NaN, '-', 'Color', tcol(q, :), 'LineWidth', 1.5);
+end
+hold(ax2, 'off');
+legend(ax2, hl, arrayfun(@(q) sprintf('%s (%d)', names{q}, n_stim(q)), 1:C, ...
+    'UniformOutput', false), 'Location', 'eastoutside', 'FontSize', 8, 'Box', 'off');
+xlim(ax2, [t(1) t(end)]); box(ax2, 'off');
+set(ax2, 'FontSize', st.tick_fs - 3);
+xlabel(ax2, 'time (s)', 'FontSize', st.label_fs - 2);
+ylabel(ax2, 'u of stimulated neurons', 'FontSize', st.label_fs - 2);
+xlim(ax1, [t(1) t(end)]);
+
+sup = sprintf('External input u  (seed %s, %d of %d neurons, |u| \\leq %.3g)', ...
+    mat2str(cfg.rng_seeds), nnz(stim), m.n, umax);
+if const_drive, sup = [sup '   includes a constant intrinsic drive']; end
+title(tl, sup, 'FontWeight', 'normal', 'FontSize', 9);
+end
+
+% -------------------------------------------------------------------------
+function iv = on_intervals(t, on)
+% [start, end] times of each run of samples where on is true; a run ends one
+% sample period after its last sample (the input is held over the sample).
+iv = zeros(0, 2);
+if ~any(on), return; end
+dt = 0;
+if numel(t) > 1, dt = t(2) - t(1); end
+d = diff([false on false]);
+t_start = t(d(1:end-1) == 1);            % first sample of each run
+t_last  = t(d(2:end) == -1);             % last sample of each run
+iv = [t_start(:), t_last(:) + dt];
+iv(:, 2) = min(iv(:, 2), t(end));
+end
+
+% -------------------------------------------------------------------------
+function [fig, info] = W_spectrum_figure(models, cond_names, cfg, st)
+% Eigenvalues of the W that is simulated (params.W: level_of_chaos and any
+% route scale folded in) for the first condition drawn, with the class's
+% theoretical bulk radius R and outliers lambda_O. Those describe obj.W, the
+% matrix before route scales, so they are marked only when the two agree.
+m   = models{1};
+W   = models{1}.get_params().W;
+differs = cellfun(@(mk) ~isequal(mk.get_params().W, W), models(2:end));
+lam = eig(full(W));
+abscissa = max(real(lam));
+radius   = max(abs(lam));
+scaled   = ~isequal(W, m.W);
+info = struct('eigenvalues', lam, 'abscissa', abscissa, 'radius', radius, ...
+    'R', m.R, 'lambda_O', m.lambda_O, 'differs_across_conditions', any(differs), ...
+    'route_scaled', scaled);
+
+vis = 'on'; if ~cfg.visible, vis = 'off'; end
+fig = figure('Color', 'w', 'Visible', vis, 'Position', [100 60 760 780]);
+ax  = axes(fig); hold(ax, 'on');
+h = plot(ax, real(lam), imag(lam), '.', 'Color', [0.15 0.15 0.15], 'MarkerSize', 7);
+hs = h; ls = {sprintf('eig(W), n = %d', m.n)};
+if ~scaled && ~m.rescale_by_abscissa
+    th = linspace(0, 2 * pi, 400);
+    hs(end+1) = plot(ax, m.R * cos(th), m.R * sin(th), '--', 'Color', [0.45 0.45 0.45], 'LineWidth', 1);
+    ls{end+1} = sprintf('bulk radius R = %.3f', m.R);
+    lo = m.lambda_O;
+    lo(abs(lo) < 1e-9 * max(m.R, 1)) = 0;    % a balanced network's outliers are 0 to round-off
+    hs(end+1) = plot(ax, real(lo), imag(lo), 'x', 'Color', [0.80 0.15 0.15], 'MarkerSize', 11, 'LineWidth', 1.5);
+    ls{end+1} = ['outliers \lambda_O = ' strjoin(arrayfun(@(v) sprintf('%.3g', real(v)), lo(:)', ...
+        'UniformOutput', false), ', ')];
+end
+hs(end+1) = xline(ax, abscissa, ':', 'Color', [0 0.45 0.70], 'LineWidth', 1.25);
+ls{end+1} = sprintf('spectral abscissa %.3f', abscissa);
+xline(ax, 0, '-', 'Color', [0.7 0.7 0.7]); yline(ax, 0, '-', 'Color', [0.7 0.7 0.7]);
+hold(ax, 'off');
+lim = 1.08 * max([radius, m.R, max(abs(m.lambda_O))]);
+axis(ax, 'equal'); xlim(ax, [-lim lim]); ylim(ax, [-lim lim]);
+grid(ax, 'on'); box(ax, 'off');
+set(ax, 'FontSize', st.tick_fs - 3);
+xlabel(ax, 'Re(\lambda)', 'FontSize', st.label_fs - 2);
+ylabel(ax, 'Im(\lambda)', 'FontSize', st.label_fs - 2);
+legend(ax, hs, ls, 'Location', 'southoutside', 'FontSize', 8, 'Box', 'off');
+
+tl_txt = {sprintf('Eigenvalues of the simulated W   (%s, seeds %s)', ...
+             strrep(cond_names{1}, '_', '\_'), mat2str(cfg.rng_seeds)), ...
+         sprintf('spectral abscissa max Re \\lambda = %.4f,   spectral radius max |\\lambda| = %.4f', ...
+             abscissa, radius), ...
+         sprintf('level\\_of\\_chaos = %g', m.level_of_chaos)};
+if scaled
+    tl_txt{end+1} = 'route scale on: W differs from the drawn matrix; R and \lambda_O (of the drawn matrix) not shown';
+end
+if m.rescale_by_abscissa
+    tl_txt{end+1} = 'rescale\_by\_abscissa on: R and \lambda_O do not apply; not shown';
+end
+if any(differs)
+    tl_txt{end+1} = sprintf('simulated W DIFFERS across the conditions drawn (%s); this is %s', ...
+        strrep(strjoin(cond_names([false differs]), ', '), '_', '\_'), strrep(cond_names{1}, '_', '\_'));
+end
+title(ax, tl_txt, 'FontWeight', 'normal', 'FontSize', 9);
 end
