@@ -706,7 +706,22 @@ becomes an issue with an acceptance test.
   Figures 7 and 8).
 - **FD-013 Closing figure** (block D).
 - **FD-014 Paper figure of 1TS versus MTS depression** (block A), from the
-  demonstration scripts.
+  demonstration scripts. **In progress (2026-11-12, `matlab-opus-2`),
+  Plan A step 7.** It was listed here as needing planning with Tom; the
+  lead wrote its acceptance itself under Tom's instruction to carry
+  Plan A through: a pipeline figure function `fig_std_1TS_vs_MTS` that
+  takes every number from the route models, shows the two conditions
+  (and the product in the four-condition set) under a sinusoidal rate,
+  under rate steps, and at steady state against rate, marks the
+  first-cycle and last-cycle peak outputs, writes a table of them, is
+  registered in the `mu7chain` bundle and has a test against an
+  independent integration. **Decisions by the lead:** it is built now,
+  beside the other work, not after the `fast` run, because it is
+  analytic and depends on no run; and the worker reports the first-cycle
+  match as it comes out with the final parameters (reserve refill 5 s,
+  where the exploration script Tom showed Brian used 4 s) and how it
+  varies with the sinusoid's frequency and amplitude, without tuning the
+  input to make the peaks agree.
 - **FD-019 A best-practices repo for multi-agent MATLAB** (Tom's idea,
   2026-11-11; after the final-draft work). If the worker agents, the `pool_*`
   functions and the session environment variable work well here, lift
