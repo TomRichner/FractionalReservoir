@@ -144,7 +144,9 @@ for set_ = {three, four}
     n_fail = n_fail + check(ok, ['style 6: tau panels titled by name, ' tag]);
     bottom = axs(arrayfun(@(a) a.Position(2) < .5, axs));
     [~, o] = sort(arrayfun(@(a) a.Position(1), bottom)); bottom = bottom(o);
-    n_fail = n_fail + check(isequal(bottom(3).XTickLabel(:)', grouped_condition_label(names, 'abbrev')), ...
+    % (with more than three ticks, multi-word labels are broken onto two lines)
+    n_fail = n_fail + check(isequal(strrep(cellstr(bottom(3).XTickLabel)', '\newline', ' '), ...
+        grouped_condition_label(names, 'abbrev')), ...
         ['style 6: horizon ticks by name, no cycling, ' tag]);
     close(f);
 end
