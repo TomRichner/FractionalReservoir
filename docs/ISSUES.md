@@ -152,7 +152,7 @@ model's arithmetic.
 
 ### FD-004 Chained-pool depression in `SRNNCellTypePairs`
 
-- **Status:** in progress (step 1 briefed to `matlab-fable-1`, with FD-005)
+- **Status:** done (2026-11-12)
 - **Serves:** block A
 - **What:** add the chained vesicle-pool model as an opt-in per route beside
   the current product, which stays the default and gives the same numbers
@@ -169,11 +169,36 @@ model's arithmetic.
   pass unchanged (adding a model must not move a number on routes that do
   not use it).
 - **Depends on:** FD-003, FD-020, FD-021.
-- **Result:** _(pending)_
+- **Result:** worker `matlab-fable-1`, commits `2b5f6c2`..`97aad1c`, merged
+  as the commit after `cc51085`. `src/model/routes/route_pool.m` (registry
+  name `pool`); a route asks for it with `std.model = 'chain'`. The four
+  class functions that call the interface were not edited. New:
+  `params.std_chain`, `params.std_n2`, `SRNNCellTypePairs.std_route_factor`,
+  a `signature` in `route_fields`. On merged main, lead's MATLAB:
+  tolerance tier pass against the anchor (720 new leaves reported, the
+  route signatures; none failed); quick 57 of 57 with the ultrarapid tier
+  byte-exact, so no number moved on a route that does not use the chain.
+  The chain is stated in `docs/EquationsParametersDocs/Equations_stability_paper.md`.
+  At the manuscript size the chain costs what the product costs in
+  `dynamics_fast` and `jacobian_times`, and a third of it in the assembled
+  Jacobian. **Decisions by the lead** (reasons in the merge commit):
+  1. The class's STD panel now draws the factor in force for a product
+     route with the geometric mean or the zero floor (it drew the raw
+     product). Accepted; a plain product route is unchanged.
+  2. `tau_rec(2) > tau_rec(1)` is not required of a chain route.
+  3. `std = struct('model', 'product')` with no other field is treated as
+     no depression, as a fieldless struct always was. Left.
+  **Passed on:** `tau_b_rel` holds ONE value on a chain route, so outside
+  code that indexes it by component errors there (FD-006); the reservoir's
+  `route_signature` cannot yet tell a chain from a product (the reservoir
+  job); `std_route_factor` needs one row per presynaptic neuron once
+  parameters differ per neuron (FD-015 and FD-006 must respect that);
+  `route_product` should get a `depression` handle so `std_route_factor`
+  is one call (given to the next model-lane job).
 
 ### FD-005 Unit tests for the chain
 
-- **Status:** open
+- **Status:** done (2026-11-12)
 - **Serves:** block A
 - **What:** analytic Jacobian against finite differences; Jacobian product
   against the assembled Jacobian; a very large reserve reproducing the single
@@ -182,7 +207,23 @@ model's arithmetic.
   one-component route identical under either model.
 - **Done when:** all pass and are in the FD-001 entry point.
 - **Depends on:** FD-004 (written alongside it).
-- **Result:** _(pending)_
+- **Result:** `scripts/tests/test_std_chain_model.m` (quick suite, about
+  20 s) and the pool model's entries in `test_route_models`; merged with
+  FD-004. Plan A section 5's nine checks, plus: the full branch of
+  `jacobian_times` on a network; `routes_identical` false between a chain
+  and a two-component product route with the same time constants; the
+  legacy delegations error on a chain route; a chain model reproduces bit
+  for bit. A transposed 2 x 2 in the assembled Jacobian fails this test
+  and passes the three older Jacobian tests (shown by hand by the worker,
+  reverted). "A one-component route identical under either model" is met
+  by the `n2 = 1e12` check, since a chain needs two pools. **Decision by
+  the lead on check 9:** the three estimators are asserted to agree within
+  0.2 on a small chain network, with a Liouville check added, not "as
+  well as on a product network of the same size": every small chain
+  network is stable with its leading exponent at the edge of a slow band,
+  where finite-time exponents depend on the initial basis. A chaotic chain
+  network large enough for that comparison is part of the chain's
+  reference job (Plan A step 5).
 
 ### FD-006 Display and reservoir code for the chain
 
@@ -458,7 +499,7 @@ model's arithmetic.
 
 ### FD-021 Refactor behind one route interface
 
-- **Status:** merged and gated (2026-11-11); set to done when the third
+- **Status:** done (2026-11-12; the third exact reference landed in `cc51085`). Was: merged and gated; set to done when the third
   exact reference, the full one, is re-captured (its run is under way).
   Interface design approved by Tom; Plan A sections 2.1 and 4.0.
 - **Serves:** block A

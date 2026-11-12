@@ -18,6 +18,12 @@
 > generated table exists to prevent.
 >
 > The implementation is `SRNNCellTypePairs.dynamics_fast` (`src/model/SRNNCellTypePairs.m`).
+> Since 2026-11-11 the depression and facilitation equations of a route live in
+> a **route model** under `src/model/routes/`: `route_product` (the product form
+> below, and the facilitation further down) and `route_pool` (the chained
+> vesicle pools, in their own section). `dynamics_fast` forms the rate, the SFA
+> equations and the dendritic equation, and asks each route's model for its state
+> derivative and its output factor.
 
 ## The model
 
@@ -161,6 +167,72 @@ of $c/K$, and leaves the low-rate gain and the $b_m$ ODEs unchanged. With
 combined the same way). `SRNNCellTypePairs.combine_std_pair` is the one
 definition; the dynamics, `plot_data.synaptic_output`, both Jacobians and
 `jacobian_times` all go through it (`test_std_geomean`).
+
+## Chained vesicle-pool depression (opt-in per route)
+
+Added 2026-11-12 (FD-004). **This is the model the final draft's
+multiple-timescale condition uses** (condition `sfa3_stdc2`); the product form
+above stays the default for a route and is kept as a fourth condition for
+comparison. A route asks for it with
+
+```matlab
+synapse_config.<pre>.<post>.std = struct('model', 'chain', ...
+    'tau_rec', [2 5], ...   % [releasable-pool refill, reserve refill], s
+    'tau_rel', 0.25, ...    % ONE release time: only the releasable pool releases
+    'n2', 2);               % reserve capacity / releasable-pool capacity
+```
+
+and then carries two variables per presynaptic neuron, a **releasable pool**
+$b_{i1}$ and a **reserve** $b_{i2}$, in series:
+
+$$
+\begin{aligned}
+\frac{db_{i1}}{dt} &= \frac{b_{i2}\,(1 - b_{i1})}{\tau_{rec_1}} - \frac{b_{i1}\, r_i}{\tau_{rel}} \\[8pt]
+\frac{db_{i2}}{dt} &= \frac{1 - b_{i2}}{\tau_{rec_2}} - \frac{1}{n_2}\,\frac{b_{i2}\,(1 - b_{i1})}{\tau_{rec_1}} \\[8pt]
+\theta_i &= r_i\, b_{i1}
+\end{aligned}
+$$
+
+Only the releasable pool is released from, and only it sets the synaptic
+output. It is refilled from the reserve at a rate proportional to how full the
+reserve is; the reserve is refilled toward full with its own, slower time
+constant and is drawn down by exactly what it hands on, divided by its relative
+capacity $n_2$. Both start at 1 and both stay in $[0, 1]$. As everywhere in this
+model, the drive is the raw rate $r_i$.
+
+**The single-timescale condition is this model with the reserve removed, not
+clamped.** With $b_{i2} \equiv 1$ the first equation is the one-component
+depression equation of the previous section, so a route with one depression
+component *is* the chain without a reserve, and it carries one state variable,
+not two. No route keeps an unused or clamped variable: it would enlarge the
+state and add a zero eigenvalue and a zero Lyapunov exponent that mean nothing.
+So 1TS and MTS share the releasable-pool equation and differ by one mechanism.
+The reserve starts full, so the two coincide at the onset of activity and come
+apart as sustained activity draws the reserve down. They are **not** matched
+in steady-state depth, by decision (to-do list, block A).
+
+**Steady state at constant rate $r$.** With
+$k_1 = r\,\tau_{rec_1}/\tau_{rel}$, $k_2 = r\,\tau_{rec_2}/(n_2\,\tau_{rel})$ and
+$s = 1 + k_1 + k_2$,
+
+$$
+b_1 = \frac{2}{s + \sqrt{s^2 - 4k_2}}, \qquad b_2 = 1 - k_2\, b_1 .
+$$
+
+This reduces to the single pool's $1/(1 + k_1)$ as $n_2 \to \infty$, and the
+sustained output $r\, b_1$ rises with rate to a ceiling of
+$\big(\tau_{rec_1}/\tau_{rel} + \tau_{rec_2}/(n_2\,\tau_{rel})\big)^{-1}$, where the
+product form's output peaks and then falls. With the chosen values
+($\tau_{rec} = [2, 5]$ s, $\tau_{rel} = 0.25$ s, $n_2 = 2$): $b_1$ is 0.420,
+0.200, 0.106, 0.054 at $r$ = 0.1, 0.25, 0.5, 1 (single pool: 0.556, 0.333,
+0.200, 0.111; product with $[2, 4]$ and $[0.25, 0.5]$ s: 0.309, 0.111, 0.040,
+0.012), and the ceiling is $1/18$. `route_pool`'s `steady_state` is the one
+place this closed form is coded (in a form that avoids cancellation when the
+reserve is nearly empty); figures and tables call it.
+
+`std.combine`, the zero floor (`std_zero_floor`) and facilitation are refused
+on a chain route; the route `scale` is allowed. The depression factor of any
+route, product or chain, is `SRNNCellTypePairs.std_route_factor`.
 
 ## Facilitation (optional)
 
