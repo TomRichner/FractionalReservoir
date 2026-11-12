@@ -31,6 +31,7 @@ arguments
     cfg.visible (1,1) logical = true
     cfg.run_dir     (1,:) char = ''    % unused; accepted for a uniform call
     cfg.preset_name (1,:) char = ''    % unused; see the note above
+    cfg.conditions             = {}    % accepted and ignored: an analytic curve, no network conditions to select
 end
 
 setup_paths();

@@ -23,6 +23,11 @@ function out = fig_dc_lle(cfg)
 % companion to fig_stim_engages_adaptation, which shows the same effect
 % qualitatively on one bursting network.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names drawn
+% as bands in the order given (legend order); empty draws every condition the
+% .mat holds, as before. Resolved by select_conditions against the saved
+% condition names; titles and colours by name, as before.
+%
 % See also: run_dc_lle_analysis, replot_dc_lle, srnn_condition_titles, confplot
 
 arguments
@@ -33,6 +38,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''    % the run whose dc_lle data to plot
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -53,7 +59,11 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
 D = load(data_file);
 r = D.dc_lle_results;
 
-conditions = r.conditions;
+% The selected conditions in the selected order (FD-006); the per-condition
+% columns of level_mean / level_std are reindexed to match.
+[conditions, idx] = select_conditions(r.conditions, cfg.conditions);
+r.level_mean = r.level_mean(:, idx);
+r.level_std  = r.level_std(:, idx);
 n_cond     = numel(conditions);
 
 %% ---- Display names, from the one shared source ----------------------------

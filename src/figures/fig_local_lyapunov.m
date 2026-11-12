@@ -16,6 +16,11 @@ function out = fig_local_lyapunov(cfg)
 % PNG and .fig only, NO SVG: the figure holds ~15 million points at K = 100
 % and the vector export took minutes (2026-09-14).
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names drawn
+% as columns in the order given; empty draws every condition the .mat holds,
+% as before. Resolved by select_conditions; titles from the NAME
+% (titles_by_name), not the title the stage saved.
+%
 % See also: run_local_lyapunov, fig_local_vs_finite_lle, fig_lyapunov_spectrum
 
 arguments
@@ -26,6 +31,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; recorded in the .mat
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -34,7 +40,12 @@ st      = manuscript_style();
 data_file = resolve_data_file(cfg.data_file, cfg.run_dir, {fullfile(cfg.run_dir, 'local_lyapunov')}, ...
     'local_lyapunov_data.mat', 'Run run_local_lyapunov first');
 D = load(data_file);
-R = D.results; n_cond = numel(R); T = D.settings.T; K = D.settings.K;
+% The selected conditions in the selected order (FD-006), retitled by NAME
+% rather than by the title run_local_lyapunov saved (inventory R3).
+[~, idx] = select_conditions({D.results.name}, cfg.conditions);
+R = D.results(idx); n_cond = numel(R); T = D.settings.T; K = D.settings.K;
+new_titles = titles_by_name({R.name}, {R.title});
+[R.title] = new_titles{:};
 
 fig = figure('Color', 'w', 'Position', [40 40 620 * n_cond, 1500]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end

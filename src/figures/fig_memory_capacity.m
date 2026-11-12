@@ -36,6 +36,15 @@ function out = fig_memory_capacity(cfg)
 % working figures are no longer opened (the master closes what a figure
 % returns, and those were never returned).
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names drawn
+% in the order given (curve and legend order in (a) and (b), left to right in
+% (c)); empty draws every condition the run holds, as before. Resolved by
+% select_conditions against results_all.conditions. The paired tests listed
+% are those whose BOTH conditions are drawn (a three-condition selection of a
+% four-condition run shows three of its six tests), and the table says how
+% many tests the ensemble ran in all, uncorrected for multiple comparisons
+% (inventory R9). The trials are the same paired trials whatever is drawn.
+%
 % See also: run_memory_capacity, plot_memory_capacity, plot_memory_capacity_combined
 
 arguments
@@ -46,6 +55,7 @@ arguments
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.preset_name (1,:) char    = ''   % unused; accepted for a uniform call
+    cfg.conditions                = {}   % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -67,21 +77,29 @@ vprintf(cfg.verbose, 'verbose', '[fig_memory_capacity] source: %s\n', mat_file);
 S = load(mat_file, 'results_all');
 R = S.results_all;
 
-%% Unpack (no recompute)
-cond_keys   = R.conditions;
+%% Unpack (no recompute), keeping the selected conditions in the selected order
+[cond_keys, idx] = select_conditions(R.conditions, cfg.conditions);
 cond_titles = mc_display_names(cond_keys);
 n_cond   = numel(cond_keys);
-H_trials = R.H_trials;
-MC_trials = R.MC_trials;
+H_trials = R.H_trials(:, idx);
+MC_trials = R.MC_trials(:, idx);
 n_trials = size(H_trials, 1);
 sm = R.summary;
 st_ = R.settings;
 delay_s = st_.delay_s;
-R2_mean = sm.R2_mean;  R2_ci = sm.R2_ci95;
+R2_mean = sm.R2_mean(idx, :);
+R2_ci   = struct('lo', sm.R2_ci95.lo(idx, :), 'hi', sm.R2_ci95.hi(idx, :));
+MC_mean = sm.MC_mean(idx); MC_ci = struct('lo', sm.MC_ci95.lo(idx), 'hi', sm.MC_ci95.hi(idx));
+H_mean  = sm.H_mean(idx);  H_ci  = struct('lo', sm.H_ci95.lo(idx),  'hi', sm.H_ci95.hi(idx));
 R2_cum_mean  = cumsum(R2_mean, 2);
 R2_cum_ci_lo = cumsum(R2_ci.lo, 2);
 R2_cum_ci_hi = cumsum(R2_ci.hi, 2);
-stats = sm.stats;
+% The paired tests: every pair of the RUN's conditions was tested
+% (run_memory_capacity, nchoosek, no multiple-comparison correction). Only the
+% pairs whose two conditions are both drawn are shown (inventory R9); the
+% table states how many were run in all.
+n_tests_run = numel(sm.stats);
+stats = sm.stats(arrayfun(@(p) pair_selected(p.pair, cond_keys), sm.stats));
 
 st = manuscript_style();
 style_cleanup = with_graphics_defaults( ...
@@ -153,7 +171,7 @@ hdr1 = '| Condition | Total MC mean [95% CI] | Horizon (s) mean [95% CI] | media
 rows1 = cell(1, n_cond);
 for i = 1:n_cond
     rows1{i} = sprintf('| %s | %.3f [%.3f, %.3f] | %.3f [%.3f, %.3f] | %.3f | %.3f |', cond_titles{i}, ...
-        sm.MC_mean(i), sm.MC_ci95.lo(i), sm.MC_ci95.hi(i), sm.H_mean(i), sm.H_ci95.lo(i), sm.H_ci95.hi(i), ...
+        MC_mean(i), MC_ci.lo(i), MC_ci.hi(i), H_mean(i), H_ci.lo(i), H_ci.hi(i), ...
         median(MC_trials(:, i), 'omitnan'), median(H_trials(:, i), 'omitnan'));
 end
 hdr2 = '| Pair | mean diff (total MC) | p (sign-flip) | patterns | Cohen''s d_z |';
@@ -173,6 +191,9 @@ if cfg.save
         fprintf(fid, '# Memory capacity\n\nSource: `%s`\n\nPreset `%s`, run mode `%s`, %d paired trials, readout `%s`, horizon threshold R^2 > %.2f, %d bootstrap samples.\n\n', ...
             mat_file, st_.preset_name, st_.run_mode, n_trials, st_.readout_signal, ...
             st_.R2_threshold_for_horizon, st_.n_boot);
+        fprintf(fid, ['Paired tests: %d were run on this ensemble (every pair of its %d conditions: %s), ' ...
+            'with no multiple-comparison correction; the %d among the conditions drawn here are listed.\n\n'], ...
+            n_tests_run, numel(R.conditions), strjoin(R.conditions, ', '), numel(stats));
         fprintf(fid, '%s\n|---|---|---|---|---|\n%s\n\n', hdr1, strjoin(rows1, newline));
         fprintf(fid, '%s\n|---|---|---|---|---|\n%s\n', hdr2, strjoin(rows2, newline));
         fclose(fid);
@@ -185,6 +206,12 @@ function shaded_ci(ax, x, lo, hi, rgb, alpha_fill)
 x = x(:)'; lo = lo(:)'; hi = hi(:)';
 fill(ax, [x, fliplr(x)], [hi, fliplr(lo)], rgb, 'FaceAlpha', alpha_fill, ...
     'EdgeColor', 'none', 'HandleVisibility', 'off');
+end
+
+function tf = pair_selected(label, names)
+% True when both conditions of a saved pair label 'a vs b' are drawn.
+parts = strsplit(label, ' vs ');
+tf = numel(parts) == 2 && all(ismember(parts, names));
 end
 
 function s = p_txt(stat)

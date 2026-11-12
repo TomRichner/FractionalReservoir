@@ -23,6 +23,11 @@ function out = fig_transient_gain(cfg)
 % direction's E fraction, participation ratio and |cos| with the leading
 % Lyapunov direction.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names drawn
+% as columns in the order given; empty draws every condition the .mat holds,
+% as before. Resolved by select_conditions; titles from the NAME
+% (titles_by_name), not the title the stage saved.
+%
 % See also: run_transient_gain, fig_transient_gain_excursions,
 %           fig_transient_amplification, SRNNCellTypePairs.transient_gain
 
@@ -34,6 +39,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -45,7 +51,13 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
     'transient_gain_data.mat', ...
     'Run run_transient_gain first');
 D = load(data_file);
-R = D.results; n_cond = numel(R);
+% The selected conditions in the selected order (FD-006), retitled by NAME:
+% run_transient_gain saves a title per condition, which would freeze the
+% name a condition had when the run was made (inventory R3).
+[~, idx] = select_conditions({D.results.name}, cfg.conditions);
+R = D.results(idx); n_cond = numel(R);
+new_titles = titles_by_name({R.name}, {R.title});
+[R.title] = new_titles{:};
 variants = D.settings.variants;
 v_style = containers.Map({'frozen_x', 'frozen_full', 'active'}, {':', '--', '-'});
 v_label = containers.Map({'frozen_x', 'frozen_full', 'active'}, ...

@@ -43,6 +43,7 @@ arguments
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''   % unused; accepted for a uniform call
+    cfg.conditions                = {}   % accepted and ignored: the Sompolinsky network's gains, no adaptation conditions to select
 end
 
 setup_paths();

@@ -18,6 +18,10 @@ function out = fig_transient_gain_excursions(cfg)
 % and used, G_max and alignment medians per class, and a Wilcoxon rank-sum p
 % on G_max (onset vs quiet) when both classes have at least three states.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), as fig_transient_gain:
+% columns in the order given, empty = everything the .mat holds; titles by
+% NAME (titles_by_name).
+%
 % See also: run_transient_gain, fig_transient_gain,
 %           SRNNCellTypePairs.excursion_samples
 
@@ -29,6 +33,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -40,7 +45,12 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
     'transient_gain_data.mat', ...
     'Run run_transient_gain first');
 D = load(data_file);
-R = D.results; n_cond = numel(R);
+% The selected conditions in the selected order (FD-006), retitled by NAME
+% rather than by the title run_transient_gain saved (inventory R3).
+[~, idx] = select_conditions({D.results.name}, cfg.conditions);
+R = D.results(idx); n_cond = numel(R);
+new_titles = titles_by_name({R.name}, {R.title});
+[R.title] = new_titles{:};
 i_act = find(strcmp(D.settings.variants, 'active'));
 classes = {'onset', 'quiet'}; c_style = {'-', '--'};
 

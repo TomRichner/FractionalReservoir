@@ -17,6 +17,11 @@ function out = fig_lyapunov_spectrum(cfg)
 % regime, the flat band of exponents near -1/tau_a,max that every neuron's
 % slow adaptation contributes.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names drawn
+% as columns in the order given; empty draws every condition the .mat holds,
+% as before. Resolved by select_conditions; titles from the NAME
+% (titles_by_name), not the title the stage saved.
+%
 % See also: run_lyapunov_spectrum, lyapunov_topk, manuscript_style
 
 arguments
@@ -28,6 +33,7 @@ arguments
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
     cfg.x_log       (1,1) logical = false % log x axis (index) for wide spectra
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -39,7 +45,12 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
     'lyapunov_spectrum_data.mat', ...
     'Run run_lyapunov_spectrum first');
 D = load(data_file);
-R = D.results; n_cond = numel(R);
+% The selected conditions in the selected order (FD-006), retitled by NAME
+% rather than by the title run_lyapunov_spectrum saved (inventory R3).
+[~, idx] = select_conditions({D.results.name}, cfg.conditions);
+R = D.results(idx); n_cond = numel(R);
+new_titles = titles_by_name({R.name}, {R.title});
+[R.title] = new_titles{:};
 variants = D.settings.variants;
 styles = containers.Map({'noise_on', 'noise_off'}, {'-', '--'});
 

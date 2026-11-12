@@ -27,6 +27,13 @@ function out = fig_eig_heatmap_imbalance(cfg)
 % lambda_1, the mean rate, B_E and the median spectral and numerical
 % abscissae of the dendritic block.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), a cell of condition
+% names drawn as columns in the order given; empty (the default) draws every
+% condition the .mat holds, in its own order, as before. Resolved by
+% select_conditions against the saved cond_names (a name the run lacks is an
+% error). Shared limits and colour scale come from the drawn columns only;
+% column titles from the condition NAME (titles_by_name), not the saved title.
+%
 % Errors fig_eig_heatmap_imbalance:NoExamples on a .mat from before the
 % examples existed (run run_eig_heatmap again).
 %
@@ -41,6 +48,7 @@ arguments
     cfg.run_dir       (1,:) char    = ''
     cfg.preset_name   (1,:) char    = ''    % unused; the preset is recorded in the .mat
     cfg.density_scale (1,:) char {mustBeMember(cfg.density_scale, {'log', 'loglog'})} = 'loglog'
+    cfg.conditions                  = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -58,10 +66,17 @@ if ~isfield(D, 'examples') || isempty(D.examples)
          'Run run_eig_heatmap again.'], data_file);
 end
 ex         = D.examples;
-titles     = D.condition_titles;
-cond_names = D.cond_names;
+[cond_names, idx] = select_conditions(D.cond_names, cfg.conditions);
+titles     = titles_by_name(cond_names, D.condition_titles(idx));
+per_cond   = {'evals_by_cond', 'lle_by_cond', 'mean_rate_by_cond', 'B_E_by_cond', ...
+              'spec_abscissa_by_cond', 'num_abscissa_by_cond'};
+for e = 1:numel(ex)   % keep the selected columns, in the selected order
+    for f = 1:numel(per_cond)
+        ex(e).(per_cond{f}) = ex(e).(per_cond{f})(idx);
+    end
+end
 n_ex       = numel(ex);
-n_cond     = numel(titles);
+n_cond     = numel(cond_names);
 lle_window = D.lle_window;
 
 %% ---- Heatmap parameters (as fig_eig_heatmap) --------------------------------
