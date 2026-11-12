@@ -162,6 +162,13 @@ F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            false, ...
         {'preset_name', cfg.preset_name});
+% What 1TS and the chained MTS share and where they differ (FD-014): the
+% first-cycle match and the steady-state difference under a sinusoidal rate,
+% rate steps, and the steady state against rate. Not in mu7revisedMedium's
+% registry, which has no chain. Built from the preset's route models, no
+% run directory; the 4cond set adds the product in green.
+F = add(F, 'fig_std_1TS_vs_MTS',              @fig_std_1TS_vs_MTS,              true, ...
+        {'preset_name', cfg.preset_name});
 F = add(F, 'fig_stim_engages_adaptation',     @fig_stim_engages_adaptation,     true, ...
         {'preset_name', cfg.bursting_preset});
 F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, true, ...
