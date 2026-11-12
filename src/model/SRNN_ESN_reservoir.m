@@ -182,7 +182,8 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             store_timeseries = true;   % false => lean MC-only path (frees the
                                        % full-res states/trajectory, skips the LLE)
             readout_signal = 'rate';   % 'rate' => read out r = phi(x_eff); 'synaptic'
-                                       % => read out br = b.*r (STD-depressed output)
+                                       % => read out the synaptic output, r times
+                                       % the route's output factor
             for i = 1:2:length(varargin)
                 switch lower(varargin{i})
                     case 'verbose',          verbose = verbose_level(varargin{i+1}) >= 2;
@@ -222,9 +223,15 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             %
             % 'rate'     => firing rate r = phi(x_eff) (adaptation baked into
             %               x_eff, but depression NOT included).
-            % 'synaptic' => r * prod(b) * prod(g), the depressed/facilitated
-            %               presynaptic output, which exposes the STD state to
-            %               the linear readout. Without STD it equals r, so
+            % 'synaptic' => r times the route's output factor, the
+            %               depressed/facilitated presynaptic output, which
+            %               exposes the STD state to the linear readout. The
+            %               factor is the route MODEL's (route_model): on a
+            %               product route prod(b) * prod(g), on a chain
+            %               route b1, the releasable pool. It is not formed
+            %               here: unpack_and_compute_states takes it from
+            %               the model's `output`, so syn_all is right for
+            %               every route model. Without STD it equals r, so
             %               those conditions are unchanged.
             params = obj.cached_params;
             switch lower(readout_signal)
@@ -664,14 +671,23 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 ax_handles(end+1) = nexttile;
                 b_prod = struct();
                 for q = 1:C
-                    % Collapse timescales via product WITHIN a route, then across
-                    % routes -- the same prod(b) collapse plot_celltypes uses.
+                    % Each route's depression FACTOR, then the product across
+                    % the type's routes. The factor is the route model's
+                    % (SRNNCellTypePairs.std_route_factor), not prod(b, 2)
+                    % formed here: on a plain product route the two are the
+                    % same array, on a chain route the factor is b1, the
+                    % releasable pool, and NOT b1 b2. (A product route with
+                    % combine = 'geomean' or the zero floor also draws its
+                    % factor now, where it drew the bare product before.)
+                    % posts is in type order (unpack_and_compute_states
+                    % fills it so), so p is the postsynaptic type's index.
                     posts = fieldnames(b.(names{q}));
                     acc = [];
                     for p = 1:numel(posts)
                         bq = b.(names{q}).(posts{p});
                         if isempty(bq); continue; end
-                        pr = reshape(prod(bq, 2), params.n_per_type(q), []);
+                        pr = reshape(SRNNCellTypePairs.std_route_factor(bq, params, q, p), ...
+                            params.n_per_type(q), []);
                         if isempty(acc); acc = pr; else; acc = acc .* pr; end
                     end
                     if isempty(acc) || all(acc(:) == 1)
@@ -944,20 +960,34 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % ASSERT_ROUTE_REDUNDANCY The 'synaptic' readout needs each neuron to
             % have ONE synaptic output. On this class it has one per target type.
             %
-            % theta_j^{q->s} = r_j * prod(b^{q->s}) * prod(g^{q->s}), so a
+            % theta_j^{q->s} = r_j * F^{q->s}, with F the route's output factor
+            % (prod(b) * prod(g) on a product route, b1 on a chain route), so a
             % presynaptic neuron of type q transmits a different signal down each
             % outgoing route unless those routes share their synaptic dynamics.
             % When they do share them the coincidence is EXACT, not approximate:
-            % db/dt = (1-b)/tau_rec - b*r_j/tau_rel depends only on the route's
-            % time constants and the presynaptic neuron's own rate, from a common
-            % b = 1 -- identical ODE, identical driver, identical initial
-            % condition, so bit-identical trajectories. Reading route 1 is then
-            % not a shortcut but the same array.
+            % a route's state obeys an ODE that depends only on the route's
+            % parameters and the presynaptic neuron's own rate, from a common
+            % initial state -- identical ODE, identical driver, identical
+            % initial condition, so bit-identical trajectories. Reading route 1
+            % is then not a shortcut but the same array.
             %
             % PER PRESYNAPTIC TYPE, not globally. Neuron j of type q only has
             % routes q->1 ... q->C; what other types do cannot affect it. A
             % global check would reject a perfectly well-defined configuration
-            % such as "E->* depressed, I->* not".
+            % such as "E->* depressed, I->* not", or "E->* a chain, I->* a
+            % product".
+            %
+            % WHAT IS COMPARED is SRNNCellTypePairs.route_fields, the one
+            % definition of "the same route" (routes_identical uses it too):
+            % the legacy STD/STF rows, the route scale, and the route MODEL's
+            % own signature -- which model, and every parameter of it. Until
+            % 2026-11-12 this class kept a private list (n_b, tau_rec, tau_rel,
+            % tau_dec, tau_fac, G, scale, std_geomean), written when depression
+            % was always a product. It could not see a chain's n2 at all, so
+            % two chain routes differing only in n2 PASSED and the readout
+            % silently read one of two different signals; and it told a chain
+            % from a two-component product only by the accident that the chain
+            % stores one tau_rel where the product stores two.
             %
             % Checked from the CONFIG rather than by comparing trajectories: the
             % config determines the answer exactly, and comparing npre x nt
@@ -965,18 +995,15 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % claim is asserted once, in test_esn_route_redundancy.
             for pre = 1:params.n_cellTypes
                 pre_name = params.cell_type_names{pre};
-                ref = [];
-                for post = 1:params.n_cellTypes
-                    here = SRNN_ESN_reservoir.route_signature(params, pre, post);
-                    if post == 1
-                        ref = here;
-                        continue
-                    end
+                ref = SRNNCellTypePairs.route_fields(params, pre, 1);
+                for post = 2:params.n_cellTypes
+                    here = SRNNCellTypePairs.route_fields(params, pre, post);
                     if ~isequal(ref, here)
                         error('SRNN_ESN_reservoir:AmbiguousSynapticOutput', ...
                             ['Presynaptic type %s has non-identical synaptic ' ...
                              'dynamics across its outgoing routes:\n' ...
                              '  %s->%s : %s\n  %s->%s : %s\n' ...
+                             'They differ in:\n%s\n' ...
                              'A neuron of type %s therefore transmits a ' ...
                              'different signal to each target, so the ' ...
                              '''synaptic'' readout has no single value to ' ...
@@ -987,6 +1014,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                             SRNN_ESN_reservoir.describe_route(ref), ...
                             pre_name, params.cell_type_names{post}, ...
                             SRNN_ESN_reservoir.describe_route(here), ...
+                            SRNN_ESN_reservoir.describe_route_difference(ref, here), ...
                             pre_name, pre_name);
                     end
                 end
@@ -995,45 +1023,162 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
         function sig = route_signature(params, pre, post)
             % ROUTE_SIGNATURE The synaptic dynamics of one route, as comparable
-            % data. Covers STD *and* STF: synaptic output is
-            % r * prod(b) * prod(g), so a per-route g breaks the readout exactly
-            % as a per-route b does. The route scale is compared too: it is a
-            % weight, not part of theta, but two routes of one presynaptic type
-            % scaled differently would make "the synaptic output of neuron j"
-            % ambiguous again.
-            sig = struct('n_b', params.n_b_pairs(pre, post), ...
-                         'n_g', params.n_g_pairs(pre, post), ...
-                         'tau_rec', [], 'tau_rel', [], ...
-                         'tau_dec', [], 'tau_fac', [], 'G', [], ...
-                         'scale', params.route_scale(pre, post), ...
-                         'std_geomean', isfield(params, 'std_geomean') && params.std_geomean(pre, post));
-            if sig.n_b > 0
-                sig.tau_rec = params.tau_b_rec{pre, post};
-                sig.tau_rel = params.tau_b_rel{pre, post};
-            end
-            if sig.n_g > 0
-                sig.tau_dec = params.tau_g_dec{pre, post};
-                sig.tau_fac = params.tau_g_fac{pre, post};
-                sig.G       = params.G{pre, post};
-            end
+            % data: SRNNCellTypePairs.route_fields, under the name this class
+            % has always had for it. There is ONE definition and it is the
+            % model class's; this is kept only so the name still resolves. It
+            % covers STD and STF, the route scale (a weight, not part of theta,
+            % but two routes of one presynaptic type scaled differently would
+            % make "the synaptic output of neuron j" ambiguous again) and the
+            % route model's signature (the model, and what only it has: a
+            % chain's n2).
+            sig = SRNNCellTypePairs.route_fields(params, pre, post);
         end
 
         function s = describe_route(sig)
             % DESCRIBE_ROUTE One-line human description, for the error above.
+            %
+            % sig is a route_fields struct. Numbers are printed with as many
+            % digits as it takes to read them back exactly (number_text), so
+            % two routes that differ at all never print alike: the rounded
+            % three digits this used before showed two identical lines under
+            % "non-identical" whenever the difference was small.
+            model = '';
+            if isfield(sig, 'signature') && isfield(sig.signature, 'model')
+                model = sig.signature.model;
+            end
+            num = @SRNN_ESN_reservoir.number_text;
             parts = {};
-            if sig.n_b > 0
-                parts{end+1} = sprintf('STD(tau_rec=%s, tau_rel=%s)', ...
-                    mat2str(sig.tau_rec, 3), mat2str(sig.tau_rel, 3));
+            if strcmp(model, 'pool')
+                % A chain: tau_rec holds [releasable-pool refill, reserve
+                % refill] and tau_rel ONE value, the releasable pool's.
+                parts{end+1} = sprintf(['chained STD(releasable-pool refill tau_rec1=%s, ' ...
+                    'reserve refill tau_rec2=%s, release tau_rel=%s, n2=%s)'], ...
+                    num(sig.tau_rec(1)), num(sig.tau_rec(2)), num(sig.tau_rel), ...
+                    num(sig.signature.n2));
+            elseif sig.n_b > 0
+                extra = '';
+                if sig.std_geomean
+                    extra = [extra ', combine=geomean'];
+                end
+                if isfield(sig, 'signature') && isfield(sig.signature, 'zero_floor') ...
+                        && sig.signature.zero_floor
+                    extra = [extra ', zero floor'];
+                end
+                parts{end+1} = sprintf('product STD(tau_rec=%s, tau_rel=%s%s)', ...
+                    num(sig.tau_rec), num(sig.tau_rel), extra);
             end
             if sig.n_g > 0
                 parts{end+1} = sprintf('STF(tau_dec=%s, tau_fac=%s, G=%s)', ...
-                    mat2str(sig.tau_dec, 3), mat2str(sig.tau_fac, 3), ...
-                    mat2str(sig.G, 3));
+                    num(sig.tau_dec), num(sig.tau_fac), num(sig.G));
             end
             if isempty(parts)
                 s = 'no short-term plasticity';
             else
                 s = strjoin(parts, ' + ');
+            end
+            if isfield(sig, 'scale') && sig.scale ~= 1
+                s = sprintf('%s, scale=%s', s, num(sig.scale));
+            end
+        end
+
+        function s = describe_route_difference(ref, here)
+            % DESCRIBE_ROUTE_DIFFERENCE Name every field in which two routes differ.
+            %
+            % ref and here are route_fields structs. One line per differing
+            % field, both values in full, and the relative difference where
+            % both are numbers of one size -- so a difference of 1e-6 reads
+            % as one. The fields are the route model's signature (model,
+            % time constants, a chain's n2, a product's combine and floor)
+            % and whatever route_fields carries beside it (the counts, the
+            % scale); a field one route does not have prints as (absent).
+            % Written generically over the two structs' fields, so a field
+            % added to a model's signature is reported with no change here.
+            [names, a, b] = SRNN_ESN_reservoir.comparable_fields(ref, here);
+            lines = {};
+            for k = 1:numel(names)
+                if isequal(a{k}, b{k})
+                    continue
+                end
+                line = sprintf('  %s: %s vs %s', names{k}, ...
+                    SRNN_ESN_reservoir.value_text(a{k}), ...
+                    SRNN_ESN_reservoir.value_text(b{k}));
+                if isnumeric(a{k}) && isnumeric(b{k}) && ~isempty(a{k}) ...
+                        && isequal(size(a{k}), size(b{k}))
+                    va = double(a{k}(:)); vb = double(b{k}(:));
+                    rel = max(abs(va - vb) ./ max(abs(va), abs(vb)));
+                    line = sprintf('%s (relative difference %.3g)', line, rel);
+                end
+                lines{end+1} = line; %#ok<AGROW>
+            end
+            if isempty(lines)
+                s = '  (no single field; the two routes'' data are not isequal)';
+            else
+                s = strjoin(lines, '\n');
+            end
+        end
+
+        function [names, a, b] = comparable_fields(ref, here)
+            % The fields of two route_fields structs, side by side. The route
+            % model's signature is listed field by field; a top-level field
+            % the signature repeats under the same name (tau_rec, ...) is
+            % listed once, from the signature. A missing field is the char
+            % '(absent)'.
+            absent = '(absent)';
+            sig_a = struct(); sig_b = struct();
+            if isfield(ref, 'signature'),  sig_a = ref.signature;  end
+            if isfield(here, 'signature'), sig_b = here.signature; end
+            sig_names = union(fieldnames(sig_a), fieldnames(sig_b), 'stable');
+            top_names = setdiff(union(fieldnames(ref), fieldnames(here), 'stable'), ...
+                [{'signature'}; sig_names(:)], 'stable');
+            names = [sig_names(:); top_names(:)]';
+            a = cell(size(names)); b = cell(size(names));
+            for k = 1:numel(names)
+                if k <= numel(sig_names)
+                    sa = sig_a; sb = sig_b;
+                else
+                    sa = ref; sb = here;
+                end
+                if isfield(sa, names{k}), a{k} = sa.(names{k}); else, a{k} = absent; end
+                if isfield(sb, names{k}), b{k} = sb.(names{k}); else, b{k} = absent; end
+            end
+        end
+
+        function s = value_text(v)
+            % One field's value, for an error message.
+            if ischar(v)
+                if strcmp(v, '(absent)'), s = v; else, s = ['''' v '''']; end
+            elseif islogical(v) && isscalar(v)
+                if v, s = 'true'; else, s = 'false'; end
+            elseif isnumeric(v) || islogical(v)
+                s = SRNN_ESN_reservoir.number_text(double(v));
+            else
+                s = strtrim(evalc('disp(v)'));
+            end
+        end
+
+        function s = number_text(v)
+            % NUMBER_TEXT A numeric array as text that reads back EXACTLY.
+            %
+            % Each element is printed with the fewest significant digits (up
+            % to 17) whose text converts back to the same double, so 0.25 is
+            % '0.25' and 2*(1 + 1e-6) is '2.000002', never '2'. Two values
+            % that differ therefore never print alike.
+            if isempty(v)
+                s = '[]';
+                return
+            end
+            parts = cell(1, numel(v));
+            for k = 1:numel(v)
+                for digits = 1:17
+                    parts{k} = sprintf('%.*g', digits, v(k));
+                    if str2double(parts{k}) == v(k) || isnan(v(k))
+                        break
+                    end
+                end
+            end
+            s = strjoin(parts, ' ');
+            if numel(v) > 1
+                s = ['[' s ']'];
             end
         end
 
