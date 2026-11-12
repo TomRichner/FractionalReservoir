@@ -122,6 +122,19 @@ ok = isequal(A.W, B.W) && isequal(A.S_c_vec, B.S_c_vec) && isequal(A.tau_a_matri
     isequal(A.u_ex, B.u_ex) && isequal(A.S0, B.S0) && isequal(state_A, state_B) && ...
     ~isempty(A.S_c_vec) && ~isempty(A.tau_a_matrix);
 all_passed = check('W, the setpoints, the SFA ladders, the stimulus, S0 and the RNG state after build() are untouched by the spreads', ok) && all_passed;
+% The check above cannot see whether the draws put the global stream back:
+% the stock input generator seeds the stream itself, so the stimulus and
+% x0 never depend on what build_network left behind. With a generator that
+% does NOT seed, they do (the tolerance tier's spread suite found this: a
+% dropped restore passed every case until one had such an input).
+unseeded = struct('generator', @(params, T, fs, ~, ~) deal(0.3 * randn(params.n, 1) .* ones(1, round(T * fs) + 1), ...
+    (0:1 / fs:T)'), 'intrinsic_drive', 0);
+A_u = net(sc_chain_f, het{:}, 'input_config', unseeded);
+B_u = net(sc_chain_f, het{:}, 'input_config', unseeded, 'std_spread', 0.25, 'stf_spread', [0.2 0.3]);
+C_u = net(sc_chain_f, het{:}, 'input_config', unseeded, 'rng_seeds', [3 2]);
+all_passed = check('with an input generator that does not seed the stream, the stimulus and S0 are still untouched: the draws restore the global RNG state', ...
+    isequal(A_u.u_ex, B_u.u_ex) && isequal(A_u.S0, B_u.S0) && ~isequal(A_u.u_ex, C_u.u_ex) && ...
+    ~isequal(A_u.u_ex, A.u_ex)) && all_passed;
 
 seed1 = B.rng_seeds(1);
 keep = rng;

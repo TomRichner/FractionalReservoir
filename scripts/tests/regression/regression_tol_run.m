@@ -270,7 +270,14 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 %           geometric mean, one component, facilitation, a route scale,
 %           and the ZERO FLOOR, which a pool route refuses) with
 %           std_spread [0.3 0.2 0.25], stf_spread [0.2 0.3 0.1]: the
-%           floor's p_min is then each neuron's own.
+%           floor's p_min is then each neuron's own. ITS INPUT COMES FROM
+%           A GENERATOR THAT DOES NOT SEED the global random stream
+%           (unseeded_staircase), so the staircase and x0 are drawn from
+%           the stream as build() left it. The stock generator seeds the
+%           stream itself, which makes "the draws put the global stream
+%           back" invisible to every other case of the tier: a mutation
+%           that dropped the restore was not caught until this network
+%           had such an input.
 % LAYER 1, POINTWISE: schain_noStim.<integrator>, schain_steps.<integrator>,
 % smixed_gain1, schain_stable.<integrator>, smixed_stable.<integrator>,
 % sfloor_stable; the states of the stf_chain suite (pick_pool_states: its
@@ -279,7 +286,8 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 % mind). A case holds what an stf_chain-suite case holds and, in its
 % view: std_draws, stf_draws, std_clipped, and under realised.<route> every
 % per-neuron array of the route model's parameters (the value each neuron
-% has, and `clipped`, which neurons the ordering rule moved). route_fields
+% has, and `clipped`, which neurons the ordering rule moved) and the
+% route's `jittered` flag. route_fields
 % carries the route's std_spread and stf_spread.
 % LAYER 2, STABLE END TO END (gain 0.2, staircase): stable.model.schain,
 % .smixed (noise off and on) and .sfloor (one run), each with std_factor,
@@ -294,7 +302,7 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 %                                 LOCAL rate        (reduced)  (reduced)
 %   schain     -0.162 / -0.161    -0.124 / -0.122   -0.426     -0.074
 %   smixed     -0.565 / -0.560    -0.398 / -0.397   -0.665     -0.388
-%   sfloor     -0.767             -0.653
+%   sfloor     -0.790             -0.648
 % No estimator finds a positive exponent (QR: none of 96 and 72),
 % lya_K_auto never retries and no SFA ladder is clipped. The 8 sweep jobs
 % have lambda_1 between -0.42 and -0.21. The ordering rule acts in the
@@ -789,7 +797,8 @@ sc4.E.E.std = chain; sc4.E.I.std = chain; sc4.I.E.std = chain; sc4.I.I.std = cha
 spec = struct('uniform', 'schain', 'mixed', 'smixed', 'sc4', sc4, ...
     'uniform_args', {{'std_spread', [0.25 0.25]}}, ...
     'third', struct('name', 'sfloor', 'model', @() options_model(0.2, true, ...
-        {'std_spread', [0.3 0.2 0.25], 'stf_spread', [0.2 0.3 0.1]})), ...
+        {'std_spread', [0.3 0.2 0.25], 'stf_spread', [0.2 0.3 0.1], ...
+         'input_config', struct('generator', @unseeded_staircase, 'intrinsic_drive', 0)})), ...
     'mixed_model', @spread_mixed_model, 'pick', @pick_pool_states, 'pointwise', @spread_pointwise, ...
     'along_run', @spread_along_run, ...
     'small_uniform', {{'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4}}, ...
@@ -859,6 +868,25 @@ m = SRNNCellTypePairs(args{:}, extra_args{:});
 m.build();
 end
 
+function [u_ex, t_ex] = unseeded_staircase(params, T, fs, ~, ~)
+% A six-step staircase on every neuron whose amplitudes are drawn from the
+% global random stream AS build() LEFT IT, without seeding it (the stock
+% generator seeds the stream itself, so nothing it produces can depend on
+% that state). The sfloor network's input: if a draw made during build()
+% (the per-neuron synapse parameters; the setpoints, the SFA ladders) did
+% not put the global stream back, this input and everything after it move.
+t_ex = (0:1 / fs:T)';
+nt = numel(t_ex);
+n_steps = 6;
+amplitudes = 0.5 * randn(params.n, n_steps);
+edges = round(linspace(1, nt + 1, n_steps + 1));
+u_ex = zeros(params.n, nt);
+for step = 1:n_steps
+    idx = edges(step):min(edges(step + 1) - 1, nt);
+    u_ex(:, idx) = repmat(amplitudes(:, step), 1, numel(idx));
+end
+end
+
 function c = spread_pointwise(m, S, t)
 % stf_pointwise, and what only a network with a per-neuron spread has, in
 % the view: the standard normals drawn, the ordering rule's count, and
@@ -886,6 +914,7 @@ for pre = 1:numel(names)
                 realised.(fields{k}) = v;
             end
         end
+        realised.jittered = P.jittered;     % whether any value of the route was drawn
         c.view.realised.([names{pre} '_to_' names{post}]) = realised;
     end
 end
