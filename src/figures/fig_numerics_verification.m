@@ -39,6 +39,11 @@ function out = fig_numerics_verification(cfg)
 %                 onward); the other two variants draw trial 1 and put the
 %                 cross-trial mean and sd in their titles.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names drawn
+% as columns in the order given, in every variant; empty draws every
+% condition the .mat holds, as before. Resolved by select_conditions; titles
+% from the NAME (titles_by_name), not the title the stage saved.
+%
 % See also: run_numerics_verification, resolve_data_file, test_benettin_vs_qr
 
 arguments
@@ -51,6 +56,7 @@ arguments
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
     cfg.n_qr_show   (1,1) double  = 20    % local QR exponents drawn in the band
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -63,6 +69,12 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
     'Run run_numerics_verification first');
 D = load(data_file);
 S = D.settings;
+% The selected conditions in the selected order (FD-006), retitled by NAME
+% rather than by the title run_numerics_verification saved (inventory R3).
+[~, idx] = select_conditions({D.results.name}, cfg.conditions);
+D.results = D.results(idx);
+new_titles = titles_by_name({D.results.name}, {D.results.title});
+[D.results.title] = new_titles{:};
 [R, SM] = trial_view(D.results);   % traces from trial 1; SM = per-condition summaries or []
 n_cond = numel(R);
 

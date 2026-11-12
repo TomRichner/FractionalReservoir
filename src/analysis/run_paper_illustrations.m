@@ -7,6 +7,11 @@ function out_dir = run_paper_illustrations(cfg,run_dir)
 % Network example also saves leading local/finite top-K rates. Accumulation
 % begins at t=0 with a separate negative-time alignment interval. Single-neuron
 % mechanism columns still skip Lyapunov estimation.
+% The saved `std` is each neuron's DEPRESSION FACTOR on its first outgoing
+% route, from SRNNCellTypePairs.std_route_factor: prod(b) on a product route,
+% the releasable pool b1 on a chained route (FD-006). `std_model` says which
+% ('product', 'chain', or 'none' where no route is depressed), so a figure can
+% label the row correctly.
 arguments
     cfg struct
     run_dir char
@@ -58,7 +63,7 @@ for j=1:2
         model.run(); pd=model.plot_data; pp=model.get_params();
         assert(SRNNCellTypePairs.routes_identical(pp),'Illustration requires identical outgoing routes.');
         r=struct('name',conds{c}.name,'title',titles(conds{c}.name),'t',pd.t, ...
-            'u',[],'x',[],'r',[],'syn',[],'sfa',[],'std',[],'selected',{{}},'n',model.n, ...
+            'u',[],'x',[],'r',[],'syn',[],'sfa',[],'std',[],'std_model','none','selected',{{}},'n',model.n, ...
             'cell_type_names',{model.cell_type_names},'t_lya',[],'local_lambda',[], ...
             'finite_lambda',[],'LLE',NaN);
         if j==1
@@ -81,7 +86,17 @@ for j=1:2
             A=pd.a.(name); B=pd.b.(name).(post{1});
             sa=zeros(numel(ix),numel(pd.t)); sb=ones(numel(ix),numel(pd.t));
             if ~isempty(A), sa=pp.c_eff(q)*reshape(sum(A(ix,:,:),2),numel(ix),[]); end
-            if ~isempty(B), sb=reshape(prod(B(ix,:,:),2),numel(ix),[]); end
+            if ~isempty(B)
+                % The route's depression factor from the model (FD-006): the
+                % product of the b columns on a product route (same bits as the
+                % prod(B,2) this used to form), the releasable pool b1 on a
+                % chain route. Taken on every row of the route, then the saved
+                % rows, because a per-neuron parameter is indexed by row.
+                post_q=find(strcmp(model.cell_type_names,post{1}),1);
+                Dq=SRNNCellTypePairs.std_route_factor(B,pp,q,post_q);
+                sb=reshape(Dq(ix,:,:),numel(ix),[]);
+                if pp.std_chain(q,post_q), r.std_model='chain'; elseif ~strcmp(r.std_model,'chain'), r.std_model='product'; end
+            end
             r.sfa=[r.sfa;sa]; r.std=[r.std;sb];
         end
         if c==1, results=r; else, results(c)=r; end   % struct([]) has no fields and cannot be indexed into

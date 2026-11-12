@@ -47,6 +47,7 @@ arguments
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''   % unused; accepted for a uniform call
+    cfg.conditions                = {}   % accepted and ignored: one analytic steady-state curve of the most-adapted SFA ladder, no conditions to select
 end
 
 setup_paths();

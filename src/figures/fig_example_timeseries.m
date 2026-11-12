@@ -19,7 +19,10 @@ function out = fig_example_timeseries(cfg)
 %   (d) the adaptation term (c/K) sum_k a_k of the same neurons, per neuron,
 %       coloured by cell type (was the population mean of each a_k until
 %       2026-09-14; the per-neuron term is what enters the rate)
-%   (e) depression prod(b) of the same neurons (route 1, same rule as (c))
+%   (e) the depression factor of the same neurons (route 1, same rule as
+%       (c)), from SRNNCellTypePairs.std_route_factor: prod(b) on a product
+%       route, the releasable pool b_1 on a chained route (FD-006); a note
+%       in each panel says which
 %   (f) the leading LOCAL expansion rate (grey) and the ACCUMULATING
 %       finite-time lambda_1 (condition colour), plot_local_and_finite_lle.
 %
@@ -40,7 +43,10 @@ function out = fig_example_timeseries(cfg)
 % saying so rather than a missing row, so the columns align.
 %
 % cfg.condition, if given, restricts the figure to that one condition (the
-% old single-column behaviour); empty draws all of them.
+% old single-column behaviour); empty draws all of them. cfg.conditions
+% (FD-006) is the bundle-wide option: names drawn as columns in the order
+% given, resolved by select_conditions against the preset's conditions;
+% only the selected conditions are simulated. Give one or the other.
 %
 % See also: paper_config, srnn_param_preset, SRNNCellTypePairs,
 %           plot_local_and_finite_lle, fig_lyapunov_spectrum
@@ -57,6 +63,7 @@ arguments
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''      % unused; accepted for a uniform call
+    cfg.conditions                = {}      % names to draw, in order; empty = all the preset holds (select_conditions)
 end
 
 setup_paths();
@@ -72,7 +79,12 @@ if ~isempty(cfg.condition)
             cfg.preset_name, cfg.condition, strjoin(cond_names, ', '));
     end
     cond_names = {cfg.condition};
+    if ~isempty(cfg.conditions)
+        error('fig_example_timeseries:BothSelections', ...
+            'Give condition or conditions, not both.');
+    end
 end
+cond_names = select_conditions(cond_names, cfg.conditions);
 n_cond = numel(cond_names);
 
 %% Simulate: one network, every condition, the sweeps' Lyapunov estimator
@@ -91,7 +103,7 @@ for i = 1:n_cond
 end
 
 %% Figure
-row_names = {'x', 'r', 'synaptic output', 'SFA  (c/K)\Sigma a', 'depression  \Pi b', '\lambda'};
+row_names = {'x', 'r', 'synaptic output', 'SFA  (c/K)\Sigma a', 'depression factor', '\lambda'};
 n_rows = numel(row_names);
 fig = figure('Color', 'w', 'Position', [60 40 420 * n_cond + 80, 1150]);
 tl = tiledlayout(fig, n_rows, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -176,14 +188,21 @@ for i = 1:n_cond
     end
     hold(ax, 'off');
 
-    % (e) depression prod(b) ---------------------------------------------------
+    % (e) the depression factor -----------------------------------------------
+    % From the model (SRNNCellTypePairs.std_route_factor), never prod(b)
+    % formed here: prod(b) on a product route, the releasable pool b1 on a
+    % chained one. The panel says which.
     ax = nexttile(tl); ax_all(5, i) = ax; hold(ax, 'on');
-    drew = false;
+    drew = false; is_chain = false; n_b_max = 0;
     for q = SRNNCellTypePairs.draw_order(C)
         posts = fieldnames(pd.b.(names{q}));
         B = pd.b.(names{q}).(posts{1});          % n_q x n_b x n_t, or []; route 1 == every route
         if isempty(B), continue; end
-        Pb = reshape(prod(B, 2), size(B, 1), size(B, 3));   % n_q x n_t
+        post_q = find(strcmp(names, posts{1}), 1);
+        Pb = SRNNCellTypePairs.std_route_factor(B, params, q, post_q);
+        Pb = reshape(Pb, size(B, 1), size(B, 3));   % n_q x n_t
+        is_chain = is_chain || params.std_chain(q, post_q);
+        n_b_max = max(n_b_max, size(B, 2));
         for k = 1:n_show(q)
             plot(ax, t, Pb(k, :), '-', 'Color', shades{q}(k, :), 'LineWidth', 0.5);
         end
@@ -194,6 +213,16 @@ for i = 1:n_cond
         set(ax, 'YTick', []);
     else
         ylim(ax, [0 1.02]);
+        if is_chain
+            note = 'b_1 (releasable pool)';
+        elseif n_b_max > 1
+            note = '\Pi_m b_m';
+        else
+            note = 'b (one pool)';
+        end
+        % just above the axes' top-right corner: 50 traces fill the inside
+        text(ax, 1, 1.01, note, 'Units', 'normalized', 'HorizontalAlignment', 'right', ...
+            'VerticalAlignment', 'bottom', 'FontSize', 8, 'Color', [0.3 0.3 0.3], 'Clipping', 'off');
     end
     hold(ax, 'off');
 

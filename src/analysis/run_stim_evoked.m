@@ -23,9 +23,11 @@ function out_dir = run_stim_evoked(cfg)
 %
 %   x     dendritic potential                  (the "CCEP-like" signal)
 %   r     rate, phi(x - (c/K) sum_k a_k)       (pre-depression)
-%   syn   synaptic output r * prod b, route 1
+%   syn   synaptic output r * (depression factor), route 1
 %   sfa   SFA feedback (c/K) sum_k a_k
-%   std   depression prod_m b_m, route 1
+%   std   the depression factor, route 1 (SRNNCellTypePairs.std_route_factor:
+%         prod_m b_m on a product route, the releasable pool b_1 on a
+%         chained route)
 %
 % in four groups, <type>_stim and <type>_nonstim for each cell type (a
 % group with no neurons is NaN). Route 1 is every route here: the run
@@ -193,7 +195,12 @@ for i0 = 1:chunk:numel(idx_t)
         if ~isempty(a.(nm)), sfa = params.c_eff(q) * reshape(sum(a.(nm), 2), nq, nts); end
         dep = ones(nq, nts);
         B = b.(nm).(posts{1});
-        if ~isempty(B), dep = reshape(prod(B, 2), nq, nts); end
+        if ~isempty(B)
+            % The route's depression factor from the model (FD-006): prod(b)
+            % on a product route (the same bits as before), b1 on a chain.
+            post_q = find(strcmp(names, posts{1}), 1);
+            dep = reshape(SRNNCellTypePairs.std_route_factor(B, params, q, post_q), nq, nts);
+        end
         data = struct('x', x.(nm), 'r', r.(nm), 'syn', so.(nm).(posts{1}), 'sfa', sfa, 'std', dep);
         masks = {local, ~local};
         tags = {'_stim', '_nonstim'};

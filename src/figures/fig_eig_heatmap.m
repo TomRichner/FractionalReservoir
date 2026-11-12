@@ -18,6 +18,16 @@ function out = fig_eig_heatmap(cfg)
 % The transform is applied HERE and the helper is handed plain values, so the
 % shared plotter in src/plotting/ stays untouched.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), a cell of condition
+% names drawn as panels in the order given; empty (the default) draws every
+% condition the .mat holds, in its own order, exactly as before. Resolved by
+% select_conditions against the saved cond_names, so a name the run lacks is
+% an error. The shared window limits and colour scale are computed from the
+% DRAWN conditions only. Panel titles come from the condition NAME
+% (titles_by_name), not from the titles run_eig_heatmap saved. Layout:
+% floor(sqrt(N)) rows, so three conditions are 1 x 3 (the paper's set) and
+% four are 2 x 2 (the review set; accepted, Tom 2026-11-12).
+%
 % PLOTTING HALF ONLY. run_eig_heatmap does the sampling and writes
 % eig_heatmap_data.mat, so the look can be iterated without re-simulating.
 %
@@ -32,6 +42,7 @@ arguments
     cfg.run_dir     (1,:) char    = ''    % the run whose eig_heatmap data to plot
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
     cfg.density_scale (1,:) char {mustBeMember(cfg.density_scale, {'log', 'loglog'})} = 'log'
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -49,11 +60,17 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
     'eig_heatmap_data.mat', ...
     'Run run_eig_heatmap first');
 D = load(data_file);
-evals_by_cond    = D.evals_by_cond;
-condition_titles = D.condition_titles;
-lle_by_cond      = D.lle_by_cond;
+if isfield(D, 'cond_names')
+    held = D.cond_names;
+else
+    held = D.condition_titles;   % a .mat from before cond_names was saved: titles stand in for names
+end
+[cond_names, idx] = select_conditions(held, cfg.conditions);
+evals_by_cond    = D.evals_by_cond(idx);
+condition_titles = titles_by_name(cond_names, D.condition_titles(idx));
+lle_by_cond      = D.lle_by_cond(idx);
 lle_window       = D.lle_window;
-n_cond           = numel(condition_titles);
+n_cond           = numel(cond_names);
 
 %% ---- Heatmap / plotting parameters ----------------------------------------
 grid_res   = 250;     % heatmap bins per axis

@@ -7,8 +7,12 @@ function out = fig_adaptation_methods(cfg)
 % One unconnected neuron driven by a step in external input, under a set of
 % mechanism combinations shown as COLUMNS. Rows are the stimulus u, the
 % dendritic state x, the firing rate r, the synaptic output, and whichever
-% mechanism states are active: adaptation a (SFA), depression b (STD),
-% facilitation g (STF).
+% mechanism states are active: adaptation a (SFA), the depression FACTOR
+% (STD; SRNNCellTypePairs.std_route_factor: prod(b) on a product route, the
+% releasable pool b_1 on a chained route, which is then drawn with its
+% reserve b_2 dashed and a legend naming the two), facilitation g (STF).
+% cfg.conditions is accepted and ignored (the columns are mechanism
+% combinations, not network conditions).
 %
 % TWO VARIANTS, one function:
 %
@@ -65,6 +69,7 @@ arguments
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''     % unused; accepted for a uniform call
+    cfg.conditions                = {}     % accepted and ignored: columns are mechanism combinations on a single-neuron preset, not network conditions
 end
 
 setup_paths();
@@ -130,6 +135,7 @@ for k = 1:n_col
         'lya_method', 'none', 'plot_deci', 1);
     model.run();
     P{k} = model.plot_data;
+    P{k}.params = model.get_params();   % for the depression factor (row_trace)
 end
 
 %% Which rows to draw
@@ -143,7 +149,7 @@ n_row = numel(rows);
 
 row_label = containers.Map( ...
     {'u', 'x', 'r', 'syn', 'a', 'b', 'g'}, ...
-    {'u  (input)', 'x', 'r', 'synaptic out', 'a  (SFA)', 'b  (STD)', 'g  (STF)'});
+    {'u  (input)', 'x', 'r', 'synaptic out', 'a  (SFA)', 'STD factor', 'g  (STF)'});
 
 %% Draw
 fig = figure('Color', 'w', 'Position', [80 60 260*n_col 130*n_row]);
@@ -159,6 +165,16 @@ for rr = 1:n_row
             continue
         end
         plot(ax(rr, cc), P{cc}.t, y, 'LineWidth', st.line_lw, 'Color', [0 0 0]);
+        if strcmp(rows{rr}, 'b')
+            y2 = row_trace(P{cc}, 'b_reserve');
+            if ~isempty(y2)   % a chained route: label the two pools
+                hold(ax(rr, cc), 'on');
+                plot(ax(rr, cc), P{cc}.t, y2, '--', 'LineWidth', st.line_lw, 'Color', [0.55 0.55 0.55]);
+                hold(ax(rr, cc), 'off');
+                legend(ax(rr, cc), {'b_1 releasable (factor)', 'b_2 reserve'}, ...
+                    'Location', 'southeast', 'Box', 'off', 'FontSize', 8);
+            end
+        end
         box(ax(rr, cc), 'off');
         set(ax(rr, cc), 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw);
         xlim(ax(rr, cc), [max(0, cfg.T_range(1)), cfg.T_range(2)]);   % the settling time before 0 is not drawn
@@ -261,9 +277,18 @@ switch name
         if ~isempty(A); y = squeeze(sum(A(1, :, :), 2))'; end
     case 'b'
         if isfield(p.b, 'E') && isfield(p.b.E, 'E') && ~isempty(p.b.E.E)
-            % b is n x n_b x nt; show the PRODUCT, which is what the synapse
-            % sees when there is more than one depression timescale.
-            y = squeeze(prod(p.b.E.E(1, :, :), 2))';
+            % b is n x n_b x nt; show the DEPRESSION FACTOR, which is what
+            % the synapse sees: the product of the b on a product route (the
+            % bits prod(b, 2) gave here before), the releasable pool b1 on a
+            % chained route. From the model, never formed here (FD-006).
+            D = SRNNCellTypePairs.std_route_factor(p.b.E.E, p.params, 1, 1);
+            y = squeeze(D(1, :, :))';
+        end
+    case 'b_reserve'
+        % A chained route's second variable, the reserve b2 (drawn beside the
+        % factor b1, labelled; it enters the output only through b1).
+        if isfield(p.b, 'E') && isfield(p.b.E, 'E') && ~isempty(p.b.E.E) && p.params.std_chain(1, 1)
+            y = squeeze(p.b.E.E(1, 2, :))';
         end
     case 'g'
         if isfield(p.g, 'E') && isfield(p.g.E, 'E') && ~isempty(p.g.E.E)

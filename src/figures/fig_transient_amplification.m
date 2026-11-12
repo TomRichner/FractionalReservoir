@@ -26,6 +26,11 @@ function out = fig_transient_amplification(cfg)
 % stable network (lambda_1 < 0, alpha < 0 most of the time) with omega > 0
 % supports transient growth; a normal Jacobian would have omega = alpha.
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names in the
+% order to draw them (legend order in (a), box order left to right in (b));
+% empty draws everything the .mat holds, as before. Resolved by
+% select_conditions; legend entries are titled by NAME (titles_by_name).
+%
 % See also: run_eig_heatmap, fig_eig_heatmap, sweep_metrics
 
 arguments
@@ -36,6 +41,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -52,9 +58,16 @@ if ~isfield(D, 'num_abscissa_by_cond')
         ['%s predates the numerical-abscissa fields; rerun run_eig_heatmap ' ...
          '(2026-09-12 or later).'], data_file);
 end
-n_cond = numel(D.cond_names);
-colors = cellfun(@(n) st.condition_color(n), D.cond_names, 'UniformOutput', false);
-titles = D.condition_titles;
+% The selected conditions, in the selected order (FD-006); every per-condition
+% field is reindexed here, so the code below sees only what is drawn.
+[cond_names, idx] = select_conditions(D.cond_names, cfg.conditions);
+D.num_abscissa_by_cond  = D.num_abscissa_by_cond(idx);
+D.spec_abscissa_by_cond = D.spec_abscissa_by_cond(idx);
+D.J_times_by_cond       = D.J_times_by_cond(idx);
+D.lle_by_cond           = D.lle_by_cond(idx);
+n_cond = numel(cond_names);
+colors = cellfun(@(n) st.condition_color(n), cond_names, 'UniformOutput', false);
+titles = titles_by_name(cond_names, D.condition_titles(idx));
 
 % (a) time series
 fig1 = figure('Color', 'w', 'Position', [100 100 600 420]);
@@ -86,7 +99,7 @@ for i = 1:n_cond
     plot(ax2, i + 0.25 * [-1 1], q([3 3]), '-', 'Color', colors{i}, 'LineWidth', 2.5);
 end
 hold(ax2, 'off');
-short = cellfun(@(n) short_of(st, n), D.cond_names, 'UniformOutput', false);
+short = cellfun(@(n) short_of(st, n), cond_names, 'UniformOutput', false);
 labels = arrayfun(@(i) sprintf('%s\\newline\\lambda_1 = %+.2f', short{i}, D.lle_by_cond(i)), 1:n_cond, 'UniformOutput', false);
 set(ax2, 'XTick', 1:n_cond, 'XTickLabel', labels, 'FontSize', st.tick_fs - 2, 'XTickLabelRotation', 0);
 xlim(ax2, [0.3, n_cond + 0.7]);

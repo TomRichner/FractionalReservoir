@@ -17,6 +17,13 @@ function out = fig_memory_capacity_example(cfg)
 % palette, labels only when n_cond == 4 -- and the first run of memory capacity
 % on a three-condition paper preset died here with "Index must not exceed 3".
 %
+% WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006), condition names drawn
+% in (a) and (b) in the order given (legend order); empty draws every
+% condition the .mat holds, as before. Resolved by select_conditions. The
+% reconstructed regime is full_adaptation_condition over the DRAWN
+% conditions, so it is always one of them (the chain, sfa3_stdc2, in both
+% sets of the mu7chain bundle).
+%
 % TWO-STEP, no re-simulation at plot time: run_memory_capacity_example runs the
 % protocol and saves mc_example_data.mat (gitignored); this renders it, so the
 % look can be iterated without re-running the reservoir.
@@ -31,6 +38,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''    % the run whose mc_example data to plot
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the .mat
+    cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
 end
 
 setup_paths();
@@ -48,10 +56,11 @@ data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
     'mc_example_data.mat', ...
     'Run run_memory_capacity_example first');
 S = load(data_file);
-results         = S.results;
-R2              = S.R2; %#ok<NASGU>
+% The selected conditions in the selected order (FD-006).
+[condition_names, idx] = select_conditions(S.condition_names, cfg.conditions);
+results         = S.results(idx);
+R2              = S.R2(idx);
 delay_s         = S.delay_s;
-condition_names = S.condition_names;
 n_cond          = numel(condition_names);
 
 %% Style + palette (matched to Fig_memory_capacity.m / plot_memory_capacity_combined.m)

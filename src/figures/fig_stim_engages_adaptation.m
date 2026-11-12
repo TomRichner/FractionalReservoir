@@ -50,6 +50,7 @@ arguments
     cfg.save         (1,1) logical = true
     cfg.visible      (1,1) logical = true
     cfg.run_dir      (1,:) char    = ''   % unused; accepted for a uniform call
+    cfg.conditions                 = {}   % accepted and ignored: one bursting network under its most-adapted regime, no network conditions to select
 end
 
 setup_paths();
