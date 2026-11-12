@@ -360,6 +360,14 @@ cases = add(cases, 'two depression, two facilitation', std2, stf2, struct(), std
 cases = add(cases, 'geometric mean of two', std2_geo, none, struct(), std2_geo_alt, none, 2, 0, 200);
 cases = add(cases, 'two depression, zero floor', std2, none, floor_on, std2_alt, none, 2, 0, 200);
 cases = add(cases, 'geometric mean, zero floor, two facilitation', std2_geo, stf2, floor_on, std2_geo_alt, stf2_alt, 2, 2, 200);
+% Three of each, with a scalar tau_rel: no preset has three components, and
+% the leave-one-out products are a loop only from three columns on.
+std3 = struct('tau_rec', [2 4 8], 'tau_rel', 0.3, 'combine', 'geomean');
+std3_alt = struct('tau_rec', [1 3 9], 'tau_rel', 0.2, 'combine', 'geomean');
+stf3 = struct('tau_dec', [1 2 4], 'tau_fac', [0.25 0.5 1], 'G', [3 2 1.5]);
+stf3_alt = struct('tau_dec', [1.5 3 5], 'tau_fac', [0.5 0.25 2], 'G', [2 4 3]);
+cases = add(cases, 'three depression (geometric mean, zero floor), three facilitation', ...
+    std3, stf3, floor_on, std3_alt, stf3_alt, 3, 3, 350);
 end
 
 function [ds, F] = product_reference(s, r, cs)

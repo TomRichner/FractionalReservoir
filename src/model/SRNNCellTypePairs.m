@@ -10,6 +10,18 @@ classdef SRNNCellTypePairs < handle
     %        g{1,1}(:); ...; g{C,C}(:); x(:)]
     % Pair arrays use (presynaptic type, postsynaptic type) ordering.
     %
+    % WHAT A ROUTE'S SYNAPSES DO IS NOT IN THIS CLASS. Each route carries a
+    % ROUTE MODEL (src/model/routes; route_model states the interface): a
+    % state per presynaptic neuron, driven by that neuron's rate r, and an
+    % output factor F, with synaptic output theta = r .* F. A route's state
+    % is its b-block followed by its g-block. get_params compiles one entry
+    % per route into params.route{pre, post} (the model, its per-neuron
+    % parameters P, the route's rows of the state vector), and
+    % dynamics_fast, compute_Jacobian_fast, jacobian_times and
+    % unpack_and_compute_states call the model through that entry,
+    % identically for every model. Depression and facilitation as this
+    % class has always had them are the model route_product.
+    %
     % Example:
     %   model = SRNNCellTypePairs( ...
     %       'n_cellTypes', 3, 'cell_type_names', {'E','PV','SST'}, ...
