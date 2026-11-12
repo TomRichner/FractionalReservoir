@@ -22,8 +22,12 @@ function [ok, leaves, info] = regression_tol_check(name, opts)
 %   - OK true: every leaf of the reference is within tolerance. The
 %     printout says how close the worst leaf of each layer was.
 %   - OK false: LEAVES lists what moved, by how much and where. THAT IS A
-%     DEFECT TO FIND. It is never a reason to loosen a tolerance, and the
-%     anchor is never re-captured to make this pass.
+%     DEFECT TO LOOK FOR FIRST. A tolerance is not adjusted, and the
+%     anchor not re-captured, while something may be wrong. A tolerance
+%     set once is not absolute, though (TR, 2026-11-11): when a thorough
+%     investigation explains why it cannot be met and shows the code is
+%     right, the lead adjusts it in regression_tol_settings and writes
+%     the cause, the evidence and the remaining margin beside the value.
 %
 % The pointwise layer is evaluated at the states STORED IN THE REFERENCE,
 % so nothing chaotic is compared along a trajectory.

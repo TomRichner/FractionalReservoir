@@ -44,7 +44,16 @@ Tom", "reported to Tom" and "do not start until he says go" below is
 superseded by this: those are the lead's decisions, recorded for Tom to
 read afterwards. The limits that stay are in `CLAUDE.md` ("The lead
 carries Plan A through to completion"): no `medium` or larger runs, no
-loosened tolerance, no push, no scope beyond this plan.
+push, no scope beyond this plan.
+
+**The rules in this plan guide judgement; they are not absolutes** (Tom,
+2026-11-11). Wherever the plan says a tolerance-tier failure is "never a
+reason to loosen a tolerance", read: it is a defect to look for first,
+and a tolerance is not touched while something may be wrong; but if a
+thorough investigation explains why the tolerance cannot be met and
+shows the code is right, the lead may adjust it and documents the cause,
+the evidence and the margin that remains. Workers still report and do not
+change a tolerance themselves.
 
 **If you are the lead agent picking this up:**
 

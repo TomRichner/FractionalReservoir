@@ -115,10 +115,24 @@ asleep stops all progress for hours, and he does not want that. So:
   among them) are the lead's own decisions now.
 - **Use the worker agents to get the work done**; the lead briefs,
   reviews every diff, runs the gates and merges.
+- **Rules written in advance are guides for judgement, not absolutes**
+  (Tom, 2026-11-11: "Writing down strict rules prospectively can cause
+  problems later where judgement after investigation would be best").
+  The tolerances are the example he gave. A tolerance-tier failure is
+  first a defect to look for, and a tolerance is not adjusted while
+  something may be wrong. But a tolerance that was set once is not
+  absolute: **if a thorough investigation explains why it cannot be met
+  and shows there is nothing wrong with the code, the lead may adjust it**
+  (1e-9 to 5e-9, say) **and documents it**: the cause, the evidence, the
+  old and new value and the margin that remains, in
+  `regression_tol_settings` beside the value, in the commit, and under
+  the issue or in the worklog. The same goes for the other rules in this
+  file: the lead says what it found and why it departed, in writing.
 - **What does not change:** agents never run `medium` or larger (Plan A
-  ends with one `fast` run, then a report to Tom); a tolerance-tier
-  failure is a defect to find, never a reason to loosen a tolerance; a
-  reference is replaced only deliberately, with the reason in the commit;
+  ends with one `fast` run, then a report to Tom); workers do not change
+  a tolerance or replace a reference on their own (they report, the lead
+  decides); a reference is replaced only deliberately, with the reason
+  in the commit;
   nothing is pushed; the scope is Plan A as written, and work the lead
   would like to add beyond it is noted in `ISSUES.md` or the worklog as a
   suggestion, not done.
@@ -234,7 +248,11 @@ edit also capture a pre-edit reference,
 `make_regression_tol_reference('<name>')` (written under
 `data/regression_tol/`, never committed), and compare after with
 `regression_tol_check('<name>')`. **A tolerance-tier failure is a defect
-to find, never a reason to loosen a tolerance or re-capture.** The tier
+to look for first.** Investigate it; do not adjust a tolerance or
+re-capture while something may be wrong. If the investigation explains
+why the tolerance cannot be met and shows the code is right, the lead may
+adjust it and documents the cause, the evidence and the remaining margin
+(see "Rules written in advance" under "Current work"). The tier
 runs serially in the client and does not need a pool; at its sizes the
 thread count moves nothing in the pointwise layer. After the refactor of
 Plan A step 0d passes it, the three exact references are re-captured
