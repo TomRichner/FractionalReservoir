@@ -126,6 +126,43 @@ depression is shallower than the product's at every rate). Whether the
 paper's claim survives is for the `medium` runs and for Tom; nothing was
 changed on account of this.
 
+**Added 07:10, same session.** Merged since 03:55: the chain's
+regression references (`3c9a447`), display packages 2, 3a and 3b
+(`b487051`, `20bccd2`, `d2aefa7`) and the comparison figure FD-014
+(`7c3d6dd`). Quick suite 64 of 64 and the stages tier exact after
+`7c3d6dd`; the gate on `20bccd2` is running. Step 8 (chained
+facilitation) is running on `matlab-fable-1`.
+
+**The preliminary `fast` run of the `mu7chain` analyses finished**
+(`data/mu7chain_fast_prelim`, 4.06 h on six workers, code of `763f53b`):
+**all ten stages OK, and every stage holds all four conditions.** Sweeps
+58 min, memory capacity 37, transient gain 92 (the long one: two
+conditions with 4000 states), the rest under 12 each. Its tau sweep holds
+the chain only and its `parameters.md` and illustration data predate two
+fixes merged since; the final run of step 6 regenerates them.
+
+**FOR TOM, the preliminary numbers. One `fast` run, no depression
+spread yet; read as orientation, not as results.**
+
+| Condition | Leading exponent at the baseline (median of 5) | Mean rate | Memory capacity (5 trials, mean and s.e.m.) | Leading exponent, noise on / off |
+|---|---|---|---|---|
+| No adaptation | +3.56 | 0.415 | 0.11 ± 0.01 | +3.69 / +3.86 |
+| 1TS | +0.32 | 0.243 | 2.30 ± 0.33 | +0.28 / +0.54 |
+| Chained MTS | +0.01 | 0.247 | 8.33 ± 1.03 | -0.13 / +0.08 |
+| Product MTS | -0.13 | 0.238 | 14.21 ± 0.35 | -0.10 / -0.10 |
+
+(Sources: the `mu_EE` 1-D sweep at the preset's value; the
+memory-capacity summary; the Lyapunov-spectrum stage.) The chained MTS
+sits between 1TS and the product on every measure: it holds the network
+at the transition rather than clearly below it, and its memory capacity
+is about 3.6 times 1TS's and about 0.6 of the product's. With the
+1-D sweeps (earlier in this entry) this says the ordering no adaptation,
+1TS, MTS survives the change of model, and that the chain's advantage
+over 1TS is smaller than the product's was. The numerics gate fails
+checks L and C for the chain at `fast`, as it does for the other
+conditions and as CLAUDE.md says `fast` windows do; its Jacobian check
+passes at 5e-11.
+
 **Raised, not acted on:** the cleaner fix for `active_routes` (three
 tests set `std_zero_floor` on the params struct); `route_pool` and
 `route_product` each carry a copy of two small helpers; seven stages save
