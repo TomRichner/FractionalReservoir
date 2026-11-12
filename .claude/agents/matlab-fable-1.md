@@ -34,8 +34,25 @@ stays forbidden.
   the FractionalReservoir repo root (the folder holding `setup_paths.m`) and
   the code `setup_paths`.
 - It exits when you finish, and everything in it goes with it. Whatever the
-  lead needs must be in a file on disk or in your report. Do not end your turn
-  while a MATLAB job you started is still running: it dies with you.
+  lead needs must be in a file on disk or in your report.
+- **Your MATLAB also exits when your turn ends or goes idle, and a job
+  running in it dies.** Waiting on a background task counts as going idle:
+  on 2026-11-12 a worker launched a two-hour run correctly, waited for it
+  with a Monitor, and lost the run 25 minutes in. So while a MATLAB job of
+  yours is running, stay in the foreground: wait with FOREGROUND shell
+  commands, each a loop that sleeps and checks and returns within about 9
+  minutes (Bash `timeout` 600000), one after another, until it is over.
+  Never use Monitor, `run_in_background` or a scheduled wakeup to wait for
+  your own MATLAB, and never end your turn while it is working. After each
+  wait check that the job is still alive (its newest output file keeps
+  getting newer), not only that it has not finished.
+- A MATLAB call that stays silent for 30 minutes is dropped by the client
+  though MATLAB carries on. A job longer than that is launched through a
+  `timer` whose `TimerFcn` is a plain function-handle call with an
+  `ErrorFcn` that writes the error to a file (an `evalc` or a
+  `try ... catch ME` inside an anonymous function fails at once, silently),
+  and followed from the shell as above; do not call MATLAB again until it
+  is over, since a queued call would hang.
 - It has no desktop, but figures still open as windows on Tom's screen. Create
   figures invisible where the code allows and close the ones you open.
 - The workspace is yours alone, so `clear classes` after a classdef edit needs
