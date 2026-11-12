@@ -232,9 +232,11 @@ model's arithmetic.
   in `make_all_paper_figures` (`85d601d`, merge `3e1bd04`); the sweep
   figures and the two-condition tau sweep (`9c3f0de`, merge `1debb64`);
   the stage-data figures and the depression-factor sites (`f8584c7`,
-  `e089e9d`, merge `b487051`). Running: the grouped main figures
-  (`matlab-opus-1`) and the analytic depression figures and generated
-  tables (`matlab-opus-2`).
+  `e089e9d`, merge `b487051`); the analytic depression figures and the
+  generated tables (merge `d2aefa7`); the grouped main figures (merge
+  `20bccd2`); the integration pass (`41ac6b1`, `0c706f5`, merge
+  `a46e05c`). **Done 2026-11-12**, except the two placeholders named
+  under "Result".
   **Decisions by the lead:**
   1. *The reservoir's time-series depression panel still multiplies the
      factors of a type's routes together* (so two identical routes draw
@@ -265,6 +267,16 @@ model's arithmetic.
      first (the others depend on it), then the sweep and stage packages
      in parallel, then the grouped composites and the analytic figures in
      parallel (the composites copy panels from the first two).
+  7. *The PNG resolution of large figures is lowered, in shared plotting
+     code* (`save_some_figs_to_folder_2`, integration pass). Above
+     4096 px MATLAB's export draws the canvas in tiles that do not line
+     up, which cut text on the seam and shifted lines against their axes;
+     the worker reproduced it from a reopened `.fig`. The resolution is
+     now 600 dpi lowered until the canvas is within 4000 px. Accepted
+     although it changes the pixel size of every bundle's large PNGs: it
+     removes a real defect, the `.svg` and `.fig` are untouched, and the
+     regression tiers compare figure file names. **For Tom: the large
+     PNGs already in the manuscript were exported with the defect.**
 - **Serves:** block A
 - **What:** code outside the dynamics that recomputes the product itself:
   the reservoir class's route signature and time-series plot, the STD
@@ -274,7 +286,21 @@ model's arithmetic.
 - **Done when:** the paper figures build on a chain preset and show the right
   quantity; the product presets' figures are unchanged.
 - **Depends on:** FD-004.
-- **Result:** _(pending)_
+- **Result:** both figure sets of `mu7chain` build through
+  `make_all_paper_figures` from one four-condition `fast` run: 37 of 37
+  entries in the three-condition set and 37 of 37 in the four-condition
+  set, each with the selection applied, about ten minutes a pass
+  (`figs/prelim_integ_3cond`, `figs/prelim_integ_4cond`, from
+  `data/mu7chain_fast_integ`; all local, not in git). The older product
+  run builds 36 of 36 with the regression reference's file names. Lead's
+  gates on the merge: quick 67 of 67, the stages tier exact.
+  **Not ready, and outside this issue:** groups 7 and 8 of the grouped
+  figures are placeholders (a PyTorch replacement experiment and a human
+  PSD file the config does not name); in the four-condition set group 6's
+  panel titles overlap (that set is not polished, by Tom's decision).
+  **Raised, not fixed:** `SRNNCellTypePairs.plot` opens its figure with
+  no `Position`, so its size depends on the session; `fig_main1_concepts`
+  does not take the selection for group 1.
 
 ### FD-007 Chain presets and conditions
 
