@@ -63,11 +63,23 @@ function model = route_model(name)
 %                              Fs  npre x ns        dF/d(s_k)
 %   ss = steady_state(r, P)    closed form at a constant rate r (npre x 1,
 %                              or a scalar): ss.s npre x ns, ss.F npre x 1
+%   D  = depression(b, P)      the depression factor from the route's
+%                              b-block alone, for display code that holds a
+%                              b array and not the whole state (b npre x
+%                              n_b, or npre x n_b x nt, n_b >= 1; D has the
+%                              shape of prod(b, 2)). The product's is
+%                              prod(b) after its combine and zero floor;
+%                              the pool's is b1. The one caller is
+%                              SRNNCellTypePairs.std_route_factor, which
+%                              calls it for every model and returns []
+%                              itself for a route without depression.
 %
 % (Plan A section 4.0 has linearize return one struct L with these four as
 % fields. They are four outputs because building that struct costs about
 % 1.5 microseconds, which is a third of the whole call for the product
-% model, once per route in every jacobian_times.)
+% model, once per route in every jacobian_times. `depression` is not in
+% that section's table: it came with the chain, whose factor is not
+% prod(b).)
 %
 % F DEPENDS ON THE STATE ONLY, never on the rate: the class carries the
 % rate dependence of theta = r .* F.
@@ -78,16 +90,6 @@ function model = route_model(name)
 %              a route gets unless it asks otherwise.
 %   'pool'     route_pool: vesicle pools in series. A route asks for it
 %              with std.model = 'chain'.
-%
-% ONE OPTIONAL HANDLE, for display code that holds a route's b array and
-% not its whole state:
-%   D = depression(b, P)       the depression factor from the b-block alone
-%                              (b npre x n_b, or npre x n_b x nt; D has the
-%                              shape of prod(b, 2)). route_pool has it;
-%                              route_product has `combine` and `zero_floor`
-%                              instead, which predate it.
-%                              SRNNCellTypePairs.std_route_factor is the
-%                              caller.
 %
 % ADDING A MODEL: write route_<name>.m returning such a struct, add its
 % case here and its entry to scripts/tests/test_route_models.m, and say in

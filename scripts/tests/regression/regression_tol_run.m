@@ -1,9 +1,20 @@
-function [R, seconds] = regression_tol_run(ref_data)
+function [R, seconds] = regression_tol_run(ref_data, suite)
 % REGRESSION_TOL_RUN Build every case of the tolerance regression tier and return the raw arrays.
 %
 %   R = regression_tol_run()            % CAPTURE: choose the pointwise states now
 %   R = regression_tol_run(ref_data)    % CHECK: evaluate at the states stored in ref_data
+%   R = regression_tol_run([], 'chain') % the CHAIN suite (below), capture
+%   R = regression_tol_run(ref_data, 'chain')
 %   [R, seconds] = regression_tol_run(...)
+%
+% TWO SUITES, each with a reference of its own. SUITE 'base' (the default)
+% is everything described from here to "THE CHAIN SUITE": the networks the
+% model class had before Plan A touched it, whose reference is the anchor.
+% SUITE 'chain' is the same two layers on networks with chained
+% vesicle-pool depression (route_pool); it is described at the end of this
+% header and its reference is regression_tol_chain.mat. The anchor holds no
+% chain route and is never re-captured, which is why the chain's cases are
+% a suite beside it and not more cases in it.
 %
 % THE TOLERANCE TIER (FD-020; docs/Plan_A_chained_vessicles.md, section 2.2)
 % is the gate for a rewrite of the model's ARITHMETIC. The three byte-exact
@@ -121,11 +132,69 @@ function [R, seconds] = regression_tol_run(ref_data)
 % changes with them, and the anchor describes the code BEFORE the model
 % class was touched: it cannot be re-captured once that code is gone.
 %
+% THE CHAIN SUITE (Plan A, step 5; 2026-11-12). Chained depression is
+% std.model = 'chain' on a route: a releasable pool b1 and a reserve b2 per
+% presynaptic neuron, a 2 x 2 coupled linearisation, output factor b1
+% (route_pool). The suite's networks are built here from the regression
+% presets' defaults plus a chain synapse_config, as the options network is;
+% no preset is added for them. Two kinds of network:
+%   chain   the regression network in its sfa3_std2 condition with all four
+%           routes switched to the chain (tau_rec [2 5], tau_rel 0.25,
+%           n2 2): SFA on both types, per-neuron setpoints and ladders
+%   mixed   FOUR cell types (E, PV, SST, VIP; n = 40) so that one
+%           presynaptic type, E, has every kind of route side by side: a
+%           chain (E->E), a two-component product (E->PV), one component
+%           (E->SST) and no depression (E->VIP). Also a chain with a route
+%           scale (PV->E), a geometric-mean product (SST->E), facilitation
+%           on a product route (SST->PV), a chain with a small reserve
+%           (VIP->SST, n2 0.5) and one with a huge reserve (VIP->VIP,
+%           n2 1e6). The full-A and the diagonal branch of jacobian_times
+%           both run inside every one of its Jacobian products.
+% LAYER 1, POINTWISE (as above: view, S, t, dS, J, JY, rates, outputs):
+%   chain_noStim.<integrator>   the chain network at n = 100, gain 1, no
+%        input, as it comes (noise off: weakly chaotic, lambda_1 about
+%        +0.1 where the product network is stable)
+%   chain_steps.<integrator>    the same under the step staircase
+%   mixed_gain1                 the mixed network at gain 1 under a staircase
+%   chain_stable.<integrator>, mixed_stable.<integrator>   layer 2's networks
+% The states are those of pick_states plus, for the chain routes: the
+% first sample (every pool exactly 1), the time of the smallest b1, the
+% time of the smallest b2, and TWO STATES THAT NO TRAJECTORY HERE REACHES,
+% made from the mid-run state by overwriting the chain routes' rows: both
+% pools deeply depleted (b1 in [0.01, 0.05], b2 in [0.02, 0.10]) and a
+% nearly full reserve over a part-used pool (b2 in [1 - 1e-4, 1], b1 in
+% [0.15, 0.85]). A single evaluation needs no trajectory to get there.
+% Beyond the base suite's quantities a case holds std_factor, every
+% route's depression factor at the states as display code gets it
+% (std_factors, which calls std_route_factor: b1 on a chain route, not
+% prod(b)), and its view holds params.std_chain and params.std_n2, which
+% display code reads and route_fields does not. Layer 2's model runs hold
+% std_factor along the run. No arithmetic reads those three, so without
+% these leaves an error in them would pass.
+% LAYER 2, STABLE END TO END (gain 0.2, staircase, as the base suite):
+%   stable.model.chain.<integrator>, stable.model.mixed.<integrator>
+%   stable.extra.chain, stable.extra.mixed   transient gain in its three
+%        variants and the finite-difference Jacobian, noise on
+%   stable.estimators.chain, .mixed   Benettin (noise on) and QR (noise
+%        off) on reduced networks (chain n = 12, mixed n = 10)
+%   stable.sweep        an 8-job serial ParamSpaceAnalysis2 sweep: two
+%        gains x two reps x two conditions, chain_all (the chain network)
+%        and chain_EE (one SFA timescale, a chain on E->E beside one-
+%        component routes). The conditions are local to this file.
+%   stable.mc.chain     memory capacity, synaptic readout, four identical
+%        chain routes
+% HOW STABLE: see the table in chain_suite below.
+%
 % See also: regression_tol_compare, regression_tol_check,
 %           make_regression_tol_reference, regression_tol_settings,
 %           regression_tol_band_check, regression_rapid_run
 arguments
     ref_data = []
+    suite (1,:) char {mustBeMember(suite, {'base', 'chain'})} = 'base'
+end
+if strcmp(suite, 'chain')
+    [R, seconds] = chain_suite(ref_data);
+    return;
 end
 t_all = tic;
 capture = isempty(ref_data);
@@ -324,6 +393,328 @@ if ~capture
     R.info.errors = errors;
 end
 seconds = toc(t_all);
+end
+
+%% ------------------------------------------------------------------------
+function [R, seconds] = chain_suite(ref_data)
+% The chain suite; what it holds is in the file's header. Same structure,
+% same helpers and same rules as the base suite above (a capture rethrows,
+% a check records a case that threw and goes on).
+%
+% HOW STABLE the layer-2 networks are (measured 2026-11-12 with the
+% settings below; exponents in 1/s; noise off / noise on):
+%              top-K lambda_1     its largest       Benettin   QR, largest
+%                                 LOCAL rate        (reduced)  (reduced)
+%   chain      -0.167 / -0.166    -0.125 / -0.122   -0.290     -0.077
+%   mixed      -0.326 / -0.325    -0.282 / -0.281   -0.479     -0.250
+% No estimator finds a positive exponent (QR: none of 96 and 62), the
+% leading direction's local rate never reaches zero, lya_K_auto never
+% retries (K stays 10) and no SFA ladder is clipped. The 8 sweep jobs have
+% lambda_1 between -0.42 and -0.21. As in the base suite the leading
+% exponent is the decay rate of a slow variable (an SFA rung, or a
+% reserve), so the gain does not move it, and the three estimators differ
+% there for the reason given above. Under the staircase the pools are
+% worked: in the stable chain network rates span 0 to 1, b1 falls to 0.10
+% and b2 to 0.58; in the mixed one the small reserve of VIP->SST falls to
+% 0.03 (its b1 to 0.07) while the huge one of VIP->VIP stays within 1e-6
+% of 1. The pointwise layer's two made states go further.
+%
+% DO NOT RETUNE the settings below; if they must change, the chain
+% reference changes with them and the commit says why.
+t_all = tic;
+capture = isempty(ref_data);
+rng_at_entry = rng;
+restore_rng = onCleanup(@() rng(rng_at_entry));
+
+P_chaos  = 'regression_pairs_noStim_noise0p025_dualStd_3cond';
+P_steps  = 'regression_pairs_steps5s_noise0p025_dualStd_3cond';
+P_stable = struct('rk4_noise_off', 'regression_stable_steps_noise0_dualStd_3cond', ...
+                  'sra1_noise_on', 'regression_stable_steps_noise0p025_dualStd_3cond');
+full_cond = 'sfa3_std2';                 % three SFA timescales; its routes are replaced
+chain = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
+sc4 = struct();
+sc4.E.E.std = chain; sc4.E.I.std = chain; sc4.I.E.std = chain; sc4.I.I.std = chain;
+integrators = struct('name', {'rk4_noise_off', 'sra1_noise_on'}, ...
+    'args', {{'sigma_u_noise', 0, 'ode_solver', 'rk4'}, {'ode_solver', 'sra1'}});
+
+R = struct('pointwise', struct(), 'stable', struct(), 'info', struct());
+R.info.threads = maxNumCompThreads;
+errors = {};
+
+%% Layer 1a. The chain network at full gain: states only, then single evaluations
+chaos_args = {'rng_seeds', [5 6], 'T_range', [0 4], 'fs', 200, 'store_full_state', true, ...
+    'lya_method', 'none', 'verbose', 'near-none'};
+sets = struct('name', {'chain_noStim', 'chain_steps'}, 'preset', {P_chaos, P_steps});
+for q = 1:numel(sets)
+    for s = 1:numel(integrators)
+        key = {'pointwise', sets(q).name, integrators(s).name};
+        try
+            m = build_from_preset(sets(q).preset, full_cond, chaos_args{:}, integrators(s).args{:}, ...
+                'synapse_config', sc4);
+            if capture
+                m.run();
+                [S, t] = pick_chain_states(m);
+            else
+                [S, t] = stored_states(ref_data, key(2:end));
+            end
+            R = setfield(R, key{:}, chain_pointwise(m, S, t));
+        catch err
+            [R, errors] = failed(R, errors, capture, err, key);
+        end
+    end
+end
+
+key = {'pointwise', 'mixed_gain1'};
+try
+    mm = mixed_model(1, 'rk4', {});
+    if capture
+        mm.run();
+        [S, t] = pick_chain_states(mm);
+    else
+        [S, t] = stored_states(ref_data, key(2:end));
+    end
+    R = setfield(R, key{:}, chain_pointwise(mm, S, t));
+catch err
+    [R, errors] = failed(R, errors, capture, err, key);
+end
+
+%% Layer 2a. The stable networks, chain and mixed, noise off and on
+stable_args = {'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, 'store_full_state', true, ...
+    'lya_method', 'topk', 'lya_K', 10, 'lya_K_auto', true, 'lya_dt', 0.05, ...
+    'lya_T_interval', [1.5 5], 'lya_warmup', 1.5, 'verbose', 'near-none'};
+nets = {'chain', 'mixed'};
+for q = 1:numel(nets)
+    for s = 1:numel(integrators)
+        key_run = {'stable', 'model', nets{q}, integrators(s).name};
+        key_pw  = {'pointwise', [nets{q} '_stable'], integrators(s).name};
+        keys = {key_run, key_pw};
+        with_extra = s == numel(integrators);
+        if with_extra; keys{end + 1} = {'stable', 'extra', nets{q}}; end %#ok<AGROW>
+        try
+            solver = integrators(s).args{end};
+            if q == 1
+                % The preset states the noise; only the integrator is named here.
+                m = build_from_preset(P_stable.(integrators(s).name), full_cond, stable_args{:}, ...
+                    'ode_solver', solver, 'synapse_config', sc4);
+            else
+                m = mixed_model(0.2, solver, {});
+            end
+            m.run();
+            e2e = end_to_end(m);
+            % Every route's depression factor along the run, as display
+            % code gets it (std_factors, which calls std_route_factor): b1
+            % on a chain route, not prod(b).
+            e2e.std_factor = SRNNCellTypePairs.std_factors(m.plot_data.b, m.get_params());
+            R = setfield(R, key_run{:}, e2e);
+            if capture
+                [S, t] = pick_chain_states(m);
+            else
+                [S, t] = stored_states(ref_data, key_pw(2:end));
+            end
+            R = setfield(R, key_pw{:}, chain_pointwise(m, S, t));
+
+            % 2b. With noise on: the transient gain in its three variants,
+            % and the finite-difference Jacobian.
+            if with_extra
+                p = m.get_params();
+                p.u_interpolant = m.u_interpolant;
+                extra = struct();
+                i0 = find(m.t_out >= 2.5, 1);
+                for variant = {'frozen_x', 'frozen_full', 'active'}
+                    [G, g_info] = SRNNCellTypePairs.transient_gain(m.S_out, m.t_out, i0, p, 0.5, ...
+                        struct('variant', variant{1}));
+                    extra.transient_gain.(variant{1}) = struct('G', G, 'info', drop_volatile(g_info));
+                end
+                extra.finite_difference_J = SRNNCellTypePairs.finite_difference_jacobian( ...
+                    m.S_out(end, :)', p, 1e-6);
+                R.stable.extra.(nets{q}) = extra;
+            end
+        catch err
+            [R, errors] = failed(R, errors, capture, err, keys{:});
+        end
+    end
+end
+
+%% Layer 2c. The other two Lyapunov estimators, on reduced stable networks
+% Smaller than the base suite's n = 20: QR integrates N^2 variational
+% equations with ode45, and at n = 20 these two runs were two thirds of
+% the suite's time (N = 160 and 124; here 96 and 62).
+small = {'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4};
+small_run = {'rng_seeds', [5 6], 'T_range', [0 3], 'fs', 200, 'lya_T_interval', [1.5 3], ...
+    'lya_warmup', 1, 'verbose', 'near-none'};
+for q = 1:numel(nets)
+    key = {'stable', 'estimators', nets{q}};
+    try
+        if q == 1
+            mb = build_from_preset(P_stable.sra1_noise_on, full_cond, small{:}, small_run{:}, ...
+                'ode_solver', 'sra1', 'lya_method', 'benettin', 'synapse_config', sc4);
+            mq = build_from_preset(P_stable.rk4_noise_off, full_cond, small{:}, small_run{:}, ...
+                'ode_solver', 'rk4', 'lya_method', 'qr', 'synapse_config', sc4);
+        else
+            mb = mixed_model(0.2, 'sra1', [{'n', 10, 'indegree', 4}, small_run, {'lya_method', 'benettin'}]);
+            mq = mixed_model(0.2, 'rk4',  [{'n', 10, 'indegree', 4}, small_run, {'lya_method', 'qr'}]);
+        end
+        mb.run();
+        mq.run();
+        R = setfield(R, key{:}, struct('benettin', drop_volatile(mb.lya_results), ...
+            'qr', drop_volatile(mq.lya_results)));
+    catch err
+        [R, errors] = failed(R, errors, capture, err, key);
+    end
+end
+
+%% Layer 2e. A sweep with chain conditions, set up as the sweep stages set theirs up
+scratch = tempname;
+try
+    ctx = resolve_run_context('param_space', 'preset_name', P_stable.sra1_noise_on, ...
+        'run_mode', 'fast', 'verbose', 'near-none');
+    % Two conditions made here (no preset carries a chain yet): the chain
+    % network, and one SFA timescale with a chain on E->E beside the
+    % preset's one-component routes.
+    c_one  = ctx.conditions{2};
+    c_full = ctx.conditions{3};
+    sc_EE = c_one.synapse_config;
+    sc_EE.E.E.std = chain;
+    sweep_conditions = { ...
+        struct('name', 'chain_all', 'tau_a', {c_full.tau_a}, 'synapse_config', sc4), ...
+        struct('name', 'chain_EE',  'tau_a', {c_one.tau_a},  'synapse_config', sc_EE)};
+    d = ctx.model_defaults;
+    d.T_range = [0 4]; d.lya_T_interval = [2 4]; d.lya_warmup = 1;
+    psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 4, 'note', 'regression_tol_chain', ...
+        'randomize_order', false, 'verbose', 'near-none', 'use_parallel', false);
+    psa.model_class    = ctx.model_class;
+    psa.integer_params = ctx.integer_params;
+    psa.model_defaults = d;
+    psa.output_dir     = scratch;
+    psa.set_conditions(sweep_conditions);
+    psa.add_grid_parameter('level_of_chaos', [0.1, 0.2]);
+    psa.add_grid_parameter('reps', 1:2);
+    psa.run();
+    sweep = struct();
+    for i = 1:numel(sweep_conditions)
+        rc = psa.results.(sweep_conditions{i}.name);
+        sweep.(sweep_conditions{i}.name) = cellfun(@drop_volatile, rc, 'UniformOutput', false);
+    end
+    R.stable.sweep = sweep;
+catch err
+    [R, errors] = failed(R, errors, capture, err, {'stable', 'sweep'});
+end
+if isfolder(scratch); rmdir(scratch, 's'); end
+
+%% Layer 2f. Memory capacity through the reservoir class, four identical chains
+key = {'stable', 'mc', 'chain'};
+try
+    [preset_mc, ~, conditions_mc] = srnn_param_preset(P_stable.rk4_noise_off);
+    fs = 200;
+    c = conditions_mc{end};
+    c.synapse_config = sc4;
+    cargs = struct2namevalue(rmfield(c, 'name'));
+    base_args = struct2namevalue(preset_mc);
+    esn = SRNN_ESN_reservoir(base_args{:}, ...
+        'fs', fs, 'ode_solver', 'sra1', 'rng_seeds', [3 4], ...
+        'input_type', 'sample_hold', 'T_hold', 0.3, ...
+        'T_wash', 5 * fs, 'T_train', 30 * fs, 'T_test', 15 * fs, 'd_max', 3 * fs, cargs{:});
+    esn.build();
+    [MC, R2, res] = esn.run_memory_capacity('readout_signal', 'synaptic', ...
+        'verbose', false, 'store_timeseries', false);
+    R = setfield(R, key{:}, struct('MC', MC, 'R2', R2, 'delay_s', res.delay_s, ...
+        'hold_len', res.hold_len, 'W', esn.W, 'W_in', esn.W_in));
+catch err
+    [R, errors] = failed(R, errors, capture, err, key);
+end
+
+if ~capture
+    R.info.errors = errors;
+end
+seconds = toc(t_all);
+end
+
+function m = mixed_model(gain, solver, extra_args)
+% The mixed network of the chain suite: four cell types, and from the one
+% presynaptic type E a chain, a two-component product, a one-component and
+% an undepressed route (see the header). Under a step staircase always, so
+% the routes' variables move at any gain; noise on with 'sra1', off with
+% 'rk4'. EXTRA_ARGS are applied last.
+chain = @(tau_rec, tau_rel, n2) struct('model', 'chain', 'tau_rec', tau_rec, 'tau_rel', tau_rel, 'n2', n2);
+sc = struct();
+sc.E.E.std     = chain([2 5], 0.25, 2);
+sc.E.PV.std    = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+sc.E.SST.std   = struct('tau_rec', 2, 'tau_rel', 0.25);
+sc.PV.E.std    = chain([1 3], 0.3, 1.5);
+sc.PV.E.scale  = 1.3;
+sc.PV.PV.std   = struct('tau_rec', 0.6, 'tau_rel', 0.3);
+sc.SST.E.std   = struct('tau_rec', [0.3 1], 'tau_rel', 0.2, 'combine', 'geomean');
+sc.SST.PV.stf  = struct('tau_dec', 0.9, 'tau_fac', 0.4, 'G', 1.8);
+sc.VIP.SST.std = chain([0.5 8], 0.2, 0.5);
+sc.VIP.VIP.std = chain([1.5 4], 0.4, 1e6);
+if strcmp(solver, 'sra1'); noise = 0.025; else; noise = 0; end
+args = {'n', 40, 'indegree', 10, 'n_cellTypes', 4, 'cell_type_names', {'E', 'PV', 'SST', 'VIP'}, ...
+    'f', [0.4 0.2 0.2 0.2], 'mu_tilde_relative', [3 -4 -2 -1.5], 'sigma_tilde_relative', [1 1 1 1], ...
+    'tau_a', {[0.25 1], [], 2, 1}, 'c', [0.3 0 0.2 0.1], 'synapse_config', sc, ...
+    'level_of_chaos', gain, 'sigma_u_noise', noise, 'ode_solver', solver, ...
+    'input_config', struct('n_steps', 6, 'step_density', struct(), 'amp', 0.5, ...
+        'no_stim_pattern', false(1, 6), 'intrinsic_drive', 0, 'positive_only', false), ...
+    'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, ...
+    'lya_method', 'topk', 'lya_K', 10, 'lya_K_auto', true, 'lya_dt', 0.05, ...
+    'lya_T_interval', [1.5 5], 'lya_warmup', 1.5, 'store_full_state', true, 'verbose', 'near-none'};
+m = SRNNCellTypePairs(args{:}, extra_args{:});
+m.build();
+end
+
+function c = chain_pointwise(m, S, t)
+% pointwise_case, and what only a network with chain routes has: the two
+% params fields that say which routes are chains and their n2 (display
+% code reads them; route_fields, and so the view, does not), and every
+% route's depression factor at the states as std_route_factor gives it.
+c = pointwise_case(m, S, t);
+p = m.get_params();
+c.view.std_chain = p.std_chain;
+c.view.std_n2 = p.std_n2;
+[~, ~, b] = SRNNCellTypePairs.unpack_and_compute_states(S', p);
+c.std_factor = SRNNCellTypePairs.std_factors(b, p);
+end
+
+function [S, t] = pick_chain_states(m)
+% States for the chain suite's pointwise layer, as columns: those of
+% pick_states (four evenly spaced, the highest mean rate, the smallest b on
+% any route), the first sample (every pool exactly 1), the times of the
+% smallest b1 and of the smallest b2 on any chain route, and two states
+% made from the mid-run state by overwriting the chain routes' rows:
+%   depleted      b1 in [0.01, 0.05], b2 in [0.02, 0.10]
+%   full reserve  b1 in [0.15, 0.85], b2 in [1 - 1e-4, 1]
+% with fixed patterns over the neurons, not random. The made states carry
+% the mid-run time.
+[S, t] = pick_states(m);
+p = m.get_params();
+lay = p.state_layout;
+nt = size(m.S_out, 1);
+b1_min = inf(nt, 1);
+b2_min = inf(nt, 1);
+i_mid = round(nt / 2);
+depleted = m.S_out(i_mid, :)';
+reserve_full = depleted;
+for pre = 1:p.n_cellTypes
+    npre = p.n_per_type(pre);
+    w1 = 0.5 + 0.5 * cos((1:npre)');
+    w2 = 0.5 + 0.5 * sin(2 * (1:npre)');
+    for post = 1:p.n_cellTypes
+        if ~p.std_chain(pre, post); continue; end
+        rows = lay.b{pre, post};             % component-major: b1 then b2
+        rows1 = rows(1:npre);
+        rows2 = rows(npre + 1:end);
+        b1_min = min(b1_min, min(m.S_out(:, rows1), [], 2));
+        b2_min = min(b2_min, min(m.S_out(:, rows2), [], 2));
+        depleted(rows1) = 0.01 + 0.04 * w1;
+        depleted(rows2) = 0.02 + 0.08 * w2;
+        reserve_full(rows1) = 0.15 + 0.70 * w1;
+        reserve_full(rows2) = 1 - 1e-4 * w2;
+    end
+end
+[~, i1] = min(b1_min);
+[~, i2] = min(b2_min);
+idx = unique([1, i1, i2]);
+S = [S, m.S_out(idx, :)', depleted, reserve_full];
+t = [t, m.t_out(idx)', m.t_out(i_mid), m.t_out(i_mid)];
 end
 
 %% ------------------------------------------------------------------------

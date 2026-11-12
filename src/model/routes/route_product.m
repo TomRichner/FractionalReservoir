@@ -55,6 +55,13 @@ function model = route_product()
 %   nominal    tau_rec, tau_rel, tau_dec, tau_fac, G as configured rows
 %              ([] where absent), combine, zero_floor
 %
+% `depression` (the interface's handle for display code) is D from a b array:
+%   D = depression(b, P)   b npre x M, or npre x M x nt; D has the shape of
+%                          prod(b, 2): the product of the components, then
+%                          the combine, then the zero floor. It is what
+%                          SRNNCellTypePairs.std_route_factor returns for
+%                          code that holds a b array and no g.
+%
 % TWO HANDLES BEYOND THE INTERFACE, `combine` and `zero_floor`, are the
 % two steps above. They exist so that SRNNCellTypePairs.combine_std_pair,
 % apply_std_zero_floor_pair and std_zero_floor_pmin, which predate this
@@ -66,7 +73,7 @@ function model = route_product()
 model = struct('name', 'product', ...
     'compile', @compile, 'initial', @initial, 'rhs', @rhs, 'output', @output, ...
     'linearize', @linearize, 'steady_state', @steady_state, ...
-    'combine', @combine, 'zero_floor', @zero_floor);
+    'depression', @depression_of_b, 'combine', @combine, 'zero_floor', @zero_floor);
 end
 
 %% The interface
@@ -196,6 +203,14 @@ if P.zero_floor
     [D, floor_gain] = zero_floor(D, P);
     dD_dP = floor_gain .* dD_dP;
 end
+end
+
+function D = depression_of_b(b, P)
+%DEPRESSION_OF_B The `depression` handle: D from the route's b array, the
+% product over the components, then the combine, then the floor. The two
+% steps are called exactly as std_route_factor called them before this
+% handle existed, so the factor is the same to the last bit.
+D = zero_floor(combine(prod(b, 2), P), P);
 end
 
 function [D, dD_dP] = combine(P_b, P)

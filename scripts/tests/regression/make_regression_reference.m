@@ -2,6 +2,7 @@ function out_file = make_regression_reference(tier, opts)
 % MAKE_REGRESSION_REFERENCE Save the reference digest for one tier of the regression.
 %
 %   out_file = make_regression_reference('rapid')
+%   out_file = make_regression_reference('rapid_chain')
 %   out_file = make_regression_reference('stages')
 %   out_file = make_regression_reference('full')                    % from the run tagged 'reference'
 %   out_file = make_regression_reference('full', 'tag', 'reference', 'ignore', patterns, 'notes', text)
@@ -9,6 +10,10 @@ function out_file = make_regression_reference(tier, opts)
 % TIERS
 %   'rapid'  runs regression_rapid_run now (about 30 s), digests it, and
 %            writes scripts/tests/fixtures/regression_rapid_digest.mat.
+%   'rapid_chain'  runs regression_rapid_chain_run now (about 30 s): the
+%            ultrarapid tier's twin for networks with chained vesicle-pool
+%            depression, which the other three references do not hold.
+%            Writes .../fixtures/regression_rapid_chain_digest.mat.
 %   'stages' runs regression_stages_run now (a few minutes), digests it,
 %            and writes .../fixtures/regression_stages_digest.mat.
 %   'full'   digests an EXISTING run of the full bundle,
@@ -38,15 +43,16 @@ function out_file = make_regression_reference(tier, opts)
 % See also: regression_rapid_run, regression_fast_run, regression_digest,
 %           regression_rapid_check, regression_check
 arguments
-    tier (1,:) char {mustBeMember(tier, {'rapid', 'stages', 'full'})}
+    tier (1,:) char {mustBeMember(tier, {'rapid', 'rapid_chain', 'stages', 'full'})}
     opts.tag (1,:) char = 'reference'
     opts.ignore cell = {}
     opts.notes (1,:) char = ''
     opts.allow_dirty (1,1) logical = false
 end
 project_root = fileparts(which('setup_paths'));
-names = struct('rapid', 'regression_rapid_digest.mat', 'stages', 'regression_stages_digest.mat', ...
-    'full', 'regression_fast_digest.mat');
+names = struct('rapid', 'regression_rapid_digest.mat', ...
+    'rapid_chain', 'regression_rapid_chain_digest.mat', ...
+    'stages', 'regression_stages_digest.mat', 'full', 'regression_fast_digest.mat');
 out_file = fullfile(project_root, 'scripts', 'tests', 'fixtures', names.(tier));
 if isfile(out_file)
     error('make_regression_reference:Exists', ...
@@ -77,6 +83,14 @@ switch tier
         digest = regression_digest(run_dir);
         rmdir(run_dir, 's');
         preset_name = 'regression_pairs_noStim_noise0p025_dualStd_3cond';
+        run_mode = 'none (direct calls)';
+        tag = '';
+    case 'rapid_chain'
+        run_dir = regression_rapid_chain_run();
+        digest = regression_digest(run_dir);
+        rmdir(run_dir, 's');
+        preset_name = ['regression_pairs_noStim_noise0p025_dualStd_3cond, routes replaced by ' ...
+            'std.model = ''chain'' in regression_rapid_chain_run'];
         run_mode = 'none (direct calls)';
         tag = '';
     case 'stages'

@@ -2393,8 +2393,7 @@ classdef SRNNCellTypePairs < handle
             % CODE THAT DISPLAYS OR USES A ROUTE'S DEPRESSION CALLS THIS and
             % does not form prod(b, 2) itself, so that it is right for every
             % route model. The arithmetic is the model's: its `depression`
-            % handle where it has one (route_pool), else route_product's
-            % `combine` and `zero_floor`.
+            % handle (route_model), one call for every model.
             if isempty(b)
                 D = [];
                 return;
@@ -2406,11 +2405,7 @@ classdef SRNNCellTypePairs < handle
                     'Route (%d, %d) has %d depression variable(s); b has %d column(s).', ...
                     pre, post, R.P.n_b, size(b, 2));
             end
-            if isfield(R.model, 'depression')
-                D = R.model.depression(b, R.P);
-            else
-                D = R.model.zero_floor(R.model.combine(prod(b, 2), R.P), R.P);
-            end
+            D = R.model.depression(b, R.P);
         end
 
         % The next three predate the route models and are kept for callers
