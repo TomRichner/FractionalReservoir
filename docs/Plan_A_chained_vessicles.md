@@ -145,7 +145,7 @@ $b_1 = 1$ it is $-r/\tau_{rel} \le 0$, and likewise for $b_2$.
 | MTS chain condition | Named **`sfa3_stdc2`** (Tom, 2026-11-11). |
 | Conditions analysed | **Four, in every analysis**: no adaptation, 1TS, chained MTS, product MTS. **The paper shows three**: no adaptation, 1TS, chained MTS. Product MTS is kept so the chain and the product can be seen side by side while this is developed. |
 | Figure sets | **Two versions of every figure, from every run.** The three-condition version (no adaptation, 1TS, chained MTS) is the paper's: **chained MTS takes over product MTS's base colour and its position** in the figure. The four-condition version adds product MTS as a **fourth column, in a new fourth base colour, green**, for comparison. |
-| Reruns | **Agents never run `medium` or larger.** Only Tom starts those and only Tom says when they are done. The plan ends with one `fast` run. |
+| Reruns | **Agents never run `medium` or larger.** Only Tom starts those and only Tom says when they are done. The plan ends with one `fast` run. **Changed by Tom, 2026-11-12:** it ends with one `essential` run instead (FD-023, about 35 min, figures 2 to 4, four conditions), and no `medium` run is made before block C is done. |
 | Parallel pools | Automatic pool creation is **off** machine-wide (Tom, 2026-11-11). Up to 12 workers in total across the lead and all workers. Tom keeps one MATLAB session with a one-worker pool on the `Just1` profile to hold a toolbox licence seat; it does not count against the 12. |
 
 Steady state at constant rate, with $k_1 = r\tau_{rec_1}/\tau_{rel}$,

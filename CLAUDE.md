@@ -153,7 +153,10 @@ asleep stops all progress for hours, and he does not want that. So:
   the issue or in the worklog. The same goes for the other rules in this
   file: the lead says what it found and why it departed, in writing.
 - **What does not change:** agents never run `medium` or larger (Plan A
-  ends with one `fast` run, then a report to Tom); workers do not change
+  was to end with one `fast` run; **since 2026-11-12 it ends with one
+  `essential` run**, FD-023, made by an Opus worker, then a report to
+  Tom, after which block B is planned with him; no `medium` run before
+  block C is done); workers do not change
   a tolerance or replace a reference on their own (they report, the lead
   decides); a reference is replaced only deliberately, with the reason
   in the commit;

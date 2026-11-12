@@ -783,6 +783,56 @@ model's arithmetic.
   beside other work on it.
 - **Result:** _(pending)_
 
+### FD-023 An `essential` run speed, below `fast`
+
+- **Status:** in progress (Tom, 2026-11-12; briefed to `matlab-fable-1`).
+  **Tom's instructions for it:**
+  - A Fable 5.2 worker builds it; once merged, an Opus 5.5 worker makes
+    the run. **The essential run takes the place of the `fast` run that
+    was to end Plan A** (step 11). After Tom and the lead have looked at
+    its figures together, block B is planned.
+  - **Testing is unit tests and the ultrarapid regression tiers, nothing
+    more**: no end-to-end smoke run, no stages or full tier, no mutation
+    checks for this build. The Opus worker's run is the first end-to-end
+    run.
+  - **The lead does not stop to ask Tom anything about the build or the
+    run**; it decides, for a reasonably efficient result, and records the
+    decisions here.
+  - **If the run comes in over the 35-minute budget it is not corrected
+    and not run a second time.** The lead reports the time it took.
+  **Decisions by the lead:**
+  1. *Two knobs, not one.* A run mode `essential` for the sizes, which
+     every stage accepts (a mode only the sweeps knew is what killed three
+     stages on 2026-09-03), and a stage selection in the bundle config
+     (`cfg.stages`, `cfg.sweeps`), since skipping stages is where the time
+     is: of the preliminary `fast` run's 243 min on 6 workers, 160 went to
+     stages figures 2 to 4 do not read.
+  2. *Figure 5 is out*, as Tom's second message has it ("figures 2-4"):
+     it needs the transient-gain stage (92 min at `fast`).
+  3. *"E:I pseudocoloring" is taken to be `fig_EI_weights_param_space`*,
+     the registered figure (the joint sample coloured by realised E:I
+     weight balance). Put to Tom and not answered before he said not to
+     ask; if he meant colouring by the fraction excitatory, that is a
+     figure option, not a rerun.
+  4. *Simulation windows stay `fast`'s.* Shortening them biases λ1; the
+     saving comes from fewer jobs and fewer stages.
+  5. *The 32-point joint sample is a stated exception* to the 128-point
+     floor of 2026-09-14, which holds from `fast` up.
+  6. *The eigenvalue stage runs the reference example only* in this
+     bundle; figure 3 reads no other.
+- **Serves:** Tom's look at a network before long runs; block A's close
+- **What:** `essential` in `run_mode_names` and every stage's cost table
+  (4 levels x 2 reps in the 1-D sweeps, a 32-point joint sample, other
+  stages at their `fast` sizes); `cfg.stages` and `cfg.sweeps` in
+  `run_all_paper_analyses`, validated before any compute, skipped stages
+  recorded in the manifest; `mu7chain_config('essential')` with the
+  stages figures 2 to 4 need, a trimmed figure registry and the
+  four-condition figure set only.
+- **Done when:** the unit tests and both ultrarapid tiers pass; the
+  existing modes' sizes and configs are unchanged.
+- **Depends on:** FD-007.
+- **Result:** _(pending)_
+
 ## To be planned
 
 Named so they are not lost. Each needs a planning session with Tom before it
