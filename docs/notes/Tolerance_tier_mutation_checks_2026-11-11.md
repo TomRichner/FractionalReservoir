@@ -412,3 +412,242 @@ errors to carry over are the "What it is" column above, at their new
 sites. Two things to keep when rewriting it: one mutation per Jacobian
 block in each of the two Jacobian routines, and at least one error that
 the parameter view cannot see.
+
+---
+
+# After the refactor: the list re-run on the route interface (2026-11-11, FD-021)
+
+Plan A step 0d moved product depression and today's facilitation out of
+`SRNNCellTypePairs` and behind the route interface (`src/model/routes/`:
+`route_model`, `route_product`). This section records the same exercise
+on the refactored code: the list written again for it, run with the same
+harness against the same anchor, with no tolerance, override or
+comparison rule changed.
+
+- Code under test: commit `3857fe9`. `src/model/SRNNCellTypePairs.m` at
+  blob `8c94d21`, `src/model/routes/route_product.m` at `b3f5b2e`,
+  `src/model/routes/route_model.m` at `dc18579`,
+  `src/model/SRNN_ESN_reservoir.m` at `4b20396` (unchanged).
+- The list: `scripts/tests/regression/regression_tol_mutations_post_refactor.m`,
+  71 mutations (48 carried over from the first list at their new sites, 23
+  new) and a 15-entry scan. Its header says what moved where.
+- Reference: the anchor, 14 threads. The unmutated refactored code passes
+  it, but no longer bit for bit: 240 of 1749 float leaves move (64
+  pointwise, 176 stable). The leaf closest to its tolerance is
+  `pointwise.options_chaotic.dS` at 4.8e-16 against 1e-12 (2100 times
+  inside) in the pointwise layer; in the stable layer
+  `stable.estimators.sfa3_std2.qr.local_LE_spectrum_t` at 7.6e-8 against
+  its 1e-5 override (130 times inside), and among leaves at the layer's
+  own 1e-9, `stable.sweep.sfa1_std1{2}.lambda_1_drift` at 1.3e-12 (770
+  times inside). So a mutation's factors below sit on a background of at
+  most 5e-4 (pointwise) and 1.3e-3 (stable, default tolerance).
+- To repeat: `rows = regression_tol_mutate(regression_tol_mutations_post_refactor())`,
+  about 22 s per mutation, 26 minutes for the list: longer than is safe
+  for one MATLAB MCP call, so it was run in three parts with `save_dir`.
+
+## Result of the re-run
+
+**All 71 mutations fail the tier, and every one fails by compared
+values.** None was caught only because a case threw.
+
+| | Mutations |
+|---|---|
+| Run | 71 (48 carried, 23 new) |
+| Caught | 71 |
+| Caught by compared values | 71 |
+| Caught only by a thrown case | 0 |
+| Also had cases that threw | 1 (`tau_rec_I_to_E_param_1e-6`: two memory-capacity cases, 12 leaves missing, beside 329 value failures; as before the refactor) |
+| Caught by the pointwise layer | 66 |
+| Caught by the stable layer | 68 |
+| Caught by both | 63 |
+| Caught ONLY by the pointwise layer | 3 (`lin_A_spurious_coupling_1e-6`, `lin_Fs_g_1e-9`, `lin_Fs_b_with_g_1e-9`) |
+| Caught ONLY by the stable layer | 5 (`init_b_1e-6`, `init_class_1e-6`, `unpack_b_reversed`, and the two reservoir mutations) |
+| Caught ONLY by overridden leaves | 2 (the two reservoir mutations, as before) |
+| Made an exact (discrete) leaf change | 16, all gross errors |
+
+The numbers of the carried mutations are the first list's to the digits
+shown wherever the error is the same error (`tau_rec_1e-6`: 169 pointwise
+leaves, 4.3e3 / 1.8e6; 263 stable, 1.1 / 2.4e4, in both runs). The tier
+sees the same error the same way on the refactored code.
+
+## Every mutation of the re-run
+
+Columns as in the first table; the stable column gives the failing
+leaves and, in brackets, how many of them are under an override.
+
+| Mutation | From | Pointwise: leaves failing | weakest / strongest | Stable: leaves failing (overridden) | weakest / strongest | Exact leaf changed | Cases that threw |
+|---|---|---|---|---|---|---|---|
+| `tau_rec_1e-6` | carried | 169 | 4.3e3 / 1.8e6 | 263 (1) | 1.1 / 2.4e4 | no | 0 |
+| `tau_rel_1e-6` | carried | 169 | 5e4 / 2.1e6 | 271 (1) | 1.5 / 1.2e4 | no | 0 |
+| `tau_a_rung_1e-6` | carried | 137 | 2.3e4 / 1e6 | 262 (1) | 1 / 2e5 | no | 0 |
+| `c_eff_no_K` | carried | 113 | 2.4e10 / 2e12 | 172 (7) | 1.4e4 / 4.2e9 | yes | 0 |
+| `G_1e-6` | carried | 21 | 1.3e5 / 6.2e6 | 42 (0) | 1.4 / 2.4e3 | no | 0 |
+| `tau_fac_1e-6` | carried | 21 | 6.5e4 / 1.6e6 | 40 (0) | 5.8 / 5.1e2 | no | 0 |
+| `tau_dec_1e-6` | carried | 21 | 4.2e4 / 1.2e6 | 42 (0) | 6.2 / 2.8e3 | no | 0 |
+| `tau_d_1e-6` | carried | 151 | 6.6e5 / 1e6 | 351 (1) | 1 / 3e5 | no | 0 |
+| `route_scale_not_folded` | carried | 17 | 8.3e10 / 1.6e12 | 42 (0) | 1.1e5 / 2.2e8 | no | 0 |
+| `tau_rec_I_to_E_param_1e-6` | carried | 106 | 4.3e3 / 1e6 | 223 (1) | 1.1 / 2e5 | no | 2 |
+| `P_tau_rest_1e-6` | new | 115 | 4.3e3 / 1.8e6 | 263 (1) | 1.1 / 2.4e4 | no | 0 |
+| `P_tau_drive_1e-6` | new | 115 | 5e4 / 2.1e6 | 271 (1) | 1.5 / 1.2e4 | no | 0 |
+| `P_target_1e-6` | new | 15 | 1.3e5 / 6.2e6 | 42 (0) | 1.4 / 2.4e3 | no | 0 |
+| `P_one_neuron_tau_rest_1e-6` | new | 115 | 1.6e3 / 1.5e6 | 246 (0) | 1 / 8.7e4 | no | 0 |
+| `recovery_sign` | carried | 14 | 3.9e10 / 3.6e12 | 298 (9) | 5.2e3 / 1.1e12 | yes | 0 |
+| `recovery_I_to_E_1e-6` | carried | 12 | 1.2e5 / 1.9e5 | 218 (1) | 1 / 4e4 | no | 0 |
+| `release_1e-6` | carried | 14 | 1.5e5 / 2.1e6 | 260 (1) | 1.3 / 2.6e4 | no | 0 |
+| `fac_buildup_sign` | carried | 2 | 5.4e11 / 3.2e12 | 42 (0) | 1.1e6 / 2.8e9 | no | 0 |
+| `sfa_drive_1e-6` | carried | 14 | 2.2e5 / 3.1e6 | 261 (1) | 1 / 7.2e4 | no | 0 |
+| `input_1e-6` | carried | 14 | 3.5e5 / 9.2e6 | 346 (1) | 1.2 / 4.1e5 | no | 0 |
+| `theta_1e-6` | new | 20 | 4.5e5 / 4.6e6 | 345 (2) | 1.2 / 3.9e5 | no | 0 |
+| `geomean_plain_product_dS` | carried | 2 | 6.1e11 / 1.2e12 | 42 (0) | 1.1e5 / 1.3e8 | no | 0 |
+| `zero_floor_off_dS` | carried | 2 | 8.9e11 / 1.2e12 | 42 (0) | 6.4e4 / 3.8e8 | no | 0 |
+| `output_no_facilitation` | carried | 8 | 1.1e11 / 1.5e12 | 42 (0) | 1.1e5 / 4.4e8 | no | 0 |
+| `p_min_1e-6` | carried | 21 | 7.6e4 / 1.8e6 | 40 (0) | 1.3 / 8.1e2 | no | 0 |
+| `geomean_gain_omitted` | carried | 13 | 9.5e9 / 1e11 | 18 (0) | 5.5e4 / 3.2e7 | no | 0 |
+| `floor_gain_omitted` | new | 13 | 4.3e10 / 3.3e11 | 18 (0) | 5.8e4 / 3.5e7 | no | 0 |
+| `geomean_exponent_1e-6` | new | 17 | 2.5e4 / 5.7e5 | 40 (0) | 1.3 / 3.8e2 | no | 0 |
+| `phi_prime_1e-6` | carried | 13 | 2.1e5 / 6.6e5 | 16 (0) | 4.9 / 2e3 | no | 0 |
+| `lin_A_last_1e-9` | new | 95 | 20 / 4.1e2 | 33 (0) | 1 / 1.8e2 | no | 0 |
+| `lin_A_first_dropped` | new | 95 | 3.9e10 / 5.9e11 | 297 (4) | 6.7e3 / 1.4e11 | yes | 0 |
+| `lin_A_spurious_coupling_1e-6` | new | 45 | 3.4e4 / 9.7e4 | 0 (0) | - | no | 0 |
+| `lin_B_1e-9` | new | 95 | 47 / 3.2e2 | 19 (0) | 1 / 1.7e2 | no | 0 |
+| `lin_B_facilitation_dropped` | carried | 13 | 4.8e10 / 2.2e11 | 18 (0) | 1.1e5 / 5.1e8 | no | 0 |
+| `lin_F_1e-9` | new | 131 | 1.1e2 / 1e3 | 47 (0) | 1 / 1.8e2 | no | 0 |
+| `lin_Fs_1e-9` | new | 95 | 76 / 1e3 | 25 (0) | 1.2 / 1.6e2 | no | 0 |
+| `lin_Fs_g_1e-9` | carried | 13 | 33 / 3.8e2 | 0 (0) | - | no | 0 |
+| `lin_Fs_b_with_g_1e-9` | new | 13 | 51 / 6e2 | 0 (0) | - | no | 0 |
+| `lin_others_not_swapped` | new | 53 | 1.2e9 / 3.4e11 | 100 (4) | 5.8e2 / 2.9e8 | yes | 0 |
+| `j_drop_a_x` | carried | 81 | 9.9e10 / 6.6e11 | 4 (4) | 4.5e3 / 7.1e4 | yes | 0 |
+| `j_drop_a_a_coupling` | carried | 81 | 1.5e10 / 2.8e11 | 4 (4) | 9.8e3 / 5.7e4 | yes | 0 |
+| `j_drop_a_a_diagonal` | carried | 81 | 1.4e11 / 6.6e11 | 4 (4) | 4.5e4 / 5.9e4 | yes | 0 |
+| `j_drop_s_a` | carried | 81 | 1.3e10 / 1.6e11 | 4 (4) | 7.4e3 / 5.2e4 | yes | 0 |
+| `j_drop_s_s` | carried | 81 | 1.8e11 / 5.9e11 | 4 (4) | 1.1e4 / 6e4 | yes | 0 |
+| `j_drop_s_x` | carried | 81 | 8.6e10 / 3.2e11 | 4 (4) | 4e3 / 4.7e4 | yes | 0 |
+| `j_drop_x_a` | carried | 81 | 1.8e10 / 4.6e11 | 4 (4) | 4.1e3 / 6.9e4 | yes | 0 |
+| `j_drop_x_s` | carried | 81 | 7.6e10 / 1e12 | 4 (4) | 4.9e3 / 5.7e4 | yes | 0 |
+| `j_drop_x_x_rate_block` | carried | 111 | 1.1e11 / 1e12 | 10 (8) | 1.1e4 / 1.8e8 | yes | 0 |
+| `j_drop_x_x_leak` | carried | 111 | 3.4e11 / 9.7e11 | 15 (7) | 4.8e4 / 6.2e9 | yes | 0 |
+| `jt_a_x` | carried | 14 | 57 / 3e2 | 12 (0) | 1.4 / 3.4 | no | 0 |
+| `jt_a_a_coupling` | carried | 14 | 17 / 84 | 2 (0) | 1 / 53 | no | 0 |
+| `jt_a_a_diagonal` | carried | 14 | 58 / 3e2 | 16 (0) | 1.1 / 1.3e2 | no | 0 |
+| `jt_s_a` | carried | 14 | 15 / 63 | 15 (0) | 1 / 1.5e2 | no | 0 |
+| `jt_s_s` | carried | 14 | 39 / 5.2e2 | 35 (0) | 1 / 1.8e2 | no | 0 |
+| `jt_s_s_last_variable` | new | 14 | 20 / 3.7e2 | 33 (0) | 1 / 1.8e2 | no | 0 |
+| `jt_s_x` | carried | 14 | 32 / 2.5e2 | 9 (0) | 1.2 / 17 | no | 0 |
+| `jt_x_a` | carried | 14 | 96 / 2.6e2 | 7 (0) | 1.1 / 34 | no | 0 |
+| `jt_x_s` | carried | 14 | 1.6e2 / 9.9e2 | 25 (0) | 1.2 / 1.6e2 | no | 0 |
+| `jt_x_s_last_variable` | new | 14 | 1.6e2 / 9.9e2 | 25 (0) | 1.2 / 1.6e2 | no | 0 |
+| `jt_x_x_rate_block` | carried | 20 | 3.7e2 / 9.7e2 | 43 (0) | 1 / 1.8e2 | no | 0 |
+| `jt_x_x_leak` | carried | 20 | 87 / 7.5e2 | 57 (0) | 1 / 1.9e2 | no | 0 |
+| `route_idx_reversed` | new | 167 | 7.1e10 / 4.4e12 | 183 (5) | 3.9e3 / 6.5e10 | yes | 0 |
+| `route_idx_blocks_swapped` | new | 17 | 1.5e11 / 5.1e12 | 19 (0) | 2.4e6 / 2.4e9 | no | 0 |
+| `init_b_1e-6` | carried | 0 | - | 269 (0) | 1.2 / 1e5 | no | 0 |
+| `init_class_1e-6` | new | 0 | - | 269 (0) | 1.2 / 1e5 | no | 0 |
+| `registry_wrong_output` | new | 58 | 1.1e11 / 2.9e12 | 33 (4) | 4.3e3 / 3.3e9 | no | 0 |
+| `registry_wrong_rhs` | new | 14 | 3.8e11 / 7e12 | 312 (9) | 6.4e4 / 1.5e11 | yes | 0 |
+| `unpack_no_zero_floor` | carried | 6 | 1.6e11 / 7.4e11 | 3 (0) | 5.5e8 / 6e8 | no | 0 |
+| `unpack_b_reversed` | new | 0 | - | 9 (0) | 2.1e8 / 3.4e8 | no | 0 |
+| `esn_readout_rate_for_synaptic` | carried | 0 | - | 4 (4) | 4.3e3 / 1.8e5 | no | 0 |
+| `esn_ridge_eta_1e-3` | carried | 0 | - | 6 (6) | 17 / 1.2e2 | no | 0 |
+
+What each one is: the `what` field of the list.
+
+## What the new structure changes about what the tier sees
+
+1. **The parameter view no longer sees every parameter error.** A
+   route's model carries the values the arithmetic reads per neuron in
+   `P`, beside the nominal rows that `route_fields` (and so the view)
+   reads. `P_tau_rest_1e-6`, `P_tau_drive_1e-6`, `P_target_1e-6` and
+   `P_one_neuron_tau_rest_1e-6` put an error in `P` alone: 54 fewer
+   pointwise leaves fail than for the same error in the nominal row (115
+   against 169), those being the view's, and `dS`, `J`, `JY` and the
+   stable layer catch them at the same factors. One neuron in each type
+   is enough (1.6e3 at the weakest failing pointwise leaf).
+2. **An error in the linearisation moves J and JY together.** Both
+   Jacobian routines read `route_product`'s `linearize`, so the equality
+   "`jacobian_times` = J * Y" cannot see an error there; before the
+   refactor a slip in one routine showed up against the other. What
+   catches such an error is the stored `J` and `JY` of the anchor, and
+   `test_route_models` (central differences of the model's own `rhs`).
+   At 1e-9 the stored values see it by factors of 20 to 1e3
+   (`lin_A_last_1e-9`, `lin_B_1e-9`, `lin_F_1e-9`, `lin_Fs_1e-9`), the
+   same resolution the `jt_*` mutations have. This rests on the anchor
+   staying fixed: a linearisation error made BEFORE a re-capture of the
+   pointwise references would be in both.
+3. **Facilitation's (x, s) entries have one witness, at 1e-9.**
+   `lin_Fs_g_1e-9` and `lin_Fs_b_with_g_1e-9` fail 13 pointwise leaves
+   (the two options networks' `J` and `JY`) and nothing in the stable
+   layer, by 33 to 600. This is item 1 of "What slipped through, and what
+   is thin" above, unchanged by the refactor.
+4. **`P.coupling` is trusted by `jacobian_times` and not by the assembled
+   Jacobian.** `lin_A_spurious_coupling_1e-6` writes an off-diagonal
+   entry of A that the model says is zero: 45 `J` leaves fail (3.4e4 to
+   9.7e4) and no `JY` leaf, because `jacobian_times` applies only the
+   diagonal for a model that states one. A model that understates its
+   coupling therefore breaks the equality of the two routines, which
+   `test_jacobian_times` checks; `test_route_models` checks the
+   statement itself (A exactly zero wherever `coupling` is false).
+
+## What the tier cannot see on the refactored code
+
+Four things are not in the list because no case of the tier reaches
+them, so a mutation there would pass:
+
+| Not reached by the tier | What covers it |
+|---|---|
+| The full (non-diagonal) application of A in `jacobian_times`. No model of today has a coupled state. | `test_route_models`, check 4: forcing every route down that branch must reproduce the diagonal branch and J * Y. Checked by hand on 2026-11-11: that branch scaled by 1 + 1e-9 fails the test (7.8e-10 against 1e-14) while the tier passes. |
+| `active_routes` compiling the routes again when `params.std_zero_floor` is switched after `get_params`. | `test_SRNNCellTypePairs`, `test_jacobian_times`, `test_SRNNCellTypePairs_tau_a_spread`, which switch it and check the Jacobian at both settings. |
+| `route_product`'s leave-one-out products for three or more components. No network of the tier has three. | `test_route_models`, the three-component case. |
+| A presynaptic type with ONE neuron. | `test_c_over_K` and `test_jacobian_times`. They caught a real defect there during the refactor: a route's state came back transposed when its index was a 1 x ns row. |
+
+And one error is invisible everywhere until the chain exists: entry
+(m, k) of A written at (k, m) in the assembled Jacobian. For a diagonal A
+it changes nothing. The chain's 2 x 2 is not symmetric, so the chain's
+own tests (finite differences on a chain route) have to catch it.
+
+## Scan on the refactored code
+
+`regression_tol_mutations_post_refactor('scan')`. Largest factor (relative
+difference / tolerance) per kind of leaf; above 1 fails.
+
+| Error | Size | View | dS | J | JY | Trajectories | top-K | Caught |
+|---|---|---|---|---|---|---|---|---|
+| depression `tau_rec` | 1e-4 | 1e8 | 1.8e8 | 3.3e7 | 2.7e7 | 3.6e4 | 3.8e5 | yes |
+| | 1e-6 | 1e6 | 1.8e6 | 3.3e5 | 2.7e5 | 3.6e2 | 3.8e3 | yes |
+| | 1e-8 | 1e4 | 1.8e4 | 3.3e3 | 2.7e3 | 3.6 | 38 | yes |
+| | 1e-10 | 1e2 | 1.8e2 | 33 | 27 | 0.036 | 0.38 | yes (161 pointwise leaves, 1 stable) |
+| | 1e-12 | 1.0 | 1.8 | 0.33 | 0.27 | 3.6e-4 | 3.8e-3 | yes, by 56 pointwise leaves, at the limit |
+| first SFA rung | 1e-4 | 1e8 | 1e8 | 8.4e7 | 5.6e7 | 7.4e4 | 2.3e5 | yes |
+| | 1e-6 | 1e6 | 1e6 | 8.4e5 | 5.6e5 | 7.4e2 | 2.3e3 | yes |
+| | 1e-8 | 1e4 | 1e4 | 8.4e3 | 5.6e3 | 7.4 | 23 | yes |
+| | 1e-10 | 1e2 | 1e2 | 84 | 56 | 0.074 | 0.23 | yes |
+| | 1e-12 | 1.0 | 1.0 | 0.84 | 0.56 | 7.4e-4 | 2.3e-3 | yes, by 15 pointwise leaves, at the limit |
+| `jacobian_times` (x, s) | 1e-4 | 0 | 5e-4 | 3e-4 | 9.9e7 | 4e-7 | 9.9e5 | yes |
+| | 1e-6 | 0 | 5e-4 | 3e-4 | 9.9e5 | 4e-7 | 9.9e3 | yes |
+| | 1e-8 | 0 | 5e-4 | 3e-4 | 9.9e3 | 4e-7 | 99 | yes |
+| | 1e-10 | 0 | 5e-4 | 3e-4 | 99 | 4e-7 | 0.99 | yes (14 pointwise leaves, 1 stable) |
+| | 1e-12 | 0 | 5e-4 | 3e-4 | 0.99 | 4e-7 | 9.8e-3 | **no** |
+
+The detection limit: 1e-12 relative for a parameter (at the limit),
+between 1e-12 and 1e-10 for a term of `jacobian_times`. In the last five
+rows the `dS`, `J` and trajectory columns are not the mutation: they are
+the refactor's own distance from the anchor, the background mentioned at
+the top of this section.
+
+## How the restore was checked, and two entries that were wrong
+
+After every mutation the harness compared the file's blob with `HEAD`'s
+and required `git status --porcelain -- <file>` to be empty; all 86 runs
+reported the blob restored. After the last run
+`git status --porcelain -- src/` was empty and
+`regression_tol_check('anchor')` and `regression_tol_check('pre_0d')`
+passed (the figures at the top of this section are from that run),
+which also shows that the restored code, not a cached mutated class, was
+what MATLAB ran.
+
+Two entries of the first draft of the list were wrong and were corrected
+before the numbers above were taken. `lin_A_last_1e-9` and
+`lin_A_first_dropped` indexed `A(:, end, end)` and `A(:, 1, 1)` without
+asking whether the route has any state: on a route with none the first
+throws and the second would have grown the array. Twelve cases threw on
+the first run of `lin_A_last_1e-9`, which is how it was seen. Both now
+act only where `ns > 0`.
