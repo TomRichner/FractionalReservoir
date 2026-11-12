@@ -20,7 +20,11 @@ classdef SRNNCellTypePairs < handle
     % dynamics_fast, compute_Jacobian_fast, jacobian_times and
     % unpack_and_compute_states call the model through that entry,
     % identically for every model. Depression and facilitation as this
-    % class has always had them are the model route_product.
+    % class has always had them are the model route_product, and what a
+    % route gets unless it asks otherwise. A route that states
+    % synapse_config.<pre>.<post>.std.model = 'chain' gets route_pool, the
+    % chained vesicle pools (a releasable pool b1 and its reserve b2;
+    % theta = r b1). compile_route is the one place that choice is made.
     %
     % Example:
     %   model = SRNNCellTypePairs( ...
@@ -108,7 +112,27 @@ classdef SRNNCellTypePairs < handle
         % 'twister' so a parallel worker draws what the client draws.
         tau_a_seed = []
         c
+        % SYNAPSE_CONFIG The routes' synapse dynamics, by name:
+        % synapse_config.<pre>.<post> with fields
+        %   std    depression. Product (the default):
+        %            struct('tau_rec', [..], 'tau_rel', [..])   plus the
+        %            optional 'combine', 'product' | 'geomean'
+        %          Chained vesicle pools:
+        %            struct('model', 'chain', 'tau_rec', [refill of the
+        %            releasable pool, refill of the reserve],
+        %            'tau_rel', scalar, 'n2', reserve capacity over
+        %            releasable-pool capacity)
+        %          std.model is 'product' (also what its absence means) or
+        %          'chain'.
+        %   stf    facilitation: struct('tau_dec', .., 'tau_fac', .., 'G', ..).
+        %          Not on a chain route (FD-018).
+        %   scale  a positive weight multiplier for the route (default 1)
+        % The fields of std and stf belong to the route's model
+        % (route_product, route_pool), which validates them.
         synapse_config = struct()
+        % STD_ZERO_FLOOR Map each product route's depression factor linearly
+        % so that its value at the steady state of r = 1 becomes 0
+        % (route_product). Refused when any route is a chain.
         std_zero_floor = false
         % VERBOSE Console verbosity: 'verbose' (every build/run/Lyapunov line),
         % 'minimal' (DEFAULT: the class prints nothing; stages and drivers print
@@ -928,6 +952,14 @@ classdef SRNNCellTypePairs < handle
             params.tau_b_rel = pair.tau_b_rel;
             params.std_zero_floor = obj.std_zero_floor;
             params.std_geomean = pair.std_geomean;   % C x C (pre, post) logical, false = product
+            % Chain routes (std.model = 'chain'; route_pool): n_b_pairs is
+            % 2 there, b column 1 the releasable pool and column 2 the
+            % reserve; tau_b_rec is [releasable-pool refill, reserve
+            % refill] and tau_b_rel ONE value. The depression factor of a
+            % chain route is b1, not prod(b): take a route's factor from
+            % std_route_factor.
+            params.std_chain = pair.std_chain;       % C x C (pre, post) logical
+            params.std_n2 = pair.std_n2;             % C x C (pre, post), NaN where the route is not a chain
             params.route_scale = pair.scale;   % C x C (pre, post), 1 where unset
             params.n_g_pairs = pair.n_g;
             params.tau_g_dec = pair.tau_g_dec;
@@ -1408,7 +1440,8 @@ classdef SRNNCellTypePairs < handle
                 'tau_b_rec', {cell(C, C)}, 'tau_b_rel', {cell(C, C)}, ...
                 'tau_g_dec', {cell(C, C)}, 'tau_g_fac', {cell(C, C)}, ...
                 'G', {cell(C, C)}, 'scale', ones(C, C), ...
-                'std_geomean', false(C, C), 'route', {cell(C, C)});
+                'std_geomean', false(C, C), 'std_chain', false(C, C), ...
+                'std_n2', nan(C, C), 'route', {cell(C, C)});
 
             config = obj.synapse_config;
             if ~isempty(config)
@@ -1486,7 +1519,14 @@ classdef SRNNCellTypePairs < handle
                     pair.n_g(pre, post) = compiled.P.n_g;
                     pair.tau_b_rec{pre, post} = nominal.tau_rec;
                     pair.tau_b_rel{pre, post} = nominal.tau_rel;
-                    pair.std_geomean(pre, post) = strcmp(nominal.combine, 'geomean');
+                    % (combine is the product model's field; std_model and
+                    % n2 the pool model's. The five rows are every model's.)
+                    pair.std_geomean(pre, post) = isfield(nominal, 'combine') && ...
+                        strcmp(nominal.combine, 'geomean');
+                    if isfield(nominal, 'std_model') && strcmp(nominal.std_model, 'chain')
+                        pair.std_chain(pre, post) = true;
+                        pair.std_n2(pre, post) = nominal.n2;
+                    end
                     pair.tau_g_dec{pre, post} = nominal.tau_dec;
                     pair.tau_g_fac{pre, post} = nominal.tau_fac;
                     pair.G{pre, post} = nominal.G;
@@ -2179,11 +2219,31 @@ classdef SRNNCellTypePairs < handle
             %          variable's derivative depends on another, so A is
             %          diagonal; jacobian_times then applies only its diagonal
             %
-            % THE MODEL'S NAME IS RESOLVED HERE AND NOWHERE ELSE in the class.
-            % Every route is 'product' today: the configuration has no field
-            % that names another model.
-            model = route_model('product');
-            P = model.compile(cfg.std, cfg.stf, opts);
+            % THE MODEL IS CHOSEN HERE AND NOWHERE ELSE in the class, from
+            % the route's std.model:
+            %   absent, 'product'   route_product (the field is taken out
+            %                       before its compile, which knows only
+            %                       its own fields)
+            %   'chain'             route_pool, the chained vesicle pools
+            % Anything else errors SRNNCellTypePairs:UnknownStdModel.
+            name = 'product';
+            std_cfg = cfg.std;
+            if isstruct(std_cfg) && isscalar(std_cfg) && isfield(std_cfg, 'model')
+                asked = std_cfg.model;
+                is_text = (ischar(asked) && isrow(asked)) || (isstring(asked) && isscalar(asked));
+                if is_text && strcmp(asked, 'chain')
+                    name = 'pool';
+                elseif is_text && strcmp(asked, 'product')
+                    std_cfg = rmfield(std_cfg, 'model');
+                else
+                    label = 'a route';
+                    if isfield(opts, 'label'), label = ['route ' opts.label]; end
+                    error('SRNNCellTypePairs:UnknownStdModel', ...
+                        'std.model on %s must be ''product'' or ''chain''.', label);
+                end
+            end
+            model = route_model(name);
+            P = model.compile(std_cfg, cfg.stf, opts);
             route = struct('model', model, 'P', P, 'cfg', cfg, 'opts', opts, 'idx', [], ...
                 'A_is_diagonal', isdiag(P.coupling));
         end
@@ -2202,6 +2262,9 @@ classdef SRNNCellTypePairs < handle
             % with, the routes are compiled again for it. That costs a
             % compile per route per call and is meant for such checks; a
             % model that wants the floor sets the property before build().
+            % Switching the floor ON over a chain route errors here
+            % (ChainZeroFloor, from the route's compile), as it does at
+            % build: a chain route is never silently given a floor.
             route = params.route;
             if params.std_zero_floor == route{1}.opts.zero_floor
                 return;
