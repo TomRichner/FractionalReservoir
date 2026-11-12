@@ -21,7 +21,10 @@
 %      and by rng_seeds(1); each independent of whether the other
 %      mechanism is spread; the leading columns do not depend on Q. W, the
 %      setpoints, the SFA ladders, the stimulus, S0 and the global RNG
-%      state after build() are untouched by turning either spread on.
+%      state after build() are untouched by turning either spread on,
+%      ALSO with an input generator that does not seed the random stream:
+%      the stock generator seeds it itself, so with it the stimulus and
+%      x0 cannot show whether the draws put the stream back.
 %   3. 1TS AND CHAINED MTS on one network seed have identical tau_rec_1
 %      and tau_rel per neuron, equal to nominal * exp(spread(pre) * z) of
 %      that neuron's own row; likewise a coupled single pool and a coupled
