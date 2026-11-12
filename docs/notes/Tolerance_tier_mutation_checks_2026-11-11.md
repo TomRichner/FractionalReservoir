@@ -651,3 +651,281 @@ asking whether the route has any state: on a route with none the first
 throws and the second would have grown the array. Twelve cases threw on
 the first run of `lin_A_last_1e-9`, which is how it was seen. Both now
 act only where `ns > 0`.
+
+---
+
+# The chain suite: mutation checks on chained depression (2026-11-12, Plan A step 5)
+
+Chained vesicle-pool depression (`route_pool`, `std.model = 'chain'`) was
+merged on 2026-11-11 with unit tests and no regression reference: the
+anchor holds no chain route. Step 5 gives the chain references of its
+own, before chained facilitation is built into the same file. This
+section records what the tolerance tier's new **chain suite** was shown
+to catch, and that the anchor still catches what it caught.
+
+- Code under test: commit `6edf1f6`. `src/model/routes/route_pool.m` at
+  blob `df97415`, `route_model.m` at `274c8c7`, `route_product.m` at
+  `01746cf`, `src/model/SRNNCellTypePairs.m` at `2182216`. (The last
+  three differ from the refactor's by one tidy that moves no number:
+  `route_product` has a `depression` handle and `std_route_factor` is one
+  call for every model.)
+- The suite: `regression_tol_run(ref, 'chain')`, reference
+  `scripts/tests/fixtures/regression_tol_chain.mat` (9.3 MB, 14 threads),
+  run with `regression_tol_check('chain')`. 2441 leaves, 1821 of them
+  floating point: 1671 pointwise (the regression network with four chain
+  routes at gain 1, with and without the staircase, noise off and on;
+  its stable twin; a four-cell-type MIXED network in which one
+  presynaptic type has a chain, a two-component product, a one-component
+  and an undepressed route), 770 stable (the chain and the mixed network
+  end to end, transient gain, finite-difference Jacobian, Benettin and
+  QR, an 8-job sweep, memory capacity on four identical chains). The
+  tolerances are the tier's, unchanged; no override was added and no
+  leaf name was added to the discrete list.
+- The list: `regression_tol_mutations_chain`, 52 one-site errors, and
+  its leaf groups (`regression_tol_mutations_chain('groups')`).
+- To repeat: `regression_tol_mutate(regression_tol_mutations_chain(),
+  'reference', 'chain', 'groups', regression_tol_mutations_chain('groups'))`,
+  about 35 s per mutation with two other MATLAB sessions running; it was
+  run in four parts with `save_dir`.
+- Background: the unmutated code matches the chain reference **exactly**
+  (`'rtol', 0`), so a factor below is all mutation.
+
+## Result for the chain
+
+**All 52 mutations fail the suite, and every one fails by compared
+values.** No case threw in any run.
+
+| | Mutations |
+|---|---|
+| Run | 52 |
+| Caught | 52 |
+| Caught by compared values | 52 |
+| Caught only by a thrown case | 0 |
+| Had a case that threw | 0 |
+| Caught by the pointwise layer | 50 |
+| Caught by the stable layer | 51 |
+| Caught by both | 49 |
+| Caught ONLY by the pointwise layer | 1 (`chain_params_std_n2_1e-6`) |
+| Caught ONLY by the stable layer | 2 (`chain_init_b1_1e-6`, `chain_init_b2_1e-6`) |
+| Caught ONLY by overridden leaves | 0 |
+| Made an exact (discrete) leaf change | 25, all gross errors |
+
+## Every chain mutation
+
+Pointwise and stable: the number of failing leaves and the weakest /
+strongest factor by which a failing float leaf exceeded its tolerance.
+A<m><k> is entry (m, k) of A = d(ds_m)/d(s_k), 1 the releasable pool and
+2 the reserve. What each one is: the `what` field of the list.
+
+| Mutation | Pointwise: leaves failing | weakest / strongest | Stable: leaves failing | weakest / strongest | Exact leaf changed | Caught by | Cases that threw |
+|---|---|---|---|---|---|---|---|
+| `chain_A11_dropped` | 102 | 2.6e10 / 3.7e11 | 284 | 4.1e3 / 1.7e12 | yes | values | 0 |
+| `chain_A11_sign` | 102 | 5.3e10 / 7.5e11 | 298 | 1.4e4 / 2.5e12 | yes | values | 0 |
+| `chain_A11_1e-9` | 102 | 26 / 3.7e2 | 29 | 1 / 9.5e2 | no | values | 0 |
+| `chain_A21_dropped` | 102 | 1.3e9 / 3.8e11 | 170 | 1.1e3 / 1.5e11 | yes | values | 0 |
+| `chain_A21_sign` | 102 | 2.7e9 / 7.6e11 | 170 | 1.4e3 / 1.1e11 | yes | values | 0 |
+| `chain_A21_1e-9` | 102 | 1.3 / 3.8e2 | 8 | 1 / 2.3e2 | no | values | 0 |
+| `chain_A12_dropped` | 93 | 4.8e8 / 1.9e11 | 170 | 8.2e2 / 8e10 | yes | values | 0 |
+| `chain_A12_sign` | 93 | 9.5e8 / 3.8e11 | 170 | 1.4e3 / 2.2e10 | yes | values | 0 |
+| `chain_A12_1e-9` | 91 | 2.9 / 1.9e2 | 22 | 1.1 / 1.6e2 | no | values | 0 |
+| `chain_A22_dropped` | 102 | 2.6e9 / 3.9e11 | 255 | 2.3e2 / 3.8e10 | yes | values | 0 |
+| `chain_A22_sign` | 102 | 5.3e9 / 7.8e11 | 298 | 6e2 / 1.1e12 | yes | values | 0 |
+| `chain_A22_1e-9` | 102 | 2.6 / 3.9e2 | 27 | 1 / 2.1e2 | no | values | 0 |
+| `chain_B_dropped` | 102 | 1.1e10 / 3.3e11 | 170 | 4.1e3 / 1.8e11 | yes | values | 0 |
+| `chain_B_sign` | 102 | 2.1e10 / 6.6e11 | 170 | 1.2e3 / 3.6e11 | yes | values | 0 |
+| `chain_B_1e-9` | 102 | 11 / 3.3e2 | 7 | 1 / 78 | no | values | 0 |
+| `chain_B_on_reserve` | 102 | 1.1e10 / 3.3e11 | 170 | 1.6e3 / 6.4e10 | yes | values | 0 |
+| `chain_lin_F_b2` | 93 | 4.3e9 / 8.2e11 | 188 | 5.5e2 / 2.1e11 | yes | values | 0 |
+| `chain_lin_F_1e-9` | 102 | 8.7 / 9.3e2 | 5 | 1.1 / 2.4e2 | no | values | 0 |
+| `chain_Fs_on_reserve` | 102 | 7.7e10 / 1e12 | 170 | 7e2 / 5.7e11 | yes | values | 0 |
+| `chain_Fs_1e-9` | 102 | 77 / 1e3 | 18 | 1 / 3.7e2 | no | values | 0 |
+| `chain_Fs_as_product` | 102 | 3.7e10 / 9.5e11 | 169 | 1.9e2 / 2e11 | yes | values | 0 |
+| `chain_C1_refill_dropped` | 9 | 9.7e9 / 4.3e11 | 327 | 1.9e3 / 3.4e10 | yes | values | 0 |
+| `chain_C1_refill_1e-6` | 9 | 9.7e3 / 4.3e5 | 283 | 1 / 2e4 | no | values | 0 |
+| `chain_C1_release_dropped` | 9 | 7.5e10 / 4.8e11 | 348 | 1.4e4 / 3e11 | yes | values | 0 |
+| `chain_C1_release_1e-6` | 9 | 7.5e4 / 4.8e5 | 301 | 1 / 4.6e4 | no | values | 0 |
+| `chain_C2_recovery_dropped` | 9 | 4.5e9 / 8.1e10 | 320 | 3.5e2 / 1.8e10 | yes | values | 0 |
+| `chain_C2_recovery_1e-6` | 9 | 4.5e3 / 8.1e4 | 238 | 1.1 / 1.7e4 | no | values | 0 |
+| `chain_C2_loss_dropped` | 9 | 4.8e9 / 8.5e11 | 326 | 1.3e2 / 7.8e10 | yes | values | 0 |
+| `chain_C2_loss_1e-6` | 9 | 4.8e3 / 8.5e5 | 270 | 1 / 6.9e4 | no | values | 0 |
+| `chain_rhs_F_b1b2` | 9 | 3.1e10 / 1e11 | 324 | 82 / 3.9e10 | yes | values | 0 |
+| `chain_P_tau_rec1_1e-6` | 111 | 2.9e3 / 8.5e5 | 285 | 1 / 2.4e5 | no | values | 0 |
+| `chain_P_tau_rec2_1e-6` | 111 | 1.2e3 / 8.1e4 | 249 | 1 / 3.7e5 | no | values | 0 |
+| `chain_P_tau_rel_1e-6` | 111 | 4.3e4 / 4.8e5 | 311 | 1 / 7.1e5 | no | values | 0 |
+| `chain_P_n2_1e-6` | 111 | 1.5e3 / 8.5e5 | 279 | 1 / 4.5e5 | no | values | 0 |
+| `chain_P_one_neuron_n2_1e-6` | 111 | 1.4e3 / 3.8e5 | 219 | 1 / 2.2e5 | no | values | 0 |
+| `chain_nominal_n2_1e-6` | 156 | 1.5e3 / 1e6 | 279 | 1 / 4.5e5 | no | values | 0 |
+| `chain_params_std_n2_1e-6` | 9 | 1e6 / 1e6 | 0 | - | no | values | 0 |
+| `chain_coupling_understated` | 9 | 2.9e9 / 2.9e11 | 162 | 1.1e3 / 8.7e10 | yes | values | 0 |
+| `chain_A_is_diagonal_forced` | 9 | 2.9e9 / 2.9e11 | 162 | 1.1e3 / 8.7e10 | yes | values | 0 |
+| `chain_init_b1_1e-6` | 0 | - | 298 | 1 / 2.2e4 | no | values | 0 |
+| `chain_init_b2_1e-6` | 0 | - | 287 | 1 / 8.8e4 | no | values | 0 |
+| `chain_output_b2` | 36 | 6.1e11 / 1.2e12 | 26 | 5.7e4 / 1.2e9 | no | values | 0 |
+| `chain_output_b1b2` | 36 | 2.5e10 / 5.5e11 | 26 | 4.8e2 / 5.8e8 | no | values | 0 |
+| `chain_depression_b2` | 36 | 8.5e11 / 8.5e11 | 16 | 4.6e8 / 7.5e8 | no | values | 0 |
+| `chain_depression_b1b2` | 36 | 4.7e10 / 4.7e11 | 16 | 5e2 / 5.7e8 | no | values | 0 |
+| `chain_registry_product` | 381 (72 of them missing) | 2.5e10 / 9.5e11 | 328 | 2.5e3 / 1.2e12 | yes | values | 0 |
+| `chain_j_ss_transposed` | 93 | 8e9 / 3.5e11 | 8 | 2.9e3 / 4.2e4 | yes | values | 0 |
+| `chain_jt_full_transposed` | 9 | 2.9e9 / 2.9e11 | 158 | 4.4e3 / 2.5e10 | yes | values | 0 |
+| `chain_jt_full_1e-9` | 9 | 26 / 5.2e2 | 24 | 1 / 7.7e2 | no | values | 0 |
+| `chain_jt_full_offdiag_1e-9` | 9 | 2.9 / 1.4e2 | 22 | 1.1 / 1.6e2 | no | values | 0 |
+| `chain_idx_b1_b2_swapped` | 183 | 2.6e11 / 1.7e12 | 174 | 1.5e3 / 7.9e9 | yes | values | 0 |
+| `chain_unpack_b_reversed` | 36 | 8.5e11 / 8.5e11 | 36 | 1.6e8 / 7.5e8 | no | values | 0 |
+
+(`chain_registry_product`: the 72 missing leaves are the view's
+`signature.n2` and `signature.std_model` and the like, which a product
+route does not have. They are missing because the value is different,
+not because a case threw.)
+
+## What the chain suite sees, and through which leaves
+
+1. **The errors the anchor could not hold are caught.** The full-A
+   branch of `jacobian_times` (`chain_jt_full_*`): the nine pointwise
+   `JY` leaves and, through top-K, the stable runs and the sweep; at
+   1 + 1e-9 by factors of 26 to 520 in `JY`. A transposed 2 x 2 in the
+   assembled Jacobian (`chain_j_ss_transposed`): all 93 stored `J`, and
+   in the stable layer only the QR estimator (8 leaves, all under its
+   override), because top-K and the transient gain do not assemble J.
+   An understated coupling (`chain_coupling_understated`, and the same
+   error on the class's side): `JY` and everything that propagates with
+   `jacobian_times`, not `J`. The two errors are separable from the
+   table: J alone moved, or JY alone.
+2. **One entry of the 2 x 2 at 1e-9 is resolved**, by factors of 190 to
+   390 at the strongest pointwise leaf, and by every stored `J` that
+   holds a chain route (91 to 102 leaves).
+3. **An error in the per-neuron parameters is invisible to the view and
+   caught by everything else**: 111 pointwise leaves (dS, J, JY) against
+   156 when the nominal row is wrong too. One neuron's n2 is enough
+   (1.4e3 at the weakest).
+4. **The right-hand side's terms**: each of the four terms of (C1) and
+   (C2) at 1 + 1e-6 fails the nine `dS` leaves by 4.5e3 to 8.5e5 and 238
+   to 301 stable leaves.
+5. **Three leaves were added because nothing else read the code they
+   check.** `std_route_factor` (the factor display code draws),
+   `params.std_n2` and `params.std_chain` feed no arithmetic, so no
+   leaf of the suite as first drafted depended on them. The suite
+   stores every route's depression factor through `std_factors` at the
+   pointwise states and along the stable runs, and the two params
+   fields in the view. `chain_depression_b2` and `chain_depression_b1b2`
+   fail 36 + 16 such leaves and no other; `chain_params_std_n2_1e-6`
+   fails the nine view leaves and no other.
+6. **Memory capacity sees the readout**: `chain_output_b2` fails
+   `stable.mc.chain.MC` and `R2` by 6.4e4 times their override. The
+   synaptic readout on a chain network works with `SRNN_ESN_reservoir`
+   as it stood on 2026-11-12 (blob `4b20396`), with four identical chain
+   routes.
+
+## What the chain suite cannot see
+
+| Not reached | What covers it |
+|---|---|
+| An error in `route_pool`'s `steady_state`. No case of the tier calls it. | `test_route_models` (the closed form against the right-hand side) and `test_std_chain_model`, check 2. |
+| The refusals (`ChainZeroFloor`, `ChainCombine`, ...). | `test_std_chain_model`, check 8. |
+| A chain route beside the zero floor: refused by design, so no case. | The same check. |
+| A presynaptic type with ONE neuron on a chain route (the mixed network's smallest type has 2 in the reduced runs, 8 otherwise). | `test_route_models`; `test_jacobian_times` for the product. |
+| `initial` returning different values per neuron. | Nothing yet; FD-015 (the spread) is where that becomes possible. |
+
+## Round-off floor of the chain suite
+
+Measured on the same day, nothing committed:
+
+- **Thread count.** Captured at 14 threads; at 1 and at 4 threads 24 of
+  1821 float leaves move, none in the pointwise layer, none of them an
+  exact leaf, and none at its layer's own tolerance: all 24 are under
+  existing overrides (the closest: the top-K orthonormality defect, and
+  QR at 7.1e-8 against 1e-5).
+- **A harmless reordering in `route_pool`** (through the harness, as two
+  "mutations" that must NOT be caught): the right-hand side's two rows
+  with their divisions regrouped, and the four entries of A written with
+  divisions in place of the precomputed reciprocals. Neither is caught.
+  The rhs probe moves 225 float leaves, the closest to its tolerance
+  being `stable.sweep.chain_all{2}.lambda_gap` at 2.7e-11 against 1e-9
+  (**36 times inside**); everything else is 2600 times inside or more
+  (`dS` 2.8e-17, Benettin local rates 3.8e-13, the finite-difference
+  Jacobian 1.1e-11 against 1e-7). The linearisation probe moves 55, the
+  closest at 1.7e-4 of its tolerance.
+
+  The one thin margin is worth knowing: `lambda_gap` is the difference
+  of the two leading exponents, which are nearly equal on a stable chain
+  network (a slow band), so round-off in the exponents is a larger
+  fraction of the gap than of either exponent. It holds 1e-9 by 36,
+  where the anchor suite's closest leaf under its own probe held it by
+  500. No tolerance was changed; the lead decides whether 36 is enough.
+
+## The anchor still catches what it caught
+
+`regression_tol_mutations_post_refactor` (71 mutations) was run again
+against the anchor on this code, where a chain model now exists beside
+the product: **71 of 71 caught, all by compared values**; 66 by the
+pointwise layer, 68 by the stable layer; one with cases that threw
+beside its value failures (`tau_rec_I_to_E_param_1e-6`, as before).
+`tau_rec_1e-6` gives the previous run's numbers to the digits shown (169
+pointwise leaves, 4.3e3 / 1.8e6; 263 stable, 1.1 / 2.4e4). The unmutated
+code passes the anchor with the refactor's own distances: 240 of 1749
+float leaves moved, the closest `pointwise.options_chaotic.dS` at
+4.8e-16 against 1e-12.
+
+## How the restore was checked
+
+All 125 runs (52 + 71 + the two probes) reported the mutated file's blob
+restored. After the last, `git status --porcelain -- src/` was empty,
+`regression_tol_check('chain', 'rtol', 0)` passed with no leaf moved,
+and `run_all_tests('quick')` passed 59 of 59 with a pool of 4, the
+byte-exact `test_regression_rapid` and `test_regression_rapid_chain`
+among them, which also shows that the restored code, not a cached
+mutated class, was what MATLAB ran.
+
+## A chaotic chain network, and the three estimators on it
+
+`test_std_chain_model`'s check 9 asserts only that the three estimators
+agree within 0.2 on a small chain network, because every chain network
+of 8 to 24 neurons tried there was stable. It takes the regression
+network's size and a higher gain to get a clearly chaotic one, and not
+much of either: the regression network (n = 100) with its four routes
+switched to the chain (tau_rec [2 5], tau_rel 0.25, n2 2), noise off,
+`rk4` at fs = 200, top-K lambda_1 over [2, 6] s:
+
+| Gain | chain | product twin (the preset's own `sfa3_std2`) |
+|---|---|---|
+| 1.0 | +0.095 | -0.176 |
+| 1.5 | +0.74 | -0.169 |
+| 2.0 | +2.17 | +0.39 |
+| 3.0 | +3.74 | +1.81 |
+
+So at the regression preset's own gain the chain network is already
+weakly chaotic where the product network is stable, and it stays the
+more chaotic of the two at every gain tried. (This is one network and
+one seed; it is not the manuscript's network.)
+
+The estimators, on the same seed, noise off:
+
+| Network | Window | fs | top-K lambda_1 | Benettin | QR, largest |
+|---|---|---|---|---|---|
+| chain, n = 100, gain 2 | [5, 20] s | 200 | +1.2316 | +1.2256 | not run |
+| product twin | [5, 20] s | 200 | +0.1865 | +0.1814 | not run |
+| chain, n = 100, gain 2 | [10, 60] s | 200 | +1.2085 | +1.2018 | not run |
+| product twin | [10, 60] s | 200 | +0.4944 | +0.4658 | not run |
+| chain, n = 100, gain 2 | [10, 60] s | 800 | +1.2332 | +1.2369 | not run |
+| product twin | [10, 60] s | 800 | +0.5332 | +0.5331 | not run |
+| chain, n = 40, gain 4 | [4, 12] s | 200 | +1.166 | +0.757 | +1.000 (822 s) |
+| product twin | [4, 12] s | 200 | +0.518 | +0.531 | +0.539 (471 s) |
+| chain, n = 40, gain 4 | [10, 60] s | 200 | +1.170 | +1.058 | not run |
+| product twin | [10, 60] s | 200 | +0.645 | +0.626 | not run |
+| chain, n = 40, gain 4 | [10, 60] s | 800 | +0.9300 | +0.9312 | not run |
+| product twin | [10, 60] s | 800 | +0.4429 | +0.4426 | not run |
+
+Three things follow. On a chaotic chain network top-K and Benettin agree
+to 0.5 % at gain 2 with the usual step. Where they differ by more (10 %
+on the chain and 3 % on the product at gain 4, fs = 200), the cause is
+the integration step and not the chain: at fs = 800 they agree to 0.1 %
+on both networks. (A different fs is a different trajectory of a chaotic
+system, so the rows at 200 and at 800 are not estimates of one number.)
+And the full-spectrum QR is not affordable on a chaotic network of this
+kind: 14 minutes for 8 s at n = 40 (N = 320), against about a second for
+the other two; over that short window, with a 3 s warm-up, the three
+differ by finite-time effects (0.76 to 1.17), which the 50 s rows remove
+for the two estimators that can afford them.
+
+The chain's exact reference (`regression_rapid_chain_digest.mat`) holds
+the n = 100, gain 2 network's top-K and Benettin results over [4, 12] s
+(+1.2748 and +1.2742).
