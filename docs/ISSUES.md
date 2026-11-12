@@ -304,11 +304,20 @@ model's arithmetic.
 
 ### FD-007 Chain presets and conditions
 
-- **Status:** presets, name maps and config merged (`0df8b63`, `82d2e7a`,
+- **Status:** **done 2026-11-12**, as Tom changed its closing condition
+  that day. Presets, name maps and config merged (`0df8b63`, `82d2e7a`,
   merge `257e4f1`; stages reference re-captured `67de9b5`; quick 58 of 58
   on merged main). `std_spread = [0.25 0.25]` set in the preset and the
-  preset fixture regenerated (`fd1fb99`, 2026-11-12). Open until the
-  bundle has run end to end. **That run is the `essential` run of FD-023,
+  preset fixture regenerated (`fd1fb99`, 2026-11-12). The bundle ran end
+  to end at `essential` (FD-023, 43 min) and its memory-capacity stage
+  ran separately at the essential speed (`b051af1`, 3 trials, 24 min).
+  **Not run on the preset with the spread:** the three-condition figure
+  set, and the stages behind figures 5 to 8 other than memory capacity.
+  **A defect the memory-capacity run found:** `verify_shared_build`
+  compared `std_clipped` across conditions, so since `fd1fb99` the
+  bundle's memory-capacity stage failed in its fairness check at any
+  speed; fixed in `4df667e` with `test_shared_build_spread`.
+  **The closing run was the `essential` run of FD-023,
   in the four-condition figure set, in place of the `fast` run with both
   figure sets** (Tom, 2026-11-12). The bundle has not been run at `fast`
   with the spread in the preset; the preliminary `fast` run predates it.

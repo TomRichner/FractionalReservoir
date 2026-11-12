@@ -308,6 +308,49 @@ neuron — `synapse_config.<pre>.<post>.stf`, with fields `tau_dec`, `tau_fac` a
 per-route form, in which
 $b$ and $g$ carry route superscripts.
 
+## Per-neuron synapse parameters (optional)
+
+The depression and facilitation constants above are written per route. With
+`std_spread` or `stf_spread` (one dimensionless number $\sigma_q$ per
+presynaptic cell type $q$, default 0) each presynaptic neuron $j$ of that type
+has its own values, the counterpart of the per-neuron SFA ladders:
+
+$$
+\tau_{j} = \tau \, e^{\sigma_q z_{j}}, \qquad
+n_{2,j} = n_2 \, e^{\sigma_q z_{j}'}, \qquad
+G_j = 1 + (G - 1)\, e^{\sigma_q z_{j}''}, \qquad z \sim \mathcal{N}(0, 1),
+$$
+
+with an independent standard normal for each quantity (every refill and release
+time of every pool, the reserve size, and for facilitation $\tau_{dec}$,
+$\tau_{fac}$, $\tau_h$ and the excess of the ceiling over 1). The nominal value
+is the median, the values stay positive, and $G_j \ge 1$. In every equation of
+the three sections above the constant is then read per presynaptic neuron; the
+equations are otherwise unchanged, and with $\sigma_q = 0$ every neuron has the
+nominal value exactly.
+
+**A neuron's draws are shared.** One row of normals is drawn per neuron and
+mechanism, and the column a quantity reads is fixed and the same for every
+route model. So a neuron has the same values on all its routes, and on one
+network seed it has the same releasable-pool refill and release time whether
+its routes carry a single pool, the chain or a product of pools, and the same
+normal behind its second refill time in the last two. That is what keeps the
+single-timescale and multiple-timescale conditions comparable neuron by neuron.
+
+**The reserve stays the slower pool.** On a chain route whose nominal reserve
+refill is slower than the releasable pool's, a neuron whose drawn
+$\log(\tau_{rec2,j} / \tau_{rec1,j})$ falls below a quarter of the nominal
+$\log(\tau_{rec2} / \tau_{rec1})$ has $\tau_{rec2,j}$ raised to that floor;
+$\tau_{rec1,j}$ is never moved, since it must equal the single pool's. With
+$\tau_{rec} = [2, 5]$ s and $\sigma = 0.25$ this moves about 2.6 % of neurons,
+and the expected reserve refill is 5.17 s (5.16 s from the log-normal alone).
+The components of a product route are jittered independently and have no
+ordering to keep.
+
+The draws are `std_draws` and `stf_draws` on `SRNNCellTypePairs`, made in
+`build()` from their own seeded streams; the realised values are in
+`get_params().route{pre, post}.P`.
+
 ## Notes
 
 **$a_{0_i}$ is the setpoint of the nonlinearity**, i.e. the property `S_c`, and

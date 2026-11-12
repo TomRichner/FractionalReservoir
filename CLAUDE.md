@@ -16,7 +16,7 @@ turned out to be **wrong** as well as what worked — the wrong turns are the pa
 that is otherwise lost, and they are what stops the next session re-deriving a
 dead end.
 
-## Current work (as of 2026-11-10)
+## Current work (as of 2026-11-12)
 
 We are bringing the manuscript to a final draft from Brian Lundstrom's
 feedback.
@@ -211,9 +211,25 @@ How to use the worker agents:
 
 **The plan for block A is `docs/Plan_A_chained_vessicles.md`**: the design
 of the chained-pool model and its per-neuron spread, the tests, the gates,
-the order of the builds and which worker does each, and the questions still
-open. Read it before any work on FD-004, FD-005, FD-006, FD-007 or FD-015,
-and do not start that work until Tom says go.
+the order of the builds and which worker did each. **Block A's code is
+built and the plan is closed out (2026-11-12)**; its section 10 says, item
+by item, what is met and what is not. Read it before changing the route
+models, the spread or the `mu7chain` bundle. Three things it leaves open,
+all by Tom's decisions of 2026-11-12: the full regression tier is
+deferred and its reference is stale; on the preset with the depression
+spread only the `essential` run and a three-trial memory-capacity run
+have been made, so the three-condition figure set and the stages behind
+figures 5 to 8 (memory capacity apart) have not run on it; and the
+`medium` run waits until block C is done.
+
+**Block B is being planned (from 2026-11-12).** It starts from pilots,
+each a short exploratory run with its own report under
+`figs/explore_B/<pilot>/` (local) and its scripts under
+`scripts/examples/` or `scripts/explorations/block_B_pilots/`. The two
+networks' conditions are defined once, in
+`run13_condition_model` and `bursting_condition_model`; pilots call
+those and do not re-derive them. Nothing in a pilot is tuned to produce
+an effect.
 
 Decisions already made that affect the code: depression gains a **chained
 vesicle-pool model** as an opt-in per route, beside the current product,
@@ -663,7 +679,7 @@ orthogonal knobs used to sit in different trees, which hid that they are a pair.
 - **`src/presets/srnn_condition_titles.m`** — name → display text, kept **out** of the conditions on purpose. A map keyed by name is what lets a *saved* run be retitled without recomputing it; a title carried in the condition would be frozen into the run directory at compute time. Titles are **mostly structural** (`sfa3_std1` → "SFA 3τ + STD 1τ"), with two deliberate exceptions: `sfa1_std1` and `sfa3_std2` — the 3-condition preset's adapting regimes, i.e. the paper's actual comparison — are titled "Single-Timescale Adaptation" and "Multiple-Timescale Adaptation", because that is the claim being made rather than how it is implemented. That those words could be restored after the rename, in one file, without touching a preset or a saved run, is the point of keying titles by **name** instead of carrying one inside each condition. It also keeps the **pre-rename names as legacy keys**, so figures regenerated from older run directories still get sensible panel titles. Two other maps key on condition names and must gain any new one: `manuscript_style` (colours *and* short labels) and `load_and_plot_lle_by_stim_period`, which now delegates its titles here rather than carrying a private copy.
 - **`src/presets/analysis_run_config.m`** — *how much compute*. `analysis_run_config(analysis, run_mode, preset_defaults)` returns `n_levels`, `n_reps`, and a `cfg.model` struct of timing settings (`ode_solver`, `fs`, `T_range`, and `lya_T_interval` only when it should be set).
 
-  **`src/presets/run_mode_names.m` is the ONE list of run modes** — `fast`, `medium`, `medium2`, `production` — and every stage validates against it. There used to be four separate lists: `analysis_run_config` accepted five modes while `run_memory_capacity`, `run_memory_capacity_example` and `run_eig_heatmap` each had a private switch accepting three. A mode valid for the sweeps was therefore invalid downstream, and since `run_all_paper_analyses` wraps each stage, that showed up as stages producing nothing *after* the sweeps had already run. On 2026-09-03 `single_multi_TS` did exactly that at `'fast2'`: three stages died, two figures failed on missing data, and `fig_memory_capacity` fell back to a twelve-day-old `.mat` and reported **success**. `'fast2'` was removed (it was `'fast'` with more reps and a longer window on two of three sweeps); `medium2` now collapses to `medium` in the stages that have no sweep dimension for it to affect. `run_all_paper_analyses` **pre-flights the mode before any compute**, and `test_run_modes` asserts every stage names the canonical list.
+  **`src/presets/run_mode_names.m` is the ONE list of run modes** — `essential` (since 2026-11-12, FD-023), `fast`, `medium`, `medium2`, `production` — and every stage validates against it. **How big is the mode; WHICH STAGES run is a separate knob**, `cfg.stages` and `cfg.sweeps` in a bundle config, resolved by `paper_stage_plan` against `paper_stage_names` before any compute (a bundle that names none runs everything, as before). `essential` is 4 levels x 2 reps in the 1-D sweeps, a 32-point joint sample, 3 memory-capacity trials, and `fast`'s sizes elsewhere; `mu7chain_config('essential')` selects the stages behind figures 2 to 4 and draws the four-condition set only, and `mu7chain_run(run_mode)` is a function. There used to be four separate lists: `analysis_run_config` accepted five modes while `run_memory_capacity`, `run_memory_capacity_example` and `run_eig_heatmap` each had a private switch accepting three. A mode valid for the sweeps was therefore invalid downstream, and since `run_all_paper_analyses` wraps each stage, that showed up as stages producing nothing *after* the sweeps had already run. On 2026-09-03 `single_multi_TS` did exactly that at `'fast2'`: three stages died, two figures failed on missing data, and `fig_memory_capacity` fell back to a twelve-day-old `.mat` and reported **success**. `'fast2'` was removed (it was `'fast'` with more reps and a longer window on two of three sweeps); `medium2` now collapses to `medium` in the stages that have no sweep dimension for it to affect. `run_all_paper_analyses` **pre-flights the mode before any compute**, and `test_run_modes` asserts every stage names the canonical list.
 
   **The two knobs are no longer fully orthogonal, and this is where they meet.** Every cell names *two* integrators — deterministic (`'rk4'` for fast/medium/medium2, `'ode45'` for production) and stochastic (`'sra1'` everywhere) — and the **preset** picks between them: `sigma_u_noise > 0` selects the stochastic one. That is why the third argument exists, and why the three sub-scripts resolve `preset_defaults` *before* calling this. Selecting here is what leaves everything else intact: `merge_struct` precedence is unchanged (`cfg.model` still wins), `ode_solver` stays banned from presets, and a σ = 0 preset is bit-identical to before the mechanism existed. `cfg.sde_solver` / `cfg.is_stochastic` live at the top level of `cfg`, never inside `cfg.model` — only `cfg.model` is merged into `model_defaults`, and neither is a model property. Note a stochastic `production` run is fixed-step and so does **not** carry `ode45`'s adaptive tolerance: there is no adaptive SDE solver, because step-size control is meaningless once increments are tied to the step.
 

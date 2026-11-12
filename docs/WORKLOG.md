@@ -34,6 +34,75 @@ Entry template:
 
 ---
 
+## 2026-11-12 18:00 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: Plan A closed out; block B pilots under way)
+
+**Tom's instructions during this stretch:** the lead runs nothing in
+MATLAB longer than about 30 s; workers run, gate and watch (CLAUDE.md,
+`eddd8ee`). Block B starts from pilots, each with its own report
+(Markdown and PDF), compiled into one report at the end; for the pilots'
+constants, a network's own values are kept and parameters only the MTS
+forms have take the mu7chain defaults, without asking him.
+
+**Issues touched:** FD-007 -> done; FD-023 (memory capacity at
+`essential` is 3 trials). Plan A section 10 closed out.
+
+**Commits:** `4df667e` the fairness check no longer compares
+`std_clipped`; `53e68b8` three trials at `essential`; `b051af1` the
+memory-capacity example script; pilots merged: `c6a6315` (0b, bursting
+network), `a33fa6f` (0a, run13), `7bf494c` (2, frozen state); this
+entry's commit: the close-out of the plan, the issue list, the equations
+file (per-neuron synapse parameters) and CLAUDE.md. Manuscript repo:
+`4ef65b2` block A's checkboxes.
+
+**Done:**
+- Memory capacity on the final preset, 3 paired trials, synaptic
+  readout: total MC 0.11, 2.9, 9.6, 14.0 (none, 1TS, chained MTS,
+  product MTS); horizons 0, 2.0, 5.7, 8.7 s. Run in Tom's desktop MATLAB
+  by the lead (the last such run), watched by a worker; 24 min.
+- **A defect found by that run:** since the spread went into the preset
+  the bundle's memory-capacity stage failed in `verify_shared_build`
+  (`std_clipped` differs between conditions). No gate could have caught
+  it: the exact chain tier's memory-capacity case does not go through
+  that check. Fixed, with `test_shared_build_spread`.
+- Plan A closed out: section 10 item by item, FD-007, the to-do
+  checkboxes, CLAUDE.md's account of block A and of the run modes.
+- Block B pilots 0a, 0b and 2 finished and merged; 1a, 1b, 3, 4, 5 and 6
+  running, each with a worker in its own worktree and MATLAB.
+
+**Pilot results so far** (one seed each, nothing tuned; reports in
+`figs/explore_B/<pilot>/report.md` and `.pdf`, local):
+- 0a, run13: original 30 events per 100 s, chained MTS 12, product MTS 1.
+- 0b, bursting network: original 33 bursts, chained MTS 34, product
+  MTS 0. On both networks chain and product MTS are NOT alike on a first
+  try, against Tom's expectation: the product depresses more.
+- 2, frozen adaptation: a script is enough, exact, no model change;
+  freezing needs its own no-stimulus control; the meaning of
+  "pre-stimulation value" in an oscillating network is Tom's to decide.
+
+**Verified:** `test_shared_build_spread`, `test_sample_hold_mc`,
+`test_essential_mode`, `test_run_modes`, `test_mu7chain_bundle` after
+the two code commits (the lead, short calls). **Not run since
+`d9cd4cf`:** the quick suite and the stages tier (changes since:
+`verify_shared_build`, the memory-capacity cost table, pilot scripts).
+
+**Not verified / known gaps:** as the 16:30 entry (full tier deferred,
+its reference stale); a subagent's Write tool refuses report files, so
+each pilot's report text comes back in its hand-back and the lead saves
+it verbatim and builds the PDF.
+
+**Raised, not acted on:** `fig_stim_engages_adaptation`'s header says
+the bursting network is quiet below the DC step and bursts above it; in
+fact it bursts with no input and goes to a steady rate under the step.
+`ied_build_network`'s default input no longer builds. The SRA1 noise
+path depends on the run's length. `build_from_preset` leaves the class's
+default stimulus on a preset without an `input_config`. In
+`fig_memory_capacity` with four conditions the legend of panel (a) lies
+over panel (b).
+
+**Next:** the six running pilots; an agent compiles the pilots' reports
+into one (Markdown and PDF); then block B is planned with Tom from it.
+The quick suite and stages tier on main, by a worker.
+
 ## 2026-11-12 16:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: Tom has seen the essential run; the full tier deferred; block B planning next)
 
 **Decision by Tom, 2026-11-12: the full regression tier is skipped for

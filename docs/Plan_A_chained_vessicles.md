@@ -1360,24 +1360,42 @@ Workers start with no memory of this conversation. Each brief gives:
 
 Code side of block A is done when:
 
-- [ ] `test_std_chain_model` and `test_std_spread` pass and are in the quick
-      suite (FD-005, FD-015).
-- [ ] The pool module is in and no `parpool(` call remains outside it
-      (FD-017).
-- [ ] The tolerance tier exists, every mutation of step 0c fails it, and
+**Closed out 2026-11-12** (the lead; state of `main` at `7bf494c`). Seven
+items are met as written; three are met only as Tom changed them that day,
+and say so.
+
+- [x] `test_std_chain_model` and `test_std_spread` pass and are in the quick
+      suite (FD-005, FD-015). Quick suite 71 of 71 at `d9cd4cf`.
+- [x] The pool module is in and no `parpool(` call remains outside it
+      (FD-017). Checked again by grep at close-out.
+- [x] The tolerance tier exists, every mutation of step 0c fails it, and
       it passes against its anchor on merged `main`.
-- [ ] Product depression, facilitation and the chain sit behind one route
+- [x] Product depression, facilitation and the chain sit behind one route
       interface; the four functions carry no model-specific branch.
 - [ ] The exact references pass on merged `main` (ultrarapid exactly;
       stages and full with their recorded ignore patterns), re-captured
       once after the refactor with the reason in the commit.
-- [ ] A chain preset builds, runs, sweeps, and goes through memory capacity
-      with the synaptic readout (FD-004, FD-007).
+      **Ultrarapid and stages: yes. Full: NOT MET.** Tom deferred the full
+      tier on 2026-11-12; its stored reference is stale and gates nothing
+      until it is re-captured (`docs/WORKLOG.md`, 2026-11-12 16:30).
+- [x] A chain preset builds, runs, sweeps, and goes through memory capacity
+      with the synaptic readout (FD-004, FD-007). Memory capacity on the
+      final preset: 3 paired trials at the essential speed, 2026-11-12
+      (`b051af1`). That run found that the stage's fairness check rejected
+      every preset with the depression spread (fixed, `4df667e`).
 - [ ] The four-condition bundle runs end to end at `fast`, and both figure
       sets build, three-condition and four-condition (FD-006, FD-007).
-- [ ] The chain has its own regression reference (step 5).
-- [ ] `Equations_stability_paper.md` states the chain, once.
-- [ ] `ISSUES.md` and `WORKLOG.md` are current, and the to-do list's block A
+      **Changed by Tom, 2026-11-12: one `essential` run, four-condition
+      set only (FD-023); done.** Both figure sets built 37 of 37 from the
+      preliminary `fast` run, which predates the spread. **Not run on the
+      final preset:** the three-condition set, and transient gain,
+      numerics, the Lyapunov spectrum, the stimulus-level sweep, the
+      SFA-timescale sweep and the memory-capacity example.
+- [x] The chain has its own regression reference (step 5).
+- [x] `Equations_stability_paper.md` states the chain, once. It states
+      release-coupled facilitation and, since close-out, the per-neuron
+      synapse parameters too.
+- [x] `ISSUES.md` and `WORKLOG.md` are current, and the to-do list's block A
       checkboxes are ticked for what is finished.
 
 Then: the comparison figure (FD-014) and the manuscript text, with Tom. The
