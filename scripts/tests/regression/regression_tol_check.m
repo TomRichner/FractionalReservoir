@@ -15,9 +15,16 @@ function [ok, leaves, info] = regression_tol_check(name, opts)
 % regression_rapid_check is the stricter gate.
 %
 %   NAME   'anchor' (default): scripts/tests/fixtures/regression_tol_anchor.mat,
-%          the model class before Plan A touched it. Any other name: a
-%          pre-edit reference made by make_regression_tol_reference(NAME),
-%          in data/regression_tol/.
+%          the model class before Plan A touched it. 'chain':
+%          .../fixtures/regression_tol_chain.mat, networks with chained
+%          vesicle-pool depression as first merged (the gate for work on
+%          route_pool: with facilitation off, the chain is unchanged). Any
+%          other name: a pre-edit reference made by
+%          make_regression_tol_reference(NAME), in data/regression_tol/.
+%          The reference says which suite of cases it holds
+%          (regression_tol_run: 'base' or 'chain') and that suite is run;
+%          'anchor' and 'chain' are run one after the other by
+%          test_regression_tolerance and test_regression_tolerance_chain.
 %
 %   - OK true: every leaf of the reference is within tolerance. The
 %     printout says how close the worst leaf of each layer was.
@@ -57,12 +64,16 @@ if ~isfile(ref_file)
         'No reference at %s.\nMake one with make_regression_tol_reference(''%s'').', ref_file, name);
 end
 ref = load(ref_file);
+% Which suite of cases the reference holds (regression_tol_run). The anchor
+% and references made before the chain suite existed do not say: 'base'.
+suite = 'base';
+if isfield(ref.meta, 'suite'); suite = ref.meta.suite; end
 
-[data, seconds] = regression_tol_run(ref.data);
+[data, seconds] = regression_tol_run(ref.data, suite);
 
 if opts.verbose
-    fprintf('Reference: %s\n  made %s from commit %s%s, %d thread(s), MATLAB %s\n', ref_file, ...
-        ref.meta.made_on, ref.meta.commit(1:min(7, end)), ...
+    fprintf('Reference: %s\n  suite ''%s'', made %s from commit %s%s, %d thread(s), MATLAB %s\n', ref_file, ...
+        suite, ref.meta.made_on, ref.meta.commit(1:min(7, end)), ...
         repmat(' (dirty tree)', 1, ~isempty(ref.meta.dirty)), ref.meta.threads, ref.meta.matlab_release);
     if data.info.threads ~= ref.meta.threads
         fprintf('  this run uses %d thread(s): expect round-off differences, not exact equality\n', ...
