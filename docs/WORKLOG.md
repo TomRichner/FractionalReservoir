@@ -34,6 +34,67 @@ Entry template:
 
 ---
 
+## 2026-11-12 14:00 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block A built; the essential run made; waiting to look at it with Tom)
+
+**Tom's instructions during this stretch** (all in CLAUDE.md, the to-do
+list or under the issue): mutation checks only for new arithmetic, short
+and targeted; the plan's timeline in `docs/gantt`, for visibility only,
+updated by an Opus worker after each merge; no `medium` run before block
+C is done; an `essential` run speed in place of the `fast` run that was
+to end Plan A, built with unit tests and the ultrarapid tiers only, an
+overrun reported and not corrected; then block B is planned with him.
+Main was pushed once at his request (`0bc35ca`); the manuscript repo was
+not pushed.
+
+**Issues touched:** FD-006 -> done; FD-015 -> done; FD-014 -> done;
+FD-018 -> done; FD-007 -> open until Tom has seen the run (spread in the
+preset `fd1fb99`); FD-023 opened -> done.
+
+**Commits (this repo):** merges `2b455ff` FD-018, `7c3d6dd` FD-014,
+`20bccd2`, `d2aefa7`, `b487051`, `1debb64`, `3e1bd04`, `a46e05c` FD-006,
+`3c9a447` step 5, `b466a98` FD-015, `e155db9` and `889e25a`, `8665e35`
+the timeline, `9c9c1f1` stimulus and W-spectrum figures, `cb55daa`
+FD-023; `fd1fb99` the spread in the preset; `89ce3d4`, `71a965d`,
+`3810bf0`, `ddb4da4` CLAUDE.md. Manuscript repo: `e691d84`, `a3524dc`.
+
+**Done:** every build step of Plan A (steps 0 to 9), the display code
+and both figure sets, the spread in the `mu7chain` preset, the essential
+run speed, and one essential run of the bundle.
+
+**Verified (lead's MATLAB, main):**
+- After FD-015: anchor pass; `chain`, `stf_chain`, `spread` at rtol 0;
+  quick 69 of 69; stages tier exact (at `b466a98` + `1a51e91`).
+- After the preset gained the spread (`fd1fb99`): six preset and spread
+  tests.
+- After FD-023 (`cb55daa`): nine tests, both ultrarapid tiers exact.
+- The essential run: 42 min 57 s on 12 workers (budget 35), all stages
+  and nine of nine figure entries OK; `data/mu7chain_essential`,
+  `figs/mu7chain_essential_4cond`.
+
+**Not verified / known gaps:**
+- **The quick suite, the stages tier and the full tier have not been run
+  since `b466a98`.** Merged since then without them: the spread in the
+  preset, `model_args` and the two extra figures in
+  `fig_example_timeseries` (the worker ran the stages tier on its
+  branch), and all of FD-023 (unit tests and ultrarapid only, by Tom's
+  instruction).
+- **The full regression tier of Plan A step 10 is still owed**, with the
+  deliberate re-capture of its reference (retitled product panels, new
+  `resolved_defaults` fields). The lead's decision: run it when the
+  desktop MATLAB and the pool are free, before any block B building.
+- The bundle has never run at `fast` with the spread in the preset; the
+  preliminary `fast` run (`data/mu7chain_fast_prelim`) predates it.
+- The essential run has 2 reps per level and 32 joint points: it shows
+  the regime, not trends.
+
+**Raised, not acted on:** the items listed under FD-015 and FD-023
+"reported, not fixed"; the manuscript's existing large PNGs carry the
+tile-seam export defect (FD-006, decision 7); `ISSUES.md` FD-022.
+
+**Next:** look at the essential run's figures with Tom; then plan block
+B with him. Before block B's building: the full tier and its reference.
+Then the Plan A section 10 checklist and the to-do checkboxes.
+
 ## 2026-11-12 01:40 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: refactor and chain merged; steps 3 and 5 running)
 
 **Standing instructions from Tom during this stretch** (in CLAUDE.md,

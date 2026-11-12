@@ -791,7 +791,9 @@ model's arithmetic.
 
 ### FD-023 An `essential` run speed, below `fast`
 
-- **Status:** in progress (Tom, 2026-11-12; briefed to `matlab-fable-1`).
+- **Status:** **done 2026-11-12**: built (`matlab-fable-1`, `9561e05`,
+  `d79bd40`, merge `cb55daa`) and run once (`matlab-opus-2`). Asked for by
+  Tom, 2026-11-12.
   **Tom's instructions for it:**
   - A Fable 5.2 worker builds it; once merged, an Opus 5.5 worker makes
     the run. **The essential run takes the place of the `fast` run that
@@ -826,6 +828,21 @@ model's arithmetic.
      floor of 2026-09-14, which holds from `fast` up.
   6. *The eigenvalue stage runs the reference example only* in this
      bundle; figure 3 reads no other.
+  **Decisions by the lead on the builder's report:**
+  7. *`fig_example_timeseries` is not in the essential registry.* It is
+     in no `mu7chain` registry; figure 2 reads the illustrations stage's
+     data, not that figure; it would add a minute and a half of
+     simulation.
+  8. *`mu7chain_run` is a function*, `mu7chain_run(run_mode)`, default
+     `'fast'`, so a mode is an argument and not an edit to the file. It
+     no longer leaves `cfg`, `run_dir` and `fig_results` in the base
+     workspace.
+  9. *The manifest's selection fields are written only when something is
+     skipped*, so the full reference cannot move for a bundle that
+     selects nothing. Held by construction; not confirmed by a full-tier
+     run.
+  10. *The run was made in the main checkout*, not a worktree, so its
+     outputs are where Tom looks; nothing was merged while it ran.
 - **Serves:** Tom's look at a network before long runs; block A's close
 - **What:** `essential` in `run_mode_names` and every stage's cost table
   (4 levels x 2 reps in the 1-D sweeps, a 32-point joint sample, other
@@ -837,7 +854,41 @@ model's arithmetic.
 - **Done when:** the unit tests and both ultrarapid tiers pass; the
   existing modes' sizes and configs are unchanged.
 - **Depends on:** FD-007.
-- **Result:** _(pending)_
+- **Result:**
+  **Build.** `essential` in `run_mode_names`; `paper_stage_names` and
+  `paper_stage_plan` (`cfg.stages`, `cfg.sweeps`, validated before any
+  compute); `cfg.eig_heatmap_examples`; `mu7chain_config('essential')`
+  with nine figure entries and the four-condition set alone. No existing
+  mode's number changed (24 of 24 `analysis_run_config` structs equal a
+  capture from the unedited function). Lead's gates on merged main:
+  `test_essential_mode`, `test_run_modes`, `test_mu7chain_bundle`,
+  `test_mu7revised_bundle`, `test_preset_conditions`,
+  `test_preset_golden`, and both ultrarapid tiers byte-exact. **Not run,
+  by Tom's instruction: the quick suite, the stages tier, the full tier.**
+  **The run** (main at `cb55daa`, 12 pool workers, 13:10:52 to 13:53:49):
+  **42 min 57 s, 7 min 57 s over the 35-minute budget. Not corrected and
+  not rerun, as Tom instructed.** Analyses 37.3 min: sweeps 17.3 (seven
+  1-D sweeps about 9; the 32-point joint sample, 128 jobs, 8.4),
+  eigenvalue stage 7.8, local Lyapunov 9.3 (serial), illustrations 2.9.
+  Figure pass 5.5 min, of which `fig_sensitivity_analysis_allStd` 3.4.
+  Every stage OK; six stages and the tau sweep skipped as selected; nine
+  of nine figure entries OK; no warning or error line in either log.
+  Outputs: `data/mu7chain_essential`, `figs/mu7chain_essential_4cond`
+  (with `report.pdf`); local, not in git.
+  **Where the estimate was off** (for the next use, not acted on): the
+  joint sample took 8.4 min against about 5 estimated, the 1-D sweeps 9
+  against 3 to 5 (a per-sweep overhead that does not shrink with the job
+  count), and the figure pass 5.5 against 4 to 6 with one figure taking
+  most of it.
+  **Seen in the figures, not fixed:** in `fig_EI_weights_param_space`
+  the titles of the two multiple-timescale panels run together (the
+  four-condition set is not polished, by Tom's decision); in figure 4
+  the no-adaptation line leaves the display range in five of six panels;
+  with 2 reps the bands mean little.
+  **Reported by the builder, not fixed:** a comment in
+  `resolve_run_context` lists four modes; the stage list in
+  `run_all_paper_analyses`' header was already stale and now points at
+  `paper_stage_names`.
 
 ## To be planned
 
