@@ -128,6 +128,13 @@ assert(contains(eq3, '| $n_2$ (E to E) | Chained STD: reserve capacity / releasa
 assert(contains(eq3, '| $\tau_{rel}$ (E to E) | Chained STD: release (releasable pool only) | 0.25 | s |'));
 assert(contains(eq3, '$b_1$ = 0.420, 0.200, 0.106, 0.054'), 'chain steady state');
 assert(~contains(eq3, 'SQUARE'), 'no product of two pools is covered: no squaring prose');
+% Only single pools beside the chain: the paper's set names the single pool
+% and states no product at all (2026-11-12).
+assert(contains(eq3, 'D_{i} &= b_{i} \quad \text{(single pool)}'), 'single pool named');
+assert(contains(eq3, '\frac{db_{i}}{dt} &= \frac{1-b_{i}}{\tau_{rec}} - \frac{b_{i}\, r_i}{\tau_{rel}}'), ...
+    'single-pool equation without the m index');
+assert(~contains(eq3, '\prod') && ~contains(eq3, 'independent pools') && ~contains(eq3, 'product route'), ...
+    'no product form in the three-condition tables');
 cond3 = read(d3, 'adaptation_conditions_table.md');
 assert(contains(cond3, 'chained pools: $\tau_{rec}$ = [2, 5] s, $\tau_{rel}$ = 0.25 s, $n_2$ = 2'));
 assert(~contains(cond3, 'product of 2 pools'));
@@ -136,6 +143,8 @@ d4 = fullfile(tmp, 'tab4');
 write_manuscript_tables('preset_name', chain_preset, 'out_dir', d4, 'conditions', four);
 eq4 = read(d4, 'equation_table.md');
 assert(contains(eq4, 'SQUARE') && contains(eq4, 'independent** pools (not a chain), the depression'));
+assert(contains(eq4, '\prod_{m=1}^{M} b_{im} \quad \text{(independent pools)}') && ...
+    contains(eq4, 'STD pools of a product route'), 'the review set keeps the general product form');
 assert(contains(read(d4, 'adaptation_conditions_table.md'), ...
     'product of 2 pools: $\tau_{rec}$ = [2, 4] s, $\tau_{rel}$ = [0.25, 0.5] s'));
 

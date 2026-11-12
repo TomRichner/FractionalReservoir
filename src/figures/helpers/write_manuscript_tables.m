@@ -381,8 +381,16 @@ fprintf(fid, '## System equations\n\n');
 % as well (1TS is a product of one pool), theta carries a depression factor
 % D_i, and a line states D_i for each form. Product-only presets are
 % written exactly as before.
+%
+% Single pools beside chains (2026-11-12, the paper's three-condition set):
+% when every covered product route is ONE pool, there is no product to state.
+% D_i is then b_i, the single pool, and its equation is written without the m
+% index, so the paper's tables name the single pool and the chain and nothing
+% else. A covered product of two or more pools (the review set) keeps the
+% general form.
 theta_factors = {};
 mixed = M.any_chain && M.any_product;
+single_only = mixed && M.n_b_max == 1;
 if mixed
     theta_factors{end+1} = 'D_{i}';
 elseif M.any_chain
@@ -409,14 +417,20 @@ end
 eqs = { ...
     dx_line, ...
     ['\theta_i &= ' theta_rhs]};
-if mixed
+if single_only
+    eqs{end+1} = ['D_{i} &= b_{i} \quad \text{(single pool)}, ' ...
+        '\qquad D_{i} = b_{i1} \quad \text{(chained pools)}'];
+elseif mixed
     eqs{end+1} = ['D_{i} &= \prod_{m=1}^{M} b_{im} \quad \text{(independent pools)}, ' ...
         '\qquad D_{i} = b_{i1} \quad \text{(chained pools)}'];
 end
 eqs = [eqs, { ...
     'r_i &= \phi\left( x_i - a_{0_i} - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right)', ...
     '\frac{da_{ik}}{dt} &= \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K'}];
-if M.n_b_max > 0
+if single_only
+    eqs{end+1} = ['\frac{db_{i}}{dt} &= \frac{1-b_{i}}{\tau_{rec}} - ' ...
+        '\frac{b_{i}\, r_i}{\tau_{rel}}'];
+elseif M.n_b_max > 0
     eqs{end+1} = ['\frac{db_{im}}{dt} &= \frac{1-b_{im}}{\tau_{rec_m}} - ' ...
         '\frac{b_{im}\, r_i}{\tau_{rel_m}}, \qquad m = 1, \dots, M'];
 end
@@ -456,7 +470,10 @@ if any(M.sigma_S_c(:) > 0)
 else
     setpoint_note = sprintf('%s for every neuron here', fmt(M.S_c));
 end
-if M.any_chain && M.any_product
+if single_only
+    m_phrase = ['$b_{i}$ the single depression pool and $b_{i1}$, $b_{i2}$ the two ' ...
+        'chained ones'];
+elseif M.any_chain && M.any_product
     m_phrase = ['$M$ the number of independent depression pools of a product ' ...
         'route ($M = 1$ is the single pool)'];
 elseif M.any_chain
@@ -552,8 +569,13 @@ fprintf(fid, ['On a **chained** route the two depression variables are pools in 
     'loses what it hands on, divided by its relative capacity $n_2$. Both start ' ...
     'at 1 and stay in $[0, 1]$.\n\n']);
 if M.any_product
+    if M.n_b_max == 1
+        m_note = '';                 % no product in play: no M to name
+    else
+        m_note = ' ($M = 1$)';
+    end
     fprintf(fid, ['With the reserve held full ($b_{i2} \\equiv 1$) the releasable-pool ' ...
-        'equation is the single-pool equation ($M = 1$), so single-pool and chained ' ...
+        'equation is the single-pool equation' m_note ', so single-pool and chained ' ...
         'depression share the releasable-pool equation and differ by the reserve. ' ...
         'The reserve starts full, so the two coincide at the onset of activity and ' ...
         'come apart as sustained activity draws the reserve down. They are not ' ...
@@ -648,7 +670,9 @@ row(fid, '$\sigma_{\tau_a}$', ...
 row(fid, '$c$',          'SFA coupling per type',     M.c,        '--');
 % M as in the equations: depression timescales. Uniform across routes in every
 % preset so far; if a preset ever differs by route, this is the widest one.
-if M.any_chain
+if M.any_chain && M.n_b_max <= 1
+    % Chains with single pools at most (the paper's set): no product, so no M.
+elseif M.any_chain
     % With chains in play M counts only the pools of a PRODUCT route.
     row(fid, '$M$',      'STD pools of a product route (covered conditions)', M.n_b_max, '--');
 else

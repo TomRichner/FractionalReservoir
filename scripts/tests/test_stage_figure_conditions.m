@@ -8,9 +8,11 @@
 %      (select_conditions:NoSuchCondition).
 %   2. fig_memory_capacity: with three of four conditions selected, the
 %      table lists the three pairs among them and says six were run.
-%   3. fig_single_neuron_revised: the mechanism rule of its header (both
-%      bundle sets draw all four columns; {no_adaptation} draws one); the
-%      titles come from the condition NAME, not the saved title.
+%   3. fig_single_neuron_revised: the mechanism rule of its header for
+%      network names (both network selections map to all four columns), exact
+%      selection for single-neuron names ({no_adaptation} draws one; a
+%      reordered pair draws in the order given); the titles come from the
+%      condition NAME, not the saved title.
 %   4. titles_by_name: map first, then the saved title, then the name.
 % Runs in a few seconds.
 
@@ -88,6 +90,14 @@ for k = 1:size(cases, 1)
         numel(ttl) == cases{k, 2} && ~any(strcmp(ttl, 'SAVED TITLE')));
     close(o.figs);
 end
+% Single-neuron names are taken as names, in the order given (the bundle's
+% per-set lists): two columns, chain first.
+o = fig_single_neuron_revised('run_dir', tmp, 'save', false, 'conditions', {'sfa0_stdc2', 'no_adaptation'});
+ttl = titled_axes(o.figs);
+map = srnn_condition_titles();
+n_fail = n_fail + check('single neuron: exact names in the order given', ...
+    isequal(reshape(ttl, 1, []), {map('sfa0_stdc2'), map('no_adaptation')}));
+close(o.figs);
 
 %% 4. titles_by_name
 tt = titles_by_name({'sfa3_std2', 'not_a_name', 'also_not'}, {'old', 'Saved', ''});

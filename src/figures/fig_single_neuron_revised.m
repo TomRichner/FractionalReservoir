@@ -29,11 +29,18 @@ function out=fig_single_neuron_revised(cfg)
 %   * a name either side that does not parse as sfaX_stdY / sfaX_stdcY is not
 %     dropped: an unparseable single-neuron condition is always drawn, and an
 %     unparseable network name contributes no class.
-% So in the mu7chain bundle BOTH sets draw all four columns: the chain is the
-% paper's multiple-timescale depression, and its single-neuron demonstration
-% belongs with it; the product MTS adds no class the single neuron lacks. A
-% selection of {no_adaptation} alone draws one column. An empty selection
-% draws every column, as before.
+% Mapped this way, either mu7chain selection would draw all four columns. The
+% bundle does not rely on the mapping: mu7chain_config names this entry's own
+% single-neuron conditions per figure set (the lead's decision, 2026-11-12),
+% and an entry's own args follow the bundle-wide 'conditions', so they win:
+%   * '3cond' (the paper's): no_adaptation, sfa1_std0, sfa0_std1 -- three
+%     columns, no adaptation, one SFA timescale, one depression pool;
+%   * '4cond' (the review): the same plus sfa0_stdc2, chained depression alone.
+% Names given here that ARE single-neuron conditions are taken as they are,
+% in their own order (see single_neuron_columns). The mechanism mapping is the
+% fallback for a caller that passes network names. A selection of
+% {no_adaptation} alone draws one column. An empty selection draws every
+% column, as before.
 %
 % Layout: 6 rows x N columns, the figure 1000 px wide per three columns.
 arguments
@@ -87,12 +94,19 @@ end
 
 %% ------------------------------------------------------------------------
 function keep=single_neuron_columns(sn_names,requested)
-% Logical mask over the single-neuron conditions (see the header's rule).
+% Indices of the single-neuron conditions to draw, in drawing order (see the
+% header's rule).
 if isempty(requested) || ((ischar(requested) || isstring(requested)) && all(strlength(requested)==0))
-    keep=true(1,numel(sn_names));
+    keep=1:numel(sn_names);
     return
 end
 requested=cellstr(requested);
+if all(ismember(requested,sn_names))
+    % Single-neuron names (the bundle's per-set lists): exactly these, in the
+    % order given, with select_conditions' rules.
+    [~,keep]=select_conditions(sn_names,requested);
+    return
+end
 present=struct('sfa',false,'product',false,'chain',false);
 for k=1:numel(requested)
     m=mechanisms(requested{k});
@@ -110,6 +124,7 @@ for k=1:numel(sn_names)
         keep(k)=(m.sfa && present.sfa) || (m.product && present.product) || (m.chain && present.chain);
     end
 end
+keep=find(keep);
 end
 
 function m=mechanisms(name)

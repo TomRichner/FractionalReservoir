@@ -98,6 +98,11 @@ for mi = 1:numel(specs)
         set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);
     end
     linkaxes(cax, 'y');
+    % The 300-px canvas leaves no room for the 20-pt x label, which printed cut
+    % in half (on product runs too); extend the canvas downward by what it
+    % needs (2026-11-12). Before the dividers, which are annotations and would
+    % not follow.
+    extend_canvas_below(combined, cax);
 
     pos = cell2mat(get(cax(:), 'Position'));
     [~, ~, col_of] = uniquetol(pos(:, 1), 0.01);
