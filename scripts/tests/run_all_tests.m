@@ -139,6 +139,7 @@ function names = slow_test_names()
         'test_sensitivity_refactor'         %  61 s  two sensitivity sweeps on a parallel pool
         'test_benettin_vs_qr'               %  50 s  SRNNModel2, n = 300, both methods
         'test_pool_module'                  %  47 s  the pool module: opens, restarts and resizes the session's pool
+        'test_select_conditions_figure'     % 120 s  cfg.conditions end to end on fig_lle_vs_rate; reads data/regression_fast/reference_post_refactor (SKIPs without it)
         'test_RMTBlocks_predictions'        %  37 s  eigenvalue statistics over many draws
         'test_eig_heatmap_stage'            %  33 s  analysis stage + three figures
         };
