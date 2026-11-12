@@ -80,6 +80,28 @@ decisions are recorded in the to-do list, not in an issue; and the worklog
 points at commits, it does not replace them. **Commit messages are still the
 record of reasoning** (see "Scope" above).
 
+**The plan's timeline is in `docs/gantt/`** (Tom, 2026-11-12):
+`Plan_Timeline.md` and a static page with an estimated Gantt chart of the
+high-level steps, at 15-minute resolution, every step of block A and
+blocks B, C and D roughly. Each task has a code, `<stage>_<step>_<kind>`
+with P for Plan, B for Build, T for Test (`A_0c_T`, `B_3_B`, `C_0_P`).
+**It is for visibility only.** Tom: "I don't want any calendar target
+dates. I just want estimates to aid in planning. I am not shooting for a
+specific done datetime. ... Agents which are building or testing are not
+beholden to the gantt chart. It is just to help the user estimate how
+the plan is shaping up." So:
+
+- It sets no target, deadline or done date, and none is written into it.
+  The future is shown as estimated working time, not as calendar dates.
+- **No agent shortens, skips, reorders or hurries a step to match it.** A
+  step takes as long as doing it properly takes. One that runs past its
+  estimate is not a problem to fix; the estimate is corrected at the next
+  update. "Quality comes first" above is unchanged by the chart.
+- **It is updated after each merge into main:** the lead briefs an Opus
+  worker (no MATLAB, `pool: 0`) to mark what finished, correct the
+  estimates and regenerate the page, following the procedure in
+  `Plan_Timeline.md`. Blocks B, C and D are redrawn as they are planned.
+
 Working arrangement (TR, 2026-11-10, revised the same day): **a lead agent
 orchestrates and worker agents build.** The lead writes the briefs, reviews
 every diff, runs the regression gates and handles the merges, so it keeps
