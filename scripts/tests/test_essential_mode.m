@@ -112,16 +112,35 @@ root = fileparts(which('setup_paths'));
 stage_files = {'run_memory_capacity', 'run_memory_capacity_example', 'run_eig_heatmap', ...
     'run_numerics_verification', 'run_lyapunov_spectrum', 'run_transient_gain', ...
     'run_local_lyapunov', 'run_dc_lle_analysis'};
+% A stage either shares 'fast's case (case {'essential', 'fast'}) or has a
+% case of its own for 'essential'; in the second form a case for 'fast'
+% alone beside it is right. Memory capacity is the one stage with its own:
+% three trials where 'fast' has five (Tom, 2026-11-12).
+own_case = {'run_memory_capacity'};
 for k = 1:numel(stage_files)
     txt = fileread(which(stage_files{k}));
     code = regexprep(txt, '%[^\n]*', '');                       % comments off
-    n_ess  = numel(regexp(code, 'case\s*\{''essential'',\s*''fast''\}'));
-    n_fast = numel(regexp(code, 'case\s*''fast'''));
-    assert(n_ess >= 1, '%s has no case for ''essential''', stage_files{k});
-    assert(n_fast == 0, '%s still has a case for ''fast'' alone, which ''essential'' would miss', stage_files{k});
+    n_shared = numel(regexp(code, 'case\s*\{''essential'',\s*''fast''\}'));
+    n_own    = numel(regexp(code, 'case\s*''essential'''));
+    n_fast   = numel(regexp(code, 'case\s*''fast'''));
+    assert(n_shared + n_own >= 1, '%s has no case for ''essential''', stage_files{k});
+    if ismember(stage_files{k}, own_case)
+        assert(n_own == 1 && n_shared == 0, '%s is expected to have its own case for ''essential''', stage_files{k});
+        assert(n_own == n_fast, '%s: a case for ''fast'' alone needs a case for ''essential'' beside it', stage_files{k});
+    else
+        assert(n_fast == 0, '%s still has a case for ''fast'' alone, which ''essential'' would miss', stage_files{k});
+    end
     assert(isempty(regexp(code, 'strcmp\([^)]*run_mode,\s*''fast''\)', 'once')), ...
         '%s tests run_mode against ''fast'' alone', stage_files{k});
 end
+% Memory capacity at 'essential': three trials, and the durations it shares
+% with every mode untouched (read from the cost table's text; the table is
+% a local function).
+mc_code = regexprep(fileread(which('run_memory_capacity')), '%[^\n]*', '');
+tok = regexp(mc_code, 'case\s*''essential''\s*cfg\.n_trials\s*=\s*(\d+)\s*;', 'tokens', 'once');
+assert(~isempty(tok) && str2double(tok{1}) == 3, 'run_memory_capacity: ''essential'' must be 3 trials');
+assert(numel(regexp(mc_code, 'cfg\.T_train_sec\s*=')) == 1, ...
+    'run_memory_capacity: the training window must be set once, for every mode');
 % The illustrations stage has no cost table to teach.
 assert(~contains(fileread(which('run_paper_illustrations')), 'run_mode'));
 

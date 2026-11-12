@@ -404,7 +404,17 @@ if nargin < 3; ode_solver_override = ''; end
 % blurred by random draws.
 cfg = struct();
 switch run_mode
-    case {'essential', 'fast'}  % 'essential' takes 'fast's sizes (run_mode_names)
+    case 'essential'
+        % THREE TRIALS (Tom, 2026-11-12): enough for a rough interval on a
+        % first look, and nothing else is cut. The durations below are the
+        % same in every mode and stay so here: with a shorter training
+        % window the readout has fewer hold-samples than features and memory
+        % capacity is under-determined. With 3 trials the sign-flip test has
+        % 2^3 = 8 outcomes, so the smallest two-sided p is 2/8 = 0.25 and no
+        % paired test can reach significance; the bootstrap interval is over
+        % three numbers. It shows where the conditions sit, no more.
+        cfg.n_trials = 3;
+    case 'fast'
         cfg.n_trials = 5;      % plumbing check; p cannot go below 0.0625
     case {'medium', 'medium2'}
         % medium2 runs at medium effort here. It differs from medium only in
