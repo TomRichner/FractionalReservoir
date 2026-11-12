@@ -31,7 +31,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 Q = timedelta(minutes=15)
 
-CODE_RE = re.compile(r"^(?P<stage>[ABCD])_(?P<step>\d+[a-z]?)_(?P<kind>[PBT])(?P<n>\d*)$")
+CODE_RE = re.compile(r"^(?P<stage>[ABCD])_(?P<step>\d+[a-z]?)_(?P<kind>[PBTU])(?P<n>\d*)$")
 STATUSES = {"done": "done", "running": "running", "planned": "planned", "tom": "waiting on Tom"}
 GLYPH = {"done": "✓", "running": "▶", "planned": "○", "tom": "◆"}
 WHO = {
@@ -42,7 +42,7 @@ WHO = {
     "tom": "Tom",
     "lead+tom": "lead + Tom",
 }
-KIND = {"P": "Plan", "B": "Build", "T": "Test"}
+KIND = {"P": "Plan", "B": "Build", "T": "Test", "U": "User (waits on Tom)"}
 MAX_NAME = 44
 MAX_BLOCK_NAME = 64
 
@@ -161,7 +161,7 @@ def load(path: Path) -> tuple[dict, list[dict], list[Task]]:
         m = CODE_RE.match(t["id"])
         if not m:
             errors.append(f"{tid}: code does not match <stage>_<step>_<kind>[n] "
-                          f"(e.g. A_0c_T, B_3_B, A_4_B2)")
+                          f"with kind P, B, T or U (e.g. A_0c_T, B_3_B, A_4_B2, A_10_U)")
         elif m.group("stage") != t["block"]:
             errors.append(f"{tid}: code's stage letter is not its block {t['block']!r}")
         if tid in seen:
@@ -793,7 +793,7 @@ g.task:focus .bar, g.task:hover .bar, g.task.hl .bar {{ stroke: var(--fg); strok
 <section>
 <h2>How to read it</h2>
 <dl class="legend">
-<dt><code>A_0c_T</code></dt><dd>Task code <em>stage_step_kind</em>: block A, step 0c of the plan, a Test. Kinds: P plan, B build, T test. A trailing number (<code>A_4_B2</code>) separates several tasks of one kind in one step. Rough blocks number their steps 0, 1, 2&hellip; with 0 the planning step.</dd>
+<dt><code>A_0c_T</code></dt><dd>Task code <em>stage_step_kind</em>: block A, step 0c of the plan, a Test. Kinds: P plan, B build, T test, U user (nothing proceeds until Tom has decided, reviewed or talked it through). The kind is fixed; the status &ldquo;waiting on Tom&rdquo; below changes as work moves. A trailing number (<code>A_4_B2</code>) separates several tasks of one kind in one step. Rough blocks number their steps 0, 1, 2&hellip; with 0 the planning step.</dd>
 <dt><span class="sw done"></span>&#x2713; done</dt><dd>finished; drawn at its actual times</dd>
 <dt><span class="sw running"></span>&#x25B6; running</dt><dd>under way now; a dotted tick marks where its estimate ended if it runs longer</dd>
 <dt><span class="sw planned"></span>&#x25CB; planned</dt><dd>not started; placed after what it waits for</dd>

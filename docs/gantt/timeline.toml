@@ -4,7 +4,9 @@
 # from this folder.
 #
 # Every [[task]]:
-#   id        task code <stage>_<step>_<kind>[n]  (see Plan_Timeline.md)
+#   id        task code <stage>_<step>_<kind>[n]  (see Plan_Timeline.md);
+#             kind P = Plan, B = Build, T = Test, U = User (waits on Tom:
+#             his decision, review or a conversation before work proceeds)
 #   block     A, B, C or D           group   row group heading within the block
 #   name      short name for the label column (at most 44 characters)
 #   who       lead | fable | opus | workers | tom | lead+tom
@@ -144,7 +146,7 @@ approx_start = true
 rule = "commits on main; 6b3d874"
 
 [[task]]
-id = "A_0_P2"
+id = "A_0_U"
 block = "A"
 group = "Planning with Tom (2026-11-11)"
 name = "Planning with Tom: build order, interface"
@@ -169,7 +171,7 @@ who = "lead"
 status = "done"
 what = "Clean tree, worker agents listed, the quick test suite passing, before the first worker is briefed."
 gate = "Quick suite 53 of 53."
-depends = ["A_0_P2"]
+depends = ["A_0_U"]
 start = 2026-11-11T16:00:00-06:00
 end = 2026-11-11T16:17:57-06:00
 took_min = 18
@@ -292,7 +294,7 @@ merge = "24e515b"
 commits = "988feae"
 
 [[task]]
-id = "A_0c_P"
+id = "A_0c_U"
 block = "A"
 group = "Plan A: foundation (steps 0 to 0d)"
 name = "Tom fixes the tolerances"
@@ -317,7 +319,7 @@ issue = "FD-021"
 status = "done"
 what = "Moved the existing depression and facilitation arithmetic out of the model's core functions into separate 'route models' under one interface, with no new model. The chain then becomes a second route model rather than a branch at every site."
 gate = "Tolerance tier against the anchor (worst 4.8e-16 against 1e-12); quick suite; 71 mutations caught on the refactored code; timing within 5 %."
-depends = ["A_0c_P"]
+depends = ["A_0c_U"]
 start = 2026-11-11T21:38:05-06:00
 end = 2026-11-11T23:39:22-06:00
 took_min = 121
@@ -678,7 +680,7 @@ commits = "41ac6b1, 0c706f5"
 [[task]]
 id = "A_10_B"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Spread into the mu7chain preset"
 who = "lead"
 issue = "FD-007"
@@ -695,9 +697,9 @@ merge = "fd1fb99 (committed on main)"
 note = "The lead's brief gave 30 min for this step, but that brief was written about when the step ran, so it is not used as an estimate of record. Ran beside A_9_T."
 
 [[task]]
-id = "A_10_T1"
+id = "A_10_U"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Hold point: Tom looks at example traces"
 who = "tom"
 status = "tom"
@@ -714,48 +716,48 @@ estimate_of_record_source = "the lead's list of remaining steps in its brief for
 note = "Under way: the lead has shown the example traces for three seeds; Tom is looking and may tune the connectivity. It is Tom's time and uncertain; the projection does not include waiting for Tom to be available."
 
 [[task]]
-id = "A_10_T2"
+id = "A_10_T1"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Quick suite, then full regression tier"
 who = "lead"
 status = "planned"
 what = "First the quick test suite (about 10 min) on the preset commit fd1fb99, which so far was checked by six targeted tests only. Then the full tier: reruns every stage and all 36 figures of the small copy of the manuscript bundle and compares with the stored references, about 50 min. The milestone check that the finished model still reproduces the paper's pipeline."
 gate = "Quick suite passes; full tier: no difference beyond the recorded ignore patterns."
-depends = ["A_10_T1"]
+depends = ["A_10_U"]
 estimate = 60
 note = "About 10 + 50 min. The full tier needs the desktop MATLAB."
 
 [[task]]
-id = "A_10_T3"
+id = "A_10_T2"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Full reference re-captured"
 who = "lead"
 status = "planned"
 what = "The full tier's reference is saved again, deliberately, because the condition titles changed; the commit says why the expected values moved."
 gate = "Second run of the full tier on the new code reproduces it."
-depends = ["A_10_T2"]
+depends = ["A_10_T1"]
 estimate = 15
 
 [[task]]
 id = "A_11_T1"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Fast run, four conditions (12 workers)"
 who = "lead"
 issue = "FD-007"
 status = "planned"
 what = "The whole analysis pipeline of the mu7chain bundle at 'fast' size on all four conditions. Tests that every stage runs end to end on the finished model; it is the last run agents make (medium and larger are Tom's)."
 gate = "Every stage finishes with all four conditions."
-depends = ["A_10_T3"]
+depends = ["A_10_T2"]
 estimate = 180
 note = "Lead's estimate; the preliminary run took 4.06 h on 6 workers. Does not start until Tom says so."
 
 [[task]]
 id = "A_11_T2"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Three-condition figure set (paper)"
 who = "lead"
 issue = "FD-006"
@@ -769,7 +771,7 @@ note = "About 10 min, drawn as 15."
 [[task]]
 id = "A_11_T3"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Four-condition figure set (review)"
 who = "lead"
 issue = "FD-006"
@@ -783,7 +785,7 @@ note = "About 10 min, drawn as 15."
 [[task]]
 id = "A_11_T4"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Check every stage and figure; report"
 who = "lead"
 status = "planned"
@@ -795,7 +797,7 @@ estimate = 15
 [[task]]
 id = "A_12_T"
 block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
+group = "Plan A: finishing (steps 10 to 12)"
 name = "Close-out: Plan A 'done means' list"
 who = "lead"
 status = "planned"
@@ -803,22 +805,6 @@ what = "Goes through the checklist of Plan A section 10, brings ISSUES and WORKL
 gate = "Every item of Plan A section 10 ticked or explained."
 depends = ["A_11_T4"]
 estimate = 30
-
-[[task]]
-id = "A_13_B"
-block = "A"
-group = "Plan A: finishing (steps 10 to 12) and after"
-name = "Medium run(s) for the paper (Tom)"
-who = "tom"
-issue = "FD-009"
-status = "tom"
-what = "The paper's results: the sweeps, memory capacity, stability and transient analyses on all four conditions at 'medium' or larger. Only Tom starts these runs and says when they are done."
-gate = "Tom's judgement."
-depends = ["A_12_T"]
-estimate = 720
-guess = true
-rough = true
-note = "Duration not known. The 12 h bar is a placeholder guess, not an estimate from a measured run."
 
 # ---------------------------------------------------------------- block B (rough)
 
@@ -872,7 +858,7 @@ group = "Block B (rough: not yet planned in detail)"
 name = "Fast run of the stimulation experiments"
 who = "lead"
 status = "planned"
-what = "A 'fast' run of both experiments to test that they run end to end before the expensive run."
+what = "A 'fast' run of both experiments to test that they run end to end. Block B has no medium run of its own: its experiments go into the one medium run that follows block C (C_4_B)."
 gate = "To be set when planned."
 depends = ["B_1_B", "B_2_B"]
 estimate = 240
@@ -882,26 +868,13 @@ guess = true
 id = "B_4_B"
 block = "B"
 group = "Block B (rough: not yet planned in detail)"
-name = "Medium run of block B (Tom)"
-who = "tom"
-status = "tom"
-what = "The run whose results go into the paper; Tom's to start and to call done."
-gate = "Tom's judgement."
-depends = ["B_3_T"]
-estimate = 720
-guess = true
-
-[[task]]
-id = "B_5_B"
-block = "B"
-group = "Block B (rough: not yet planned in detail)"
 name = "Combined stimulation figure (Figs 7 + 8)"
 who = "workers"
 issue = "FD-012"
 status = "planned"
-what = "One figure combining the clinical and model stimulation figures, with the causal result in it; supplementary figures with time series and parameter-space maps."
+what = "One figure combining the clinical and model stimulation figures, with the causal result in it; supplementary figures with time series and parameter-space maps. Built on the fast run's results (B_3_T) and redrawn from the medium run (C_4_B) later."
 gate = "To be set when planned."
-depends = ["B_4_B"]
+depends = ["B_3_T"]
 estimate = 360
 guess = true
 
@@ -968,15 +941,16 @@ guess = true
 id = "C_4_B"
 block = "C"
 group = "Block C (rough: not yet planned in detail)"
-name = "Medium gain-sweep runs (Tom)"
+name = "Medium run, blocks A, B and C (Tom)"
 who = "tom"
-issue = "FD-010"
+issue = "FD-009, FD-010"
 status = "tom"
-what = "The gain sweep for the paper on the three E:I balances; three balances triple the cost."
+what = "The one medium run of the paper's analyses for blocks A, B and C together: block A's sweeps, memory capacity, stability and transient analyses on all four conditions, block B's stimulation experiments, and block C's gain sweep on the three E:I balances. Tom starts it, and not before stage C is done, that is built and tested at fast (Tom, 2026-11-12: 'we will not be doing a medium run until we get done with stage C'). Only Tom says when it is done."
 gate = "Tom's judgement."
-depends = ["C_3_T"]
-estimate = 960
+depends = ["A_12_T", "B_3_T", "C_3_T"]
+estimate = 2400
 guess = true
+note = "Duration not known. The 40 h bar is the sum of the three placeholder guesses it replaces (block A 12 h, block B 12 h, block C 16 h), not an estimate from a measured run. Waits on the fast runs of A, B and C, not on block B's figure, which a run does not need."
 
 [[task]]
 id = "C_5_B"
@@ -986,7 +960,7 @@ name = "Statistics and memory figure"
 who = "workers"
 issue = "FD-010"
 status = "planned"
-what = "Per condition and E:I balance: Gaussian height, centre and width of memory against gain, mean and variance across the range; the figure of gain vs memory, exponent vs memory and gain vs exponent."
+what = "From the medium run (C_4_B). Per condition and E:I balance: Gaussian height, centre and width of memory against gain, mean and variance across the range; the figure of gain vs memory, exponent vs memory and gain vs exponent."
 gate = "To be set when planned."
 depends = ["C_4_B"]
 estimate = 360
@@ -1018,7 +992,7 @@ issue = "FD-013"
 status = "planned"
 what = "The figure itself and the supplementary figures supporting each panel; panel 3 comes from block B's parameter-space sweep, panel 4 from block C."
 gate = "To be set when planned."
-depends = ["D_0_P", "B_5_B", "C_5_B"]
+depends = ["D_0_P", "B_4_B", "C_5_B"]
 estimate = 360
 guess = true
 

@@ -47,12 +47,19 @@ It is just to help the user estimate how the plan is shaping up."
     `../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`).
   - *step*: the step as the plan numbers it. Block A uses Plan A's numbers
     (`docs/Plan_A_chained_vessicles.md` section 7: 0a, 0b, 0c, 0d, 1, 2, 3,
-    4, 5, 7, 8; then the lead's 9 (the spread), 10, 11, 12 for the finish,
-    and 13 for Tom's `medium` run). Step 0 of block A also holds the work
-    of 2026-11-10 that came before Plan A (test audit, regression tiers).
-    Blocks B, C, D are not planned in detail; their bars are numbered
-    0, 1, 2, ... in order, with 0 the planning step.
-  - *kind*: P = Plan, B = Build, T = Test.
+    4, 5, 7, 8; then the lead's 9 (the spread), 10, 11, 12 for the finish).
+    Step 0 of block A also holds the work of 2026-11-10 that came before
+    Plan A (test audit, regression tiers). Blocks B, C, D are not planned
+    in detail; their bars are numbered 0, 1, 2, ... in order, with 0 the
+    planning step.
+  - *the medium run*: there is one, for blocks A, B and C together, drawn
+    in block C (`C_4_B`): Tom, 2026-11-12, "we will not be doing a medium
+    run until we get done with stage C", so it follows block C's fast run,
+    and blocks A and B end with their fast runs.
+  - *kind*: P = Plan, B = Build, T = Test, U = User: nothing proceeds
+    until Tom has decided, reviewed, or talked it through (a hold point,
+    Tom fixing the tolerances). Writing a plan or a design stays P, a run
+    that produces results stays B even when only Tom starts it.
   - *n*: an optional number when one step has several tasks of the same
     kind (`A_4_B1` to `A_4_B5` are FD-006's five display packages).
   The code is the task's id in the data; dependencies refer to it.
@@ -60,7 +67,11 @@ It is just to help the user estimate how the plan is shaping up."
   the bar's pattern, not by colour alone: solid grey = done (actual
   times); amber stripes = running; outlined = planned; purple dots =
   waiting on Tom (a decision, a review, or a run only Tom starts); dashed
-  outline and "(guess)" = rough, not yet planned in detail.
+  outline and "(guess)" = rough, not yet planned in detail. The kind U and
+  the status "waiting on Tom" are different things: a task's kind says
+  what the step is and never changes, its status says where it stands and
+  changes as the work moves (a U task is done once Tom has spoken, and a
+  B task such as Tom's medium run waits on Tom without being a U).
 - **Beside each bar**: done tasks show how long they took ("took 1 h 06
   min", with ≈ when the start was inferred), and "est. X, took Y" when an
   estimate was recorded before they ran. Future tasks show their estimate.
