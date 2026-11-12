@@ -305,6 +305,55 @@ model can be tested alone, without building a network, and
 resolved. `get_params` stores `params.route(pre, post)` with the model, its
 `P` and its state indices.
 
+**As built in step 0d (FD-021, merged `7d49430`), where it differs from
+the table above; each departure was made for measured speed and accepted
+by the lead:**
+
+- `params.route` is a **cell**, `params.route{pre, post}`, with fields
+  `model`, `P`, `cfg` (the route's `std` and `stf` as configured), `opts`,
+  `idx` and `A_is_diagonal`. (Taking an element of a struct array cost
+  five times as much, once per route per right-hand-side call.)
+- `linearize` returns **four outputs**, `[A, B, F, Fs]`, with the shapes
+  and meanings of the table, not a struct `L`.
+- A model declares **`P.coupling`** (`ns x ns` logical: which entries of
+  `A` can be nonzero). `jacobian_times` applies only the diagonal when the
+  model says `A` is diagonal and the full product otherwise; without this
+  it was 30 % slower at n = 100. **`P.coupling` must not understate**:
+  `jacobian_times` trusts it, the assembled Jacobian does not, and
+  `test_route_models` checks it per model.
+- `compile(std_cfg, stf_cfg, opts)` takes `opts` with `npre`,
+  `zero_floor`, `label`, `err_id_prefix`. `P` carries `nominal` (the
+  configured rows) and `signature`; the legacy `params` fields are filled
+  from `P.nominal`.
+- The four functions read the route table through
+  `SRNNCellTypePairs.active_routes(params)`: three existing tests switch
+  `params.std_zero_floor` on the struct after `get_params`, and the floor
+  is compiled into each route, so the routes are recompiled when the two
+  disagree.
+- `route_product` writes depression and facilitation as one equation,
+  `ds = (1 - s)./tau_rest + (target - s).*r./tau_drive`, with target 0
+  for depression and `G` for facilitation.
+
+**What step 1 inherits from this** (the worker's own list of where the
+chain will strain the interface):
+
+- `compile_route` hard-codes `'product'`; it is where `std.model` is read.
+- The full-`A` branch of `jacobian_times` is run by no case of the
+  tolerance tier yet, only by one check of `test_route_models`. The
+  chain's own reference (step 5) is what brings it under the tier.
+- Writing entry `(m, k)` of `A` at `(k, m)` in the assembled Jacobian is
+  invisible for a diagonal `A`. The chain's 2 x 2 is not symmetric, so its
+  finite-difference test is what catches a transposition.
+- An error in `linearize` moves the assembled Jacobian and
+  `jacobian_times` together, so their equality test cannot see it; stored
+  values and `test_route_models` can.
+- `route_fields` and the reservoir's `route_signature` read the legacy
+  nominal fields and cannot tell a chain route from a product route with
+  the same numbers. `P.signature` exists for that and is not wired in.
+- `combine_std_pair`, `apply_std_zero_floor_pair`, `std_zero_floor_pmin`
+  and `p_min` are product-only.
+- `initial` returns one row for all neurons.
+
 How the four class functions use it, identically for every model:
 
 - `dynamics_fast`: `[ds, F] = rhs(...)`; `recurrent += W_block * (F .* r)`.
