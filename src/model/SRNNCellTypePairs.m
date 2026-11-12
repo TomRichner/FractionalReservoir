@@ -10,6 +10,18 @@ classdef SRNNCellTypePairs < handle
     %        g{1,1}(:); ...; g{C,C}(:); x(:)]
     % Pair arrays use (presynaptic type, postsynaptic type) ordering.
     %
+    % WHAT A ROUTE'S SYNAPSES DO IS NOT IN THIS CLASS. Each route carries a
+    % ROUTE MODEL (src/model/routes; route_model states the interface): a
+    % state per presynaptic neuron, driven by that neuron's rate r, and an
+    % output factor F, with synaptic output theta = r .* F. A route's state
+    % is its b-block followed by its g-block. get_params compiles one entry
+    % per route into params.route{pre, post} (the model, its per-neuron
+    % parameters P, the route's rows of the state vector), and
+    % dynamics_fast, compute_Jacobian_fast, jacobian_times and
+    % unpack_and_compute_states call the model through that entry,
+    % identically for every model. Depression and facilitation as this
+    % class has always had them are the model route_product.
+    %
     % Example:
     %   model = SRNNCellTypePairs( ...
     %       'n_cellTypes', 3, 'cell_type_names', {'E','PV','SST'}, ...
@@ -902,7 +914,15 @@ classdef SRNNCellTypePairs < handle
             % max(1, .) guards K = 0, where there are no a-states at all and the
             % term is absent anyway. (min(1, .) would not: min(1,0) is 0.)
             params.c_eff = obj.c ./ max(1, obj.n_a);
-            pair = obj.compile_synapse_config();
+            % THE ROUTES. params.route (filled in below, once the layout is
+            % known) is what the dynamics, both Jacobians and the unpacking
+            % evaluate: per route its model, the model's per-neuron
+            % parameters P and the route's rows of the state vector. The
+            % fields that follow here are the NOMINAL values of the same
+            % routes, kept under the names code outside the class reads
+            % (SRNN_ESN_reservoir, route_fields, figures, tests). Nothing
+            % in the class computes with them.
+            pair = obj.compile_synapse_config(obj.n_per_type);
             params.n_b_pairs = pair.n_b;
             params.tau_b_rec = pair.tau_b_rec;
             params.tau_b_rel = pair.tau_b_rel;
@@ -920,9 +940,27 @@ classdef SRNNCellTypePairs < handle
             % above already carry them. Empty in the homogeneous case.
             params.S_c_vec = obj.S_c_vec;
             params.x0_std = obj.x0_std;
-            params.N_sys_eqs = obj.N_sys_eqs;
-            params.state_layout = SRNNCellTypePairs.make_state_layout( ...
+            layout = SRNNCellTypePairs.make_state_layout( ...
                 obj.n, obj.n_per_type, obj.n_a, pair.n_b, pair.n_g);
+            % The layout's length IS the number of equations (the same sum
+            % get.N_sys_eqs forms); reading it here saves compiling the
+            % synapse configuration a second time in every get_params.
+            params.N_sys_eqs = layout.N;
+            params.state_layout = layout;
+            % A route's state is its b-block followed by its g-block. The two
+            % are not adjacent in the state vector (every route's b-block
+            % comes before any g-block), so the route carries an index list.
+            % Both blocks are component-major (one run of npre per
+            % component), so reshape(S(idx), npre, ns) is the route's state.
+            % The table is A CELL, {pre, post}: taking one element out of a
+            % struct array costs five times what a cell lookup does, once
+            % per route in every right-hand-side evaluation.
+            params.route = pair.route;
+            for pre = 1:obj.n_cellTypes
+                for post = 1:obj.n_cellTypes
+                    params.route{pre, post}.idx = [layout.b{pre, post}, layout.g{pre, post}];
+                end
+            end
             params.rng_seeds = obj.rng_seeds;
             if ~isempty(obj.W)
                 % params.W is what the dynamics, both Jacobians and jacobian_times
@@ -1346,138 +1384,112 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
-        function pair = compile_synapse_config(obj)
-            %COMPILE_SYNAPSE_CONFIG Validate named routes and expand scalars.
+        function pair = compile_synapse_config(obj, counts)
+            %COMPILE_SYNAPSE_CONFIG Validate named routes and compile each one's model.
+            %
+            %   pair = obj.compile_synapse_config()          nominal parameters only
+            %   pair = obj.compile_synapse_config(counts)    per-neuron parameters,
+            %                                                counts(pre) rows each
+            %
+            % The class checks the shape of synapse_config and the route's
+            % scale. Everything inside a route's `std` and `stf` belongs to
+            % the route's model (src/model/routes; see route_model), whose
+            % compile validates it and returns the route's parameters P.
+            %
+            % pair.route is the C x C cell, {pre, post}, of the structs
+            % compile_route returns (model, P, cfg, opts). The other fields are the nominal
+            % values that code outside the model reads, under the names they
+            % have always had (n_b, n_g, tau_b_rec, ..., scale).
             C = obj.n_cellTypes;
+            if nargin < 2, counts = ones(1, C); end
+            names = obj.cell_type_names;
             pair = struct( ...
                 'n_b', zeros(C, C), 'n_g', zeros(C, C), ...
                 'tau_b_rec', {cell(C, C)}, 'tau_b_rel', {cell(C, C)}, ...
                 'tau_g_dec', {cell(C, C)}, 'tau_g_fac', {cell(C, C)}, ...
                 'G', {cell(C, C)}, 'scale', ones(C, C), ...
-                'std_geomean', false(C, C));
-            config = obj.synapse_config;
-            if isempty(config), return; end
-            if ~isstruct(config) || ~isscalar(config)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'synapse_config must be a scalar named struct.');
-            end
+                'std_geomean', false(C, C), 'route', {cell(C, C)});
 
-            names = obj.cell_type_names;
-            unknown_pre = setdiff(fieldnames(config), names);
-            if ~isempty(unknown_pre)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'Unknown presynaptic type: %s.', unknown_pre{1});
+            config = obj.synapse_config;
+            if ~isempty(config)
+                if ~isstruct(config) || ~isscalar(config)
+                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                        'synapse_config must be a scalar named struct.');
+                end
+                unknown_pre = setdiff(fieldnames(config), names);
+                if ~isempty(unknown_pre)
+                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                        'Unknown presynaptic type: %s.', unknown_pre{1});
+                end
             end
             for pre = 1:C
                 pre_name = names{pre};
-                if ~isfield(config, pre_name), continue; end
-                targets = config.(pre_name);
-                if ~isstruct(targets) || ~isscalar(targets)
-                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                        'synapse_config.%s must be a scalar struct.', pre_name);
-                end
-                unknown_post = setdiff(fieldnames(targets), names);
-                if ~isempty(unknown_post)
-                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                        'Unknown postsynaptic type on %s route: %s.', ...
-                        pre_name, unknown_post{1});
+                targets = struct();
+                if ~isempty(config) && isfield(config, pre_name)
+                    targets = config.(pre_name);
+                    if ~isstruct(targets) || ~isscalar(targets)
+                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                            'synapse_config.%s must be a scalar struct.', pre_name);
+                    end
+                    unknown_post = setdiff(fieldnames(targets), names);
+                    if ~isempty(unknown_post)
+                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                            'Unknown postsynaptic type on %s route: %s.', ...
+                            pre_name, unknown_post{1});
+                    end
                 end
                 for post = 1:C
                     post_name = names{post};
-                    if ~isfield(targets, post_name), continue; end
-                    route = targets.(post_name);
-                    if isempty(route), continue; end
-                    if ~isstruct(route) || ~isscalar(route)
-                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                            'Route %s->%s must be a scalar struct.', pre_name, post_name);
-                    end
-                    unknown_mechanism = setdiff(fieldnames(route), {'std', 'stf', 'scale'});
-                    if ~isempty(unknown_mechanism)
-                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                            'Unknown field on route %s->%s: %s.', ...
-                            pre_name, post_name, unknown_mechanism{1});
-                    end
-
-                    % Route SCALE (2026-09-14): a positive scalar multiplying
-                    % the route's weights, W(post, pre) * scale, applied in
-                    % get_params to params.W only (obj.W stays the drawn matrix).
-                    % It exists to match the steady-state synaptic output of a
-                    % two-timescale STD route to a one-timescale one at a
-                    % reference rate; see the dualStdScaled presets. Default 1.
-                    if isfield(route, 'scale') && ~isempty(route.scale)
-                        sc = route.scale;
-                        if ~(isnumeric(sc) && isscalar(sc) && isfinite(sc) && sc > 0)
+                    cfg = struct('std', [], 'stf', []);
+                    if isfield(targets, post_name) && ~isempty(targets.(post_name))
+                        route = targets.(post_name);
+                        if ~isstruct(route) || ~isscalar(route)
                             error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                'Route %s->%s scale must be a positive finite scalar.', ...
-                                pre_name, post_name);
+                                'Route %s->%s must be a scalar struct.', pre_name, post_name);
                         end
-                        pair.scale(pre, post) = double(sc);
-                    end
-
-                    if isfield(route, 'std') && ~isempty(route.std) && ...
-                            ~(isstruct(route.std) && isempty(fieldnames(route.std)))
-                        std_config = route.std;
-                        SRNNCellTypePairs.validate_fields(std_config, ...
-                            {'tau_rec', 'tau_rel'}, pre_name, post_name, 'std', ...
-                            {'combine'});
-                        tau_rec = SRNNCellTypePairs.positive_row(std_config.tau_rec, ...
-                            'tau_rec', pre_name, post_name);
-                        if isempty(tau_rec)
+                        unknown_mechanism = setdiff(fieldnames(route), {'std', 'stf', 'scale'});
+                        if ~isempty(unknown_mechanism)
                             error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                'STD tau_rec must be nonempty on route %s->%s.', ...
-                                pre_name, post_name);
+                                'Unknown field on route %s->%s: %s.', ...
+                                pre_name, post_name, unknown_mechanism{1});
                         end
-                        tau_rel = SRNNCellTypePairs.expand_pair_parameter( ...
-                            std_config.tau_rel, numel(tau_rec), 'tau_rel', ...
-                            pre_name, post_name, false);
-                        pair.n_b(pre, post) = numel(tau_rec);
-                        pair.tau_b_rec{pre, post} = tau_rec;
-                        pair.tau_b_rel{pre, post} = tau_rel;
 
-                        % STD COMBINE (2026-09-24, opt-in): how the route's M
-                        % depression factors enter theta. 'product' (DEFAULT,
-                        % bit-identical to before) is prod_m b_m; 'geomean' is
-                        % (prod_m b_m)^(1/M). With every pair at one rho =
-                        % tau_rel/tau_rec the geomean steady state is the
-                        % one-timescale 1/(1 + r/rho) at EVERY constant rate --
-                        % the depression analogue of SFA's c/K (the product
-                        % squares it at M = 2). Ported from train-srnn's
-                        % geometric-mean STD matching; see combine_std_pair.
-                        if isfield(std_config, 'combine') && ~isempty(std_config.combine)
-                            combine_mode = std_config.combine;
-                            if ~((ischar(combine_mode) && isrow(combine_mode)) || (isstring(combine_mode) && isscalar(combine_mode))) || ...
-                                    ~any(strcmp(char(combine_mode), {'product', 'geomean'}))
+                        % Route SCALE (2026-09-14): a positive scalar multiplying
+                        % the route's weights, W(post, pre) * scale, applied in
+                        % get_params to params.W only (obj.W stays the drawn matrix).
+                        % It exists to match the steady-state synaptic output of a
+                        % two-timescale STD route to a one-timescale one at a
+                        % reference rate; see the dualStdScaled presets. Default 1.
+                        % It acts on the weights, so it belongs to the class and
+                        % is the same whatever the route's model.
+                        if isfield(route, 'scale') && ~isempty(route.scale)
+                            sc = route.scale;
+                            if ~(isnumeric(sc) && isscalar(sc) && isfinite(sc) && sc > 0)
                                 error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                    'STD combine on route %s->%s must be ''product'' or ''geomean''.', ...
+                                    'Route %s->%s scale must be a positive finite scalar.', ...
                                     pre_name, post_name);
                             end
-                            pair.std_geomean(pre, post) = strcmp(char(combine_mode), 'geomean');
+                            pair.scale(pre, post) = double(sc);
                         end
+                        if isfield(route, 'std'), cfg.std = route.std; end
+                        if isfield(route, 'stf'), cfg.stf = route.stf; end
                     end
 
-                    if isfield(route, 'stf') && ~isempty(route.stf) && ...
-                            ~(isstruct(route.stf) && isempty(fieldnames(route.stf)))
-                        stf_config = route.stf;
-                        SRNNCellTypePairs.validate_fields(stf_config, ...
-                            {'tau_dec', 'tau_fac', 'G'}, pre_name, post_name, 'stf');
-                        tau_dec = SRNNCellTypePairs.positive_row(stf_config.tau_dec, ...
-                            'tau_dec', pre_name, post_name);
-                        if isempty(tau_dec)
-                            error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                'STF tau_dec must be nonempty on route %s->%s.', ...
-                                pre_name, post_name);
-                        end
-                        tau_fac = SRNNCellTypePairs.expand_pair_parameter( ...
-                            stf_config.tau_fac, numel(tau_dec), 'tau_fac', ...
-                            pre_name, post_name, false);
-                        G = SRNNCellTypePairs.expand_pair_parameter( ...
-                            stf_config.G, numel(tau_dec), 'G', ...
-                            pre_name, post_name, true);
-                        pair.n_g(pre, post) = numel(tau_dec);
-                        pair.tau_g_dec{pre, post} = tau_dec;
-                        pair.tau_g_fac{pre, post} = tau_fac;
-                        pair.G{pre, post} = G;
-                    end
+                    compiled = SRNNCellTypePairs.compile_route(cfg, struct( ...
+                        'npre', counts(pre), 'zero_floor', obj.std_zero_floor, ...
+                        'label', [pre_name '->' post_name], ...
+                        'err_id_prefix', 'SRNNCellTypePairs'));
+                    pair.route{pre, post} = compiled;
+
+                    nominal = compiled.P.nominal;
+                    pair.n_b(pre, post) = compiled.P.n_b;
+                    pair.n_g(pre, post) = compiled.P.n_g;
+                    pair.tau_b_rec{pre, post} = nominal.tau_rec;
+                    pair.tau_b_rel{pre, post} = nominal.tau_rel;
+                    pair.std_geomean(pre, post) = strcmp(nominal.combine, 'geomean');
+                    pair.tau_g_dec{pre, post} = nominal.tau_dec;
+                    pair.tau_g_fac{pre, post} = nominal.tau_fac;
+                    pair.G{pre, post} = nominal.G;
                 end
             end
         end
@@ -2135,83 +2147,71 @@ classdef SRNNCellTypePairs < handle
         end
 
         function S0 = initialize_state(params)
-            C = params.n_cellTypes;
-            parts = cell(1, C + 2 * C * C + 1);
-            cursor = 0;
-            for q = 1:params.n_cellTypes
-                cursor = cursor + 1;
-                parts{cursor} = zeros(params.n_per_type(q) * params.n_a(q), 1);
-            end
-            for pre = 1:C
-                for post = 1:C
-                    cursor = cursor + 1;
-                    parts{cursor} = ones(params.n_per_type(pre) * ...
-                        params.n_b_pairs(pre, post), 1);
+            % Adaptation starts at 0, every route's state at the values its
+            % model states (route_model: initial), and x is drawn.
+            layout = params.state_layout;
+            S0 = zeros(layout.N, 1);
+            for pre = 1:params.n_cellTypes
+                for post = 1:params.n_cellTypes
+                    route = params.route{pre, post};
+                    S0(route.idx) = repmat(route.model.initial(route.P), params.n_per_type(pre), 1);   % numel matches; column-major is component-major
                 end
             end
-            for pre = 1:C
-                for post = 1:C
-                    cursor = cursor + 1;
-                    parts{cursor} = ones(params.n_per_type(pre) * ...
-                        params.n_g_pairs(pre, post), 1);
-                end
-            end
-            parts{end} = params.x0_std .* randn(params.n, 1);
-            S0 = vertcat(parts{:});
+            S0(layout.x) = params.x0_std .* randn(params.n, 1);
         end
 
-        function validate_fields(config, required, pre_name, post_name, mechanism, optional)
-            if nargin < 6, optional = {}; end
-            if ~isstruct(config) || ~isscalar(config)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s configuration on route %s->%s must be a scalar struct.', ...
-                    upper(mechanism), pre_name, post_name);
-            end
-            fields = fieldnames(config);
-            missing = setdiff(required, fields);
-            unknown = setdiff(fields, [required, optional]);
-            if ~isempty(missing)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'Missing %s field on route %s->%s: %s.', ...
-                    upper(mechanism), pre_name, post_name, missing{1});
-            end
-            if ~isempty(unknown)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'Unknown %s field on route %s->%s: %s.', ...
-                    upper(mechanism), pre_name, post_name, unknown{1});
-            end
+        function route = compile_route(cfg, opts)
+            %COMPILE_ROUTE One entry of the route table: a route's model and parameters.
+            %
+            %   route = SRNNCellTypePairs.compile_route(cfg, opts)
+            %
+            % cfg.std and cfg.stf are the route's configuration ([] when
+            % absent); opts goes to the model's compile (npre, zero_floor,
+            % label, err_id_prefix). Returns
+            %   model  the route model (route_model), a struct of handles
+            %   P      model.compile(cfg.std, cfg.stf, opts)
+            %   cfg, opts   as given, so the route can be compiled again
+            %   idx    the route's rows of the state vector, filled in by
+            %          get_params: [layout.b{pre, post}, layout.g{pre, post}],
+            %          so that reshape(S(idx), npre, P.ns) is the route's
+            %          state and dS(idx) = ds puts its derivative back
+            %   A_is_diagonal   the model states (P.coupling) that no state
+            %          variable's derivative depends on another, so A is
+            %          diagonal; jacobian_times then applies only its diagonal
+            %
+            % THE MODEL'S NAME IS RESOLVED HERE AND NOWHERE ELSE in the class.
+            % Every route is 'product' today: the configuration has no field
+            % that names another model.
+            model = route_model('product');
+            P = model.compile(cfg.std, cfg.stf, opts);
+            route = struct('model', model, 'P', P, 'cfg', cfg, 'opts', opts, 'idx', [], ...
+                'A_is_diagonal', isdiag(P.coupling));
         end
 
-        function value = positive_row(value, field_name, pre_name, post_name)
-            if ~isnumeric(value) || ~isvector(value) || ...
-                    any(~isfinite(value)) || any(value <= 0)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s on route %s->%s must contain positive finite values.', ...
-                    field_name, pre_name, post_name);
+        function route = active_routes(params)
+            %ACTIVE_ROUTES The route table that dynamics_fast, compute_Jacobian_fast,
+            % jacobian_times and unpack_and_compute_states evaluate.
+            %
+            % It is params.route as get_params compiled it, with one
+            % exception. params.std_zero_floor is an option of the class that
+            % callers switch ON THE PARAMS STRUCT after get_params
+            % (test_SRNNCellTypePairs, test_jacobian_times and
+            % test_SRNNCellTypePairs_tau_a_spread check both settings that
+            % way), and the option is compiled into every route's P. So when
+            % the struct states another setting than the table was compiled
+            % with, the routes are compiled again for it. That costs a
+            % compile per route per call and is meant for such checks; a
+            % model that wants the floor sets the property before build().
+            route = params.route;
+            if params.std_zero_floor == route{1}.opts.zero_floor
+                return;
             end
-            value = reshape(value, 1, []);
-        end
-
-        function value = expand_pair_parameter(value, count, field_name, ...
-                pre_name, post_name, at_least_one)
-            if ~isnumeric(value) || ~isvector(value) || isempty(value) || ...
-                    any(~isfinite(value)) || any(value <= 0)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s on route %s->%s must contain positive finite values.', ...
-                    field_name, pre_name, post_name);
-            end
-            if at_least_one && any(value < 1)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'G on route %s->%s must be at least one.', pre_name, post_name);
-            end
-            if isscalar(value)
-                value = repmat(value, 1, count);
-            elseif numel(value) ~= count
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s on route %s->%s must be scalar or have %d values.', ...
-                    field_name, pre_name, post_name, count);
-            else
-                value = reshape(value, 1, []);
+            for k = 1:numel(route)
+                opts = route{k}.opts;
+                opts.zero_floor = params.std_zero_floor;
+                again = SRNNCellTypePairs.compile_route(route{k}.cfg, opts);
+                again.idx = route{k}.idx;
+                route{k} = again;
             end
         end
 
@@ -2260,152 +2260,115 @@ classdef SRNNCellTypePairs < handle
             u = params.u_interpolant(t)';
             C = params.n_cellTypes;
             layout = params.state_layout;
-            a = cell(1, C);
-            b_state = cell(C, C);
-            g_state = cell(C, C);
+            route = SRNNCellTypePairs.active_routes(params);
             x = S(layout.x);
             x_eff = x;
-
+            a = cell(1, C);
             for q = 1:C
-                idx = params.type_indices{q};
-                nq = params.n_per_type(q);
                 if params.n_a(q) > 0
-                    a{q} = reshape(S(layout.a{q}), nq, params.n_a(q));
+                    idx = params.type_indices{q};
+                    a{q} = reshape(S(layout.a{q}), params.n_per_type(q), params.n_a(q));
                     x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
-                else
-                    a{q} = zeros(nq, 0);
                 end
             end
-
             rate = params.activation_function(x_eff);
-            a_derivatives = cell(1, C);
+
+            dS = zeros(layout.N, 1);
             for q = 1:C
-                idx = params.type_indices{q};
                 if params.n_a(q) > 0
-                    a_derivatives{q} = ((rate(idx) - a{q}) ./ params.tau_a_matrix{q});
-                else
-                    a_derivatives{q} = [];
+                    dS(layout.a{q}) = (rate(params.type_indices{q}) - a{q}) ./ params.tau_a_matrix{q};
                 end
             end
 
-            b_derivatives = cell(C, C);
-            g_derivatives = cell(C, C);
+            % The routes. Each route's model advances the route's state (one
+            % row per presynaptic neuron), driven by the presynaptic rate,
+            % and returns the output factor F; the route's synaptic output
+            % is theta = F .* rate. What a route's state is and how it moves
+            % is the model's business (src/model/routes; route_model).
             recurrent = zeros(params.n, 1);
             for pre = 1:C
                 pre_idx = params.type_indices{pre};
                 npre = params.n_per_type(pre);
                 pre_rate = rate(pre_idx);
                 for post = 1:C
-                    nb = params.n_b_pairs(pre, post);
-                    ng = params.n_g_pairs(pre, post);
-                    depression = ones(npre, 1);
-                    facilitation = ones(npre, 1);
-                    if nb > 0
-                        b_state{pre, post} = reshape( ...
-                            S(layout.b{pre, post}), npre, nb);
-                        depression = SRNNCellTypePairs.combine_std_pair( ...
-                            prod(b_state{pre, post}, 2), params, pre, post);
-                        b_derivatives{pre, post} = ...
-                            (1 - b_state{pre, post}) ./ params.tau_b_rec{pre, post} ...
-                            - (b_state{pre, post} .* pre_rate) ...
-                            ./ params.tau_b_rel{pre, post};
-                    else
-                        b_state{pre, post} = ones(npre, 0);
-                        b_derivatives{pre, post} = [];
-                    end
-                    if ng > 0
-                        g_state{pre, post} = reshape( ...
-                            S(layout.g{pre, post}), npre, ng);
-                        facilitation = prod(g_state{pre, post}, 2);
-                        g_derivatives{pre, post} = ...
-                            (1 - g_state{pre, post}) ./ params.tau_g_dec{pre, post} ...
-                            + ((params.G{pre, post} - g_state{pre, post}) .* pre_rate) ...
-                            ./ params.tau_g_fac{pre, post};
-                    else
-                        g_state{pre, post} = ones(npre, 0);
-                        g_derivatives{pre, post} = [];
-                    end
-                    depression = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
-                        depression, params, pre, post);
+                    R = route{pre, post};
+                    model = R.model;
+                    P = R.P;
+                    [ds, F] = model.rhs(reshape(S(R.idx), npre, P.ns), pre_rate, P);
+                    dS(R.idx) = ds;
                     post_idx = params.type_indices{post};
                     recurrent(post_idx) = recurrent(post_idx) + ...
-                        params.W(post_idx, pre_idx) * ...
-                        (facilitation .* depression .* pre_rate);
+                        params.W(post_idx, pre_idx) * (F .* pre_rate);
                 end
             end
-
-            derivatives = [a_derivatives, reshape(b_derivatives', 1, []), ...
-                reshape(g_derivatives', 1, []), {(-x + recurrent + u) ./ params.tau_d}];
-            for k = 1:numel(derivatives) - 1
-                derivatives{k} = derivatives{k}(:);
-            end
-            dS = vertcat(derivatives{:});
+            dS(layout.x) = (-x + recurrent + u) ./ params.tau_d;
         end
 
-        function b_used = apply_std_zero_floor_pair(b, params, pre, post)
-            b_used = b;
-            if ~params.std_zero_floor || params.n_b_pairs(pre, post) == 0
-                return;
-            end
-            p_min = SRNNCellTypePairs.std_zero_floor_pmin(params, pre, post);
-            b_used = (b - p_min) ./ (1 - p_min);
+        % The next three predate the route models and are kept for callers
+        % that name them. Each is a delegation to the route's model: the
+        % arithmetic is in route_product, and they apply to its routes only
+        % (every route today). dynamics_fast, compute_Jacobian_fast,
+        % jacobian_times and unpack_and_compute_states do not call them.
+
+        function D_used = apply_std_zero_floor_pair(D, params, pre, post)
+            % The zero floor's map of a depression factor D on route
+            % (pre, post); D unchanged when the floor is off or the route
+            % has no depression.
+            route = SRNNCellTypePairs.active_routes(params);
+            R = route{pre, post};
+            D_used = R.model.zero_floor(D, R.P);
         end
 
         function p_min = std_zero_floor_pmin(params, pre, post)
-            % The combined depression factor at r = 1 (the ceiling of the
-            % logistic), which the zero floor maps to 0. Under 'geomean' the
-            % floor applies to the combined factor, so p_min is combined the
-            % same way; under 'product' this is the historical expression.
-            p_min = prod(params.tau_b_rel{pre, post} ./ ...
-                (params.tau_b_rec{pre, post} + params.tau_b_rel{pre, post}));
-            p_min = SRNNCellTypePairs.combine_std_pair(p_min, params, pre, post);
+            % The depression factor of route (pre, post) at the steady state
+            % of r = 1, which the zero floor maps to 0: npre x 1, one value
+            % per presynaptic neuron; [] on a route without depression.
+            p_min = params.route{pre, post}.P.p_min;
         end
 
-        function [D, dD_dP] = combine_std_pair(P, params, pre, post)
-            %COMBINE_STD_PAIR The depression factor a route's theta uses.
+        function [D, dD_dP] = combine_std_pair(P_b, params, pre, post)
+            %COMBINE_STD_PAIR The depression factor of route (pre, post), before the floor.
             %
-            %   [D, dD_dP] = SRNNCellTypePairs.combine_std_pair(P, params, pre, post)
+            %   [D, dD_dP] = SRNNCellTypePairs.combine_std_pair(P_b, params, pre, post)
             %
-            % P is prod_m b_m over the route's M timescales (any shape). Under
-            % the default 'product' combine D = P and dD_dP = 1 (a scalar, so
-            % the Jacobian products stay bit-identical). Under 'geomean'
-            % (synapse_config.<pre>.<post>.std.combine) D = P^(1/M) and
-            % dD_dP = D / (M P); b_m > 0 always (db/dt = 1/tau_rec at b = 0),
-            % so P > 0. Every site that forms theta -- dynamics_fast,
-            % compute_Jacobian_fast, jacobian_times, unpack_and_compute_states
-            % -- goes through here, then through the zero floor.
-            D = P;
-            dD_dP = 1;
-            if ~isfield(params, 'std_geomean') || ~params.std_geomean(pre, post)
-                return;
-            end
-            M = params.n_b_pairs(pre, post);
-            if M <= 1
-                return;
-            end
-            D = P .^ (1 / M);
-            dD_dP = D ./ (M .* P);
+            % P_b is prod_m b_m over the route's M components (any shape).
+            % 'product' combine: D = P_b, dD_dP = 1. 'geomean'
+            % (synapse_config.<pre>.<post>.std.combine): D = P_b^(1/M),
+            % dD_dP = D / (M P_b).
+            R = params.route{pre, post};
+            [D, dD_dP] = R.model.combine(P_b, R.P);
         end
 
         function J = compute_Jacobian_fast(S, params)
+            % COMPUTE_JACOBIAN_FAST The sparse Jacobian of dynamics_fast at state S.
+            %
+            % Rows = which derivative, columns = which state. With phi' the
+            % activation's derivative, c_eff the SFA strength per timescale
+            % and, per route, the model's linearisation (route_model, linearize:
+            % A = d(ds)/ds, B = d(ds)/dr, F the output factor,
+            % Fs = dF/ds):
+            %   (a, a), (a, x)  the SFA ladder, below
+            %   (s, s)  A, per presynaptic neuron
+            %   (s, x)  B phi'             on the presynaptic neuron's x
+            %   (s, a)  -c_eff B phi'      on each of its SFA variables
+            %   (x, s)  W_block diag(r Fs(:, k)) / tau_d
+            %   (x, x)  -1/tau_d  +  W_block diag(F phi') / tau_d
+            %   (x, a)  -c_eff W_block diag(F phi') / tau_d
+            % because the rate is r = phi(x - c_eff sum_k a_k) and a route's
+            % synaptic output is theta = r F(s).
+            %
+            % ANY CHANGE HERE OR IN dynamics_fast MUST BE MIRRORED IN
+            % jacobian_times (see its header).
             C = params.n_cellTypes;
             layout = params.state_layout;
+            route = SRNNCellTypePairs.active_routes(params);
             n = params.n;
-            a = cell(1, C);
-            b_state = cell(C, C);
-            g_state = cell(C, C);
-            depression = cell(C, C);
-            facilitation = cell(C, C);
-            x = S(layout.x);
-            x_eff = x;
-
+            x_eff = S(layout.x);
             for q = 1:C
-                idx = params.type_indices{q}; nq = params.n_per_type(q);
                 if params.n_a(q) > 0
-                    a{q} = reshape(S(layout.a{q}), nq, params.n_a(q));
-                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
-                else
-                    a{q} = zeros(nq, 0);
+                    idx = params.type_indices{q};
+                    a = reshape(S(layout.a{q}), params.n_per_type(q), params.n_a(q));
+                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a, 2);
                 end
             end
 
@@ -2445,135 +2408,54 @@ classdef SRNNCellTypePairs < handle
                 pre_rate_prime = rate_prime(pre_idx);
                 na = params.n_a(pre);
                 row_a = layout.a{pre};
+                neuron = (1:npre)';
                 for post = 1:C
                     post_idx = params.type_indices{post};
-                    nb = params.n_b_pairs(pre, post);
-                    ng = params.n_g_pairs(pre, post);
-                    row_b = layout.b{pre, post};
-                    row_g = layout.g{pre, post};
-
-                    if nb > 0
-                        b_state{pre, post} = reshape( ...
-                            S(row_b), npre, nb);
-                        [depression{pre, post}, combine_gain] = ...
-                            SRNNCellTypePairs.combine_std_pair( ...
-                            prod(b_state{pre, post}, 2), params, pre, post);
-                    else
-                        b_state{pre, post} = ones(npre, 0);
-                        depression{pre, post} = ones(npre, 1);
-                    end
-                    if ng > 0
-                        g_state{pre, post} = reshape( ...
-                            S(row_g), npre, ng);
-                        facilitation{pre, post} = prod(g_state{pre, post}, 2);
-                    else
-                        g_state{pre, post} = ones(npre, 0);
-                        facilitation{pre, post} = ones(npre, 1);
-                    end
-                    depression_syn = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
-                        depression{pre, post}, params, pre, post);
-
-                    if nb > 0
-                        if na > 0
-                            coeff = b_state{pre, post} .* ...
-                                (params.c_eff(pre) .* pre_rate_prime ...
-                                ./ params.tau_b_rel{pre, post});
-                            stack = sparse(1:numel(row_b), ...
-                                repmat((1:npre)', nb, 1), coeff(:), ...
-                                numel(row_b), npre);
-                            J(row_b, row_a) = kron(sparse(ones(1, na)), stack);
-                        end
-                        tau_rel_stack = kron(params.tau_b_rel{pre, post}(:), ...
-                            ones(npre, 1));
-                        diagonal = kron(-1 ./ params.tau_b_rec{pre, post}(:), ...
-                            ones(npre, 1)) - repmat(pre_rate, nb, 1) ./ tau_rel_stack;
-                        J(row_b, row_b) = spdiags( ...
-                            diagonal, 0, numel(row_b), numel(row_b));
-                        vals = -(b_state{pre, post}(:) .* ...
-                            repmat(pre_rate_prime, nb, 1)) ./ tau_rel_stack;
-                        J(row_b, row_x) = sparse(1:numel(row_b), ...
-                            repmat(pre_idx(:), nb, 1), vals, numel(row_b), n);
-                    end
-
-                    if ng > 0
-                        if na > 0
-                            coeff = -(params.G{pre, post} - g_state{pre, post}) .* ...
-                                (params.c_eff(pre) .* pre_rate_prime ...
-                                ./ params.tau_g_fac{pre, post});
-                            stack = sparse(1:numel(row_g), ...
-                                repmat((1:npre)', ng, 1), coeff(:), ...
-                                numel(row_g), npre);
-                            J(row_g, row_a) = kron(sparse(ones(1, na)), stack);
-                        end
-                        tau_fac_stack = kron(params.tau_g_fac{pre, post}(:), ...
-                            ones(npre, 1));
-                        diagonal = kron(-1 ./ params.tau_g_dec{pre, post}(:), ...
-                            ones(npre, 1)) - repmat(pre_rate, ng, 1) ./ tau_fac_stack;
-                        J(row_g, row_g) = spdiags( ...
-                            diagonal, 0, numel(row_g), numel(row_g));
-                        G_stack = kron(params.G{pre, post}(:), ones(npre, 1));
-                        vals = ((G_stack - g_state{pre, post}(:)) .* ...
-                            repmat(pre_rate_prime, ng, 1)) ./ tau_fac_stack;
-                        J(row_g, row_x) = sparse(1:numel(row_g), ...
-                            repmat(pre_idx(:), ng, 1), vals, numel(row_g), n);
-                    end
-
+                    R = route{pre, post};
+                    model = R.model;
+                    P = R.P;
+                    ns = P.ns;
+                    row_s = R.idx;
+                    [A, B, F, Fs] = model.linearize(reshape(S(row_s), npre, ns), pre_rate, P);
                     W_block = params.W(post_idx, pre_idx);
-                    synaptic_modulation = facilitation{pre, post} .* depression_syn;
-                    rate_block = W_block * spdiags( ...
-                        synaptic_modulation .* pre_rate_prime, 0, npre, npre);
+
+                    if ns > 0
+                        % The route's rows are component-major: variable m of
+                        % neuron i is entry at(i, m) = (m - 1) npre + i of row_s.
+                        at = neuron + npre .* (0:ns - 1);                  % npre x ns
+                        n_s = npre * ns;
+
+                        % (s, s): entry (i, m, k) of A at row at(i, m),
+                        % column at(i, k).
+                        J(row_s, row_s) = sparse(repmat(at, 1, ns), repelem(at, 1, ns), ...
+                            reshape(A, npre, ns * ns), n_s, n_s);
+
+                        % (s, x) and (s, a): the rate's part, through phi'.
+                        to_x = B .* pre_rate_prime;                      % npre x ns
+                        J(row_s, row_x) = sparse(at(:), repmat(pre_idx(:), ns, 1), ...
+                            to_x(:), n_s, n);
+                        if na > 0
+                            stack = sparse(at(:), repmat(neuron, ns, 1), ...
+                                -params.c_eff(pre) .* to_x(:), n_s, npre);
+                            J(row_s, row_a) = kron(sparse(ones(1, na)), stack);
+                        end
+
+                        % (x, s): theta = r F, so d theta / d s_k = r dF/ds_k.
+                        to_theta = pre_rate .* Fs;                       % npre x ns
+                        D = sparse(repmat(neuron, ns, 1), at(:), to_theta(:), npre, n_s);
+                        J(row_x(post_idx), row_s) = (W_block * D) ./ params.tau_d;
+                    end
+
+                    % (x, x) and (x, a): d theta / d r = F, through phi'.
+                    rate_block = W_block * spdiags(F .* pre_rate_prime, 0, npre, npre);
                     J(row_x(post_idx), row_x(pre_idx)) = ...
                         J(row_x(post_idx), row_x(pre_idx)) + rate_block ./ params.tau_d;
-
                     if na > 0
                         replicate = kron(ones(1, na), speye(npre));
                         block = -params.c_eff(pre) .* rate_block;
                         J(row_x(post_idx), row_a) = ...
                             J(row_x(post_idx), row_a) + ...
                             (block * replicate) ./ params.tau_d;
-                    end
-                    if nb > 0
-                        product_derivative = zeros(npre, nb);
-                        for m = 1:nb
-                            other = [1:m-1, m+1:nb];
-                            if isempty(other)
-                                product_derivative(:, m) = 1;
-                            else
-                                product_derivative(:, m) = ...
-                                    prod(b_state{pre, post}(:, other), 2);
-                            end
-                        end
-                        gain = 1;
-                        if params.std_zero_floor
-                            p_min = SRNNCellTypePairs.std_zero_floor_pmin( ...
-                                params, pre, post);
-                            gain = 1 / (1 - p_min);
-                        end
-                        % chain rule through the combine (1 under 'product')
-                        gain = gain .* combine_gain;
-                        coeff = gain .* facilitation{pre, post} .* ...
-                            pre_rate .* product_derivative;
-                        D = sparse(repmat((1:npre)', nb, 1), ...
-                            1:numel(row_b), coeff(:), npre, numel(row_b));
-                        J(row_x(post_idx), row_b) = ...
-                            (W_block * D) ./ params.tau_d;
-                    end
-                    if ng > 0
-                        product_derivative = zeros(npre, ng);
-                        for k = 1:ng
-                            other = [1:k-1, k+1:ng];
-                            if isempty(other)
-                                product_derivative(:, k) = 1;
-                            else
-                                product_derivative(:, k) = ...
-                                    prod(g_state{pre, post}(:, other), 2);
-                            end
-                        end
-                        coeff = depression_syn .* pre_rate .* product_derivative;
-                        D = sparse(repmat((1:npre)', ng, 1), ...
-                            1:numel(row_g), coeff(:), npre, numel(row_g));
-                        J(row_x(post_idx), row_g) = ...
-                            (W_block * D) ./ params.tau_d;
                     end
                 end
             end
@@ -2600,40 +2482,46 @@ classdef SRNNCellTypePairs < handle
             %   test_SRNNCellTypePairs verifies the assembled Jacobian, and this
             %   routine inherits that verification only through the equality.
             %
-            %   Block structure (rows = which derivative, cols = which state):
-            %     a_k rows : tau_inv(k) * (-Ya_k + phi' .* Ye)
-            %     b_m rows : -(1/tau_rec + r/tau_rel) .* Yb_m - b_m phi'/tau_rel .* Ye_pre
-            %     g_k rows : -(1/tau_dec + r/tau_fac) .* Yg_k + (G-g_k) phi'/tau_fac .* Ye_pre
-            %     x   rows : (-Yx + sum over routes W_block * dtheta) / tau_d
-            %   where Ye = Yx(idx) - c_eff * sum_k Ya_k is the perturbation of
-            %   the effective input x_eff, phi' the activation derivative, and
-            %   dtheta the perturbation of the synaptic output r prod(b) prod(g)
-            %   (with the zero-floor gain and the geomean combine on the
-            %   depression factor).
+            %   WHAT IS MIRRORED, AND WHAT CANNOT DRIFT. The two functions read
+            %   a route through the same call, model.linearize(s, r, P)
+            %   (src/model/routes; route_model), which returns A = d(ds)/ds,
+            %   B = d(ds)/dr, the output factor F and Fs = dF/ds. A
+            %   route model's equations are therefore linearised in ONE place,
+            %   and a new model changes neither function. What each function
+            %   writes for itself, and what the test above compares, is how
+            %   those pieces and the SFA ladder enter the blocks.
+            %
+            %   Block structure (rows = which derivative, cols = which state),
+            %   with Ye = Yx(idx) - c_eff * sum_k Ya_k the perturbation of the
+            %   effective input x_eff, phi' the activation derivative and
+            %   dr = phi' .* Ye the perturbation of the rate:
+            %     a_k rows  : tau_inv(k) * (-Ya_k + dr)
+            %     s   rows  : A * Ys + B .* dr_pre       (per neuron of the route)
+            %     x   rows  : (-Yx + sum over routes W_block * dtheta) / tau_d
+            %   where Ys is the route's slice of Y and
+            %     dtheta = F .* dr_pre + r .* (Fs * Ys)
+            %   is the perturbation of the route's synaptic output theta = r F(s).
             %
             % See also: compute_Jacobian_fast, dynamics_fast, lyapunov_topk,
-            %           test_jacobian_times
+            %           route_model, test_jacobian_times
             C = params.n_cellTypes;
             layout = params.state_layout;
+            route = SRNNCellTypePairs.active_routes(params);
             K = size(Y, 2);
-            x = S(layout.x);
-            x_eff = x;
+            x_eff = S(layout.x);
             Yx = Y(layout.x, :);
 
-            a  = cell(1, C);
             Ya = cell(1, C);          % nq x na x K slices of Y
             Ye = cell(1, C);          % perturbation of x_eff, nq x K
             for q = 1:C
                 idx = params.type_indices{q}; nq = params.n_per_type(q);
                 na = params.n_a(q);
                 if na > 0
-                    a{q}  = reshape(S(layout.a{q}), nq, na);
+                    a = reshape(S(layout.a{q}), nq, na);
                     Ya{q} = reshape(Y(layout.a{q}, :), nq, na, K);
-                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
+                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a, 2);
                     Ye{q} = Yx(idx, :) - params.c_eff(q) .* reshape(sum(Ya{q}, 2), nq, K);
                 else
-                    a{q}  = zeros(nq, 0);
-                    Ya{q} = zeros(nq, 0, K);
                     Ye{q} = Yx(idx, :);
                 end
             end
@@ -2650,94 +2538,42 @@ classdef SRNNCellTypePairs < handle
                 dr = rate_prime(idx) .* Ye{q};                       % nq x K
                 Za = -Ya{q} + reshape(dr, nq, 1, K);                 % nq x na x K
                 Za = Za .* (1 ./ params.tau_a_matrix{q});            % per-neuron taus, nq x na
-                % (multiply by the reciprocal, as the assembled Jacobian does,
-                % so the two paths stay bit-identical)
+                % (multiply by the reciprocal, as the assembled Jacobian does)
                 Z(layout.a{q}, :) = reshape(Za, nq * na, K);
             end
 
-            % b, g and x rows, per route
+            % The routes' rows and the x rows
             Z(layout.x, :) = -Yx ./ params.tau_d;
             for pre = 1:C
                 pre_idx = params.type_indices{pre};
                 npre = params.n_per_type(pre);
                 pre_rate = rate(pre_idx);
-                pre_rate_prime = rate_prime(pre_idx);
-                dr_pre = pre_rate_prime .* Ye{pre};                  % npre x K
-                Ye_pre3 = reshape(Ye{pre}, npre, 1, K);
+                dr_pre = rate_prime(pre_idx) .* Ye{pre};             % npre x K
+                dr_pre3 = reshape(dr_pre, npre, 1, K);
                 for post = 1:C
                     post_idx = params.type_indices{post};
-                    nb = params.n_b_pairs(pre, post);
-                    ng = params.n_g_pairs(pre, post);
-                    row_b = layout.b{pre, post};
-                    row_g = layout.g{pre, post};
+                    R = route{pre, post};
+                    model = R.model;
+                    P = R.P;
+                    ns = P.ns;
+                    [A, B, F, Fs] = model.linearize(reshape(S(R.idx), npre, ns), pre_rate, P);
 
-                    depression = ones(npre, 1);
-                    facilitation = ones(npre, 1);
-                    dtheta_b = zeros(npre, K);
-                    dtheta_g = zeros(npre, K);
-
-                    if nb > 0
-                        b = reshape(S(row_b), npre, nb);
-                        Yb = reshape(Y(row_b, :), npre, nb, K);
-                        [depression, combine_gain] = SRNNCellTypePairs.combine_std_pair( ...
-                            prod(b, 2), params, pre, post);
-                        tau_rec = params.tau_b_rec{pre, post}(:);
-                        tau_rel = params.tau_b_rel{pre, post}(:);
-                        % db_m/dt = (1 - b_m)/tau_rec_m - b_m r/tau_rel_m
-                        diag_b = -(1 ./ tau_rec)' - pre_rate * (1 ./ tau_rel)';   % npre x nb
-                        coeff_b = -(b .* pre_rate_prime) ./ tau_rel';               % npre x nb
-                        Zb = diag_b .* Yb + coeff_b .* Ye_pre3;                     % npre x nb x K
-                        Z(row_b, :) = reshape(Zb, npre * nb, K);
-                        % d prod(b) = sum_m prod_{m' ~= m} b_m' * db_m
-                        product_derivative = zeros(npre, nb);
-                        for m = 1:nb
-                            other = [1:m-1, m+1:nb];
-                            if isempty(other)
-                                product_derivative(:, m) = 1;
-                            else
-                                product_derivative(:, m) = prod(b(:, other), 2);
-                            end
+                    dtheta = F .* dr_pre;                          % npre x K
+                    if ns > 0
+                        Ys = reshape(Y(R.idx, :), npre, ns, K);
+                        % Zs(i, m, :) = sum_k A(i, m, k) Ys(i, k, :) + B(i, m) dr(i, :).
+                        % Where the model states that A is diagonal, only
+                        % the diagonal is applied: the same sum without its
+                        % zero terms (ns products per neuron, not ns^2).
+                        if R.A_is_diagonal
+                            Zs = A(:, 1:ns + 1:ns * ns) .* Ys;
+                        else
+                            Zs = reshape(sum(A .* reshape(Ys, npre, 1, ns, K), 3), npre, ns, K);
                         end
-                        gain = 1;
-                        if params.std_zero_floor
-                            p_min = SRNNCellTypePairs.std_zero_floor_pmin(params, pre, post);
-                            gain = 1 / (1 - p_min);
-                        end
-                        % chain rule through the combine (1 under 'product')
-                        gain = gain .* combine_gain;
-                        dtheta_b = gain .* reshape(sum(product_derivative .* Yb, 2), npre, K);
+                        Zs = Zs + B .* dr_pre3;
+                        Z(R.idx, :) = reshape(Zs, npre * ns, K);
+                        dtheta = dtheta + pre_rate .* reshape(sum(Fs .* Ys, 2), npre, K);
                     end
-
-                    if ng > 0
-                        g = reshape(S(row_g), npre, ng);
-                        Yg = reshape(Y(row_g, :), npre, ng, K);
-                        facilitation = prod(g, 2);
-                        tau_dec = params.tau_g_dec{pre, post}(:);
-                        tau_fac = params.tau_g_fac{pre, post}(:);
-                        G = params.G{pre, post}(:);
-                        % dg_k/dt = (1 - g_k)/tau_dec_k + (G_k - g_k) r/tau_fac_k
-                        diag_g = -(1 ./ tau_dec)' - pre_rate * (1 ./ tau_fac)';   % npre x ng
-                        coeff_g = ((G' - g) .* pre_rate_prime) ./ tau_fac';         % npre x ng
-                        Zg = diag_g .* Yg + coeff_g .* Ye_pre3;                     % npre x ng x K
-                        Z(row_g, :) = reshape(Zg, npre * ng, K);
-                        product_derivative = zeros(npre, ng);
-                        for k = 1:ng
-                            other = [1:k-1, k+1:ng];
-                            if isempty(other)
-                                product_derivative(:, k) = 1;
-                            else
-                                product_derivative(:, k) = prod(g(:, other), 2);
-                            end
-                        end
-                        dtheta_g = reshape(sum(product_derivative .* Yg, 2), npre, K);
-                    end
-
-                    depression_syn = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
-                        depression, params, pre, post);
-                    % theta = r * prod(g) * floor(prod(b)); d theta by the product rule
-                    dtheta = (facilitation .* depression_syn) .* dr_pre ...
-                        + (facilitation .* pre_rate) .* dtheta_b ...
-                        + (depression_syn .* pre_rate) .* dtheta_g;
                     Z(layout.x(post_idx), :) = Z(layout.x(post_idx), :) + ...
                         (params.W(post_idx, pre_idx) * dtheta) ./ params.tau_d;
                 end
@@ -3122,6 +2958,7 @@ classdef SRNNCellTypePairs < handle
                 unpack_and_compute_states(S_out, params)
             nt = size(S_out, 1);
             layout = params.state_layout;
+            route = SRNNCellTypePairs.active_routes(params);
             x_all = S_out(:, layout.x)';
             x_eff = x_all;
             a_named = struct(); b_named = struct(); g_named = struct();
@@ -3150,31 +2987,23 @@ classdef SRNNCellTypePairs < handle
                 synaptic_output_named.(pre_name) = struct();
                 for post = 1:params.n_cellTypes
                     post_name = params.cell_type_names{post};
-                    nb = params.n_b_pairs(pre, post);
-                    ng = params.n_g_pairs(pre, post);
-                    depression = ones(npre, nt);
-                    facilitation = ones(npre, nt);
-                    if nb > 0
-                        bq = reshape(S_out(:, layout.b{pre, post})', ...
-                            npre, nb, nt);
-                        depression = SRNNCellTypePairs.combine_std_pair( ...
-                            reshape(prod(bq, 2), npre, nt), params, pre, post);
-                        b_named.(pre_name).(post_name) = bq;
-                    else
-                        b_named.(pre_name).(post_name) = [];
+                    R = route{pre, post};
+                    P = R.P;
+                    % The route's state at every time, npre x ns x nt. Its
+                    % first P.n_b columns are the route's b-block and the
+                    % rest its g-block; either is [] when the route has none.
+                    s = reshape(S_out(:, R.idx)', npre, P.ns, nt);
+                    b_named.(pre_name).(post_name) = [];
+                    g_named.(pre_name).(post_name) = [];
+                    if P.n_b > 0
+                        b_named.(pre_name).(post_name) = s(:, 1:P.n_b, :);
                     end
-                    if ng > 0
-                        gq = reshape(S_out(:, layout.g{pre, post})', ...
-                            npre, ng, nt);
-                        facilitation = reshape(prod(gq, 2), npre, nt);
-                        g_named.(pre_name).(post_name) = gq;
-                    else
-                        g_named.(pre_name).(post_name) = [];
+                    if P.n_g > 0
+                        g_named.(pre_name).(post_name) = s(:, P.n_b + 1:end, :);
                     end
-                    depression = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
-                        depression, params, pre, post);
+                    % Synaptic output = the model's output factor times the rate.
                     synaptic_output_named.(pre_name).(post_name) = ...
-                        facilitation .* depression .* rate(pre_idx, :);
+                        reshape(R.model.output(s, P), npre, nt) .* rate(pre_idx, :);
                 end
             end
             x_named = SRNNCellTypePairs.split_by_type(x_all, params, 1);
