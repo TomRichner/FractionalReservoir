@@ -19,66 +19,43 @@ function name = full_adaptation_condition(conditions)
 %   sfa3_std1        default, overconnected, bursting_pairs
 %   sfa1_std1_stf1   single_neuron_stf
 %   sfa3_std0        sompolinsky_pairs (no routes at all)
+%   sfa3_stdc2       the mu7chain bundle (chained vesicle-pool depression),
+%                    which ALSO carries sfa3_std2 and must return the chain
 %
-% Four names for one role, so a literal cannot be right everywhere and this
+% Five names for one role, so a literal cannot be right everywhere and this
 % lookup is what keeps the callers correct for presets that do not exist yet.
 %
-% HOW. Parses each name as sfa<X>_std<Y> with an optional _stf<Z> and returns the
-% one with the greatest X+Y+Z; ties break on the larger X. Names that do not
-% match -- 'no_adaptation', or anything a future preset invents -- are ignored,
-% which is what keeps the paper's naming convention from becoming a requirement.
-% test_preset_conditions checks that a name matching the pattern tells the truth
-% about its counts, so the arithmetic here is on values that have been verified.
+% HOW. Parses each name as sfa<X>_std<Y>, sfa<X>_std<Y>_stf<Z> or
+% sfa<X>_stdc<Y> (three exact patterns; MATLAB's regexp drops the token of a
+% trailing optional group, so optional groups cannot be used) and returns the
+% one with the greatest X+Y+Z; ties break on the larger X, and then a CHAIN
+% (stdc) wins over a product by an explicit rule, not by its place in the
+% preset. Names that do not match -- 'no_adaptation', or anything a future
+% preset invents -- are ignored, which is what keeps the paper's naming
+% convention from becoming a requirement. test_preset_conditions checks that a
+% name matching a pattern tells the truth about its counts, so the arithmetic
+% here is on values that have been verified.
+%
+% WHAT WENT WRONG BEFORE THE THIRD PATTERN (2026-11-12, FD-007). With only the
+% two product patterns, sfa3_stdc2 matched neither and was skipped: given the
+% paper's three conditions (no_adaptation, sfa1_std1, sfa3_stdc2) this
+% returned sfa1_std1, the SINGLE-timescale regime, with no error.
+%
+% The ranking lives in full_adaptation_conditions (plural), which returns
+% every condition tied at the top, chain first; this returns the first of
+% them.
 %
 % Errors, naming every condition, if nothing matches: a preset with no
 % conforming name has no answer to give, and guessing (the last condition, say)
 % would silently hand back whatever happened to be listed last.
 %
-% See also: srnn_param_preset, build_from_preset, srnn_condition_titles
+% See also: full_adaptation_conditions, srnn_param_preset, build_from_preset,
+%           srnn_condition_titles
 
 arguments
     conditions (1,:) cell
 end
 
-best = -1; best_sfa = -1; name = '';
-names = cell(1, numel(conditions));
-for i = 1:numel(conditions)
-    names{i} = conditions{i}.name;
-    counts = parse_condition_name(names{i});
-    if isempty(counts); continue; end
-    total = sum(counts);
-    if total > best || (total == best && counts(1) > best_sfa)
-        best = total; best_sfa = counts(1); name = names{i};
-    end
-end
-
-if isempty(name)
-    error('full_adaptation_condition:NoneMatch', ...
-        ['No condition name matches sfa<X>_std<Y>[_stf<Z>], so none can be ' ...
-         'identified as the fully-adapted regime.\n  Found: %s\n\n' ...
-         'Pass the condition name explicitly if this preset uses a different ' ...
-         'naming convention.'], strjoin(names, ', '));
-end
-end
-
-%% ------------------------------------------------------------------------
-function counts = parse_condition_name(name)
-% [n_sfa n_std n_stf] for a conforming name, [] otherwise.
-%
-% TWO PATTERNS, EACH FULLY MANDATORY, rather than one with an optional
-% (?:_stf(\d+))? group. MATLAB's regexp does NOT return a token for a trailing
-% optional group even when it matches: 'sfa1_std1_stf1' against that pattern
-% yields two tokens, not three, and the facilitation count silently reads as
-% zero. Named tokens behave the same way (the field is simply absent). Verified
-% both. Two exact patterns cannot express that failure.
-counts = [];
-t3 = regexp(name, '^sfa(\d+)_std(\d+)_stf(\d+)$', 'tokens', 'once');
-if ~isempty(t3)
-    counts = cellfun(@str2double, t3);
-    return
-end
-t2 = regexp(name, '^sfa(\d+)_std(\d+)$', 'tokens', 'once');
-if ~isempty(t2)
-    counts = [cellfun(@str2double, t2), 0];
-end
+names = full_adaptation_conditions(conditions);
+name = names{1};
 end

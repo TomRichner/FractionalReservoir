@@ -1255,6 +1255,150 @@ switch name
             struct('name','sfa1_std0','tau_a',{on},'synapse_config',struct()), ...
             struct('name','sfa0_std1','tau_a',{off},'synapse_config',sc)};
 
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain'
+        % THE mu7chain BUNDLE'S NETWORK (2026-11-12, FD-007, Plan A step 3).
+        % Belongs to scripts/paper/mu7chain_config.
+        %
+        % THE NAME STATES A DEPRESSION SPREAD THIS CASE DOES NOT SET YET.
+        % 'stdSpread0p25' means std_spread = [0.25 0.25] (per-neuron log-normal
+        % jitter of the depression time constants and n2, shared draws across
+        % the three adapting conditions; Plan A section 4.3). The property
+        % arrives with FD-015 and does not exist on SRNNCellTypePairs today, so
+        % setting it here would fail validation. The lead adds it to THIS struct
+        % when FD-015 lands; until then the preset runs with no depression
+        % spread, and a run made before that is not the network the name says.
+        %
+        % The network is the manuscript's baseline (..._3cond_mu7revisedMedium),
+        % value for value: n = 500, mu_tilde_relative 7 on every route, SFA on
+        % both cell types with per-neuron ladders (tau_a_spread 0.25), per-neuron
+        % setpoints S_c_i = 0.2 + 0.1 randn, no external input, Wiener noise
+        % 0.025. Written out in full rather than chained, because a preset may
+        % chain only within its own config's bundle. The three presets below
+        % chain to THIS one and belong to the same bundle.
+        %
+        % FOUR CONDITIONS, every analysis runs all four; the paper shows the
+        % first three (Plan A section 1):
+        %   no_adaptation  nothing
+        %   sfa1_std1      1TS: one SFA timescale, one depression pool
+        %                  (tau_rec 2, tau_rel 0.25), no reserve variable
+        %   sfa3_stdc2     chained MTS, the paper's MTS: three SFA timescales,
+        %                  the chained vesicle pool (releasable pool refilled
+        %                  from a reserve; tau_rec [2 5], tau_rel 0.25, n2 2)
+        %   sfa3_std2      product MTS, kept for the side-by-side: three SFA
+        %                  timescales, the product of two independent pools
+        %                  (tau_rec [2 4], tau_rel [0.25 0.5]), as in the
+        %                  mu7revisedMedium preset
+        % All four routes carry the depression in each adapting condition. The
+        % chain's releasable pool has the 1TS pool's constants, so the
+        % releasable-pool equation is identical in sfa1_std1 and sfa3_stdc2.
+        model_class = 'SRNNCellTypePairs';
+        d = struct( ...
+            'n',                    500, ...
+            'indegree',             100, ...
+            'n_cellTypes',          2, ...
+            'cell_type_names',      {{'E', 'I'}}, ...
+            'f',                    [0.5 0.5], ...
+            'mu_tilde_relative',    [7 -7; 7 -7], ...     % (post <- pre), multiples of F
+            'sigma_tilde_relative', [1.5 1.5; 1.5 1.5], ...     % multiples of F
+            'level_of_chaos',       1.0, ...
+            'activation',           'piecewise', ...
+            'S_a',                  0.8, ...
+            'S_c',                  0.20, ...    % centre of the per-neuron draw
+            'mu_S_c',               [], ...      % empty: centre on S_c
+            'sigma_S_c',            [0.1 0.1], ... % per-neuron spread, both types
+            'c',                    [0.5, 0.5], ...     % TOTAL SFA budget, E AND I
+            'tau_a_spread',         [0.25 0.25], ...    % per-neuron SFA ladders
+            'input_config',         struct('n_steps', 3, 'step_density', struct(), 'amp', 0.5, ...
+                                           'no_stim_pattern', true(1, 3), 'intrinsic_drive', 0, ...
+                                           'positive_only', false), ...
+            'F_tracks_network',     false, ...
+            'F_ref_n',              500, ...
+            'F_ref_indegree',       100, ...
+            'sigma_u_noise',        0.025);
+
+        % Same ladder on both types; the single-timescale regime takes the first
+        % entry on both.
+        taus     = log_ladder(0.25, 10, 3);
+        sfa_off  = {zeros(1,0), zeros(1,0)};
+        sfa_one  = {taus(1),    taus(1)};
+        sfa_all  = {taus,       taus};
+
+        % The three depression forms. single_std is the chain's releasable pool
+        % and the product's first component alike (tau_rec 2, tau_rel 0.25).
+        single_std = struct('tau_rec', 2, 'tau_rel', 0.25);
+        chain_std  = struct('model', 'chain', ...
+                            'tau_rec', [single_std.tau_rec 5], ... % [releasable refill, reserve refill]
+                            'tau_rel', single_std.tau_rel, ...     % only the releasable pool releases
+                            'n2',      2);                         % reserve / releasable capacity
+        prod_std   = struct('tau_rec', [single_std.tau_rec 4], ...
+                            'tau_rel', [single_std.tau_rel 0.5]);
+        std_one = struct();
+        std_one.E.E.std = single_std;   std_one.E.I.std = single_std;
+        std_one.I.E.std = single_std;   std_one.I.I.std = single_std;
+        std_chain = struct();
+        std_chain.E.E.std = chain_std;  std_chain.E.I.std = chain_std;
+        std_chain.I.E.std = chain_std;  std_chain.I.I.std = chain_std;
+        std_prod = struct();
+        std_prod.E.E.std = prod_std;    std_prod.E.I.std = prod_std;
+        std_prod.I.E.std = prod_std;    std_prod.I.I.std = prod_std;
+        std_off = struct();
+
+        conditions = { ...
+            struct('name','no_adaptation', 'tau_a',{sfa_off}, 'synapse_config',std_off), ...
+            struct('name','sfa1_std1',     'tau_a',{sfa_one}, 'synapse_config',std_one), ...
+            struct('name','sfa3_stdc2',    'tau_a',{sfa_all}, 'synapse_config',std_chain), ...
+            struct('name','sfa3_std2',     'tau_a',{sfa_all}, 'synapse_config',std_prod) };
+
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain'
+        % Memory-capacity twin of the mu7chain preset: Wiener process off (the
+        % config names sra1 as the MC integrator). Same bundle (mu7chain_config),
+        % chained under the within-bundle rule.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain');
+        d.sigma_u_noise = 0;
+
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain'
+        % Stimulus-staircase twin of the mu7chain preset for run_local_lyapunov:
+        % a new random step every 5 s that never returns to zero (8 steps over
+        % the stage's T = 40 s, each a fresh amp*randn on 20% of each cell
+        % type), as in the mu7revisedMedium bundle's steps5s twin. Same bundle.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain');
+        d.input_config = struct('n_steps', 8, 'step_density', struct(), 'amp', 0.5, ...
+            'no_stim_pattern', false(1, 8), 'intrinsic_drive', 0, 'positive_only', false);
+
+    case 'single_neuron_mu7chain'
+        % Within the mu7chain bundle: one reference E neuron without recurrence,
+        % noise or heterogeneity, isolating one mechanism per condition. The
+        % mu7revisedMedium single-neuron preset's three conditions, plus the
+        % chain alone as the fourth (Plan A 4.4, Tom's decisions on the
+        % inventory: every three-condition figure gets a four-condition
+        % version, the single-neuron figure included):
+        %   no_adaptation, sfa1_std0 (one SFA timescale), sfa0_std1 (one
+        %   depression pool), sfa0_stdc2 (the chained pool, no SFA).
+        % Conditions are taken from the parent BY NAME, not by position, so a
+        % reordering of the parent cannot silently swap mechanisms here.
+        [d, model_class, ref] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain');
+        d.n=1; d.indegree=1; d.n_cellTypes=1; d.cell_type_names={'E'};
+        d.f=1; d.mu_tilde_relative=0; d.sigma_tilde_relative=0;
+        d.c=d.c(1); d.sigma_S_c=0; d.tau_a_spread=0;
+        % No heterogeneity: once FD-015 gives the parent std_spread, it is
+        % switched off here like every other spread.
+        if isfield(d, 'std_spread'); d.std_spread = 0; end
+        d.sigma_u_noise=0; d.x0_std=0;
+        ref_names = cellfun(@(c) c.name, ref, 'UniformOutput', false);
+        one   = ref{strcmp(ref_names, 'sfa1_std1')};
+        chain = ref{strcmp(ref_names, 'sfa3_stdc2')};
+        off = {zeros(1,0)}; on = one.tau_a(1);   % E's single SFA timescale
+        sc_one   = struct(); sc_one.E.E.std   = one.synapse_config.E.E.std;
+        sc_chain = struct(); sc_chain.E.E.std = chain.synapse_config.E.E.std;
+        conditions={ ...
+            struct('name','no_adaptation','tau_a',{off},'synapse_config',struct()), ...
+            struct('name','sfa1_std0',    'tau_a',{on}, 'synapse_config',struct()), ...
+            struct('name','sfa0_std1',    'tau_a',{off},'synapse_config',sc_one), ...
+            struct('name','sfa0_stdc2',   'tau_a',{off},'synapse_config',sc_chain)};
+
     case 'regression_pairs_noStim_noise0p025_dualStd_3cond'
         % THE REGRESSION BUNDLE'S NETWORK (2026-11-10, FD-002): the manuscript
         % network (..._3cond_mu7revisedMedium) at ONE FIFTH THE SIZE, so the
@@ -1964,7 +2108,12 @@ names = {'default', 'overconnected', ...
     'single_neuron_regression', ...
     ... % the tolerance tier's stable networks (regression_tol_run), same bundle
     'regression_stable_steps_noise0p025_dualStd_3cond', ...
-    'regression_stable_steps_noise0_dualStd_3cond'};
+    'regression_stable_steps_noise0_dualStd_3cond', ...
+    ... % the mu7chain bundle (mu7chain_config): chained vesicle-pool depression, FD-007
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain', ...
+    'single_neuron_mu7chain'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)
