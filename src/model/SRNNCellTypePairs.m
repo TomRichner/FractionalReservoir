@@ -902,7 +902,15 @@ classdef SRNNCellTypePairs < handle
             % max(1, .) guards K = 0, where there are no a-states at all and the
             % term is absent anyway. (min(1, .) would not: min(1,0) is 0.)
             params.c_eff = obj.c ./ max(1, obj.n_a);
-            pair = obj.compile_synapse_config();
+            % THE ROUTES. params.route (filled in below, once the layout is
+            % known) is what the dynamics, both Jacobians and the unpacking
+            % evaluate: per route its model, the model's per-neuron
+            % parameters P and the route's rows of the state vector. The
+            % fields that follow here are the NOMINAL values of the same
+            % routes, kept under the names code outside the class reads
+            % (SRNN_ESN_reservoir, route_fields, figures, tests). Nothing
+            % in the class computes with them.
+            pair = obj.compile_synapse_config(obj.n_per_type);
             params.n_b_pairs = pair.n_b;
             params.tau_b_rec = pair.tau_b_rec;
             params.tau_b_rel = pair.tau_b_rel;
@@ -923,6 +931,16 @@ classdef SRNNCellTypePairs < handle
             params.N_sys_eqs = obj.N_sys_eqs;
             params.state_layout = SRNNCellTypePairs.make_state_layout( ...
                 obj.n, obj.n_per_type, obj.n_a, pair.n_b, pair.n_g);
+            % A route's state is its b-block followed by its g-block. The two
+            % are not adjacent in the state vector (every route's b-block
+            % comes before any g-block), so the route carries an index list.
+            params.route = pair.route;
+            for pre = 1:obj.n_cellTypes
+                for post = 1:obj.n_cellTypes
+                    params.route(pre, post).idx = [params.state_layout.b{pre, post}, ...
+                        params.state_layout.g{pre, post}];
+                end
+            end
             params.rng_seeds = obj.rng_seeds;
             if ~isempty(obj.W)
                 % params.W is what the dynamics, both Jacobians and jacobian_times
@@ -1346,138 +1364,115 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
-        function pair = compile_synapse_config(obj)
-            %COMPILE_SYNAPSE_CONFIG Validate named routes and expand scalars.
+        function pair = compile_synapse_config(obj, counts)
+            %COMPILE_SYNAPSE_CONFIG Validate named routes and compile each one's model.
+            %
+            %   pair = obj.compile_synapse_config()          nominal parameters only
+            %   pair = obj.compile_synapse_config(counts)    per-neuron parameters,
+            %                                                counts(pre) rows each
+            %
+            % The class checks the shape of synapse_config and the route's
+            % scale. Everything inside a route's `std` and `stf` belongs to
+            % the route's model (src/model/routes; see route_model), whose
+            % compile validates it and returns the route's parameters P.
+            %
+            % pair.route is the C x C (pre, post) struct array compile_route
+            % returns (model, P, cfg, opts). The other fields are the nominal
+            % values that code outside the model reads, under the names they
+            % have always had (n_b, n_g, tau_b_rec, ..., scale).
             C = obj.n_cellTypes;
+            if nargin < 2, counts = ones(1, C); end
+            names = obj.cell_type_names;
             pair = struct( ...
                 'n_b', zeros(C, C), 'n_g', zeros(C, C), ...
                 'tau_b_rec', {cell(C, C)}, 'tau_b_rel', {cell(C, C)}, ...
                 'tau_g_dec', {cell(C, C)}, 'tau_g_fac', {cell(C, C)}, ...
                 'G', {cell(C, C)}, 'scale', ones(C, C), ...
-                'std_geomean', false(C, C));
-            config = obj.synapse_config;
-            if isempty(config), return; end
-            if ~isstruct(config) || ~isscalar(config)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'synapse_config must be a scalar named struct.');
-            end
+                'std_geomean', false(C, C), 'route', []);
 
-            names = obj.cell_type_names;
-            unknown_pre = setdiff(fieldnames(config), names);
-            if ~isempty(unknown_pre)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'Unknown presynaptic type: %s.', unknown_pre{1});
+            config = obj.synapse_config;
+            if ~isempty(config)
+                if ~isstruct(config) || ~isscalar(config)
+                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                        'synapse_config must be a scalar named struct.');
+                end
+                unknown_pre = setdiff(fieldnames(config), names);
+                if ~isempty(unknown_pre)
+                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                        'Unknown presynaptic type: %s.', unknown_pre{1});
+                end
             end
             for pre = 1:C
                 pre_name = names{pre};
-                if ~isfield(config, pre_name), continue; end
-                targets = config.(pre_name);
-                if ~isstruct(targets) || ~isscalar(targets)
-                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                        'synapse_config.%s must be a scalar struct.', pre_name);
-                end
-                unknown_post = setdiff(fieldnames(targets), names);
-                if ~isempty(unknown_post)
-                    error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                        'Unknown postsynaptic type on %s route: %s.', ...
-                        pre_name, unknown_post{1});
+                targets = struct();
+                if ~isempty(config) && isfield(config, pre_name)
+                    targets = config.(pre_name);
+                    if ~isstruct(targets) || ~isscalar(targets)
+                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                            'synapse_config.%s must be a scalar struct.', pre_name);
+                    end
+                    unknown_post = setdiff(fieldnames(targets), names);
+                    if ~isempty(unknown_post)
+                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
+                            'Unknown postsynaptic type on %s route: %s.', ...
+                            pre_name, unknown_post{1});
+                    end
                 end
                 for post = 1:C
                     post_name = names{post};
-                    if ~isfield(targets, post_name), continue; end
-                    route = targets.(post_name);
-                    if isempty(route), continue; end
-                    if ~isstruct(route) || ~isscalar(route)
-                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                            'Route %s->%s must be a scalar struct.', pre_name, post_name);
-                    end
-                    unknown_mechanism = setdiff(fieldnames(route), {'std', 'stf', 'scale'});
-                    if ~isempty(unknown_mechanism)
-                        error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                            'Unknown field on route %s->%s: %s.', ...
-                            pre_name, post_name, unknown_mechanism{1});
-                    end
-
-                    % Route SCALE (2026-09-14): a positive scalar multiplying
-                    % the route's weights, W(post, pre) * scale, applied in
-                    % get_params to params.W only (obj.W stays the drawn matrix).
-                    % It exists to match the steady-state synaptic output of a
-                    % two-timescale STD route to a one-timescale one at a
-                    % reference rate; see the dualStdScaled presets. Default 1.
-                    if isfield(route, 'scale') && ~isempty(route.scale)
-                        sc = route.scale;
-                        if ~(isnumeric(sc) && isscalar(sc) && isfinite(sc) && sc > 0)
+                    cfg = struct('std', [], 'stf', []);
+                    if isfield(targets, post_name) && ~isempty(targets.(post_name))
+                        route = targets.(post_name);
+                        if ~isstruct(route) || ~isscalar(route)
                             error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                'Route %s->%s scale must be a positive finite scalar.', ...
-                                pre_name, post_name);
+                                'Route %s->%s must be a scalar struct.', pre_name, post_name);
                         end
-                        pair.scale(pre, post) = double(sc);
-                    end
-
-                    if isfield(route, 'std') && ~isempty(route.std) && ...
-                            ~(isstruct(route.std) && isempty(fieldnames(route.std)))
-                        std_config = route.std;
-                        SRNNCellTypePairs.validate_fields(std_config, ...
-                            {'tau_rec', 'tau_rel'}, pre_name, post_name, 'std', ...
-                            {'combine'});
-                        tau_rec = SRNNCellTypePairs.positive_row(std_config.tau_rec, ...
-                            'tau_rec', pre_name, post_name);
-                        if isempty(tau_rec)
+                        unknown_mechanism = setdiff(fieldnames(route), {'std', 'stf', 'scale'});
+                        if ~isempty(unknown_mechanism)
                             error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                'STD tau_rec must be nonempty on route %s->%s.', ...
-                                pre_name, post_name);
+                                'Unknown field on route %s->%s: %s.', ...
+                                pre_name, post_name, unknown_mechanism{1});
                         end
-                        tau_rel = SRNNCellTypePairs.expand_pair_parameter( ...
-                            std_config.tau_rel, numel(tau_rec), 'tau_rel', ...
-                            pre_name, post_name, false);
-                        pair.n_b(pre, post) = numel(tau_rec);
-                        pair.tau_b_rec{pre, post} = tau_rec;
-                        pair.tau_b_rel{pre, post} = tau_rel;
 
-                        % STD COMBINE (2026-09-24, opt-in): how the route's M
-                        % depression factors enter theta. 'product' (DEFAULT,
-                        % bit-identical to before) is prod_m b_m; 'geomean' is
-                        % (prod_m b_m)^(1/M). With every pair at one rho =
-                        % tau_rel/tau_rec the geomean steady state is the
-                        % one-timescale 1/(1 + r/rho) at EVERY constant rate --
-                        % the depression analogue of SFA's c/K (the product
-                        % squares it at M = 2). Ported from train-srnn's
-                        % geometric-mean STD matching; see combine_std_pair.
-                        if isfield(std_config, 'combine') && ~isempty(std_config.combine)
-                            combine_mode = std_config.combine;
-                            if ~((ischar(combine_mode) && isrow(combine_mode)) || (isstring(combine_mode) && isscalar(combine_mode))) || ...
-                                    ~any(strcmp(char(combine_mode), {'product', 'geomean'}))
+                        % Route SCALE (2026-09-14): a positive scalar multiplying
+                        % the route's weights, W(post, pre) * scale, applied in
+                        % get_params to params.W only (obj.W stays the drawn matrix).
+                        % It exists to match the steady-state synaptic output of a
+                        % two-timescale STD route to a one-timescale one at a
+                        % reference rate; see the dualStdScaled presets. Default 1.
+                        % It acts on the weights, so it belongs to the class and
+                        % is the same whatever the route's model.
+                        if isfield(route, 'scale') && ~isempty(route.scale)
+                            sc = route.scale;
+                            if ~(isnumeric(sc) && isscalar(sc) && isfinite(sc) && sc > 0)
                                 error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                    'STD combine on route %s->%s must be ''product'' or ''geomean''.', ...
+                                    'Route %s->%s scale must be a positive finite scalar.', ...
                                     pre_name, post_name);
                             end
-                            pair.std_geomean(pre, post) = strcmp(char(combine_mode), 'geomean');
+                            pair.scale(pre, post) = double(sc);
                         end
+                        if isfield(route, 'std'), cfg.std = route.std; end
+                        if isfield(route, 'stf'), cfg.stf = route.stf; end
                     end
 
-                    if isfield(route, 'stf') && ~isempty(route.stf) && ...
-                            ~(isstruct(route.stf) && isempty(fieldnames(route.stf)))
-                        stf_config = route.stf;
-                        SRNNCellTypePairs.validate_fields(stf_config, ...
-                            {'tau_dec', 'tau_fac', 'G'}, pre_name, post_name, 'stf');
-                        tau_dec = SRNNCellTypePairs.positive_row(stf_config.tau_dec, ...
-                            'tau_dec', pre_name, post_name);
-                        if isempty(tau_dec)
-                            error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                                'STF tau_dec must be nonempty on route %s->%s.', ...
-                                pre_name, post_name);
-                        end
-                        tau_fac = SRNNCellTypePairs.expand_pair_parameter( ...
-                            stf_config.tau_fac, numel(tau_dec), 'tau_fac', ...
-                            pre_name, post_name, false);
-                        G = SRNNCellTypePairs.expand_pair_parameter( ...
-                            stf_config.G, numel(tau_dec), 'G', ...
-                            pre_name, post_name, true);
-                        pair.n_g(pre, post) = numel(tau_dec);
-                        pair.tau_g_dec{pre, post} = tau_dec;
-                        pair.tau_g_fac{pre, post} = tau_fac;
-                        pair.G{pre, post} = G;
+                    compiled = SRNNCellTypePairs.compile_route(cfg, struct( ...
+                        'npre', counts(pre), 'zero_floor', obj.std_zero_floor, ...
+                        'label', [pre_name '->' post_name], ...
+                        'err_id_prefix', 'SRNNCellTypePairs'));
+                    if isempty(pair.route)
+                        pair.route = repmat(compiled, C, C);
                     end
+                    pair.route(pre, post) = compiled;
+
+                    nominal = compiled.P.nominal;
+                    pair.n_b(pre, post) = compiled.P.n_b;
+                    pair.n_g(pre, post) = compiled.P.n_g;
+                    pair.tau_b_rec{pre, post} = nominal.tau_rec;
+                    pair.tau_b_rel{pre, post} = nominal.tau_rel;
+                    pair.std_geomean(pre, post) = strcmp(nominal.combine, 'geomean');
+                    pair.tau_g_dec{pre, post} = nominal.tau_dec;
+                    pair.tau_g_fac{pre, post} = nominal.tau_fac;
+                    pair.G{pre, post} = nominal.G;
                 end
             end
         end
@@ -2135,83 +2130,67 @@ classdef SRNNCellTypePairs < handle
         end
 
         function S0 = initialize_state(params)
-            C = params.n_cellTypes;
-            parts = cell(1, C + 2 * C * C + 1);
-            cursor = 0;
-            for q = 1:params.n_cellTypes
-                cursor = cursor + 1;
-                parts{cursor} = zeros(params.n_per_type(q) * params.n_a(q), 1);
-            end
-            for pre = 1:C
-                for post = 1:C
-                    cursor = cursor + 1;
-                    parts{cursor} = ones(params.n_per_type(pre) * ...
-                        params.n_b_pairs(pre, post), 1);
+            % Adaptation starts at 0, every route's state at the values its
+            % model states (route_model: initial), and x is drawn.
+            layout = params.state_layout;
+            S0 = zeros(layout.N, 1);
+            for pre = 1:params.n_cellTypes
+                for post = 1:params.n_cellTypes
+                    route = params.route(pre, post);
+                    start = repmat(route.model.initial(route.P), params.n_per_type(pre), 1);
+                    S0(route.idx) = start(:);
                 end
             end
-            for pre = 1:C
-                for post = 1:C
-                    cursor = cursor + 1;
-                    parts{cursor} = ones(params.n_per_type(pre) * ...
-                        params.n_g_pairs(pre, post), 1);
-                end
-            end
-            parts{end} = params.x0_std .* randn(params.n, 1);
-            S0 = vertcat(parts{:});
+            S0(layout.x) = params.x0_std .* randn(params.n, 1);
         end
 
-        function validate_fields(config, required, pre_name, post_name, mechanism, optional)
-            if nargin < 6, optional = {}; end
-            if ~isstruct(config) || ~isscalar(config)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s configuration on route %s->%s must be a scalar struct.', ...
-                    upper(mechanism), pre_name, post_name);
-            end
-            fields = fieldnames(config);
-            missing = setdiff(required, fields);
-            unknown = setdiff(fields, [required, optional]);
-            if ~isempty(missing)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'Missing %s field on route %s->%s: %s.', ...
-                    upper(mechanism), pre_name, post_name, missing{1});
-            end
-            if ~isempty(unknown)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'Unknown %s field on route %s->%s: %s.', ...
-                    upper(mechanism), pre_name, post_name, unknown{1});
-            end
+        function route = compile_route(cfg, opts)
+            %COMPILE_ROUTE One entry of the route table: a route's model and parameters.
+            %
+            %   route = SRNNCellTypePairs.compile_route(cfg, opts)
+            %
+            % cfg.std and cfg.stf are the route's configuration ([] when
+            % absent); opts goes to the model's compile (npre, zero_floor,
+            % label, err_id_prefix). Returns
+            %   model  the route model (route_model), a struct of handles
+            %   P      model.compile(cfg.std, cfg.stf, opts)
+            %   cfg, opts   as given, so the route can be compiled again
+            %   idx    the route's rows of the state vector, filled in by
+            %          get_params: [layout.b{pre, post}, layout.g{pre, post}],
+            %          so that reshape(S(idx), npre, P.ns) is the route's state
+            %
+            % THE MODEL'S NAME IS RESOLVED HERE AND NOWHERE ELSE in the class.
+            % Every route is 'product' today: the configuration has no field
+            % that names another model.
+            model = route_model('product');
+            route = struct('model', model, 'P', model.compile(cfg.std, cfg.stf, opts), ...
+                'cfg', cfg, 'opts', opts, 'idx', []);
         end
 
-        function value = positive_row(value, field_name, pre_name, post_name)
-            if ~isnumeric(value) || ~isvector(value) || ...
-                    any(~isfinite(value)) || any(value <= 0)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s on route %s->%s must contain positive finite values.', ...
-                    field_name, pre_name, post_name);
+        function route = active_routes(params)
+            %ACTIVE_ROUTES The route table that dynamics_fast, compute_Jacobian_fast,
+            % jacobian_times and unpack_and_compute_states evaluate.
+            %
+            % It is params.route as get_params compiled it, with one
+            % exception. params.std_zero_floor is an option of the class that
+            % callers switch ON THE PARAMS STRUCT after get_params
+            % (test_SRNNCellTypePairs, test_jacobian_times and
+            % test_SRNNCellTypePairs_tau_a_spread check both settings that
+            % way), and the option is compiled into every route's P. So when
+            % the struct states another setting than the table was compiled
+            % with, the routes are compiled again for it. That costs a
+            % compile per route per call and is meant for such checks; a
+            % model that wants the floor sets the property before build().
+            route = params.route;
+            if params.std_zero_floor == route(1).opts.zero_floor
+                return;
             end
-            value = reshape(value, 1, []);
-        end
-
-        function value = expand_pair_parameter(value, count, field_name, ...
-                pre_name, post_name, at_least_one)
-            if ~isnumeric(value) || ~isvector(value) || isempty(value) || ...
-                    any(~isfinite(value)) || any(value <= 0)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s on route %s->%s must contain positive finite values.', ...
-                    field_name, pre_name, post_name);
-            end
-            if at_least_one && any(value < 1)
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    'G on route %s->%s must be at least one.', pre_name, post_name);
-            end
-            if isscalar(value)
-                value = repmat(value, 1, count);
-            elseif numel(value) ~= count
-                error('SRNNCellTypePairs:InvalidSynapseConfig', ...
-                    '%s on route %s->%s must be scalar or have %d values.', ...
-                    field_name, pre_name, post_name, count);
-            else
-                value = reshape(value, 1, []);
+            for k = 1:numel(route)
+                opts = route(k).opts;
+                opts.zero_floor = params.std_zero_floor;
+                again = SRNNCellTypePairs.compile_route(route(k).cfg, opts);
+                again.idx = route(k).idx;
+                route(k) = again;
             end
         end
 
