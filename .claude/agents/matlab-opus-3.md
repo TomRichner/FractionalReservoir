@@ -37,22 +37,31 @@ stays forbidden.
   lead needs must be in a file on disk or in your report.
 - **Your MATLAB also exits when your turn ends or goes idle, and a job
   running in it dies.** Waiting on a background task counts as going idle:
-  on 2026-11-12 a worker launched a two-hour run correctly, waited for it
+  on 2026-11-12 a worker launched a four-hour run correctly, waited for it
   with a Monitor, and lost the run 25 minutes in. So while a MATLAB job of
-  yours is running, stay in the foreground: wait with FOREGROUND shell
-  commands, each a loop that sleeps and checks and returns within about 9
-  minutes (Bash `timeout` 600000), one after another, until it is over.
-  Never use Monitor, `run_in_background` or a scheduled wakeup to wait for
-  your own MATLAB, and never end your turn while it is working. After each
-  wait check that the job is still alive (its newest output file keeps
-  getting newer), not only that it has not finished.
-- A MATLAB call that stays silent for 30 minutes is dropped by the client
-  though MATLAB carries on. A job longer than that is launched through a
-  `timer` whose `TimerFcn` is a plain function-handle call with an
-  `ErrorFcn` that writes the error to a file (an `evalc` or a
-  `try ... catch ME` inside an anonymous function fails at once, silently),
-  and followed from the shell as above; do not call MATLAB again until it
-  is over, since a queued call would hang.
+  yours is running, stay in the foreground.
+- **How to run a job longer than a few minutes** (worked out the hard way
+  on 2026-11-12; a second worker carried a four-hour run through this way):
+  - **Do not use a MATLAB `timer`.** In your no-desktop session a timer's
+    callback does not run while the session is idle: `TasksExecuted` goes
+    to 1, nothing happens and nothing errors. (Timers work only in the
+    lead's desktop MATLAB.) Console output inside a timer callback also
+    fails there with `iolib:badbit`.
+  - Launch the job with ONE blocking MATLAB call, through a small wrapper
+    script outside the repo that writes a marker file when it starts and
+    when it ends and catches any error into a file. The client gives up on
+    a call that is silent for 30 minutes; **MATLAB carries on regardless**.
+    Do not call MATLAB again until the job is over: a queued call hangs.
+  - Then wait with FOREGROUND shell commands, each a loop that sleeps and
+    checks and returns in **under about 165 seconds** (a command that runs
+    longer than 180 s is moved to the background, which is the thing to
+    avoid), one after another until it is over. Never use Monitor,
+    `run_in_background` or a scheduled wakeup to wait for your own MATLAB,
+    and never end your turn while it is working.
+  - After each wait check that the job is alive, not only that it has not
+    finished: the newest file under its output directory keeps getting
+    newer, or the pool workers' CPU time keeps rising (some stages write
+    nothing for an hour).
 - It has no desktop, but figures still open as windows on Tom's screen. Create
   figures invisible where the code allows and close the ones you open.
 - The workspace is yours alone, so `clear classes` after a classdef edit needs
