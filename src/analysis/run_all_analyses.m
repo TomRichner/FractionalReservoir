@@ -17,15 +17,33 @@ function run_dir = run_all_analyses(preset_name, run_mode, opts)
 % INPUTS
 %   preset_name  which network to simulate. See srnn_param_preset.
 %                Carries the model class and the adaptation conditions too.
-%   run_mode     how much compute to spend: 'fast' | 'medium' | 'medium2' |
-%                'production' (run_mode_names). See analysis_run_config.m for the
-%                per-analysis numbers. 'fast' is the smoke test.
+%   run_mode     how much compute to spend: 'essential' | 'fast' | 'medium' |
+%                'medium2' | 'production' (run_mode_names). See
+%                analysis_run_config.m for the per-analysis numbers. 'fast' is
+%                the smoke test; 'essential' is below it, for a first look.
 %   save_figs    write extra figure formats alongside each sweep (default true).
 %   output_dir   override the dated directory (default: create one).
 %   assemble     stack the 1-D sensitivity sheets after the sweeps (default true).
 %   param_space_seed  seed for the joint parameter-space sample (default [],
 %                unset: drawn from the clock as before). Passed to the
 %                param_space stage only; see ParamSpaceAnalysis2.sample_seed.
+%   sweeps       which of the three sweeps to run (FD-023): a cell of names
+%                from paper_stage_names ('sensitivity', 'tau', 'param_space').
+%                Default: all three. They run in that order whatever order is
+%                given. The list is taken AS GIVEN: an empty cell runs no
+%                sweep and still creates the directory, the provenance record
+%                and run_manifest.mat, which is what run_all_paper_analyses
+%                needs when a bundle selects only later stages. (In a bundle's
+%                cfg, an absent or empty cfg.sweeps means all three; that
+%                default is resolved by paper_stage_plan, not here.) A sweep
+%                not run is printed as skipped and recorded in run_manifest
+%                (sweeps_run / sweeps_skipped; both fields are absent from a
+%                run that made all three, so its manifest is what it always
+%                was).
+%   manifest_fields  a struct of extra fields for run_manifest (default none).
+%                run_all_paper_analyses records its own stage selection this
+%                way, so the manifest says what the directory does not hold
+%                from the moment it is created.
 %
 % WAS A SCRIPT that ran three other scripts, passing settings through
 % base-workspace `master_*` variables the callees read with exist(). Everything
@@ -52,10 +70,22 @@ arguments
     opts.assemble     (1,1) logical = true
     opts.verbose                    = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     opts.param_space_seed           = []          % [] = unset (clock); else the seed of the joint sample
+    opts.sweeps          cell       = {'sensitivity', 'tau', 'param_space'}   % the sweeps to run, as given; {} = none
+    opts.manifest_fields (1,1) struct = struct()  % extra run_manifest fields from the caller
 end
 
 setup_paths();
 opts.verbose = verbose_name(opts.verbose);
+
+% Which sweeps run. Checked before the directory is created.
+[~, sweep_names] = paper_stage_names();
+if ~iscellstr(opts.sweeps) || ~all(ismember(opts.sweeps, sweep_names))
+    error('run_all_analyses:BadSweep', ...
+        '''sweeps'' must be a cell of names from: %s.', strjoin(sweep_names, ', '));
+end
+run_sweep  = ismember(sweep_names, opts.sweeps);
+sweeps_run = sweep_names(run_sweep);
+n_run      = numel(sweeps_run);
 
 vprintf(opts.verbose, 'verbose', '=== Starting All Analyses ===\n');
 vprintf(opts.verbose, 'verbose', 'Start time: %s\n\n', datetime('now'));
@@ -93,8 +123,17 @@ vprintf(opts.verbose, 'verbose', 'Conditions: %s\n', ...
     strjoin(cellfun(@(c) c.name, conditions, 'UniformOutput', false), ', '));
 vprintf(opts.verbose, 'verbose', 'Run mode: %s\n\n', run_mode);
 
+% The manifest names the sweeps only when some are skipped: a run of all
+% three keeps the manifest it always had.
+extra = opts.manifest_fields;
+if ~all(run_sweep)
+    extra.sweeps_run     = sweeps_run;
+    extra.sweeps_skipped = sweep_names(~run_sweep);
+    vprintf(opts.verbose, 'minimal', '[sweeps] running %d of %d: %s; skipped (not selected): %s\n', ...
+        n_run, numel(sweep_names), list_or_none(sweeps_run), strjoin(extra.sweeps_skipped, ', '));
+end
 save_manifest(run_dir, preset_name, preset_defaults, model_class, run_mode, ...
-    opts.save_figs, prov, dt_str);
+    opts.save_figs, prov, dt_str, extra);
 
 %% Shared context arguments for every sub-analysis
 ctx_args = {'preset_name', preset_name, 'run_mode', run_mode, ...
@@ -102,8 +141,16 @@ ctx_args = {'preset_name', preset_name, 'run_mode', run_mode, ...
             'verbose', opts.verbose};
 
 %% 1. Sensitivity
+% The [k/n] counters number the sweeps that run; with all three selected the
+% lines are the ones this always printed.
+do_sensitivity = ismember('sensitivity', sweeps_run);
+do_tau         = ismember('tau', sweeps_run);
+do_param_space = ismember('param_space', sweeps_run);
+i_run = 0;
+if do_sensitivity
+i_run = i_run + 1;
 vprintf(opts.verbose, 'verbose', '========================================\n');
-vprintf(opts.verbose, 'minimal', '[1/3] Running Sensitivity Analysis...\n');
+vprintf(opts.verbose, 'minimal', '[%d/%d] Running Sensitivity Analysis...\n', i_run, n_run);
 vprintf(opts.verbose, 'verbose', '========================================\n');
 % A fresh pool before each stage. The three analyses run back to back for hours
 % against one pool otherwise; see pool_restart for why that is worth
@@ -150,23 +197,30 @@ if opts.assemble && opts.save_figs
         {'mu_EE_relative', 'mu_EI_relative', 'mu_IE_relative', 'mu_II_relative'}, ...
         'mu_blocks');
 end
+end   % do_sensitivity
 
 %% 2. Tau sensitivity
+if do_tau
+i_run = i_run + 1;
 vprintf(opts.verbose, 'verbose', '========================================\n');
-vprintf(opts.verbose, 'minimal', '[2/3] Running Tau Sensitivity Analysis...\n');
+vprintf(opts.verbose, 'minimal', '[%d/%d] Running Tau Sensitivity Analysis...\n', i_run, n_run);
 vprintf(opts.verbose, 'verbose', '========================================\n');
 pool_restart(opts.verbose);
 run_tau_sensitivity_analysis(resolve_run_context('tau_sensitivity', ctx_args{:}));
+end
 
 %% 3. Parameter space
+if do_param_space
+i_run = i_run + 1;
 vprintf(opts.verbose, 'verbose', '========================================\n');
-vprintf(opts.verbose, 'minimal', '[3/3] Running Parameter Space Analysis...\n');
+vprintf(opts.verbose, 'minimal', '[%d/%d] Running Parameter Space Analysis...\n', i_run, n_run);
 vprintf(opts.verbose, 'verbose', '========================================\n');
 pool_restart(opts.verbose);
 % The joint sample's seed goes to this stage alone: it is the only one that
 % draws a random order. Empty leaves the sample drawn from the clock.
 run_param_space_analysis(resolve_run_context('param_space', ctx_args{:}, ...
     'param_space_seed', opts.param_space_seed));
+end
 
 %% Human-readable parameter record
 % parameters.md next to run_manifest.mat: the preset and run mode, what the
@@ -195,8 +249,12 @@ vprintf(opts.verbose, 'verbose', '========================================\n');
 end
 
 %% ------------------------------------------------------------------------
+function s = list_or_none(names)
+if isempty(names); s = 'none'; else; s = strjoin(names, ', '); end
+end
+
 function save_manifest(run_dir, preset_name, preset_defaults, model_class, ...
-    run_mode, save_figs, prov, dt_str)
+    run_mode, save_figs, prov, dt_str, extra)
 % Machine-readable run manifest, for reproducibility and self-documentation.
 %
 % The activation fields record the nonlinearity in force: the preset's, where it
@@ -246,5 +304,17 @@ run_manifest = struct( ...
     'git_dirty', prov.is_dirty, ...
     'matlab_version', version, ...
     'timestamp', dt_str);
+% The caller's extra fields (the stage and sweep selection, when there is
+% one). A name the manifest already has is refused: nothing may overwrite
+% the record of what ran.
+extra_names = fieldnames(extra);
+clash = intersect(extra_names, fieldnames(run_manifest));
+if ~isempty(clash)
+    error('run_all_analyses:ManifestFieldClash', ...
+        'manifest_fields may not replace run_manifest''s own field(s): %s.', strjoin(clash, ', '));
+end
+for k = 1:numel(extra_names)
+    run_manifest.(extra_names{k}) = extra.(extra_names{k});
+end
 save(fullfile(run_dir, 'run_manifest.mat'), 'run_manifest');
 end

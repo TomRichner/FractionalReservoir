@@ -68,7 +68,7 @@ setup_paths();
 
 %% Cost table -- BEFORE any compute, so a bad mode fails in milliseconds
 switch cfg.run_mode
-    case 'fast'                 , T = 20; n_seeds = 1; n_regular = 6;  n_exc = 4;  horizon = 1;
+    case {'essential', 'fast'}  , T = 20; n_seeds = 1; n_regular = 6;  n_exc = 4;  horizon = 1;    % 'essential' takes 'fast's sizes
     case {'medium', 'medium2'}  , T = 40; n_seeds = 2; n_regular = 12; n_exc = 8;  horizon = 2;
     case 'production'           , T = 60; n_seeds = 3; n_regular = 20; n_exc = 10; horizon = 3;
     otherwise

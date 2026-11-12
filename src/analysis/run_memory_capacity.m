@@ -404,8 +404,8 @@ if nargin < 3; ode_solver_override = ''; end
 % blurred by random draws.
 cfg = struct();
 switch run_mode
-    case 'fast'
-        cfg.n_trials = 5;       % plumbing check; p cannot go below 0.0625
+    case {'essential', 'fast'}  % 'essential' takes 'fast's sizes (run_mode_names)
+        cfg.n_trials = 5;      % plumbing check; p cannot go below 0.0625
     case {'medium', 'medium2'}
         % medium2 runs at medium effort here. It differs from medium only in
         % SWEEP dimensions -- more grid levels, fewer reps, a finer fs for the

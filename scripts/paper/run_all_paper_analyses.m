@@ -36,6 +36,26 @@ function run_dir = run_all_paper_analyses(cfg)
 % find this run later. Stages 2-6 write into subfolders of it, so a run
 % directory holds everything the paper was built from.
 %
+% (The list above is from when there were six; the stages as they run today,
+% in order, are paper_stage_names.)
+%
+% SELECTING STAGES (FD-023). By default every stage runs. A bundle may name
+% the ones it wants:
+%   cfg.stages   cell of stage names from paper_stage_names; absent or empty
+%                = all. Order is ignored; stages run in the order below.
+%   cfg.sweeps   which sweeps stage 1 runs ('sensitivity', 'tau',
+%                'param_space'); absent or empty = all three.
+%   cfg.eig_heatmap_examples   the eig-heatmap stage's examples; absent or
+%                empty = its default three.
+% An unknown name is an error in the pre-flight, before any compute and
+% before the run directory is created (paper_stage_plan). A stage not run is
+% printed as SKIPPED in the summary and recorded in run_manifest
+% (stages_run, stages_skipped, sweeps_run, sweeps_skipped; absent from a run
+% that selected nothing), so the directory says what it does not contain.
+% The run directory, its provenance and its manifest are made whatever is
+% selected. A figure whose stage was skipped errors by design
+% (resolve_data_file): the bundle's figure registry must not list it.
+%
 % ERROR ISOLATION. Each stage is wrapped: a failure is reported and the queue
 % continues, so an overnight run does not lose four hours of finished sweeps to
 % a crash in the last twenty minutes. The summary says what ran and what did not.
@@ -76,6 +96,29 @@ if ~ismember(cfg.run_mode, valid_modes)
          'later stages one by one. (''fast2'' was removed 2026-09-03 for ' ...
          'exactly that reason -- use ''fast''.)'], ...
         cfg.run_mode, strjoin(valid_modes, ', '));
+end
+
+%% PREFLIGHT: which stages and sweeps this bundle runs (FD-023)
+% cfg.stages and cfg.sweeps select; absent or empty means everything, as
+% before the fields existed. paper_stage_plan validates the names against
+% paper_stage_names and errors on an unknown one HERE, before any compute and
+% before the run directory is created, for the same reason the run mode is
+% checked here. The run mode sets sizes; this sets which stages run; the two
+% are separate (run_mode_names).
+plan = paper_stage_plan(cfg);
+
+% cfg.eig_heatmap_examples (optional; absent or empty = the stage's default,
+% the reference network and the two E:I-imbalanced examples) is passed to
+% run_eig_heatmap as its 'examples'. A bundle whose figures read only the
+% reference names that one example and saves the other two.
+eig_args = {};
+if isfield(cfg, 'eig_heatmap_examples') && ~isempty(cfg.eig_heatmap_examples)
+    ex = cfg.eig_heatmap_examples;
+    if ~(isstruct(ex) && all(isfield(ex, {'label', 'overrides'})))
+        error('run_all_paper_analyses:BadEigExamples', ...
+            'cfg.eig_heatmap_examples must be a struct array with fields label and overrides (see run_eig_heatmap).');
+    end
+    eig_args = {'examples', ex};
 end
 
 %% PREFLIGHT: this session must have a pool allocation
@@ -143,9 +186,21 @@ if ~isempty(param_space_seed) && ~(isnumeric(param_space_seed) && isscalar(param
     error('run_all_paper_analyses:BadParamSpaceSeed', ...
         'cfg.param_space_seed must be empty or a nonnegative integer scalar no larger than 2^32 - 1.');
 end
+% The sweeps to run go to run_all_analyses by argument, with the stage
+% selection for run_manifest. Both are passed ONLY when something is skipped,
+% so a bundle that selects nothing makes the call, and the manifest, it
+% always did. run_all_analyses is called even when the 'sweeps' stage is not
+% selected (with no sweeps): it is what creates the run directory, the
+% provenance record and the manifest the figures find the run by.
+sweep_args = {};
+if plan.is_selection
+    sweep_args = {'sweeps', plan.sweeps, 'manifest_fields', ...
+        struct('stages_run', {plan.stages}, 'stages_skipped', {plan.stages_skipped})};
+end
 if isempty(cfg.run_dir)
+    print_selection(plan, cfg.verbose);
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'verbose', cfg.verbose, ...
-        'param_space_seed', param_space_seed);
+        'param_space_seed', param_space_seed, sweep_args{:});
     log_guard = start_log(fullfile(run_dir, 'command_window.log'), cfg.verbose); %#ok<NASGU>
 else
     out_dir = cfg.run_dir;
@@ -156,12 +211,15 @@ else
     if ~isfolder(out_dir); mkdir(out_dir); end
     log_guard = start_log(fullfile(out_dir, 'command_window.log'), cfg.verbose); %#ok<NASGU>
     vprintf(cfg.verbose, 'minimal', '  output   : %s\n', out_dir);
+    print_selection(plan, cfg.verbose);
     run_dir = run_all_analyses(cfg.preset_name, cfg.run_mode, 'output_dir', out_dir, 'verbose', cfg.verbose, ...
-        'param_space_seed', param_space_seed);
+        'param_space_seed', param_space_seed, sweep_args{:});
 end
 
 results = struct('stage', {}, 'ok', {}, 'minutes', {}, 'detail', {}, 'err', {});
-results = record(results, 'sweeps', true, toc(t_all)/60, run_dir, '');
+if plan.runs.sweeps
+    results = record(results, 'sweeps', true, toc(t_all)/60, run_dir, '');
+end
 
 %% 2-5. The figure-specific compute
 % Each writes into the run directory, so the whole paper's inputs sit together.
@@ -200,7 +258,7 @@ stages = { ...
         'output_dir', fullfile(run_dir, 'mc_example')); ...
     'eig_heatmap',     @() run_eig_heatmap( ...
         'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
-        'out_dir', fullfile(run_dir, 'eig_heatmap')); ...
+        'out_dir', fullfile(run_dir, 'eig_heatmap'), eig_args{:}); ...
     'numerics',        @() run_numerics_verification( ...
         'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
         'out_dir', fullfile(run_dir, 'numerics_verification')); ...
@@ -221,6 +279,20 @@ stages = { ...
 if isfield(cfg,'illustrations') && cfg.illustrations
     stages(end+1,:)={'paper_illustrations', @()run_paper_illustrations(cfg,run_dir)};
 end
+
+% Keep the selected stages (FD-023). The table above must hold exactly the
+% stages paper_stage_names lists after 'sweeps', in its order, or a selection
+% could name a stage that never runs. test_essential_mode checks that from
+% this file's text, without running anything; the assert is the backstop,
+% and it comes after the sweeps only because the table needs run_dir.
+table_names = stages(:, 1)';
+want_names  = [plan.stages(~strcmp(plan.stages, 'sweeps')), ...
+               plan.stages_skipped(~strcmp(plan.stages_skipped, 'sweeps'))];
+all_names   = paper_stage_names();
+assert(isequal(table_names, all_names(ismember(all_names, want_names))), ...
+    'run_all_paper_analyses:StageTableMismatch', ...
+    'The stage table (%s) is not paper_stage_names'' list for this bundle.', strjoin(table_names, ', '));
+stages = stages(ismember(table_names, plan.stages), :);
 
 for k = 1:size(stages, 1)
     name = stages{k, 1};
@@ -263,6 +335,15 @@ for k = 1:numel(results)
     if r.ok; tag = 'OK    '; else; tag = 'FAILED'; end
     vprintf(cfg.verbose, 'minimal', '  %s  %-18s %7.1f min\n', tag, r.stage, r.minutes);
     if ~r.ok; vfail('          %s\n', r.err); end
+end
+% What this run directory does NOT hold, by the bundle's own selection (also
+% in run_manifest: stages_skipped, sweeps_skipped).
+for k = 1:numel(plan.stages_skipped)
+    vprintf(cfg.verbose, 'minimal', '  SKIPPED %-18s (not selected by cfg.stages)\n', plan.stages_skipped{k});
+end
+if plan.runs.sweeps && ~isempty(plan.sweeps_skipped)
+    vprintf(cfg.verbose, 'minimal', '  SKIPPED within sweeps: %s (not selected by cfg.sweeps)\n', ...
+        strjoin(plan.sweeps_skipped, ', '));
 end
 vprintf(cfg.verbose, 'verbose', 'Next: make_all_paper_figures(paper_config(''run_dir'', run_dir))\n');
 end
@@ -314,6 +395,18 @@ function tf = is_absolute_path(p)
 % the same reasoning, as in make_all_paper_figures.
 tf = startsWith(p, filesep) || startsWith(p, '/') || ...
      ~isempty(regexp(p, '^[A-Za-z]:[\\/]', 'once'));
+end
+
+function print_selection(plan, verbose)
+% One line each for what a selecting bundle runs and skips; nothing for a
+% bundle that runs everything.
+if ~plan.is_selection; return; end
+vprintf(verbose, 'minimal', '  stages   : %s\n', list_or_none(plan.stages));
+vprintf(verbose, 'minimal', '  skipped  : %s (not selected by cfg.stages)\n', list_or_none(plan.stages_skipped));
+end
+
+function s = list_or_none(names)
+if isempty(names); s = 'none'; else; s = strjoin(names, ', '); end
 end
 
 function results = record(results, stage, ok, minutes, detail, err)

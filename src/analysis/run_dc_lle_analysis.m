@@ -273,7 +273,7 @@ function cfg = dc_lle_run_config(run_mode, preset_defaults, ode_solver_override)
 % indegree = 4, and 7 conditions per seed instead of 1. 25/38/50 seeds would
 % have made even 'fast' an hour.
 switch run_mode
-    case 'fast'
+    case {'essential', 'fast'}      % 'essential' takes 'fast's sizes (run_mode_names)
         cfg = pack(5);
     case {'medium', 'medium2'}
         cfg = pack(15);

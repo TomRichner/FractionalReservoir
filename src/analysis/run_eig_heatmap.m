@@ -86,7 +86,7 @@ if ~isfolder(out_dir); mkdir(out_dir); end
 % (levels, reps, fs for the stochastic integrator), and this stage has no sweep.
 % Same collapse as run_memory_capacity and run_dc_lle_analysis.
 switch cfg.run_mode
-    case 'fast',                   T_range = [0 40];  n_samples = 40;   fs = 200;
+    case {'essential', 'fast'},    T_range = [0 40];  n_samples = 40;   fs = 200;   % 'essential' takes 'fast's sizes
     case {'medium', 'medium2'},    T_range = [0 100]; n_samples = 150;  fs = 400;
     case 'production',             T_range = [0 200]; n_samples = 300;  fs = 400;
     otherwise
@@ -136,13 +136,13 @@ if ~any(strcmp({examples.label}, 'reference'))
 end
 n_ex = numel(examples);
 n_examples_override = cfg.n_override;
-if strcmp(cfg.run_mode, 'fast') && cfg.n_override == 0
+if ismember(cfg.run_mode, {'essential', 'fast'}) && cfg.n_override == 0
     n_examples_override = 250;      % a dense eig at N = 4000 is ~30 s; fast keeps the examples affordable
 end
 n_samples_ex = cfg.n_samples_examples;
 if n_samples_ex == 0
     switch cfg.run_mode
-        case 'fast',                n_samples_ex = 40;
+        case {'essential', 'fast'}, n_samples_ex = 40;
         case {'medium', 'medium2'}, n_samples_ex = 60;
         case 'production',          n_samples_ex = 150;
     end

@@ -141,8 +141,8 @@ setup_paths();
 % test_run_modes asserts the :badMode identifier and that the message names
 % every mode in run_mode_names().
 switch cfg.run_mode
-    case 'fast'
-        T_free = 6;   T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_reshoot = 1;  n_lle = 2;
+    case {'essential', 'fast'}      % 'essential' takes 'fast's sizes (run_mode_names)
+        T_free = 6;  T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_reshoot = 1;  n_lle = 2;
     case {'medium', 'medium2'}
         T_free = 12;  T_lle = 20;  T_noisy = 4.5;  n_small = 40;  T_small = [-10, 10]; max_restarts = 800;  n_reshoot = 5;  n_lle = 25;
     case 'production'
