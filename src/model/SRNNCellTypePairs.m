@@ -1840,9 +1840,12 @@ classdef SRNNCellTypePairs < handle
             end
             if has_b
                 panel = panel + 1; ax_handles(panel) = nexttile;
-                b_collapsed = SRNNCellTypePairs.collapse_routes(p.b, 'prod');
+                % Each route's depression factor (std_route_factor): the
+                % product of its components on a product route, the
+                % releasable pool b1 on a chain route.
+                [b_collapsed, std_label] = SRNNCellTypePairs.std_factors(p.b, obj.get_params());
                 SRNNCellTypePairs.plot_route_series( ...
-                    p.t, b_collapsed, obj.cell_type_names, 'STD (product)', true);
+                    p.t, b_collapsed, obj.cell_type_names, std_label, true);
             end
             if has_g
                 panel = panel + 1; ax_handles(panel) = nexttile;
@@ -1898,7 +1901,9 @@ classdef SRNNCellTypePairs < handle
             n_rows = 4 + has_a + has_b + has_g + has_lya;
             C = obj.n_cellTypes;
             colors = SRNNCellTypePairs.type_colors(C);
-            b_collapsed = SRNNCellTypePairs.collapse_routes(p.b, 'prod');
+            % Each route's depression factor (std_route_factor): the product
+            % of its components on a product route, b1 on a chain route.
+            [b_collapsed, std_label] = SRNNCellTypePairs.std_factors(p.b, obj.get_params());
             g_collapsed = SRNNCellTypePairs.collapse_routes(p.g, 'prod');
             fig_handle = figure('Name', 'SRNNCellTypePairs by presynaptic type');
             layout = tiledlayout(fig_handle, n_rows, C, ...
@@ -1947,7 +1952,7 @@ classdef SRNNCellTypePairs < handle
                     ax_handles(row, q) = ax;
                     SRNNCellTypePairs.plot_postsynaptic_route_lines( ...
                         ax, p.t, b_collapsed.(name), obj.cell_type_names);
-                    if q == 1, ylabel(ax, 'STD (product)'); end
+                    if q == 1, ylabel(ax, std_label); end
                 end
                 if has_g
                     row = row + 1;
@@ -2367,18 +2372,62 @@ classdef SRNNCellTypePairs < handle
             dS(layout.x) = (-x + recurrent + u) ./ params.tau_d;
         end
 
+        function D = std_route_factor(b, params, pre, post)
+            %STD_ROUTE_FACTOR The depression factor of route (pre, post) from its b array.
+            %
+            %   D = SRNNCellTypePairs.std_route_factor(b, params, pre, post)
+            %
+            % b is the route's b-block as plot_data.b and
+            % unpack_and_compute_states give it: npre x n_b, or
+            % npre x n_b x nt, one row per presynaptic neuron of the route.
+            % D has the shape of prod(b, 2) (npre x 1, or npre x 1 x nt), and
+            % is [] where b is empty (a route without depression).
+            %
+            % D is what multiplies the rate (and the facilitation, if any)
+            % in the route's synaptic output:
+            %   product route   prod_m b_m, then the geometric mean if the
+            %                   route's combine is 'geomean', then the zero
+            %                   floor if std_zero_floor is on
+            %   chain route     b1, the releasable pool. NOT b1 b2: the
+            %                   reserve acts only through b1.
+            % CODE THAT DISPLAYS OR USES A ROUTE'S DEPRESSION CALLS THIS and
+            % does not form prod(b, 2) itself, so that it is right for every
+            % route model. The arithmetic is the model's: its `depression`
+            % handle where it has one (route_pool), else route_product's
+            % `combine` and `zero_floor`.
+            if isempty(b)
+                D = [];
+                return;
+            end
+            route = SRNNCellTypePairs.active_routes(params);
+            R = route{pre, post};
+            if size(b, 2) ~= R.P.n_b
+                error('SRNNCellTypePairs:RouteFactorShape', ...
+                    'Route (%d, %d) has %d depression variable(s); b has %d column(s).', ...
+                    pre, post, R.P.n_b, size(b, 2));
+            end
+            if isfield(R.model, 'depression')
+                D = R.model.depression(b, R.P);
+            else
+                D = R.model.zero_floor(R.model.combine(prod(b, 2), R.P), R.P);
+            end
+        end
+
         % The next three predate the route models and are kept for callers
-        % that name them. Each is a delegation to the route's model: the
-        % arithmetic is in route_product, and they apply to its routes only
-        % (every route today). dynamics_fast, compute_Jacobian_fast,
-        % jacobian_times and unpack_and_compute_states do not call them.
+        % that name them. Each is a delegation to route_product, where the
+        % arithmetic is, and they apply to PRODUCT routes only: the
+        % combine, the floor and p_min are that model's. On any other
+        % route (a chain) they raise SRNNCellTypePairs:ProductRouteOnly;
+        % std_route_factor is the call that serves every route.
+        % dynamics_fast, compute_Jacobian_fast, jacobian_times and
+        % unpack_and_compute_states do not call them.
 
         function D_used = apply_std_zero_floor_pair(D, params, pre, post)
             % The zero floor's map of a depression factor D on route
             % (pre, post); D unchanged when the floor is off or the route
             % has no depression.
             route = SRNNCellTypePairs.active_routes(params);
-            R = route{pre, post};
+            R = SRNNCellTypePairs.product_route(route, pre, post, 'apply_std_zero_floor_pair');
             D_used = R.model.zero_floor(D, R.P);
         end
 
@@ -2386,7 +2435,22 @@ classdef SRNNCellTypePairs < handle
             % The depression factor of route (pre, post) at the steady state
             % of r = 1, which the zero floor maps to 0: npre x 1, one value
             % per presynaptic neuron; [] on a route without depression.
-            p_min = params.route{pre, post}.P.p_min;
+            R = SRNNCellTypePairs.product_route(params.route, pre, post, 'std_zero_floor_pmin');
+            p_min = R.P.p_min;
+        end
+
+        function R = product_route(route, pre, post, caller)
+            % Entry (pre, post) of a route table, for the three product-only
+            % delegations: an error naming std_route_factor on any other
+            % model's route.
+            R = route{pre, post};
+            if ~strcmp(R.P.model, 'product')
+                error('SRNNCellTypePairs:ProductRouteOnly', ...
+                    ['%s applies to product depression only, and route (%d, %d) carries the ' ...
+                    '''%s'' route model (std.model = ''chain''). For the depression factor of ' ...
+                    'any route use SRNNCellTypePairs.std_route_factor(b, params, pre, post).'], ...
+                    caller, pre, post, R.P.model);
+            end
         end
 
         function [D, dD_dP] = combine_std_pair(P_b, params, pre, post)
@@ -2398,7 +2462,7 @@ classdef SRNNCellTypePairs < handle
             % 'product' combine: D = P_b, dD_dP = 1. 'geomean'
             % (synapse_config.<pre>.<post>.std.combine): D = P_b^(1/M),
             % dD_dP = D / (M P_b).
-            R = params.route{pre, post};
+            R = SRNNCellTypePairs.product_route(params.route, pre, post, 'combine_std_pair');
             [D, dD_dP] = R.model.combine(P_b, R.P);
         end
 
@@ -2706,7 +2770,8 @@ classdef SRNNCellTypePairs < handle
             %   tf = SRNNCellTypePairs.routes_identical(params)
             %
             % Compares STD (n_b, tau_rec, tau_rel), STF (n_g, tau_dec, tau_fac,
-            % G) and the route scale of every route against route (1, 1), across
+            % G), the route model's signature (which model, and what only it
+            % has: a chain's n2) and the route scale of every route against route (1, 1), across
             % ALL presynaptic types -- the same fields SRNN_ESN_reservoir.
             % route_signature compares, but as a logical rather than an error
             % and globally rather than per presynaptic type. When true, every
@@ -2745,6 +2810,13 @@ classdef SRNNCellTypePairs < handle
                 sig.tau_dec = params.tau_g_dec{pre, post}(:)';
                 sig.tau_fac = params.tau_g_fac{pre, post}(:)';
                 sig.G       = params.G{pre, post}(:)';
+            end
+            % The route model's own statement of what dynamics the route
+            % carries (route_model: P.signature). The fields above cannot
+            % tell a chain route from a two-component product route with
+            % the same time constants, nor two chains with different n2.
+            if isfield(params, 'route')
+                sig.signature = params.route{pre, post}.P.signature;
             end
         end
 
@@ -3125,6 +3197,32 @@ classdef SRNNCellTypePairs < handle
                     collapsed.(pre_names{pre}).(post_names{post}) = ...
                         reshape(value, size(value, 1), []);
                 end
+            end
+        end
+
+        function [factor, label] = std_factors(b_named, params)
+            %STD_FACTORS Every route's depression factor from a named b struct.
+            %
+            %   [factor, label] = SRNNCellTypePairs.std_factors(plot_data.b, params)
+            %
+            % factor.<pre>.<post> is npre x nt, the route's factor at every
+            % time (std_route_factor), [] where the route has no
+            % depression. label is the axis label for a panel of them:
+            % 'STD (product)' while every depressed route is a product,
+            % 'STD factor' once any is a chain (whose factor is b1).
+            factor = b_named;
+            names = params.cell_type_names;
+            for pre = 1:numel(names)
+                for post = 1:numel(names)
+                    value = b_named.(names{pre}).(names{post});
+                    if isempty(value), continue; end
+                    D = SRNNCellTypePairs.std_route_factor(value, params, pre, post);
+                    factor.(names{pre}).(names{post}) = reshape(D, size(D, 1), []);
+                end
+            end
+            label = 'STD (product)';
+            if any(params.std_chain(:))
+                label = 'STD factor';
             end
         end
 
