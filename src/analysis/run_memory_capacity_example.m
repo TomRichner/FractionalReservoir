@@ -63,7 +63,7 @@ end
 % the first 60 s of the test window after the longest delay is dropped, so
 % a 30-s fast test window used to show half a trace.
 switch opts.run_mode
-    case 'fast',                T_train_sec = 120; T_test_sec = 75;  d_max_sec = 5;
+    case {'essential', 'fast'}, T_train_sec = 120; T_test_sec = 75;  d_max_sec = 5;    % 'essential' takes 'fast's sizes
     case {'medium', 'medium2'}, T_train_sec = 300; T_test_sec = 90;  d_max_sec = 10;
     case 'production',          T_train_sec = 600; T_test_sec = 150; d_max_sec = 15;
     otherwise

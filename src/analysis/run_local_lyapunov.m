@@ -40,7 +40,7 @@ end
 
 setup_paths();
 switch cfg.run_mode
-    case 'fast',                K = 30;
+    case {'essential', 'fast'}, K = 30;      % 'essential' takes 'fast's sizes
     case {'medium', 'medium2'}, K = 100;
     case 'production',          K = 100;
     otherwise

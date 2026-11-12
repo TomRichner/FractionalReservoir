@@ -24,6 +24,13 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 %
 % Modes -- the canonical list is run_mode_names(), which every later stage
 % validates against too:
+%   'essential'  - below 'fast' (Tom, 2026-11-12, FD-023): 4 levels x 2 reps on
+%                  the 1-D sweeps and a 32-point joint sample; solver, fs,
+%                  T_range and Lyapunov window are 'fast's in every analysis
+%                  (a shorter window would bias lambda_1). For a first look
+%                  at a network, with a bundle that also selects stages
+%                  (cfg.stages / cfg.sweeps, paper_stage_plan). Two reps per
+%                  level give medians, not usable interquartile bands.
 %   'fast'       - few levels/reps, fs=200, short T_range; finishes quickly
 %   'medium'     - roughly halfway; for a usable but not publication-size run
 %   'medium2'    - between medium and production, at fs=800, for overnight
@@ -97,6 +104,10 @@ switch analysis
     case 'sensitivity'
         % 1-D sweeps, one PSA per swept parameter, with a reps axis.
         switch run_mode
+            case 'essential'
+                % 4 levels x 2 reps (Tom, 2026-11-12): 8 jobs per condition
+                % per sweep. Everything else is the 'fast' row below.
+                cfg = pack(4,  2,  'rk4',   200, [0, 10], [5, 10]);
             case 'fast'
                 % fs=200 keeps Benettin's lya_dt/dt guard satisfied (4>=3).
                 % 5 levels x 5 reps (TR, 2026-09-15; was 4 x 3): 25 jobs per
@@ -126,7 +137,9 @@ switch analysis
         % medium/production use the longer T_range and the class-default LLE
         % window rather than an explicit short one.
         switch run_mode
-            case 'fast'
+            case {'essential', 'fast'}
+                % 'essential' is 'fast' here: the mode must be valid for every
+                % analysis, and the bundle that uses it does not run this sweep.
                 % NOTE: this window is far shorter than the swept tau, so long-tau
                 % LLE reflects a transient -- accepted for fast qualitative runs.
                 cfg = pack(7,  7,  'rk4',   200, [0, 20], [10, 20]);
@@ -156,11 +169,19 @@ switch analysis
         % n_grid_points is how many randomly-chosen points are actually
         % simulated, and run_param_space_analysis turns it into a
         % subset_fraction. See that file for what a sparse sample can and
-        % cannot support. AT LEAST 128 POINTS IN EVERY MODE (TR, 2026-09-14):
+        % cannot support. AT LEAST 128 POINTS FROM 'fast' UP (TR, 2026-09-14):
         % 27 (fast) and 64 (medium) were too few to read as a distribution
         % in fig_param_space_allStd / fig_lle_vs_rate. Cost: at 'fast' the
         % joint stage is ~5x what it was (128 x 3 conditions x 20-s runs).
+        % 'essential' IS THE ONE EXCEPTION, 32 points, by Tom's instruction
+        % of 2026-11-12 ("a 32 seed param space analysis"): it is a look at
+        % where the network sits, not a distribution to read. The floor
+        % holds for every mode from 'fast' up.
         switch run_mode
+            case 'essential'
+                % The 'fast' row with a quarter of the sample.
+                cfg = pack(3, [], 'rk4',   200, [0, 20], [10, 20]);
+                cfg.n_grid_points = 32;
             case 'fast'
                 cfg = pack(3, [], 'rk4',   200, [0, 20], [10, 20]);
                 cfg.n_grid_points = 128;

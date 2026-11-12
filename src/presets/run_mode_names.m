@@ -1,7 +1,7 @@
 function names = run_mode_names()
 % RUN_MODE_NAMES The run modes every stage of the pipeline must support.
 %
-%   names = RUN_MODE_NAMES()   % {'fast', 'medium', 'medium2', 'production'}
+%   names = RUN_MODE_NAMES()   % {'essential', 'fast', 'medium', 'medium2', 'production'}
 %
 % ONE list, because there used to be four and they disagreed. analysis_run_config
 % accepted five modes; run_memory_capacity, run_memory_capacity_example and
@@ -24,7 +24,18 @@ function names = run_mode_names()
 % each stage really accepts every name in it -- so a mode cannot be added to the
 % sweeps again without the later stages being taught about it.
 %
-% See also: analysis_run_config, run_all_paper_analyses, test_run_modes
+% 'essential' (Tom, 2026-11-12, FD-023) is the mode below 'fast', for a look at
+% a network before committing to long runs. It changes SIZES in the two places
+% Tom named, both in analysis_run_config: the 1-D sweeps are 4 levels x 2 reps
+% and the joint sample is 32 points. Everywhere else it takes 'fast's sizes
+% (every stage's cost table lists it beside 'fast'), the way 'medium2' collapses
+% to 'medium' where it has nothing to change; windows and integrators are
+% 'fast's throughout, because a shorter window biases lambda_1. WHICH STAGES a
+% run makes is a separate knob, cfg.stages / cfg.sweeps (paper_stage_plan): a
+% mode names sizes only, and every stage accepts every mode.
+%
+% See also: analysis_run_config, run_all_paper_analyses, test_run_modes,
+%           paper_stage_plan
 
-names = {'fast', 'medium', 'medium2', 'production'};
+names = {'essential', 'fast', 'medium', 'medium2', 'production'};
 end

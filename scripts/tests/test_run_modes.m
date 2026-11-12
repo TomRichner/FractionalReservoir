@@ -36,6 +36,12 @@ all_passed = check(sprintf('run_mode_names = {%s}', strjoin(modes, ', ')), ...
     iscellstr(modes) && ~isempty(modes)) && all_passed; %#ok<ISCLSTR>
 all_passed = check('''fast2'' is gone (removed 2026-09-03)', ...
     ~ismember('fast2', modes)) && all_passed;
+% 'essential' (FD-023) is in the list, so every loop below covers it: the
+% three analyses resolve it, and every later stage names it in its :badMode
+% message. That each stage's cost table has a CASE for it is checked from the
+% stage files' text in test_essential_mode (the gap described above).
+all_passed = check('''essential'' is in the list, below ''fast''', ...
+    numel(modes) >= 2 && strcmp(modes{1}, 'essential') && strcmp(modes{2}, 'fast')) && all_passed;
 
 %% analysis_run_config accepts exactly the canonical list
 fprintf('\n-- analysis_run_config accepts exactly it --\n');
@@ -101,6 +107,19 @@ bad_cfg2.run_mode = 'fast2';
 probe = fullfile(fileparts(which('setup_paths')), 'data', '__preflight_probe__');
 all_passed = check('...and creates no output directory', ~isfolder(probe)) && all_passed;
 if isfolder(probe); rmdir(probe, 's'); end
+% Every canonical mode passes the mode pre-flight. Shown without running
+% anything: each config also names a stage that does not exist, so the call
+% stops at the NEXT pre-flight (the stage selection, FD-023), which it can
+% only reach once its mode has been accepted.
+ok = true;
+for j = 1:numel(modes)
+    c = paper_config('run_dir', 'data/__preflight_probe__');
+    c.run_mode = modes{j};
+    c.stages = {'no_such_stage'};
+    ok = ok && throws_id(@() run_all_paper_analyses(c), 'paper_stage_plan:UnknownStage');
+end
+all_passed = check(sprintf('all %d modes pass the mode pre-flight', numel(modes)), ...
+    ok && ~isfolder(probe)) && all_passed;
 
 %% ------------------------------------------------------------------------
 if all_passed

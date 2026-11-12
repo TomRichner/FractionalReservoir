@@ -51,6 +51,12 @@ catch err
     threw = strcmp(err.identifier, 'mu7chain_config:BadRunMode');
 end
 assert(threw, 'an unknown run mode must be refused');
+% These modes run every stage and draw both sets; only 'essential' selects
+% (FD-023; its own checks are in test_essential_mode).
+for k = {cfg3, cfg4, cfg_med}
+    assert(isempty(k{1}.stages) && isempty(k{1}.sweeps) && isempty(k{1}.eig_heatmap_examples));
+    assert(isequal(k{1}.figure_sets, {'3cond', '4cond'}));
+end
 
 % The grouped registry is rebuilt per set: each set's grouped entries read
 % their sources from that set's own fig_root (inventory R6).
