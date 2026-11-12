@@ -254,9 +254,25 @@ why the tolerance cannot be met and shows the code is right, the lead may
 adjust it and documents the cause, the evidence and the remaining margin
 (see "Rules written in advance" under "Current work"). The tier
 runs serially in the client and does not need a pool; at its sizes the
-thread count moves nothing in the pointwise layer. After the refactor of
-Plan A step 0d passes it, the three exact references are re-captured
-once, by the lead.
+thread count moves nothing in the pointwise layer. The three exact
+references were re-captured once after the refactor of Plan A step 0d
+passed it (2026-11-12).
+
+**The chain has references of its own** (Plan A step 5, 2026-11-12),
+because the anchor and the three exact references above contain no chain
+route. A second suite of the tolerance tier, `chain`
+(`regression_tol_check('chain')`, reference
+`scripts/tests/fixtures/regression_tol_chain.mat`,
+`test_regression_tolerance_chain`): the regression network with four
+chain routes and a mixed four-cell-type network in which one presynaptic
+type has a chain, a two-component product, a one-component and an
+undepressed route. And an exact tier, `rapid_chain`
+(`run_all_tests('test_regression_rapid_chain')`,
+`make_regression_reference('rapid_chain')`). Both are in the quick suite,
+about 20 s each. A pre-edit capture of a suite other than the base one is
+`make_regression_tol_reference('<name>', 'suite', 'chain')`. Each route
+model added after the chain gets a suite and a mutation list the same
+way (`regression_tol_mutations_*.m`, run with `regression_tol_mutate`).
 
 Two things to know. The full tier runs longer than the MATLAB MCP client
 waits (a call silent for 30 minutes is dropped, though MATLAB carries on):

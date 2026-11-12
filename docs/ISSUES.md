@@ -433,8 +433,35 @@ model's arithmetic.
 
 ### FD-018 Chained facilitation, after chained depression
 
-- **Status:** open (decided by Tom 2026-11-11; design written and reviewed,
-  Plan A section 4.6; parameter values chosen)
+- **Status:** in progress (step 8 briefed to `matlab-fable-1`; decided by
+  Tom 2026-11-11; design written and reviewed, Plan A section 4.6;
+  parameter values chosen).
+  **Its gate, the chain's own references (Plan A step 5), is in place:**
+  worker `matlab-fable-1`, commits `020dfa7`..`c9a5d80`, merged `3c9a447`.
+  A `chain` suite of the tolerance tier with its own reference
+  (`regression_tol_chain.mat`, 2441 leaves) and an exact tier
+  `rapid_chain` (`regression_rapid_chain_digest.mat`), both in the quick
+  suite. On merged main the lead's capture is bit-identical to the
+  committed chain reference, the exact tier matches, the anchor passes
+  and quick is 61 of 61. 52 chain mutations, all caught by values.
+  **Decisions by the lead:**
+  1. *One thin margin is left as it is.* Under harmless reorderings of
+     the chain code a sweep job's `lambda_gap` (the difference of two
+     nearly equal exponents) sits 36 times inside the stable tolerance of
+     1e-9, where every other leaf is 2600 times inside or more. No
+     tolerance is changed now. If that leaf fails after a change the
+     pointwise layer shows to be harmless, that is the case for an
+     override, to be documented then.
+  2. *Coupled facilitation gets a tolerance reference and mutation checks
+     of its own in step 8* (a third suite). Plan A asks for the chain's
+     references, not explicitly for facilitation's; but the per-neuron
+     spread (FD-015) is built next on the same code and needs a gate
+     there, so the lead counts it as part of building step 8 properly. No
+     new exact tier is added for it.
+  3. *A display factor for facilitation,* `stf_route_factor`, is added
+     beside `std_route_factor`, because a coupled route's g-block holds
+     the calcium trace as well and a plot that multiplies the block's
+     columns would be wrong.
 - **Serves:** a later paper. **Facilitation does not appear in this one.**
   Built now so the model does not have to be refactored twice.
 - **What:** the release-coupled, serial form: option C (section 5) of
