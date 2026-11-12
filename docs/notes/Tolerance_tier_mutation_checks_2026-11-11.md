@@ -929,3 +929,303 @@ for the two estimators that can afford them.
 The chain's exact reference (`regression_rapid_chain_digest.mat`) holds
 the n = 100, gain 2 network's top-K and Benettin results over [4, 12] s
 (+1.2748 and +1.2742).
+
+
+# The stf_chain suite: mutation checks on release-coupled facilitation (2026-11-12, Plan A step 8)
+
+Release-coupled facilitation (`route_pool`, `stf.model = 'chain'`: a
+release probability `g` that multiplies the output and the rate at which
+the releasable pool is used, optionally driven by a calcium trace `h`)
+was built on 2026-11-12 (FD-018). Neither the anchor nor the chain
+reference holds a coupled route, so it gets a suite of its own, captured
+before the per-neuron spread is built on top of it. This section records
+what that suite was shown to catch, and that the chain suite still
+catches what it caught on the rewritten `route_pool`.
+
+- Code under test: commit `2328d19`. `src/model/routes/route_pool.m` at
+  blob `5eecc19`, `route_model.m` at `f41e980`, `route_product.m` at
+  `01746cf` (unchanged), `src/model/SRNNCellTypePairs.m` at `7167da0`.
+- The suite: `regression_tol_run(ref, 'stf_chain')`, reference
+  `scripts/tests/fixtures/regression_tol_stf_chain.mat` (13.0 MB, 14
+  threads), run with `regression_tol_check('stf_chain')`. 2679 leaves,
+  2017 of them floating point: 1869 pointwise, 810 stable. Two networks:
+  `facil`, the regression network with all four routes a chain with `g`
+  and `h` (tau_dec 1.5, tau_fac 0.25, G 5, tau_h 0.5), with and without
+  the staircase, noise off and on, and its stable twin; and `fmixed`,
+  four cell types with every variant of the pool model that has
+  facilitation (no depression, a single pool or the chain; with and
+  without the calcium trace) beside product routes, a chain without
+  facilitation, a coupled route at G = 1 and a stiff one (G 8, tau_fac
+  0.1, tau_h 0.05). Stable layer: both end to end, transient gain,
+  finite-difference Jacobian, Benettin and QR on n = 6, an 8-job sweep,
+  memory capacity with the synaptic readout on four identical coupled
+  routes. The tolerances are the tier's, unchanged; no override was
+  added and no leaf name was added to the discrete list.
+- The list: `regression_tol_mutations_stf_chain`, 91 one-site errors,
+  and its leaf groups (`regression_tol_mutations_stf_chain('groups')`).
+- To repeat: `regression_tol_mutate(regression_tol_mutations_stf_chain(),
+  'reference', 'stf_chain', 'groups',
+  regression_tol_mutations_stf_chain('groups'))`, a median of 24 s per
+  mutation (59 s at most) with two other MATLAB sessions running; it was
+  run in four parts with `save_dir`.
+- Background: the unmutated code matches the reference **exactly**
+  (`'rtol', 0`; a second capture is `isequaln` to it), so a factor below
+  is all mutation.
+
+## Result for coupled facilitation
+
+**All 91 mutations fail the suite, and every one fails by compared
+values.** One of them also had cases that threw.
+
+| | Mutations |
+|---|---|
+| Run | 91 |
+| Caught | 91 |
+| Caught by compared values | 91 |
+| Caught only by a thrown case | 0 |
+| Had a case that threw | 1 (`stf_registry_product`, 11 cases, beside 394 stable leaves failing by value) |
+| Caught by the pointwise layer | 88 |
+| Caught by the stable layer | 85 |
+| Caught by both | 82 |
+| Caught ONLY by the pointwise layer | 6 (`stf_B_g_1e-9`, `stf_single_A_b1_b1_1e-9`, `stf_nodep_Fs_1e-9`, `stf_nodep_lin_F_1e-9`, `stf_params_tau_h_1e-6`, `stf_params_stf_chain_false`) |
+| Caught ONLY by the stable layer | 3 (`stf_init_h_1e-6`, `stf_init_h_one`, `stf_init_g_1e-6`) |
+| Caught ONLY by overridden leaves | 0 |
+| Made an exact (discrete, logical or text) leaf change | 48 |
+
+## Every facilitation mutation
+
+Pointwise and stable: the number of failing leaves and the weakest /
+strongest factor by which a failing float leaf exceeded its tolerance.
+The variables are named: `A_b1_g` is d(db1/dt)/dg, `B_h` is d(dh/dt)/dr.
+"trace" is a route with the calcium trace, "rate" one without (the rate
+drives g), "single" a single pool, "nodep" a route without depression.
+What each one is: the `what` field of the list.
+
+| Mutation | Pointwise: leaves failing | weakest / strongest | Stable: leaves failing | weakest / strongest | Exact leaf changed | Caught by | Cases that threw |
+|---|---|---|---|---|---|---|---|
+| `stf_A_b1_g_dropped` | 108 | 2e9 / 1.8e11 | 180 | 1.6e3 / 2.8e9 | yes | values | 0 |
+| `stf_A_b1_g_sign` | 108 | 4e9 / 3.6e11 | 180 | 3.6e3 / 4.8e9 | yes | values | 0 |
+| `stf_A_b1_g_1e-9` | 108 | 2 / 1.8e2 | 6 | 1 / 15 | no | values | 0 |
+| `stf_A_g_g_trace_dropped` | 108 | 9.6e9 / 5.2e11 | 302 | 3.1e3 / 1.6e10 | yes | values | 0 |
+| `stf_A_g_g_trace_sign` | 108 | 1.9e10 / 1e12 | 310 | 9.6e3 / 2.3e10 | yes | values | 0 |
+| `stf_A_g_g_trace_1e-9` | 108 | 9.6 / 5.2e2 | 27 | 1 / 13 | no | values | 0 |
+| `stf_A_g_g_rate_dropped` | 36 | 3e10 / 1.7e11 | 90 | 1.1e4 / 1.5e10 | yes | values | 0 |
+| `stf_A_g_g_rate_sign` | 36 | 6.1e10 / 3.4e11 | 150 | 1.3e4 / 1.6e10 | yes | values | 0 |
+| `stf_A_g_g_rate_1e-9` | 36 | 30 / 1.7e2 | 4 | 1.5 / 1.7 | no | values | 0 |
+| `stf_A_g_h_dropped` | 108 | 1.6e10 / 1e12 | 180 | 9.2e3 / 2e9 | yes | values | 0 |
+| `stf_A_g_h_sign` | 108 | 3.2e10 / 2e12 | 180 | 3.4e3 / 4.1e9 | yes | values | 0 |
+| `stf_A_g_h_1e-9` | 108 | 16 / 1e3 | 18 | 1 / 11 | no | values | 0 |
+| `stf_A_h_h_dropped` | 108 | 4.1e9 / 1e12 | 276 | 5.9e3 / 2e10 | yes | values | 0 |
+| `stf_A_h_h_sign` | 108 | 8.2e9 / 2e12 | 318 | 1.7e4 / 5.7e10 | yes | values | 0 |
+| `stf_A_h_h_1e-9` | 108 | 4.1 / 1e3 | 22 | 1.1 / 12 | no | values | 0 |
+| `stf_B_h_dropped` | 108 | 5.7e9 / 9.9e11 | 180 | 6.2e3 / 5.5e9 | yes | values | 0 |
+| `stf_B_h_sign` | 108 | 1.1e10 / 2e12 | 180 | 3.4e3 / 9.7e9 | yes | values | 0 |
+| `stf_B_h_1e-9` | 108 | 5.7 / 9.9e2 | 13 | 1 / 8.4 | no | values | 0 |
+| `stf_B_g_dropped` | 36 | 2.9e10 / 3.3e11 | 88 | 3.8e3 / 4.7e8 | yes | values | 0 |
+| `stf_B_g_sign` | 36 | 5.7e10 / 6.5e11 | 88 | 1.9e3 / 3.7e8 | yes | values | 0 |
+| `stf_B_g_1e-9` | 36 | 29 / 3.3e2 | 0 | - | no | values | 0 |
+| `stf_B_b1_dropped` | 108 | 9.9e9 / 3.3e11 | 178 | 1.5e3 / 2.4e9 | yes | values | 0 |
+| `stf_B_b1_sign` | 108 | 2e10 / 6.5e11 | 184 | 2.4e3 / 1.1e10 | yes | values | 0 |
+| `stf_B_b1_1e-9` | 108 | 9.9 / 3.3e2 | 3 | 1.6 / 2.4 | no | values | 0 |
+| `stf_A_b1_g_transposed` | 108 | 2e9 / 1.8e11 | 180 | 2.5e3 / 2.5e9 | yes | values | 0 |
+| `stf_A_g_h_transposed` | 108 | 1.6e10 / 1e12 | 180 | 1.2e4 / 6.3e9 | yes | values | 0 |
+| `stf_B_h_on_g` | 108 | 5.7e9 / 9.9e11 | 180 | 4.7e3 / 4.9e9 | yes | values | 0 |
+| `stf_A_g_g_d_r_for_h` | 108 | 7.6e9 / 4.4e11 | 178 | 8.7e2 / 1.5e9 | yes | values | 0 |
+| `stf_lin_d_r_for_h` | 108 | 1.5e10 / 1e12 | 184 | 1.8e3 / 9.2e9 | yes | values | 0 |
+| `stf_lin_d_h_for_r` | 36 | 2.9e10 / 3.3e11 | 88 | 3.8e3 / 4.7e8 | yes | values | 0 |
+| `stf_A_b1_b1_g_dropped` | 99 | 1.1e7 / 7.1e11 | 186 | 2.1e3 / 2.2e10 | yes | values | 0 |
+| `stf_A_b1_b1_g_1e-9` | 108 | 21 / 8.7e2 | 23 | 1.1 / 12 | no | values | 0 |
+| `stf_B_b1_g_dropped` | 99 | 1.5e7 / 1.5e11 | 178 | 8e2 / 1.8e9 | yes | values | 0 |
+| `stf_single_A_b1_b1_dropped` | 36 | 3.7e10 / 6e11 | 105 | 2.6e3 / 1.4e11 | yes | values | 0 |
+| `stf_single_A_b1_b1_1e-9` | 36 | 37 / 6e2 | 0 | - | no | values | 0 |
+| `stf_single_A_b1_b1_as_chain` | 36 | 2.2e10 / 8.3e10 | 88 | 2e3 / 1.1e9 | yes | values | 0 |
+| `stf_lin_F_g_dropped` | 99 | 7.8e6 / 1.9e11 | 182 | 2.6e3 / 1.5e9 | yes | values | 0 |
+| `stf_lin_F_1e-9` | 108 | 23 / 8.1e2 | 1 | 1.3 / 1.3 | no | values | 0 |
+| `stf_Fs_b1_dropped` | 108 | 1.3e10 / 1e12 | 179 | 3.1e3 / 3.8e9 | yes | values | 0 |
+| `stf_Fs_b1_g_dropped` | 99 | 5.5e6 / 8e11 | 179 | 4.9e2 / 2.4e9 | yes | values | 0 |
+| `stf_Fs_b1_1e-9` | 108 | 13 / 1e3 | 21 | 1.1 / 6.1 | no | values | 0 |
+| `stf_Fs_g_dropped` | 108 | 2.9e9 / 7.8e11 | 179 | 1.6e3 / 3.1e9 | yes | values | 0 |
+| `stf_Fs_g_1e-9` | 108 | 2.9 / 7.8e2 | 5 | 1 / 4.1 | no | values | 0 |
+| `stf_Fs_h_as_factor` | 108 | 8.7e9 / 7.9e11 | 179 | 3e3 / 1.8e9 | yes | values | 0 |
+| `stf_nodep_Fs_dropped` | 36 | 1e10 / 1.8e11 | 45 | 97 / 1.1e9 | yes | values | 0 |
+| `stf_nodep_Fs_1e-9` | 36 | 10 / 1.8e2 | 0 | - | no | values | 0 |
+| `stf_nodep_lin_F_1e-9` | 36 | 17 / 1.1e3 | 0 | - | no | values | 0 |
+| `stf_rhs_trace_g_decay_dropped` | 9 | 6.1e10 / 1.9e11 | 418 | 1.3e2 / 1e10 | yes | values | 0 |
+| `stf_rhs_trace_g_decay_1e-6` | 9 | 6.1e4 / 1.9e5 | 370 | 1.1 / 3.5e3 | no | values | 0 |
+| `stf_rhs_trace_g_drive_dropped` | 9 | 1.3e11 / 3.9e11 | 400 | 7.7e3 / 1.2e10 | yes | values | 0 |
+| `stf_rhs_trace_g_drive_1e-6` | 9 | 1.3e5 / 3.9e5 | 378 | 1.2 / 8e3 | no | values | 0 |
+| `stf_rhs_trace_h_rate_dropped` | 9 | 4.6e10 / 5.8e11 | 404 | 7.4e3 / 1.1e10 | yes | values | 0 |
+| `stf_rhs_trace_h_rate_1e-6` | 9 | 4.6e4 / 5.8e5 | 376 | 1.3 / 1.6e4 | no | values | 0 |
+| `stf_rhs_trace_h_decay_dropped` | 9 | 4.6e10 / 1.2e12 | 418 | 7.9e3 / 6.9e9 | yes | values | 0 |
+| `stf_rhs_trace_h_decay_1e-6` | 9 | 4.6e4 / 1.2e6 | 377 | 1.1 / 1.3e4 | no | values | 0 |
+| `stf_rhs_d_r_for_h` | 9 | 3.7e11 / 1e12 | 398 | 7.3e2 / 2.1e9 | yes | values | 0 |
+| `stf_rhs_rate_g_decay_dropped` | 3 | 1.3e11 / 1.5e11 | 238 | 6.2 / 6.6e8 | yes | values | 0 |
+| `stf_rhs_rate_g_decay_1e-6` | 3 | 1.3e5 / 1.5e5 | 222 | 1 / 3.6e2 | no | values | 0 |
+| `stf_rhs_rate_g_drive_dropped` | 3 | 4.7e11 / 5.3e11 | 239 | 5.7e3 / 1.3e9 | yes | values | 0 |
+| `stf_rhs_rate_g_drive_1e-6` | 3 | 4.7e5 / 5.3e5 | 219 | 1.1 / 4.8e2 | no | values | 0 |
+| `stf_rhs_release_g_dropped` | 9 | 3.2e10 / 5.8e10 | 418 | 15 / 1.3e10 | yes | values | 0 |
+| `stf_rhs_release_g_1e-6` | 9 | 8.1e4 / 1.9e5 | 374 | 1.8 / 1.2e4 | no | values | 0 |
+| `stf_rhs_F_g_dropped` | 9 | 3.6e10 / 4.6e11 | 400 | 3.1e2 / 3.7e9 | yes | values | 0 |
+| `stf_rhs_F_1e-6` | 9 | 9.6e4 / 1.2e6 | 376 | 1.3 / 6.5e3 | no | values | 0 |
+| `stf_rhs_F_g_h` | 9 | 1.2e11 / 1.2e12 | 399 | 1.1e3 / 4.7e9 | yes | values | 0 |
+| `stf_rhs_nodep_F_1e-6` | 3 | 4.2e5 / 2.5e6 | 172 | 1 / 9.2e2 | no | values | 0 |
+| `stf_rhs_single_refill_dropped` | 3 | 8.2e10 / 9.5e10 | 238 | 1e2 / 8.5e8 | yes | values | 0 |
+| `stf_rhs_single_refill_1e-6` | 3 | 8.2e4 / 9.5e4 | 213 | 1.2 / 5.5e2 | no | values | 0 |
+| `stf_P_tau_dec_1e-6` | 117 | 1.4e3 / 1.9e5 | 383 | 1.2 / 4.5e3 | no | values | 0 |
+| `stf_P_tau_fac_1e-6` | 117 | 3.3e4 / 1e6 | 386 | 1.1 / 6.3e3 | no | values | 0 |
+| `stf_P_G_1e-6` | 117 | 4.1e4 / 4.6e6 | 390 | 1.4 / 1.1e4 | no | values | 0 |
+| `stf_P_tau_h_1e-6` | 117 | 9.6e3 / 1e6 | 377 | 1 / 1.8e4 | no | values | 0 |
+| `stf_P_one_neuron_G_1e-6` | 117 | 4.1e4 / 4.5e6 | 372 | 1.1 / 1.9e3 | no | values | 0 |
+| `stf_nominal_G_1e-6` | 219 | 4.1e4 / 4.6e6 | 390 | 1.4 / 1.1e4 | no | values | 0 |
+| `stf_nominal_tau_h_1e-6` | 162 | 9.6e3 / 1e6 | 377 | 1 / 1.8e4 | no | values | 0 |
+| `stf_params_tau_h_1e-6` | 9 | 1e6 / 1e6 | 0 | - | no | values | 0 |
+| `stf_params_stf_chain_false` | 9 | - | 0 | - | yes | values | 0 |
+| `stf_coupling_b1_g_understated` | 3 | 2.3e10 / 3.8e10 | 84 | 1.5e4 / 1.2e8 | no | values | 0 |
+| `stf_coupling_g_h_understated` | 3 | 2.1e11 / 2.3e11 | 42 | 1.5e6 / 3.7e9 | yes | values | 0 |
+| `stf_init_h_1e-6` | 0 | - | 388 | 1.2 / 2.8e4 | no | values | 0 |
+| `stf_init_h_one` | 0 | - | 404 | 3.8e2 / 4e9 | yes | values | 0 |
+| `stf_init_g_1e-6` | 0 | - | 378 | 1.2 / 5.7e3 | no | values | 0 |
+| `stf_output_g_dropped` | 42 | 3.8e10 / 8.1e11 | 30 | 1.1e5 / 7.6e8 | no | values | 0 |
+| `stf_output_g_h` | 33 | 5.5e11 / 1e12 | 24 | 2.8e5 / 1e9 | no | values | 0 |
+| `stf_output_nodep_g_h` | 3 | 3.9e11 / 5.2e11 | 2 | 5.5e8 / 5.8e8 | no | values | 0 |
+| `stf_facilitation_g_h` | 36 | 5.3e11 / 7.6e11 | 16 | 7.1e8 / 9e8 | no | values | 0 |
+| `stf_facilitation_h` | 36 | 6.8e11 / 8.8e11 | 16 | 8.2e8 / 9.5e8 | no | values | 0 |
+| `stf_registry_product` | 0 (and 1869 missing) | - | 394 (and 92 missing) | 1.3e5 / 2.5e10 | yes | values | 11 |
+| `stf_route_factor_prod` | 36 | 5.3e11 / 7.6e11 | 16 | 7.1e8 / 9e8 | no | values | 0 |
+| `stf_idx_g_h_swapped` | 189 | 6e11 / 3.4e13 | 188 | 2.1e3 / 9.9e9 | yes | values | 0 |
+| `stf_unpack_g_reversed` | 36 | 6.8e11 / 8.8e11 | 34 | 2.4e8 / 9.5e8 | no | values | 0 |
+
+(`stf_registry_product`: the registry hands every pool route the product
+model. A coupled route then has output-only facilitation and no calcium
+trace, so the state vector is shorter (1000 where the reference has 1200
+in `facil`): the pointwise cases cannot be evaluated at the stored states
+and throw, which is the 1869 missing leaves, while the stable networks
+run end to end and fail by value, 394 leaves, plus 92 missing because an
+array changed size or a signature field is gone. `stf_params_stf_chain_false`
+fails nine logical leaves, `view.stf_chain`, which have no factor.)
+
+## What the stf_chain suite sees, and through which leaves
+
+1. **Every entry of the linearisation that facilitation adds or changes
+   is resolved at 1 + 1e-9**: (b1, g), (g, g) with and without the trace,
+   (g, h), (h, h), the rate columns of h, of g and of b1, the factor g in
+   (b1, b1), F and Fs. By factors of 170 to 1100 at the strongest
+   pointwise leaf and 2 to 37 at the weakest, in every stored `J` and
+   `JY` of a network that has the entry (108 leaves, or 36 where only
+   `fmixed` has the variant). The stable layer sees 11 of the 15 such
+   errors too, through top-K and the transient gain, at factors of 1 to
+   15: the pointwise layer is what carries a 1e-9 error here.
+2. **An entry in the wrong place is caught as a gross error**: (b1, g)
+   written at (g, b1), (g, h) at (h, g), the rate column of h in g's
+   row, all at 1e9 and above.
+3. **d = r where d = h belongs, and the reverse**: in the right-hand
+   side (`stf_rhs_d_r_for_h`: 9 `dS` leaves at 3.7e11 and above, 398
+   stable leaves), in (g, g) and in the rate column of g in both
+   directions (`stf_A_g_g_d_r_for_h`, `stf_lin_d_r_for_h`,
+   `stf_lin_d_h_for_r`).
+4. **The factor g in the release term and in F are separable.** Dropped
+   from the release term alone (`stf_rhs_release_g_dropped`: the
+   output-only form on a pool route) the nine `dS` leaves fail at 3e10;
+   dropped from F alone (`stf_rhs_F_g_dropped`) at 4e10 and above; at
+   1 + 1e-6 either fails `dS` by 8e4 to 1e6 and about 375 stable leaves.
+   In the linearisation the pointwise count is 99 and not 108 where an
+   error only removes a factor g: each of the nine cases holds its run's
+   first sample, where g is exactly 1 and that state's `J` cannot differ.
+5. **Each term of the g and h equations at 1 + 1e-6** fails `dS` by 5e4
+   to 1e6 and 219 to 378 stable leaves; the trace's two terms
+   separately.
+6. **An error in the per-neuron parameters is invisible to the view and
+   caught by everything else**: 117 pointwise leaves against 162 or 219
+   when the nominal row is wrong too. One neuron's G is enough (4e4 at
+   the weakest pointwise leaf).
+7. **The leaves that exist because nothing else reads the code they
+   check** did their work: `stf_facilitation_g_h`, `stf_facilitation_h`
+   and `stf_route_factor_prod` (the display factor returned as g h) fail
+   36 pointwise and 16 stable `stf_factor` leaves and nothing else;
+   `stf_params_tau_h_1e-6` and `stf_params_stf_chain_false` fail the
+   nine view leaves and nothing else.
+8. **The initial state is seen by the stable layer only**, as for the
+   chain: h starting at 1e-6, or at 1 like every other route variable,
+   and g at 1 + 1e-6 (378 to 404 leaves).
+9. **The understated coupling is caught through the routes whose block
+   it makes diagonal**: without (b1, g), the single pool with g
+   (`jacobian_times` then drops the entry: 3 `JY` leaves at 2e10, 84
+   stable); without (g, h), the route with g and h alone (3 at 2e11, 42
+   stable). On the chain with g and h the same understatement changes
+   nothing, because that block is not diagonal either way and the class
+   reads only whether it is.
+
+## What the stf_chain suite cannot see, and what is thin
+
+| Not reached | What covers it |
+|---|---|
+| An error in `route_pool`'s `steady_state`. No case of the tier calls it. | `test_route_models` (the closed form against the right-hand side, a long integration, and Plan A 4.6's numbers) and `test_stf_chain_model`, check 2. |
+| d = h where d = r belongs in the RIGHT-HAND SIDE of a route without a trace. It cannot be written as an edit that runs: the route has no h to read. | Its form in the linearisation is in the list; `test_route_models` compares the right-hand side with an independent loop. |
+| The refusals (`ChainStfOutputOnly`, `ChainStfProductStd`, ...). | `test_route_models`, section 3c; `test_stf_chain_model`, check 6. |
+| The zero floor beside a pool route without depression (allowed, not in force). | `test_stf_chain_model`, check 6. |
+| `P.coupling` understated where the block stays non-diagonal. Nothing reads it there. | `test_route_models` checks the statement itself against central differences, per variant. |
+| `initial` returning different values per neuron. | Nothing yet; FD-015 (the spread) is where that becomes possible. |
+
+Thin, though caught: **the output factor of a route with g and h and no
+depression** is read by five leaves only (`stf_output_nodep_g_h`: three
+pointwise, two stable, all `synaptic_output` of `fmixed`'s E->SST), at
+4e11, because `output` feeds the unpacked synaptic output and nothing
+else and only one route of the suite is of that kind. The memory-capacity
+case reads `output` on a chain with g and h, not on this variant.
+
+## Round-off floor of the stf_chain suite
+
+Measured on the same day, nothing committed:
+
+- **Thread count.** Captured at 14 threads; at 1 and at 4 threads 24 of
+  2017 float leaves move, none in the pointwise layer, none of them an
+  exact leaf, and all 24 under existing overrides (the closest: the
+  top-K orthonormality defect at 8.6e-5 of its override).
+- **Harmless reorderings in `route_pool`** (through the harness, as three
+  "mutations" that must NOT be caught): the g and h equations with their
+  divisions regrouped, the release term as `(g r) b1 / tau_rel`, and the
+  (g, h) entry as a product with the reciprocal. None is caught. The
+  release probe moves 360 float leaves, the closest to its tolerance
+  being `stable.estimators.facil.benettin.local_lya` at 1.3e-11 against
+  1e-9 (**80 times inside**); the g and h probe 130, the closest the same
+  kind of leaf at 220 times inside; the linearisation probe 70, the
+  closest `JY` at 2.7e-16 against 1e-12. `dS` moves by 2e-16 at most,
+  trajectories by 3.5e-16, top-K by 7e-14.
+
+**One criterion of the other two suites does not hold here, and it is
+not instability.** The leading direction's LOCAL rate is positive at
+times in the stable layer (+1.6 per second in `facil`, +0.37 in
+`fmixed`), where the base and chain suites' never reaches zero. Lowering
+the gain does not change it (+2.1 at gain 0.1 and at 0.05): it comes
+from the coupled route's own block, which is non-normal ((g, h) =
+(G - g)/tau_fac is up to 16 per second beside decay rates of about 2,
+and (b1, g) = -b1 r/tau_rel), so a tangent vector can grow for a while
+although every exponent is negative (top-K lambda_1 -0.36 and -0.58; no
+estimator finds a positive exponent; no K retry; sweep lambda_1 -0.69 to
+-0.33). The round-off evidence above is what says the margin is enough:
+a reordering moves a stable leaf by 1.3e-11 at most.
+
+## The chain suite still catches what it caught
+
+`route_pool` was rewritten from fixed two-pool lines into one code path
+over the variables a route has, so the 52 entries of
+`regression_tol_mutations_chain` no longer found their text. The same 52
+errors were re-expressed on the new lines (names, order and meaning
+unchanged) and run against the chain reference: **52 of 52 caught, all
+by compared values, no case threw**, and the number of failing leaves in
+each layer is the 2026-11-12 table's for every one of the 52
+(`chain_A11_dropped` 102 and 284, `chain_registry_product` 309 failing
+and 72 missing pointwise and 328 stable, and so on). The unmutated code
+passes the chain reference at `'rtol', 0` with no leaf moved, and the
+byte-exact `test_regression_rapid_chain` passes: the chain without
+facilitation computes what it computed.
+
+## How the restore was checked
+
+All 146 runs (91 + 52 + the three probes) reported the mutated file's
+blob restored. After the last, `git status --porcelain` was empty,
+`regression_tol_check('stf_chain', 'rtol', 0)` and
+`regression_tol_check('chain', 'rtol', 0)` passed with no leaf moved,
+and `run_all_tests('quick')` passed 63 of 63 with a pool of 4, the
+byte-exact `test_regression_rapid` and `test_regression_rapid_chain`
+among them.
