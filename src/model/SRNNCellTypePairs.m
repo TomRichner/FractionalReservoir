@@ -2334,24 +2334,35 @@ classdef SRNNCellTypePairs < handle
         end
 
         function J = compute_Jacobian_fast(S, params)
+            % COMPUTE_JACOBIAN_FAST The sparse Jacobian of dynamics_fast at state S.
+            %
+            % Rows = which derivative, columns = which state. With phi' the
+            % activation's derivative, c_eff the SFA strength per timescale
+            % and, per route, the model's linearisation L (route_model:
+            % L.A = d(ds)/ds, L.B = d(ds)/dr, L.F the output factor,
+            % L.Fs = dF/ds):
+            %   (a, a), (a, x)  the SFA ladder, below
+            %   (s, s)  L.A, per presynaptic neuron
+            %   (s, x)  L.B phi'             on the presynaptic neuron's x
+            %   (s, a)  -c_eff L.B phi'      on each of its SFA variables
+            %   (x, s)  W_block diag(r L.Fs(:, k)) / tau_d
+            %   (x, x)  -1/tau_d  +  W_block diag(L.F phi') / tau_d
+            %   (x, a)  -c_eff W_block diag(L.F phi') / tau_d
+            % because the rate is r = phi(x - c_eff sum_k a_k) and a route's
+            % synaptic output is theta = r F(s).
+            %
+            % ANY CHANGE HERE OR IN dynamics_fast MUST BE MIRRORED IN
+            % jacobian_times (see its header).
             C = params.n_cellTypes;
             layout = params.state_layout;
+            route = SRNNCellTypePairs.active_routes(params);
             n = params.n;
-            a = cell(1, C);
-            b_state = cell(C, C);
-            g_state = cell(C, C);
-            depression = cell(C, C);
-            facilitation = cell(C, C);
-            x = S(layout.x);
-            x_eff = x;
-
+            x_eff = S(layout.x);
             for q = 1:C
-                idx = params.type_indices{q}; nq = params.n_per_type(q);
                 if params.n_a(q) > 0
-                    a{q} = reshape(S(layout.a{q}), nq, params.n_a(q));
-                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a{q}, 2);
-                else
-                    a{q} = zeros(nq, 0);
+                    idx = params.type_indices{q};
+                    a = reshape(S(layout.a{q}), params.n_per_type(q), params.n_a(q));
+                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a, 2);
                 end
             end
 
@@ -2391,135 +2402,54 @@ classdef SRNNCellTypePairs < handle
                 pre_rate_prime = rate_prime(pre_idx);
                 na = params.n_a(pre);
                 row_a = layout.a{pre};
+                neuron = (1:npre)';
                 for post = 1:C
                     post_idx = params.type_indices{post};
-                    nb = params.n_b_pairs(pre, post);
-                    ng = params.n_g_pairs(pre, post);
-                    row_b = layout.b{pre, post};
-                    row_g = layout.g{pre, post};
-
-                    if nb > 0
-                        b_state{pre, post} = reshape( ...
-                            S(row_b), npre, nb);
-                        [depression{pre, post}, combine_gain] = ...
-                            SRNNCellTypePairs.combine_std_pair( ...
-                            prod(b_state{pre, post}, 2), params, pre, post);
-                    else
-                        b_state{pre, post} = ones(npre, 0);
-                        depression{pre, post} = ones(npre, 1);
-                    end
-                    if ng > 0
-                        g_state{pre, post} = reshape( ...
-                            S(row_g), npre, ng);
-                        facilitation{pre, post} = prod(g_state{pre, post}, 2);
-                    else
-                        g_state{pre, post} = ones(npre, 0);
-                        facilitation{pre, post} = ones(npre, 1);
-                    end
-                    depression_syn = SRNNCellTypePairs.apply_std_zero_floor_pair( ...
-                        depression{pre, post}, params, pre, post);
-
-                    if nb > 0
-                        if na > 0
-                            coeff = b_state{pre, post} .* ...
-                                (params.c_eff(pre) .* pre_rate_prime ...
-                                ./ params.tau_b_rel{pre, post});
-                            stack = sparse(1:numel(row_b), ...
-                                repmat((1:npre)', nb, 1), coeff(:), ...
-                                numel(row_b), npre);
-                            J(row_b, row_a) = kron(sparse(ones(1, na)), stack);
-                        end
-                        tau_rel_stack = kron(params.tau_b_rel{pre, post}(:), ...
-                            ones(npre, 1));
-                        diagonal = kron(-1 ./ params.tau_b_rec{pre, post}(:), ...
-                            ones(npre, 1)) - repmat(pre_rate, nb, 1) ./ tau_rel_stack;
-                        J(row_b, row_b) = spdiags( ...
-                            diagonal, 0, numel(row_b), numel(row_b));
-                        vals = -(b_state{pre, post}(:) .* ...
-                            repmat(pre_rate_prime, nb, 1)) ./ tau_rel_stack;
-                        J(row_b, row_x) = sparse(1:numel(row_b), ...
-                            repmat(pre_idx(:), nb, 1), vals, numel(row_b), n);
-                    end
-
-                    if ng > 0
-                        if na > 0
-                            coeff = -(params.G{pre, post} - g_state{pre, post}) .* ...
-                                (params.c_eff(pre) .* pre_rate_prime ...
-                                ./ params.tau_g_fac{pre, post});
-                            stack = sparse(1:numel(row_g), ...
-                                repmat((1:npre)', ng, 1), coeff(:), ...
-                                numel(row_g), npre);
-                            J(row_g, row_a) = kron(sparse(ones(1, na)), stack);
-                        end
-                        tau_fac_stack = kron(params.tau_g_fac{pre, post}(:), ...
-                            ones(npre, 1));
-                        diagonal = kron(-1 ./ params.tau_g_dec{pre, post}(:), ...
-                            ones(npre, 1)) - repmat(pre_rate, ng, 1) ./ tau_fac_stack;
-                        J(row_g, row_g) = spdiags( ...
-                            diagonal, 0, numel(row_g), numel(row_g));
-                        G_stack = kron(params.G{pre, post}(:), ones(npre, 1));
-                        vals = ((G_stack - g_state{pre, post}(:)) .* ...
-                            repmat(pre_rate_prime, ng, 1)) ./ tau_fac_stack;
-                        J(row_g, row_x) = sparse(1:numel(row_g), ...
-                            repmat(pre_idx(:), ng, 1), vals, numel(row_g), n);
-                    end
-
+                    R = route{pre, post};
+                    model = R.model;
+                    P = R.P;
+                    ns = P.ns;
+                    row_s = R.idx;
+                    L = model.linearize(reshape(S(row_s), npre, ns), pre_rate, P);
                     W_block = params.W(post_idx, pre_idx);
-                    synaptic_modulation = facilitation{pre, post} .* depression_syn;
-                    rate_block = W_block * spdiags( ...
-                        synaptic_modulation .* pre_rate_prime, 0, npre, npre);
+
+                    if ns > 0
+                        % The route's rows are component-major: variable m of
+                        % neuron i is entry at(i, m) = (m - 1) npre + i of row_s.
+                        at = neuron + npre .* (0:ns - 1);                  % npre x ns
+                        n_s = npre * ns;
+
+                        % (s, s): entry (i, m, k) of L.A at row at(i, m),
+                        % column at(i, k).
+                        J(row_s, row_s) = sparse(repmat(at, 1, ns), repelem(at, 1, ns), ...
+                            reshape(L.A, npre, ns * ns), n_s, n_s);
+
+                        % (s, x) and (s, a): the rate's part, through phi'.
+                        to_x = L.B .* pre_rate_prime;                      % npre x ns
+                        J(row_s, row_x) = sparse(at(:), repmat(pre_idx(:), ns, 1), ...
+                            to_x(:), n_s, n);
+                        if na > 0
+                            stack = sparse(at(:), repmat(neuron, ns, 1), ...
+                                -params.c_eff(pre) .* to_x(:), n_s, npre);
+                            J(row_s, row_a) = kron(sparse(ones(1, na)), stack);
+                        end
+
+                        % (x, s): theta = r F, so d theta / d s_k = r dF/ds_k.
+                        to_theta = pre_rate .* L.Fs;                       % npre x ns
+                        D = sparse(repmat(neuron, ns, 1), at(:), to_theta(:), npre, n_s);
+                        J(row_x(post_idx), row_s) = (W_block * D) ./ params.tau_d;
+                    end
+
+                    % (x, x) and (x, a): d theta / d r = F, through phi'.
+                    rate_block = W_block * spdiags(L.F .* pre_rate_prime, 0, npre, npre);
                     J(row_x(post_idx), row_x(pre_idx)) = ...
                         J(row_x(post_idx), row_x(pre_idx)) + rate_block ./ params.tau_d;
-
                     if na > 0
                         replicate = kron(ones(1, na), speye(npre));
                         block = -params.c_eff(pre) .* rate_block;
                         J(row_x(post_idx), row_a) = ...
                             J(row_x(post_idx), row_a) + ...
                             (block * replicate) ./ params.tau_d;
-                    end
-                    if nb > 0
-                        product_derivative = zeros(npre, nb);
-                        for m = 1:nb
-                            other = [1:m-1, m+1:nb];
-                            if isempty(other)
-                                product_derivative(:, m) = 1;
-                            else
-                                product_derivative(:, m) = ...
-                                    prod(b_state{pre, post}(:, other), 2);
-                            end
-                        end
-                        gain = 1;
-                        if params.std_zero_floor
-                            p_min = SRNNCellTypePairs.std_zero_floor_pmin( ...
-                                params, pre, post);
-                            gain = 1 / (1 - p_min);
-                        end
-                        % chain rule through the combine (1 under 'product')
-                        gain = gain .* combine_gain;
-                        coeff = gain .* facilitation{pre, post} .* ...
-                            pre_rate .* product_derivative;
-                        D = sparse(repmat((1:npre)', nb, 1), ...
-                            1:numel(row_b), coeff(:), npre, numel(row_b));
-                        J(row_x(post_idx), row_b) = ...
-                            (W_block * D) ./ params.tau_d;
-                    end
-                    if ng > 0
-                        product_derivative = zeros(npre, ng);
-                        for k = 1:ng
-                            other = [1:k-1, k+1:ng];
-                            if isempty(other)
-                                product_derivative(:, k) = 1;
-                            else
-                                product_derivative(:, k) = ...
-                                    prod(g_state{pre, post}(:, other), 2);
-                            end
-                        end
-                        coeff = depression_syn .* pre_rate .* product_derivative;
-                        D = sparse(repmat((1:npre)', ng, 1), ...
-                            1:numel(row_g), coeff(:), npre, numel(row_g));
-                        J(row_x(post_idx), row_g) = ...
-                            (W_block * D) ./ params.tau_d;
                     end
                 end
             end
