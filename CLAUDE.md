@@ -172,13 +172,38 @@ file name, not by pixel.
 no number** (the pool module, configs, figures, plumbing). They cannot
 gate a rewrite of the model's arithmetic, where a reordered expression
 changes the last bit, and a tolerance cannot be applied to their chaotic
-trajectories. For that, Plan A (sections 2 and 6) adds a **tolerance
-tier**, not built yet: single evaluations of the right-hand side and the
-Jacobians at stored states, and small stable networks end to end, with a
-fresh reference captured before any critical edit and one anchor kept
-throughout. A tolerance-tier failure is a defect to find, never a reason
-to loosen a tolerance. After the refactor of Plan A step 0d passes that
-tier, the three exact references are re-captured once, by the lead.
+trajectories. For that there is a **tolerance tier** (FD-020, Plan A
+sections 2 and 6; built 2026-11-11, its tolerances still proposed until
+the mutation checks of step 0c fix them):
+
+| Run it with | Time | What it covers |
+|---|---|---|
+| `run_all_tests('test_regression_tolerance')` (in the quick suite), or `regression_tol_check('anchor')` | 24 s | **Pointwise:** `dynamics_fast`, `compute_Jacobian_fast`, `jacobian_times` and a canonical view of the parameters at 111 states stored in the fixture (chaotic and stable networks, three conditions, noise off and on, and the three-cell-type options network), at rtol 1e-12. **Stable, end to end:** small stable networks (`regression_stable_steps_*`, gain 0.2, n = 40): trajectories, all three Lyapunov estimators, transient gain, a sweep, memory capacity, at rtol 1e-9, discrete outputs exact. |
+| `regression_tol_band_check('rapid' \| 'stages' \| 'full')` | as that tier | The existing digests with a loose tolerance: structural rows fail, value rows are listed as a band. On demand. |
+
+It compares **element by element** (`regression_tol_compare`; the exact
+tiers' `regression_compare` compares digest statistics) and reports the
+largest difference per leaf on a pass too, so a pass says how close it
+was. An element passes when it moved by no more than rtol times the
+largest magnitude in its leaf. Every tolerance, and the four leaves that
+need a looser one with the measured reason for each, is in
+`regression_tol_settings`. The tier stores physics, never the `params`
+struct, so it survives a refactor of the model; leaves that exist only in
+a new run are reported, not failed.
+
+**The anchor**, `scripts/tests/fixtures/regression_tol_anchor.mat`
+(8.7 MB), was captured from the model class before it was touched (blob
+`2b0118d4`) and is kept throughout: compare against it after every merge
+that touches `src/model/` or `ParamSpaceAnalysis2.m`. Before a critical
+edit also capture a pre-edit reference,
+`make_regression_tol_reference('<name>')` (written under
+`data/regression_tol/`, never committed), and compare after with
+`regression_tol_check('<name>')`. **A tolerance-tier failure is a defect
+to find, never a reason to loosen a tolerance or re-capture.** The tier
+runs serially in the client and does not need a pool; at its sizes the
+thread count moves nothing in the pointwise layer. After the refactor of
+Plan A step 0d passes it, the three exact references are re-captured
+once, by the lead.
 
 Two things to know. The full tier runs longer than the MATLAB MCP client
 waits (a call silent for 30 minutes is dropped, though MATLAB carries on):
@@ -324,7 +349,7 @@ Four figures name their own preset because they are deliberately different netwo
 
 `setup_paths.m` lives at the **repo root** and derives everything from its own location. It deliberately enumerates `src/` and `scripts/` rather than `genpath`-ing the root: `data/`, `figs/` and `docs/` must stay off the path, and `data/param_space/run_all_*/` holds copies of the launcher scripts that would otherwise shadow the originals. It never calls `savepath`. `run_all_analyses.m` and friends derive `project_root = fileparts(which('setup_paths'))`, so they tolerate living in a subdirectory.
 
-There is no standalone test framework; ad-hoc verification scripts live in `scripts/tests/` as `test_*.m` (e.g. `test_std_product_model.m`, `test_psa_saveload.m`, `test_SRNNCellTypePairs.m`, `test_SRNN2_S_c_heterogeneity.m`). **`run_all_tests` is the one entry point** (2026-11-10): `run_all_tests('quick')` runs the 53 fast tests in about 4.5 minutes (including the ultrarapid regression), `run_all_tests('slow')` the 8 slow ones (about 20 minutes plus the 50-minute full regression), and it takes a name, a wildcard or a cell of names; it returns a table and counts a printed `FAIL` as a failure even when nothing throws. Run single tests from the MATLAB editor or via the matlab MCP `run_matlab_file` tool. Two report styles coexist: some print `PASS`/`FAIL` per check and a final banner, others `assert` and are silent until they throw.
+There is no standalone test framework; ad-hoc verification scripts live in `scripts/tests/` as `test_*.m` (e.g. `test_std_product_model.m`, `test_psa_saveload.m`, `test_SRNNCellTypePairs.m`, `test_SRNN2_S_c_heterogeneity.m`). **`run_all_tests` is the one entry point** (2026-11-10): `run_all_tests('quick')` runs the 55 fast tests in about 5 minutes (including the ultrarapid regression and the tolerance tier), `run_all_tests('slow')` the 9 slow ones (about 20 minutes plus the 50-minute full regression), and it takes a name, a wildcard or a cell of names; it returns a table and counts a printed `FAIL` as a failure even when nothing throws. Run single tests from the MATLAB editor or via the matlab MCP `run_matlab_file` tool. Two report styles coexist: some print `PASS`/`FAIL` per check and a final banner, others `assert` and are silent until they throw.
 
 **Run the tests that cover what you touched, including the plotting assertions.** Several tests reach into figure objects (`test_SRNNCellTypePairs` checks the actual line colours of `plot_celltypes`), so a change to a colormap or a plot helper can break a test that looks unrelated to the model maths.
 
@@ -559,9 +584,9 @@ anything.
 - `setup_paths.m` — shared bootstrap, **at the repo root**, not under `scripts/` (self-locating; resolvable from a cold session with cwd at the root).
 - `scripts/paper/` — the two entry points, `paper_config.m` and `reproduce_paper_run.m`. **Start here.**
 - `scripts/examples/` — exploratory scripts. Nineteen of them, thirteen having moved out of `tests/` where they had accumulated; several are stale, and reviewing them is tracked follow-up work.
-- `scripts/tests/` — 61 `test_*.m` verification scripts, three of them the regression tiers (audited 2026-11-10, FD-001: all pass; five exploratory scripts that asserted nothing were removed), `run_all_tests.m`, plus the two `*TestAccess` helper classes, `make_preset_golden.m` (a fixture generator, not a test) and `fixtures/`. Run them from the editor or via the matlab MCP `run_matlab_file` tool.
+- `scripts/tests/` — 64 `test_*.m` verification scripts (61 until FD-016, FD-017 and FD-020 each added one), three of them the regression tiers (audited 2026-11-10, FD-001: all pass; five exploratory scripts that asserted nothing were removed), `run_all_tests.m`, plus the two `*TestAccess` helper classes, `make_preset_golden.m` (a fixture generator, not a test) and `fixtures/`. Run them from the editor or via the matlab MCP `run_matlab_file` tool.
 
-  **`fixtures/golden_preset_outputs.mat` is force-added to git** (`*.mat` is gitignored). It freezes every `srnn_param_preset` output — 42 presets and 136 conditions as of 2026-11-10, after the four regression presets were added (13 and 49 when first captured), plus the retired/unknown error identifiers — first captured *before* the conditions refactor and regenerated whenever a preset is added (2026-09-04 for the two `mu8p25` presets, 2026-09-09 for `sfaEI`), and `test_preset_golden` compares against it with no exclusions. Note the unknown-name error *message* is frozen too, and it embeds the valid-preset list, so **adding a preset legitimately fails this test** until the fixture is regenerated. If that test fails, fix the code, not the fixture: `make_preset_golden` refuses to overwrite an existing one, so regenerating means deleting the `.mat` deliberately and saying in the commit message why the expected values moved.
+  **`fixtures/golden_preset_outputs.mat` is force-added to git** (`*.mat` is gitignored). It freezes every `srnn_param_preset` output — 44 presets and 142 conditions as of 2026-11-11, with the two `regression_stable_steps_*` presets of the tolerance tier (42 and 136 on 2026-11-10, after the four regression presets were added; 13 and 49 when first captured), plus the retired/unknown error identifiers — first captured *before* the conditions refactor and regenerated whenever a preset is added (2026-09-04 for the two `mu8p25` presets, 2026-09-09 for `sfaEI`), and `test_preset_golden` compares against it with no exclusions. Note the unknown-name error *message* is frozen too, and it embeds the valid-preset list, so **adding a preset legitimately fails this test** until the fixture is regenerated. If that test fails, fix the code, not the fixture: `make_preset_golden` refuses to overwrite an existing one, so regenerating means deleting the `.mat` deliberately and saying in the commit message why the expected values moved.
 
 ### Figure conventions
 
