@@ -24,7 +24,10 @@ classdef SRNNCellTypePairs < handle
     % route gets unless it asks otherwise. A route that states
     % synapse_config.<pre>.<post>.std.model = 'chain' gets route_pool, the
     % chained vesicle pools (a releasable pool b1 and its reserve b2;
-    % theta = r b1). compile_route is the one place that choice is made.
+    % theta = r b1), and one that states .stf.model = 'chain' gets the same
+    % model with release-coupled facilitation (a release probability g,
+    % optionally driven by a calcium trace h; theta = r g b1).
+    % compile_route is the one place that choice is made.
     %
     % Example:
     %   model = SRNNCellTypePairs( ...
@@ -124,15 +127,27 @@ classdef SRNNCellTypePairs < handle
         %            releasable-pool capacity)
         %          std.model is 'product' (also what its absence means) or
         %          'chain'.
-        %   stf    facilitation: struct('tau_dec', .., 'tau_fac', .., 'G', ..).
-        %          Not on a chain route (FD-018).
+        %   stf    facilitation. Output-only (the default; route_product):
+        %            struct('tau_dec', [..], 'tau_fac', [..], 'G', [..])
+        %          Release-coupled (route_pool): release probability g
+        %          multiplies the output AND the rate at which the
+        %          releasable pool is used:
+        %            struct('model', 'chain', 'tau_dec', scalar,
+        %            'tau_fac', scalar, 'G', scalar >= 1)   plus the
+        %            optional 'tau_h', the time constant of a calcium
+        %            trace h that then drives g in place of the rate
+        %          stf.model is 'product' (also what its absence means) or
+        %          'chain'. With 'chain' the route's depression is absent,
+        %          ONE component (it is the pool b1) or the chain. A chain
+        %          route takes no output-only facilitation.
         %   scale  a positive weight multiplier for the route (default 1)
         % The fields of std and stf belong to the route's model
         % (route_product, route_pool), which validates them.
         synapse_config = struct()
         % STD_ZERO_FLOOR Map each product route's depression factor linearly
         % so that its value at the steady state of r = 1 becomes 0
-        % (route_product). Refused when any route is a chain.
+        % (route_product). Refused when any route with depression is a
+        % vesicle-pool route (std.model or stf.model = 'chain').
         std_zero_floor = false
         % VERBOSE Console verbosity: 'verbose' (every build/run/Lyapunov line),
         % 'minimal' (DEFAULT: the class prints nothing; stages and drivers print
@@ -965,6 +980,15 @@ classdef SRNNCellTypePairs < handle
             params.tau_g_dec = pair.tau_g_dec;
             params.tau_g_fac = pair.tau_g_fac;
             params.G = pair.G;
+            % Release-coupled facilitation (stf.model = 'chain';
+            % route_pool): n_g_pairs is 1 there, or 2 with a calcium
+            % trace: g column 1 is the release probability g and column 2
+            % the calcium trace h, which is NOT a factor of the output.
+            % tau_g_dec, tau_g_fac and G hold ONE value each. Take a
+            % route's facilitation factor from stf_route_factor, not from
+            % prod(g).
+            params.stf_chain = pair.stf_chain;       % C x C (pre, post) logical
+            params.stf_tau_h = pair.stf_tau_h;       % C x C (pre, post), NaN where the route has no calcium trace
             params.tau_d = obj.tau_d;
             params.activation_function = obj.activation_function;
             params.activation_function_derivative = obj.activation_function_derivative;
@@ -1441,7 +1465,8 @@ classdef SRNNCellTypePairs < handle
                 'tau_g_dec', {cell(C, C)}, 'tau_g_fac', {cell(C, C)}, ...
                 'G', {cell(C, C)}, 'scale', ones(C, C), ...
                 'std_geomean', false(C, C), 'std_chain', false(C, C), ...
-                'std_n2', nan(C, C), 'route', {cell(C, C)});
+                'std_n2', nan(C, C), 'stf_chain', false(C, C), ...
+                'stf_tau_h', nan(C, C), 'route', {cell(C, C)});
 
             config = obj.synapse_config;
             if ~isempty(config)
@@ -1530,6 +1555,13 @@ classdef SRNNCellTypePairs < handle
                     pair.tau_g_dec{pre, post} = nominal.tau_dec;
                     pair.tau_g_fac{pre, post} = nominal.tau_fac;
                     pair.G{pre, post} = nominal.G;
+                    % (stf_model and tau_h are the pool model's.)
+                    if isfield(nominal, 'stf_model') && strcmp(nominal.stf_model, 'chain')
+                        pair.stf_chain(pre, post) = true;
+                        if ~isempty(nominal.tau_h)
+                            pair.stf_tau_h(pre, post) = nominal.tau_h;
+                        end
+                    end
                 end
             end
         end
@@ -1849,9 +1881,12 @@ classdef SRNNCellTypePairs < handle
             end
             if has_g
                 panel = panel + 1; ax_handles(panel) = nexttile;
-                g_collapsed = SRNNCellTypePairs.collapse_routes(p.g, 'prod');
+                % Each route's facilitation factor (stf_route_factor): the
+                % product of its components on an output-only route, the
+                % release probability g on a release-coupled one.
+                [g_collapsed, stf_label] = SRNNCellTypePairs.stf_factors(p.g, obj.get_params());
                 SRNNCellTypePairs.plot_route_series( ...
-                    p.t, g_collapsed, obj.cell_type_names, 'STF (product)', true);
+                    p.t, g_collapsed, obj.cell_type_names, stf_label, true);
             end
             if has_lya
                 panel = panel + 1; ax_handles(panel) = nexttile;
@@ -1903,8 +1938,11 @@ classdef SRNNCellTypePairs < handle
             colors = SRNNCellTypePairs.type_colors(C);
             % Each route's depression factor (std_route_factor): the product
             % of its components on a product route, b1 on a chain route.
-            [b_collapsed, std_label] = SRNNCellTypePairs.std_factors(p.b, obj.get_params());
-            g_collapsed = SRNNCellTypePairs.collapse_routes(p.g, 'prod');
+            % Likewise each route's facilitation factor (stf_route_factor):
+            % g, not g h, on a release-coupled route.
+            params_now = obj.get_params();
+            [b_collapsed, std_label] = SRNNCellTypePairs.std_factors(p.b, params_now);
+            [g_collapsed, stf_label] = SRNNCellTypePairs.stf_factors(p.g, params_now);
             fig_handle = figure('Name', 'SRNNCellTypePairs by presynaptic type');
             layout = tiledlayout(fig_handle, n_rows, C, ...
                 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -1960,7 +1998,7 @@ classdef SRNNCellTypePairs < handle
                     ax_handles(row, q) = ax;
                     SRNNCellTypePairs.plot_postsynaptic_route_lines( ...
                         ax, p.t, g_collapsed.(name), obj.cell_type_names);
-                    if q == 1, ylabel(ax, 'STF (product)'); end
+                    if q == 1, ylabel(ax, stf_label); end
                 end
                 if has_lya
                     row = row + 1;
@@ -2225,14 +2263,22 @@ classdef SRNNCellTypePairs < handle
             %          diagonal; jacobian_times then applies only its diagonal
             %
             % THE MODEL IS CHOSEN HERE AND NOWHERE ELSE in the class, from
-            % the route's std.model:
-            %   absent, 'product'   route_product (the field is taken out
-            %                       before its compile, which knows only
-            %                       its own fields)
-            %   'chain'             route_pool, the chained vesicle pools
-            % Anything else errors SRNNCellTypePairs:UnknownStdModel.
+            % the route's std.model and stf.model. Each is absent or
+            % 'product' (today's forms; the field is taken out before the
+            % model's compile) or 'chain':
+            %   neither is 'chain'    route_product
+            %   std.model = 'chain'   route_pool, the chained vesicle pools
+            %   stf.model = 'chain'   route_pool, release-coupled
+            %                         facilitation; the route's depression
+            %                         is then absent, one component (the
+            %                         single pool) or the chain
+            % Anything else errors SRNNCellTypePairs:UnknownStdModel or
+            % SRNNCellTypePairs:UnknownStfModel. Which combinations the
+            % pool model takes is its own business (route_pool: a chain
+            % with output-only facilitation is refused there, for one).
             name = 'product';
             std_cfg = cfg.std;
+            stf_cfg = cfg.stf;
             if isstruct(std_cfg) && isscalar(std_cfg) && isfield(std_cfg, 'model')
                 asked = std_cfg.model;
                 is_text = (ischar(asked) && isrow(asked)) || (isstring(asked) && isscalar(asked));
@@ -2247,8 +2293,22 @@ classdef SRNNCellTypePairs < handle
                         'std.model on %s must be ''product'' or ''chain''.', label);
                 end
             end
+            if isstruct(stf_cfg) && isscalar(stf_cfg) && isfield(stf_cfg, 'model')
+                asked = stf_cfg.model;
+                is_text = (ischar(asked) && isrow(asked)) || (isstring(asked) && isscalar(asked));
+                if is_text && strcmp(asked, 'chain')
+                    name = 'pool';
+                elseif is_text && strcmp(asked, 'product')
+                    stf_cfg = rmfield(stf_cfg, 'model');
+                else
+                    label = 'a route';
+                    if isfield(opts, 'label'), label = ['route ' opts.label]; end
+                    error('SRNNCellTypePairs:UnknownStfModel', ...
+                        'stf.model on %s must be ''product'' or ''chain''.', label);
+                end
+            end
             model = route_model(name);
-            P = model.compile(std_cfg, cfg.stf, opts);
+            P = model.compile(std_cfg, stf_cfg, opts);
             route = struct('model', model, 'P', P, 'cfg', cfg, 'opts', opts, 'idx', [], ...
                 'A_is_diagonal', isdiag(P.coupling));
         end
@@ -2408,6 +2468,47 @@ classdef SRNNCellTypePairs < handle
             D = R.model.depression(b, R.P);
         end
 
+        function Fg = stf_route_factor(g, params, pre, post)
+            %STF_ROUTE_FACTOR The facilitation factor of route (pre, post) from its g array.
+            %
+            %   Fg = SRNNCellTypePairs.stf_route_factor(g, params, pre, post)
+            %
+            % g is the route's g-block as plot_data.g and
+            % unpack_and_compute_states give it: npre x n_g, or
+            % npre x n_g x nt, one row per presynaptic neuron of the route.
+            % Fg has the shape of prod(g, 2) (npre x 1, or npre x 1 x nt),
+            % and is [] where g is empty (a route without facilitation).
+            %
+            % Fg is what facilitation multiplies the route's synaptic
+            % output by:
+            %   output-only route (route_product)   prod_l g_l
+            %   release-coupled route (route_pool,  g, the release
+            %   stf.model = 'chain')                probability: column 1.
+            %                                       NOT g h: the calcium
+            %                                       trace h (column 2) acts
+            %                                       only through g.
+            % CODE THAT DISPLAYS OR USES A ROUTE'S FACILITATION CALLS THIS
+            % and does not form prod(g, 2) itself, as std_route_factor is
+            % for depression. The arithmetic is the model's: its
+            % `facilitation` handle where it has one (route_model), and the
+            % product of the g-block's columns where it has none.
+            if isempty(g)
+                Fg = [];
+                return;
+            end
+            R = params.route{pre, post};
+            if size(g, 2) ~= R.P.n_g
+                error('SRNNCellTypePairs:RouteFactorShape', ...
+                    'Route (%d, %d) has %d facilitation variable(s); g has %d column(s).', ...
+                    pre, post, R.P.n_g, size(g, 2));
+            end
+            if isfield(R.model, 'facilitation')
+                Fg = R.model.facilitation(g, R.P);
+            else
+                Fg = prod(g, 2);
+            end
+        end
+
         % The next three predate the route models and are kept for callers
         % that name them. Each is a delegation to route_product, where the
         % arithmetic is, and they apply to PRODUCT routes only: the
@@ -2442,7 +2543,7 @@ classdef SRNNCellTypePairs < handle
             if ~strcmp(R.P.model, 'product')
                 error('SRNNCellTypePairs:ProductRouteOnly', ...
                     ['%s applies to product depression only, and route (%d, %d) carries the ' ...
-                    '''%s'' route model (std.model = ''chain''). For the depression factor of ' ...
+                    '''%s'' route model (std.model or stf.model = ''chain''). For the depression factor of ' ...
                     'any route use SRNNCellTypePairs.std_route_factor(b, params, pre, post).'], ...
                     caller, pre, post, R.P.model);
             end
@@ -2752,7 +2853,9 @@ classdef SRNNCellTypePairs < handle
             % LEADING_VECTOR_BLOCKS Norm^2 fractions of a tangent vector by block.
             %   B = leading_vector_blocks(q, params.state_layout) returns
             %   B.x, B.sfa, B.std, B.stf (summing to 1) for the dendritic, SFA
-            %   (all a), STD (all b) and STF (all g) coordinates of q.
+            %   (all a), STD (all b) and STF (all g) coordinates of q. The
+            %   g-block of a release-coupled route holds its calcium trace h
+            %   beside g, so h counts as STF.
             q = q(:); tot = sum(q .^ 2);
             ia = [layout.a{:}]; ib = [layout.b{:}]; ig = [layout.g{:}];
             B = struct('x', sum(q(layout.x) .^ 2) / tot, 'sfa', sum(q(ia) .^ 2) / tot, ...
@@ -3218,6 +3321,33 @@ classdef SRNNCellTypePairs < handle
             label = 'STD (product)';
             if any(params.std_chain(:))
                 label = 'STD factor';
+            end
+        end
+
+        function [factor, label] = stf_factors(g_named, params)
+            %STF_FACTORS Every route's facilitation factor from a named g struct.
+            %
+            %   [factor, label] = SRNNCellTypePairs.stf_factors(plot_data.g, params)
+            %
+            % factor.<pre>.<post> is npre x nt, the route's factor at every
+            % time (stf_route_factor), [] where the route has no
+            % facilitation. label is the axis label for a panel of them:
+            % 'STF (product)' while every facilitated route is output-only
+            % (the product of its components), 'STF factor' once any is
+            % release-coupled (whose factor is g and not g h).
+            factor = g_named;
+            names = params.cell_type_names;
+            for pre = 1:numel(names)
+                for post = 1:numel(names)
+                    value = g_named.(names{pre}).(names{post});
+                    if isempty(value), continue; end
+                    Fg = SRNNCellTypePairs.stf_route_factor(value, params, pre, post);
+                    factor.(names{pre}).(names{post}) = reshape(Fg, size(Fg, 1), []);
+                end
+            end
+            label = 'STF (product)';
+            if any(params.stf_chain(:))
+                label = 'STF factor';
             end
         end
 

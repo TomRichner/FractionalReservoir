@@ -43,14 +43,19 @@
 %      0.01 to above 0.99.
 %   8. Each refusal raises its own error, at build: the zero floor,
 %      combine, one or three tau_rec, a vector tau_rel, no n2, an invalid
-%      n2, stf on a chain route, an unknown std.model. Switching the floor
-%      on in params after get_params raises the same error as at build.
+%      n2, output-only stf on a chain route (the error names
+%      stf.model = 'chain'; test_stf_chain_model has the release-coupled
+%      form), an unknown std.model. Switching the floor on in params after
+%      get_params raises the same error as at build.
 %   9. Benettin, QR and top-K run on a chain network and on the same
 %      network with two-component product routes; on each the three
 %      leading exponents lie within 0.2 of each other, the bound for
 %      finite-time exponents of a stable network. And Liouville: the sum
 %      of all the chain network's exponents equals the mean trace of its
-%      Jacobian over the window.
+%      Jacobian over the window. And the TIGHT comparison, on a chain
+%      network that is clearly chaotic (no small one is): the regression
+%      network, n = 100, four chain routes, gain 2, where top-K and
+%      Benettin agree to 1 % on lambda_1 = +1.27.
 % And, from what the refactor behind the route interface found:
 %  10. params: n_b_pairs, std_chain, std_n2, the nominal rows; both pools
 %      start at 1.
@@ -274,7 +279,7 @@ refusals = { ...
     'a vector tau_rel',          @() small_network(on_EE(with('tau_rel', [0.25 0.4]))), 'ChainTauRelNotScalar'
     'no n2',                     @() small_network(on_EE(rmfield(chain, 'n2'))), 'ChainMissingN2'
     'n2 not positive',           @() small_network(on_EE(with('n2', -1))), 'ChainInvalidN2'
-    'stf on a chain route',      @() small_network(with_stf), 'ChainStfNotBuilt'
+    'output-only stf on a chain route', @() small_network(with_stf), 'ChainStfOutputOnly'
     'an unknown std.model',      @() small_network(on_EE(with('model', 'chian'))), 'UnknownStdModel'};
 ok = true;
 ids = cell(1, size(refusals, 1));
@@ -448,6 +453,31 @@ e_liouville = abs(sum(mk.lya_results.LE_spectrum) - mean(trace_J)) / abs(mean(tr
 all_passed = check(sprintf('9. Liouville on the chain network: sum of all %d exponents %.3f, mean trace(J) %.3f (rel %.1e)', ...
     numel(mk.lya_results.LE_spectrum), sum(mk.lya_results.LE_spectrum), mean(trace_J), e_liouville), ...
     e_liouville < 1e-3) && all_passed;
+% The tight comparison needs a CHAOTIC chain network, where the leading
+% exponent is isolated and a finite-time estimate does not depend on the
+% initial basis. The regression network (n = 100) with its four routes
+% switched to the chain is one at gain 2, noise off: over [4, 12] s top-K
+% gave +1.2748 and Benettin +1.2742 on 2026-11-12 (the settings of
+% regression_rapid_chain_run, section 1d; docs/notes/
+% Tolerance_tier_mutation_checks_2026-11-11.md, "A chaotic chain
+% network"). About a second each. The bound is 1 % of the exponent; the
+% two differ by 0.05 %.
+chain4 = struct('std', sc.E.E.std);
+sc4 = struct('E', struct('E', chain4, 'I', chain4), 'I', struct('E', chain4, 'I', chain4));
+chaos = {'rng_seeds', [5 6], 'T_range', [0 12], 'fs', 200, 'lya_T_interval', [4 12], 'lya_warmup', 3, ...
+    'verbose', 'near-none', 'sigma_u_noise', 0, 'ode_solver', 'rk4', 'level_of_chaos', 2, 'synapse_config', sc4};
+preset = 'regression_pairs_noStim_noise0p025_dualStd_3cond';
+mt = build_from_preset(preset, 'sfa3_std2', chaos{:}, 'lya_method', 'topk', 'lya_K', 10, ...
+    'lya_K_auto', false, 'lya_dt', 0.05);
+mt.run();
+mb = build_from_preset(preset, 'sfa3_std2', chaos{:}, 'lya_method', 'benettin');
+mb.run();
+lle_topk = mt.lya_results.LLE;
+lle_ben = mb.lya_results.LLE;
+all_passed = check(sprintf(['9. a chaotic chain network (n = 100, four chain routes, gain 2): top-K %+.4f, ' ...
+    'Benettin %+.4f, apart by %.2f %% (< 1 %%)'], lle_topk, lle_ben, 100 * abs(lle_topk - lle_ben) / lle_topk), ...
+    all(p_chain_routes(mt)) && lle_topk > 1 && lle_ben > 1 && ...
+    abs(lle_topk - lle_ben) <= 0.01 * lle_topk) && all_passed;
 
 fprintf('\n');
 if all_passed
@@ -464,6 +494,12 @@ sc.E.E.std = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2
 sc.E.I.std = struct('tau_rec', 2, 'tau_rel', 0.25);
 sc.I.E.std = struct('model', 'chain', 'tau_rec', [1 3], 'tau_rel', 0.3, 'n2', 1.5);
 sc.I.E.scale = 1.3;
+end
+
+function tf = p_chain_routes(m)
+% Which routes of a built model are chains (the flags of get_params).
+p = m.get_params();
+tf = p.std_chain(:)';
 end
 
 function sc = product_twin(sc)

@@ -44,6 +44,17 @@
 %      inward on the boundary of [0, 1]^2; the 2 x 2 is full and not
 %      symmetric; the signature tells n2 apart and a chain from a product
 %      with the same time constants; each refusal has its own identifier.
+%   3c. route_pool with release-coupled facilitation: every variant
+%      carries exactly its variables and states the coupling it has; the
+%      steady state is g = (1 + G k r)/(1 + k r), h = r and the
+%      facilitation-free pools at the effective rate g r, so the sustained
+%      output is that of the route without facilitation at g r and its
+%      ceiling does not move (Plan A section 4.6's numbers); G = 1 is the
+%      route without facilitation, exactly; g and h cannot leave [1, G]
+%      and [0, 1]; the single pool without facilitation is route_product's
+%      one component; the display factors are b1 and g (not g h); the
+%      signature tells every variant apart; each refusal has its own
+%      identifier.
 %   4.SRNNCellTypePairs.jacobian_times applies a route's A in two ways (its
 %      diagonal where the model states A is diagonal, the full per-neuron
 %      product otherwise): on a network with every kind of route, forcing
@@ -382,7 +393,7 @@ refusals = { ...
     {with('combine', 'geomean'), [], struct(), 'ChainCombine'}, ...
     {with('combine', 'product'), [], struct(), 'ChainCombine'}, ...
     {chain_cfg, [], struct('zero_floor', true), 'ChainZeroFloor'}, ...
-    {chain_cfg, stf_cfg, struct(), 'ChainStfNotBuilt'}, ...
+    {chain_cfg, stf_cfg, struct(), 'ChainStfOutputOnly'}, ...
     {with('tau_rec', [2 -5]), [], struct(), 'InvalidSynapseConfig'}, ...
     {with('tau_rel', 0), [], struct(), 'InvalidSynapseConfig'}, ...
     {without('tau_rel'), [], struct(), 'InvalidSynapseConfig'}, ...
@@ -400,6 +411,189 @@ for k = 1:numel(refusals)
     ok = ok && ok_k;
 end
 all_passed = check(sprintf('    %d bad chain configurations each raise their own <prefix>:<identifier>', numel(refusals)), ok) && all_passed;
+
+%% 3c. route_pool with release-coupled facilitation
+fprintf('  route_pool, release-coupled facilitation\n');
+% Tom's values (Plan A, section 4.6): G = 5, tau_fac = tau_rel = 0.25,
+% tau_dec = 1.5, tau_h = 0.5.
+fac = struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5);
+fac_h = fac;
+fac_h.tau_h = 0.5;
+one_pool = struct('tau_rec', 2, 'tau_rel', 0.25);
+variants = { ...          std        stf     n_b n_g  coupling over the variables present
+    'single pool',        one_pool,  [],     1, 0, true; ...
+    'chain',              chain_cfg, [],     2, 0, true(2); ...
+    'g',                  [],        fac,    0, 1, true; ...
+    'g, h',               [],        fac_h,  0, 2, [true true; false true]; ...
+    'single pool, g',     one_pool,  fac,    1, 1, [true true; false true]; ...
+    'single pool, g, h',  one_pool,  fac_h,  1, 2, [true true false; false true true; false false true]; ...
+    'chain, g',           chain_cfg, fac,    2, 1, [true true true; true true false; false false true]; ...
+    'chain, g, h',        chain_cfg, fac_h,  2, 2, [true true true false; true true false false; ...
+                                                    false false true true; false false false true]};
+ok = true;
+sigs = cell(1, size(variants, 1));
+for k = 1:size(variants, 1)
+    Pk = pool.compile(variants{k, 2}, variants{k, 3}, struct('npre', 3));
+    sigs{k} = Pk.signature;
+    s0 = [ones(1, variants{k, 4}), ones(1, min(variants{k, 5}, 1)), zeros(1, variants{k, 5} == 2)];
+    ok_k = Pk.n_b == variants{k, 4} && Pk.n_g == variants{k, 5} && isequal(Pk.coupling, variants{k, 6}) && ...
+        isequal(pool.initial(Pk), s0) && Pk.has_g == (variants{k, 5} >= 1) && Pk.has_h == (variants{k, 5} == 2) && ...
+        isfield(Pk, 'tau_rec1') == (variants{k, 4} >= 1) && isfield(Pk, 'tau_rec2') == (variants{k, 4} == 2) && ...
+        isfield(Pk, 'n2') == (variants{k, 4} == 2) && isfield(Pk, 'tau_dec') == (variants{k, 5} >= 1) && ...
+        isfield(Pk, 'tau_h') == (variants{k, 5} == 2);
+    if ~ok_k, fprintf('      variant ''%s'' is not as stated\n', variants{k, 1}); end
+    ok = ok && ok_k;
+end
+all_passed = check(sprintf(['    %d variants: each carries exactly its variables (columns [b1, b2 | g, h]), ' ...
+    'its parameters and its coupling; pools and g start at 1, h at 0'], size(variants, 1)), ok) && all_passed;
+distinct = true;
+for k = 1:numel(sigs)
+    for j = k + 1:numel(sigs)
+        distinct = distinct && ~isequal(sigs{k}, sigs{j});
+    end
+end
+sig2 = @(std_cfg, stf_cfg) pool.compile(std_cfg, stf_cfg, struct()).signature;
+other_h = fac_h;
+other_h.tau_h = 0.6;
+other_G = fac;
+other_G.G = 4;
+output_only = product.compile(one_pool, struct('tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5)).signature;
+ok = distinct && ~isequal(sig2(one_pool, fac_h), sig2(one_pool, other_h)) && ...
+    ~isequal(sig2(one_pool, fac), sig2(one_pool, other_G)) && ...
+    ~isequal(sig2(one_pool, fac), output_only) && ...
+    isequal(sig2(chain_cfg, fac_h), pool.compile(chain_cfg, fac_h, struct('npre', 9)).signature) && ...
+    ~isfield(sig2(chain_cfg, []), 'tau_h') && ~isfield(sig2(chain_cfg, []), 'stf_model');
+all_passed = check(['    the signature tells the variants apart, tau_h and G apart, and a coupled route from an ' ...
+    'output-only one with the same numbers; a route without facilitation states no facilitation field'], ok) && all_passed;
+
+% The steady state. kappa = tau_dec/tau_fac = 6.
+r4 = [0.02; 0.1; 0.25; 1];
+g_cf = (1 + 5 * 6 * r4) ./ (1 + 6 * r4);
+e_g = 0;
+e_out = 0;
+e_h = 0;
+rel_out = zeros(4, 2);
+for k = 5:8                                  % the four variants with depression and facilitation
+    Pk = pool.compile(variants{k, 2}, variants{k, 3}, struct('npre', 4));
+    P_plain = pool.compile(variants{k, 2}, [], struct('npre', 4));
+    ss_k = pool.steady_state(r4, Pk);
+    n_b = variants{k, 4};
+    e_g = max(e_g, max(abs(ss_k.s(:, n_b + 1) - g_cf)));
+    if variants{k, 5} == 2, e_h = max(e_h, max(abs(ss_k.s(:, n_b + 2) - r4))); end
+    % r g b1 is the facilitation-free route's sustained output at the rate g r.
+    at_gr = pool.steady_state(g_cf .* r4, P_plain);
+    e_out = max(e_out, max(abs(r4 .* ss_k.F - g_cf .* r4 .* at_gr.F)));
+    e_out = max(e_out, max(abs(ss_k.s(:, 1:n_b) - at_gr.s), [], 'all'));
+    rel_out(:, n_b) = ss_k.F ./ pool.steady_state(r4, P_plain).F;
+end
+for k = 3:4                                  % facilitation alone: F = g
+    ss_k = pool.steady_state(r4, pool.compile([], variants{k, 3}, struct('npre', 4)));
+    e_g = max([e_g; abs(ss_k.s(:, 1) - g_cf); abs(ss_k.F - g_cf)]);
+end
+all_passed = check(sprintf(['    steady state: g = (1 + G k r)/(1 + k r) (max %.1e), h = r (max %.1e), pools and output ' ...
+    'those of the route without facilitation at the rate g r (max %.1e)'], e_g, e_h, e_out), ...
+    e_g <= 1e-15 && e_h == 0 && e_out <= 1e-15) && all_passed;
+all_passed = check(['    Plan A 4.6''s numbers at r = 0.02, 0.1, 0.25, 1: g = 1.43, 2.50, 3.40, 4.43; sustained output ' ...
+    'over no facilitation 1.35, 1.50, 1.31, 1.09 (single pool) and 1.32, 1.19, 1.08, 1.02 (chain)'], ...
+    isequal(round(g_cf, 2), [1.43; 2.50; 3.40; 4.43]) && isequal(round(rel_out(:, 1), 2), [1.35; 1.50; 1.31; 1.09]) && ...
+    isequal(round(rel_out(:, 2), 2), [1.32; 1.19; 1.08; 1.02])) && all_passed;
+% Coupled facilitation does not raise the chain's ceiling 1/18.
+out_f = r_up .* pool.steady_state(r_up, pool.compile(chain_cfg, fac_h, struct('npre', numel(r_up)))).F;
+all_passed = check(sprintf(['    the sustained output with facilitation rises to the same ceiling 1/18 (at r = 1e6: ' ...
+    '1/%.4f) and is above the output without it at every rate'], 1 / out_f(end)), ...
+    all(diff(out_f) > 0) && out_f(end) < 1 / 18 && abs(out_f(end) - 1 / 18) <= 1e-6 && all(out_f > out)) && all_passed;
+
+% G = 1: g has nowhere to go, and at g = 1 the pools' equations are the
+% facilitation-free route's, to the last bit.
+flat = fac_h;
+flat.G = 1;
+P_flat = pool.compile(chain_cfg, flat, struct('npre', 50));
+s_flat = [rand(50, 2), ones(50, 1), rand(50, 1)];
+[d_flat, F_flat] = pool.rhs(s_flat, rr, P_flat);
+[d_plain, F_plain] = pool.rhs(s_flat(:, 1:2), rr, P50);
+all_passed = check('    G = 1: dg/dt = 0 at g = 1, and the pools and the output are the chain''s without facilitation, exactly', ...
+    all(d_flat(:, 3) == 0) && isequal(d_flat(:, 1:2), d_plain) && isequal(F_flat, F_plain)) && all_passed;
+
+% g stays in [1, G] and h in [0, 1] (for a rate in [0, 1]); b1 stays in
+% [0, 1] with g in its release term.
+P_edge = pool.compile(chain_cfg, fac_h, struct('npre', 50));
+P_edge1 = pool.compile(one_pool, fac, struct('npre', 50));
+at = @(g, h) pool.rhs([edge, edge, g, h], rr, P_edge);
+d_g1 = at(ones(50, 1), edge);
+d_gG = at(5 * ones(50, 1), edge);
+d_h0 = at(1 + 4 * edge, zeros(50, 1));
+d_h1 = at(1 + 4 * edge, ones(50, 1));
+d_g1r = pool.rhs([edge, ones(50, 1)], rr, P_edge1);
+d_gGr = pool.rhs([edge, 5 * ones(50, 1)], rr, P_edge1);
+d_b10 = pool.rhs([zeros(50, 1), edge, 1 + 4 * edge, edge], rr, P_edge);
+d_b11 = pool.rhs([ones(50, 1), edge, 1 + 4 * edge, edge], rr, P_edge);
+all_passed = check('    g cannot leave [1, G], h cannot leave [0, 1], b1 cannot leave [0, 1] with g in the release term', ...
+    all(d_g1(:, 3) >= 0) && all(d_gG(:, 3) <= 0) && all(d_h0(:, 4) >= 0) && all(d_h1(:, 4) <= 0) && ...
+    all(d_g1r(:, 2) >= 0) && all(d_gGr(:, 2) <= 0) && all(d_b10(:, 1) >= 0) && all(d_b11(:, 1) <= 0)) && all_passed;
+
+% The single pool without facilitation is route_product's one component.
+P_single = pool.compile(one_pool, [], struct('npre', npre));
+P_prod = product.compile(one_pool, [], struct('npre', npre));
+s1 = 0.05 + 0.9 * rand(npre, 1);
+[d_s, F_s] = pool.rhs(s1, rates, P_single);
+[d_p, F_p] = product.rhs(s1, rates, P_prod);
+L_s = linearized(pool, s1, rates, P_single);
+L_p = linearized(product, s1, rates, P_prod);
+e_same = max([abs(d_s - d_p); abs(F_s - F_p); abs(L_s.A(:) - L_p.A(:)); abs(L_s.B - L_p.B); abs(L_s.Fs - L_p.Fs); ...
+    abs(pool.steady_state(rates, P_single).s - product.steady_state(rates, P_prod).s)]);
+all_passed = check(sprintf('    the single pool without facilitation is the product''s one component (max %.1e)', e_same), ...
+    e_same <= 1e-15) && all_passed;
+
+% The display factors: b1, and g (not g h).
+P_all = pool.compile(chain_cfg, fac_h, struct('npre', 2));
+g_arr = cat(3, [2 0.3; 4 0.1], [1.5 0.9; 3 0.5]);
+all_passed = check('    facilitation(g, P) is g, the first g-block column, with the shape of prod(g, 2); never g h', ...
+    isequal(pool.facilitation(g_arr, P_all), g_arr(:, 1, :)) && ...
+    isequal(pool.depression(cat(3, [0.4 0.7; 0.2 0.9], [0.1 0.3; 0.5 0.6]), P_all), cat(3, [0.4; 0.2], [0.1; 0.5])) && ...
+    isequal(pool.output([0.4 0.7 2 0.3; 0.2 0.9 4 0.1], P_all), [0.8; 0.8])) && all_passed;
+
+two_pools = struct('tau_rec', [2 5], 'tau_rel', 0.25);
+set_fac = @(name, value) setfield(fac, name, value);
+set_std = @(cfg, name, value) setfield(cfg, name, value);
+refusals = { ...
+    {chain_cfg, rmfield(fac, 'model'), struct(), 'ChainStfOutputOnly'}, ...
+    {chain_cfg, set_fac('model', 'product'), struct(), 'ChainStfOutputOnly'}, ...
+    {[], rmfield(fac, 'model'), struct(), 'ChainStfOutputOnly'}, ...
+    {two_pools, fac, struct(), 'ChainStfProductStd'}, ...
+    {struct('tau_rec', [2 5 9], 'tau_rel', 0.25), fac_h, struct(), 'ChainStfProductStd'}, ...
+    {set_std(one_pool, 'combine', 'geomean'), fac, struct(), 'ChainCombine'}, ...
+    {set_std(chain_cfg, 'combine', 'product'), fac, struct(), 'ChainCombine'}, ...
+    {one_pool, fac, struct('zero_floor', true), 'ChainZeroFloor'}, ...
+    {chain_cfg, fac_h, struct('zero_floor', true), 'ChainZeroFloor'}, ...
+    {one_pool, set_fac('tau_dec', [1.5 3]), struct(), 'ChainStfNotScalar'}, ...
+    {one_pool, set_fac('tau_fac', [0.25 1]), struct(), 'ChainStfNotScalar'}, ...
+    {chain_cfg, set_fac('G', [5 2]), struct(), 'ChainStfNotScalar'}, ...
+    {one_pool, set_fac('G', 0.5), struct(), 'ChainStfInvalidG'}, ...
+    {[], set_fac('tau_h', 0), struct(), 'ChainStfInvalidTauH'}, ...
+    {[], set_fac('tau_h', -1), struct(), 'ChainStfInvalidTauH'}, ...
+    {one_pool, set_fac('tau_h', Inf), struct(), 'ChainStfInvalidTauH'}, ...
+    {one_pool, set_fac('tau_h', [0.5 1]), struct(), 'ChainStfInvalidTauH'}, ...
+    {one_pool, set_fac('tau_h', []), struct(), 'ChainStfInvalidTauH'}, ...
+    {one_pool, rmfield(fac, 'G'), struct(), 'InvalidSynapseConfig'}, ...
+    {one_pool, set_fac('tau_dec', -1), struct(), 'InvalidSynapseConfig'}, ...
+    {one_pool, set_fac('tau', 3), struct(), 'InvalidSynapseConfig'}, ...
+    {set_std(one_pool, 'n2', 2), fac, struct(), 'InvalidSynapseConfig'}, ...
+    {set_std(one_pool, 'tau_rel', [0.25 0.4]), fac, struct(), 'InvalidSynapseConfig'}, ...
+    {one_pool, 7, struct(), 'InvalidSynapseConfig'}};
+ok = true;
+for k = 1:numel(refusals)
+    bad_k = refusals{k};
+    as_class = bad_k{3};
+    as_class.err_id_prefix = 'SRNNCellTypePairs';
+    ok_k = throws_id(@() pool.compile(bad_k{1}, bad_k{2}, bad_k{3}), ['route_pool:' bad_k{4}]) && ...
+        throws_id(@() pool.compile(bad_k{1}, bad_k{2}, as_class), ['SRNNCellTypePairs:' bad_k{4}]);
+    if ~ok_k, fprintf('      refusal %d (%s) did not raise its identifier\n', k, bad_k{4}); end
+    ok = ok && ok_k;
+end
+floor_free = pool.compile([], fac_h, struct('zero_floor', true));
+all_passed = check(sprintf(['    %d bad configurations with facilitation each raise their own <prefix>:<identifier>; ' ...
+    'the zero floor on a route without depression is not in force and not refused'], numel(refusals)), ...
+    ok && floor_free.n_b == 0 && floor_free.n_g == 2) && all_passed;
 
 %% 4. the class's two ways of applying A agree
 % jacobian_times applies a route's A = d(ds)/ds in one of two ways: only
@@ -508,6 +702,82 @@ small = struct('model', 'chain', 'tau_rec', [3 0.8], 'tau_rel', 0.3, 'n2', 0.5);
 small_alt = struct('model', 'chain', 'tau_rec', [2 1.2], 'tau_rel', 0.2, 'n2', 0.8);
 cases = add_pool(cases, 'chain, reserve twice the releasable pool', chain, chain_alt, 300);
 cases = add_pool(cases, 'chain, small fast reserve', small, small_alt, 200);
+
+% The pool model's other variants: the single pool, and release-coupled
+% facilitation (a release probability g in [1, G], and with tau_h a
+% calcium trace h in [0, 1]) on no depression, the single pool and the
+% chain. Tom's values (Plan A, section 4.6), and an alternative in which
+% nothing equals anything else. G is at most 5 here.
+fac = struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5);
+fac_alt = struct('model', 'chain', 'tau_dec', 0.9, 'tau_fac', 0.4, 'G', 2.86);
+fac_h = struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5, 'tau_h', 0.5);
+fac_h_alt = struct('model', 'chain', 'tau_dec', 0.9, 'tau_fac', 0.4, 'G', 2.86, 'tau_h', 0.2);
+draw_variant = @(n_b, has_g, has_h) @(npre, ns) [0.05 + 0.9 * rand(npre, n_b), ...
+    1 + 4 * rand(npre, has_g), rand(npre, has_h)];
+add_variant = @(cases, label, std_cfg, stf_cfg, std_alt, stf_alt, n_b, has_g, has_h, T) [cases, struct( ...
+    'label', ['pool: ' label], 'model', 'pool', 'std', std_cfg, 'stf', stf_cfg, 'opts', struct(), ...
+    'std_alt', std_alt, 'stf_alt', stf_alt, 'initial', [ones(1, n_b + has_g), zeros(1, has_h)], ...
+    'draw', draw_variant(n_b, has_g, has_h), 'reference', @pool_reference, 'T_settle', T)];
+cases = add_variant(cases, 'single pool', std1, none, std1_alt, none, 1, 0, 0, 80);
+cases = add_variant(cases, 'g alone (rate-driven)', none, fac, none, fac_alt, 0, 1, 0, 60);
+cases = add_variant(cases, 'g and calcium trace h', none, fac_h, none, fac_h_alt, 0, 1, 1, 60);
+cases = add_variant(cases, 'single pool, g', std1, fac, std1_alt, fac_alt, 1, 1, 0, 100);
+cases = add_variant(cases, 'single pool, g, h', std1, fac_h, std1_alt, fac_h_alt, 1, 1, 1, 100);
+cases = add_variant(cases, 'chain, g', chain, fac, chain_alt, fac_alt, 2, 1, 0, 300);
+cases = add_variant(cases, 'chain, g, h', chain, fac_h, chain_alt, fac_h_alt, 2, 1, 1, 300);
+cases = add_variant(cases, 'small fast reserve, g, h', small, fac_h_alt, small_alt, fac_h, 2, 1, 1, 200);
+end
+
+function [ds, F] = pool_reference(s, r, cs)
+% Every variant of the pool model for ONE neuron, from the equations of
+% docs/Plan_A_chained_vessicles.md, section 4.6, written with an explicit
+% list of which variables the route has (and NOT by setting an absent
+% variable to a constant in the full equations):
+%   db1/dt = b2 (1 - b1)/tau_rec1 - g b1 r/tau_rel       b2 absent: (1 - b1)/tau_rec1
+%                                                        g absent:  b1 r/tau_rel
+%   db2/dt = (1 - b2)/tau_rec2 - (1/n2) b2 (1 - b1)/tau_rec1
+%   dg/dt  = (1 - g)/tau_dec + (G - g) d/tau_fac         d = h, or r when h is absent
+%   dh/dt  = (r - h)/tau_h
+%   F = g b1; b1 when g is absent; g when b1 is absent
+has_b1 = ~isempty(cs.std);
+has_b2 = has_b1 && numel(cs.std.tau_rec) == 2;
+has_g = ~isempty(cs.stf);
+has_h = has_g && isfield(cs.stf, 'tau_h');
+ds = zeros(1, has_b1 + has_b2 + has_g + has_h);
+col = 0;
+F = 1;
+if has_g
+    g = s(has_b1 + has_b2 + 1);
+end
+if has_b1
+    b1 = s(1);
+    col = col + 1;
+    if has_g
+        used = g * b1 * r / cs.std.tau_rel;
+    else
+        used = b1 * r / cs.std.tau_rel;
+    end
+    if has_b2
+        b2 = s(2);
+        ds(col) = b2 * (1 - b1) / cs.std.tau_rec(1) - used;
+        col = col + 1;
+        ds(col) = (1 - b2) / cs.std.tau_rec(2) - (1 / cs.std.n2) * b2 * (1 - b1) / cs.std.tau_rec(1);
+    else
+        ds(col) = (1 - b1) / cs.std.tau_rec(1) - used;
+    end
+    F = F * b1;
+end
+if has_g
+    col = col + 1;
+    if has_h
+        h = s(col + 1);
+        ds(col) = (1 - g) / cs.stf.tau_dec + (cs.stf.G - g) * h / cs.stf.tau_fac;
+        ds(col + 1) = (r - h) / cs.stf.tau_h;
+    else
+        ds(col) = (1 - g) / cs.stf.tau_dec + (cs.stf.G - g) * r / cs.stf.tau_fac;
+    end
+    F = F * g;
+end
 end
 
 function [ds, F] = chain_reference(s, r, cs)

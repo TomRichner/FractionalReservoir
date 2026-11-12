@@ -18,13 +18,18 @@ function [ok, leaves, info] = regression_tol_check(name, opts)
 %          the model class before Plan A touched it. 'chain':
 %          .../fixtures/regression_tol_chain.mat, networks with chained
 %          vesicle-pool depression as first merged (the gate for work on
-%          route_pool: with facilitation off, the chain is unchanged). Any
+%          route_pool: with facilitation off, the chain is unchanged).
+%          'stf_chain': .../fixtures/regression_tol_stf_chain.mat, networks
+%          with release-coupled facilitation as first built (the gate for
+%          the per-neuron spread and any later edit to it). Any
 %          other name: a pre-edit reference made by
 %          make_regression_tol_reference(NAME), in data/regression_tol/.
 %          The reference says which suite of cases it holds
-%          (regression_tol_run: 'base' or 'chain') and that suite is run;
-%          'anchor' and 'chain' are run one after the other by
-%          test_regression_tolerance and test_regression_tolerance_chain.
+%          (regression_tol_run: 'base', 'chain' or 'stf_chain') and that
+%          suite is run; 'anchor', 'chain' and 'stf_chain' are run one
+%          after the other by test_regression_tolerance,
+%          test_regression_tolerance_chain and
+%          test_regression_tolerance_stf_chain.
 %
 %   - OK true: every leaf of the reference is within tolerance. The
 %     printout says how close the worst leaf of each layer was.

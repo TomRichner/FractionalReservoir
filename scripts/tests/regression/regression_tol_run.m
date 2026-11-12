@@ -5,16 +5,22 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 %   R = regression_tol_run(ref_data)    % CHECK: evaluate at the states stored in ref_data
 %   R = regression_tol_run([], 'chain') % the CHAIN suite (below), capture
 %   R = regression_tol_run(ref_data, 'chain')
+%   R = regression_tol_run([], 'stf_chain')   % the STF_CHAIN suite (below)
 %   [R, seconds] = regression_tol_run(...)
 %
-% TWO SUITES, each with a reference of its own. SUITE 'base' (the default)
-% is everything described from here to "THE CHAIN SUITE": the networks the
-% model class had before Plan A touched it, whose reference is the anchor.
-% SUITE 'chain' is the same two layers on networks with chained
-% vesicle-pool depression (route_pool); it is described at the end of this
-% header and its reference is regression_tol_chain.mat. The anchor holds no
-% chain route and is never re-captured, which is why the chain's cases are
-% a suite beside it and not more cases in it.
+% THREE SUITES, each with a reference of its own. SUITE 'base' (the
+% default) is everything described from here to "THE CHAIN SUITE": the
+% networks the model class had before Plan A touched it, whose reference is
+% the anchor. SUITE 'chain' is the same two layers on networks with chained
+% vesicle-pool depression (route_pool); it is described near the end of
+% this header and its reference is regression_tol_chain.mat. SUITE
+% 'stf_chain' is the same two layers on networks with release-coupled
+% facilitation (the same route model, with a release probability g and a
+% calcium trace h); it is described last and its reference is
+% regression_tol_stf_chain.mat. The anchor holds no pool route and is never
+% re-captured, and the chain's reference describes the chain before
+% facilitation was built, which is why each is a suite of its own and not
+% more cases in another's.
 %
 % THE TOLERANCE TIER (FD-020; docs/Plan_A_chained_vessicles.md, section 2.2)
 % is the gate for a rewrite of the model's ARITHMETIC. The three byte-exact
@@ -183,17 +189,68 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 %        component routes). The conditions are local to this file.
 %   stable.mc.chain     memory capacity, synaptic readout, four identical
 %        chain routes
-% HOW STABLE: see the table in chain_suite below.
+% HOW STABLE: see the table in pool_suite below.
+%
+% THE STF_CHAIN SUITE (Plan A, step 8; 2026-11-12). Release-coupled
+% facilitation is stf.model = 'chain' on a route (route_pool): a release
+% probability g that multiplies the output AND the rate at which the
+% releasable pool is used, optionally driven by a calcium trace h; beside
+% no depression, a single pool or the chain. The suite has the chain
+% suite's structure (one function, pool_suite, runs both from a spec) on
+% two networks of its own:
+%   facil   the regression network in its sfa3_std2 condition with all four
+%           routes a chain with g and h (the chain's values; tau_dec 1.5,
+%           tau_fac 0.25, G 5, tau_h 0.5: Plan A section 4.6)
+%   fmixed  four cell types (E, PV, SST, VIP; n = 40) with EVERY variant of
+%           the pool model that has facilitation, beside product routes:
+%           E->E chain, g, h; E->PV single pool, g; E->SST g, h (no
+%           depression); E->VIP a two-component product with two-component
+%           output-only facilitation; PV->E chain, g, with a route scale;
+%           PV->PV single pool, g, h; PV->SST g; SST->E a chain without
+%           facilitation; SST->PV output-only facilitation; SST->SST a
+%           single pool with g at G = 1 (g cannot move); VIP->E a
+%           geometric-mean product; VIP->SST a chain with a small reserve,
+%           a high ceiling (G = 8) and a fast trace (tau_h 0.05); VIP->VIP
+%           a chain with a huge reserve and slow, weak facilitation.
+% LAYER 1, POINTWISE: facil_noStim.<integrator>, facil_steps.<integrator>,
+% fmixed_gain1, facil_stable.<integrator>, fmixed_stable.<integrator>. The
+% states are those of pick_states plus the first sample (pools and g
+% exactly 1, h exactly 0), the times of the smallest b1, the smallest b2,
+% the largest g and the largest h on any pool route, and two states no
+% trajectory here reaches, made from the mid-run state:
+%   depleted, facilitated   b1 in [0.01, 0.05], b2 in [0.02, 0.10], g in
+%                           the top tenth of [1, G], h in [0.9, 1]
+%   rested, reserve full    b1 in [0.15, 0.85], b2 in [1 - 1e-4, 1], g
+%                           within 1e-4 (G - 1) of 1, h in [0, 1e-4]
+% A case holds what a chain-suite case holds and, for facilitation,
+% stf_factor (every route's facilitation factor as display code gets it:
+% stf_factors, which calls stf_route_factor: g on a coupled route, not
+% g h) and in its view params.stf_chain and params.stf_tau_h. Layer 2's
+% model runs hold stf_factor along the run.
+% LAYER 2, STABLE END TO END (gain 0.2, staircase): stable.model.facil,
+% stable.model.fmixed, stable.extra.<net>, stable.estimators.<net> (reduced
+% to n = 6, where fmixed has ONE SST and ONE VIP neuron, so a presynaptic
+% type with one neuron on a pool route is covered), stable.sweep (8 jobs: facil_all, and
+% facil_EE: one SFA timescale, a chain with g and h on E->E, a single pool
+% with g on E->I, one-component product routes from I) and stable.mc.facil
+% (memory capacity, synaptic readout, four identical routes).
+% HOW STABLE: see the table in stf_chain_spec below. One criterion of the
+% other suites cannot hold here and is not a sign of instability: the
+% leading direction's LOCAL rate is positive at times at any gain, because
+% a coupled route's own block is non-normal.
 %
 % See also: regression_tol_compare, regression_tol_check,
 %           make_regression_tol_reference, regression_tol_settings,
 %           regression_tol_band_check, regression_rapid_run
 arguments
     ref_data = []
-    suite (1,:) char {mustBeMember(suite, {'base', 'chain'})} = 'base'
+    suite (1,:) char {mustBeMember(suite, {'base', 'chain', 'stf_chain'})} = 'base'
 end
 if strcmp(suite, 'chain')
-    [R, seconds] = chain_suite(ref_data);
+    [R, seconds] = pool_suite(ref_data, chain_spec());
+    return;
+elseif strcmp(suite, 'stf_chain')
+    [R, seconds] = pool_suite(ref_data, stf_chain_spec());
     return;
 end
 t_all = tic;
@@ -396,13 +453,16 @@ seconds = toc(t_all);
 end
 
 %% ------------------------------------------------------------------------
-function [R, seconds] = chain_suite(ref_data)
-% The chain suite; what it holds is in the file's header. Same structure,
-% same helpers and same rules as the base suite above (a capture rethrows,
-% a check records a case that threw and goes on).
+function [R, seconds] = pool_suite(ref_data, spec)
+% The chain suite and the stf_chain suite: the suites of networks with
+% vesicle-pool routes. What each holds is in the file's header; SPEC
+% (chain_spec, stf_chain_spec) says which networks, which states and which
+% extra leaves. Same structure, same helpers and same rules as the base
+% suite above (a capture rethrows, a check records a case that threw and
+% goes on).
 %
-% HOW STABLE the layer-2 networks are (measured 2026-11-12 with the
-% settings below; exponents in 1/s; noise off / noise on):
+% HOW STABLE the CHAIN suite's layer-2 networks are (measured 2026-11-12
+% with the settings below; exponents in 1/s; noise off / noise on):
 %              top-K lambda_1     its largest       Benettin   QR, largest
 %                                 LOCAL rate        (reduced)  (reduced)
 %   chain      -0.167 / -0.166    -0.125 / -0.122   -0.290     -0.077
@@ -419,8 +479,8 @@ function [R, seconds] = chain_suite(ref_data)
 % 0.03 (its b1 to 0.07) while the huge one of VIP->VIP stays within 1e-6
 % of 1. The pointwise layer's two made states go further.
 %
-% DO NOT RETUNE the settings below; if they must change, the chain
-% reference changes with them and the commit says why.
+% DO NOT RETUNE the settings below; if they must change, both pool
+% references change with them and the commit says why.
 t_all = tic;
 capture = isempty(ref_data);
 rng_at_entry = rng;
@@ -431,9 +491,7 @@ P_steps  = 'regression_pairs_steps5s_noise0p025_dualStd_3cond';
 P_stable = struct('rk4_noise_off', 'regression_stable_steps_noise0_dualStd_3cond', ...
                   'sra1_noise_on', 'regression_stable_steps_noise0p025_dualStd_3cond');
 full_cond = 'sfa3_std2';                 % three SFA timescales; its routes are replaced
-chain = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
-sc4 = struct();
-sc4.E.E.std = chain; sc4.E.I.std = chain; sc4.I.E.std = chain; sc4.I.I.std = chain;
+sc4 = spec.sc4;                          % the uniform network's four routes
 integrators = struct('name', {'rk4_noise_off', 'sra1_noise_on'}, ...
     'args', {{'sigma_u_noise', 0, 'ode_solver', 'rk4'}, {'ode_solver', 'sra1'}});
 
@@ -441,10 +499,10 @@ R = struct('pointwise', struct(), 'stable', struct(), 'info', struct());
 R.info.threads = maxNumCompThreads;
 errors = {};
 
-%% Layer 1a. The chain network at full gain: states only, then single evaluations
+%% Layer 1a. The uniform network at full gain: states only, then single evaluations
 chaos_args = {'rng_seeds', [5 6], 'T_range', [0 4], 'fs', 200, 'store_full_state', true, ...
     'lya_method', 'none', 'verbose', 'near-none'};
-sets = struct('name', {'chain_noStim', 'chain_steps'}, 'preset', {P_chaos, P_steps});
+sets = struct('name', {[spec.uniform '_noStim'], [spec.uniform '_steps']}, 'preset', {P_chaos, P_steps});
 for q = 1:numel(sets)
     for s = 1:numel(integrators)
         key = {'pointwise', sets(q).name, integrators(s).name};
@@ -453,36 +511,36 @@ for q = 1:numel(sets)
                 'synapse_config', sc4);
             if capture
                 m.run();
-                [S, t] = pick_chain_states(m);
+                [S, t] = spec.pick(m);
             else
                 [S, t] = stored_states(ref_data, key(2:end));
             end
-            R = setfield(R, key{:}, chain_pointwise(m, S, t));
+            R = setfield(R, key{:}, spec.pointwise(m, S, t));
         catch err
             [R, errors] = failed(R, errors, capture, err, key);
         end
     end
 end
 
-key = {'pointwise', 'mixed_gain1'};
+key = {'pointwise', [spec.mixed '_gain1']};
 try
-    mm = mixed_model(1, 'rk4', {});
+    mm = spec.mixed_model(1, 'rk4', {});
     if capture
         mm.run();
-        [S, t] = pick_chain_states(mm);
+        [S, t] = spec.pick(mm);
     else
         [S, t] = stored_states(ref_data, key(2:end));
     end
-    R = setfield(R, key{:}, chain_pointwise(mm, S, t));
+    R = setfield(R, key{:}, spec.pointwise(mm, S, t));
 catch err
     [R, errors] = failed(R, errors, capture, err, key);
 end
 
-%% Layer 2a. The stable networks, chain and mixed, noise off and on
+%% Layer 2a. The stable networks, uniform and mixed, noise off and on
 stable_args = {'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, 'store_full_state', true, ...
     'lya_method', 'topk', 'lya_K', 10, 'lya_K_auto', true, 'lya_dt', 0.05, ...
     'lya_T_interval', [1.5 5], 'lya_warmup', 1.5, 'verbose', 'near-none'};
-nets = {'chain', 'mixed'};
+nets = {spec.uniform, spec.mixed};
 for q = 1:numel(nets)
     for s = 1:numel(integrators)
         key_run = {'stable', 'model', nets{q}, integrators(s).name};
@@ -497,21 +555,22 @@ for q = 1:numel(nets)
                 m = build_from_preset(P_stable.(integrators(s).name), full_cond, stable_args{:}, ...
                     'ode_solver', solver, 'synapse_config', sc4);
             else
-                m = mixed_model(0.2, solver, {});
+                m = spec.mixed_model(0.2, solver, {});
             end
             m.run();
             e2e = end_to_end(m);
             % Every route's depression factor along the run, as display
             % code gets it (std_factors, which calls std_route_factor): b1
-            % on a chain route, not prod(b).
-            e2e.std_factor = SRNNCellTypePairs.std_factors(m.plot_data.b, m.get_params());
+            % on a chain route, not prod(b). And in the stf_chain suite
+            % its facilitation factor (stf_factors): g, not g h.
+            e2e = spec.along_run(e2e, m);
             R = setfield(R, key_run{:}, e2e);
             if capture
-                [S, t] = pick_chain_states(m);
+                [S, t] = spec.pick(m);
             else
                 [S, t] = stored_states(ref_data, key_pw(2:end));
             end
-            R = setfield(R, key_pw{:}, chain_pointwise(m, S, t));
+            R = setfield(R, key_pw{:}, spec.pointwise(m, S, t));
 
             % 2b. With noise on: the transient gain in its three variants,
             % and the finite-difference Jacobian.
@@ -538,10 +597,11 @@ end
 %% Layer 2c. The other two Lyapunov estimators, on reduced stable networks
 % Smaller than the base suite's n = 20: QR integrates N^2 variational
 % equations with ode45, and at n = 20 these two runs were two thirds of
-% the suite's time (N = 160 and 124; here 96 and 62).
-small = {'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4};
-small_run = {'rng_seeds', [5 6], 'T_range', [0 3], 'fs', 200, 'lya_T_interval', [1.5 3], ...
-    'lya_warmup', 1, 'verbose', 'near-none'};
+% the chain suite's time (N = 160 and 124; at its n = 12 and 10, 96 and 62).
+% The stf_chain suite's networks carry twice the route variables and are
+% stiffer, so its two are n = 6 (N = 72 and 64) over a 1.5 s integration.
+small = spec.small_uniform;
+small_run = [{'rng_seeds', [5 6], 'fs', 200, 'verbose', 'near-none'}, spec.small_window];
 for q = 1:numel(nets)
     key = {'stable', 'estimators', nets{q}};
     try
@@ -551,8 +611,8 @@ for q = 1:numel(nets)
             mq = build_from_preset(P_stable.rk4_noise_off, full_cond, small{:}, small_run{:}, ...
                 'ode_solver', 'rk4', 'lya_method', 'qr', 'synapse_config', sc4);
         else
-            mb = mixed_model(0.2, 'sra1', [{'n', 10, 'indegree', 4}, small_run, {'lya_method', 'benettin'}]);
-            mq = mixed_model(0.2, 'rk4',  [{'n', 10, 'indegree', 4}, small_run, {'lya_method', 'qr'}]);
+            mb = spec.mixed_model(0.2, 'sra1', [spec.small_mixed, small_run, {'lya_method', 'benettin'}]);
+            mq = spec.mixed_model(0.2, 'rk4',  [spec.small_mixed, small_run, {'lya_method', 'qr'}]);
         end
         mb.run();
         mq.run();
@@ -568,19 +628,13 @@ scratch = tempname;
 try
     ctx = resolve_run_context('param_space', 'preset_name', P_stable.sra1_noise_on, ...
         'run_mode', 'fast', 'verbose', 'near-none');
-    % Two conditions made here (no preset carries a chain yet): the chain
-    % network, and one SFA timescale with a chain on E->E beside the
-    % preset's one-component routes.
-    c_one  = ctx.conditions{2};
-    c_full = ctx.conditions{3};
-    sc_EE = c_one.synapse_config;
-    sc_EE.E.E.std = chain;
-    sweep_conditions = { ...
-        struct('name', 'chain_all', 'tau_a', {c_full.tau_a}, 'synapse_config', sc4), ...
-        struct('name', 'chain_EE',  'tau_a', {c_one.tau_a},  'synapse_config', sc_EE)};
+    % Two conditions made here (the suite's networks are not presets): the
+    % uniform network, and one SFA timescale with a pool route on E->E
+    % beside the preset's one-component routes.
+    sweep_conditions = spec.sweep_conditions(ctx, sc4);
     d = ctx.model_defaults;
     d.T_range = [0 4]; d.lya_T_interval = [2 4]; d.lya_warmup = 1;
-    psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 4, 'note', 'regression_tol_chain', ...
+    psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 4, 'note', spec.sweep_note, ...
         'randomize_order', false, 'verbose', 'near-none', 'use_parallel', false);
     psa.model_class    = ctx.model_class;
     psa.integer_params = ctx.integer_params;
@@ -601,8 +655,8 @@ catch err
 end
 if isfolder(scratch); rmdir(scratch, 's'); end
 
-%% Layer 2f. Memory capacity through the reservoir class, four identical chains
-key = {'stable', 'mc', 'chain'};
+%% Layer 2f. Memory capacity through the reservoir class, four identical routes
+key = {'stable', 'mc', spec.uniform};
 try
     [preset_mc, ~, conditions_mc] = srnn_param_preset(P_stable.rk4_noise_off);
     fs = 200;
@@ -627,6 +681,216 @@ if ~capture
     R.info.errors = errors;
 end
 seconds = toc(t_all);
+end
+
+function spec = chain_spec()
+% The chain suite (see the header): what pool_suite runs for it.
+chain = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
+sc4 = struct();
+sc4.E.E.std = chain; sc4.E.I.std = chain; sc4.I.E.std = chain; sc4.I.I.std = chain;
+spec = struct('uniform', 'chain', 'mixed', 'mixed', 'sc4', sc4, ...
+    'mixed_model', @mixed_model, 'pick', @pick_chain_states, 'pointwise', @chain_pointwise, ...
+    'along_run', @chain_along_run, ...
+    'small_uniform', {{'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4}}, ...
+    'small_mixed', {{'n', 10, 'indegree', 4}}, ...
+    'small_window', {{'T_range', [0 3], 'lya_T_interval', [1.5 3], 'lya_warmup', 1}}, ...
+    'sweep_conditions', @chain_sweep_conditions, 'sweep_note', 'regression_tol_chain');
+end
+
+function conditions = chain_sweep_conditions(ctx, sc4)
+% chain_all: the chain network. chain_EE: one SFA timescale, a chain on
+% E->E beside the preset's one-component routes.
+c_one  = ctx.conditions{2};
+c_full = ctx.conditions{3};
+sc_EE = c_one.synapse_config;
+sc_EE.E.E.std = sc4.E.E.std;
+conditions = { ...
+    struct('name', 'chain_all', 'tau_a', {c_full.tau_a}, 'synapse_config', sc4), ...
+    struct('name', 'chain_EE',  'tau_a', {c_one.tau_a},  'synapse_config', sc_EE)};
+end
+
+function e2e = chain_along_run(e2e, m)
+e2e.std_factor = SRNNCellTypePairs.std_factors(m.plot_data.b, m.get_params());
+end
+
+function spec = stf_chain_spec()
+% The stf_chain suite (see the header): what pool_suite runs for it.
+%
+% HOW STABLE its layer-2 networks are (measured 2026-11-12 with
+% pool_suite's settings; exponents in 1/s; noise off / noise on):
+%              top-K lambda_1     its largest       Benettin   QR, largest
+%                                 LOCAL rate        (reduced)  (reduced)
+%   facil      -0.356 / -0.348    +1.61 / +1.57     -0.845     -0.092
+%   fmixed     -0.583 / -0.579    +0.37 / +0.37     -0.545     -0.250
+% No estimator finds a positive exponent (QR: none of 72 and 64),
+% lya_K_auto never retries (K stays 10) and no SFA ladder is clipped. The
+% 8 sweep jobs have lambda_1 between -0.69 and -0.33. THE LOCAL RATE IS
+% POSITIVE AT TIMES, unlike
+% the other suites', and at any gain (facil: +1.6 at gain 0.2, +2.1 at
+% 0.1 and at 0.05): a coupled route's own block is non-normal (the entry
+% d(dg/dt)/dh = (G - g)/tau_fac is up to 16 per second beside decay rates
+% of 2 per second, and d(db1/dt)/dg = -b1 r/tau_rel), so a tangent vector
+% can grow for a while although every exponent is negative. The gain does
+% not move it and the margin against round-off is what it is in the other
+% suites: the exponents. Under the staircase the variables are worked:
+% in the stable facil network rates span 0 to 1, g reaches 4.0 of its
+% ceiling 5, h 0.73, b1 falls to 0.02 and b2 to 0.53; in fmixed g reaches
+% 7.5 (VIP->SST, ceiling 8) where b1 falls to 0.004, and SST->SST's g
+% (G = 1) stays exactly 1. The pointwise layer's two made states go
+% further.
+route = struct('std', struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2), ...
+    'stf', struct('model', 'chain', 'tau_dec', 1.5, 'tau_fac', 0.25, 'G', 5, 'tau_h', 0.5));
+sc4 = struct();
+sc4.E.E = route; sc4.E.I = route; sc4.I.E = route; sc4.I.I = route;
+spec = struct('uniform', 'facil', 'mixed', 'fmixed', 'sc4', sc4, ...
+    'mixed_model', @stf_mixed_model, 'pick', @pick_pool_states, 'pointwise', @stf_pointwise, ...
+    'along_run', @stf_along_run, ...
+    'small_uniform', {{'n', 6, 'indegree', 3, 'F_ref_n', 6, 'F_ref_indegree', 3}}, ...
+    'small_mixed', {{'n', 6, 'indegree', 3}}, ...
+    'small_window', {{'T_range', [0 2], 'lya_T_interval', [1 2], 'lya_warmup', 0.5}}, ...
+    'sweep_conditions', @stf_sweep_conditions, 'sweep_note', 'regression_tol_stf_chain');
+end
+
+function conditions = stf_sweep_conditions(ctx, sc4)
+% facil_all: the facil network. facil_EE: one SFA timescale, a chain with
+% g and h on E->E and a single pool with g on E->I, beside the preset's
+% one-component product routes from I.
+c_one  = ctx.conditions{2};
+c_full = ctx.conditions{3};
+sc_EE = c_one.synapse_config;
+sc_EE.E.E = sc4.E.E;
+sc_EE.E.I.stf = rmfield(sc4.E.E.stf, 'tau_h');
+conditions = { ...
+    struct('name', 'facil_all', 'tau_a', {c_full.tau_a}, 'synapse_config', sc4), ...
+    struct('name', 'facil_EE',  'tau_a', {c_one.tau_a},  'synapse_config', sc_EE)};
+end
+
+function e2e = stf_along_run(e2e, m)
+p = m.get_params();
+e2e.std_factor = SRNNCellTypePairs.std_factors(m.plot_data.b, p);
+e2e.stf_factor = SRNNCellTypePairs.stf_factors(m.plot_data.g, p);
+end
+
+function m = stf_mixed_model(gain, solver, extra_args)
+% The mixed network of the stf_chain suite: four cell types and every
+% variant of the pool model that has facilitation, beside product routes
+% (see the header). Under a step staircase always; noise on with 'sra1',
+% off with 'rk4'. EXTRA_ARGS are applied last.
+chain = @(tau_rec, tau_rel, n2) struct('model', 'chain', 'tau_rec', tau_rec, 'tau_rel', tau_rel, 'n2', n2);
+fac = @(tau_dec, tau_fac, G) struct('model', 'chain', 'tau_dec', tau_dec, 'tau_fac', tau_fac, 'G', G);
+fac_h = @(tau_dec, tau_fac, G, tau_h) struct('model', 'chain', 'tau_dec', tau_dec, 'tau_fac', tau_fac, ...
+    'G', G, 'tau_h', tau_h);
+sc = struct();
+sc.E.E.std     = chain([2 5], 0.25, 2);
+sc.E.E.stf     = fac_h(1.5, 0.25, 5, 0.5);
+sc.E.PV.std    = struct('tau_rec', 2, 'tau_rel', 0.25);
+sc.E.PV.stf    = fac(1.5, 0.25, 5);
+sc.E.SST.stf   = fac_h(1.5, 0.25, 5, 0.5);
+sc.E.VIP.std   = struct('tau_rec', [2 4], 'tau_rel', [0.25 0.5]);
+sc.E.VIP.stf   = struct('tau_dec', [0.4 1.2], 'tau_fac', [0.2 0.3], 'G', [1.5 2]);
+sc.PV.E.std    = chain([1 3], 0.3, 1.5);
+sc.PV.E.stf    = fac(0.9, 0.4, 2.86);
+sc.PV.E.scale  = 1.3;
+sc.PV.PV.std   = struct('tau_rec', 0.6, 'tau_rel', 0.3);
+sc.PV.PV.stf   = fac_h(0.9, 0.4, 2.86, 0.2);
+sc.PV.SST.stf  = fac(0.9, 0.4, 2.86);
+sc.SST.E.std   = chain([2 5], 0.25, 2);
+sc.SST.PV.stf  = struct('tau_dec', 0.9, 'tau_fac', 0.4, 'G', 1.8);
+sc.SST.SST.std = struct('tau_rec', 0.8, 'tau_rel', 0.25);
+sc.SST.SST.stf = fac(2, 1, 1);
+sc.VIP.E.std   = struct('tau_rec', [0.3 1], 'tau_rel', 0.2, 'combine', 'geomean');
+sc.VIP.SST.std = chain([0.5 8], 0.2, 0.5);
+sc.VIP.SST.stf = fac_h(3, 0.1, 8, 0.05);
+sc.VIP.VIP.std = chain([1.5 4], 0.4, 1e6);
+sc.VIP.VIP.stf = fac(0.5, 2, 1.5);
+if strcmp(solver, 'sra1'); noise = 0.025; else; noise = 0; end
+args = {'n', 40, 'indegree', 10, 'n_cellTypes', 4, 'cell_type_names', {'E', 'PV', 'SST', 'VIP'}, ...
+    'f', [0.4 0.2 0.2 0.2], 'mu_tilde_relative', [3 -4 -2 -1.5], 'sigma_tilde_relative', [1 1 1 1], ...
+    'tau_a', {[0.25 1], [], 2, 1}, 'c', [0.3 0 0.2 0.1], 'synapse_config', sc, ...
+    'level_of_chaos', gain, 'sigma_u_noise', noise, 'ode_solver', solver, ...
+    'input_config', struct('n_steps', 6, 'step_density', struct(), 'amp', 0.5, ...
+        'no_stim_pattern', false(1, 6), 'intrinsic_drive', 0, 'positive_only', false), ...
+    'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, ...
+    'lya_method', 'topk', 'lya_K', 10, 'lya_K_auto', true, 'lya_dt', 0.05, ...
+    'lya_T_interval', [1.5 5], 'lya_warmup', 1.5, 'store_full_state', true, 'verbose', 'near-none'};
+m = SRNNCellTypePairs(args{:}, extra_args{:});
+m.build();
+end
+
+function c = stf_pointwise(m, S, t)
+% chain_pointwise, and what only a network with coupled facilitation has:
+% the two params fields that say which routes are coupled and their
+% calcium trace's time constant (display code reads them), and every
+% route's facilitation factor at the states as stf_route_factor gives it.
+c = chain_pointwise(m, S, t);
+p = m.get_params();
+c.view.stf_chain = p.stf_chain;
+c.view.stf_tau_h = p.stf_tau_h;
+[~, ~, ~, ~, ~, g] = SRNNCellTypePairs.unpack_and_compute_states(S', p);
+c.stf_factor = SRNNCellTypePairs.stf_factors(g, p);
+end
+
+function [S, t] = pick_pool_states(m)
+% States for the stf_chain suite's pointwise layer, as columns: those of
+% pick_states, the first sample (pools and g exactly 1, h exactly 0), the
+% times of the smallest b1, the smallest b2, the largest g and the largest
+% h on any pool route, and two states made from the mid-run state by
+% overwriting the pool routes' rows (see the header), with fixed patterns
+% over the neurons, not random. The made states carry the mid-run time.
+% Which variables a pool route has is read from params: n_b_pairs,
+% std_chain, stf_chain, stf_tau_h and the ceiling G.
+[S, t] = pick_states(m);
+p = m.get_params();
+lay = p.state_layout;
+nt = size(m.S_out, 1);
+b1_min = inf(nt, 1);
+b2_min = inf(nt, 1);
+g_max = -inf(nt, 1);
+h_max = -inf(nt, 1);
+i_mid = round(nt / 2);
+spent = m.S_out(i_mid, :)';
+rested = spent;
+for pre = 1:p.n_cellTypes
+    npre = p.n_per_type(pre);
+    w1 = 0.5 + 0.5 * cos((1:npre)');
+    w2 = 0.5 + 0.5 * sin(2 * (1:npre)');
+    w3 = 0.5 + 0.5 * cos(3 * (1:npre)');
+    for post = 1:p.n_cellTypes
+        if ~(p.std_chain(pre, post) || p.stf_chain(pre, post)); continue; end
+        if p.n_b_pairs(pre, post) >= 1
+            rows1 = lay.b{pre, post}(1:npre);            % component-major: b1 then b2
+            b1_min = min(b1_min, min(m.S_out(:, rows1), [], 2));
+            spent(rows1) = 0.01 + 0.04 * w1;
+            rested(rows1) = 0.15 + 0.70 * w1;
+        end
+        if p.std_chain(pre, post)
+            rows2 = lay.b{pre, post}(npre + 1:end);
+            b2_min = min(b2_min, min(m.S_out(:, rows2), [], 2));
+            spent(rows2) = 0.02 + 0.08 * w2;
+            rested(rows2) = 1 - 1e-4 * w2;
+        end
+        if p.stf_chain(pre, post)
+            rows_g = lay.g{pre, post}(1:npre);           % component-major: g then h
+            G = p.G{pre, post};
+            g_max = max(g_max, max(m.S_out(:, rows_g), [], 2));
+            spent(rows_g) = 1 + (G - 1) * (0.9 + 0.1 * w3);
+            rested(rows_g) = 1 + (G - 1) * 1e-4 * w3;
+            if ~isnan(p.stf_tau_h(pre, post))
+                rows_h = lay.g{pre, post}(npre + 1:end);
+                h_max = max(h_max, max(m.S_out(:, rows_h), [], 2));
+                spent(rows_h) = 0.9 + 0.1 * w1;
+                rested(rows_h) = 1e-4 * w2;
+            end
+        end
+    end
+end
+[~, i1] = min(b1_min);
+[~, i2] = min(b2_min);
+[~, i3] = max(g_max);
+[~, i4] = max(h_max);
+idx = unique([1, i1, i2, i3, i4]);
+S = [S, m.S_out(idx, :)', spent, rested];
+t = [t, m.t_out(idx)', m.t_out(i_mid), m.t_out(i_mid)];
 end
 
 function m = mixed_model(gain, solver, extra_args)

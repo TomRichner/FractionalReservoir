@@ -73,13 +73,25 @@ function model = route_model(name)
 %                              SRNNCellTypePairs.std_route_factor, which
 %                              calls it for every model and returns []
 %                              itself for a route without depression.
+%   Fg = facilitation(g, P)    OPTIONAL. The factor facilitation puts on
+%                              the output, from the route's g-block alone
+%                              (g npre x n_g, or npre x n_g x nt, n_g >= 1;
+%                              Fg has the shape of prod(g, 2)). A model
+%                              WITHOUT this handle has the product of its
+%                              g-block columns (route_product: every g
+%                              multiplies the output). The pool's is g, its
+%                              first column, and not g h: the calcium trace
+%                              is in the g-block and is no factor of the
+%                              output. The one caller is
+%                              SRNNCellTypePairs.stf_route_factor.
 %
 % (Plan A section 4.0 has linearize return one struct L with these four as
 % fields. They are four outputs because building that struct costs about
 % 1.5 microseconds, which is a third of the whole call for the product
 % model, once per route in every jacobian_times. `depression` is not in
 % that section's table: it came with the chain, whose factor is not
-% prod(b).)
+% prod(b); `facilitation` came with release-coupled facilitation, whose
+% g-block holds a calcium trace that is not a factor of the output.)
 %
 % F DEPENDS ON THE STATE ONLY, never on the rate: the class carries the
 % rate dependence of theta = r .* F.
@@ -88,8 +100,11 @@ function model = route_model(name)
 %   'product'  route_product: product depression times output-only
 %              facilitation; also the route with no synapse dynamics. What
 %              a route gets unless it asks otherwise.
-%   'pool'     route_pool: vesicle pools in series. A route asks for it
-%              with std.model = 'chain'.
+%   'pool'     route_pool: vesicle pools in series (chained depression)
+%              and release-coupled facilitation, where release probability
+%              also sets how fast the releasable pool is used. A route
+%              asks for it with std.model = 'chain', with
+%              stf.model = 'chain', or with both.
 %
 % ADDING A MODEL: write route_<name>.m returning such a struct, add its
 % case here and its entry to scripts/tests/test_route_models.m, and say in
