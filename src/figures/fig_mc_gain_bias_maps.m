@@ -23,6 +23,8 @@ function out = fig_mc_gain_bias_maps(cfg)
 %      is stated in the colour bar's label). One scale serves both regimes:
 %      without adaptation lambda_1 spans about -10 to +8, with chained MTS
 %      -0.1 to +3, and a linear scale shared by both renders -0.1 as white.
+%      cfg.lle_scale = 'linear' is the alternative: the same diverging map,
+%      linear from -cfg.lle_clip to +cfg.lle_clip, values beyond clipped.
 %   3. the interquartile range of memory capacity over seeds, shared scale,
 %      only when cfg.show_iqr (default true) AND some cell has more than one
 %      successful seed; with one seed the row would be blank, so it is
@@ -72,6 +74,7 @@ arguments
     cfg.show_iqr      (1,1) logical = true
     cfg.flag_fraction (1,1) double  = 0.9
     cfg.mc_scale      (1,:) char    {mustBeMember(cfg.mc_scale, {'sqrt', 'linear'})} = 'sqrt'
+    cfg.lle_scale     (1,:) char    {mustBeMember(cfg.lle_scale, {'symlog', 'linear'})} = 'symlog'
     cfg.lle_lin       (1,1) double  = 0.05 % symlog_lle's linear scale (1/s)
     cfg.lle_clip      (1,1) double  = 10   % |lambda_1| clipped here (1/s)
     cfg.fig_tag       (1,:) char    = 'Fig_MC_gain_bias_maps'
@@ -111,8 +114,17 @@ switch cfg.mc_scale
         mc_ticks = [];
         mc_cb = 'MC (median)';
 end
-[~, l_tp, l_tl, l_lim] = symlog_lle(0, cfg.lle_lin, cfg.lle_clip);
-L_col = symlog_lle(L, cfg.lle_lin, cfg.lle_clip);
+switch cfg.lle_scale
+    case 'symlog'
+        [~, l_tp, l_tl, l_lim] = symlog_lle(0, cfg.lle_lin, cfg.lle_clip);
+        L_col = symlog_lle(L, cfg.lle_lin, cfg.lle_clip);
+        l_cb = sprintf('\\lambda_1 (1/s), symmetric log, clipped at \\pm%g', cfg.lle_clip);
+    otherwise
+        l_lim = cfg.lle_clip * [-1 1];
+        L_col = min(max(L, l_lim(1)), l_lim(2));   % NaN stays NaN (grey)
+        l_tp = []; l_tl = {};
+        l_cb = sprintf('\\lambda_1 (1/s), linear, clipped at \\pm%g', cfg.lle_clip);
+end
 iq_clim = [0, max([IQ(:); eps])];
 
 rows = {struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', mc_cmap(), ...
@@ -120,7 +132,7 @@ rows = {struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', mc_cmap(), ...
                'ticks', mc_f(mc_ticks), 'ticklabels', {num_labels(mc_ticks)})
         struct('V', L_col, 'clim', l_lim, 'cmap', lle_cmap(), ...
                'label', '\lambda_1, task input on', ...
-               'cb', sprintf('\\lambda_1 (1/s), symmetric log, clipped at \\pm%g', cfg.lle_clip), ...
+               'cb', l_cb, ...
                'ticks', l_tp, 'ticklabels', {l_tl})};
 if cfg.show_iqr && n_seeds > 1
     rows{end+1} = struct('V', IQ, 'clim', iq_clim, 'cmap', spread_cmap(), ...
