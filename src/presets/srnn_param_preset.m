@@ -1360,6 +1360,26 @@ switch name
             'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain');
         d.sigma_u_noise = 0;
 
+    case {'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain_EI3to2', ...
+          'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain_EI2to3'}
+        % E:I variants of the memory-capacity twin for block C's gain sweeps
+        % (Plan C, sections 2 and 4, runs C3b and C3c; decision 3 of the
+        % plan). Same bundle (mu7chain_config), chained from the noise-free
+        % twin under the within-bundle rule. ONE thing differs: the mean
+        % weights, on both postsynaptic types, with |mu_E| + |mu_I| held at
+        % the parent's 14 (multiples of F):
+        %   _EI3to2  excitation-dominated,  |mu_E| : |mu_I| = 3 : 2, [8.4 -5.6]
+        %   _EI2to3  inhibition-dominated,  |mu_E| : |mu_I| = 2 : 3, [5.6 -8.4]
+        % The parent is 1 : 1, [7 -7]. Conditions, noise (off), spreads and
+        % everything else are the parent's.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain');
+        if endsWith(name, '_EI3to2')
+            d.mu_tilde_relative = [8.4 -5.6; 8.4 -5.6];   % (post <- pre)
+        else
+            d.mu_tilde_relative = [5.6 -8.4; 5.6 -8.4];
+        end
+
     case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain'
         % Stimulus-staircase twin of the mu7chain preset for run_local_lyapunov:
         % a new random step every 5 s that never returns to zero (8 steps over
@@ -2115,6 +2135,8 @@ names = {'default', 'overconnected', ...
     ... % the mu7chain bundle (mu7chain_config): chained vesicle-pool depression, FD-007
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain_EI3to2', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain_EI2to3', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain', ...
     'single_neuron_mu7chain'};
 end
