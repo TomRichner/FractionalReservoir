@@ -1016,4 +1016,27 @@ becomes an issue with an acceptance test.
   15. *The figure functions are revised on the pilot's real data while the
      main run is in progress* (`matlab-opus-3`, no pool), with a reader
      for a run still in progress, so the report does not wait on figure
-     fixes after the run.
+     fixes after the run. Merged `c9b9377` after the lead looked at the
+     pilot's maps and gain curves. Choices in it, the worker's, accepted:
+     memory capacity on a square-root colour scale shared by all
+     conditions; lambda_1 on a diverging symmetric-log scale clipped at
+     +-10 per second; lambda_1 = 0 drawn as the edges between cells of
+     opposite sign; a cell is marked silent or saturated at 90 % of
+     neurons (was 50 %: at bias 0.55 more than half the chained-MTS
+     neurons are silent and memory capacity is still 5 to 9).
+  16. *The stage's size table is moved to the grid the pilot led to.* Its
+     `fast` becomes the grid of decision 14 (so the mode reproduces the
+     run the report is built from), `essential` the same gains by four
+     biases with one seed, and `medium` and `production` finer grids on
+     the same ranges with the preset's gain among the levels (Tom's to
+     run). The table as first written (gain to 3, bias -0.2 to 0.8) was a
+     guess made before any data.
+  17. *The stage enters the entry points as an OPT-IN stage with a bundle
+     of its own* (`mu7chain_gainbias_config` / `_run`), not as one more
+     stage of every bundle: a bundle that names no stages must run what it
+     runs today, and the full sweep is hours. Built by `matlab-opus-1`
+     without a pool while the main run holds all 12. **Its branch is
+     merged only after the block C runs end**, because it edits
+     `run_mc_gain_sweep.m` (the size table), which the running MATLAB has
+     loaded from the main checkout; the quick suite and the stages tier
+     are run on merged main then.
