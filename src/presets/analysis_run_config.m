@@ -9,7 +9,7 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 %   cfg = analysis_run_config('sensitivity', run_mode, preset_defaults);
 %   psa = ParamSpaceAnalysis2('n_levels', cfg.n_levels, ...);
 %   psa.model_defaults = merge_struct(preset_defaults, cfg.model);
-%   psa.add_grid_parameter('reps', 1:cfg.n_reps);
+%   psa.add_grid_levels('reps', 1:cfg.n_reps);   % not add_grid_parameter: see its header
 %
 % Returns:
 %   cfg.n_levels - levels per grid parameter

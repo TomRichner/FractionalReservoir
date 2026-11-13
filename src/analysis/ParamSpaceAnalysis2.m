@@ -228,6 +228,48 @@ classdef ParamSpaceAnalysis2 < handle
             end
         end
 
+        function add_grid_levels(obj, param_name, levels)
+            % ADD_GRID_LEVELS Add a grid axis whose values are exactly LEVELS.
+            %
+            % Usage:
+            %   psa.add_grid_levels('reps', 1:n_reps)
+            %
+            % add_grid_parameter reads its value by length: two elements are a
+            % [min max] RANGE expanded to n_levels values, three or more an
+            % explicit list (and one is refused). That is right for a swept
+            % physical parameter and wrong for a list whose length varies,
+            % such as 1:n_reps: with n_reps = 2 the reps axis became
+            % linspace(1, 2, n_levels), 4 repetitions at n_levels = 4 where 2
+            % were meant (the 'essential' mode, Plan C F2, 2026-11-12), and
+            % with n_reps = 1 it errored. This method always stores LEVELS as
+            % the explicit list, whatever its length (one or more), and leaves
+            % add_grid_parameter's reading of a two-element range unchanged.
+            % A list of three or more is stored exactly as add_grid_parameter
+            % stores it, so the grid, the job table and the seeds are the same.
+
+            if ~ischar(param_name) && ~isstring(param_name)
+                error('ParamSpaceAnalysis2:InvalidInput', ...
+                    'param_name must be a string or char array');
+            end
+            if ~isnumeric(levels) || ~isvector(levels) || isempty(levels)
+                error('ParamSpaceAnalysis2:InvalidInput', ...
+                    'levels must be a non-empty numeric vector');
+            end
+
+            ParamSpaceAnalysis2.reject_condition_field(param_name);
+
+            if ~ismember(param_name, obj.grid_params)
+                obj.grid_params{end+1} = param_name;
+            end
+            obj.explicit_vectors.(param_name) = levels;
+            if isfield(obj.param_ranges, param_name)
+                obj.param_ranges = rmfield(obj.param_ranges, param_name);
+            end
+            vprintf(obj.verbose, 'verbose', ...
+                'Added grid parameter: %s, explicit levels, %d values\n', ...
+                param_name, numel(levels));
+        end
+
         function remove_grid_parameter(obj, param_name)
             % REMOVE_GRID_PARAMETER Remove a parameter from the grid
 
