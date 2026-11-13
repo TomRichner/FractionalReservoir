@@ -1158,4 +1158,19 @@ becomes an issue with an acceptance test.
 - **Related exploration (2026-11-13, merged `1bb77c7`):** on the main
   sweep, without adaptation bias sets the mean rate (r = -0.67) but does
   not track lambda_1 (r = 0.00).
-- **Result:** _(pending)_
+- **Result (first grid, 2026-11-13):** built and merged (`b0d29a4`); gate
+  on main (5 tests, ultrarapid 0 differences in 994 leaves); run
+  `data/mc_gain_sweep_selffb`: 7 gains (0.22 to 2) by k = 0, 0.5, 1, 2,
+  bias 0.2, seed 3001, four conditions, 28 jobs in 30 min, none failed;
+  figures `figs/block_C/selffb/`. The k = 0 row reproduces the main run's
+  seed-3001 values at bias 0.2. Self-feedback moves the no-adaptation edge
+  to higher gain (0.33-0.5 at k = 0, 1-1.4 at k = 0.5, 1.4-2 at k = 1,
+  none up to gain 2 at k = 2), which the bias could not do; but memory
+  without adaptation does not follow: its best at k >= 0.5 is 6.3, below
+  its k = 0 peak of 8.1 and far below the adapting conditions (13 to 15.5).
+  At k = 2 no condition turns chaotic and memory stays 3 to 7; at large k
+  the no-adaptation network sits at the leak floor (lambda_1 about -10).
+  Reading (lead's): a fixed, instantaneous self-inhibition buys stability
+  but not memory; adaptation's slow, rate-dependent feedback buys both.
+  One seed: a first look. Small open item: the scatter's size legend lacks
+  "(R_W)".
