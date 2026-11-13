@@ -683,7 +683,7 @@ PAGE = """<!doctype html>
   --band-block: #e6e9ee; --band-group: #f1f3f5; --proj: #f3f6fb; --gap: #eeeeee;
   --done: #7c8794; --run-bg: #f2c46d; --run-fg: #b8862c; --plan-bg: #ffffff; --plan: #3f6fb5;
   --tom-bg: #efe4f7; --tom-fg: #8656a8; --now: #c0392b; --tip-bg: #ffffff; --tip-b: #b9bec5;
-  --code: #2e4f7a;
+  --code: #2e4f7a; --sb-track: #e4e7eb; --sb-thumb: #8b939d; --sb-thumb-h: #5d636b;
 }}
 @media (prefers-color-scheme: dark) {{
   :root:not([data-theme="light"]) {{
@@ -691,7 +691,7 @@ PAGE = """<!doctype html>
     --band-block: #2a2f36; --band-group: #21252a; --proj: #1b2230; --gap: #24272b;
     --done: #8a96a4; --run-bg: #a8792a; --run-fg: #e0b25f; --plan-bg: #1d232c; --plan: #7aa7e8;
     --tom-bg: #3a2c45; --tom-fg: #c79ae6; --now: #ff6b5b; --tip-bg: #22262b; --tip-b: #4a5058;
-    --code: #9cc0f0;
+    --code: #9cc0f0; --sb-track: #262a2f; --sb-thumb: #6b737d; --sb-thumb-h: #9aa1aa;
   }}
 }}
 :root[data-theme="dark"] {{
@@ -699,7 +699,7 @@ PAGE = """<!doctype html>
   --band-block: #2a2f36; --band-group: #21252a; --proj: #1b2230; --gap: #24272b;
   --done: #8a96a4; --run-bg: #a8792a; --run-fg: #e0b25f; --plan-bg: #1d232c; --plan: #7aa7e8;
   --tom-bg: #3a2c45; --tom-fg: #c79ae6; --now: #ff6b5b; --tip-bg: #22262b; --tip-b: #4a5058;
-  --code: #9cc0f0;
+  --code: #9cc0f0; --sb-track: #262a2f; --sb-thumb: #6b737d; --sb-thumb-h: #9aa1aa;
 }}
 html, body {{ margin: 0; background: var(--bg); color: var(--fg);
   font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }}
@@ -724,6 +724,29 @@ dl.legend dt {{ white-space: nowrap; }}
 .sw.now {{ width: 2px; background: var(--now); }}
 code {{ color: var(--code); }}
 .scroll {{ overflow-x: auto; border: 1px solid var(--line); background: var(--bg); }}
+/* The chart is wider than the window, and its own scroll bar sits at its foot, out of
+   sight unless the page is scrolled to the bottom. So the script hides that bar and
+   drives a second one, .hbar, pinned to the bottom of the window (sticky) for as long
+   as any part of the chart is on screen; the two are kept in step both ways. Without
+   the script, .hbar stays hidden and the chart keeps its own bar. */
+.hbar {{ display: none; }}
+.chartwrap.pinned .scroll {{ scrollbar-width: none; }}
+.chartwrap.pinned .scroll::-webkit-scrollbar {{ display: none; }}
+.chartwrap.pinned .hbar {{ display: block; position: sticky; bottom: 0; z-index: 5;
+  overflow-x: auto; overflow-y: hidden; background: var(--bg);
+  border: 1px solid var(--line); border-top: none; }}
+.hbar-w {{ height: 1px; }}
+/* always drawn, never an auto-hiding overlay bar (Chrome, Edge, Safari) */
+.hbar::-webkit-scrollbar {{ height: 16px; }}
+.hbar::-webkit-scrollbar-track {{ background: var(--sb-track); }}
+.hbar::-webkit-scrollbar-thumb {{ background: var(--sb-thumb); border-radius: 8px;
+  border: 3px solid var(--sb-track); min-width: 40px; }}
+.hbar::-webkit-scrollbar-thumb:hover, .hbar::-webkit-scrollbar-thumb:active {{ background: var(--sb-thumb-h); }}
+/* the standard properties, for browsers without the pseudo-elements (Firefox); kept out
+   of Chrome, where setting them would switch the styled bar above off */
+@supports not selector(::-webkit-scrollbar) {{
+  .hbar {{ scrollbar-width: auto; scrollbar-color: var(--sb-thumb) var(--sb-track); }}
+}}
 .inner {{ display: flex; width: max-content; }}
 .labels {{ position: sticky; left: 0; z-index: 2; flex: none; }}
 .chart {{ flex: none; display: block; }}
@@ -805,10 +828,13 @@ g.task:focus .bar, g.task:hover .bar, g.task.hl .bar {{ stroke: var(--fg); strok
 <p>Hover over (or tab to) a bar or a row for what the step does, who does it, what it waits for and how it is checked.</p>
 </section>
 </div>
+<div class="chartwrap">
 <div class="scroll"><div class="inner">
 {labels}
 {chart}
 </div></div>
+<div class="hbar" aria-hidden="true"><div class="hbar-w"></div></div>
+</div>
 </main>
 <div id="tip" role="tooltip"></div>
 <script id="taskdata" type="application/json">{info}</script>
@@ -865,9 +891,20 @@ g.task:focus .bar, g.task:hover .bar, g.task.hl .bar {{ stroke: var(--fg); strok
   document.addEventListener('keydown', function (ev) {{ if (ev.key === 'Escape') tip.style.display = 'none'; }});
   // open with "now" in view: a quarter of the visible chart lies before it
   var scroller = document.querySelector('.scroll');
+  // the horizontal bar pinned to the bottom of the window (see .hbar in the CSS)
+  var wrap = document.querySelector('.chartwrap');
+  var hbar = document.querySelector('.hbar');
+  var hbarW = hbar.firstElementChild;
+  wrap.classList.add('pinned');
+  function sizeBar() {{ hbarW.style.width = scroller.scrollWidth + 'px'; hbar.scrollLeft = scroller.scrollLeft; }}
+  function follow(from, to) {{ if (Math.abs(to.scrollLeft - from.scrollLeft) >= 1) to.scrollLeft = from.scrollLeft; }}
+  scroller.addEventListener('scroll', function () {{ follow(scroller, hbar); }}, {{ passive: true }});
+  hbar.addEventListener('scroll', function () {{ follow(hbar, scroller); }}, {{ passive: true }});
+  window.addEventListener('resize', sizeBar);
+  sizeBar();
   var nowLine = document.querySelector('line.now');
   var leftW = document.querySelector('svg.labels').getBoundingClientRect().width;
-  function scrollTo(x) {{ scroller.scrollLeft = Math.max(0, x - (scroller.clientWidth - leftW) * 0.25); }}
+  function scrollTo(x) {{ scroller.scrollLeft = Math.max(0, x - (scroller.clientWidth - leftW) * 0.25); hbar.scrollLeft = scroller.scrollLeft; }}
   scrollTo(parseFloat(nowLine.getAttribute('x1')));
   // #show=CODE opens that task's hover box (for checking the page without a mouse)
   var m = /^#show=([A-Za-z0-9_]+)$/.exec(location.hash);
