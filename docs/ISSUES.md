@@ -945,3 +945,26 @@ becomes an issue with an acceptance test.
   them into a separate repo with examples and documentation so other
   projects can use the same arrangement (MATLAB MCP server, one private
   session per agent, Parallel Computing Toolbox), and test it on a Mac.
+
+### FD-010 Memory capacity and growth rate across gain and bias (block C)
+
+- **Status:** in progress (Tom, 2026-11-12: do block C next; the lead
+  decides, logs and proceeds until it is done). The plan is
+  `docs/Plan_C_memory_capacity_gain_bias.md`; its section 7 lists the
+  lead's eight decisions taken with the plan (generator pinned to twister;
+  lambda_1 measured with the memory-task input on; E:I variants at 8.4 /
+  5.6 and 5.6 / 8.4; the bias axis is `S_c`, the centre of the per-neuron
+  draw; Gaussian fit against log gain; the 2-D map on the standard network
+  only; `Manuscript5.md` not edited, a proposal written beside the to-do
+  list; noise off).
+- **Tom's additions to the agreed design (2026-11-12):** a second axis,
+  the nonlinearity's bias `S_c` (the manuscript's a_0), shown as 2-D maps,
+  gain by bias, memory capacity as colour, per condition. The question: is
+  chained MTS the most robust (consistently higher memory capacity than
+  1TS or none)? Expected: no adaptation needs precise tuning.
+- **Three fixes first (Tom: yes to all):** the model names its random
+  generator; the reps axis of the `essential` 1-D sweeps; the 1TS SFA
+  constant is the neuron's fastest MTS rung.
+- **Serves:** block C
+- **Depends on:** FD-007, FD-015.
+- **Result:** _(pending)_
