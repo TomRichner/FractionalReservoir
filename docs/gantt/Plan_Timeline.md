@@ -49,13 +49,18 @@ It is just to help the user estimate how the plan is shaping up."
     (`docs/Plan_A_chained_vessicles.md` section 7: 0a, 0b, 0c, 0d, 1, 2, 3,
     4, 5, 7, 8; then the lead's 9 (the spread), 10, 11, 12 for the finish).
     Step 0 of block A also holds the work of 2026-11-10 that came before
-    Plan A (test audit, regression tiers). Blocks B, C, D are not planned
-    in detail; their bars are numbered 0, 1, 2, ... in order, with 0 the
-    planning step.
+    Plan A (test audit, regression tiers). Block C uses Plan C's steps
+    (`docs/Plan_C_memory_capacity_gain_bias.md` section 6: C0 the three
+    fixes and their re-captures, C1 the stage, C2 the pilot, C3 the main
+    runs, C4 figures and report; then 5 the close-out and Tom's review, 6
+    the medium run, 7 its figures). Block B's step 0 is its pilots and
+    their report; its later steps, and all of block D, are not planned in
+    detail and are numbered 1, 2, ... in order.
   - *the medium run*: there is one, for blocks A, B and C together, drawn
-    in block C (`C_4_B`): Tom, 2026-11-12, "we will not be doing a medium
-    run until we get done with stage C", so it follows block C's fast run,
-    and blocks A and B end with their fast runs.
+    in block C (`C_6_U` Tom decides to start it, `C_6_B` the run): Tom,
+    2026-11-12, "we will not be doing a medium run until we get done with
+    stage C", so it follows block C's close-out and Tom's review, and
+    block B's fast run.
   - *kind*: P = Plan, B = Build, T = Test, U = User: nothing proceeds
     until Tom has decided, reviewed, or talked it through (a hold point,
     Tom fixing the tolerances). Writing a plan or a design stays P, a run
@@ -113,7 +118,9 @@ Each done task says in `rule` how it was measured:
 **Estimates.** `estimate` is the working estimate in minutes, a multiple
 of 15, for tasks not finished. For block A they are the lead's; where a
 duration is a guess (`guess = true`) the hover box and the bar say so.
-Blocks B, C and D are guesses throughout.
+Block C's are the lead's (from Plan C and its measured
+pilot) up to Tom's review; blocks B and D, and the medium run, are
+guesses.
 
 **Estimate of record.** When a task starts, its estimate at that moment
 is copied into `estimate_of_record` (with `estimate_of_record_source`)
