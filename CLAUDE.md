@@ -37,7 +37,11 @@ leaving all long tests over 40 min to a future date." So size every run
 an agent makes, and every `essential` / `fast` entry of a size table, to
 the smallest that shows the result, each under about 40 minutes; more
 seeds and finer grids go into the `medium` / `production` sizes for
-later. What is written in code is complete whatever the run size.
+later. What is written in code is complete whatever the run size. And
+the same morning: "i want the effort going into writing high quality,
+generalized, readible, maintainable, best practice code, not have the
+effort go into long runs." Where the work could go either way, it goes
+into the code.
 
 Two documents to read first:
 
