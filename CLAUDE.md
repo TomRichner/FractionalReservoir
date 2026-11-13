@@ -284,8 +284,19 @@ bundle (`cfg.mc_gain_sweep.variants`: tag and preset), `..._mu7chain_EI3to2`
 and `..._mu7chain_EI2to3` (mean weights 8.4 / 5.6 and 5.6 / 8.4, sum held
 at 14), each run gain only at its own bias into
 `<run_dir>/mc_gain_sweep_<tag>/`. The result of the quick test is
-`docs/notes/Block_C_results_2026-11-13.md`. Three fixes went in first,
-each of which moved numbers:
+`docs/notes/Block_C_results_2026-11-13.md`. **The second axis need not be
+the bias** (FD-024): `second_axis` names any one scalar model property
+(`S_c` by default) and `second_levels` its levels; `mc_sweep_second_axis`
+is the one mapping from the property to the table column, the job-file
+token and the settings names. The bias keeps its old names (column
+`bias`, token `b`, `bias_levels`), and the job signature gains
+`second_axis` only off the default, so results made before still read
+and resume. **Self-negative feedback** is `SRNNCellTypePairs.self_feedback`
+(`1 x C`, k in units of `R_gain1`, the bulk radius at gain 1): applied in
+`get_params` only, after `level_of_chaos` and the route `scale`, as
+`W_sim = g W_drawn - diag(k) R_gain1`; it breaks Dale's law for E cells,
+accepted (Tom, 2026-11-13). Three fixes went in first, each of which
+moved numbers:
 
 - **Every seeding call names its generator** (`rng(seed, 'twister')`;
   F1). A pool worker's default generator is not a client's, so a model
