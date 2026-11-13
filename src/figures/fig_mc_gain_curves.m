@@ -24,11 +24,11 @@ function out = fig_mc_gain_curves(cfg)
 % adaptation lambda_1 runs from about -10 to +8 along gain; with chained
 % MTS it sits at about -0.10 (the slowest adaptation mode) at every stable
 % gain, and on a linear axis that cluster collapses onto the zero line. On
-% the symmetric-log axis both are readable, and in column 3 a cluster (at
-% least three per-gain medians with lambda_1 < 0 within 0.03 1/s of each
-% other) is also marked by a bracket and its value, in the condition's
-% colour, so the vertical stack of points reads as "lambda_1 does not
-% move here" rather than as a measurement of distance to instability.
+% the symmetric-log axis both are readable. In column 3 that cluster is a
+% vertical stack of points; it is not annotated on the panel (Tom,
+% 2026-11-13: brackets and a corner list of their values cluttered it);
+% the caption says that lambda_1 is an outcome, not a controlled variable,
+% and that with MTS it stays near the slowest adaptation rate.
 %
 % THE BIAS: cfg.bias (default each result's preset bias, 0.2). Each row uses
 % the nearest bias level its result holds, and the row title states both,
@@ -108,7 +108,6 @@ for r = 1:n_rows
         h = plot(ax(r, 1), g, mc_m, '-', 'Color', col, 'LineWidth', st.line_lw);
         plot(ax(r, 2), g, sl(l_m), '-', 'Color', col, 'LineWidth', st.line_lw);
         plot(ax(r, 3), sl(l_m), mc_m, '-', 'Color', col, 'LineWidth', st.line_lw);
-        mark_cluster(ax(r, 3), l_m, mc_m, col, c, sl);
         if ~ismember(conds{c}, legend_t)
             legend_h(end+1) = h; legend_t{end+1} = conds{c}; %#ok<AGROW>
         end
@@ -213,35 +212,6 @@ if nnz(ok) < 2; return; end
 x = x(ok); lo = lo(ok); hi = hi(ok);
 fill(ax, [x, fliplr(x)], [hi, fliplr(lo)], col, 'FaceAlpha', 0.15, 'EdgeColor', 'none', ...
     'HandleVisibility', 'off');
-end
-
-function mark_cluster(ax, l_m, mc_m, col, c, sl)
-% A run of stable per-gain medians whose lambda_1 barely moves: bracket it
-% and state the value, so the stack is not mistaken for a trend.
-% The statement goes in a list in the axes' upper-right corner (positive
-% lambda_1 with high memory capacity, where no curve runs: once lambda_1 is
-% clearly positive the memory capacity has collapsed), one line per
-% clustered condition in its colour, stacked downward. Not beside the
-% bracket: two conditions that cluster at the same lambda_1 would overlap
-% there. Not the lower-left corner, where it sat first: on the
-% excitation-dominated network (E : I = 3 : 2) the no-adaptation curve runs
-% there (lambda_1 near -10, memory capacity 0 to 3) and the list crossed it.
-MIN_POINTS = 3;         % per-gain medians that make a cluster
-HALF_WIDTH = 0.03;      % 1/s around their median lambda_1
-k = find(isfinite(l_m) & isfinite(mc_m) & l_m < 0);
-if numel(k) < MIN_POINTS; return; end
-lv = l_m(k);
-in = abs(lv - median(lv)) <= HALF_WIDTH;
-if nnz(in) < MIN_POINTS; return; end
-lc = median(lv(in)); y = mc_m(k(in));
-x0 = sl(lc) - 0.15 - 0.08 * (c - 1);
-plot(ax, x0 * [1 1], [min(y) max(y)], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
-plot(ax, x0 + [0 0.05], min(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
-plot(ax, x0 + [0 0.05], max(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
-n_prev = numel(findobj(ax, 'Tag', 'lle_cluster'));
-text(ax, 0.98, 0.98 - 0.07 * n_prev, sprintf('[ \\lambda_1 \\approx %.2f at %d gains', lc, nnz(in)), ...
-    'Units', 'normalized', 'Color', col, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', ...
-    'FontSize', 8, 'Tag', 'lle_cluster');
 end
 
 function [xt, xtl] = gain_ticks(gains)
