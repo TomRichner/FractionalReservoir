@@ -206,8 +206,13 @@ asleep stops all progress for hours, and he does not want that. So:
   would like to add beyond it is noted in `ISSUES.md` or the worklog as a
   suggestion, not done.
 - Decisions that record what the paper will say (parameter values,
-  condition names, what a figure shows) still go into the to-do list in
-  the manuscript repo, marked as the lead's decision so Tom can find them.
+  condition names) still go into the to-do list in the manuscript repo,
+  marked as the lead's decision so Tom can find them. **Which figures the
+  draft shows, and in what version, goes into
+  `../StochasticPlasticDynamicalSystemPaper/docs/final_draft/Figure_plan.md`**
+  (since 2026-11-13): one row per figure (status, what changes, the
+  function and run that make it, who decided), then a dated log. A
+  proposal there is marked "lead (proposal)" until Tom decides.
 
 How to use the worker agents:
 
