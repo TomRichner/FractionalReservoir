@@ -1,7 +1,7 @@
 function [out_dir, results_file] = run_mc_gain_sweep(opts)
 % RUN_MC_GAIN_SWEEP Memory capacity and lambda_1 at every point of a gain-by-bias sweep.
 %
-%   out_dir = RUN_MC_GAIN_SWEEP()                          % the pilot ('essential')
+%   out_dir = RUN_MC_GAIN_SWEEP()                          % 'essential': a first look
 %   out_dir = RUN_MC_GAIN_SWEEP('run_mode', 'fast', 'output_dir', d)
 %   [out_dir, results_file] = RUN_MC_GAIN_SWEEP('gain_levels', g, 'bias_levels', b, ...
 %       'seeds', s, 'conditions', {'no_adaptation', 'sfa3_stdc2'})
@@ -45,12 +45,32 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 %                     capacity can be read as saturated, silent or chaotic.
 %
 % SIZES, by run_mode (explicit gain_levels / bias_levels / seeds override):
-%   essential    9 gains x  7 biases x  2 seeds   (the pilot)
-%   fast         9 gains x  7 biases x  3 seeds
-%   medium(2)   13 gains x  9 biases x  5 seeds
-%   production  17 gains x 11 biases x 10 seeds
-% Gains are log-spaced from 0.1 to 3, biases linear from -0.2 to 0.8, seeds
-% seed_net_base + 1, 2, ... The protocol is the same in every mode.
+%   essential    9 gains x  4 biases x  1 seed    gains as fast, biases
+%                                                [-0.6 -0.2 0.2 0.6]
+%   fast         9 gains x  7 biases x  4 seeds   gains [0.1 0.15 0.22
+%                                                0.33 0.5 0.7 1.0 1.4 2.0],
+%                                                biases -0.6:0.2:0.6
+%   medium(2)   13 gains x  9 biases x  5 seeds   biases -0.6:0.15:0.6
+%   production  17 gains x 13 biases x 10 seeds   biases -0.6:0.1:0.6
+% Gains run from 0.1 to 2 and always include 1.0. In medium and production
+% they are log-spaced in two pieces that meet at 1 (nine and twelve equal
+% log steps from 0.1 to 1, then three and four from 1 to 2: ratios 1.29 and
+% 1.26 per step in medium, 1.21 and 1.19 in production), rounded to three
+% significant figures:
+%   medium      0.1 0.129 0.167 0.215 0.278 0.359 0.464 0.599 0.774
+%               1 1.26 1.59 2
+%   production  0.1 0.121 0.147 0.178 0.215 0.261 0.316 0.383 0.464 0.562
+%               0.681 0.825 1 1.19 1.41 1.68 2
+% Seeds are seed_net_base + 1, 2, ... The protocol is the same in every mode.
+% WHY THIS GRID (FD-010, the lead's decisions 14 and 16, from the pilot of
+% 2026-11-12, which ran gains 0.1 to 3 and biases -0.2 to 0.8): bias 0.8
+% silenced the network and gain 3 gave no memory in any condition, so both
+% ends are dropped; the no-adaptation peak lay on the pilot's low-bias edge
+% (-0.2), so the bias axis is extended down to -0.6; and the preset's own
+% point (gain 1, bias 0.2) is a grid point in every mode. The bias levels
+% are MATLAB colon ranges, so "0.2" is the colon's 0.19999999999999996 (as
+% in the main run of 2026-11-12, whose job files carry those values); the
+% figures and statistics take the nearest level to the preset's bias.
 %
 % RESUMABLE. Each finished job writes <out_dir>/jobs/job_*.mat; a rerun into
 % the same output directory skips the jobs that are there (and reruns the
@@ -121,17 +141,30 @@ t_start = tic;
 
 %% Sizes -- BEFORE any compute, so a bad mode fails in milliseconds
 P = mc_protocol();
+% The grid by mode; see SIZES in the header for the levels and why.
+fast_gains = [0.1 0.15 0.22 0.33 0.5 0.7 1.0 1.4 2.0];
 switch opts.run_mode
-    case 'essential',           n_gain = 9;  n_bias = 7;  n_seeds = 2;
-    case 'fast',                n_gain = 9;  n_bias = 7;  n_seeds = 3;
-    case {'medium', 'medium2'}, n_gain = 13; n_bias = 9;  n_seeds = 5;
-    case 'production',          n_gain = 17; n_bias = 11; n_seeds = 10;
+    case 'essential'
+        gain_levels = fast_gains;
+        bias_levels = [-0.6 -0.2 0.2 0.6];
+        n_seeds = 1;
+    case 'fast'
+        gain_levels = fast_gains;
+        bias_levels = -0.6:0.2:0.6;
+        n_seeds = 4;
+    case {'medium', 'medium2'}
+        gain_levels = [0.1 0.129 0.167 0.215 0.278 0.359 0.464 0.599 0.774 1 1.26 1.59 2];
+        bias_levels = -0.6:0.15:0.6;
+        n_seeds = 5;
+    case 'production'
+        gain_levels = [0.1 0.121 0.147 0.178 0.215 0.261 0.316 0.383 0.464 0.562 ...
+                       0.681 0.825 1 1.19 1.41 1.68 2];
+        bias_levels = -0.6:0.1:0.6;
+        n_seeds = 10;
     otherwise
         error('run_mc_gain_sweep:badMode', 'Unknown run_mode ''%s'' (expected %s).', ...
             opts.run_mode, strjoin(run_mode_names(), ', '));
 end
-gain_levels = logspace(log10(0.1), log10(3), n_gain);
-bias_levels = linspace(-0.2, 0.8, n_bias);
 seeds       = P.seed_net_base + (1:n_seeds);
 if ~isempty(opts.gain_levels); gain_levels = opts.gain_levels; end
 if ~isempty(opts.bias_levels); bias_levels = opts.bias_levels; end

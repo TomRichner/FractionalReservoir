@@ -15,7 +15,11 @@ function plan = paper_stage_plan(cfg)
 %
 % THE CONFIG FIELDS
 %   cfg.stages   cell of stage names (paper_stage_names). Absent or empty:
-%                every stage, exactly as before the field existed.
+%                every stage, exactly as before the field existed. An
+%                OPT-IN stage (paper_stage_names' third output, such as
+%                'mc_gain_sweep') runs only when named here; "every stage"
+%                never includes it, and a plan that does not name it does
+%                not mention it (not in stages_skipped, no field in runs).
 %   cfg.sweeps   cell of sweep names, the analyses the 'sweeps' stage runs.
 %                Absent or empty: all three. Ignored (plan.sweeps is empty)
 %                when 'sweeps' itself is not selected.
@@ -33,7 +37,9 @@ function plan = paper_stage_plan(cfg)
 %                        'sweeps' stage is not selected)
 %   plan.sweeps_skipped  the sweeps not run
 %   plan.is_selection    true when anything is skipped
-%   plan.runs            a struct of logicals, one field per stage name
+%   plan.runs            a struct of logicals, one field per stage name of
+%                        the first list, plus a true field for each opt-in
+%                        stage selected
 %
 % ERRORS, all listing the valid names:
 %   paper_stage_plan:UnknownStage   a name in cfg.stages that is no stage
@@ -48,7 +54,7 @@ arguments
     cfg (1,1) struct
 end
 
-[all_stages, all_sweeps] = paper_stage_names();
+[all_stages, all_sweeps, opt_in] = paper_stage_names();
 
 has_illustrations = isfield(cfg, 'illustrations') && ~isempty(cfg.illustrations) && ...
     all(logical(cfg.illustrations));
@@ -58,16 +64,22 @@ if ~has_illustrations
 end
 
 %% Stages
+% An opt-in stage (paper_stage_names' third list) joins `available` only when
+% cfg.stages names it, so a bundle that does not name one has the plan it
+% had before opt-in stages existed: not in stages, not in stages_skipped,
+% no field in runs.
 want = selection(cfg, 'stages');
 if isempty(want)
     run_stage = true(size(available));
 else
-    unknown = setdiff(want, all_stages, 'stable');
+    unknown = setdiff(want, [all_stages, opt_in], 'stable');
     if ~isempty(unknown)
         error('paper_stage_plan:UnknownStage', ...
-            'cfg.stages names %s, which %s. The stages are: %s.', ...
-            quoted(unknown), is_not(unknown, 'a stage'), strjoin(all_stages, ', '));
+            'cfg.stages names %s, which %s. The stages are: %s; opt-in: %s.', ...
+            quoted(unknown), is_not(unknown, 'a stage'), strjoin(all_stages, ', '), ...
+            strjoin(opt_in, ', '));
     end
+    available = [available, opt_in(ismember(opt_in, want))];
     if ismember('paper_illustrations', want) && ~has_illustrations
         error('paper_stage_plan:IllustrationsOff', ...
             ['cfg.stages names ''paper_illustrations'', but cfg.illustrations is absent or false, ' ...
@@ -101,6 +113,9 @@ plan.is_selection = ~isempty(plan.stages_skipped) || ~isempty(plan.sweeps_skippe
 plan.runs = struct();
 for k = 1:numel(all_stages)
     plan.runs.(all_stages{k}) = ismember(all_stages{k}, plan.stages);
+end
+for k = 1:numel(opt_in)
+    if ismember(opt_in{k}, plan.stages); plan.runs.(opt_in{k}) = true; end
 end
 end
 
