@@ -106,7 +106,9 @@ constants in [section 8](#8-parameter-values).
 ## 1. What this file is
 
 The section above, "The model at a glance", is the simplified statement for a
-first reading. Sections 2 to 9 are the full statement.
+first reading. Sections 2 to 9 are the full statement, and
+[section 10](#10-the-jacobian-of-the-simplified-model) derives the Jacobian of
+the simplified model.
 
 This file states the network model with multiple-timescale (MTS) adaptation in
 its **chained** form: spike-frequency adaptation with $K$ timescales, short-term
@@ -121,8 +123,9 @@ carry something.
 the statement of the model that the code is checked against, and
 [`../cell_type_pair_equations.md`](../cell_type_pair_equations.md) the per-route
 form of the product model. This file must agree with both in substance. Where
-they differ, they are right and this file is to be corrected. The Jacobian is
-not restated here; section 9 says where it is.
+they differ, they are right and this file is to be corrected. The Jacobian of
+the full system is not restated here; section 9 says where it is in the code,
+and section 10 derives it for the simplified model.
 
 ## 2. Notation
 
@@ -640,7 +643,7 @@ Paths are from the repository root.
 | (17): per-neuron SFA ladders | `SRNNCellTypePairs.build_tau_a_matrix` (`tau_a_matrix`) |
 | Setpoints | `SRNNCellTypePairs.build_setpoints` (`S_c_vec`) |
 | Which model a route gets | `SRNNCellTypePairs.compile_route`; registry `route_model.m` |
-| Jacobian (not restated here) | a route's block: `route_pool.m`, `linearize`, and the table in its header; assembled in `SRNNCellTypePairs.compute_Jacobian_fast`; matrix-free product in `jacobian_times` |
+| Jacobian (the full system's is not restated here; section 10 derives the simplified model's) | a route's block: `route_pool.m`, `linearize`, and the table in its header; assembled in `SRNNCellTypePairs.compute_Jacobian_fast`; matrix-free product in `jacobian_times` |
 | A route's factors for display | `SRNNCellTypePairs.std_route_factor` ($b_1$), `stf_route_factor` ($g$) |
 | Parameter values | `src/presets/srnn_param_preset.m`, the case block named in section 8 |
 
@@ -670,3 +673,471 @@ against `steady_state` ($4 \times 10^{-16}$), the drawn constants against the
 compiled ones ($2 \times 10^{-16}$ relative), and the full right-hand side of
 two 40-neuron networks with three SFA timescales against `dynamics_fast`
 ($7 \times 10^{-15}$ relative).
+
+## 10. The Jacobian of the simplified model
+
+This section linearizes the simplified model, (S1) to (S6), and writes its
+Jacobian in block form, in the manner of the effective-connectivity equation of
+the previous paper (Richner et al. 2026, its Equation 3),
+$J_{\mathrm{eff}} = \frac{1}{\tau_d} \left( -I + W B\, \Phi'(h) \right)$. That
+equation is the block of the Jacobian that acts on the dendritic states. Here
+the adaptation and pool variables are kept as states too, so the result is the
+whole matrix, with $J_{\mathrm{eff}}$ as its first block.
+
+### 10.1 Simplifications
+
+1. **One set of constants.** Every spread of section 6 is zero except the
+   setpoints': all neurons share $\tau_d$, $c$, $K$, the $\tau_{a_k}$,
+   $\tau_{rec_1}$, $\tau_{rec_2}$, $\tau_{rel}$ and $n_2$. The setpoint
+   $a_{0_i}$ may still differ between neurons; that costs nothing, because it
+   enters only through the operating point (18).
+2. **Every route alike, depression on every route**, so the shorthand of
+   section 3 applies: each neuron has one releasable pool $b_{i1}$ and one
+   reserve $b_{i2}$. (The code keeps one copy of a neuron's pools per route.
+   With routes alike the copies are equal at all times, and the matrix below is
+   the code's Jacobian acting on states with equal copies; section 10.6.)
+3. **No facilitation**, as in the paper's network.
+4. **$c$ and $K$ are the same for both cell types**, as in the paper's network.
+5. **The input and the noise are additive** and do not depend on the state, so
+   they do not appear in the Jacobian. They act on it only through the state
+   at which it is evaluated.
+
+Cell types are not otherwise simplified away: Dale's law and the E and I
+weight statistics are inside $W$, which is left general.
+
+### 10.2 Linearization
+
+Write the state as vectors of length $N$: $x$, the SFA variables
+$a_1, \dots, a_K$, and the pools $b_1$ and $b_2$. Following the previous paper,
+let
+
+$$
+h_i = x_i - a_{0_i} - \frac{c}{K} \sum_{k=1}^{K} a_{ik}, \qquad r_i = \phi(h_i) \tag{18}
+$$
+
+be the operating point of neuron $i$ on its nonlinearity and its rate, and
+define the diagonal matrices
+
+$$
+\Phi' = \mathrm{diag}\big( \phi'(h_i) \big), \qquad R = \mathrm{diag}(r_i), \qquad B_1 = \mathrm{diag}(b_{i1}), \qquad B_2 = \mathrm{diag}(b_{i2}) .
+$$
+
+A small perturbation of the state changes the operating point, through it the
+rate, and through the rate and the releasable pool the synaptic output
+$\theta = R\, b_1$:
+
+$$
+\delta h = \delta x - \frac{c}{K} \sum_{k=1}^{K} \delta a_k, \qquad
+\delta r = \Phi'\, \delta h, \qquad
+\delta \theta = B_1\, \delta r + R\, \delta b_1 \tag{19}
+$$
+
+Every equation of the model depends on $x$ and on the $a_k$ only through the
+rate, so $\Phi'\, \delta h$ is the one channel by which the dendritic and
+adaptation states act. Substituting (19) into the perturbed (S1), (S3), (S5)
+and (S6):
+
+$$
+\begin{aligned}
+\tau_d\, \delta \dot{x} &= -\delta x + W \left( B_1 \Phi'\, \delta h + R\, \delta b_1 \right) \\
+\tau_{a_k}\, \delta \dot{a}_k &= -\delta a_k + \Phi'\, \delta h, \qquad k = 1, \dots, K \\
+\delta \dot{b}_1 &= -\left( \frac{B_2}{\tau_{rec_1}} + \frac{R}{\tau_{rel}} \right) \delta b_1 + \frac{I - B_1}{\tau_{rec_1}}\, \delta b_2 - \frac{B_1}{\tau_{rel}}\, \Phi'\, \delta h \\
+\delta \dot{b}_2 &= \frac{B_2}{n_2 \tau_{rec_1}}\, \delta b_1 - \left( \frac{I}{\tau_{rec_2}} + \frac{I - B_1}{n_2 \tau_{rec_1}} \right) \delta b_2
+\end{aligned} \tag{20}
+$$
+
+### 10.3 The block form
+
+Order the state as $z = (x;\ a_1;\ \dots;\ a_K;\ b_1;\ b_2)$, with $(K + 3) N$
+entries. Let $\mathbf{1}_K$ be the column of $K$ ones,
+$T_a = \mathrm{diag}(1/\tau_{a_1}, \dots, 1/\tau_{a_K})$, and $\otimes$ the
+Kronecker product, so that $\mathbf{1}_K^{\top} \otimes M$ is the block $M$
+repeated $K$ times side by side. With the **effective connectivity**
+
+$$
+W_{\mathrm{eff}} = W B_1 \Phi', \qquad J_{\mathrm{eff}} = \frac{1}{\tau_d} \left( -I + W B_1 \Phi' \right) \tag{21}
+$$
+
+equations (20) read $\delta \dot{z} = J\, \delta z$ with
+
+$$
+J =
+\begin{pmatrix}
+J_{xx} & J_{xa} & J_{xb_1} & 0 \\
+J_{ax} & J_{aa} & 0 & 0 \\
+J_{b_1 x} & J_{b_1 a} & J_{b_1 b_1} & J_{b_1 b_2} \\
+0 & 0 & J_{b_2 b_1} & J_{b_2 b_2}
+\end{pmatrix} \tag{22}
+$$
+
+$$
+\begin{aligned}
+J_{xx} &= J_{\mathrm{eff}} = \tfrac{1}{\tau_d} \left( -I + W B_1 \Phi' \right)
+  & J_{xa} &= -\tfrac{c}{K \tau_d}\; \mathbf{1}_K^{\top} \otimes W B_1 \Phi'
+  & J_{xb_1} &= \tfrac{1}{\tau_d}\, W R \\
+J_{ax} &= T_a \mathbf{1}_K \otimes \Phi'
+  & J_{aa} &= -T_a \otimes I - \tfrac{c}{K}\; T_a \mathbf{1}_K \mathbf{1}_K^{\top} \otimes \Phi' \\
+J_{b_1 x} &= -\tfrac{1}{\tau_{rel}}\, B_1 \Phi'
+  & J_{b_1 a} &= \tfrac{c}{K \tau_{rel}}\; \mathbf{1}_K^{\top} \otimes B_1 \Phi' \\
+J_{b_1 b_1} &= -\left( \tfrac{1}{\tau_{rec_1}} B_2 + \tfrac{1}{\tau_{rel}} R \right)
+  & J_{b_1 b_2} &= \tfrac{1}{\tau_{rec_1}} (I - B_1) \\
+J_{b_2 b_1} &= \tfrac{1}{n_2 \tau_{rec_1}}\, B_2
+  & J_{b_2 b_2} &= -\tfrac{1}{\tau_{rec_2}} I - \tfrac{1}{n_2 \tau_{rec_1}} (I - B_1)
+\end{aligned} \tag{23}
+$$
+
+Every block except those holding $W$ is diagonal or made of diagonal blocks: a
+neuron's adaptation and pools are coupled to that neuron alone. The same
+matrix is shorter when the channel through the rate is written once:
+
+$$
+J = D + U\, \Phi'\, V^{\top} \tag{24}
+$$
+
+$$
+D =
+\begin{pmatrix}
+-\tfrac{1}{\tau_d} I & 0 & \tfrac{1}{\tau_d} W R & 0 \\
+0 & -T_a \otimes I & 0 & 0 \\
+0 & 0 & J_{b_1 b_1} & J_{b_1 b_2} \\
+0 & 0 & J_{b_2 b_1} & J_{b_2 b_2}
+\end{pmatrix},
+\qquad
+U =
+\begin{pmatrix}
+\tfrac{1}{\tau_d} W B_1 \\
+T_a \mathbf{1}_K \otimes I \\
+-\tfrac{1}{\tau_{rel}} B_1 \\
+0
+\end{pmatrix},
+\qquad
+V =
+\begin{pmatrix}
+I \\
+-\tfrac{c}{K}\, \mathbf{1}_K \otimes I \\
+0 \\
+0
+\end{pmatrix}
+$$
+
+$V^{\top} \delta z = \delta h$ reads the operating point out of the state,
+$\Phi'$ turns it into a change of rate, and $U$ says what a change of rate does
+to each variable. $D$ is what is left with the rates held fixed: the leaks, the
+pools' own dynamics, and the pools' action on the dendrites.
+
+**What the form says.**
+
+- **The nonlinearity enters only as $\Phi'$**, the slope of each neuron's
+  nonlinearity at its own operating point, and it scales **columns**: neuron
+  $j$'s slope multiplies what neuron $j$ sends. The setpoint (the bias) appears
+  nowhere else.
+- **Depression scales the same columns by $B_1$.** As in the previous paper,
+  $W_{\mathrm{eff}} = W B_1 \Phi'$: a neuron with an empty releasable pool, or
+  one sitting on a flat part of its nonlinearity, is removed from the effective
+  connectivity for as long as that lasts. In the chain only $B_1$ scales the
+  columns; the reserve acts through $J_{b_1 b_2}$, by slowing the refill.
+- **SFA does not change $W_{\mathrm{eff}}$ at a given state.** It appears as
+  the same columns with the opposite sign and the weight $c/K$ ($J_{xa}$), as a
+  negative feedback of each neuron on itself ($J_{aa}$), and through where it
+  has moved the operating point $h$.
+- **The pools feed back through $W R$**: a change in a neuron's releasable
+  pool is transmitted in proportion to its rate.
+- **$J$ depends on the state.** It is a matrix at each moment of a run,
+  $J(z(t))$; it is one matrix only at a fixed point.
+
+### 10.4 The conditions as special cases
+
+Removing a variable removes its rows and columns from (22); nothing is
+clamped (section 4).
+
+**No adaptation** ($K = 0$, no pools). $h_i = x_i - a_{0_i}$, the state is $x$
+alone, and
+
+$$
+J = \frac{1}{\tau_d} \left( -I + W \Phi' \right) \tag{25}
+$$
+
+**Single timescale** ($K = 1$, single pool). Delete the reserve's row and
+column and put $B_2 = I$ in $J_{b_1 b_1}$, which is (9) linearized. The state
+is $(x;\ a_1;\ b_1)$ and
+
+$$
+J =
+\begin{pmatrix}
+\tfrac{1}{\tau_d} \left( -I + W B_1 \Phi' \right) & -\tfrac{c}{\tau_d}\, W B_1 \Phi' & \tfrac{1}{\tau_d}\, W R \\
+\tfrac{1}{\tau_{a_1}} \Phi' & -\tfrac{1}{\tau_{a_1}} \left( I + c\, \Phi' \right) & 0 \\
+-\tfrac{1}{\tau_{rel}}\, B_1 \Phi' & \tfrac{c}{\tau_{rel}}\, B_1 \Phi' & -\left( \tfrac{1}{\tau_{rec_1}} I + \tfrac{1}{\tau_{rel}} R \right)
+\end{pmatrix} \tag{26}
+$$
+
+**Chained multiple timescale** ($K = 3$, chain). Equations (22) and (23) as
+written.
+
+**Product multiple timescale** differs in the synapse only. With
+$\theta = R\, b_1 b_2$ and two independent pools, $W_{\mathrm{eff}} = W B_1 B_2 \Phi'$
+(both pools scale the columns); the dendrites hear both pools,
+$J_{xb_1} = \tfrac{1}{\tau_d} W R B_2$ and $J_{xb_2} = \tfrac{1}{\tau_d} W R B_1$;
+each pool is driven by the rate,
+$J_{b_m x} = -\tfrac{1}{\tau_{rel_m}} B_m \Phi'$; and the pools do not see each
+other, $J_{b_m b_m} = -\left( \tfrac{1}{\tau_{rec_m}} I + \tfrac{1}{\tau_{rel_m}} R \right)$
+with $J_{b_1 b_2} = J_{b_2 b_1} = 0$. In (24) that is a different $D$ and $U$
+and the same $\Phi' V^{\top}$.
+
+### 10.5 Adaptation as a gain on each neuron's column
+
+Because adaptation and the pools are local to a neuron, they can be eliminated
+neuron by neuron, which shows what they do to the effective connectivity at
+each timescale. Look for a mode $\delta z\, e^{st}$ of (20). The SFA rows give
+$\delta a_k = \Phi' \delta h / (1 + s \tau_{a_k})$, so by (19)
+
+$$
+\delta r = \Phi' \left( I + c\, A(s)\, \Phi' \right)^{-1} \delta x, \qquad A(s) = \frac{1}{K} \sum_{k=1}^{K} \frac{1}{1 + s \tau_{a_k}}
+$$
+
+and the pool rows give $\delta b_{i1} = -H_i(s)\, b_{i1}\, \delta r_i / \tau_{rel}$,
+where $H_i(s)$ is the first diagonal entry of the inverse of neuron $i$'s
+two-by-two pool block,
+
+$$
+H_i(s) = \frac{s + d_{i2}}{(s + d_{i1})(s + d_{i2}) - \dfrac{(1 - b_{i1})\, b_{i2}}{n_2 \tau_{rec_1}^2}},
+\qquad d_{i1} = \frac{b_{i2}}{\tau_{rec_1}} + \frac{r_i}{\tau_{rel}},
+\quad d_{i2} = \frac{1}{\tau_{rec_2}} + \frac{1 - b_{i1}}{n_2 \tau_{rec_1}} .
+$$
+
+The dendritic row then closes on $\delta x$ alone: $s$ is an eigenvalue of $J$
+when
+
+$$
+\det \Big[ (1 + s \tau_d)\, I - W\, G(s) \Big] = 0, \qquad G(s) = \mathrm{diag}\big( g_i(s) \big) \tag{27}
+$$
+
+$$
+g_i(s) = \underbrace{\frac{\phi'(h_i)}{1 + c\, A(s)\, \phi'(h_i)}}_{\text{slope, reduced by SFA}} \;\; \underbrace{b_{i1} \left( 1 - \frac{r_i\, H_i(s)}{\tau_{rel}} \right)}_{\text{depression}} \tag{28}
+$$
+
+(for $s$ that is not already an eigenvalue of a neuron's own SFA or pool
+block). This is the no-adaptation problem, $\det[(1 + s \tau_d) I - W \Phi'] = 0$,
+with each neuron's slope replaced by a gain that depends on the timescale of
+the mode:
+
+- **Fast modes** ($|s|$ much larger than every adaptation rate): $A \to 0$,
+  $H_i \to 0$, and $g_i \to b_{i1}\, \phi'(h_i)$. Adaptation is frozen and the
+  effective connectivity is $W B_1 \Phi'$, the previous paper's.
+- **Slow modes** ($s \to 0$): $A \to 1$, so SFA divides the slope by
+  $1 + c\, \phi'$; and with the pools at their steady state for the rate $r_i$,
+  the depression factor becomes the slope of the sustained-output curve of
+  section 5, $d\theta / dr$, which is smaller than $b_{i1}$ and goes to zero as
+  the output approaches its ceiling (14).
+- **In between**, each SFA timescale switches on in turn as $|s|$ falls below
+  $1/\tau_{a_k}$, and the reserve after the releasable pool. Multiple
+  timescales make $g_i(s)$ a graded function of timescale where a single one
+  makes it a step.
+- **The conditions differ only in $g_i(s)$.** No adaptation: $g_i = \phi'(h_i)$.
+  Single timescale: $K = 1$ and
+  $H_i = 1 / (s + 1/\tau_{rec_1} + r_i / \tau_{rel})$. Product: the depression
+  factor of (28) is replaced by
+  $b_{i1} b_{i2} \big( 1 - \sum_m r_i / [\tau_{rel_m} (s + 1/\tau_{rec_m} + r_i/\tau_{rel_m})] \big)$.
+
+Equation (27) describes the eigenvalues of $J$ frozen at one state. They are
+the Lyapunov exponents only at a fixed point. Along a trajectory the exponents
+come from the product of the propagators of $J(z(t))$, and the eigenvalues of
+the frozen matrix neither equal nor bound them.
+
+### 10.6 Checked against the code
+
+**Checked on 2026-11-13** by
+`scripts/explorations/check_chained_MTS_jacobian_block_form.m`, which assembles
+(24) from the formulas above, with the nonlinearity and every block coded
+independently of the model class, and compares it with
+`SRNNCellTypePairs.compute_Jacobian_fast` at two random states per case:
+
+- One cell type, one route, 12 neurons, where the code's state is a
+  permutation of $z$ (the code orders it $a$, then $b$, then $x$, with the SFA
+  variables timescale by timescale and the pools pool by pool, as here):
+  element by element, for no adaptation (25), single timescale (26), chained
+  MTS (22) and product MTS. Largest difference $1.5 \times 10^{-16}$ of the
+  largest entry.
+- Two cell types and four chain routes, 16 neurons, where the code's state
+  holds two copies of each neuron's pools (128 states against 96). With $T$
+  the matrix that writes each pool into both copies,
+  $J_{\mathrm{code}}\, T = T J$ to $2.4 \times 10^{-16}$: the block form is the
+  code's Jacobian on states with equal copies. (The code's matrix has 32 more
+  eigenvalues, for differences between the copies; those obey a neuron's pool
+  block alone, which is stable, and a run never excites them.)
+- The reduction (27): at each of the 96 eigenvalues of that $J$, the smallest
+  singular value of $(1 + s \tau_d) I - W G(s)$ is at most $2 \times 10^{-12}$
+  of its largest (median $10^{-15}$), against $10^{-5}$ or more a short
+  distance away from an eigenvalue.
+
+### 10.7 Why the no-adaptation edge hardly depends on the bias
+
+**The observation** (block C, `docs/notes/Block_C_results_2026-11-13.md`).
+Without adaptation $\lambda_1$, measured with the memory task's input on, turns
+positive between gain 0.33 and 0.5 at every bias $S_c$ from $-0.6$ to $0.4$,
+and between 0.5 and 0.7 at $S_c = 0.6$; the pilot found the network silent at
+$S_c = 0.8$. With adaptation the edge lies at higher gain, and further out the
+lower the bias. The network is the paper's with the noise off: $N = 500$,
+balanced mean weights, a per-neuron setpoint spread of 0.1, and the
+**piecewise** sigmoid of section 8 ($S_a = 0.8$: slope 1 for $|h| \le 0.4$,
+falling linearly to 0 at $|h| = 0.6$). Gain is $g$, a multiplier on $W$, and
+$S_c$ is the center of the setpoints $a_{0_i}$; a lower bias makes a neuron
+fire at a lower input. What follows is a reading of (25), not a new
+simulation. Three numbers are quoted for the network, read off the built
+model: the bulk radius of $W$ at gain 1 is $R_W = 4.80$ (the code's `R`); the
+eigenvalues of $W$ at network seed 3001 have largest real part 4.90 and no
+outlier beyond the bulk; the row sums of $W$ have standard deviation 4.67.
+
+**The expectation.** "For a given gain I would have expected a certain
+eigenvalue abscissa of the Jacobian, and that scaling the bias appropriately
+would put that abscissa on the edge." By (25) that is exactly right when every
+neuron sits at the same operating point $\bar{h}$. Then $\Phi' = \phi'(\bar{h}) I$,
+the eigenvalues of $J$ are those of $W$ scaled by $g\, \phi'(\bar{h})$ and
+shifted, the abscissa is $(g R_W\, \phi'(\bar{h}) - 1)/\tau_d$, and for any
+$g R_W > 1$ there is a bias that puts it on zero: the one with
+$\phi'(\bar{h}) = 1/(g R_W)$. The edge would then be a curve in the plane of
+gain and bias that bends strongly, because the bias would have to push every
+neuron further onto the flat part of its nonlinearity as the gain rises.
+
+**How the bias actually enters.** Only through $\Phi' = \mathrm{diag}(\phi'(h_i))$
+with $h_i = x_i - a_{0_i}$, one slope per neuron, scaling that neuron's column
+of $W$. So, as the question says, the bias does not move the eigenvalues of
+one random matrix; it changes which matrix $W \Phi'$ is. For a random $W$
+whose columns are scaled by slopes that are not correlated with them, the bulk
+of the spectrum of $W \Phi'$ fills a disk of radius
+
+$$
+\rho \approx g R_W \sqrt{\langle \phi'^2 \rangle}, \qquad \langle \phi'^2 \rangle = \frac{1}{N} \sum_i \phi'(h_i)^2 \tag{29}
+$$
+
+so the edge condition of the frozen matrix is $g R_W \sqrt{\langle \phi'^2 \rangle} = 1$:
+what matters is the mean squared slope over the **distribution** of operating
+points, not the slope at one. (On this network's $W$ at gain 1, keeping a
+random 40 % or 17 % of the columns and zeroing the rest gives a largest
+eigenvalue modulus of 3.29 or 2.17, against 3.02 and 1.92 from (29).) Three
+consequences follow from (25) and (29).
+
+1. **Below $g R_W = 1$ the bias cannot matter.** $\phi' \le 1$, so
+   $\rho \le g R_W$: for $g < 1/R_W = 0.21$ the frozen matrix is stable
+   wherever the neurons sit. The bias can only lower slopes; it cannot
+   destabilize.
+2. **At the measured edge only a minority of neurons are on the slope.**
+   Gains 0.33 to 0.5 are $g R_W = 1.6$ to $2.4$, so by (29)
+   $\langle \phi'^2 \rangle$ is between 0.40 and 0.17 there. For this
+   nonlinearity, whose slope is 1 or 0 except in the rounded corners, that is
+   about the fraction of neurons in the linear range: a fifth to two fifths.
+   If (29) holds, the network at the edge is mostly saturated, at zero or at
+   one, at every bias.
+3. **The network spreads its own operating points, by an amount set by the
+   gain.** $x_i = u_i + g \sum_j w_{ij} r_j$, and with balanced mean weights
+   the recurrent sum has a mean near zero and a standard deviation across
+   neurons of about $g R_W\, q$, with $q = \sqrt{\langle r^2 \rangle}$ the
+   root-mean-square rate. With rates spread over $[0, 1]$, $q$ is 0.6 to 0.7,
+   so at $g R_W \approx 1.75$ the operating points are spread by about 1.1.
+   That is as wide as the whole range of bias tested ($\pm 0.6$), about twice
+   the half-width of the sloped part of the nonlinearity, and ten times the
+   setpoint spread of 0.1.
+
+Put together: the bias shifts the center of a distribution of operating points
+that the recurrent input has already made wider than the nonlinearity. Sliding
+a wide distribution across a narrow window changes the fraction inside the
+window only a little. The gain acts differently: it multiplies $W$ directly,
+and although the spread it causes lowers $\langle \phi'^2 \rangle$, it does so
+only in proportion to $1/g$, so $\rho$ still grows, as $\sqrt{g}$. If the
+operating points are taken as Gaussian with mean $m$ and a standard deviation
+$s \approx g R_W\, q$ wider than the sloped region, then
+$\langle \phi'^2 \rangle \approx \Delta\, e^{-m^2/2s^2} / (\sqrt{2\pi}\, s)$
+with $\Delta = \int \phi'^2\, dh$ ($0.93$ for this nonlinearity, $2/3$ for the
+logistic one), and (29) puts the edge at
+
+$$
+g R_W \approx \frac{\sqrt{2\pi}\; q}{\Delta}\; e^{m^2 / 2 s^2} \tag{30}
+$$
+
+For $q = 0.65$ and $m = 0$ this is $g R_W \approx 1.75$, $g \approx 0.36$,
+inside the measured bracket; and shifting the center by $m = 0.6$ at
+$s \approx 1.1$ multiplies it by $e^{0.15} \approx 1.16$, less than one step of
+the gain grid (a factor of 1.4 to 1.5). The strong bias dependence of the
+single-operating-point picture is replaced by a weak one, which a grid this
+coarse would not show. Equation (30) is an estimate of scale, not a fit: $q$
+and $s$ themselves depend on the gain and the bias and were not solved for.
+
+**Why saturation cannot do the bias's work at low bias, and can at high
+bias.** The rate lies in $[0, 1]$, so the two ends are not alike. A network
+pushed toward **high** rates by a low bias cannot hold all its neurons at one:
+with $r_j \approx 1$ the recurrent input has a spread of $g R_W \approx 1.6$ to
+$2.4$ and both signs, which returns a large share of neurons to the slope or to
+zero. A network pushed toward **low** rates by a high bias can stay there:
+silent neurons send nothing, $q \to 0$, the spread collapses, and every slope
+is zero. That is the one way the bias can stabilize at $g R_W > 1$, and it is
+where the data show an effect: the edge moves out at $S_c = 0.6$ and the
+network is silent at $S_c = 0.8$.
+
+**With adaptation.** By (27) and (28) the same $W$ is scaled by
+$g_i(s)$ in place of $\phi'(h_i)$, and $g_i$ depends on the rate, which the
+bias sets, in a way $\phi'$ does not. The depression factor is at most
+$b_{i1}$, which falls with the rate: at a sustained rate near one it is 0.11
+for the single pool and 0.054 for the chain, and the product's $b_{i1} b_{i2}$
+is 0.012 (section 5); near $r = 0.05$ they are 0.71, 0.63 and 0.51. SFA lowers
+the operating point by $c\, r_i$, most for the neurons that fire most, and
+divides the slope of slow modes by $1 + c\, \phi'$. A low bias means high
+rates, hence small column gains and an edge at higher gain; a high bias means
+low rates, full pools, little adaptation, and an edge near the no-adaptation
+one. That is the direction the maps show, and the order of the conditions at
+the lowest bias (edge at gain 1.4 to 2 for the single timescale, 2 to 2.8 for
+the chain, beyond 4 for the product) is the order of those three factors. The
+equations give the direction and the order; they do not give the edge's
+position, which depends on the rates and pool states the network settles into.
+
+**Where this is only a heuristic.**
+
+- **$\lambda_1$ is not an eigenvalue.** Equations (25) to (30) describe $J$
+  frozen at a state. $\lambda_1$ is the growth rate of the product of
+  propagators of $J(x(t))$ along a trajectory that is driven by the task's
+  input and, past the edge, chaotic. The frozen abscissa equals $\lambda_1$
+  only at a fixed point, and $J$ is non-normal, so a time-varying $J$ with a
+  negative abscissa at every moment can still have $\lambda_1 > 0$, and the
+  reverse.
+- **Equation (29) is the circular law used outside its assumptions.** It needs
+  the slopes to be independent of the columns they scale and the entries of
+  $W$ to be independent with zero mean. Here $W$ is sparse with E and I means,
+  and the slope of neuron $j$ depends on its inputs. For $W$ itself the means
+  produce no outlier at this seed; for $W \Phi'$ the mean part cancels only
+  while the E and I populations have the same slope statistics, which the
+  symmetric preset makes likely and nothing guarantees.
+- **The Gaussian in (30) is a convenience.** With this nonlinearity the
+  rates pile up at zero and one, and the distribution of operating points is
+  the solution of a self-consistent problem (the rates set the spread that
+  sets the rates), which the estimate does not solve. Dynamic mean-field
+  theory solves it for an infinite network with independent zero-mean
+  weights and no input; this network is finite, sparse, driven, and obeys
+  Dale's law.
+- **The input.** The task's input moves the operating points in time. At a
+  high bias it may be what keeps neurons on the slope at all, and $\lambda_1$
+  with the input on need not equal $\lambda_1$ without it.
+
+**What would test it.** None of these needs a large run.
+
+1. **The edge condition (29) directly.** At the cells on either side of the
+   no-adaptation edge, evaluate $g R_W \sqrt{\langle \phi'^2 \rangle}$ along the
+   trajectory, averaged over time. The explanation predicts a value near one at
+   the edge at every bias, with $\langle \phi'^2 \rangle$ nearly constant across
+   bias at a fixed gain. The stored fractions of pinned and silent neurons give
+   a first look without any run: one minus their sum should be roughly
+   $1/(g R_W)^2$ at the edge, and should change little with bias.
+2. **The spread of operating points.** The standard deviation of $h_i$ across
+   neurons should grow in proportion to the gain and be about one at the edge.
+   If it is much narrower than the sloped region, the explanation is wrong.
+3. **A bias that is large compared with the spread.** Extend the bias well
+   beyond $\pm g R_W q$ (to $\pm 2$, say). The edge should bend toward higher
+   gain on the high-bias side, as it begins to at $S_c = 0.6$, and stay put on
+   the low-bias side.
+4. **A finer gain grid** between 0.22 and 0.7 would resolve the weak
+   dependence that (30) predicts, 10 to 20 %, which the present grid cannot.
+5. **The frozen spectrum against $\lambda_1$.** Compare the abscissa of
+   $\frac{1}{\tau_d}(-I + g W \Phi')$ at sampled states with $\lambda_1$ in the
+   same cells (the eigenvalue-heatmap stage does this at the preset). Where
+   they disagree in sign, the first and last caveats above are the place to
+   look.
+6. **For the adapting conditions,** the same with $G(0)$ and with $B_1 \Phi'$
+   in place of $\Phi'$: whether the slow gain or the frozen-adaptation gain
+   tracks the edge says which timescale of (28) sets it.
