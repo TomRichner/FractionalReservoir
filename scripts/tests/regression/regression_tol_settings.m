@@ -77,6 +77,13 @@ function T = regression_tol_settings()
 %   override        n x 2 cell {pattern, rtol}: a leaf whose key matches takes
 %                   that rtol instead of its layer's (first match wins).
 %                   Every row needs its reason written beside it.
+%   anchor_superseded  n x 2 cell {pattern, reason}: leaves of the ANCHOR
+%                   that a deliberate change of physics has moved. They are
+%                   not compared against the anchor (regression_tol_check
+%                   applies this only when the reference is the anchor, never
+%                   to the chain / stf_chain / spread suites or to a pre-edit
+%                   capture); they are counted, printed in one line with the
+%                   reason, and returned with status 'superseded'. See below.
 %
 % See also: regression_tol_compare, regression_tol_check,
 %           regression_tol_band_check, make_regression_tol_reference
@@ -104,4 +111,47 @@ T.override = { ...
     ... % are nearly collinear in a stable network; the solve amplifies
     ... % round-off to as much as 6e-9 relative (same measurement).
     '^stable\.mc\.\w+\.(MC|R2)$', 1e-6};
+
+% LEAVES OF THE ANCHOR SUPERSEDED BY A DELIBERATE CHANGE OF PHYSICS.
+%
+% The anchor (scripts/tests/fixtures/regression_tol_anchor.mat) is the model
+% class as it stood before Plan A touched it. It is written once and KEPT:
+% it is the one reference that ties every later version of the code to the
+% original, and make_regression_tol_reference refuses to replace it. When a
+% change is MEANT to move numbers, the leaves it moves are listed here, with
+% the reason, rather than re-capturing the anchor (which would lose the tie
+% for every leaf that did not move) or loosening a tolerance (which would
+% weaken the test for every leaf). Each pattern is written as narrowly as the
+% keys allow, so every leaf that did not move stays compared.
+%
+% F3, commit cce78c9, 2026-11-12 (Tom's decision): with ONE spike-frequency-
+% adaptation timescale a neuron's time constant now reads the FAST-END draw
+% of its per-neuron ladder, so that it equals the fastest rung of a
+% multiple-timescale ladder on the same seed. That moves the one-timescale
+% condition sfa1_std1 (which has tau_a_spread > 0) and nothing else: against
+% the anchor 176 leaves failed, all of sfa1_std1 (60 pointwise: dS, JY, the
+% six J and the two tau_a_matrix of each of the six pointwise cases; 116
+% stable: trajectories, Lyapunov results and summary, plot data, memory
+% capacity and the sweep's measures), and every other leaf was bit-identical
+% or within tolerance. The pattern below was checked on 2026-11-13 against
+% the anchor's key list: it matches exactly those 176 leaves and none of the
+% 485 other sfa1_std1 leaves of the anchor, which still pass (the stored
+% states, the rates and
+% synaptic outputs evaluated at them, the discrete counts, the sweep's
+% D_KY, h_KS and the like), which therefore remain compared. These cases
+% are guarded since F3 by the exact ultrarapid tier (references re-captured
+% at bdf211d), which compares the same condition bit for bit.
+f3_superseded = strjoin({ ...
+    '^pointwise\.\w+\.sfa1_std1\.\w+\.(dS|JY|J\{\d+\}|view\.tau_a_matrix\{\d+\})$', ...
+    ['^stable\.model\.sfa1_std1\.\w+\.(S_kept' ...
+        '|lya_results\.(LE_spectrum|LLE|Q_final|cond_max|cond_t|finite_LE_spectrum_t|local_LE_spectrum_t|sort_idx)' ...
+        '|lya_summary\.(LLE|cond_max|lambda_1_drift|lambda_2|lambda_gap|lead_frac_sfa|lead_frac_std|lead_frac_x|local_rate_lead|p95_finite_0p2s)' ...
+        '|plot_data\.(a|b|r|synaptic_output|x)\.\w+(\.\w+)?)$'], ...
+    '^stable\.mc\.sfa1_std1\.(MC|R2)$', ...
+    ['^stable\.sweep\.sfa1_std1\{\d+\}\.(LLE|cond_max|lambda_1_drift|lambda_2|lambda_gap|lead_frac_sfa' ...
+        '|lead_frac_std|lead_frac_x|local_rate_lead|mean_rate|mean_synaptic_output|p95_finite_0p2s)$']}, '|');
+T.anchor_superseded = { ...
+    f3_superseded, ['superseded by F3 (commit cce78c9, 2026-11-12): the one-timescale SFA constant ' ...
+        'reads the fast-end draw of the per-neuron ladder; 176 leaves of sfa1_std1, guarded since ' ...
+        'by the exact ultrarapid tier (re-captured at bdf211d)']};
 end

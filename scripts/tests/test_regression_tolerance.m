@@ -21,8 +21,25 @@
 % is regression_tol_band_check, run on demand. See docs/ISSUES.md, FD-020,
 % and docs/Plan_A_chained_vessicles.md, sections 2.2 and 6.
 
-[ok, leaves] = regression_tol_check('anchor');
+%
+% SUPERSEDED LEAVES. The anchor is never re-captured. Leaves that a
+% deliberate change of physics moved are listed, with the reason, in
+% regression_tol_settings().anchor_superseded and are not compared against
+% the anchor (regression_tol_check applies the list to the anchor only).
+% Since F3 (commit cce78c9, 2026-11-12) that is 176 leaves of sfa1_std1.
+% This test checks the count is what the settings say it is, so a pattern
+% that grows to swallow other leaves, or a leaf that newly fails inside
+% sfa1_std1, is seen; test_regression_tol_superseded checks the mechanism.
+
+[ok, leaves, info] = regression_tol_check('anchor');
 assert(ok, 'test_regression_tolerance:Differences', ...
     '%d leaf(s) of the tolerance tier''s anchor are outside tolerance or missing; see the list above.', ...
     nnz(ismember(leaves.status, {'FAIL', 'missing'})));
-fprintf('PASS  tolerance regression tier matches the anchor within tolerance\n');
+n_superseded = nnz(strcmp(leaves.status, 'superseded'));
+assert(n_superseded == 176, 'test_regression_tolerance:Superseded', ...
+    '%d leaves superseded, expected 176 (F3); a pattern in regression_tol_settings().anchor_superseded matches more or fewer leaves than it was written for.', ...
+    n_superseded);
+assert(all(contains(leaves.key(strcmp(leaves.status, 'superseded')), '.sfa1_std1')), ...
+    'test_regression_tolerance:SupersededOutside', 'a superseded leaf lies outside sfa1_std1');
+fprintf('PASS  tolerance regression tier matches the anchor within tolerance (%d leaves superseded, not compared: %s)\n', ...
+    n_superseded, info.superseded(1).reason);

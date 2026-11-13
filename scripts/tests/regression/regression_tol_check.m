@@ -45,6 +45,23 @@ function [ok, leaves, info] = regression_tol_check(name, opts)
 %     right, the lead adjusts it in regression_tol_settings and writes
 %     the cause, the evidence and the remaining margin beside the value.
 %
+% SUPERSEDED LEAVES OF THE ANCHOR. The anchor is a historical reference: it
+% is never re-captured, so it keeps tying the code to the model class as it
+% was before Plan A for every leaf that has not moved. When a deliberate
+% change of physics moves some of its leaves, those leaves are listed in
+% regression_tol_settings().anchor_superseded ({pattern, reason} rows),
+% and ONLY when NAME is 'anchor' they are taken out of pass / fail: they
+% get status 'superseded' in LEAVES (their differences still computed and
+% kept in the table), the printout says "N leaves superseded, not
+% compared: <reason>", and info.superseded lists each pattern with its
+% reason, count and keys. No tolerance changes and no other leaf is
+% treated differently. The suites 'chain', 'stf_chain' and 'spread' and
+% every pre-edit capture are compared in full. The first entry is F3
+% (commit cce78c9, 2026-11-12): with one SFA timescale a neuron's time
+% constant reads the fast-end draw of its per-neuron ladder, which moved
+% the 176 leaves of the condition sfa1_std1 that depend on it; those cases
+% are guarded since by the exact ultrarapid tier, re-captured at bdf211d.
+%
 % The pointwise layer is evaluated at the states STORED IN THE REFERENCE,
 % so nothing chaotic is compared along a trajectory.
 %
@@ -92,10 +109,24 @@ if opts.verbose
         fprintf('  this is MATLAB %s: library round-off may differ\n', version);
     end
 end
+% Superseded leaves apply to the anchor alone (see the header).
+superseded = cell(0, 2);
+if strcmp(name, 'anchor') && isfield(opts.settings, 'anchor_superseded')
+    superseded = opts.settings.anchor_superseded;
+end
 [ok, leaves, summary] = regression_tol_compare(ref.data, data, 'settings', opts.settings, ...
-    'rtol', opts.rtol, 'verbose', opts.verbose);
+    'rtol', opts.rtol, 'verbose', opts.verbose, 'superseded', superseded);
+sup = struct('pattern', superseded(:, 1), 'reason', superseded(:, 2), 'n', [], 'keys', []);
+left = strcmp(leaves.status, 'superseded');     % first matching pattern wins, as in the compare
+for k = 1:numel(sup)
+    hit = left & ~cellfun(@isempty, regexp(leaves.key, sup(k).pattern, 'once'));
+    sup(k).keys = leaves.key(hit);
+    sup(k).n = nnz(hit);
+    left = left & ~hit;
+end
 info = struct('ref_file', ref_file, 'meta', ref.meta, 'data', data, 'seconds', seconds, ...
     'summary', summary);
+info.superseded = sup;
 % Cases that threw. Their reference leaves already count as missing; this
 % says why, and keeps OK false even for a case the reference does not hold.
 if ~isempty(data.info.errors)
