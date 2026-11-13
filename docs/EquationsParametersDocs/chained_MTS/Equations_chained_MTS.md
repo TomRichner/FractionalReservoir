@@ -173,6 +173,7 @@ which is the median over neurons (section 6).
 |:-----------|:---------------------------------------------|:-----|:-------------------|:------|
 | $\tau_d$ | Dendritic time constant | s | `tau_d` | M |
 | $w_{ij}$ | Connection weight onto $i$ from $j$ | -- | `W` | M |
+| $k_q$ | Self-feedback strength of cell type $q$: the diagonal of $W$ is lowered by $k_{q(i)} R_W$ (section 3) | multiples of $R_W$ | `self_feedback` | new |
 | $u_i$ | External input | -- | `input_config` | M |
 | $\sigma_u$ | Input-referred noise amplitude | units of $u$ | `sigma_u_noise` | M |
 | $\phi$ | Zero-centred sigmoid, range $[0, 1]$ | -- | `activation`, `S_a` | M |
@@ -214,6 +215,25 @@ each taken on the route from the sender's cell type to its own:
 $$
 \tau_d\, dx_i = \left( -x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \theta_j^{q(j) \to q(i)} \right) dt + \sigma_u\, dW_i \tag{1}
 $$
+
+**The weights, with optional self-feedback.** The weights are a drawn matrix
+$W^{0}$ times the overall gain (`level_of_chaos`; written $g$ in section 10,
+where no release probability appears), less an optional negative self-feedback
+on the diagonal (`self_feedback`, one strength $k_q$ per cell type, zero in
+every preset):
+
+$$
+w_{ij} = g\, w^{0}_{ij} - k_{q(i)}\, R_W\, \delta_{ij}
+$$
+
+$R_W$ is the theoretical bulk radius of $W^{0}$, so $k$ is in multiples of the
+bulk radius and the gain does not multiply it. The diagonal entry is a
+self-connection through the neuron's own synaptic output
+$\theta_i^{q(i) \to q(i)}$, depressed and facilitated by that route's pools like
+any other connection; it adds no variable and no equation. On an excitatory
+neuron it breaks Dale's law, which is accepted: the term stands for
+self-inhibition. $W^{0}$ can itself have nonzero diagonal entries, and the
+shift adds to them.
 
 **Firing rate.** The rate is the output of the nonlinearity, before the synapse
 acts on it:
@@ -635,6 +655,7 @@ Paths are from the repository root.
 |:----------------------|:------------------------------------------------------------------|
 | (1), (2), (3): dendritic state, rate, SFA; the recurrent sum over routes | `src/model/SRNNCellTypePairs.m`, `dynamics_fast` |
 | $c / K$ | `SRNNCellTypePairs.get_params` (`params.c_eff`) |
+| Self-feedback on the diagonal of $W$ | `SRNNCellTypePairs.get_params` (`params.W`; `R_gain1` is $R_W$); `test_self_feedback` |
 | Noise term of (1) | `src/model/integrators/sde_fixed_step.m` |
 | (4) to (11): a route's state derivative and output factor $g\, b_1$ | `src/model/routes/route_pool.m`, `rhs` and `output` |
 | Single pool without facilitation, (9) with $g$ absent; the product form of section 7 | `src/model/routes/route_product.m`, `rhs` |
@@ -758,7 +779,10 @@ $$
 W_{\mathrm{eff}} = W B_1 \Phi', \qquad J_{\mathrm{eff}} = \frac{1}{\tau_d} \left( -I + W B_1 \Phi' \right) \tag{21}
 $$
 
-equations (20) read $\delta \dot{z} = J\, \delta z$ with
+(with self-feedback, section 3, $W$ here and in every block below is
+$g W^{0} - k R_W I$, so $J_{\mathrm{eff}} = \frac{1}{\tau_d} \left( -I + (g W^{0} - k R_W I)\, B_1 \Phi' \right)$;
+nothing else in the Jacobian changes), equations (20) read
+$\delta \dot{z} = J\, \delta z$ with
 
 $$
 J =

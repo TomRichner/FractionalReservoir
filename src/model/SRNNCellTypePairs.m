@@ -72,6 +72,38 @@ classdef SRNNCellTypePairs < handle
         F_ref_indegree   = 100
 
         level_of_chaos = 1.0
+        % SELF_FEEDBACK Negative self-feedback through the diagonal of the
+        % weight matrix: one dimensionless strength k per cell type (1 x C;
+        % a scalar is broadcast; [] = zeros = none, the default, and every
+        % result is then what it was without this property). The matrix the
+        % dynamics read is
+        %
+        %   W_sim = W - diag(k_i) * R_W,      k_i = self_feedback(type of i)
+        %
+        % where W is the drawn matrix obj.W (level_of_chaos already in it)
+        % with any route `scale` applied, and R_W is the theoretical bulk
+        % radius of the drawn matrix AT GAIN 1 (R_gain1 = R / level_of_chaos).
+        %   UNITS      multiples of R_W: k = 1 moves every eigenvalue of W
+        %              left by one bulk radius.
+        %   PLACEMENT  after level_of_chaos and after the route scale, so
+        %              neither multiplies it: the gain and the self-feedback
+        %              are independent axes (W_sim = g W_drawn - k R_W I).
+        %   WHAT IT IS a self-connection W_ii through the neuron's own
+        %              synaptic output theta_i of the route (type q -> type
+        %              q): it is depressed and facilitated by that route's
+        %              pools like any other connection of the route.
+        %   DALE'S LAW a negative W_ii on an excitatory neuron breaks it.
+        %              That is accepted (Tom, 2026-11-13): the term stands
+        %              for self-inhibition, not for an excitatory synapse.
+        %   THE DRAWN DIAGONAL is not zero in general (the sparse draw may
+        %              place a connection there); the shift ADDS to whatever
+        %              is there.
+        % obj.W stays the drawn matrix (plot_W, the shared-build check); the
+        % shifted diagonal lives only in get_params().W, where the route
+        % scale is applied, so the dynamics, both Jacobians and
+        % jacobian_times agree by construction. R, lambda_O and
+        % rescale_by_abscissa describe the drawn matrix and ignore it.
+        self_feedback = []
         rescale_by_abscissa = false
         zrs_mode = 'none'           % 'none' | 'ZRS' | 'SZRS' | 'Partial_SZRS'
     end
@@ -337,7 +369,8 @@ classdef SRNNCellTypePairs < handle
         mu_tilde                        % C x C absolute block means    = relative * F
         sigma_tilde                     % C x C absolute block std devs = relative * F
         R                               % Bulk spectral radius (generalizes Harris Eq. 18)
-        lambda_O                        % Outlier eigenvalues, descending by magnitude
+        R_gain1                         % ... at level_of_chaos = 1: the unit of self_feedback
+        lambda_O                       % Outlier eigenvalues, descending by magnitude
 
         % Scalar aliases into mu_tilde_relative / sigma_tilde_relative for the
         % two-type case, named (post, pre) -- mu_EI is "E receives from I".
@@ -534,8 +567,16 @@ classdef SRNNCellTypePairs < handle
         function val = get.R(obj)
             % Perron root of the block variance matrix V(a,b) = n*f_b*sigma_s_sq,
             % generalizing Harris Eq. (18); see RMTBlocks.R.
+            val = obj.R_gain1 * obj.level_of_chaos;
+        end
+
+        function val = get.R_gain1(obj)
+            % The bulk radius the block statistics give at level_of_chaos = 1.
+            % A property of its own because self_feedback is measured in it:
+            % the gain must not rescale the self-feedback, and R / level_of_chaos
+            % is undefined at gain 0.
             V = obj.n * (obj.f .* obj.block_sigma_s_sq());
-            val = sqrt(max(0, max(real(eig(V))))) * obj.level_of_chaos;
+            val = sqrt(max(0, max(real(eig(V)))));
         end
 
         function val = get.lambda_O(obj)
@@ -1107,9 +1148,10 @@ classdef SRNNCellTypePairs < handle
             params.rng_seeds = obj.rng_seeds;
             if ~isempty(obj.W)
                 % params.W is what the dynamics, both Jacobians and jacobian_times
-                % read. The per-route scale is folded in HERE and nowhere else, so
-                % those four stay consistent by construction; obj.W (plot_W, the
-                % MC shared-build check) is the drawn matrix without it.
+                % read. The per-route scale and the self-feedback are folded in
+                % HERE and nowhere else, so those four stay consistent by
+                % construction; obj.W (plot_W, the MC shared-build check) is the
+                % drawn matrix without them.
                 params.W = obj.W;
                 if any(pair.scale(:) ~= 1)
                     for pre = 1:obj.n_cellTypes
@@ -1120,6 +1162,19 @@ classdef SRNNCellTypePairs < handle
                             end
                         end
                     end
+                end
+                % Self-feedback (see the property): the diagonal moves by
+                % -k R_W per neuron, k by the neuron's type and R_W the bulk
+                % radius at gain 1, AFTER the gain (in obj.W) and the route
+                % scale, so neither multiplies it. Skipped at k = 0, where
+                % params.W is then the matrix it was before the property
+                % existed, stored entries included.
+                if any(obj.self_feedback ~= 0)
+                    k_per_neuron = zeros(obj.n, 1);
+                    for q = 1:obj.n_cellTypes
+                        k_per_neuron(obj.type_indices{q}) = obj.self_feedback(q);
+                    end
+                    params.W = params.W - spdiags(k_per_neuron * obj.R_gain1, 0, obj.n, obj.n);
                 end
             end
         end
@@ -1319,8 +1374,9 @@ classdef SRNNCellTypePairs < handle
             end
             obj.tau_a_spread = reshape(obj.tau_a_spread, 1, []);
 
-            % Synapse-parameter spreads: the same broadcasting.
-            for name = {'std_spread', 'stf_spread'}
+            % Synapse-parameter spreads and the self-feedback: the same
+            % broadcasting.
+            for name = {'std_spread', 'stf_spread', 'self_feedback'}
                 value = obj.(name{1});
                 if isempty(value)
                     value = zeros(1, C);
@@ -1445,6 +1501,12 @@ classdef SRNNCellTypePairs < handle
                 error('SRNNCellTypePairs:InvalidParams', ...
                     ['tau_a_spread must be empty, a scalar, or a finite nonnegative ' ...
                     '1 x %d row (one log-normal spread per cell type).'], C);
+            end
+            if numel(obj.self_feedback) ~= C || ~isnumeric(obj.self_feedback) || ...
+                    any(~isfinite(obj.self_feedback))
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    ['self_feedback must be empty, a scalar, or a finite 1 x %d row ' ...
+                    '(one strength per cell type, in multiples of R_gain1).'], C);
             end
             if ~isempty(obj.tau_a_seed) && ~(isscalar(obj.tau_a_seed) && ...
                     isnumeric(obj.tau_a_seed) && isfinite(obj.tau_a_seed))

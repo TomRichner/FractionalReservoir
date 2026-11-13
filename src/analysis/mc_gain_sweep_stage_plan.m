@@ -15,12 +15,15 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %                       that is absent or empty leaves run_mc_gain_sweep's
 %                       own value for the mode:
 %     gain_levels, bias_levels, seeds, conditions
+%     second_axis, second_levels
 %     model_args, protocol, lya_K, lya_T_sec, lya_acc_sec, segment_len
 %                       run_mc_gain_sweep's options of those names (the
-%                       second line is for tests)
+%                       second line names a second axis other than the
+%                       bias and its levels; the third is for tests)
 %     variants          struct array with fields tag and preset: further
 %                       networks, each swept along GAIN ONLY, at its own
-%                       bias (mc_gain_sweep_preset_point), with the main
+%                       value of the second axis (its bias, by default;
+%                       mc_gain_sweep_preset_point), with the main
 %                       run's gains, conditions and options, into
 %                       <run_dir>/mc_gain_sweep_<tag>
 %                       (mc_gain_sweep_variant_folder)
@@ -41,7 +44,8 @@ arguments
     cfg (1,1) struct
 end
 
-GRID_OPTIONS  = {'gain_levels', 'bias_levels', 'seeds', 'conditions'};
+GRID_OPTIONS  = {'gain_levels', 'bias_levels', 'second_levels', 'seeds', 'conditions'};
+AXIS_OPTION   = {'second_axis'};
 OTHER_OPTIONS = {'model_args', 'protocol', 'lya_K', 'lya_T_sec', 'lya_acc_sec', 'segment_len'};
 STAGE_FIELDS  = {'variants', 'variant_seeds'};
 
@@ -54,7 +58,7 @@ if isfield(cfg, 'mc_gain_sweep') && ~isempty(cfg.mc_gain_sweep); opts = cfg.mc_g
 if ~(isstruct(opts) && isscalar(opts))
     error('mc_gain_sweep_stage_plan:BadConfig', 'cfg.mc_gain_sweep must be a scalar struct.');
 end
-allowed = [GRID_OPTIONS, OTHER_OPTIONS, STAGE_FIELDS];
+allowed = [GRID_OPTIONS, AXIS_OPTION, OTHER_OPTIONS, STAGE_FIELDS];
 unknown = setdiff(fieldnames(opts), allowed);
 if ~isempty(unknown)
     error('mc_gain_sweep_stage_plan:BadConfig', ...
@@ -67,10 +71,14 @@ shared = {'run_mode', cfg.run_mode, 'verbose', cfg.verbose};
 if isfield(cfg, 'mc_ode_solver') && ~isempty(cfg.mc_ode_solver)
     shared = [shared, {'ode_solver', cfg.mc_ode_solver}];
 end
-shared = [shared, given(opts, [setdiff(GRID_OPTIONS, {'bias_levels', 'seeds'}, 'stable'), OTHER_OPTIONS])];
+% The main run alone takes the levels of the second axis and the seeds; a
+% variant runs at its own value and may have seeds of its own.
+MAIN_ONLY = {'bias_levels', 'second_levels', 'seeds'};
+shared = [shared, given(opts, [setdiff(GRID_OPTIONS, MAIN_ONLY, 'stable'), AXIS_OPTION, OTHER_OPTIONS])];
+second_axis = mc_sweep_second_axis(opts);
 
 runs = struct('label', 'main', 'folder', '', 'args', ...
-    {[{'preset_name', cfg.mc_preset}, shared, given(opts, {'bias_levels', 'seeds'})]});
+    {[{'preset_name', cfg.mc_preset}, shared, given(opts, MAIN_ONLY)]});
 
 variants = struct('tag', {}, 'preset', {});
 if isfield(opts, 'variants') && ~isempty(opts.variants); variants = opts.variants; end
@@ -86,9 +94,9 @@ model_args = {};
 if isfield(opts, 'model_args') && ~isempty(opts.model_args); model_args = opts.model_args; end
 for k = 1:numel(variants)
     v = variants(k);
-    [~, own_bias] = mc_gain_sweep_preset_point(v.preset, model_args);   % errors on an unknown preset
+    [~, own_value] = mc_gain_sweep_preset_point(v.preset, model_args, second_axis.property);   % errors on an unknown preset
     runs(end+1) = struct('label', v.tag, 'folder', mc_gain_sweep_variant_folder(v.tag), 'args', ...
-        {[{'preset_name', v.preset}, shared, variant_seeds, {'bias_levels', own_bias}]}); %#ok<AGROW>
+        {[{'preset_name', v.preset}, shared, variant_seeds, {second_axis.levels_option, own_value}]}); %#ok<AGROW>
 end
 labels = {runs.label};
 if numel(unique(labels)) < numel(labels)

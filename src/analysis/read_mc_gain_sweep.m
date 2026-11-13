@@ -1,5 +1,5 @@
 function D = read_mc_gain_sweep(source)
-% READ_MC_GAIN_SWEEP The one reader of the gain-by-bias memory-capacity table (block C).
+% READ_MC_GAIN_SWEEP The one reader of the memory-capacity table of a gain sweep against a second axis (block C).
 %
 %   D = READ_MC_GAIN_SWEEP(mat_file)     % mc_gain_sweep_results.mat
 %   D = READ_MC_GAIN_SWEEP(T)            % a table already in memory
@@ -12,10 +12,18 @@ function D = read_mc_gain_sweep(source)
 % caller that accepts "a file, a table or a result already read" passes
 % whatever it was given straight in.
 %
-% THE TABLE: one row per (gain, bias, seed, condition), with the stage's
-% column names:
+% THE SECOND AXIS is the bias (S_c) unless the settings name another model
+% property in settings.second_axis (run_mc_gain_sweep's option of that
+% name). mc_sweep_second_axis gives its column in the table: 'bias' for
+% S_c, the property's name otherwise ('self_feedback'). A result written
+% before the axis could be chosen carries no such setting and is a bias
+% result, read as it always was.
+%
+% THE TABLE: one row per (gain, second-axis value, seed, condition), with
+% the stage's column names:
 %   gain         level_of_chaos of the job
-%   bias         S_c, the centre of the per-neuron setpoint draw
+%   bias         the second axis's column, here under its name for S_c, the
+%                center of the per-neuron setpoint draw
 %   seed         network seed (the pairing key across conditions)
 %   condition    condition name (cellstr)
 %   mc_total     total memory capacity
@@ -27,32 +35,39 @@ function D = read_mc_gain_sweep(source)
 %   frac_pinned, frac_silent  fractions of neurons pinned / silent
 %   failed       logical; a failed row has every value set to NaN here, and
 %                a row with no finite mc_total counts as failed
-% Required: gain, bias, seed, condition, mc_total. Any other column that is
+% Required: gain, the second axis's column, seed, condition, mc_total. Any
+% other column that is
 % absent is filled with NaN (failed with false, R2_delay with no columns)
 % and listed in D.missing, so a hand-made table of the five required
 % columns can be drawn and summarised.
 %
 % D: T (as above), conditions (the settings' order when it names them, else
-% the order of first appearance), gains, biases, seeds (sorted unique),
-% delay_s (settings.delay_s, else []), preset_name, preset_gain and
-% preset_bias (the settings' values; a table that carries none is taken to
-% sit at gain 1, bias 0.2, the paper presets' point), missing, settings,
-% source.
+% the order of first appearance), gains, seeds (sorted unique), delay_s
+% (settings.delay_s, else []), preset_name, preset_gain, missing, settings,
+% source, and for the second axis, whatever property it is:
+%   second_axis    its descriptor (mc_sweep_second_axis): property, column
+%   second_levels  its levels (sorted unique values of D.T.(column))
+%   preset_second  the preset's own value on it (settings.preset_<column>)
+% A table that carries no preset point is taken to sit at gain 1 and, on
+% the bias axis, at bias 0.2 (the paper presets' point); on another axis
+% the preset's value is then unknown (NaN).
+% A BIAS RESULT ALSO HAS D.biases and D.preset_bias, the same two values
+% under the names they had when the bias was the only second axis. Code
+% that should work for any axis reads second_levels and preset_second.
 %
-% See also: run_mc_gain_sweep, read_mc_gain_sweep_jobs, mc_gain_grid,
-%           mc_gain_bias_statistics
+% See also: run_mc_gain_sweep, read_mc_gain_sweep_jobs, mc_sweep_second_axis,
+%           mc_gain_grid, mc_gain_bias_statistics
 
-REQUIRED = {'gain', 'bias', 'seed', 'condition', 'mc_total'};
 VALUES   = {'mc_total', 'horizon', 'lle_input', 'lle_noinput', ...
             'rate_E', 'rate_I', 'frac_pinned', 'frac_silent'};
 % Where a table with no settings is taken to sit: the class default gain
-% and the S_c of the paper's presets.
+% and, on the bias axis, the S_c of the paper's presets.
 DEFAULT_PRESET_GAIN = 1;
 DEFAULT_PRESET_BIAS = 0.2;
 
 settings = struct();
 source_text = '(table in memory)';
-if isstruct(source) && all(isfield(source, {'T', 'gains', 'biases', 'conditions'}))
+if isstruct(source) && all(isfield(source, {'T', 'gains', 'second_levels', 'conditions'}))
     D = source;
     return
 elseif ischar(source) || isstring(source)
@@ -74,6 +89,9 @@ else
 end
 
 %% Columns: the required ones present, the others filled
+axis2 = mc_sweep_second_axis(settings);
+column = axis2.column;
+REQUIRED = {'gain', column, 'seed', 'condition', 'mc_total'};
 names = T.Properties.VariableNames;
 absent = setdiff(REQUIRED, names, 'stable');
 if ~isempty(absent)
@@ -92,7 +110,7 @@ end
 %% Types, and a failed row carries no values
 T.condition = cellstr(string(T.condition));
 T.failed    = logical(T.failed) | ~isfinite(T.mc_total);
-for name = [{'gain', 'bias', 'seed'}, VALUES]
+for name = [{'gain', column, 'seed'}, VALUES]
     T.(name{1}) = double(T.(name{1}));
 end
 for name = VALUES
@@ -112,12 +130,19 @@ D = struct();
 D.T           = T;
 D.conditions  = conditions;
 D.gains       = unique(T.gain)';
-D.biases      = unique(T.bias)';
 D.seeds       = unique(T.seed)';
 D.delay_s     = field_or(settings, 'delay_s', []);
 D.preset_name = char(field_or(settings, 'preset_name', ''));
 D.preset_gain = field_or(settings, 'preset_gain', DEFAULT_PRESET_GAIN);
-D.preset_bias = field_or(settings, 'preset_bias', DEFAULT_PRESET_BIAS);
+default_second = NaN;
+if axis2.is_default; default_second = DEFAULT_PRESET_BIAS; end
+D.second_axis   = axis2;
+D.second_levels = unique(T.(column))';
+D.preset_second = field_or(settings, ['preset_' column], default_second);
+if axis2.is_default
+    D.biases      = D.second_levels;
+    D.preset_bias = D.preset_second;
+end
 D.missing     = missing;
 D.settings    = settings;
 D.source      = source_text;

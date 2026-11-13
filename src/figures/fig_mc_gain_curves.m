@@ -1,5 +1,5 @@
 function out = fig_mc_gain_curves(cfg)
-% FIG_MC_GAIN_CURVES Memory capacity and lambda_1 against gain at one bias, per condition (block C).
+% FIG_MC_GAIN_CURVES Memory capacity and lambda_1 against gain at one level of the sweep's second axis (the bias by default), per condition (block C).
 %
 %   out = FIG_MC_GAIN_CURVES('run_dir', d)
 %   out = FIG_MC_GAIN_CURVES('data_file', f)
@@ -30,9 +30,12 @@ function out = fig_mc_gain_curves(cfg)
 % the caption says that lambda_1 is an outcome, not a controlled variable,
 % and that with MTS it stays near the slowest adaptation rate.
 %
-% THE BIAS: cfg.bias (default each result's preset bias, 0.2). Each row uses
-% the nearest bias level its result holds, and the row title states both,
-% so a result swept only along gain (one bias level) is drawn at that level.
+% THE LEVEL OF THE SECOND AXIS: cfg.second (default each result's own
+% preset value on its second axis: bias 0.2, or self-feedback 0). Each row
+% uses the nearest level its result holds, and the row title states both
+% in the axis's own wording (mc_sweep_quantity), so a result swept only
+% along gain (one level) is drawn at that level. cfg.bias is the same
+% option under the name it had when the second axis was always the bias.
 %
 % WHICH RESULTS, one row each (resolve_mc_gain_sweep):
 %   cfg.data       results in memory (one, or a cell of them)
@@ -57,7 +60,8 @@ arguments
     cfg.data                      = []      % read_mc_gain_sweep output / table, or a cell of them
     cfg.variants    (1,:) cell    = {}      % with run_dir: variant networks to add as rows
     cfg.row_labels                = {}      % one per row; empty = from each result's preset, or its file
-    cfg.bias                      = []      % empty = each result's preset bias
+    cfg.second                    = []      % level of the second axis; empty = each result's preset value
+    cfg.bias                      = []      % cfg.second, by its earlier name
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
@@ -69,6 +73,10 @@ arguments
 end
 
 setup_paths();
+if ~isempty(cfg.second) && ~isempty(cfg.bias)
+    error('fig_mc_gain_curves:TwoLevels', 'Give second or bias (its earlier name), not both.');
+end
+second_wanted = [cfg.second, cfg.bias];
 Ds = load_all(cfg);
 n_rows = numel(Ds);
 st = manuscript_style();
@@ -90,14 +98,15 @@ for r = 1:n_rows
     D = Ds{r};
     conds = select_conditions(D.conditions, cfg.conditions);
     cond_colors = mc_condition_colors(conds);
-    b_want = cfg.bias; if isempty(b_want); b_want = D.preset_bias; end
-    [~, ib] = min(abs(D.biases - b_want));
-    b = D.biases(ib);
+    Q2 = mc_sweep_quantity(D.second_axis.column, D);
+    b_want = second_wanted; if isempty(b_want); b_want = D.preset_second; end
+    [~, ib] = min(abs(D.second_levels - b_want));
+    b = D.second_levels(ib);
     g = D.gains;
     for k = 1:3; ax(r, k) = nexttile(tl); hold(ax(r, k), 'on'); end
     for c = 1:numel(conds)
         col = cond_colors(c, :);
-        T = D.T(strcmp(D.T.condition, conds{c}) & D.T.bias == b & ~D.T.failed, :);
+        T = D.T(strcmp(D.T.condition, conds{c}) & Q2.values == b & ~D.T.failed, :);
         [mc_m, mc_lo, mc_hi] = per_gain(T, g, 'mc_total');
         [l_m, l_lo, l_hi]    = per_gain(T, g, 'lle_input');
         band(ax(r, 1), g, mc_lo, mc_hi, col);
@@ -126,9 +135,9 @@ for r = 1:n_rows
     ylabel(ax(r, 1), 'Memory capacity', 'FontSize', st.label_fs - 3);
     ylabel(ax(r, 2), '\lambda_1 (1/s), symmetric log', 'FontSize', st.label_fs - 3);
     ylabel(ax(r, 3), 'Memory capacity', 'FontSize', st.label_fs - 3);
-    bias_txt = sprintf('bias S_c = %.3g', b);
-    if abs(b - b_want) > 1e-9; bias_txt = sprintf('%s (nearest to %.3g)', bias_txt, b_want); end
-    title(ax(r, 1), sprintf('%s, %s', labels{r}, bias_txt), 'FontSize', st.title_fs - 3, ...
+    level_txt = Q2.at(b);
+    if abs(b - b_want) > 1e-9; level_txt = sprintf('%s (nearest to %.3g)', level_txt, b_want); end
+    title(ax(r, 1), sprintf('%s, %s', labels{r}, level_txt), 'FontSize', st.title_fs - 3, ...
         'FontWeight', 'normal', 'HorizontalAlignment', 'left', 'Units', 'normalized', 'Position', [0 1.02 0]);
     if r == n_rows
         xlabel(ax(r, 1), 'Gain', 'FontSize', st.label_fs - 3);

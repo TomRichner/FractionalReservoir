@@ -1,5 +1,5 @@
 function [S, files, SB, SG] = mc_gain_bias_statistics(cfg)
-% MC_GAIN_BIAS_STATISTICS Robustness statistics of memory capacity over the gain-by-bias map (block C).
+% MC_GAIN_BIAS_STATISTICS Robustness statistics of memory capacity over the map of gain by the sweep's second axis (block C).
 %
 %   S = MC_GAIN_BIAS_STATISTICS('data_file', f)
 %   S = MC_GAIN_BIAS_STATISTICS('data', D_or_table, 'out_dir', d)
@@ -11,6 +11,16 @@ function [S, files, SB, SG] = mc_gain_bias_statistics(cfg)
 % distribution, which pools every job. With out_dir given, writes
 % <tag>.csv (S), <tag>_by_bias.csv (SB), <tag>_by_gain.csv (SG) and one
 % <tag>.md holding all three.
+%
+% THE SECOND AXIS IS THE RESULT'S (D.second_axis): the bias S_c, or the
+% property the sweep ran, for example the self-feedback k. Everything below
+% is written for the bias, and holds for any axis with its column name in
+% place of "bias": the columns are then peak_self_feedback,
+% gain_oct_fitself_feedback, self_feedback_range_best, ..., SB's key
+% column is self_feedback and its file <tag>_by_self_feedback.csv, and the
+% markdown names the axis and its unit in mc_sweep_quantity's wording. The
+% code computes with axis-neutral names and renames the columns once, at
+% the end (name_columns).
 %
 % S, per condition (Plan C, section 5):
 %   n_jobs, n_failed         rows of the condition; failed rows are skipped
@@ -34,8 +44,8 @@ function [S, files, SB, SG] = mc_gain_bias_statistics(cfg)
 %   grid's edge is open (the width is then a lower bound); a row that never
 %   reaches half_any has width 0. SB and SG hold every row and column.
 %   gain_oct_fitbias, _open  along gain, in OCTAVES (log2 of the gain
-%                            ratio), at bias_fit (the preset's bias, nearest
-%                            level)
+%                            ratio), at cfg.second_fit (default the preset's
+%                            bias; the nearest level)
 %   gain_oct_best, _bias,    the widest along gain over all biases, and at
 %   _open                    which bias
 %   bias_range_presetgain,   along bias, in S_c units, at the preset's gain
@@ -43,7 +53,7 @@ function [S, files, SB, SG] = mc_gain_bias_statistics(cfg)
 %   bias_range_best, _gain,  the widest along bias over all gains, and at
 %   _open                    which gain
 %
-%   GAUSSIAN FIT along gain at bias_fit (Plan C decision 5):
+%   GAUSSIAN FIT along gain at second_fit (Plan C decision 5):
 %   fit_*                    a Gaussian in log10(gain) fitted to the cell
 %                            medians, mc = h exp(-(x - c)^2 / (2 w^2)), no
 %                            offset, least squares from several starts (the
@@ -80,7 +90,7 @@ arguments
     cfg.data_file  (1,:) char = ''
     cfg.data                  = []      % read_mc_gain_sweep output, or anything it reads
     cfg.conditions            = {}
-    cfg.bias_fit              = []      % empty: D.preset_bias
+    cfg.second_fit            = []      % level of the second axis for the fit; empty: D.preset_second
     cfg.reference  (1,:) char = 'sfa3_stdc2'
     cfg.fit_r2_min (1,1) double = 0.8
     cfg.out_dir    (1,:) char = ''
@@ -97,9 +107,12 @@ else
 end
 conds = select_conditions(D.conditions, cfg.conditions);
 nc = numel(conds);
-bias_fit = cfg.bias_fit;
-if isempty(bias_fit); bias_fit = D.preset_bias; end
-[~, ib_fit] = min(abs(D.biases - bias_fit));
+levels2 = D.second_levels;                      % the second axis: its levels,
+column2 = D.second_axis.column;                 % its column in the table,
+Q2 = mc_sweep_quantity(column2, D);             % and its wording
+second_fit = cfg.second_fit;
+if isempty(second_fit); second_fit = D.preset_second; end
+[~, ib_fit] = min(abs(levels2 - second_fit));
 [~, ig_pre] = min(abs(log(D.gains) - log(D.preset_gain)));
 x_log = log10(D.gains);
 x_oct = log2(D.gains);
@@ -134,43 +147,43 @@ for c = 1:nc
     r.best_any = best_any;
     [r.peak_mc, k] = max(m(:), [], 'omitnan');
     if isempty(k) || isnan(r.peak_mc)
-        r.peak_gain = NaN; r.peak_bias = NaN;
+        r.peak_gain = NaN; r.peak_second = NaN;
     else
         [bk, gk] = ind2sub(size(m), k);
-        r.peak_gain = D.gains(gk); r.peak_bias = D.biases(bk);
+        r.peak_gain = D.gains(gk); r.peak_second = levels2(bk);
     end
 
-    % Tuning width along gain (octaves), every bias
-    oct = zeros(1, numel(D.biases)); oct_open = false(1, numel(D.biases));
-    for b = 1:numel(D.biases)
+    % Tuning width along gain (octaves), every level of the second axis
+    oct = zeros(1, numel(levels2)); oct_open = false(1, numel(levels2));
+    for b = 1:numel(levels2)
         [w, lo, hi, op] = above_range(x_oct, m(b, :), half_any);
         oct(b) = w; oct_open(b) = op;
         [pk, kk] = max(m(b, :), [], 'omitnan');
         pg = NaN; if ~isempty(kk) && isfinite(pk); pg = D.gains(kk); end
-        sb{end+1, 1} = struct('condition', conds{c}, 'bias', D.biases(b), 'row_peak_mc', pk, ...
+        sb{end+1, 1} = struct('condition', conds{c}, 'second', levels2(b), 'row_peak_mc', pk, ...
             'row_peak_gain', pg, 'gain_lo', 2^lo, 'gain_hi', 2^hi, 'octaves', w, 'open', op); %#ok<AGROW>
     end
-    r.gain_oct_fitbias = oct(ib_fit); r.gain_oct_fitbias_open = oct_open(ib_fit);
+    r.gain_oct_fitsecond = oct(ib_fit); r.gain_oct_fitsecond_open = oct_open(ib_fit);
     [r.gain_oct_best, kb] = max(oct);
-    r.gain_oct_best_bias = D.biases(kb); r.gain_oct_best_open = oct_open(kb);
+    r.gain_oct_best_second = levels2(kb); r.gain_oct_best_open = oct_open(kb);
 
-    % Tuning width along bias (S_c), every gain
+    % Tuning width along the second axis (in its own units), every gain
     rng_b = zeros(1, numel(D.gains)); rng_open = false(1, numel(D.gains));
     for g = 1:numel(D.gains)
-        [w, lo, hi, op] = above_range(D.biases, m(:, g)', half_any);
+        [w, lo, hi, op] = above_range(levels2, m(:, g)', half_any);
         rng_b(g) = w; rng_open(g) = op;
         [pk, kk] = max(m(:, g), [], 'omitnan');
-        pb = NaN; if ~isempty(kk) && isfinite(pk); pb = D.biases(kk); end
+        pb = NaN; if ~isempty(kk) && isfinite(pk); pb = levels2(kk); end
         sg{end+1, 1} = struct('condition', conds{c}, 'gain', D.gains(g), 'col_peak_mc', pk, ...
-            'col_peak_bias', pb, 'bias_lo', lo, 'bias_hi', hi, 'range', w, 'open', op); %#ok<AGROW>
+            'col_peak_second', pb, 'second_lo', lo, 'second_hi', hi, 'range', w, 'open', op); %#ok<AGROW>
     end
-    r.bias_range_presetgain = rng_b(ig_pre); r.bias_range_presetgain_open = rng_open(ig_pre);
-    [r.bias_range_best, kg] = max(rng_b);
-    r.bias_range_best_gain = D.gains(kg); r.bias_range_best_open = rng_open(kg);
+    r.second_range_presetgain = rng_b(ig_pre); r.second_range_presetgain_open = rng_open(ig_pre);
+    [r.second_range_best, kg] = max(rng_b);
+    r.second_range_best_gain = D.gains(kg); r.second_range_best_open = rng_open(kg);
 
-    % Along gain at the fit bias: Gaussian fit and measured width
+    % Along gain at the fit level: Gaussian fit and measured width
     y = m(ib_fit, :);
-    r.fit_bias = D.biases(ib_fit);
+    r.fit_second = levels2(ib_fit);
     [r.fit_height, r.fit_center_gain, r.fit_width_log10, r.fit_r2] = gauss_fit(x_log, y);
     r.fit_fwhm_log10 = 2 * sqrt(2 * log(2)) * r.fit_width_log10;
     [r.fwhm_meas_log10, ~, ~, r.fwhm_open] = above_range(x_log, y, max(y, [], 'omitnan') / 2);
@@ -180,17 +193,17 @@ for c = 1:nc
         r.width_used_oct = r.fwhm_meas_log10 * log2(10); r.width_source = 'measured';
     end
 
-    % Paired with the reference, same gain, bias and seed
+    % Paired with the reference, same gain, second-axis value and seed
     r.paired_ref = cfg.reference;
     r.share_ref_higher = NaN; r.median_paired_diff = NaN; r.n_pairs = 0;
     if has_ref && ~strcmp(conds{c}, cfg.reference)
-        A = T(ok, {'gain', 'bias', 'seed', 'mc_total'});
-        B = Tref(~Tref.failed, {'gain', 'bias', 'seed', 'mc_total'});
+        A = T(ok, {'gain', column2, 'seed', 'mc_total'});
+        B = Tref(~Tref.failed, {'gain', column2, 'seed', 'mc_total'});
         B = renamevars(B, 'mc_total', 'mc_ref');
-        P = innerjoin(A, B, 'Keys', {'gain', 'bias', 'seed'});
+        P = innerjoin(A, B, 'Keys', {'gain', column2, 'seed'});
         if height(P) > 0
             P.diff = P.mc_ref - P.mc_total;
-            G = groupsummary(P, {'gain', 'bias'}, 'median', 'diff');
+            G = groupsummary(P, {'gain', column2}, 'median', 'diff');
             r.share_ref_higher   = mean(G.median_diff > 0);
             r.median_paired_diff = median(P.diff);
             r.n_pairs            = height(P);
@@ -205,22 +218,40 @@ S.width_source = cellstr(S.width_source);
 SB = struct2table([sb{:}], 'AsArray', true); SB.condition = cellstr(SB.condition);
 SG = struct2table([sg{:}], 'AsArray', true); SG.condition = cellstr(SG.condition);
 
-vprintf(cfg.verbose, 'minimal', '[mc_gain_bias_statistics] %d conditions, %d gains x %d biases x %d seeds; fit at bias %.3g; half the best of any = %.3g\n', ...
-    nc, numel(D.gains), numel(D.biases), numel(D.seeds), D.biases(ib_fit), half_any);
+vprintf(cfg.verbose, 'minimal', '[mc_gain_bias_statistics] %d conditions, %d gains x %d %s x %d seeds; fit at %s; half the best of any = %.3g\n', ...
+    nc, numel(D.gains), numel(levels2), Q2.plural, numel(D.seeds), Q2.at(levels2(ib_fit)), half_any);
 
+% The markdown is written from the tables as computed; the tables then
+% leave, and are saved, under the second axis's own column names.
 files = {};
-if ~isempty(cfg.out_dir)
+write_files = ~isempty(cfg.out_dir);
+if write_files
     if ~isfolder(cfg.out_dir); mkdir(cfg.out_dir); end
+    f_md = fullfile(cfg.out_dir, [cfg.tag '.md']);
+    write_md(f_md, S, SB, SG, D, Q2, second_fit, cfg, half_any, D.gains(ig_pre));
+end
+S  = name_columns(S, column2);
+SB = name_columns(SB, column2);
+SG = name_columns(SG, column2);
+if write_files
     f_csv = fullfile(cfg.out_dir, [cfg.tag '.csv']);
     writetable(S, f_csv);
-    f_sb = fullfile(cfg.out_dir, [cfg.tag '_by_bias.csv']);
+    f_sb = fullfile(cfg.out_dir, [cfg.tag '_by_' column2 '.csv']);
     writetable(SB, f_sb);
     f_sg = fullfile(cfg.out_dir, [cfg.tag '_by_gain.csv']);
     writetable(SG, f_sg);
-    f_md = fullfile(cfg.out_dir, [cfg.tag '.md']);
-    write_md(f_md, S, SB, SG, D, cfg, half_any, D.gains(ig_pre));
     files = {f_csv, f_md, f_sb, f_sg};
 end
+end
+
+%% ------------------------------------------------------------------------
+function T = name_columns(T, column)
+% The statistics are computed with the second axis called "second"
+% (peak_second, second_range_best, ...). A table leaves with the axis's own
+% column name in its place: peak_bias for the bias, as these columns were
+% always called, peak_self_feedback for the self-feedback.
+names = T.Properties.VariableNames;
+T.Properties.VariableNames = regexprep(names, '(^|_|fit)second(_|$)', ['$1' column '$2']);
 end
 
 %% ------------------------------------------------------------------------
@@ -283,58 +314,66 @@ end
 w = hi - lo;
 end
 
-function write_md(file, S, SB, SG, D, cfg, half_any, gain_at_preset)
-% The three tables as one markdown file. gain_at_preset: the gain level
-% nearest the preset's, where the width along bias is quoted.
+function write_md(file, S, SB, SG, D, Q2, second_fit, cfg, half_any, gain_at_preset)
+% The three tables as one markdown file, from the tables under their
+% axis-neutral column names. Q2: the second axis's wording
+% (mc_sweep_quantity). second_fit: the level asked for the fit.
+% gain_at_preset: the gain level nearest the preset's, where the width
+% along the second axis is quoted.
 fid = fopen(file, 'w');
 if fid < 0; warning('mc_gain_bias_statistics:Write', 'Cannot write %s', file); return; end
 c = onCleanup(@() fclose(fid));
 titles = titles_by_name(S.condition');
-fprintf(fid, '# Memory capacity across gain and bias: robustness statistics\n\n');
+levels2 = D.second_levels;
+axis_name = plain(Q2.symbol);                    % 'bias', 'self-feedback'
+axis_var  = plain(Q2.variable);                  % 'S_c', 'k'
+axis_unit = plain(Q2.unit);                      % '', 'R_W'
+if isempty(axis_unit); axis_unit = axis_var; end % the bias is quoted in S_c
+fprintf(fid, '# Memory capacity across gain and %s: robustness statistics\n\n', axis_name);
 fprintf(fid, 'Source: `%s`\n\n', D.source);
-fprintf(fid, ['%d gains (%.3g to %.3g, level_of_chaos) x %d biases (S_c %.3g to %.3g) x %d seed(s). ' ...
+fprintf(fid, ['%d gains (%.3g to %.3g, level_of_chaos) x %d %s (%s %.3g to %.3g) x %d seed(s). ' ...
     'Map statistics pool every grid point and seed; shares, peaks and widths use the median over seeds per grid point. ' ...
     'Half the best cell of any condition: %.3f. ' ...
-    'Gaussian fit against log10 gain at bias %.3g (the nearest level to %.3g). ' ...
-    'Paired differences are %s minus the row''s condition, same gain, bias and seed.\n\n'], ...
-    numel(D.gains), min(D.gains), max(D.gains), numel(D.biases), min(D.biases), max(D.biases), ...
-    numel(D.seeds), half_any, S.fit_bias(1), ifempty(cfg.bias_fit, D.preset_bias), cfg.reference);
+    'Gaussian fit against log10 gain at %s %.3g (the nearest level to %.3g). ' ...
+    'Paired differences are %s minus the row''s condition, same gain, %s and seed.\n\n'], ...
+    numel(D.gains), min(D.gains), max(D.gains), numel(levels2), plain(Q2.plural), axis_var, min(levels2), max(levels2), ...
+    numel(D.seeds), half_any, axis_name, S.fit_second(1), second_fit, cfg.reference, axis_name);
 fprintf(fid, '## The map\n\n');
-fprintf(fid, '| Condition | jobs (failed) | MC median | IQR | 5th | 95th | share >= half own best | share >= half best of any | peak MC | at gain | at bias |\n');
+fprintf(fid, '| Condition | jobs (failed) | MC median | IQR | 5th | 95th | share >= half own best | share >= half best of any | peak MC | at gain | at %s |\n', axis_name);
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     fprintf(fid, '| %s | %d (%d) | %.3f | %.3f | %.3f | %.3f | %.2f | %.2f | %.3f | %.3g | %.3g |\n', ...
         titles{i}, S.n_jobs(i), S.n_failed(i), S.mc_median(i), S.mc_iqr(i), ...
         S.mc_p05(i), S.mc_p95(i), S.share_half_own(i), S.share_half_any(i), S.peak_mc(i), ...
-        S.peak_gain(i), S.peak_bias(i));
+        S.peak_gain(i), S.peak_second(i));
 end
 fprintf(fid, ['\n## Tuning width: where MC >= %.3f (half the best of any condition)\n\n' ...
     'Contiguous stretch around the row''s (column''s) best cell; "+" marks a stretch that reaches the grid''s edge (a lower bound).\n\n'], half_any);
-fprintf(fid, '| Condition | along gain at bias %.3g (octaves) | widest along gain (octaves) | at bias | along bias at gain %.3g (S_c) | widest along bias (S_c) | at gain |\n', ...
-    S.fit_bias(1), gain_at_preset);
+fprintf(fid, '| Condition | along gain at %s %.3g (octaves) | widest along gain (octaves) | at %s | along %s at gain %.3g (%s) | widest along %s (%s) | at gain |\n', ...
+    axis_name, S.fit_second(1), axis_name, axis_name, gain_at_preset, axis_unit, axis_name, axis_unit);
 fprintf(fid, '|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     fprintf(fid, '| %s | %.2f%s | %.2f%s | %.3g | %.3f%s | %.3f%s | %.3g |\n', titles{i}, ...
-        S.gain_oct_fitbias(i), open_mark(S.gain_oct_fitbias_open(i)), S.gain_oct_best(i), open_mark(S.gain_oct_best_open(i)), ...
-        S.gain_oct_best_bias(i), S.bias_range_presetgain(i), open_mark(S.bias_range_presetgain_open(i)), ...
-        S.bias_range_best(i), open_mark(S.bias_range_best_open(i)), S.bias_range_best_gain(i));
+        S.gain_oct_fitsecond(i), open_mark(S.gain_oct_fitsecond_open(i)), S.gain_oct_best(i), open_mark(S.gain_oct_best_open(i)), ...
+        S.gain_oct_best_second(i), S.second_range_presetgain(i), open_mark(S.second_range_presetgain_open(i)), ...
+        S.second_range_best(i), open_mark(S.second_range_best_open(i)), S.second_range_best_gain(i));
 end
-fprintf(fid, '\n### Along gain, every bias (octaves)\n\n| Condition |%s\n|---|%s\n', ...
-    sprintf(' S_c %.3g |', D.biases), repmat('---|', 1, numel(D.biases)));
+fprintf(fid, '\n### Along gain, every %s (octaves)\n\n| Condition |%s\n|---|%s\n', axis_name, ...
+    sprintf([' ' axis_var ' %.3g |'], levels2), repmat('---|', 1, numel(levels2)));
 for i = 1:height(S)
     R = SB(strcmp(SB.condition, S.condition{i}), :);
     fprintf(fid, '| %s |%s\n', titles{i}, ...
         strjoin(arrayfun(@(k) sprintf(' %.2f%s |', R.octaves(k), open_mark(R.open(k))), 1:height(R), 'UniformOutput', false), ''));
 end
-fprintf(fid, '\n### Along bias, every gain (S_c units)\n\n| Condition |%s\n|---|%s\n', ...
+fprintf(fid, '\n### Along %s, every gain (%s units)\n\n| Condition |%s\n|---|%s\n', axis_name, axis_unit, ...
     sprintf(' g %.3g |', D.gains), repmat('---|', 1, numel(D.gains)));
 for i = 1:height(S)
     R = SG(strcmp(SG.condition, S.condition{i}), :);
     fprintf(fid, '| %s |%s\n', titles{i}, ...
         strjoin(arrayfun(@(k) sprintf(' %.3f%s |', R.range(k), open_mark(R.open(k))), 1:height(R), 'UniformOutput', false), ''));
 end
-fprintf(fid, ['\n## Width at half of its own maximum, along gain at bias %.3g\n\n' ...
-    'The width quoted is the Gaussian fit''s when its R^2 >= %.2f, else the measured one.\n\n'], S.fit_bias(1), cfg.fit_r2_min);
+fprintf(fid, ['\n## Width at half of its own maximum, along gain at %s %.3g\n\n' ...
+    'The width quoted is the Gaussian fit''s when its R^2 >= %.2f, else the measured one.\n\n'], axis_name, S.fit_second(1), cfg.fit_r2_min);
 fprintf(fid, '| Condition | fit height | fit centre (gain) | fit FWHM (log10 gain) | fit R^2 | measured FWHM (log10 gain) | width quoted (octaves) | from | share of grid points %s higher | median paired diff | pairs |\n', cfg.reference);
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
@@ -350,6 +389,7 @@ function s = open_mark(tf)
 if tf; s = '+'; else; s = ''; end
 end
 
-function v = ifempty(a, b)
-if isempty(a); v = b; else; v = a; end
+function s = plain(s)
+% A label written for the tex interpreter, as plain text for markdown.
+s = strrep(s, '\_', '_');
 end
