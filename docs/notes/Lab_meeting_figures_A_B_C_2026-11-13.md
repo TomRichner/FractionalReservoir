@@ -1,6 +1,10 @@
 ---
 title: "Lab meeting figures: blocks A, B and C"
 date: 2026-11-13
+abstract: |
+  Every four-condition figure (no adaptation, single-timescale, chained MTS, product MTS) of blocks A, B and C of the final-draft work so far.
+
+  **Equations of the model:** [Equations_chained_MTS.pdf](file:///C:/Users/m218089/Desktop/github_repos/FractionalReservoir/docs/EquationsParametersDocs/chained_MTS/Equations_chained_MTS.pdf) (the chained multiple-timescale model, its conditions, and in section 10 the Jacobian in block form), at `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\docs\EquationsParametersDocs\chained_MTS\Equations_chained_MTS.pdf`.
 header-includes:
   - |
     ```{=latex}
@@ -8,10 +12,6 @@ header-includes:
     \renewcommand{\textbackslash}{\oldtextbackslash\allowbreak}\sloppy}
     ```
 ---
-
-Every four-condition figure (no adaptation, single-timescale, chained MTS, product MTS) of blocks A, B and C of the final-draft work so far.
-
-**Equations of the model:** [Equations_chained_MTS.pdf](file:///C:/Users/m218089/Desktop/github_repos/FractionalReservoir/docs/EquationsParametersDocs/chained_MTS/Equations_chained_MTS.pdf) (the chained multiple-timescale model, its conditions, and in section 10 the Jacobian in block form), at `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\docs\EquationsParametersDocs\chained_MTS\Equations_chained_MTS.pdf`.
 
 # A. Chained vesicle-pool model and the essential run
 
