@@ -53,7 +53,7 @@ else
 end
 
 state = rng;
-rng(rng_seed);
+rng(rng_seed, 'twister');
 pick = randperm(numel(pool), round(numel(pool) * neuron_frac));
 rng(state);
 idx = sort(pool(pick));

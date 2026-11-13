@@ -98,7 +98,7 @@ end
 
 % The Wiener term, regenerated as build_noise draws it (xi1 first, then xi2).
 seed = model.noise_seed; if isempty(seed), seed = model.rng_seeds(1) + 224737; end
-state = rng; rng(seed);
+state = rng; rng(seed, 'twister');
 xi1 = randn(n, numel(model.t_ex) - 1);
 rng(state);
 step = iw; step(step > size(xi1, 2)) = size(xi1, 2);     % step j runs from t_ex(j) to t_ex(j+1)
