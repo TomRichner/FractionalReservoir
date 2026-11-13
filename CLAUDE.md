@@ -253,15 +253,28 @@ is **`run_mc_gain_sweep`** (`src/analysis/`): memory capacity and
 $\lambda_1$ at every point of a grid of `level_of_chaos` (gain) by `S_c`
 (bias), every condition built on the same seeds per job, one small file
 per finished job under `<output_dir>/mc_gain_sweep/jobs/`, so a repeat of
-the same call resumes. It is a plain `parfor` over a job table, not a
-`ParamSpaceAnalysis2` sweep (PSA has no hook for a per-job memory task).
-Its sizes are its own table by run mode; agents run `essential` and
-`fast` only. `read_mc_gain_sweep` reads a result; the figures are
-`fig_mc_gain_bias_maps`, `fig_mc_gain_curves`, `fig_mc_robustness` and
-the table `mc_gain_bias_statistics`. Two presets of the `mu7chain` bundle
-exist for it, `..._mu7chain_EI3to2` and `..._mu7chain_EI2to3` (mean
-weights 8.4 / 5.6 and 5.6 / 8.4, sum held at 14). Three fixes went in
-first, each of which moved numbers:
+the same call resumes (checked on the real run: 126 done, 28 run). It is
+a plain `parfor` over a job table, not a `ParamSpaceAnalysis2` sweep (PSA
+has no hook for a per-job memory task). Its sizes are its own table by
+run mode: `essential` is 12 jobs, about 10 minutes on 12 workers, the
+size agents run; `fast` is the report's grid (11 gains by 7 biases by 2
+seeds, about 2 h 40, Tom's); `medium` and `production` finer. A job file
+becomes table rows through `mc_gain_sweep_job_rows` only, and the delay
+axis comes from `mc_delay_axis` only. `read_mc_gain_sweep` reads a
+result, `read_mc_gain_sweep_jobs` a run still in progress (read-only),
+and `make_block_C_figures` draws the whole set (maps, gain curves with
+variant networks as rows, robustness, statistics tables) in one call.
+From the entry points it is the **opt-in stage** `mc_gain_sweep` of the
+bundle `mu7chain_gainbias_config` / `_run`: opt-in stages are entries
+of `paper_opt_in_stages` (name, plan, run), run only when a bundle names
+them in `cfg.stages`, so no other bundle runs it; a new opt-in stage is
+an entry there and two functions. The variant networks are named by the
+bundle (`cfg.mc_gain_sweep.variants`: tag and preset), `..._mu7chain_EI3to2`
+and `..._mu7chain_EI2to3` (mean weights 8.4 / 5.6 and 5.6 / 8.4, sum held
+at 14), each run gain only at its own bias into
+`<run_dir>/mc_gain_sweep_<tag>/`. The result of the quick test is
+`docs/notes/Block_C_results_2026-11-13.md`. Three fixes went in first,
+each of which moved numbers:
 
 - **Every seeding call names its generator** (`rng(seed, 'twister')`;
   F1). A pool worker's default generator is not a client's, so a model
