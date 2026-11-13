@@ -948,7 +948,11 @@ becomes an issue with an acceptance test.
 
 ### FD-010 Memory capacity and growth rate across gain and bias (block C)
 
-- **Status:** in progress (Tom, 2026-11-12: do block C next; the lead
+- **Status:** **done as a quick test (2026-11-13)**: gates on main at
+  `f5ab69b` passed (quick suite 80 of 80 in 13.8 min, stages tier exact,
+  1245 of 1245 leaves); `ae3a980` after it changes only the placement of
+  a figure label, tested by its worker. What remains is Tom's (see
+  Result). Was: in progress (Tom, 2026-11-12: do block C next; the lead
   decides, logs and proceeds until it is done). The plan is
   `docs/Plan_C_memory_capacity_gain_bias.md`; its section 7 lists the
   lead's eight decisions taken with the plan (generator pinned to twister;

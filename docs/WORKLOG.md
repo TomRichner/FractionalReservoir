@@ -34,6 +34,59 @@ Entry template:
 
 ---
 
+## 2026-11-13 09:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block C done as a quick test)
+
+**Issues touched:** FD-010 (in progress -> done as a quick test; what
+remains is Tom's).
+**Tom's instructions this morning (now in CLAUDE.md, "Current work", and
+in memory):** pick up where it left off, no deadlines; all tests minimal
+and fast, preferably 10 minutes or less, 40 at most, longer ones for a
+later date; the effort goes into high-quality, general, readable,
+maintainable code, not into long runs. Decisions 20 and 21 under FD-010.
+**What happened overnight:** at 03:48 the session lost its API login;
+the C3a worker and its MATLAB ended at 173 of 252 jobs and nothing ran
+until 08:11. The stage's job files lost nothing. On Tom's word the rest
+of the 252 was not run: the result is built from the two complete seeds.
+**Commits (this repo):** `5f98249`..`91d9f25` decisions 14 to 21;
+`c9b9377` figures revised on the pilot; `d5e7614` figures for four
+conditions; `94926ad` code-quality pass with the bundle (opt-in stages
+behind `paper_opt_in_stages`, `mu7chain_gainbias_config`, one
+job-to-rows mapping, one delay axis, the size table); `f5ab69b`,
+`ae3a980` figure fixes; `c18d6a8`, `e8fda25` the report; `2740fb1`
+FD-010 result; `006d0a0` timeline; CLAUDE.md `3181602`, `bfa91c6`,
+`3c943db`, `b07197e`, `e23ec7d`. Manuscript repo: `3551e65`, `3ffc3c1`
+the proposed Results text; `f012833` the to-do list.
+**Verified:** the stage's resume on the real run (126 of 154 skipped, 28
+run); the code-quality pass changes no number (a copy of the 126 job files
+resumed with none rerun; `test_mc_gain_sweep_job_files`; lean path still
+bit-equal); gates on main at `f5ab69b`: quick suite 80 of 80 (13.8 min,
+pool 6), stages tier exact (1245 of 1245 leaves). `ae3a980` (a label's
+placement) was tested by its worker only (`test_mc_gain_bias_figures`).
+The report's numbers were checked by hand against the table by the
+figures workers, one condition each.
+**Not verified / known gaps:** two seeds on the main map and one on each
+E:I network; seeds 3003 (39 jobs) and 3004 (8) are partial on disk and
+unused; the full regression tier still deferred.
+**Raised, not acted on:**
+- **The quick suite now takes 13.8 min** (5 min at 55 tests on
+  2026-11-10; block C added about 3 min of it: `test_mc_gain_bias_bundle`
+  63 s, `test_mc_gain_sweep` 45 s, `test_mc_lean_path` 39 s). Above Tom's
+  10-minute preference. Suggestion: move the slowest to `slow`, or shrink
+  their cases; Tom to say which tests must stay in `quick`.
+- A worker's MATLAB reported a leftover pool label (`matlab-opus-3`,
+  allocation 0) from an earlier agent; `pool_set` corrected it. Worth a
+  look at how the label survives between agents.
+- From the code-quality worker: `SRNN_ESN_reservoir`'s memory-capacity
+  methods print with bare `fprintf` (bypassing `vlog`); two stale `%#ok`
+  in `run_memory_capacity.m` (lines 73, 233); the bundle's stage could run
+  the main and variant sweeps as one job list (essential 30 -> 20 min).
+- Nine crashed `Processes` jobs (IDs 1 to 9) are kept by MATLAB for their
+  crash dumps.
+**Next:** Tom's decisions on block C (the proposal's first section: the
+claim, Figure 6's single-network panel, main text or supplement, a
+`medium` run), and on block B's nine pilots. Timeline update after this
+merge (an Opus worker, no MATLAB).
+
 ## 2026-11-12 19:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block B pilots compiled; block C started, running overnight without Tom)
 
 **THE LEAD'S CONTEXT WILL BE COMPACTED DURING THIS STRETCH. To pick up:
