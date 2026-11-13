@@ -14,7 +14,7 @@ function out = explore_bias_rate_lambda1(root)
 % the rate and the share of neurons on the slope only a little, and
 % lambda_1 hardly at all, while the gain moves lambda_1 directly.
 %
-% Four figures, each fig_mc_sweep_scatter over every run of the main sweep
+% Six figures, each fig_mc_sweep_scatter over every run of the main sweep
 % (11 gains x 7 biases x 2 seeds), four conditions:
 %   1. bias against rate_mean, colored by gain
 %   2. bias against lambda_1 (input on), colored by gain
@@ -24,6 +24,10 @@ function out = explore_bias_rate_lambda1(root)
 %      1/(g R_W)^2 at the no-adaptation edge, roughly independent of bias at
 %      a fixed gain; that curve is drawn on the no-adaptation panel, with
 %      R_W the bulk radius of W at gain 1, read off the preset's model.
+%   5. rate_mean against lambda_1, colored by gain, marker area by bias
+%      (filled for bias >= 0, a ring for bias < 0; Tom, 2026-11-13)
+%   6. memory capacity against lambda_1, the same encoding
+% In 5 and 6 a clipped lambda_1 is an open square at the axis edge.
 % Bias has seven levels, so in figures 1 and 2 the points stand in seven
 % columns and Spearman's rho is computed with many tied ranks (averaged).
 %
@@ -31,7 +35,7 @@ function out = explore_bias_rate_lambda1(root)
 % the two gains that bracket the sign change of the median lambda_1 with
 % the mean share on the slope there against 1/(g R_W)^2.
 %
-% Output: <root>/figs/explore_C/bias_rate_lambda1/Fig_bias_*.{png,svg,fig}
+% Output: <root>/figs/explore_C/bias_rate_lambda1/Fig_*.{png,svg,fig}
 %
 % See also: fig_mc_sweep_scatter, mc_sweep_quantity, explore_mc_vs_lambda1_scatter
 
@@ -60,7 +64,11 @@ specs = {
     {'x', 'lle_input', 'y', 'rate_mean',     'color_by', 'gain', 'fig_tag', 'Fig_rate_mean_vs_lambda1', ...
      'stats_position', [0.56 0.99]}
     {'x', 'gain',      'y', 'frac_on_slope', 'color_by', 'bias', 'fig_tag', 'Fig_gain_vs_frac_on_slope', ...
-     'overlay', edge_curve, 'stats_position', [0.50 0.22]}};
+     'overlay', edge_curve, 'stats_position', [0.50 0.22]}
+    {'x', 'lle_input', 'y', 'rate_mean',     'color_by', 'gain', 'size_by', 'bias', ...
+     'fig_tag', 'Fig_rate_mean_vs_lambda1_size_bias', 'stats_position', [0.56 0.99]}
+    {'x', 'lle_input', 'y', 'mc_total',      'color_by', 'gain', 'size_by', 'bias', ...
+     'fig_tag', 'Fig_MC_vs_lambda1_size_bias', 'stats_position', [0.56 0.99]}};
 out = struct('stats', {cell(numel(specs), 1)}, 'files', {{}}, 'R_W', R_W, 'edge', []);
 for k = 1:numel(specs)
     o = fig_mc_sweep_scatter(common{:}, specs{k}{:});

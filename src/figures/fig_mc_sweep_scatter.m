@@ -32,6 +32,21 @@ function out = fig_mc_sweep_scatter(cfg)
 % averaged, so a grid axis with few levels, like bias, gives many ties); a
 % correlation over fewer than three points is NaN.
 %
+% SIZE BY A SIGNED QUANTITY (cfg.size_by, e.g. 'bias'): the marker's AREA
+% grows linearly with |value|, from cfg.size_range(1) points^2 at zero to
+% cfg.size_range(2) at cfg.size_max (default: the largest |level| of a grid
+% axis, else the largest |value| drawn; larger values are drawn at the
+% largest area). A value > 0, and zero, is a filled marker; a value < 0 an
+% open ring of the same area, its edge in the point's color. The color
+% still shows cfg.color_by. Markers are drawn largest first, so a small one
+% is never hidden under a large one. A row below the panels shows the
+% sizes of cfg.size_legend (default: the grid's levels when there are at
+% most seven, else five values spanning +-size_max). In this mode a
+% clipped run is an OPEN SQUARE of fixed area at the axis edge (rings now
+% mean a negative value), named in the size legend and the title line.
+% Without size_by the figure is drawn as before (open circles for clipped
+% runs, every marker one size). The statistics are the same either way.
+%
 % OVERLAYS: cfg.overlay is a struct array of reference curves, each with
 % fields x, y (vectors in the quantities' units), label, and conditions
 % (cellstr of the panels it is drawn on; empty = every panel). A curve is
@@ -63,6 +78,10 @@ arguments
     cfg.x              (1,:) char    = 'lle_input'
     cfg.y              (1,:) char    = 'mc_total'
     cfg.color_by       (1,:) char    = 'gain'
+    cfg.size_by        (1,:) char    = ''         % a quantity drawn as marker area, its sign as filled / ring
+    cfg.size_range     (1,2) double {mustBePositive} = [8 160]   % marker area (points^2) at 0 and at size_max
+    cfg.size_max       double {mustBeScalarOrEmpty, mustBePositive} = []   % |value| drawn at the largest area
+    cfg.size_legend    double        = []         % values shown in the size legend
     cfg.clip           (1,1) struct  = struct()   % per quantity name, a clip replacing the registry's
     cfg.overlay        struct        = struct('x', {}, 'y', {}, 'label', {}, 'conditions', {})
     cfg.stats_position (1,2) double  = [0.56 0.70]   % normalized, top left corner of the statistics box
@@ -86,11 +105,29 @@ if isempty(fig_tag); fig_tag = sprintf('Fig_MC_sweep_%s_vs_%s', cfg.y, cfg.x); e
 
 MARKER_SIZE      = 22;     % filled marker, an unclipped run
 MARKER_SIZE_OPEN = 28;     % open marker, a clipped run at the axis edge
+CLIPPED_SQUARE_AREA = 30;  % open square, a clipped run when size_by is in use (fixed: not a size)
 MARKER_ALPHA     = 0.85;
 MAX_LEVEL_TICKS  = 8;      % a grid axis with more levels than this gets six colorbar ticks
 
 ok_all = ~T.failed & isfinite(Qx.values) & isfinite(Qy.values);
 in_set = ismember(T.condition, conds);
+
+% Marker area by a signed quantity: one mapping, shared by every panel and
+% the size legend.
+sized = ~isempty(cfg.size_by);
+if sized
+    Qs = quantity(cfg.size_by);
+    size_max = cfg.size_max;
+    if isempty(size_max)
+        if isempty(Qs.levels)
+            size_max = max(abs(Qs.values(ok_all & in_set)), [], 'omitnan');
+        else
+            size_max = max(abs(Qs.levels));
+        end
+        if isempty(size_max) || ~(size_max > 0); size_max = 1; end
+    end
+    marker_area = @(v) cfg.size_range(1) + diff(cfg.size_range) * min(abs(v) / size_max, 1);
+end
 x_lim = Qx.limits(Qx.values(ok_all & in_set));
 y_lim = Qy.limits(Qy.values(ok_all & in_set));
 
@@ -112,7 +149,9 @@ cmap = parula(256);
 cb_label = Qc.label;
 if strcmp(Qc.scale, 'log'); cb_label = [cb_label ' (log scale)']; end
 
-fig = figure('Color', 'w', 'Units', 'centimeters', 'Position', [2 2 10 * nc 11]);
+fig_height = 11;
+if sized; fig_height = 13; end   % room for the size legend below the panels
+fig = figure('Color', 'w', 'Units', 'centimeters', 'Position', [2 2 10 * nc fig_height]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 tl = tiledlayout(fig, 1, nc, 'TileSpacing', 'compact', 'Padding', 'compact');
 stats = cell(nc, 1);
@@ -129,9 +168,16 @@ for c = 1:nc
     ax = nexttile(tl); hold(ax, 'on'); box(ax, 'on');
     if Qx.zero_line; xline(ax, 0, '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw); end
     if Qy.zero_line; yline(ax, 0, '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw); end
-    scatter(ax, xp(~clipped), yp(~clipped), MARKER_SIZE, g(~clipped), 'filled', ...
-        'MarkerFaceAlpha', MARKER_ALPHA, 'MarkerEdgeColor', 'none');
-    scatter(ax, xp(clipped), yp(clipped), MARKER_SIZE_OPEN, g(clipped), 'LineWidth', 1);
+    if sized
+        s = Qs.values(ok);
+        draw_sized(ax, xp(~clipped), yp(~clipped), s(~clipped), g(~clipped), marker_area);
+        scatter(ax, xp(clipped), yp(clipped), CLIPPED_SQUARE_AREA, g(clipped), 's', ...
+            'LineWidth', 1, 'Tag', 'mc_sweep_scatter_clipped');
+    else
+        scatter(ax, xp(~clipped), yp(~clipped), MARKER_SIZE, g(~clipped), 'filled', ...
+            'MarkerFaceAlpha', MARKER_ALPHA, 'MarkerEdgeColor', 'none');
+        scatter(ax, xp(clipped), yp(clipped), MARKER_SIZE_OPEN, g(clipped), 'LineWidth', 1);
+    end
     draw_overlays(ax, cfg.overlay, conds{c});
     colormap(ax, cmap); clim(ax, c_lim);
     set(ax, 'XScale', Qx.scale, 'YScale', Qy.scale);
@@ -179,10 +225,23 @@ caption = sprintf('%s against %s, every run (%d gains x %d biases x %d seeds)', 
     Qx.symbol, numel(D.gains), numel(D.biases), numel(D.seeds));
 clipped_q = [Qx, Qy];
 clipped_q = clipped_q(~cellfun(@isempty, {clipped_q.clip}));
+clip_text = '';
 if ~isempty(clipped_q)
     [~, first] = unique({clipped_q.symbol}, 'stable');
     parts = arrayfun(@(q) sprintf('|%s| > %g', q.symbol, q.clip), clipped_q(first), 'UniformOutput', false);
-    caption = sprintf('%s; open markers: %s, drawn at the edge', caption, strjoin(parts, ' or '));
+    clip_text = strjoin(parts, ' or ');
+end
+if sized
+    caption = {caption, sprintf('color: %s; marker area: |%s|, filled \\geq 0, ring < 0', ...
+        Qc.symbol, Qs.symbol)};
+    if ~isempty(clip_text)
+        caption{2} = sprintf('%s; open squares: %s, drawn at the edge', caption{2}, clip_text);
+    end
+    legend_values = cfg.size_legend;
+    if isempty(legend_values); legend_values = default_size_legend(Qs, size_max); end
+    draw_size_legend(tl, Qs, legend_values, marker_area, clip_text, CLIPPED_SQUARE_AREA, st);
+elseif ~isempty(clip_text)
+    caption = sprintf('%s; open markers: %s, drawn at the edge', caption, clip_text);
 end
 title(tl, caption, 'FontSize', st.title_fs - 2);
 
@@ -210,6 +269,75 @@ if isempty(bound)
 end
 clipped = abs(v) > bound;
 vp = min(max(v, -bound), bound);
+end
+
+function draw_sized(ax, x, y, s, g, marker_area)
+% Markers whose area is marker_area(s): filled where s >= 0 (or unknown),
+% an open ring where s < 0, colored by g. Drawn largest first, as runs of
+% consecutive markers of one kind, so a small marker lands on top of a
+% large one whichever kind each is.
+RING_WIDTH   = 1.1;    % points: reads as a ring at the smallest ring and the largest
+FILLED_ALPHA = 0.7;    % lets a ring or a dot under a filled marker show through
+if isempty(s); return; end
+a = marker_area(s);
+a(isnan(a)) = marker_area(0);
+[a, order] = sort(a, 'descend');
+x = x(order); y = y(order); g = g(order);
+ring = s(order) < 0;
+starts = [1; find(diff(ring(:)) ~= 0) + 1];
+stops = [starts(2:end) - 1; numel(ring)];
+for k = 1:numel(starts)
+    i = starts(k):stops(k);
+    if ring(i(1))
+        scatter(ax, x(i), y(i), a(i), g(i), 'LineWidth', RING_WIDTH, 'Tag', 'mc_sweep_scatter_ring');
+    else
+        scatter(ax, x(i), y(i), a(i), g(i), 'filled', 'MarkerFaceAlpha', FILLED_ALPHA, ...
+            'MarkerEdgeColor', 'none', 'Tag', 'mc_sweep_scatter_filled');
+    end
+end
+end
+
+function v = default_size_legend(Qs, size_max)
+% The grid's levels when there are few, else five values over +-size_max
+% (or four over [0, size_max] for a quantity that is never negative).
+if ~isempty(Qs.levels) && numel(Qs.levels) <= 7
+    v = Qs.levels(:)';
+elseif any(Qs.values < 0)
+    v = linspace(-size_max, size_max, 5);
+else
+    v = linspace(0, size_max, 4);
+end
+end
+
+function draw_size_legend(tl, Qs, values, marker_area, clip_text, square_area, st)
+% A row of reference markers below the panels, drawn by the panels' own
+% mapping (marker areas are in points, so they match the panels exactly),
+% in a neutral gray, each labeled with its value; then the clipped mark.
+gray = [0.35 0.35 0.35];
+ax = axes(tl, 'Visible', 'off', 'Tag', 'mc_sweep_scatter_size_legend');
+ax.Layout.Tile = 'south';
+hold(ax, 'on');
+n = numel(values);
+text(ax, 0.4, 0, sprintf('%s:', Qs.symbol), 'HorizontalAlignment', 'right', ...
+    'VerticalAlignment', 'middle', 'FontSize', st.tick_fs - 3);
+for k = 1:n
+    if values(k) < 0
+        scatter(ax, k, 0, marker_area(values(k)), gray, 'LineWidth', 1.1);
+    else
+        scatter(ax, k, 0, marker_area(values(k)), gray, 'filled', 'MarkerEdgeColor', 'none');
+    end
+    text(ax, k, -0.55, sprintf('%g', values(k)), 'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'top', 'FontSize', st.tick_fs - 4);
+end
+x_end = n + 0.8;
+if ~isempty(clip_text)
+    scatter(ax, n + 1.4, 0, square_area, gray, 's', 'LineWidth', 1);
+    text(ax, n + 1.7, 0, sprintf('%s, drawn at the edge', clip_text), ...
+        'VerticalAlignment', 'middle', 'FontSize', st.tick_fs - 4);
+    x_end = n + 4.5;
+end
+% Padded on the right so the row sits compactly left of center.
+xlim(ax, [-1.5, x_end + n]); ylim(ax, [-1.4 1]);
 end
 
 function draw_overlays(ax, overlay, condition)

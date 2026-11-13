@@ -21,6 +21,11 @@
 %     silent; gain against rate_mean colored by frac_on_slope draws gain on
 %     a log axis, an overlay on its one panel, no sign split, and a Pearson
 %     r that matches a direct computation;
+%   * with size_by = 'bias': runs with bias >= 0 are filled and those below
+%     zero rings, marker area is linear in |bias| (8 to 160 points^2) and
+%     drawn largest first, clipped runs are open squares of one area, the
+%     size legend and the title line are there, and the statistics are
+%     unchanged;
 %   * read_mc_gain_sweep_jobs reads a folder of finished job files (half of
 %     them, plus a *.tmp save in progress it must skip) into the same table,
 %     without touching the folder;
@@ -183,6 +188,41 @@ k = strcmp(Dn.T.condition, 'sfa1_std1') & ~Dn.T.failed & isfinite(Qr.values);
 S = o.stats(strcmp(o.stats.condition, 'sfa1_std1'), :);
 assert(S.n == nnz(k) && abs(S.pearson_r - pearson_direct(Dn.T.gain(k), Qr.values(k))) < 1e-12);
 close(o.figs);
+
+%% Marker area by a signed quantity (size_by): bias >= 0 filled, < 0 a ring,
+% area growing with |bias|, clipped runs open squares of one fixed area
+o = fig_mc_sweep_scatter('data', D, 'conditions', {'no_adaptation'}, 'x', 'lle_input', 'y', 'mc_total', ...
+    'size_by', 'bias', 'clip', struct('lle_input', 1), 'save', false, 'visible', false);
+panel = findall(o.figs, 'Type', 'axes', '-not', 'Tag', 'mc_sweep_scatter_size_legend');
+filled = findall(panel, 'Tag', 'mc_sweep_scatter_filled');
+ring = findall(panel, 'Tag', 'mc_sweep_scatter_ring');
+sq = findall(panel, 'Tag', 'mc_sweep_scatter_clipped');
+assert(~isempty(filled) && ~isempty(ring) && isscalar(sq), 'size_by: filled, ring and clipped marks expected');
+assert(all(strcmp({filled.MarkerFaceColor}, 'flat')) && all(strcmp({ring.MarkerFaceColor}, 'none')) && ...
+    strcmp(sq.Marker, 'square') && strcmp(sq.MarkerFaceColor, 'none') && isscalar(unique(sq.SizeData)));
+k = strcmp(D.T.condition, 'no_adaptation') & ~D.T.failed & isfinite(D.T.lle_input) & isfinite(D.T.mc_total);
+unclipped = k & abs(D.T.lle_input) <= 1;
+n_filled = sum(arrayfun(@(h) numel(h.XData), filled));
+n_ring = sum(arrayfun(@(h) numel(h.XData), ring));
+assert(n_filled == nnz(unclipped & D.T.bias >= 0) && n_ring == nnz(unclipped & D.T.bias < 0) && ...
+    numel(sq.XData) == nnz(k & abs(D.T.lle_input) > 1), 'size_by: marker counts by sign and clip');
+% Area linear in |bias|, from 8 points^2 at zero to 160 at the largest
+% |level|: the areas drawn are exactly those of the unclipped runs' biases.
+% Drawn largest first, so the first object holds the largest area.
+area_of = @(b) 8 + 152 * abs(b) / max(abs(D.biases));
+a = sort(cell2mat(arrayfun(@(h) h.SizeData(:), [filled; ring], 'UniformOutput', false)));
+assert(max(abs(a - sort(area_of(D.T.bias(unclipped))))) < 1e-9, 'size_by: area must be linear in |bias|');
+drawn = flipud(findobj(panel, '-regexp', 'Tag', 'mc_sweep_scatter_(filled|ring)'));   % creation order
+first_sizes = arrayfun(@(h) h.SizeData(1), drawn);
+assert(all(diff(first_sizes) <= 0), 'size_by: markers drawn largest first');
+assert(isscalar(findall(o.figs, 'Tag', 'mc_sweep_scatter_size_legend')), 'size_by: a size legend');
+cap = strjoin(cellstr(findall(o.figs, 'Type', 'tiledlayout').Title.String), ' ');
+assert(contains(cap, 'ring < 0') && contains(cap, 'open squares'), 'size_by: the title line names the marks');
+o_plain = fig_mc_sweep_scatter('data', D, 'conditions', {'no_adaptation'}, ...
+    'clip', struct('lle_input', 1), 'save', false, 'visible', false);
+assert(isequaln(o.stats, o_plain.stats), 'size_by must not change the statistics');
+assert(isempty(findall(o_plain.figs, 'Tag', 'mc_sweep_scatter_clipped')), 'without size_by, the old clip mark');
+close([o.figs, o_plain.figs]);
 
 %% The statistics recover the generator's pattern
 [S, files, SB, SG] = mc_gain_bias_statistics('data', D, 'out_dir', tmp, 'verbose', 'near-none');
