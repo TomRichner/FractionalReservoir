@@ -218,10 +218,14 @@ end
 function mark_cluster(ax, l_m, mc_m, col, c, sl)
 % A run of stable per-gain medians whose lambda_1 barely moves: bracket it
 % and state the value, so the stack is not mistaken for a trend.
-% The statement goes in a list in the axes' lower-left corner (strongly
-% negative lambda_1 with low memory capacity, where no curve runs), one
-% line per clustered condition in its colour. Not beside the bracket: two
-% conditions that cluster at the same lambda_1 would overlap there.
+% The statement goes in a list in the axes' upper-right corner (positive
+% lambda_1 with high memory capacity, where no curve runs: once lambda_1 is
+% clearly positive the memory capacity has collapsed), one line per
+% clustered condition in its colour, stacked downward. Not beside the
+% bracket: two conditions that cluster at the same lambda_1 would overlap
+% there. Not the lower-left corner, where it sat first: on the
+% excitation-dominated network (E : I = 3 : 2) the no-adaptation curve runs
+% there (lambda_1 near -10, memory capacity 0 to 3) and the list crossed it.
 MIN_POINTS = 3;         % per-gain medians that make a cluster
 HALF_WIDTH = 0.03;      % 1/s around their median lambda_1
 k = find(isfinite(l_m) & isfinite(mc_m) & l_m < 0);
@@ -235,8 +239,8 @@ plot(ax, x0 * [1 1], [min(y) max(y)], '-', 'Color', col, 'LineWidth', 1, 'Handle
 plot(ax, x0 + [0 0.05], min(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
 plot(ax, x0 + [0 0.05], max(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
 n_prev = numel(findobj(ax, 'Tag', 'lle_cluster'));
-text(ax, 0.02, 0.03 + 0.07 * n_prev, sprintf('[ \\lambda_1 \\approx %.2f at %d gains', lc, nnz(in)), ...
-    'Units', 'normalized', 'Color', col, 'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', ...
+text(ax, 0.98, 0.98 - 0.07 * n_prev, sprintf('[ \\lambda_1 \\approx %.2f at %d gains', lc, nnz(in)), ...
+    'Units', 'normalized', 'Color', col, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', ...
     'FontSize', 8, 'Tag', 'lle_cluster');
 end
 
