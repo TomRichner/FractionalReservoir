@@ -35,7 +35,8 @@ just don't want deadlines leading to truncated code or shortcuts in
 written code. I am in favor of only doing fast, efficient tests, and
 leaving all long tests over 40 min to a future date." So size every run
 an agent makes, and every `essential` / `fast` entry of a size table, to
-the smallest that shows the result, each under about 40 minutes; more
+the smallest that shows the result, each under about 40 minutes and
+preferably 10 or less ("if tests can be 10 min or less, even better"); more
 seeds and finer grids go into the `medium` / `production` sizes for
 later. What is written in code is complete whatever the run size. And
 the same morning: "i want the effort going into writing high quality,
