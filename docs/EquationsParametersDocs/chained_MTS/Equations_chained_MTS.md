@@ -508,18 +508,17 @@ $$
 \qquad \omega_k = \frac{\log \tau_{a_k} - \log \tau_{a_1}}{\log \tau_{a_K} - \log \tau_{a_1}} \tag{17}
 $$
 
-For $K = 1$, $\omega_1 = 1$: the single time constant takes the slow draw alone,
-$\tau_{a,i1} = \tau_{a_1} e^{\sigma_{\tau_a} z_i^{slow}}$. The ordering is kept
+For $K = 1$, $\omega_1 = 0$: the single time constant takes the fast draw alone,
+$\tau_{a,i1} = \tau_{a_1} e^{\sigma_{\tau_a} z_i^{fast}}$, so that, as for
+depression, a neuron's single SFA time constant in the single-timescale
+condition is the fastest rung of its ladder in the multiple-timescale condition
+on the same seed (the two have the same nominal value, and the equality holds
+for every neuron whose ladder ends the floor below did not move). The ordering is kept
 by the same quarter-of-the-nominal-span floor, applied here **symmetrically**:
 where the two end offsets bring the ends closer than a quarter of
 $\log (\tau_{a_K} / \tau_{a_1})$, both are moved apart about their log-midpoint
 until the gap equals the floor. On the paper's ladder (ratio 40) this moves
 essentially no neuron.
-
-Note the difference from depression: a neuron's single SFA time constant in the
-single-timescale condition (the slow draw) is **not** the fastest rung of its
-ladder in the multiple-timescale condition (the fast draw), although the
-two have the same nominal value.
 
 **Setpoints.** The setpoint is Gaussian, not log-normal:
 $a_{0_i} = S_c + \sigma_{S_c}\, \xi_i$, with $S_c$ the centre.

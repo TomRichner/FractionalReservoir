@@ -98,8 +98,16 @@ classdef SRNNCellTypePairs < handle
         % neuron") and the interior rungs follow in log space at the nominal's
         % own log position. For a log_ladder nominal that is "jitter the
         % endpoints and re-run logspace"; for any other nominal, sigma = 0
-        % reproduces it exactly. K = 1 takes the slow draw alone; K = 2 is the
-        % two endpoints. The spread is proportional to tau, so +/-10% is
+        % reproduces it exactly. K = 2 is the two endpoints. K = 1 TAKES THE
+        % FAST DRAW ALONE (w_1 = 0; Plan C, F3, 2026-11-12): on one seed a
+        % neuron's single SFA time constant is the fastest rung of the
+        % ladder it has in a multiple-timescale condition with the same
+        % nominal first rung (where the ordering floor did not move that
+        % ladder's ends), as its single depression pool is the releasable
+        % pool of the chain. Until then K = 1 took the SLOW draw, so the
+        % single- and multiple-timescale conditions of one network differed
+        % in which neurons were fast as well as in the number of timescales.
+        % The spread is proportional to tau, so +/-10% is
         % +/-0.025 s at 0.25 s and +/-1 s at 10 s.
         %
         % WHY: with every neuron on the same ladder the stable regime has ~n
@@ -1904,7 +1912,10 @@ classdef SRNNCellTypePairs < handle
                 d_slow = s * z(idx, 2);
                 n_clipped = 0;
                 if K == 1
-                    w = 1;
+                    % One timescale: the FAST-end normal, the one the first
+                    % rung of a multi-timescale ladder reads on this seed
+                    % (see the tau_a_spread property). No ordering to keep.
+                    w = 0;
                 else
                     % MINIMUM LOG-SEPARATION FLOOR (TR, 2026-09-14). The two end
                     % draws are independent, so a neuron's jittered ends can come

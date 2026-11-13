@@ -67,7 +67,10 @@ log-spaced ladder this is "jitter the endpoints and re-run logspace". It exists
 to break the degeneracy of the slow Lyapunov band (every neuron otherwise
 contributes an exponent within a few percent of $-1/\tau_{a_K}$); note that
 with a spread the leading exponent of a stable network is $-1/\tau$ of the
-*slowest drawn neuron*. The draw is seeded, saved and restored around, and
+*slowest drawn neuron*. A type with a single timescale ($K = 1$) takes
+$w_1 = 0$, the fast-end draw alone, so on one seed a neuron's single-timescale
+constant is the fastest rung of the ladder it has in a multiple-timescale
+condition with the same nominal first rung. The draw is seeded, saved and restored around, and
 recorded in the read-only `tau_a_matrix`. See `SRNNCellTypePairs.tau_a_spread`.
 
 **Adaptation is normalized by $K$, depression is not.** Each $a_{ik}$ relaxes to
