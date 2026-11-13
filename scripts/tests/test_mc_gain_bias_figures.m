@@ -8,6 +8,7 @@
 %   * fig_mc_gain_bias_maps, fig_mc_gain_curves (one result and a list of
 %     three as rows) and fig_mc_robustness build, invisible and unsaved, for
 %     the paper's three conditions and for four, with the expected panels;
+%   * the maps' linear lambda_1 scale spans +-lle_clip;
 %   * with one seed the maps drop the blank spread row and say "one seed";
 %     the lambda_1 = 0 boundary is drawn;
 %   * a result is found by run_dir in <run_dir>/mc_gain_sweep;
@@ -73,6 +74,16 @@ for sel = {three, four}
     % puts a sign change.
     assert(~isempty(findall(o.figs, 'Tag', 'lle_zero')), 'maps: no lambda_1 = 0 boundary drawn');
     close(o.figs);
+    if nc == 3
+        % Linear color scales: lambda_1's colorbar spans +-lle_clip
+        o = fig_mc_gain_bias_maps('data', D, 'conditions', sel{1}, 'mc_scale', 'linear', ...
+            'lle_scale', 'linear', 'lle_clip', 5, 'save', false, 'visible', false);
+        cbs = findall(o.figs, 'Type', 'colorbar');
+        lcb = cbs(contains(arrayfun(@(b) b.Label.String, cbs, 'UniformOutput', false), 'lambda'));
+        assert(isscalar(lcb) && isequal(lcb.Limits, [-5 5]) && contains(lcb.Label.String, 'linear'), ...
+            'maps: linear lambda_1 scale must span +-lle_clip');
+        close(o.figs);
+    end
 
     o = fig_mc_gain_curves('data', D, 'conditions', sel{1}, 'save', false, 'visible', false);
     assert(numel(findall(o.figs, 'Type', 'axes')) == 3); close(o.figs);
