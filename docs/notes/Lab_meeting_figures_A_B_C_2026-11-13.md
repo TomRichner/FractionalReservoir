@@ -403,7 +403,17 @@ Left out (fewer than four conditions; none of these pilots ran the no-adaptation
 
 - No. Mean rate and $\lambda_1$ are essentially uncorrelated in every condition (Pearson r from -0.07 to -0.24): the low memory capacity on the chaotic side is chaos, not silence or saturation.
 
-## C11. Population mean rate against $\lambda_1$, marker size by bias
+## C11. Population mean rate against $\lambda_1$, colored by bias
+
+![](C:/Users/m218089/Desktop/github_repos/FractionalReservoir/figs/explore_C/bias_rate_lambda1/Fig_colorbias_rate_mean_vs_lambda1.png){width=100%}
+
+`C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\explore_C\bias_rate_lambda1\Fig_colorbias_rate_mean_vs_lambda1.png`
+
+**Question:** Seen by bias rather than gain, does the mean firing rate decide where the network turns unstable?
+
+- No. Each bias level traces an arch as gain rises, and arches of every bias cross $\lambda_1 = 0$ at mean rates from about 0.1 to 0.6 without adaptation; with both MTS forms the stable runs sit at $\lambda_1 \approx -0.1$ across the whole range of mean rate (0 to 0.8).
+
+## C12. Population mean rate against $\lambda_1$, marker size by bias
 
 ![](C:/Users/m218089/Desktop/github_repos/FractionalReservoir/figs/explore_C/bias_rate_lambda1/Fig_rate_mean_vs_lambda1_size_bias.png){width=100%}
 
@@ -413,7 +423,7 @@ Left out (fewer than four conditions; none of these pilots ran the no-adaptation
 
 - Yes, along the rate axis: negative biases (rings) sit at high mean rates and positive biases (filled markers) at low ones. Gain sets which side of $\lambda_1$ = 0 a network lands on.
 
-## C12. Share of neurons on the nonlinearity's slope against gain
+## C13. Share of neurons on the nonlinearity's slope against gain
 
 ![](C:/Users/m218089/Desktop/github_repos/FractionalReservoir/figs/explore_C/bias_rate_lambda1/Fig_gain_vs_frac_on_slope.png){width=100%}
 
