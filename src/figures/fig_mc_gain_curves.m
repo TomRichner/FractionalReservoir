@@ -17,6 +17,18 @@ function out = fig_mc_gain_curves(cfg)
 % in column 3 the line joins the per-gain medians of both quantities, in
 % gain order).
 %
+% lambda_1 IS ON A SYMMETRIC-LOG AXIS (symlog_lle: linear within about
+% +-cfg.lle_lin = 0.05 1/s, logarithmic beyond, clipped at +-cfg.lle_clip
+% = 10 1/s), the y axis of column 2 and the x axis of column 3. Without
+% adaptation lambda_1 runs from about -10 to +8 along gain; with chained
+% MTS it sits at about -0.10 (the slowest adaptation mode) at every stable
+% gain, and on a linear axis that cluster collapses onto the zero line. On
+% the symmetric-log axis both are readable, and in column 3 a cluster (at
+% least three per-gain medians with lambda_1 < 0 within 0.03 1/s of each
+% other) is also marked by a bracket and its value, in the condition's
+% colour, so the vertical stack of points reads as "lambda_1 does not
+% move here" rather than as a measurement of distance to instability.
+%
 % THE BIAS: cfg.bias (default each result's preset bias, 0.2). Each row uses
 % the nearest bias level its result holds, and the row title states both,
 % so a result swept only along gain (one bias level) is drawn at that level.
@@ -38,6 +50,8 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.preset_name (1,:) char    = ''      % unused; accepted for a uniform call
     cfg.conditions                = {}
+    cfg.lle_lin     (1,1) double  = 0.05    % symlog_lle's linear scale (1/s)
+    cfg.lle_clip    (1,1) double  = 10      % |lambda_1| clipped here (1/s)
     cfg.fig_tag     (1,:) char    = 'Fig_MC_gain_curves'
 end
 
@@ -51,7 +65,10 @@ if ischar(labels); labels = {labels}; end
 assert(numel(labels) == n_rows, 'fig_mc_gain_curves:RowLabels', ...
     '%d row labels for %d results.', numel(labels), n_rows);
 
-fig = figure('Color', 'w', 'Position', [80 60 1150 300 * n_rows + 70]);
+sl = @(v) symlog_lle(v, cfg.lle_lin, cfg.lle_clip);
+[~, l_tp, l_tl, l_lim] = symlog_lle(0, cfg.lle_lin, cfg.lle_clip);
+
+fig = figure('Color', 'w', 'Position', [80 60 1150 300 * n_rows + 90]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 tl = tiledlayout(fig, n_rows, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 ax = gobjects(n_rows, 3);
@@ -70,13 +87,14 @@ for r = 1:n_rows
         [mc_m, mc_lo, mc_hi] = per_gain(T, g, 'mc_total');
         [l_m, l_lo, l_hi]    = per_gain(T, g, 'lle_input');
         band(ax(r, 1), g, mc_lo, mc_hi, col);
-        band(ax(r, 2), g, l_lo, l_hi, col);
+        band(ax(r, 2), g, sl(l_lo), sl(l_hi), col);
         scatter(ax(r, 1), T.gain, T.mc_total, 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
-        scatter(ax(r, 2), T.gain, T.lle_input, 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
-        scatter(ax(r, 3), T.lle_input, T.mc_total, 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
+        scatter(ax(r, 2), T.gain, sl(T.lle_input), 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
+        scatter(ax(r, 3), sl(T.lle_input), T.mc_total, 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
         h = plot(ax(r, 1), g, mc_m, '-', 'Color', col, 'LineWidth', st.line_lw);
-        plot(ax(r, 2), g, l_m, '-', 'Color', col, 'LineWidth', st.line_lw);
-        plot(ax(r, 3), l_m, mc_m, '-', 'Color', col, 'LineWidth', st.line_lw);
+        plot(ax(r, 2), g, sl(l_m), '-', 'Color', col, 'LineWidth', st.line_lw);
+        plot(ax(r, 3), sl(l_m), mc_m, '-', 'Color', col, 'LineWidth', st.line_lw);
+        mark_cluster(ax(r, 3), l_m, mc_m, col, c, sl);
         if ~ismember(conds{c}, legend_t)
             legend_h(end+1) = h; legend_t{end+1} = conds{c}; %#ok<AGROW>
         end
@@ -84,13 +102,16 @@ for r = 1:n_rows
     yline(ax(r, 2), 0, '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw - 0.5);
     xline(ax(r, 3), 0, '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw - 0.5);
     [xt, xtl] = gain_ticks(g);
+    set(ax(r, 2), 'YTick', l_tp, 'YTickLabel', l_tl);
+    set(ax(r, 3), 'XTick', l_tp, 'XTickLabel', l_tl);
+    ylim(ax(r, 2), l_lim); xlim(ax(r, 3), l_lim);
     for k = 1:2
         set(ax(r, k), 'XScale', 'log', 'XTick', xt, 'XTickLabel', xtl);
         xlim(ax(r, k), [min(g) max(g)] .* [0.9 1.1]);
         xline(ax(r, k), D.preset_gain, ':', 'Color', [0.5 0.5 0.5]);
     end
     ylabel(ax(r, 1), 'Memory capacity', 'FontSize', st.label_fs - 3);
-    ylabel(ax(r, 2), '\lambda_1 (1/s)', 'FontSize', st.label_fs - 3);
+    ylabel(ax(r, 2), '\lambda_1 (1/s), symmetric log', 'FontSize', st.label_fs - 3);
     ylabel(ax(r, 3), 'Memory capacity', 'FontSize', st.label_fs - 3);
     bias_txt = sprintf('bias S_c = %.3g', b);
     if abs(b - b_want) > 1e-9; bias_txt = sprintf('%s (nearest to %.3g)', bias_txt, b_want); end
@@ -99,7 +120,7 @@ for r = 1:n_rows
     if r == n_rows
         xlabel(ax(r, 1), 'Gain', 'FontSize', st.label_fs - 3);
         xlabel(ax(r, 2), 'Gain', 'FontSize', st.label_fs - 3);
-        xlabel(ax(r, 3), '\lambda_1 (1/s), task input on', 'FontSize', st.label_fs - 3);
+        xlabel(ax(r, 3), '\lambda_1 (1/s), task input on, symmetric log', 'FontSize', st.label_fs - 3);
     end
 end
 set(ax, 'FontSize', st.tick_fs - 3, 'TickDir', 'out', 'Box', 'off');
@@ -163,6 +184,24 @@ if nnz(ok) < 2; return; end
 x = x(ok); lo = lo(ok); hi = hi(ok);
 fill(ax, [x, fliplr(x)], [hi, fliplr(lo)], col, 'FaceAlpha', 0.15, 'EdgeColor', 'none', ...
     'HandleVisibility', 'off');
+end
+
+function mark_cluster(ax, l_m, mc_m, col, c, sl)
+% A run of stable per-gain medians whose lambda_1 barely moves: bracket it
+% and state the value, so the stack is not mistaken for a trend.
+k = find(isfinite(l_m) & isfinite(mc_m) & l_m < 0);
+if numel(k) < 3; return; end
+lv = l_m(k);
+in = abs(lv - median(lv)) <= 0.03;
+if nnz(in) < 3; return; end
+lc = median(lv(in)); y = mc_m(k(in));
+x0 = sl(lc) - 0.15 - 0.08 * (c - 1);
+plot(ax, x0 * [1 1], [min(y) max(y)], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
+plot(ax, x0 + [0 0.05], min(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
+plot(ax, x0 + [0 0.05], max(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
+text(ax, x0, max(y), sprintf('\\lambda_1 \\approx %.2f at %d gains', lc, nnz(in)), ...
+    'Color', col, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom', ...
+    'FontSize', 8, 'Tag', 'lle_cluster');
 end
 
 function [xt, xtl] = gain_ticks(gains)

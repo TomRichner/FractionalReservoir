@@ -73,9 +73,13 @@ for c = 1:nc
     h(c) = stairs(ax_b, [0; xs], [share; 0], '-', 'Color', col, 'LineWidth', st.line_lw);
 end
 xlim(ax_a, [0.4, nc + 0.6]);
-set(ax_a, 'XTick', 1:nc, 'XTickLabel', cellfun(@(n) cond_short(st, n), conds, 'UniformOutput', false));
+% Tick labels are the conditions' full titles, one word per line where it
+% helps: the short names ('Baseline', 'SFA+STD') do not tell the chained
+% MTS from the product one, nor match the other block C figures.
+set(ax_a, 'XTick', 1:nc, 'XTickLabel', cellfun(@(n) tick_title(st, n), conds, 'UniformOutput', false), ...
+    'TickLabelInterpreter', 'tex');
 ylabel(ax_a, 'Memory capacity', 'FontSize', st.label_fs - 2);
-title(ax_a, sprintf('Every grid point and seed (%d x %d x %d)', numel(D.gains), numel(D.biases), ...
+title(ax_a, sprintf('Every job: %d gains x %d biases x %d seed(s)', numel(D.gains), numel(D.biases), ...
     numel(D.seeds)), 'FontWeight', 'normal', 'FontSize', st.title_fs - 2);
 ylim(ax_a, [0, 1.05 * max(vmax, eps)]);
 xlim(ax_b, [0, 1.05 * max(vmax, eps)]); ylim(ax_b, [0 1.02]);
@@ -102,8 +106,11 @@ function t = cond_title(st, nm)
 if isKey(st.condition_title, nm); t = st.condition_title(nm); else; t = nm; end
 end
 
-function t = cond_short(st, nm)
-if isKey(st.condition_short, nm); t = st.condition_short(nm); else; t = nm; end
+function t = tick_title(st, nm)
+t = cond_title(st, nm);
+t = regexprep(t, '-Timescale ', '-Timescale\\newline');
+t = regexprep(t, '\s+(\(.*\))$', '\\newline$1');
+t = strrep(t, 'No Adaptation', 'No\newlineAdaptation');
 end
 
 function c = cond_color(st, nm)
