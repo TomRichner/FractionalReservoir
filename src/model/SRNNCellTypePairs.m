@@ -103,6 +103,20 @@ classdef SRNNCellTypePairs < handle
         % scale is applied, so the dynamics, both Jacobians and
         % jacobian_times agree by construction. R, lambda_O and
         % rescale_by_abscissa describe the drawn matrix and ignore it.
+        %
+        % SELF_COUPLING (a Dependent alias, declared with the other aliases
+        % below) is the same diagonal term with the opposite sign: the
+        % signed self-connection in multiples of R_W,
+        %
+        %   W_sim = W + diag(s_i) * R_W,      s = -self_feedback
+        %
+        % so s < 0 is negative and s > 0 positive self-feedback. It stores
+        % nothing of its own: setting it writes self_feedback = -s, reading
+        % it returns -self_feedback. It exists so a sweep axis can run from
+        % negative to positive feedback in the sign a reader expects
+        % (Tom's gain-by-self-coupling maps, 2026-11-13). Same units, same
+        % placement. Dale's law: positive s on an inhibitory type and
+        % negative s on an excitatory type both break it.
         self_feedback = []
         rescale_by_abscissa = false
         zrs_mode = 'none'           % 'none' | 'ZRS' | 'SZRS' | 'Partial_SZRS'
@@ -403,6 +417,12 @@ classdef SRNNCellTypePairs < handle
         %              Reading it asserts the ladders are equal
         %              (SRNNCellTypePairs:TauAMismatch). Two-type only.
         tau_a_EI
+        %   self_coupling -- the signed diagonal of W in multiples of R_W
+        %              (1 x C): W_ii = +s R_W, s < 0 negative and s > 0
+        %              positive feedback. An alias of self_feedback with the
+        %              sign reversed (self_feedback = -s); see that property.
+        %              Any number of types.
+        self_coupling
         activation_function             % Built from activation + S_a/S_c
         activation_function_derivative
         sigma_x_raw                     % Raw diffusion coefficient = sigma_u_noise / tau_d
@@ -678,6 +698,25 @@ classdef SRNNCellTypePairs < handle
             for q = 1:obj.n_cellTypes
                 obj.tau_a{q} = reshape(v, 1, []);
             end
+        end
+
+        function v = get.self_coupling(obj)
+            % The sign reversal of self_feedback. A zero reads as +0, not
+            % -0, so a printed default says 0.
+            v = -obj.self_feedback;
+            v(v == 0) = 0;
+        end
+
+        function set.self_coupling(obj, v)
+            % Writes self_feedback, which complete_type_defaults broadcasts
+            % and validate checks, so the alias takes the same shapes (empty,
+            % scalar, 1 x C) and refuses the same values. Non-numeric input
+            % is passed through unchanged for validate to reject.
+            if isnumeric(v)
+                v = -v;
+                v(v == 0) = 0;
+            end
+            obj.self_feedback = v;
         end
 
         function set.verbose(obj, v)

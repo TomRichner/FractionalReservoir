@@ -18,6 +18,9 @@ function Q = mc_sweep_quantity(name, D, opts)
 %   bias           S_c, the center of the per-neuron setpoint draw
 %   self_feedback  k, the negative self-feedback on the diagonal of W, in
 %                  multiples of R_W, the bulk radius of W at gain 1
+%   self_coupling  s = -k, the same diagonal term signed as a connection:
+%                  s < 0 negative, s > 0 positive feedback (the model's
+%                  alias SRNNCellTypePairs.self_coupling)
 % A result has one of them; asking for the other is an error. A second axis
 % on a property with no entry here is still a quantity, labeled by its
 % property name: give it an entry (the local function second_axis_wording)
@@ -39,6 +42,9 @@ function Q = mc_sweep_quantity(name, D, opts)
 %   variable    the quantity's mathematical symbol where it has one ('S_c',
 %               'k'), else ''
 %   unit        its unit as text ('R_W', '1/s'), '' where it has none
+%   note        a short gloss of how to read the values, for a caption or
+%               a legend ('< 0 negative, > 0 positive feedback'); '' where
+%               there is none
 %   plural      what several levels of it are called in a caption ('biases')
 %   at          @(v) text stating one value ('bias S_c = 0.2')
 %   scale       'linear' or 'log' (gain is log, as in every block C figure)
@@ -64,7 +70,7 @@ end
 
 LLE_CLIP = 5;   % 1/s, as the linear lambda_1 map and fig_mc_vs_lambda1
 
-SECOND_AXES = {'bias', 'self_feedback'};   % the second axes with wording of their own
+SECOND_AXES = {'bias', 'self_feedback', 'self_coupling'};   % the second axes with wording of their own
 names = [{'gain'}, SECOND_AXES, {'mc_total', 'horizon', 'lle_input', 'lle_noinput', ...
     'rate_E', 'rate_I', 'rate_mean', 'frac_pinned', 'frac_silent', 'frac_on_slope'}];
 second_column = '';
@@ -88,7 +94,7 @@ padded     = @(v) pad_range(v);
 
 % Defaults, overridden per quantity below
 Q = struct('name', name, 'values', [], 'symbol', name, 'label', name, 'variable', '', ...
-    'unit', '', 'plural', '', 'at', [], 'scale', 'linear', ...
+    'unit', '', 'note', '', 'plural', '', 'at', [], 'scale', 'linear', ...
     'clip', [], 'zero_split', false, 'zero_line', false, 'levels', [], 'limits', padded);
 
 is_second_axis = any(strcmp(name, SECOND_AXES)) || strcmp(name, second_column);
@@ -97,7 +103,7 @@ if is_second_axis
         error('mc_sweep_quantity:NotInResult', ...
             'This result has no column ''%s''; its second axis is ''%s''.', name, second_column);
     end
-    [Q.symbol, Q.variable, Q.unit, Q.plural] = second_axis_wording(name);
+    [Q.symbol, Q.variable, Q.unit, Q.plural, Q.note] = second_axis_wording(name);
     Q.label = strtrim(sprintf('%s %s', Q.symbol, Q.variable));
     if ~isempty(Q.unit); Q.label = sprintf('%s (%s)', Q.label, Q.unit); end
     Q.values = T.(name);
@@ -157,17 +163,24 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function [symbol, variable, unit, plural] = second_axis_wording(column)
+function [symbol, variable, unit, plural, note] = second_axis_wording(column)
 % How a second axis of the sweep reads: its name in words, its mathematical
-% symbol, its unit, and what several of its levels are called. THE ONE PLACE
-% a new second axis gets its wording; without an entry it goes by its
-% column name (underscores escaped for the tex interpreter).
+% symbol, its unit, what several of its levels are called, and a gloss of
+% how to read its sign where that is not obvious. THE ONE PLACE a new
+% second axis gets its wording; without an entry it goes by its column
+% name (underscores escaped for the tex interpreter).
+note = '';
 switch column
     case 'bias'
         symbol = 'bias';  variable = 'S_c';  unit = '';  plural = 'biases';
     case 'self_feedback'
         symbol = 'self-feedback';  variable = 'k';  unit = 'R_W';
         plural = 'self-feedback levels';
+        note = 'k > 0 negative feedback';
+    case 'self_coupling'
+        symbol = 'self-coupling';  variable = 's';  unit = 'R_W';
+        plural = 'self-coupling levels';
+        note = '< 0 negative, > 0 positive feedback';
     otherwise
         symbol = strrep(column, '_', '\_');  variable = '';  unit = '';
         plural = sprintf('%s levels', symbol);

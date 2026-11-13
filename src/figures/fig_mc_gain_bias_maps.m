@@ -29,7 +29,9 @@ function out = fig_mc_gain_bias_maps(cfg)
 %      only when cfg.show_iqr (default true) AND some cell has more than one
 %      successful seed; with one seed the row would be blank, so it is
 %      dropped and the caption says "one seed".
-% x is the gain (level_of_chaos) on a log axis, y the result's second axis
+% x is the gain (level_of_chaos), on a log axis for a log-spaced grid and a
+% linear one for an evenly spaced grid (cfg.gain_scale, 'auto' by default;
+% 'log' or 'linear' to force one), y the result's second axis
 % (D.second_axis): the bias S_c, or whatever property the sweep ran, for
 % example the self-feedback k in units of R_W. Its label and its name in
 % the caption come from mc_sweep_quantity. The ticks are the grid's own
@@ -81,6 +83,7 @@ arguments
     cfg.lle_lin       (1,1) double  = 0.05 % symlog_lle's linear scale (1/s)
     cfg.lle_clip      (1,1) double  = 10   % |lambda_1| clipped here (1/s)
     cfg.fig_tag       (1,:) char    = 'Fig_MC_gain_bias_maps'
+    cfg.gain_scale    (1,:) char    {mustBeMember(cfg.gain_scale, {'auto', 'log', 'linear'})} = 'auto'
 end
 
 setup_paths();
@@ -149,7 +152,8 @@ nr = numel(rows);
 fig = figure('Color', 'w', 'Position', [60 60 270 * nc + 200, 260 * nr + 120]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 outer = tiledlayout(fig, nr, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-x = log10(D.gains); y = D.second_levels;
+gain_x = gain_axis_transform(D.gains, cfg.gain_scale);
+x = gain_x(D.gains); y = D.second_levels;
 xe = edges(x); ye = edges(y);
 xtl = arrayfun(@(v) sprintf('%.3g', v), D.gains, 'UniformOutput', false);
 ytl = arrayfun(@(v) sprintf('%.3g', v), D.second_levels, 'UniformOutput', false);
@@ -185,7 +189,7 @@ for r = 1:nr
         xlim(ax, xe([1 end])); ylim(ax, ye([1 end]));
         mark_flags(ax, x, y, PIN(:, :, c) >= cfg.flag_fraction, SIL(:, :, c) >= cfg.flag_fraction);
         zero_boundary(ax, xe, ye, L(:, :, c), st);
-        plot(ax, log10(D.preset_gain), D.preset_second, 'p', 'MarkerSize', 11, ...
+        plot(ax, gain_x(D.preset_gain), D.preset_second, 'p','MarkerSize', 11, ...
             'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 0.8);
         if r == 1
             title(ax, titles{c}, 'FontSize', st.title_fs - 2, ...
@@ -280,6 +284,25 @@ for b = 1:nb - 1           % neighbours along the second axis: a horizontal edge
 end
 if isempty(X); return; end
 plot(ax, X, Y, '--', 'Color', st.zeroline_color, 'LineWidth', 2, 'Tag', 'lle_zero');
+end
+
+function f = gain_axis_transform(gains, scale)
+% Where a gain sits along x: log10 on a log axis, the gain itself on a
+% linear one. 'auto' follows the grid: linear when the levels are evenly
+% spaced (a linspace grid on a log axis crowds its top levels and their
+% tick labels together), log otherwise (the size table's log-spaced grids).
+if strcmp(scale, 'auto')
+    d = diff(sort(gains(:)));
+    scale = 'log';
+    if numel(d) >= 2 && max(abs(d - mean(d))) <= 1e-6 * mean(d)
+        scale = 'linear';
+    end
+end
+if strcmp(scale, 'linear')
+    f = @(g) g;
+else
+    f = @log10;
+end
 end
 
 function s = capitalized(s)
