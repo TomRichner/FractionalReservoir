@@ -53,7 +53,10 @@ It is just to help the user estimate how the plan is shaping up."
     (`docs/Plan_C_memory_capacity_gain_bias.md` section 6: C0 the three
     fixes and their re-captures, C1 the stage, C2 the pilot, C3 the main
     runs, C4 figures and report; then 5 the close-out and Tom's review, 6
-    the medium run, 7 its figures). Block B's step 0 is its pilots and
+    the medium run, 7 its figures). `C_3_U` is Tom's decision of
+    2026-11-13 morning that made block C a quick test (FD-010, decision
+    21); the main run's lost-login interruption, 03:48 to 08:11, is
+    left as a gap between bars, not drawn as working time. Block B's step 0 is its pilots and
     their report; its later steps, and all of block D, are not planned in
     detail and are numbered 1, 2, ... in order.
   - *the medium run*: there is one, for blocks A, B and C together, drawn
