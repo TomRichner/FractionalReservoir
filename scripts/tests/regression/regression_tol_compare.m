@@ -45,6 +45,11 @@ function [ok, leaves, summary] = regression_tol_compare(ref, new, opts)
 %   new       in NEW, not in REF: REPORTED, does not fail. The refactor and
 %             later models add fields (to route_fields, to lya_summary);
 %             a reference cannot hold what did not exist when it was made.
+%   superseded  in both, and its key matches a pattern of the 'superseded'
+%             option: a deliberate change of physics moved it, so it is not
+%             compared. Its max_abs / max_rel are still computed and kept,
+%             DETAIL carries the reason, and it neither passes nor fails.
+%             A superseded leaf missing from NEW stays 'missing'.
 %
 % OK is true when no leaf is FAIL or missing. LEAVES is a table of every
 % leaf (key, layer, kind, status, n, max_abs, max_rel, max_rel_elem, rtol,
@@ -53,7 +58,13 @@ function [ok, leaves, summary] = regression_tol_compare(ref, new, opts)
 %
 % Options: settings (default regression_tol_settings()), rtol (a scalar
 % that replaces EVERY tolerance, overrides included; 0 is the exact
-% comparison), verbose (default true), max_print (default 40).
+% comparison), verbose (default true), max_print (default 40), superseded
+% (n x 2 cell {pattern, reason}, default none: leaves whose key matches a
+% pattern get status 'superseded'; regression_tol_check passes
+% regression_tol_settings().anchor_superseded here when, and only when,
+% the reference is the anchor). SUMMARY counts them per layer
+% (n_superseded) and leaves them out of the worst leaf; the printout gives
+% one line per pattern: "N leaves superseded, not compared: <reason>".
 %
 % See also: regression_tol_run, regression_tol_settings, regression_tol_check
 arguments
@@ -63,8 +74,14 @@ arguments
     opts.rtol double {mustBeScalarOrEmpty, mustBeNonnegative} = []
     opts.verbose (1,1) logical = true
     opts.max_print (1,1) double = 40
+    opts.superseded cell = cell(0, 2)
 end
 T = opts.settings;
+if ~isempty(opts.superseded) && size(opts.superseded, 2) ~= 2
+    error('regression_tol_compare:BadSuperseded', ...
+        'superseded must be an n x 2 cell {pattern, reason}.');
+end
+n_sup = zeros(size(opts.superseded, 1), 1);
 
 layers = {'pointwise', 'stable'};
 if all(isfield(ref, layers))
@@ -88,6 +105,16 @@ for k = 1:numel(ia)
     row = compare_leaf(ref_vals{ia(k)}, new_vals{ib(k)}, rtol, T.floor_frac, discrete);
     row.key = key;
     row.layer = layer;
+    for s = 1:size(opts.superseded, 1)
+        if ~isempty(regexp(key, opts.superseded{s, 1}, 'once'))
+            % Keep what the comparison found, after the reason.
+            row.detail = strtrim(sprintf('%s [compared, it would be: %s %s]', ...
+                opts.superseded{s, 2}, row.status, row.detail));
+            row.status = 'superseded';
+            n_sup(s) = n_sup(s) + 1;
+            break;
+        end
+    end
     rows(k) = row;
 end
 at = numel(ia);
@@ -117,14 +144,15 @@ ok = ~any(bad);
 
 layer_names = unique(leaves.layer, 'stable');
 summary = struct('layer', {}, 'n_leaves', {}, 'n_fail', {}, 'n_missing', {}, 'n_new', {}, ...
-    'worst_max_rel', {}, 'worst_key', {}, 'rtol', {});
+    'n_superseded', {}, 'worst_max_rel', {}, 'worst_key', {}, 'rtol', {});
 for q = 1:numel(layer_names)
     in = strcmp(leaves.layer, layer_names{q});
     L = leaves(in, :);
     s = struct('layer', layer_names{q}, 'n_leaves', height(L), ...
         'n_fail', nnz(strcmp(L.status, 'FAIL')), 'n_missing', nnz(strcmp(L.status, 'missing')), ...
-        'n_new', nnz(strcmp(L.status, 'new')), 'worst_max_rel', 0, 'worst_key', '', 'rtol', NaN);
-    is_float = strcmp(L.kind, 'float') & isfinite(L.max_rel);
+        'n_new', nnz(strcmp(L.status, 'new')), 'n_superseded', nnz(strcmp(L.status, 'superseded')), ...
+        'worst_max_rel', 0, 'worst_key', '', 'rtol', NaN);
+    is_float = strcmp(L.kind, 'float') & isfinite(L.max_rel) & ~strcmp(L.status, 'superseded');
     if any(is_float)
         % The worst leaf is the one CLOSEST TO ITS OWN TOLERANCE (leaves
         % under an override have another rtol than the layer's), or, when
@@ -158,7 +186,12 @@ if opts.verbose
         else
             fprintf('; no float leaf moved');
         end
-        fprintf('\n             %d FAIL, %d missing, %d new\n', s.n_fail, s.n_missing, s.n_new);
+        fprintf('\n             %d FAIL, %d missing, %d new', s.n_fail, s.n_missing, s.n_new);
+        if s.n_superseded > 0; fprintf(', %d superseded', s.n_superseded); end
+        fprintf('\n');
+    end
+    for k = 1:numel(n_sup)
+        fprintf('  %d leaves superseded, not compared: %s\n', n_sup(k), opts.superseded{k, 2});
     end
     noted = leaves(strcmp(leaves.status, 'pass') & ~cellfun(@isempty, leaves.detail), :);
     for k = 1:min(height(noted), opts.max_print)
