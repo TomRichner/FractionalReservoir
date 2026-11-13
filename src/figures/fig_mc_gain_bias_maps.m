@@ -147,6 +147,10 @@ for c = 1:nc
     titles{c} = strsplit(regexprep(cond_titles{c}, '\s+(\(.*\))$', '\n$1'), newline);
 end
 n_lines = max(cellfun(@numel, titles));
+% The layout reserves too little height for a two-line title: exported, the
+% wrapped second line then crosses the axes' top edge. One more blank line
+% below every title lifts the text clear.
+if n_lines > 1; n_lines = n_lines + 1; end
 for c = 1:nc
     titles{c}(end+1:n_lines) = {' '};
 end
