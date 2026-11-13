@@ -49,6 +49,12 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
         T_hold = []             % 'sample_hold' hold duration (s); if empty, defaults to 3*tau_d
         u_scale = 1             % Stimulus amplitude scaling
         u_offset = 0            % Stimulus DC offset
+        % true: build() does not make the n x T input u_ex or its
+        % interpolant (0.6 GB each at n = 500 over 760 s). Only
+        % run_memory_capacity_lean can then run, which forms the input per
+        % segment; run_memory_capacity, run_reservoir_esn and run() need
+        % the full table and say so. Default false: build() as before.
+        lean_input = false
     end
 
     %% Memory Capacity Protocol Properties
@@ -96,7 +102,8 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % Define ESN-specific property names (not in SRNNCellTypePairs)
             esn_props = {'f_in', 'sigma_in', 'rng_seed_input', ...
                 'T_wash', 'T_train', 'T_test', 'd_max', 'eta', ...
-                'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset', 'T_hold'};
+                'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset', 'T_hold', ...
+                'lean_input'};
 
             % Parse ESN-specific name-value pairs
             for i = 1:2:length(varargin)
@@ -199,9 +206,6 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 fprintf('  Max delay: %d\n', obj.d_max);
             end
 
-            % Use u_scalar generated during build
-            u_scalar = obj.u_scalar;
-
             %% Step 1: Run reservoir and collect states
             if verbose
                 fprintf('  Running reservoir simulation...\n');
@@ -217,66 +221,20 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             [x_all, a_all, b_all, r_all, syn_all, g_all] = ...
                 SRNNCellTypePairs.unpack_and_compute_states(obj.S_out, obj.cached_params);
 
-            % Stack every cell type's readout signal into one n x T matrix, in
-            % TYPE ORDER, which is the same order type_indices uses -- so row i
-            % of R_all is neuron i, and the readout weights stay interpretable.
-            %
-            % 'rate'     => firing rate r = phi(x_eff) (adaptation baked into
-            %               x_eff, but depression NOT included).
-            % 'synaptic' => r times the route's output factor, the
-            %               depressed/facilitated presynaptic output, which
-            %               exposes the STD state to the linear readout. The
-            %               factor is the route MODEL's (route_model): on a
-            %               product route prod(b) * prod(g), on a chain
-            %               route b1, the releasable pool. It is not formed
-            %               here: unpack_and_compute_states takes it from
-            %               the model's `output`, so syn_all is right for
-            %               every route model. Without STD it equals r, so
-            %               those conditions are unchanged.
+            % The signal the readout sees, every cell type stacked into one
+            % n x T matrix in TYPE ORDER: 'rate' or 'synaptic'. One definition,
+            % readout_from_states, shared with run_memory_capacity_lean.
             params = obj.cached_params;
-            switch lower(readout_signal)
-                case 'rate'
-                    R_all = SRNN_ESN_reservoir.stack_by_type(r_all, params);
-                case 'synaptic'
-                    % Per-route on this class: a presynaptic neuron has one
-                    % synaptic output PER TARGET TYPE. They coincide only when
-                    % all of that neuron's outgoing routes carry identical
-                    % synaptic dynamics -- which this refuses to assume.
-                    SRNN_ESN_reservoir.assert_route_redundancy(params);
-                    first_route = struct();
-                    for q = 1:params.n_cellTypes
-                        name = params.cell_type_names{q};
-                        posts = fieldnames(syn_all.(name));
-                        first_route.(name) = syn_all.(name).(posts{1});
-                    end
-                    R_all = SRNN_ESN_reservoir.stack_by_type(first_route, params);
-                otherwise
-                    error('SRNN_ESN_reservoir:BadReadoutSignal', ...
-                        'readout_signal must be ''rate'' or ''synaptic'' (got ''%s'').', readout_signal);
-            end
+            R_all = SRNN_ESN_reservoir.readout_from_states(r_all, syn_all, params, readout_signal);
 
             %% Step 2b: Sample-and-hold -> decimate to one state per hold so MC is
             % measured in hold units (canonical i.i.d.-input MC). Other input
             % types keep sample resolution (hold_len = 1, all locals = obj.*).
+            % The decimation, the split and the delay grid are
+            % mc_readout_plan's, shared with run_memory_capacity_lean.
+            plan = obj.mc_readout_plan();
             if obj.hold_len > 1
-                idx = obj.hold_len:obj.hold_len:size(R_all, 2);  % last sample of each hold
-                eff_idx = idx;                      % effective index -> full-res sample
-                R_all = R_all(:, idx);
-                u_scalar = u_scalar(idx);
-                n_wash  = round(obj.T_wash  / obj.hold_len);
-                n_train = round(obj.T_train / obj.hold_len);
-                n_test  = round(obj.T_test  / obj.hold_len);
-                d_max_eff   = max(1, floor(obj.d_max / obj.hold_len));
-                delay_scale = obj.hold_len / obj.fs;   % seconds per hold-delay
-            else
-                eff_idx = 1:size(R_all, 2);         % identity (sample resolution)
-                n_wash = obj.T_wash;  n_train = obj.T_train;  n_test = obj.T_test;
-                d_max_eff = obj.d_max;  delay_scale = 1 / obj.fs;
-            end
-            % Clamp the test window so the requested split fits the sequence.
-            n_avail = numel(u_scalar) - n_wash;
-            if n_train + n_test > n_avail
-                n_test = max(1, n_avail - n_train);
+                R_all = R_all(:, plan.idx);         % last sample of each hold
             end
 
             % Lean path: the full-resolution states and the raw trajectory are no
@@ -288,24 +246,310 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 obj.S_out = [];
             end
 
-            %% Step 3: Discard washout and split into train/test
-            T_eff = n_train + n_test;
+            %% Steps 3-6: washout, split, one ridge readout per delay, R^2, MC.
+            % score_readout is the ONE implementation of the scoring; the lean
+            % path (run_memory_capacity_lean) calls the same method.
+            [MC, R2_d, weights_all, predictions, u_test] = ...
+                obj.score_readout(R_all, plan, verbose);
+            % Real times of the (possibly decimated) test samples. predictions
+            % index into 1:n_test, so the delay panels plot against t_pred, not
+            % the full-resolution t_test (which would mis-scale under sample_hold).
+            t_pred = t_all(plan.idx(plan.te_idx));                % n_test x 1
 
+            %% Store results including time series for plotting
+            mc_results = obj.pack_mc_results(MC, R2_d, plan, weights_all, ...
+                predictions, t_pred, u_test);
+
+            if store_timeseries
+                % Full-resolution state time series + LLE, for plot_esn_timeseries.
+                test_start_idx = obj.T_wash + obj.T_train + 1;
+                mc_results.t_test = t_all(test_start_idx:end);
+                mc_results.u_ex = obj.u_ex;   % actual neural input (n x T)
+                mc_results.x = x_all;
+                mc_results.a = a_all;
+                mc_results.b = b_all;
+                mc_results.r = r_all;
+                % Named synaptic_output, not br: it nests by ROUTE (.E.E) and
+                % with STF in play the quantity is not b*r. g is kept alongside
+                % it so a stored run can show facilitation separately.
+                mc_results.synaptic_output = syn_all;
+                mc_results.g = g_all;
+
+                %% Step 7: Compute Lyapunov exponents using parent class method
+                if ~strcmpi(obj.lya_method, 'none')
+                    obj.lya_T_interval = [t_all(obj.T_wash + 1), t_all(end)];  % after washout
+                    obj.compute_lyapunov();
+                end
+                mc_results.lya_results = obj.lya_results;
+            else
+                % Lean path: heavy states/trajectory were freed above; the LLE
+                % needs S_out and is not part of MC, so it is skipped.
+                mc_results.lya_results = [];
+            end
+
+            obj.mc_results = mc_results;
+        end
+
+        function [MC, R2_d, mc_results] = run_memory_capacity_lean(obj, varargin)
+            % RUN_MEMORY_CAPACITY_LEAN Memory capacity without the state trajectory.
+            %
+            % [MC, R2_d, results] = run_memory_capacity_lean()
+            % [...] = run_memory_capacity_lean('readout_signal', 'synaptic', ...
+            %             'segment_len', 600, 'verbose', false)
+            %
+            % The same task, input, integrator and scoring as
+            % run_memory_capacity, which integrates the whole sequence in one
+            % call and holds every state at every step (at n = 500 and 760 s,
+            % 152,000 rows by about 4,000 states, about 5 GB, then the
+            % per-variable copies) only to keep one readout column per hold.
+            % This path integrates SEGMENT BY SEGMENT (segment_len samples,
+            % default 600), keeps the readout signal at the samples the scoring
+            % uses, accumulates each neuron's time-mean rate, and carries the
+            % last state into the next segment. What it holds is the readout
+            % matrix (n by the number of holds) and one segment of states and
+            % of input. THE INPUT IS FORMED PER SEGMENT too: W_in times the
+            % scalar sequence over the segment's samples (and one sample
+            % beyond, so a stage time that rounds past the segment's last grid
+            % point interpolates between the neighbours the full table has),
+            % in a linear interpolant of its own. Each entry is the same
+            % product and each interpolation is between the same two grid
+            % values as in the full n-by-samples table that build() makes, so
+            % the bits are the same; and the full table (u_ex and its
+            % interpolant, 0.6 GB each at n = 500 and 760 s) is not needed.
+            % Set lean_input = true before build() and it is never made.
+            %
+            % EXACT, NOT APPROXIMATE, with a fixed-step integrator ('rk4',
+            % 'euler', 'heun', 'sra1'). Those take each step from the time
+            % grid they are handed (h = t(k+1) - t(k), stages at t(k) + c h)
+            % and from the state alone, so cutting the grid into segments that
+            % share their end points changes no step: the states are the same
+            % bits, and so are the readout matrix, the R^2 curve and MC
+            % (test_mc_lean_path asserts isequal). With noise on it is exact
+            % too: the Wiener increments are generated once for the whole
+            % sequence (build_noise) and sde_fixed_step addresses them by
+            % ABSOLUTE time, so a segment consumes the increments the single
+            % call would have. (The noise tensor is 2 n by the number of
+            % steps, so with noise on this path is exact but less lean.) With
+            % an adaptive integrator ('ode45', 'ode15s') a segment boundary
+            % restarts the step-size control, and the result differs within
+            % the tolerance.
+            %
+            % THE SCORING IS SHARED: mc_readout_plan (decimation, split, delay
+            % grid), readout_from_states (which signal is read out),
+            % score_readout (ridge readout per delay, R^2, MC) and
+            % pack_mc_results are the methods run_memory_capacity calls.
+            %
+            % Name-value options:
+            %   'readout_signal'  'rate' (default) | 'synaptic', as run_memory_capacity
+            %   'segment_len'     samples integrated per call (default 600; >= 2)
+            %   'verbose'         as run_memory_capacity
+            %   'trace_window'    [t_lo t_hi] in seconds, default [] (nothing).
+            %                     Keeps, for the samples in that window only,
+            %                     what a figure of the time series draws:
+            %                     results.trace with t, the input u_ex, and
+            %                     x, a, b, r, synaptic_output, g keyed as
+            %                     run_memory_capacity's stored series are.
+            %
+            % results has run_memory_capacity's fields (lya_results empty, no
+            % state series), and:
+            %   rate_mean    n x 1, each neuron's rate averaged over the
+            %                training and test windows, at full sample
+            %                resolution, neurons in type order
+            %   rate_window  [first last] sample of that average
+            %   lean         true
+            %
+            % See also: run_memory_capacity, score_readout, run_mc_gain_sweep
+
+            if ~obj.is_built
+                error('SRNN_ESN_reservoir:NotBuilt', ...
+                    'Reservoir must be built first. Call build().');
+            end
+            verbose = verbose_level(obj.verbose) >= 2;
+            readout_signal = 'rate';
+            segment_len = 600;
+            trace_window = [];
+            for i = 1:2:length(varargin)
+                switch lower(varargin{i})
+                    case 'verbose',        verbose = verbose_level(varargin{i+1}) >= 2;
+                    case 'readout_signal', readout_signal = varargin{i+1};
+                    case 'segment_len',    segment_len = varargin{i+1};
+                    case 'trace_window',   trace_window = varargin{i+1};
+                    otherwise
+                        error('SRNN_ESN_reservoir:BadOption', ...
+                            'Unknown option ''%s''.', varargin{i});
+                end
+            end
+            if ~(isscalar(segment_len) && segment_len >= 2 && segment_len == round(segment_len))
+                error('SRNN_ESN_reservoir:BadOption', ...
+                    'segment_len must be an integer of at least 2 (a fixed-step integrator needs three grid points).');
+            end
+
+            plan = obj.mc_readout_plan();
+            params = obj.cached_params;
+            t_all = obj.t_ex;
+            T_total = numel(t_all);
+
+            % The right-hand side and the noise, exactly as run_reservoir_esn
+            % sets them up.
+            if isempty(obj.ode_opts)
+                obj.ode_opts = odeset('RelTol', 1e-5, 'AbsTol', 1e-5, 'MaxStep', 1 / obj.fs);
+            end
+            rhs_params = params;
+            obj.build_noise();
+            W_in_col = obj.W_in;
+            u_seq = obj.u_scalar;
+
+            % Which samples are readout columns, and which count towards the
+            % time-mean rate (the training and test windows, full resolution).
+            n_cols = numel(plan.idx);
+            col_of = zeros(T_total, 1);
+            col_of(plan.idx) = 1:n_cols;
+            L = obj.hold_len;
+            rate_lo = plan.n_wash * L + 1;
+            rate_hi = min((plan.n_wash + plan.n_train + plan.n_test) * L, T_total);
+            R_dec = zeros(obj.n, n_cols);
+            rate_sum = zeros(obj.n, 1);
+            n_rate = 0;
+
+            % Optional trace: the samples of one window, for a figure.
+            trace_rows = [];
+            if ~isempty(trace_window)
+                trace_rows = find(t_all >= trace_window(1) & t_all <= trace_window(2));
+            end
+            S_trace = zeros(numel(trace_rows), numel(obj.S0));
+            n_traced = 0;
+
+            if verbose
+                fprintf('Running memory capacity (lean): %d samples in segments of %d\n', ...
+                    T_total, segment_len);
+            end
+            S_cur = obj.S0;
+            s0 = 1;
+            while s0 < T_total
+                s1 = min(s0 + segment_len, T_total);
+                if T_total - s1 < 2
+                    s1 = T_total;       % never leave a stub of fewer than three points
+                end
+                % The segment's input, interpolated exactly as build()'s
+                % full table would be (same grid values, linear, no
+                % extrapolation), over the segment and one sample beyond.
+                g = s0:min(s1 + 1, T_total);
+                rhs_params.u_interpolant = griddedInterpolant(t_all(g), ...
+                    (W_in_col * u_seq(g)')', 'linear', 'none');
+                rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, rhs_params);
+                [~, S_seg] = obj.integrate(rhs, t_all(s0:s1), S_cur);
+                S_cur = S_seg(end, :).';
+                if s0 == 1
+                    rows = (s0:s1).';
+                else
+                    rows = (s0 + 1:s1).';       % row s0 was the previous segment's last
+                    S_seg = S_seg(2:end, :);
+                end
+
+                [~, ~, ~, r_seg, syn_seg] = ...
+                    SRNNCellTypePairs.unpack_and_compute_states(S_seg, params);
+                is_col = col_of(rows) > 0;
+                if any(is_col)
+                    R_seg = SRNN_ESN_reservoir.readout_from_states(r_seg, syn_seg, params, readout_signal);
+                    R_dec(:, col_of(rows(is_col))) = R_seg(:, is_col);
+                end
+                in_rate = rows >= rate_lo & rows <= rate_hi;
+                if any(in_rate)
+                    rate_seg = SRNN_ESN_reservoir.stack_by_type(r_seg, params);
+                    rate_sum = rate_sum + sum(rate_seg(:, in_rate), 2);
+                    n_rate = n_rate + nnz(in_rate);
+                end
+                if ~isempty(trace_rows)
+                    in_trace = rows >= trace_rows(1) & rows <= trace_rows(end);
+                    k = nnz(in_trace);
+                    S_trace(n_traced + (1:k), :) = S_seg(in_trace, :);
+                    n_traced = n_traced + k;
+                end
+                s0 = s1;
+            end
+            obj.noise_increments = [];
+            obj.t_out = t_all;
+            obj.S_out = [];
+
+            [MC, R2_d, weights_all, predictions, u_test] = ...
+                obj.score_readout(R_dec, plan, verbose);
+            t_pred = t_all(plan.idx(plan.te_idx));
+            mc_results = obj.pack_mc_results(MC, R2_d, plan, weights_all, ...
+                predictions, t_pred, u_test);
+            mc_results.lya_results = [];
+            mc_results.rate_mean = rate_sum / max(1, n_rate);
+            mc_results.rate_window = [rate_lo, rate_hi];
+            mc_results.lean = true;
+            if ~isempty(trace_rows)
+                tr = struct();
+                tr.t = t_all(trace_rows);
+                tr.rows = trace_rows;
+                tr.u_ex = W_in_col * u_seq(trace_rows)';
+                [tr.x, tr.a, tr.b, tr.r, tr.synaptic_output, tr.g] = ...
+                    SRNNCellTypePairs.unpack_and_compute_states(S_trace, params);
+                mc_results.trace = tr;
+            end
+            obj.mc_results = mc_results;
+        end
+
+        function plan = mc_readout_plan(obj)
+            % MC_READOUT_PLAN Which samples are scored, and how they are split.
+            %
+            % One definition for run_memory_capacity and
+            % run_memory_capacity_lean. Sample-and-hold input is scored in HOLD
+            % units: one readout column per hold, at its last sample (canonical
+            % i.i.d.-input MC). Other input types keep sample resolution.
+            %
+            %   idx          full-resolution sample of each readout column
+            %   u            the input at those samples
+            %   n_wash, n_train, n_test   the split, in readout columns
+            %   d_max_eff    delays scored;  delay_scale  seconds per delay
+            %   te_idx       readout columns of the test window
+            T_total = numel(obj.u_scalar);
+            plan = struct();
+            if obj.hold_len > 1
+                plan.idx = obj.hold_len:obj.hold_len:T_total;  % last sample of each hold
+                plan.u = obj.u_scalar(plan.idx);
+                plan.n_wash  = round(obj.T_wash  / obj.hold_len);
+                plan.n_train = round(obj.T_train / obj.hold_len);
+                plan.n_test  = round(obj.T_test  / obj.hold_len);
+                plan.d_max_eff   = max(1, floor(obj.d_max / obj.hold_len));
+                plan.delay_scale = obj.hold_len / obj.fs;   % seconds per hold-delay
+            else
+                plan.idx = 1:T_total;               % identity (sample resolution)
+                plan.u = obj.u_scalar;
+                plan.n_wash = obj.T_wash;  plan.n_train = obj.T_train;  plan.n_test = obj.T_test;
+                plan.d_max_eff = obj.d_max;  plan.delay_scale = 1 / obj.fs;
+            end
+            % Clamp the test window so the requested split fits the sequence.
+            n_avail = numel(plan.u) - plan.n_wash;
+            if plan.n_train + plan.n_test > n_avail
+                plan.n_test = max(1, n_avail - plan.n_train);
+            end
+            plan.te_idx = (plan.n_wash + plan.n_train + 1):(plan.n_wash + plan.n_train + plan.n_test);
+        end
+
+        function [MC, R2_d, weights_all, predictions, u_test] = score_readout(obj, R_all, plan, verbose)
+            % SCORE_READOUT Memory capacity from the readout matrix.
+            %
+            % R_all is n by the number of readout columns (plan.idx), however
+            % it was collected. Discards the washout, splits into training and
+            % test, trains one ridge readout per delay on the training window
+            % and scores its R^2 on the test window; MC is the sum.
+
+            n_wash = plan.n_wash;  n_train = plan.n_train;  n_test = plan.n_test;
+            d_max_eff = plan.d_max_eff;
+
+            %% Step 3: Discard washout and split into train/test
             % Reservoir states after washout
             R_eff = R_all(:, (n_wash + 1):end);  % n x (>= T_eff)
-            u_eff = u_scalar((n_wash + 1):end);  % (>= T_eff) x 1
+            u_eff = plan.u((n_wash + 1):end);    % (>= T_eff) x 1
 
             % Split into training and test
             R_train = R_eff(:, 1:n_train)';                       % n_train x n
             R_test  = R_eff(:, (n_train + 1):(n_train + n_test))';% n_test x n
             u_train = u_eff(1:n_train);                           % n_train x 1
             u_test  = u_eff((n_train + 1):(n_train + n_test));    % n_test x 1
-
-            % Real times of the (possibly decimated) test samples. predictions
-            % index into 1:n_test, so the delay panels plot against t_pred, not
-            % the full-resolution t_test (which would mis-scale under sample_hold).
-            te_idx = (n_wash + n_train + 1):(n_wash + n_train + n_test);
-            t_pred = t_all(eff_idx(te_idx));                      % n_test x 1
 
             %% Step 4-5: Train readouts and compute R^2 for each delay
             if verbose
@@ -372,14 +616,16 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             if verbose
                 fprintf('  Total Memory Capacity: %.4f\n', MC);
             end
+        end
 
-            %% Store results including time series for plotting
+        function mc_results = pack_mc_results(obj, MC, R2_d, plan, weights_all, predictions, t_pred, u_test)
+            % PACK_MC_RESULTS The result fields both memory-capacity paths share.
             mc_results = struct();
             mc_results.MC = MC;
             mc_results.R2_d = R2_d;
-            mc_results.d = 1:d_max_eff;                 % delay index (holds if sample_hold, else samples)
+            mc_results.d = 1:plan.d_max_eff;            % delay index (holds if sample_hold, else samples)
             mc_results.hold_len = obj.hold_len;         % samples per held value (1 = sample resolution)
-            mc_results.delay_s = (1:d_max_eff) * delay_scale;  % delay axis in seconds
+            mc_results.delay_s = (1:plan.d_max_eff) * plan.delay_scale;  % delay axis in seconds
             mc_results.weights = weights_all;
             mc_results.T_wash = obj.T_wash;
             mc_results.T_train = obj.T_train;
@@ -389,35 +635,6 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             mc_results.predictions = predictions;
             mc_results.t_pred = t_pred;   % time axis matching predictions (hold-aware)
             mc_results.u_test = u_test;
-
-            if store_timeseries
-                % Full-resolution state time series + LLE, for plot_esn_timeseries.
-                test_start_idx = obj.T_wash + obj.T_train + 1;
-                mc_results.t_test = t_all(test_start_idx:end);
-                mc_results.u_ex = obj.u_ex;   % actual neural input (n x T)
-                mc_results.x = x_all;
-                mc_results.a = a_all;
-                mc_results.b = b_all;
-                mc_results.r = r_all;
-                % Named synaptic_output, not br: it nests by ROUTE (.E.E) and
-                % with STF in play the quantity is not b*r. g is kept alongside
-                % it so a stored run can show facilitation separately.
-                mc_results.synaptic_output = syn_all;
-                mc_results.g = g_all;
-
-                %% Step 7: Compute Lyapunov exponents using parent class method
-                if ~strcmpi(obj.lya_method, 'none')
-                    obj.lya_T_interval = [t_all(obj.T_wash + 1), t_all(end)];  % after washout
-                    obj.compute_lyapunov();
-                end
-                mc_results.lya_results = obj.lya_results;
-            else
-                % Lean path: heavy states/trajectory were freed above; the LLE
-                % needs S_out and is not part of MC, so it is skipped.
-                mc_results.lya_results = [];
-            end
-
-            obj.mc_results = mc_results;
         end
 
         function run_reservoir_esn(obj)
@@ -431,6 +648,11 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
             params = obj.cached_params;
             dt = 1 / obj.fs;
+            if obj.lean_input
+                error('SRNN_ESN_reservoir:LeanInput', ...
+                    ['This reservoir was built with lean_input = true, so it has no ' ...
+                     'input table. Use run_memory_capacity_lean, or build with lean_input = false.']);
+            end
 
             % Set up ODE options (matching SRNNModel pattern)
             if isempty(obj.ode_opts)
@@ -888,10 +1110,18 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % 3. Map scalar input to neural input
             dt = 1 / obj.fs;
             obj.t_ex = (0:(T_total-1))' * dt;
-            obj.u_ex = obj.W_in * obj.u_scalar';  % n x T
+            if obj.lean_input
+                % Neither the n x T input nor its interpolant is made:
+                % run_memory_capacity_lean forms both per segment from W_in
+                % and u_scalar. Nothing else can run on this reservoir.
+                obj.u_ex = [];
+                obj.u_interpolant = [];
+            else
+                obj.u_ex = obj.W_in * obj.u_scalar';  % n x T
 
-            % 4. Create linear interpolant for ODE solver
-            obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'linear', 'none');
+                % 4. Create linear interpolant for ODE solver
+                obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'linear', 'none');
+            end
 
             % 5. Initialize state vector.
             % Called through the class, not the instance: initialize_state is a
@@ -943,6 +1173,49 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
     end
 
     methods (Static)
+        function R = readout_from_states(r_all, syn_all, params, readout_signal)
+            % READOUT_FROM_STATES The n x T signal the linear readout sees.
+            %
+            % r_all and syn_all are unpack_and_compute_states' rate and
+            % synaptic_output for any set of time samples. Every cell type's
+            % signal is stacked in TYPE ORDER, which is the order type_indices
+            % uses -- so row i is neuron i, and the readout weights stay
+            % interpretable. One definition for both memory-capacity paths.
+            %
+            % 'rate'     => firing rate r = phi(x_eff) (adaptation baked into
+            %               x_eff, but depression NOT included).
+            % 'synaptic' => r times the route's output factor, the
+            %               depressed/facilitated presynaptic output, which
+            %               exposes the STD state to the linear readout. The
+            %               factor is the route MODEL's (route_model): on a
+            %               product route prod(b) * prod(g), on a chain
+            %               route b1, the releasable pool. It is not formed
+            %               here: unpack_and_compute_states takes it from
+            %               the model's `output`, so syn_all is right for
+            %               every route model. Without STD it equals r, so
+            %               those conditions are unchanged.
+            switch lower(readout_signal)
+                case 'rate'
+                    R = SRNN_ESN_reservoir.stack_by_type(r_all, params);
+                case 'synaptic'
+                    % Per-route on this class: a presynaptic neuron has one
+                    % synaptic output PER TARGET TYPE. They coincide only when
+                    % all of that neuron's outgoing routes carry identical
+                    % synaptic dynamics -- which this refuses to assume.
+                    SRNN_ESN_reservoir.assert_route_redundancy(params);
+                    first_route = struct();
+                    for q = 1:params.n_cellTypes
+                        name = params.cell_type_names{q};
+                        posts = fieldnames(syn_all.(name));
+                        first_route.(name) = syn_all.(name).(posts{1});
+                    end
+                    R = SRNN_ESN_reservoir.stack_by_type(first_route, params);
+                otherwise
+                    error('SRNN_ESN_reservoir:BadReadoutSignal', ...
+                        'readout_signal must be ''rate'' or ''synaptic'' (got ''%s'').', readout_signal);
+            end
+        end
+
         function R = stack_by_type(named, params)
             % STACK_BY_TYPE Concatenate a per-cell-type signal into one n x T.
             %

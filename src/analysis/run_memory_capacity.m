@@ -54,6 +54,15 @@ arguments
     % the n = 500 network, ~5 GB of states plus their per-variable copies;
     % fast's 5 trials had fitted). The cap is the parfor's M argument.
     opts.max_workers            (1,1) double  = 0
+    % true: every trial takes SRNN_ESN_reservoir.run_memory_capacity_lean,
+    % which integrates segment by segment and holds no state trajectory and
+    % no n x T input table. The R^2 curves, capacities and horizons are the
+    % same bits (fixed-step integrator; test_mc_lean_path), the statistics
+    % therefore too, and a trial holds about 0.1 GB instead of about 16 GB,
+    % so max_workers = 0 then allows the whole pool. Default false: the
+    % existing path, unchanged. With store_internal_results the internal
+    % struct has the lean path's fields (no state series).
+    opts.lean                   (1,1) logical = false
 end
 
 setup_paths();
@@ -174,8 +183,19 @@ vprintf(opts.verbose, 'verbose', '\n==== Running %d paired trials (%s input) ===
 
 max_workers = opts.max_workers;
 if max_workers <= 0
-    max_workers = mc_workers_from_memory(16);
+    % GB a trial holds. Existing path: about 16 (see max_workers above).
+    % Lean path: 0.5 allowed. Measured at n = 500 over 760 s (2026-11-13):
+    % MATLAB's memory grew by 0.04 GB across a run and the process's peak
+    % working set did not rise; the arrays it holds (the n x 2533 readout
+    % matrix, one 600-sample segment of states with its unpacked copies,
+    % the scoring's training matrix) sum to about 0.1 GB.
+    if opts.lean
+        max_workers = mc_workers_from_memory(0.5);
+    else
+        max_workers = mc_workers_from_memory(16);
+    end
 end
+lean = opts.lean;
 vprintf(opts.verbose, 'minimal', '[memory_capacity] %d trials, at most %d in parallel\n', n_trials, max_workers);
 
 parfor (k = 1:n_trials, max_workers)
@@ -190,11 +210,19 @@ parfor (k = 1:n_trials, max_workers)
     int_row = cell(1, n_cond);
 
     for i = 1:n_cond
-        esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
-        esn_i.build();
-        [mc_i, r2_i, res_i] = esn_i.run_memory_capacity( ...
-            'store_timeseries', false, 'verbose', verbose_level(opts.verbose) >= 2, ...
-            'readout_signal', readout_signal);
+        if lean
+            esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:}, 'lean_input', true);
+            esn_i.build();
+            [mc_i, r2_i, res_i] = esn_i.run_memory_capacity_lean( ...
+                'verbose', verbose_level(opts.verbose) >= 2, ...
+                'readout_signal', readout_signal);
+        else
+            esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
+            esn_i.build();
+            [mc_i, r2_i, res_i] = esn_i.run_memory_capacity( ...
+                'store_timeseries', false, 'verbose', verbose_level(opts.verbose) >= 2, ...
+                'readout_signal', readout_signal);
+        end
         r2_i = r2_i(:)';
         if numel(r2_i) ~= d_max_eff
             error('Trial %d condition %s: expected %d delays, got %d', ...
@@ -304,6 +332,9 @@ s.R2_threshold_for_horizon = R2_thresh;
 s.n_boot = cfg.n_boot;
 s.n_perm_max = cfg.n_perm_max;  s.perm_exact_max_N = cfg.perm_exact_max_N;
 s.seed_net_base = cfg.seed_net_base;  s.seed_stim_base = cfg.seed_stim_base;
+% Recorded only when on, so a run on the existing path saves the settings
+% it always has (a field added unconditionally would move the references).
+if opts.lean; s.lean = true; end
 results_all.settings = s;
 
 results_all.conditions = condition_names;
@@ -435,12 +466,11 @@ switch run_mode
             run_mode, strjoin(run_mode_names(), ', '));
 end
 
-% The experiment, identical in every mode. Seconds and Hz.
-cfg.T_wash_sec  = 10;     % washout before anything is recorded
-cfg.T_train_sec = 600;    % readout training window -> 2000 hold-samples
-cfg.T_test_sec  = 150;    % readout test window
-cfg.d_max_sec   = 15;     % longest delay scored
-cfg.fs          = 200;
+% The experiment, identical in every mode: durations, fs, the input, the
+% readout signal, the horizon threshold and the seed bases. They are
+% mc_protocol's (src/analysis), the one place they are written, shared with
+% run_mc_gain_sweep.
+cfg = mc_protocol(cfg);
 
 cfg = with_protocol_constants(cfg);
 cfg.ode_solver = select_solver(cfg, preset_defaults, ode_solver_override);
@@ -485,12 +515,8 @@ check_noise_settings(sigma, solver, 'run_memory_capacity');
 end
 
 function cfg = with_protocol_constants(cfg)
-% Protocol constants -- identical in every mode, so they are not knobs.
-% sample_hold: i.i.d. values held for T_hold, so MC is measured in HOLD UNITS.
-% That is the fair choice for a low-pass reservoir and is free of the
-% autocorrelation inflation that white input produces.
-cfg.input_type     = 'sample_hold';
-cfg.T_hold         = 0.3;      % s; sets the MC delay increment
+% The constants of THIS stage's statistics and integrator choice -- identical
+% in every mode, so they are not knobs. (The task itself is mc_protocol's.)
 % Resampling counts. Both are Monte Carlo over the n_trials numbers already in
 % hand and cost milliseconds, so there is no reason for a mode to skimp.
 %
@@ -507,20 +533,12 @@ cfg.T_hold         = 0.3;      % s; sets the MC delay increment
 cfg.n_boot           = 2000;
 cfg.n_perm_max       = 10000;  % Monte Carlo draws when 2^N exceeds the cap
 cfg.perm_exact_max_N = 20;     % enumerate exactly up to 2^20 patterns
-cfg.u_f_cutoff     = 5;        % only used by 'bandlimited'
-cfg.u_alpha        = 1;        % only used by 'one_over_f'
 % The two integrators this run mode would use, deterministic and stochastic.
 % select_solver picks between them from the preset's sigma_u_noise, or takes an
 % explicit override. Named here rather than chosen here so the choice sits in
 % one place -- the same split analysis_run_config uses.
 cfg.det_solver     = 'rk4';    % fixed-step; fast and adequate at sigma = 0
 cfg.sde_solver     = 'sra1';   % Rossler SRA1: same cost as heun, strong order 1.5
-% 'synaptic' reads out br = b.*r, exposing the STD state to the linear readout.
-% Unchanged for the no-STD conditions, where br == r.
-cfg.readout_signal = 'synaptic';
-cfg.R2_threshold_for_horizon = 0.10;
-cfg.seed_net_base  = 3000;
-cfg.seed_stim_base = 4000;
 end
 
 %% ======================================================================
