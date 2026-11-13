@@ -29,6 +29,8 @@
 %   6. trace_window returns the existing path's stored series over that
 %      window, bit for bit, and nothing outside it.
 %   7. The lean path leaves no trajectory on the object (S_out empty).
+%   8. lean_input = true: build() makes no n x T input table, the lean
+%      path gives the same bits, and the existing path refuses to run.
 %
 % Prints [PASS]/[FAIL] per check and errors at the end if anything failed.
 % About 15 s. Assumes setup_paths has run.
@@ -106,6 +108,29 @@ ok = all(tr.t >= win(1) & tr.t <= win(2)) && numel(k) == round(diff(win) * fs) +
     && isequal(tr.b.E.E, full5.b.E.E(:, :, k)) && isequal(tr.u_ex, full5.u_ex(:, k));
 n_fail = n_fail + report(ok, sprintf('trace_window [%g %g] s: %d samples, the stored series bit for bit', ...
     win(1), win(2), numel(k)));
+
+%% ---- 8. lean_input: the n x T input table is never built ----
+fprintf('\n=== 8. lean_input ===\n');
+args8 = [net, adapt, proto, {'ode_solver', 'sra1', 'lya_method', 'none'}];
+full8 = SRNN_ESN_reservoir(args8{:});
+full8.build();
+[~, ~, res_full8] = full8.run_memory_capacity('verbose', false, 'readout_signal', 'synaptic');
+lean8 = SRNN_ESN_reservoir(args8{:}, 'lean_input', true);
+lean8.build();
+[~, ~, res_lean8] = lean8.run_memory_capacity_lean('readout_signal', 'synaptic', 'trace_window', win);
+n_fail = n_fail + report(isempty(lean8.u_ex) && isempty(lean8.u_interpolant), ...
+    'lean_input = true: build() makes neither u_ex nor its interpolant');
+n_fail = n_fail + report(same_scores(res_full8, res_lean8) ...
+    && isequal(res_lean8.trace.u_ex, res_full8.u_ex(:, res_lean8.trace.rows)), ...
+    'lean_input = true: scores and the traced input bit-identical to the existing path');
+threw = '';
+try
+    lean8.run_memory_capacity('verbose', false);
+catch ME
+    threw = ME.identifier;
+end
+n_fail = n_fail + report(strcmp(threw, 'SRNN_ESN_reservoir:LeanInput'), ...
+    sprintf('the existing path refuses a lean_input reservoir (%s)', threw));
 
 %% ---- Verdict ----
 fprintf('\n');

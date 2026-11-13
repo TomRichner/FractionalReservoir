@@ -49,6 +49,12 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
         T_hold = []             % 'sample_hold' hold duration (s); if empty, defaults to 3*tau_d
         u_scale = 1             % Stimulus amplitude scaling
         u_offset = 0            % Stimulus DC offset
+        % true: build() does not make the n x T input u_ex or its
+        % interpolant (0.6 GB each at n = 500 over 760 s). Only
+        % run_memory_capacity_lean can then run, which forms the input per
+        % segment; run_memory_capacity, run_reservoir_esn and run() need
+        % the full table and say so. Default false: build() as before.
+        lean_input = false
     end
 
     %% Memory Capacity Protocol Properties
@@ -96,7 +102,8 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % Define ESN-specific property names (not in SRNNCellTypePairs)
             esn_props = {'f_in', 'sigma_in', 'rng_seed_input', ...
                 'T_wash', 'T_train', 'T_test', 'd_max', 'eta', ...
-                'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset', 'T_hold'};
+                'input_type', 'u_f_cutoff', 'u_alpha', 'u_scale', 'u_offset', 'T_hold', ...
+                'lean_input'};
 
             % Parse ESN-specific name-value pairs
             for i = 1:2:length(varargin)
@@ -299,9 +306,17 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % default 600), keeps the readout signal at the samples the scoring
             % uses, accumulates each neuron's time-mean rate, and carries the
             % last state into the next segment. What it holds is the readout
-            % matrix (n by the number of holds), one segment of states, and the
-            % input the reservoir built (u_ex and its interpolant, n by the
-            % number of samples each: the largest thing left).
+            % matrix (n by the number of holds) and one segment of states and
+            % of input. THE INPUT IS FORMED PER SEGMENT too: W_in times the
+            % scalar sequence over the segment's samples (and one sample
+            % beyond, so a stage time that rounds past the segment's last grid
+            % point interpolates between the neighbours the full table has),
+            % in a linear interpolant of its own. Each entry is the same
+            % product and each interpolation is between the same two grid
+            % values as in the full n-by-samples table that build() makes, so
+            % the bits are the same; and the full table (u_ex and its
+            % interpolant, 0.6 GB each at n = 500 and 760 s) is not needed.
+            % Set lean_input = true before build() and it is never made.
             %
             % EXACT, NOT APPROXIMATE, with a fixed-step integrator ('rk4',
             % 'euler', 'heun', 'sra1'). Those take each step from the time
@@ -380,9 +395,9 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 obj.ode_opts = odeset('RelTol', 1e-5, 'AbsTol', 1e-5, 'MaxStep', 1 / obj.fs);
             end
             rhs_params = params;
-            rhs_params.u_interpolant = obj.u_interpolant;
-            rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, rhs_params);
             obj.build_noise();
+            W_in_col = obj.W_in;
+            u_seq = obj.u_scalar;
 
             % Which samples are readout columns, and which count towards the
             % time-mean rate (the training and test windows, full resolution).
@@ -415,6 +430,13 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 if T_total - s1 < 2
                     s1 = T_total;       % never leave a stub of fewer than three points
                 end
+                % The segment's input, interpolated exactly as build()'s
+                % full table would be (same grid values, linear, no
+                % extrapolation), over the segment and one sample beyond.
+                g = s0:min(s1 + 1, T_total);
+                rhs_params.u_interpolant = griddedInterpolant(t_all(g), ...
+                    (W_in_col * u_seq(g)')', 'linear', 'none');
+                rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, rhs_params);
                 [~, S_seg] = obj.integrate(rhs, t_all(s0:s1), S_cur);
                 S_cur = S_seg(end, :).';
                 if s0 == 1
@@ -462,7 +484,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 tr = struct();
                 tr.t = t_all(trace_rows);
                 tr.rows = trace_rows;
-                tr.u_ex = obj.u_ex(:, trace_rows);
+                tr.u_ex = W_in_col * u_seq(trace_rows)';
                 [tr.x, tr.a, tr.b, tr.r, tr.synaptic_output, tr.g] = ...
                     SRNNCellTypePairs.unpack_and_compute_states(S_trace, params);
                 mc_results.trace = tr;
@@ -626,6 +648,11 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
             params = obj.cached_params;
             dt = 1 / obj.fs;
+            if obj.lean_input
+                error('SRNN_ESN_reservoir:LeanInput', ...
+                    ['This reservoir was built with lean_input = true, so it has no ' ...
+                     'input table. Use run_memory_capacity_lean, or build with lean_input = false.']);
+            end
 
             % Set up ODE options (matching SRNNModel pattern)
             if isempty(obj.ode_opts)
@@ -1083,10 +1110,18 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % 3. Map scalar input to neural input
             dt = 1 / obj.fs;
             obj.t_ex = (0:(T_total-1))' * dt;
-            obj.u_ex = obj.W_in * obj.u_scalar';  % n x T
+            if obj.lean_input
+                % Neither the n x T input nor its interpolant is made:
+                % run_memory_capacity_lean forms both per segment from W_in
+                % and u_scalar. Nothing else can run on this reservoir.
+                obj.u_ex = [];
+                obj.u_interpolant = [];
+            else
+                obj.u_ex = obj.W_in * obj.u_scalar';  % n x T
 
-            % 4. Create linear interpolant for ODE solver
-            obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'linear', 'none');
+                % 4. Create linear interpolant for ODE solver
+                obj.u_interpolant = griddedInterpolant(obj.t_ex, obj.u_ex', 'linear', 'none');
+            end
 
             % 5. Initialize state vector.
             % Called through the class, not the instance: initialize_state is a

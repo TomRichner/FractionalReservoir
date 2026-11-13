@@ -435,12 +435,11 @@ switch run_mode
             run_mode, strjoin(run_mode_names(), ', '));
 end
 
-% The experiment, identical in every mode. Seconds and Hz.
-cfg.T_wash_sec  = 10;     % washout before anything is recorded
-cfg.T_train_sec = 600;    % readout training window -> 2000 hold-samples
-cfg.T_test_sec  = 150;    % readout test window
-cfg.d_max_sec   = 15;     % longest delay scored
-cfg.fs          = 200;
+% The experiment, identical in every mode: durations, fs, the input, the
+% readout signal, the horizon threshold and the seed bases. They are
+% mc_protocol's (src/analysis), the one place they are written, shared with
+% run_mc_gain_sweep.
+cfg = mc_protocol(cfg);
 
 cfg = with_protocol_constants(cfg);
 cfg.ode_solver = select_solver(cfg, preset_defaults, ode_solver_override);
@@ -485,12 +484,8 @@ check_noise_settings(sigma, solver, 'run_memory_capacity');
 end
 
 function cfg = with_protocol_constants(cfg)
-% Protocol constants -- identical in every mode, so they are not knobs.
-% sample_hold: i.i.d. values held for T_hold, so MC is measured in HOLD UNITS.
-% That is the fair choice for a low-pass reservoir and is free of the
-% autocorrelation inflation that white input produces.
-cfg.input_type     = 'sample_hold';
-cfg.T_hold         = 0.3;      % s; sets the MC delay increment
+% The constants of THIS stage's statistics and integrator choice -- identical
+% in every mode, so they are not knobs. (The task itself is mc_protocol's.)
 % Resampling counts. Both are Monte Carlo over the n_trials numbers already in
 % hand and cost milliseconds, so there is no reason for a mode to skimp.
 %
@@ -507,20 +502,12 @@ cfg.T_hold         = 0.3;      % s; sets the MC delay increment
 cfg.n_boot           = 2000;
 cfg.n_perm_max       = 10000;  % Monte Carlo draws when 2^N exceeds the cap
 cfg.perm_exact_max_N = 20;     % enumerate exactly up to 2^20 patterns
-cfg.u_f_cutoff     = 5;        % only used by 'bandlimited'
-cfg.u_alpha        = 1;        % only used by 'one_over_f'
 % The two integrators this run mode would use, deterministic and stochastic.
 % select_solver picks between them from the preset's sigma_u_noise, or takes an
 % explicit override. Named here rather than chosen here so the choice sits in
 % one place -- the same split analysis_run_config uses.
 cfg.det_solver     = 'rk4';    % fixed-step; fast and adequate at sigma = 0
 cfg.sde_solver     = 'sra1';   % Rossler SRA1: same cost as heun, strong order 1.5
-% 'synaptic' reads out br = b.*r, exposing the STD state to the linear readout.
-% Unchanged for the no-STD conditions, where br == r.
-cfg.readout_signal = 'synaptic';
-cfg.R2_threshold_for_horizon = 0.10;
-cfg.seed_net_base  = 3000;
-cfg.seed_stim_base = 4000;
 end
 
 %% ======================================================================
