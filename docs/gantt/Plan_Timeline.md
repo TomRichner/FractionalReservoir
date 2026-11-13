@@ -85,6 +85,11 @@ It is just to help the user estimate how the plan is shaping up."
   estimate was recorded before they ran. Future tasks show their estimate.
 - **Idle stretches** in the past (3 h or more with no recorded work, such
   as nights) are drawn as a narrow grey "idle" column.
+- **Scrolling sideways**: the chart's horizontal scroll bar is pinned to
+  the bottom of the window whenever any part of the chart is on screen,
+  and is always drawn (not an auto-hiding overlay bar), so there is no
+  need to scroll to the chart's foot to move along the time axis.
+  Shift + mouse wheel over the chart also scrolls it sideways.
 - **Hover** over a bar or a row (or tab to it) for what the step does and
   why, who does it, the issue, status, times, the prior estimate, what it
   waits for, how it is checked, and the merge commit.
