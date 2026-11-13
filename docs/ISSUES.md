@@ -983,3 +983,16 @@ becomes an issue with an acceptance test.
   11. *The 1TS condition's lambda_1 changed sign on the regression network
      with F3* (-0.060 to +0.087). Not a defect: the condition sits near
      zero. To be watched in block C's 1TS column and stated in the report.
+  12. *The tolerance anchor is kept, not replaced; the leaves F3 moved are
+     recorded as superseded.* The plan said to re-capture the anchor. Its
+     maker refuses by design (the anchor is the model class before Plan A,
+     written once), and the re-capture worker rightly stopped. The lead's
+     decision: the anchor stays a historical reference; the 176 leaves of
+     `sfa1_std1` are listed in `regression_tol_settings` as superseded by
+     F3 (`cce78c9`) and not compared against it; no tolerance changes;
+     those cases are guarded bit for bit by the re-captured ultrarapid
+     tier. Six other references re-captured (`373155b`), each after a
+     check that only one-SFA-timescale leaves had moved.
+  13. *The pilot ran on 6 pool workers with 1 seed and 5 bias levels*
+     (the gates held the other 6); its job is the grid's range, not a
+     result.
