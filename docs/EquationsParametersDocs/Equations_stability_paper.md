@@ -354,6 +354,47 @@ The draws are `std_draws` and `stf_draws` on `SRNNCellTypePairs`, made in
 `build()` from their own seeded streams; the realised values are in
 `get_params().route{pre, post}.P`.
 
+## Self-feedback on the diagonal of the weights (optional)
+
+Added 2026-11-13 for block C's sweep of memory capacity over gain and
+self-feedback. With `self_feedback` (one dimensionless strength $k_q$ per cell
+type $q$, default 0) the weights of the recurrent sum are
+
+$$
+w_{ij} = g\, w^{0}_{ij} - k_{q(i)}\, R_W\, \delta_{ij},
+\qquad\text{in matrix form}\qquad
+W = g\, W^{0} - R_W\, \mathrm{diag}\big(k_{q(i)}\big),
+$$
+
+where $W^{0}$ is the drawn matrix at gain 1, $g$ is the gain (`level_of_chaos`),
+$q(i)$ is the cell type of neuron $i$, and $R_W$ is the theoretical bulk radius
+of $W^{0}$ (the code's `R_gain1`, which is `R` at `level_of_chaos = 1`). With
+one $k$ for every type this is $W = g\, W^{0} - k\, R_W\, I$.
+
+- **Units.** $k$ is in multiples of the bulk radius: $k = 1$ moves every
+  eigenvalue of $W$ left by $R_W$.
+- **Independent of the gain.** The gain multiplies $W^{0}$ only, so gain and
+  self-feedback are two separate axes. A route `scale` does not multiply the
+  self-feedback either.
+- **What it is.** $W_{ii}$ is a self-connection through the neuron's own
+  synaptic output: the term in $dx_i$ is $-k_{q(i)} R_W\, \theta_i$, with
+  $\theta_i$ taken on the route from the neuron's cell type to itself, so it is
+  depressed and facilitated by that route's pools like any other connection. It
+  is not a new state variable and adds no equation.
+- **Dale's law.** A negative $W_{ii}$ on an excitatory neuron breaks Dale's
+  law. That is accepted (Tom, 2026-11-13): the term stands for self-inhibition.
+- **The drawn diagonal.** $W^{0}$ is a sparse random draw and can have nonzero
+  diagonal entries; the shift adds to whatever is there.
+
+In the code the shift is applied in `SRNNCellTypePairs.get_params`, to
+`params.W` only, where the route `scale` is applied: the drawn `W` (`plot_W`,
+the shared-build check) is untouched, and the dynamics, both Jacobians and
+`jacobian_times` read `params.W`, so they agree by construction. `R` and
+`lambda_O` describe the drawn matrix. In the Jacobian the only change is the
+matrix $W$ itself: for a network without adaptation,
+$J = \frac{1}{\tau_d}\left(-I + (g W^{0} - k R_W I)\, \Phi'\right)$.
+`test_self_feedback` checks the diagonal, the Jacobians and that expression.
+
 ## Notes
 
 **$a_{0_i}$ is the setpoint of the nonlinearity**, i.e. the property `S_c`, and
