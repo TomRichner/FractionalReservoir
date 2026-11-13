@@ -1068,3 +1068,17 @@ becomes an issue with an acceptance test.
      width at bias 0.2 at that level). If the four seeds bear that out,
      the report says so plainly: the experiment then supports "adaptation
      widens the range", not "chained MTS is the most robust".
+  20. *The main run was interrupted and is resumed; the time limits of the
+     plan are dropped.* At 03:48 the session lost its API login (Claude
+     Code required a new login); the worker running C3a ended and its
+     MATLAB with it, at 173 of 252 jobs (seeds 3001 and 3002 complete, 39
+     of 3003, 8 of 3004). Nothing ran until Tom logged in again at 08:11.
+     No result was lost: the stage writes one file per job and the same
+     call resumes. Tom, 2026-11-13 08:15: "pick up everything from where
+     it left off. don't worry about deadlines, just do good quality work".
+     So the order of decision 18 stands in full (the rest of the main
+     grid, the two extra gain levels, then both E:I runs with eleven
+     gains), and its "nothing launched after 08:15" no longer applies.
+     Relaunched 08:15 with `matlab-opus-2`, pool 12. A worker's MATLAB
+     does not outlive the worker; a run that must survive a lost login
+     would have to be started outside an agent, which is Tom's to decide.
