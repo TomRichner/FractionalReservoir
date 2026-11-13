@@ -57,8 +57,8 @@ equations file (`907136f`, simplified section `691ae9d`); the plan for C
 (`cd0a778`).
 
 **STATE (rewritten after each merge):**
-- main at `cd0a778`. Nothing of block C merged yet.
-- Running (worktrees, own MATLAB): `matlab-fable-1` F1 + F3 (generator,
+- main at the merge of F2. Merged: the E:I presets and the block C figures and statistics (`c2dfb1a`), F2 the reps axis (this merge).
+- Still running (worktrees, own MATLAB): `matlab-fable-1` F1 + F3 (generator,
   SFA constant); `matlab-opus-1` F2 (reps axis); `matlab-fable-2` the
   stage `run_mc_gain_sweep` with a lean memory path in
   `SRNN_ESN_reservoir`; `matlab-opus-3` the 3 : 2 and 2 : 3 presets and
