@@ -1040,3 +1040,31 @@ becomes an issue with an acceptance test.
      `run_mc_gain_sweep.m` (the size table), which the running MATLAB has
      loaded from the main checkout; the quick suite and the stages tier
      are run on merged main then.
+  18. *The gain axis is extended by two levels, 2.8 and 4.0, after the
+     main grid has run* (same output directory, same biases and seeds; the
+     stage skips the 252 finished jobs and runs 56 more; the nine-gain
+     table is kept as `mc_gain_sweep_results_252.mat`). Found on the first
+     seed's four-condition map (48 of 63 cells, 02:47): at bias -0.4 and
+     -0.6 the adapting conditions are still stable at gain 2.0, the top of
+     the grid, with their highest memory capacity there (chained MTS 14.3
+     at gain 2, bias -0.6; product MTS has no lambda_1 crossing below
+     gain 2 at bias 0 or less). A map whose best cell is on its edge does
+     not show where the collapse is, and the width along gain, the number
+     that answers "who needs tuning", would be cut off for the adapting
+     conditions and so understated in their favour's opposite. The pilot's
+     gain 3 was dead only at bias -0.2 and above, for the two conditions
+     it ran. The bias axis is not extended further down: lower bias moves
+     every edge to higher gain without end (saturated neurons have less
+     effective gain), so it is the gain collapse at each bias that has to
+     be bracketed. The two E:I runs take the same eleven gains. Cost about
+     one hour of the 12 workers; the order is the extension, then C3b,
+     then C3c; no new run is launched after 08:15.
+  19. *What the first seed shows, recorded before the full result so it is
+     not shaped afterwards:* single-timescale adaptation is about level
+     with chained MTS (peak 17.6 against 14.3, width along gain at bias
+     0.2 of 1.29 against 1.39 octaves at half the best of any condition),
+     product MTS behind both in the middle of the map but stable to
+     higher gain, and no adaptation confined to a narrow band (no gain
+     width at bias 0.2 at that level). If the four seeds bear that out,
+     the report says so plainly: the experiment then supports "adaptation
+     widens the range", not "chained MTS is the most robust".
