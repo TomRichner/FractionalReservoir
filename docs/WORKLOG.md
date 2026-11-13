@@ -34,6 +34,44 @@ Entry template:
 
 ---
 
+## 2026-11-12 19:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block B pilots compiled; block C started, running overnight without Tom)
+
+**THE LEAD'S CONTEXT WILL BE COMPACTED DURING THIS STRETCH. To pick up:
+read `docs/Plan_C_memory_capacity_gain_bias.md` (the approved plan, its
+section 6 is the order), FD-010 in `docs/ISSUES.md`, and the STATE lines
+below, which the lead rewrites after every merge.**
+
+**Tom's instructions (2026-11-12 evening):** do block C next; he is
+asleep; the lead makes decisions, logs them and proceeds until C is done;
+no questions; six worker agents; the lead runs nothing in MATLAB over
+about 30 s. Fix first: the random generator, the reps axis, and the 1TS
+SFA constant (to be the neuron's fastest MTS rung). His addition to C: a
+second axis, the bias `S_c`, shown as 2-D maps (gain by bias, memory
+capacity as colour); question: is chained MTS the most robust.
+
+**Since the 18:00 entry:** all nine block B pilots merged (`988aa84`
+pilot 3, `35ceeb6` 1a, `7a3ae4c` 4, `284cedf` 6, `7cd3bb6` 1b, `fadcb01`
+5); compiled report `docs/notes/Block_B_pilots_2026-11-12.md` (`8cc7ae6`;
+nine decisions for Tom, none taken yet: block B waits); the chained-MTS
+equations file (`907136f`, simplified section `691ae9d`); the plan for C
+(`cd0a778`).
+
+**STATE (rewritten after each merge):**
+- main at `cd0a778`. Nothing of block C merged yet.
+- Running (worktrees, own MATLAB): `matlab-fable-1` F1 + F3 (generator,
+  SFA constant); `matlab-opus-1` F2 (reps axis); `matlab-fable-2` the
+  stage `run_mc_gain_sweep` with a lean memory path in
+  `SRNN_ESN_reservoir`; `matlab-opus-3` the 3 : 2 and 2 : 3 presets and
+  the block C figures on synthetic data.
+- Next: merge F2, then F1 + F3 (re-capture the references F3 moves, one
+  at a time, reason in each commit), then the stage (rebased), then the
+  presets and figures; gate on merged main by a worker (quick, stages,
+  tolerance, ultrarapid); pilot (plan section 3); main runs (section 4);
+  figures, statistics, report (section 5); close-out.
+
+**Not run since `d9cd4cf`:** the quick suite and the stages tier.
+**Deferred by Tom:** the full regression tier; its reference is stale.
+
 ## 2026-11-12 18:00 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: Plan A closed out; block B pilots under way)
 
 **Tom's instructions during this stretch:** the lead runs nothing in
