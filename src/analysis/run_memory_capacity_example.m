@@ -38,6 +38,13 @@ arguments
     % Empty -> deterministic at sigma = 0, stochastic above it. Name one to
     % force it; 'sra1' is legal at sigma = 0. Same rule as run_memory_capacity.
     opts.ode_solver  (1,:) char    = ''
+    % true: each condition takes SRNN_ESN_reservoir.run_memory_capacity_lean,
+    % which holds no state trajectory and no n x T input table. What the
+    % figure reads (the per-delay predictions, their time axis, the R^2
+    % curve) is the same bits; the Lyapunov exponent the existing path
+    % computes and this stage has always discarded is not computed.
+    % Default false: the existing path, unchanged.
+    opts.lean        (1,1) logical = false
 end
 
 setup_paths();
@@ -122,7 +129,7 @@ n_cond = numel(condition_names);
 %% Build every condition on one network
 esn = cell(1, n_cond);
 for i = 1:n_cond
-    esn{i} = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
+    esn{i} = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:}, 'lean_input', opts.lean);
     esn{i}.build();
 end
 % tau_a and synapse_config are what the conditions vary, so they are expected to
@@ -137,8 +144,13 @@ R2 = cell(1, n_cond);
 results = cell(1, n_cond);
 for i = 1:n_cond
     vprintf(opts.verbose, 'verbose', '\n===== CONDITION %d/%d: %s =====\n', i, n_cond, condition_names{i});
-    [MC(i), R2{i}, results{i}] = esn{i}.run_memory_capacity( ...
-        'readout_signal', readout_signal, 'verbose', verbose_level(opts.verbose) >= 2);
+    if opts.lean
+        [MC(i), R2{i}, results{i}] = esn{i}.run_memory_capacity_lean( ...
+            'readout_signal', readout_signal, 'verbose', verbose_level(opts.verbose) >= 2);
+    else
+        [MC(i), R2{i}, results{i}] = esn{i}.run_memory_capacity( ...
+            'readout_signal', readout_signal, 'verbose', verbose_level(opts.verbose) >= 2);
+    end
 end
 
 vprintf(opts.verbose, 'verbose', '\nMemory Capacity:\n');
@@ -158,6 +170,8 @@ settings = struct('preset_name', opts.preset_name, 'run_mode', opts.run_mode, ..
     'fs', fs, 'T_hold', T_hold, 'input_type', input_type, ...
     'readout_signal', readout_signal, 'T_train_sec', T_train_sec, ...
     'T_test_sec', T_test_sec, 'T_wash_sec', T_wash_sec, 'd_max_sec', d_max_sec);
+% Recorded only when on, so the existing path saves what it always has.
+if opts.lean; settings.lean = true; end
 
 % A standalone run writes into data/, NOT next to this file. The old default
 % dropped mc_example_data.mat into the figure folder, where

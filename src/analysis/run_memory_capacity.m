@@ -54,6 +54,15 @@ arguments
     % the n = 500 network, ~5 GB of states plus their per-variable copies;
     % fast's 5 trials had fitted). The cap is the parfor's M argument.
     opts.max_workers            (1,1) double  = 0
+    % true: every trial takes SRNN_ESN_reservoir.run_memory_capacity_lean,
+    % which integrates segment by segment and holds no state trajectory and
+    % no n x T input table. The R^2 curves, capacities and horizons are the
+    % same bits (fixed-step integrator; test_mc_lean_path), the statistics
+    % therefore too, and a trial holds about 0.1 GB instead of about 16 GB,
+    % so max_workers = 0 then allows the whole pool. Default false: the
+    % existing path, unchanged. With store_internal_results the internal
+    % struct has the lean path's fields (no state series).
+    opts.lean                   (1,1) logical = false
 end
 
 setup_paths();
@@ -174,8 +183,19 @@ vprintf(opts.verbose, 'verbose', '\n==== Running %d paired trials (%s input) ===
 
 max_workers = opts.max_workers;
 if max_workers <= 0
-    max_workers = mc_workers_from_memory(16);
+    % GB a trial holds. Existing path: about 16 (see max_workers above).
+    % Lean path: 0.5 allowed. Measured at n = 500 over 760 s (2026-11-13):
+    % MATLAB's memory grew by 0.04 GB across a run and the process's peak
+    % working set did not rise; the arrays it holds (the n x 2533 readout
+    % matrix, one 600-sample segment of states with its unpacked copies,
+    % the scoring's training matrix) sum to about 0.1 GB.
+    if opts.lean
+        max_workers = mc_workers_from_memory(0.5);
+    else
+        max_workers = mc_workers_from_memory(16);
+    end
 end
+lean = opts.lean;
 vprintf(opts.verbose, 'minimal', '[memory_capacity] %d trials, at most %d in parallel\n', n_trials, max_workers);
 
 parfor (k = 1:n_trials, max_workers)
@@ -190,11 +210,19 @@ parfor (k = 1:n_trials, max_workers)
     int_row = cell(1, n_cond);
 
     for i = 1:n_cond
-        esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
-        esn_i.build();
-        [mc_i, r2_i, res_i] = esn_i.run_memory_capacity( ...
-            'store_timeseries', false, 'verbose', verbose_level(opts.verbose) >= 2, ...
-            'readout_signal', readout_signal);
+        if lean
+            esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:}, 'lean_input', true);
+            esn_i.build();
+            [mc_i, r2_i, res_i] = esn_i.run_memory_capacity_lean( ...
+                'verbose', verbose_level(opts.verbose) >= 2, ...
+                'readout_signal', readout_signal);
+        else
+            esn_i = SRNN_ESN_reservoir(base_args{:}, condition_args{i}{:});
+            esn_i.build();
+            [mc_i, r2_i, res_i] = esn_i.run_memory_capacity( ...
+                'store_timeseries', false, 'verbose', verbose_level(opts.verbose) >= 2, ...
+                'readout_signal', readout_signal);
+        end
         r2_i = r2_i(:)';
         if numel(r2_i) ~= d_max_eff
             error('Trial %d condition %s: expected %d delays, got %d', ...
@@ -304,6 +332,9 @@ s.R2_threshold_for_horizon = R2_thresh;
 s.n_boot = cfg.n_boot;
 s.n_perm_max = cfg.n_perm_max;  s.perm_exact_max_N = cfg.perm_exact_max_N;
 s.seed_net_base = cfg.seed_net_base;  s.seed_stim_base = cfg.seed_stim_base;
+% Recorded only when on, so a run on the existing path saves the settings
+% it always has (a field added unconditionally would move the references).
+if opts.lean; s.lean = true; end
 results_all.settings = s;
 
 results_all.conditions = condition_names;
