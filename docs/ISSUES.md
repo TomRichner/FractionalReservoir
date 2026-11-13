@@ -996,3 +996,24 @@ becomes an issue with an acceptance test.
   13. *The pilot ran on 6 pool workers with 1 seed and 5 bias levels*
      (the gates held the other 6); its job is the grid's range, not a
      result.
+  14. *The main grid, from the pilot:* gains 0.1, 0.15, 0.22, 0.33, 0.5,
+     0.7, 1.0, 1.4, 2.0; biases -0.6 to 0.6 in steps of 0.2; four seeds
+     (3001 to 3004); all four conditions; 252 jobs, `fast` size of the
+     stage, output `data/mc_gain_sweep_main`. Reasons: the pilot's
+     no-adaptation peak (memory capacity 10.2 at gain 0.36) sat on the
+     pilot's low-bias edge (-0.2), so the bias axis is extended down to
+     -0.6 to bracket it; bias 0.8 silenced the network and gain 3 gave
+     nothing in either condition, so both are dropped; the levels are
+     chosen so that the preset's own point (gain 1, bias 0.2) is a grid
+     point, which the pilot worker's proposed grid (nine log-spaced gains
+     0.1 to 2, seven biases -0.5 to 0.7) did not give; the gain levels are
+     near-log-spaced with four between 0.15 and 0.5, where the
+     no-adaptation band lies. Four seeds, not three: the pilot measured
+     about 9 worker-minutes per job of four conditions, so 252 jobs take
+     about 3 h 15 min on 12 workers, which the night allows, and seeds
+     are what give the distribution Tom asked for. The two E:I runs
+     (C3b, C3c) keep three seeds, gain only at bias 0.2.
+  15. *The figure functions are revised on the pilot's real data while the
+     main run is in progress* (`matlab-opus-3`, no pool), with a reader
+     for a run still in progress, so the report does not wait on figure
+     fixes after the run.
