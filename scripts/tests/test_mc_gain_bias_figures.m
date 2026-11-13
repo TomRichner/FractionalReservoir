@@ -15,6 +15,12 @@
 %   * fig_mc_vs_lambda1 draws four panels and one colorbar, writes its PNG,
 %     and its Pearson r, Spearman rho and counts for one condition, in
 %     out.stats and in the panel's text, match a direct computation;
+%   * the general fig_mc_sweep_scatter behind it: rate_mean weights the
+%     rates by the named preset's fractions (or a stage override of f_E)
+%     and is refused when they are unknown, frac_on_slope is 1 - pinned -
+%     silent; gain against rate_mean colored by frac_on_slope draws gain on
+%     a log axis, an overlay on its one panel, no sign split, and a Pearson
+%     r that matches a direct computation;
 %   * read_mc_gain_sweep_jobs reads a folder of finished job files (half of
 %     them, plus a *.tmp save in progress it must skip) into the same table,
 %     without touching the folder;
@@ -138,9 +144,44 @@ assert(S.n == nnz(k) && S.n_stable == nnz(x < 0) && S.n_unstable == nnz(x > 0) &
     S.n_failed == nnz(strcmp(D.T.condition, c)) - nnz(k) && S.n_clipped == nnz(abs(x) > 5));
 ax = findall(o.figs, 'Type', 'axes');
 panel = ax(strcmp(arrayfun(@(a) char(a.Title.String), ax, 'UniformOutput', false), titles_by_name({c})));
-txt = findall(panel, 'Tag', 'mc_lambda1_stats');
+txt = findall(panel, 'Tag', 'mc_sweep_scatter_stats');
 assert(isscalar(txt) && contains(txt.String{1}, sprintf('Pearson r = %.2f, n = %d', r_direct, nnz(k))) && ...
     contains(txt.String{2}, sprintf('%.2f', rho_direct)), 'the panel''s statistics must match');
+close(o.figs);
+
+%% The general scatter: derived quantities, a non-default x and y, an overlay
+% rate_mean weights rate_E and rate_I by the fractions of the preset the
+% result names (here the main sweep's, f = [0.5 0.5]); without a preset or
+% an f override the fractions are unknown and the call refuses.
+threw = false;
+try
+    mc_sweep_quantity('rate_mean', D);
+catch err
+    threw = strcmp(err.identifier, 'mc_sweep_population_fractions:NoFractions');
+end
+assert(threw, 'rate_mean without known fractions must be refused');
+s_named = settings;
+s_named.preset_name = mu7chain_config('essential').mc_preset;
+Dn = read_mc_gain_sweep(struct('T', T, 'settings', s_named));
+fr = srnn_param_preset(s_named.preset_name).f;
+Qr = mc_sweep_quantity('rate_mean', Dn);
+assert(max(abs(Qr.values - (fr(1) * Dn.T.rate_E + fr(2) * Dn.T.rate_I)), [], 'omitnan') < 1e-15);
+s_named.model_args = {'f_E', 0.8};                % a stage override wins over the preset
+Q8 = mc_sweep_quantity('rate_mean', read_mc_gain_sweep(struct('T', T, 'settings', s_named)));
+assert(max(abs(Q8.values - (0.8 * T.rate_E + 0.2 * T.rate_I)), [], 'omitnan') < 1e-12);
+Qs = mc_sweep_quantity('frac_on_slope', Dn);
+assert(isequaln(Qs.values, 1 - Dn.T.frac_pinned - Dn.T.frac_silent));
+
+curve = struct('x', [0.1 1], 'y', [0.5 0.5], 'label', 'ref', 'conditions', {{'no_adaptation'}});
+o = fig_mc_sweep_scatter('data', Dn, 'conditions', three, 'x', 'gain', 'y', 'rate_mean', ...
+    'color_by', 'frac_on_slope', 'overlay', curve, 'save', false, 'visible', false);
+ax = findall(o.figs, 'Type', 'axes');
+assert(numel(ax) == 3 && all(strcmp({ax.XScale}, 'log')), 'gain is drawn on a log axis');
+assert(isscalar(findall(o.figs, 'Tag', 'mc_sweep_scatter_overlay')), 'the overlay belongs to one panel');
+assert(~ismember('r_stable', o.stats.Properties.VariableNames), 'no sign split unless x is lambda_1');
+k = strcmp(Dn.T.condition, 'sfa1_std1') & ~Dn.T.failed & isfinite(Qr.values);
+S = o.stats(strcmp(o.stats.condition, 'sfa1_std1'), :);
+assert(S.n == nnz(k) && abs(S.pearson_r - pearson_direct(Dn.T.gain(k), Qr.values(k))) < 1e-12);
 close(o.figs);
 
 %% The statistics recover the generator's pattern
