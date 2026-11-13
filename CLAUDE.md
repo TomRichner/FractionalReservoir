@@ -231,6 +231,38 @@ networks' conditions are defined once, in
 those and do not re-derive them. Nothing in a pilot is tuned to produce
 an effect.
 
+**Block C (FD-010, from 2026-11-12 night): memory capacity over gain and
+bias.** The plan is `docs/Plan_C_memory_capacity_gain_bias.md`; the
+lead's decisions are numbered under FD-010 in `docs/ISSUES.md`. The stage
+is **`run_mc_gain_sweep`** (`src/analysis/`): memory capacity and
+$\lambda_1$ at every point of a grid of `level_of_chaos` (gain) by `S_c`
+(bias), every condition built on the same seeds per job, one small file
+per finished job under `<output_dir>/mc_gain_sweep/jobs/`, so a repeat of
+the same call resumes. It is a plain `parfor` over a job table, not a
+`ParamSpaceAnalysis2` sweep (PSA has no hook for a per-job memory task).
+Its sizes are its own table by run mode; agents run `essential` and
+`fast` only. `read_mc_gain_sweep` reads a result; the figures are
+`fig_mc_gain_bias_maps`, `fig_mc_gain_curves`, `fig_mc_robustness` and
+the table `mc_gain_bias_statistics`. Two presets of the `mu7chain` bundle
+exist for it, `..._mu7chain_EI3to2` and `..._mu7chain_EI2to3` (mean
+weights 8.4 / 5.6 and 5.6 / 8.4, sum held at 14). Three fixes went in
+first, each of which moved numbers:
+
+- **Every seeding call names its generator** (`rng(seed, 'twister')`;
+  F1). A pool worker's default generator is not a client's, so a model
+  built in a `parfor` used to differ from the same seeds built in a
+  session. Client-built numbers are unchanged; sweeps run before
+  2026-11-12 night (the `essential` run among them) cannot be reproduced
+  to the bit. A new seeding call names the generator too
+  (`test_rng_generator_independent`).
+- **A reps axis is added with `psa.add_grid_levels('reps', 1:n_reps)`**
+  (F2), never `add_grid_parameter`, which reads a two-element value as a
+  `[min max]` range and expanded `1:2` to `n_levels` repetitions.
+- **With one SFA timescale the neuron's constant is the fast end of its
+  ladder draw** (F3; `build_tau_a_matrix`, `w = 0` at K = 1), so the 1TS
+  constant equals the first rung of the MTS ladder on the same seed. It
+  moved every one-timescale result with `tau_a_spread > 0`.
+
 Decisions already made that affect the code: depression gains a **chained
 vesicle-pool model** as an opt-in per route, beside the current product,
 which stays the default and gives the same numbers to round-off (FD-004).
@@ -350,6 +382,20 @@ runs serially in the client and does not need a pool; at its sizes the
 thread count moves nothing in the pointwise layer. The three exact
 references were re-captured once after the refactor of Plan A step 0d
 passed it (2026-11-12).
+
+**The anchor is kept, and 176 of its leaves are superseded**
+(2026-11-12 night, FD-010 decision 12). The one-timescale SFA fix (F3
+under "Block C" above) moved the `sfa1_std1` cases on purpose. The
+anchor's maker refuses to overwrite it, by design, so those leaves are
+listed in `regression_tol_settings` as `T.anchor_superseded`, with the
+reason: `regression_tol_check` does not compare them against the anchor
+(and only against the anchor), counts them and prints one line.
+`test_regression_tol_superseded` and `test_regression_tolerance` fix the
+count at 176. The same cases are guarded bit for bit by the ultrarapid
+tier, whose references, with the stages reference and the `chain`,
+`stf_chain` and `spread` suites, were re-captured after F3 (`373155b`).
+A later deliberate change of physics is recorded the same way: a pattern
+and a reason, never a looser tolerance.
 
 **The chain has references of its own** (Plan A step 5, 2026-11-12),
 because the anchor and the three exact references above contain no chain
@@ -810,6 +856,16 @@ anything.
 
 - **The `'synaptic'` readout takes one route, and checks first.** Depression is per *route* on Pairs, so `theta_j^{q→s} = r_j ∏b ∏g` differs by target and "the synaptic output of neuron *j*" need not exist. `SRNN_ESN_reservoir.assert_route_redundancy` requires, **per presynaptic type**, that all of that type's outgoing routes carry identical STD *and* STF, then reads route 1. That is exact, not an approximation: identical routes integrate the same ODE from `b = 1` driven by the same `r_j`, so the trajectories are bit-identical. Per *presynaptic type* rather than globally, because neuron *j* of type *q* only has routes `q→*`; "E→\* depressed, I→\* not" is well defined and is accepted. `readout_signal = 'rate'` is the escape hatch for a preset with genuinely per-route synapses. Enforced by `scripts/tests/test_esn_route_redundancy.m`, which also asserts the bit-identity numerically.
 - **`mc_run_config` selects its integrator** the way `analysis_run_config` does — `det_solver` at `sigma_u_noise = 0`, `sde_solver` above it — plus an explicit `'ode_solver'` override on both entry points. The override exists because `'sra1'` is legal at σ = 0 (`sde_fixed_step` treats an absent noise tensor as zero) and naming it is the only way to make an MC run use the same integrator as the sweeps with noise off. It previously hardcoded `'rk4'`, which meant a noisy preset could not run MC at all.
+- **There is a lean memory-capacity path** (2026-11-12 night):
+  `SRNN_ESN_reservoir.run_memory_capacity_lean` integrates the task
+  segment by segment and keeps only the readout column of each hold, so
+  no state trajectory is held (0.04 GB against 17 GB per trial at
+  n = 500). Same protocol (`mc_protocol`, the one statement of the
+  durations) and the same scoring code; R² and total memory capacity are
+  identical to the existing path (`test_mc_lean_path`).
+  `run_mc_gain_sweep` always uses it. `run_memory_capacity` and
+  `run_memory_capacity_example` take `lean` (default false; `cfg.mc_lean`
+  in a bundle), so the bundle's stage is unchanged until Tom switches it.
 - **MC runs save snake_case condition keys**, like every other run directory, with display text from `srnn_condition_titles` via `src/figures/helpers/mc_display_names.m`. Unknown keys pass through unchanged so pre-2026-09-02 runs still plot.
 **Deleted 2026-09-02**, recoverable from git history:
 
