@@ -89,7 +89,7 @@ arguments
 end
 
 if ~isempty(cfg.data)
-    if isstruct(cfg.data) && isfield(cfg.data, 'gains'); D = cfg.data; else; D = read_mc_gain_sweep(cfg.data); end
+    D = read_mc_gain_sweep(cfg.data);
 elseif ~isempty(cfg.data_file)
     D = read_mc_gain_sweep(cfg.data_file);
 else
@@ -218,7 +218,7 @@ if ~isempty(cfg.out_dir)
     f_sg = fullfile(cfg.out_dir, [cfg.tag '_by_gain.csv']);
     writetable(SG, f_sg);
     f_md = fullfile(cfg.out_dir, [cfg.tag '.md']);
-    write_md(f_md, S, SB, SG, D, cfg, half_any);
+    write_md(f_md, S, SB, SG, D, cfg, half_any, D.gains(ig_pre));
     files = {f_csv, f_md, f_sb, f_sg};
 end
 end
@@ -283,11 +283,13 @@ end
 w = hi - lo;
 end
 
-function write_md(file, S, SB, SG, D, cfg, half_any)
+function write_md(file, S, SB, SG, D, cfg, half_any, gain_at_preset)
+% The three tables as one markdown file. gain_at_preset: the gain level
+% nearest the preset's, where the width along bias is quoted.
 fid = fopen(file, 'w');
 if fid < 0; warning('mc_gain_bias_statistics:Write', 'Cannot write %s', file); return; end
 c = onCleanup(@() fclose(fid));
-titles = srnn_condition_titles();
+titles = titles_by_name(S.condition');
 fprintf(fid, '# Memory capacity across gain and bias: robustness statistics\n\n');
 fprintf(fid, 'Source: `%s`\n\n', D.source);
 fprintf(fid, ['%d gains (%.3g to %.3g, level_of_chaos) x %d biases (S_c %.3g to %.3g) x %d seed(s). ' ...
@@ -302,17 +304,17 @@ fprintf(fid, '| Condition | jobs (failed) | MC median | IQR | 5th | 95th | share
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     fprintf(fid, '| %s | %d (%d) | %.3f | %.3f | %.3f | %.3f | %.2f | %.2f | %.3f | %.3g | %.3g |\n', ...
-        ttl(titles, S.condition{i}), S.n_jobs(i), S.n_failed(i), S.mc_median(i), S.mc_iqr(i), ...
+        titles{i}, S.n_jobs(i), S.n_failed(i), S.mc_median(i), S.mc_iqr(i), ...
         S.mc_p05(i), S.mc_p95(i), S.share_half_own(i), S.share_half_any(i), S.peak_mc(i), ...
         S.peak_gain(i), S.peak_bias(i));
 end
 fprintf(fid, ['\n## Tuning width: where MC >= %.3f (half the best of any condition)\n\n' ...
     'Contiguous stretch around the row''s (column''s) best cell; "+" marks a stretch that reaches the grid''s edge (a lower bound).\n\n'], half_any);
 fprintf(fid, '| Condition | along gain at bias %.3g (octaves) | widest along gain (octaves) | at bias | along bias at gain %.3g (S_c) | widest along bias (S_c) | at gain |\n', ...
-    S.fit_bias(1), D.gains(nearest_gain(D)));
+    S.fit_bias(1), gain_at_preset);
 fprintf(fid, '|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
-    fprintf(fid, '| %s | %.2f%s | %.2f%s | %.3g | %.3f%s | %.3f%s | %.3g |\n', ttl(titles, S.condition{i}), ...
+    fprintf(fid, '| %s | %.2f%s | %.2f%s | %.3g | %.3f%s | %.3f%s | %.3g |\n', titles{i}, ...
         S.gain_oct_fitbias(i), open_mark(S.gain_oct_fitbias_open(i)), S.gain_oct_best(i), open_mark(S.gain_oct_best_open(i)), ...
         S.gain_oct_best_bias(i), S.bias_range_presetgain(i), open_mark(S.bias_range_presetgain_open(i)), ...
         S.bias_range_best(i), open_mark(S.bias_range_best_open(i)), S.bias_range_best_gain(i));
@@ -321,14 +323,14 @@ fprintf(fid, '\n### Along gain, every bias (octaves)\n\n| Condition |%s\n|---|%s
     sprintf(' S_c %.3g |', D.biases), repmat('---|', 1, numel(D.biases)));
 for i = 1:height(S)
     R = SB(strcmp(SB.condition, S.condition{i}), :);
-    fprintf(fid, '| %s |%s\n', ttl(titles, S.condition{i}), ...
+    fprintf(fid, '| %s |%s\n', titles{i}, ...
         strjoin(arrayfun(@(k) sprintf(' %.2f%s |', R.octaves(k), open_mark(R.open(k))), 1:height(R), 'UniformOutput', false), ''));
 end
 fprintf(fid, '\n### Along bias, every gain (S_c units)\n\n| Condition |%s\n|---|%s\n', ...
     sprintf(' g %.3g |', D.gains), repmat('---|', 1, numel(D.gains)));
 for i = 1:height(S)
     R = SG(strcmp(SG.condition, S.condition{i}), :);
-    fprintf(fid, '| %s |%s\n', ttl(titles, S.condition{i}), ...
+    fprintf(fid, '| %s |%s\n', titles{i}, ...
         strjoin(arrayfun(@(k) sprintf(' %.3f%s |', R.range(k), open_mark(R.open(k))), 1:height(R), 'UniformOutput', false), ''));
 end
 fprintf(fid, ['\n## Width at half of its own maximum, along gain at bias %.3g\n\n' ...
@@ -338,22 +340,14 @@ fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     open_txt = ''; if S.fwhm_open(i); open_txt = ' (open, lower bound)'; end
     fprintf(fid, '| %s | %.3f | %.3g | %.3f | %.3f | %.3f%s | %.2f | %s | %.2f | %+.3f | %d |\n', ...
-        ttl(titles, S.condition{i}), S.fit_height(i), S.fit_center_gain(i), S.fit_fwhm_log10(i), ...
+        titles{i}, S.fit_height(i), S.fit_center_gain(i), S.fit_fwhm_log10(i), ...
         S.fit_r2(i), S.fwhm_meas_log10(i), open_txt, S.width_used_oct(i), S.width_source{i}, ...
         S.share_ref_higher(i), S.median_paired_diff(i), S.n_pairs(i));
 end
 end
 
-function k = nearest_gain(D)
-[~, k] = min(abs(log(D.gains) - log(D.preset_gain)));
-end
-
 function s = open_mark(tf)
 if tf; s = '+'; else; s = ''; end
-end
-
-function t = ttl(titles, nm)
-if isKey(titles, nm); t = titles(nm); else; t = nm; end
 end
 
 function v = ifempty(a, b)

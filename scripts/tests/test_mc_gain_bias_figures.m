@@ -3,8 +3,8 @@
 % Quick, no simulation. On make_synthetic_mc_gain_sweep's table (the shape
 % Plan C section 2 fixes for run_mc_gain_sweep), checks that
 %   * read_mc_gain_sweep reads a table, a struct and a .mat file alike,
-%     accepts the stage's likely alternative column names, fills a missing
-%     optional column with NaN and lists it, and refuses a missing required one;
+%     returns its own output unchanged, fills a missing optional column
+%     with NaN and lists it, and refuses a missing required one;
 %   * fig_mc_gain_bias_maps, fig_mc_gain_curves (one result and a list of
 %     three as rows) and fig_mc_robustness build, invisible and unsaved, for
 %     the paper's three conditions and for four, with the expected panels;
@@ -39,15 +39,18 @@ cleanup_tmp = onCleanup(@() rmdir(tmp, 's'));
 assert(isequal(D.conditions, four) && numel(D.gains) == 9 && numel(D.biases) == 6 && numel(D.seeds) == 3);
 assert(nnz(D.T.failed) == truth.n_failed && all(isnan(D.T.lle_input(D.T.failed))));
 assert(D.preset_gain == 1 && D.preset_bias == 0.2 && isempty(D.missing));
-% A file, with the stage's possible column names
-T2 = renamevars(T, {'gain', 'bias', 'mc_total', 'lle_input'}, {'level_of_chaos', 'S_c', 'MC', 'lambda1_input'});
-T2 = removevars(T2, 'lle_noinput');
-results = T2;
+assert(isequaln(read_mc_gain_sweep(D), D), 'the reader must return its own output unchanged');
+assert(isequaln(read_mc_gain_sweep(T).T, D.T), 'a bare table reads into the same rows');
+% A file, as the stage saves it (T and settings), here without one optional column
+T_full = T;
+T = removevars(T_full, 'lle_noinput');
 f = fullfile(tmp, 'mc_gain_sweep_results.mat');
-save(f, 'results', 'settings');
+save(f, 'T', 'settings');
+T = T_full;
 D2 = read_mc_gain_sweep(f);
 assert(isequaln(D2.T.mc_total, D.T.mc_total) && isequaln(D2.T.lle_input, D.T.lle_input));
 assert(isequal(D2.missing, {'lle_noinput'}) && all(isnan(D2.T.lle_noinput)));
+assert(strcmp(D2.source, f) && isequal(D2.conditions, four));
 threw = false;
 try
     read_mc_gain_sweep(removevars(T, 'seed'));
@@ -147,9 +150,12 @@ assert(abs(Sh.gain_oct_best(2) - 3) < 1e-12 && Sh.gain_oct_best_open(2));
 assert(Sh.best_any(1) == 10 && Sh.share_half_any(1) == 0.5);
 
 %% A run in progress: its job files read back into the same table
+% The signature carries what the reader takes the delays and the preset's
+% point from: the protocol, the preset and its overrides (here a bias of
+% 0.25 where the preset has 0.2).
 job_dir = fullfile(tmp, 'partial', 'mc_gain_sweep', 'jobs'); mkdir(job_dir);
-sig = struct('preset_name', '', 'protocol', struct('fs', 200, 'T_hold', 0.3, 'd_max_sec', 15), ...
-    'model_args', {{}});
+sig = struct('preset_name', mu7chain_config('essential').mc_preset, 'protocol', mc_protocol(), ...
+    'model_args', {{'S_c', 0.25}});
 [grp, gg] = findgroups(T(:, {'gain', 'bias', 'seed'}));
 keep = 1:2:height(gg);                    % half the jobs "finished"
 for k = keep
@@ -176,7 +182,8 @@ for v = {'mc_total', 'lle_input', 'frac_silent', 'R2_delay', 'failed'}
     assert(isequaln(got.(v{1}), want.(v{1})), 'partial reader: %s differs', v{1});
 end
 assert(numel(Dj.delay_s) == numel(settings.delay_s) && max(abs(Dj.delay_s - settings.delay_s)) < 1e-12);
-assert(Dj.preset_bias == 0.2);
+assert(Dj.preset_gain == 1 && Dj.preset_bias == 0.25, 'the preset''s point, with the signature''s overrides');
+assert(isequal(Dj.conditions, four) && Dj.settings.partial);
 
 %% One call for a run's whole set, on a result missing a condition
 Dm = read_mc_gain_sweep(struct('T', T(~strcmp(T.condition, 'sfa1_std1') & T.gain <= 1, :), 'settings', settings));

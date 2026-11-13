@@ -7,9 +7,7 @@ function cfg = mc_protocol(cfg)
 % THE ONE PLACE these values are written. run_memory_capacity (the paired
 % trials at the preset network) and run_mc_gain_sweep (memory capacity at
 % every point of a gain-by-bias sweep) both take them from here, so the two
-% stages measure the same task. They were local to run_memory_capacity
-% until the sweep stage needed them (FD-010); the values and the reasons
-% below are unchanged from there.
+% stages measure the same task. mc_delay_axis gives the delays it scores.
 %
 % Durations, in seconds and Hz. None of it is worth trading for speed:
 %   T_train_sec  decides whether MC means anything at all. The ridge readout
@@ -19,7 +17,7 @@ function cfg = mc_protocol(cfg)
 %   d_max_sec    caps the horizon that can be measured; observed horizons
 %                reach 5.5 to 5.7 s, so 15 s leaves room.
 %
-% See also: run_memory_capacity, run_mc_gain_sweep, SRNN_ESN_reservoir
+% See also: mc_delay_axis, run_memory_capacity, run_mc_gain_sweep, SRNN_ESN_reservoir
 
 if nargin < 1
     cfg = struct();
