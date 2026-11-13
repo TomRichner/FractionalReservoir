@@ -753,7 +753,7 @@ header-includes:
 
 `C:\Users\m218089\Desktop\github_repos\FractionalReservoir\figs\block_C\selffb\four_conditions\Fig_MC_gain_bias_maps.png`
 
-**Question:** The bias could not move the no-adaptation edge of chaos; does self-negative feedback on the diagonal of W ($W = g,W_mathrm{drawn} - k,R_W I$, at the preset bias 0.2) move it, and does memory without adaptation then follow?
+**Question:** The bias could not move the no-adaptation edge of chaos; does self-negative feedback on the diagonal of W ($W = g\,W_\mathrm{drawn} - k\,R_W I$, at the preset bias 0.2) move it, and does memory without adaptation then follow?
 
 - The edge moves to higher gain as k grows: gain 0.33 to 0.5 at k = 0, 1 to 1.4 at k = 0.5, 1.4 to 2 at k = 1, and none up to gain 2 at k = 2.
 - Memory without adaptation does not follow: its best at k of 0.5 or more is 6.3, below its k = 0 peak of 8.1 and far below the adapting conditions' peaks (13.4 to 15.5; chained MTS 15.5 at gain 1.4, k = 0.5).
