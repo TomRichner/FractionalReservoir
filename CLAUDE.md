@@ -463,6 +463,18 @@ model on every figure run). They were previously restated by hand in eleven
 places and drifted apart; the block above is a summary for orientation, and that
 file is authoritative. **Do not add a twelfth copy** — link instead.
 
+**One second statement exists, by Tom's request (2026-11-12):**
+`docs/EquationsParametersDocs/chained_MTS/Equations_chained_MTS.md`, the
+chained multiple-timescale model written for a reader of the manuscript: its
+notation extended per route and per neuron (every time constant carries the
+neuron index, $\tau_{rec,im}$), the reductions, steady states, how the
+per-neuron values are drawn, and what changes against the manuscript's product
+form. Its equations were coded independently and checked against `route_pool`
+and `dynamics_fast` at round-off. `Equations_stability_paper.md` remains the
+statement the code is checked against; the chained-MTS file must agree with it,
+so **a change to the route models or the spread is made in both**. Its PDF is
+built beside it with pandoc and is not tracked.
+
 Three things the block above is easy to get wrong:
 
 **Placement of `b`.** `θ_i` is the SYNAPTIC OUTPUT — the rate after depression.
