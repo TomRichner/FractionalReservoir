@@ -189,6 +189,13 @@ end
 function mark_cluster(ax, l_m, mc_m, col, c, sl)
 % A run of stable per-gain medians whose lambda_1 barely moves: bracket it
 % and state the value, so the stack is not mistaken for a trend.
+% The statement goes in a list in the axes' lower-left corner (strongly
+% negative lambda_1 with low memory capacity, where a stable network does
+% not sit; the upper left holds the no-adaptation peak), one line
+% per clustered condition in its colour, stacked by the condition's index:
+% the chained and product MTS both cluster near -0.1, and labels placed
+% beside their brackets overlapped each other and the 1TS curve, and ran
+% past the left edge of the axes.
 k = find(isfinite(l_m) & isfinite(mc_m) & l_m < 0);
 if numel(k) < 3; return; end
 lv = l_m(k);
@@ -199,8 +206,9 @@ x0 = sl(lc) - 0.15 - 0.08 * (c - 1);
 plot(ax, x0 * [1 1], [min(y) max(y)], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
 plot(ax, x0 + [0 0.05], min(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
 plot(ax, x0 + [0 0.05], max(y) * [1 1], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
-text(ax, x0, max(y), sprintf('\\lambda_1 \\approx %.2f at %d gains', lc, nnz(in)), ...
-    'Color', col, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom', ...
+n_prev = numel(findobj(ax, 'Tag', 'lle_cluster'));
+text(ax, 0.02, 0.03 + 0.07 * n_prev, sprintf('[ \\lambda_1 \\approx %.2f at %d gains', lc, nnz(in)), ...
+    'Units', 'normalized', 'Color', col, 'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', ...
     'FontSize', 8, 'Tag', 'lle_cluster');
 end
 

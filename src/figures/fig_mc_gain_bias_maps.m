@@ -95,6 +95,10 @@ for c = 1:nc
     SIL(:, :, c) = mc_gain_grid(D, conds{c}, 'frac_silent');
 end
 n_seeds = max([NOK(:); 0]);              % most successful seeds behind any cell
+% A cell with fewer than two successful seeds has no spread to show: grey,
+% not white. White would read as "the seeds agree", and on a run in
+% progress (seeds finishing unevenly) that was most of the row.
+IQ(NOK < 2) = NaN;
 mc_max = max([MC(:); eps]);
 switch cfg.mc_scale
     case 'sqrt'
@@ -134,6 +138,18 @@ xe = edges(x); ye = edges(y);
 xtl = arrayfun(@(v) sprintf('%.3g', v), D.gains, 'UniformOutput', false);
 ytl = arrayfun(@(v) sprintf('%.3g', v), D.biases, 'UniformOutput', false);
 ax_all = gobjects(nr, nc);
+% A qualifier in parentheses goes to a second line, so that four long
+% titles ("... Adaptation (product)") do not run together. When any title
+% wraps, every title gets two lines (a blank second line where there is no
+% qualifier), so the condition names stay on one baseline across the row.
+titles = cell(1, nc);
+for c = 1:nc
+    titles{c} = strsplit(regexprep(cond_title(st, conds{c}), '\s+(\(.*\))$', '\n$1'), newline);
+end
+n_lines = max(cellfun(@numel, titles));
+for c = 1:nc
+    titles{c}(end+1:n_lines) = {' '};
+end
 for r = 1:nr
     R = rows{r};
     inner = tiledlayout(outer, 1, nc, 'TileSpacing', 'compact', 'Padding', 'tight');
@@ -152,10 +168,7 @@ for r = 1:nr
         plot(ax, log10(D.preset_gain), D.preset_bias, 'p', 'MarkerSize', 11, ...
             'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 0.8);
         if r == 1
-            % A qualifier in parentheses goes to a second line, so that four
-            % long titles ("... Adaptation (product)") do not run together.
-            t = regexprep(cond_title(st, conds{c}), '\s+(\(.*\))$', '\n$1');
-            title(ax, strsplit(t, newline), 'FontSize', st.title_fs - 2, ...
+            title(ax, titles{c}, 'FontSize', st.title_fs - 2, ...
                 'FontWeight', 'normal', 'Color', cond_color(st, conds{c}));
         end
         if c == 1
@@ -181,9 +194,11 @@ if n_seeds <= 1
 else
     seed_txt = sprintf('Median over up to %d seeds', n_seeds);
 end
+grey_txt = 'Grey: no successful job';
+if nr == 3; grey_txt = [grey_txt ' (spread row: fewer than two)']; end
 title(outer, {sprintf('%s. Green dashed: edge between cells with \\lambda_1 > 0 and \\lambda_1 \\leq 0.', seed_txt), ...
-    sprintf('Star: preset (gain %.3g, bias %.3g). + saturated, o silent (\\geq %.0f%% of neurons). Grey: no successful job.', ...
-        D.preset_gain, D.preset_bias, 100 * cfg.flag_fraction)}, ...
+    sprintf('Star: preset (gain %.3g, bias %.3g). + saturated, o silent (\\geq %.0f%% of neurons). %s.', ...
+        D.preset_gain, D.preset_bias, 100 * cfg.flag_fraction, grey_txt)}, ...
     'FontSize', st.tick_fs - 5);
 
 %% Save
@@ -270,7 +285,10 @@ c = interp1(linspace(0, 1, size(k, 1)), k, linspace(0, 1, 256));
 end
 
 function c = gray_cmap()
-c = repmat(linspace(1, 0.15, 256)', 1, 3);
+% White to dark purple, not grey: grey is the colour of a cell with no data
+% (the axes colour), and a grey scale made the two indistinguishable.
+k = [1 1 1; 0.80 0.76 0.89; 0.55 0.45 0.72; 0.25 0.10 0.40];
+c = interp1(linspace(0, 1, size(k, 1)), k, linspace(0, 1, 256));
 end
 
 function t = cond_title(st, nm)
