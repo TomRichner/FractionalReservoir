@@ -36,8 +36,10 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 %   cfg.fig_root      figs/mu7chain_gainbias_<run_mode>_<figure_set>
 %   cfg.figures       the block C figures only: fig_mc_gain_bias_maps,
 %                     fig_mc_gain_curves (the main network, then a row per
-%                     variant), fig_mc_robustness, and the statistics
-%                     tables (mc_gain_bias_statistics) written beside them
+%                     variant), fig_mc_robustness, fig_mc_vs_lambda1
+%                     (memory capacity against lambda_1, every run), and
+%                     the statistics tables (mc_gain_bias_statistics)
+%                     written beside them
 %
 % See also: mu7chain_gainbias_run, mu7chain_config, run_mc_gain_sweep,
 %           mc_gain_sweep_stage_plan, run_all_paper_analyses
@@ -74,6 +76,7 @@ cfg.figures = { ...
     registry_entry('fig_mc_gain_bias_maps',   @fig_mc_gain_bias_maps,   true,  {}), ...
     registry_entry('fig_mc_gain_curves',      @fig_mc_gain_curves,      true,  {'variants', variant_tags}), ...
     registry_entry('fig_mc_robustness',       @fig_mc_robustness,       true,  {}), ...
+    registry_entry('fig_mc_vs_lambda1',       @fig_mc_vs_lambda1,       true,  {}), ...
     registry_entry('mc_gain_bias_statistics', @statistics_entry,        false, {})};
 end
 

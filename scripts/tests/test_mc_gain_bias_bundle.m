@@ -22,7 +22,7 @@
 %      of test_mc_gain_sweep, a 2 x 2 grid, one seed and three conditions,
 %      serial; then make_all_paper_figures from that run directory. The main
 %      result and the two variants' gain-only results (one bias level each,
-%      the preset's 0.2) are where the figures look; all four registry
+%      the preset's 0.2) are where the figures look; all five registry
 %      entries write files; the gain-curves figure has one row per network
 %      named, labelled by its E : I ratio, and a variant the run directory
 %      does not hold is an error.
@@ -73,7 +73,7 @@ for md = {'essential', 'fast'}
         assert(strcmp(c.fig_root, ['figs/mu7chain_gainbias_' md{1} '_' fs{1}]));
         names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
         assert(isequal(names, {'fig_mc_gain_bias_maps', 'fig_mc_gain_curves', ...
-            'fig_mc_robustness', 'mc_gain_bias_statistics'}));
+            'fig_mc_robustness', 'fig_mc_vs_lambda1', 'mc_gain_bias_statistics'}));
         if strcmp(fs{1}, '3cond'); want = conds3; else; want = conds4; end
         assert(isequal(c.conditions, want));
         assert(isequal(c.figure_sets, base.figure_sets));
@@ -175,7 +175,7 @@ assert(~isfolder(fullfile(tmp, 'mc_example')) && ~isfolder(fullfile(tmp, 'eig_he
 t0 = tic;
 R = make_all_paper_figures(cfg);
 t_fig = toc(t0);
-assert(all([R.ok]) && numel(R) == 4, 'figures failed: %s', strjoin({R(~[R.ok]).name}, ', '));
+assert(all([R.ok]) && numel(R) == 5,'figures failed: %s', strjoin({R(~[R.ok]).name}, ', '));
 stat = R(strcmp({R.name}, 'mc_gain_bias_statistics'));
 assert(any(endsWith(stat.files, 'MC_gain_bias_statistics.csv')) && all(cellfun(@isfile, stat.files)));
 quiet = {'conditions', conds3, 'save', false, 'visible', false};

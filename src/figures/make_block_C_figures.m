@@ -36,14 +36,14 @@ function out = make_block_C_figures(data, out_dir, cfg)
 % by EVERY result drawn (the main and the variants).
 %
 % Per set, in <out_dir>/<set>/: Fig_MC_gain_bias_maps, Fig_MC_gain_curves,
-% Fig_MC_robustness (save_figure_stable's formats) and
+% Fig_MC_robustness, Fig_MC_vs_lambda1 (save_figure_stable's formats) and
 % MC_gain_bias_statistics.{csv,md} with _by_bias.csv and _by_gain.csv.
 %
 % out: source, notes (cellstr), and one field per set that was drawn (dir,
 % conditions, files, the statistics table S).
 %
 % See also: fig_mc_gain_bias_maps, fig_mc_gain_curves, fig_mc_robustness,
-%           mc_gain_bias_statistics, read_mc_gain_sweep_jobs
+%           fig_mc_vs_lambda1, mc_gain_bias_statistics, read_mc_gain_sweep_jobs
 
 arguments
     data
@@ -99,6 +99,7 @@ for s = 1:2:numel(cfg.sets)
     end
 
     files = [files, drawn(fig_mc_robustness('data', D, 'conditions', conds, common{:}), set_dir)]; %#ok<AGROW>
+    files = [files, drawn(fig_mc_vs_lambda1('data', D, 'conditions', conds, common{:}), set_dir)]; %#ok<AGROW>
 
     [S, stat_files] = mc_gain_bias_statistics('data', D, 'conditions', conds, ...
         'reference', cfg.reference, 'out_dir', set_dir, 'verbose', cfg.verbose);
