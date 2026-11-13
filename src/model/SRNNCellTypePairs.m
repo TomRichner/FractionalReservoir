@@ -828,7 +828,7 @@ classdef SRNNCellTypePairs < handle
 
             n_steps = numel(obj.t_ex) - 1;
             stream_state = rng;
-            rng(seed);
+            rng(seed, 'twister');
             xi1 = randn(obj.n, n_steps);
             xi2 = randn(obj.n, n_steps);
             rng(stream_state);
@@ -1696,7 +1696,7 @@ classdef SRNNCellTypePairs < handle
         end
 
         function build_network(obj)
-            rng(obj.rng_seeds(1));
+            rng(obj.rng_seeds(1), 'twister');
             % RMTBlocks indexes the statistics by BOTH postsynaptic (row) and
             % presynaptic (column) type, so E->E can differ from E->I, and it
             % supplies R and lambda_O. (It replaced RMTCellTypes, which applied
@@ -1970,7 +1970,7 @@ classdef SRNNCellTypePairs < handle
                 seed = obj.rng_seeds(1) + 104729;
             end
             stream_state = rng;
-            rng(seed);
+            rng(seed, 'twister');
             z = randn(obj.n, 1);
             rng(stream_state);
 
@@ -2569,7 +2569,7 @@ classdef SRNNCellTypePairs < handle
                 [u_ex, t_ex] = config.generator(params, T, fs, rng_seed, config);
                 return;
             end
-            rng(rng_seed);
+            rng(rng_seed, 'twister');
             t_ex = (0:1/fs:T)';
             nt = numel(t_ex);
             n_steps = config.n_steps;
