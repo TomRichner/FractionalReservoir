@@ -29,6 +29,16 @@ this work, and none is to be written into these documents. Where compute
 is costly, save on compute, not on scope: use the regression tiers and
 `fast` pre-production runs; `medium` and larger runs are Tom's to start.
 
+**Runs and tests are minimal and fast; code is never cut short** (Tom,
+2026-11-13): "I want all tests going forward to be minimal, fast tests. I
+just don't want deadlines leading to truncated code or shortcuts in
+written code. I am in favor of only doing fast, efficient tests, and
+leaving all long tests over 40 min to a future date." So size every run
+an agent makes, and every `essential` / `fast` entry of a size table, to
+the smallest that shows the result, each under about 40 minutes; more
+seeds and finer grids go into the `medium` / `production` sizes for
+later. What is written in code is complete whatever the run size.
+
 Two documents to read first:
 
 - **`../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`** is

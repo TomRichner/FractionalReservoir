@@ -1100,3 +1100,10 @@ becomes an issue with an acceptance test.
      stage's size table moves to this test (`fast` = eleven gains, 0.1 to
      4.0, by seven biases, two seeds; `medium` and `production` take the
      gain range to 4.0 as well), so `fast` reproduces the report's run.
+     *Tom's clarification the same morning, a standing rule:* every test
+     and run is minimal and fast, under about 40 minutes; longer ones wait
+     for a later date; what is cut is compute, never code (now in
+     CLAUDE.md under "Current work"). The quick test above fits it: three
+     separate calls of about 30, 15 and 15 minutes. The `essential` and
+     `fast` entries of the stage's size table are to be sized the same way
+     when the bundle branch is merged.
