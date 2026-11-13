@@ -8,7 +8,16 @@
 %   * fig_mc_gain_bias_maps, fig_mc_gain_curves (one result and a list of
 %     three as rows) and fig_mc_robustness build, invisible and unsaved, for
 %     the paper's three conditions and for four, with the expected panels;
+%   * with one seed the maps drop the blank spread row and say "one seed";
+%     the lambda_1 = 0 boundary is drawn;
 %   * a result is found by run_dir in <run_dir>/mc_gain_sweep;
+%   * read_mc_gain_sweep_jobs reads a folder of finished job files (half of
+%     them, plus a *.tmp save in progress it must skip) into the same table,
+%     without touching the folder;
+%   * the tuning width at half the best of any condition, on a 4-point
+%     example worked by hand (2 octaves closed; 3 octaves open);
+%   * make_block_C_figures writes a set's figures and tables for a result
+%     that lacks one of the set's conditions, with a note;
 %   * mc_gain_bias_statistics recovers what the generator put in: each
 %     condition's peak and its location, the failed job, the order of the
 %     shares of the map at half the best of any condition (chained MTS >
@@ -56,7 +65,11 @@ for sel = {three, four}
     assert(numel(findall(o.figs, 'Type', 'colorbar')) == 3);
     assert(isempty(o.files)); close(o.figs);
     o = fig_mc_gain_bias_maps('data', D, 'conditions', sel{1}, 'show_iqr', false, 'save', false, 'visible', false);
-    assert(numel(findall(o.figs, 'Type', 'axes')) == 2 * nc); close(o.figs);
+    assert(numel(findall(o.figs, 'Type', 'axes')) == 2 * nc);
+    % The lambda_1 = 0 boundary is drawn as cell edges where the generator
+    % puts a sign change.
+    assert(~isempty(findall(o.figs, 'Tag', 'lle_zero')), 'maps: no lambda_1 = 0 boundary drawn');
+    close(o.figs);
 
     o = fig_mc_gain_curves('data', D, 'conditions', sel{1}, 'save', false, 'visible', false);
     assert(numel(findall(o.figs, 'Type', 'axes')) == 3); close(o.figs);
@@ -66,6 +79,14 @@ for sel = {three, four}
     assert(numel(ax) == 2);
     assert(numel(findall(o.figs, 'Type', 'stair')) == nc); close(o.figs);
 end
+% One seed: the spread row would be blank, so it is dropped and the caption says so
+D_one = read_mc_gain_sweep(struct('T', T(T.seed == D.seeds(1), :), 'settings', settings));
+o = fig_mc_gain_bias_maps('data', D_one, 'conditions', three, 'save', false, 'visible', false);
+assert(numel(findall(o.figs, 'Type', 'axes')) == 2 * 3 && numel(findall(o.figs, 'Type', 'colorbar')) == 2);
+tl = findall(o.figs, 'Type', 'tiledlayout');
+cap = arrayfun(@(t) strjoin(cellstr(t.Title.String), ' '), tl, 'UniformOutput', false);
+assert(any(contains(cap, 'One seed')), 'one-seed caption missing');
+close(o.figs);
 % Three results as rows, one of them read from a file, one swept along gain only
 D_gain_only = read_mc_gain_sweep(struct('T', T(T.bias == 0.2, :), 'settings', settings));
 o = fig_mc_gain_curves('data', {D, D2, D_gain_only}, 'conditions', three, ...
@@ -82,8 +103,10 @@ o = fig_mc_robustness('run_dir', run_dir, 'conditions', three, 'save', false, 'v
 assert(contains(o.source, 'mc_gain_sweep_results.mat')); close(o.figs);
 
 %% The statistics recover the generator's pattern
-[S, files] = mc_gain_bias_statistics('data', D, 'out_dir', tmp, 'verbose', 'near-none');
-assert(numel(files) == 2 && all(cellfun(@isfile, files)));
+[S, files, SB, SG] = mc_gain_bias_statistics('data', D, 'out_dir', tmp, 'verbose', 'near-none');
+assert(numel(files) == 4 && all(cellfun(@isfile, files)));
+assert(height(SB) == 4 * numel(D.biases) && height(SG) == 4 * numel(D.gains));
+assert(all(strcmp(S.width_source([row_of(S, 'sfa1_std1'), row_of(S, 'sfa3_stdc2')]), 'fit')));
 assert(isequal(S.condition', four) && height(S) == 4);
 for c = 1:4
     p = truth.peak.(S.condition{c});
@@ -110,4 +133,60 @@ D3 = read_mc_gain_sweep(struct('T', T(~strcmp(T.condition, 'sfa3_std2'), :)));
 S4 = mc_gain_bias_statistics('data', D3, 'verbose', 'near-none');
 assert(isequal(S4.condition', three));
 
-disp('PASS: test_mc_gain_bias_figures -- reader, three figures at 3 and 4 conditions, statistics recover the synthetic pattern.');
+%% The tuning width at half the best of any condition, by hand
+% A: MC 2 8 8 2 at gains 1 2 4 8; B: 10 everywhere. Half the best of any is
+% 5; A crosses it half way between 1 and 2 and between 4 and 8 (linear in
+% MC, log2 gain): from log2 gain 0.5 to 2.5, so 2 octaves, closed; B
+% covers the whole row, 3 octaves, open.
+Th = table(repmat([1; 2; 4; 8], 2, 1), zeros(8, 1), ones(8, 1), ...
+    [repmat({'A'}, 4, 1); repmat({'B'}, 4, 1)], [2; 8; 8; 2; 10; 10; 10; 10], ...
+    'VariableNames', {'gain', 'bias', 'seed', 'condition', 'mc_total'});
+Sh = mc_gain_bias_statistics('data', Th, 'reference', 'B', 'verbose', 'near-none');
+assert(abs(Sh.gain_oct_fitbias(1) - 2) < 1e-12 && ~Sh.gain_oct_fitbias_open(1));
+assert(abs(Sh.gain_oct_best(2) - 3) < 1e-12 && Sh.gain_oct_best_open(2));
+assert(Sh.best_any(1) == 10 && Sh.share_half_any(1) == 0.5);
+
+%% A run in progress: its job files read back into the same table
+job_dir = fullfile(tmp, 'partial', 'mc_gain_sweep', 'jobs'); mkdir(job_dir);
+sig = struct('preset_name', '', 'protocol', struct('fs', 200, 'T_hold', 0.3, 'd_max_sec', 15), ...
+    'model_args', {{}});
+[grp, gg] = findgroups(T(:, {'gain', 'bias', 'seed'}));
+keep = 1:2:height(gg);                    % half the jobs "finished"
+for k = keep
+    R = T(grp == k, :);
+    nr = height(R);
+    job = struct('gain', R.gain(1), 'bias', R.bias(1), 'seed', R.seed(1), 'seed_stim', R.seed(1) + 1, ...
+        'conditions', {R.condition'}, 'signature', sig, 'mc_total', R.mc_total', 'horizon', R.horizon', ...
+        'R2_delay', R.R2_delay, 'lle_input', R.lle_input', 'lle_noinput', R.lle_noinput', ...
+        'rate_E', R.rate_E', 'rate_I', R.rate_I', 'frac_pinned', R.frac_pinned', ...
+        'frac_silent', R.frac_silent', 'seconds', ones(1, nr), 'failed', R.failed', ...
+        'message', {repmat({''}, 1, nr)});
+    save(fullfile(job_dir, sprintf('job_%03d.mat', k)), 'job');
+end
+fclose(fopen(fullfile(job_dir, 'job_999.mat.tmp'), 'w'));   % a save in progress: not read
+before = dir(job_dir);
+[Dj, info] = read_mc_gain_sweep_jobs(fullfile(tmp, 'partial'));
+assert(info.n_read == numel(keep) && info.n_signatures == 1);
+after = dir(job_dir);
+assert(isequal({after.name}, {before.name}) && isequal([after.datenum], [before.datenum]), ...
+    'the reader must not touch the job folder');
+want = sortrows(D.T(ismember(grp, keep), :), {'gain', 'bias', 'seed', 'condition'});
+got  = sortrows(Dj.T, {'gain', 'bias', 'seed', 'condition'});
+for v = {'mc_total', 'lle_input', 'frac_silent', 'R2_delay', 'failed'}
+    assert(isequaln(got.(v{1}), want.(v{1})), 'partial reader: %s differs', v{1});
+end
+assert(numel(Dj.delay_s) == numel(settings.delay_s) && max(abs(Dj.delay_s - settings.delay_s)) < 1e-12);
+assert(Dj.preset_bias == 0.2);
+
+%% One call for a run's whole set, on a result missing a condition
+Dm = read_mc_gain_sweep(struct('T', T(~strcmp(T.condition, 'sfa1_std1') & T.gain <= 1, :), 'settings', settings));
+ob = make_block_C_figures(Dm, fullfile(tmp, 'blockC'), 'sets', {'three', three}, 'verbose', 'near-none');
+assert(isequal(ob.three.conditions, {'no_adaptation', 'sfa3_stdc2'}) && isscalar(ob.notes));
+assert(all(cellfun(@isfile, ob.three.files)) && numel(ob.three.files) >= 7);
+assert(any(endsWith(ob.three.files, 'MC_gain_bias_statistics.md')));
+
+disp('PASS: test_mc_gain_bias_figures -- reader, partial reader, three figures at 3 and 4 conditions and one seed, statistics and tuning widths, the one-call set.');
+
+function r = row_of(S, name)
+r = find(strcmp(S.condition, name));
+end
