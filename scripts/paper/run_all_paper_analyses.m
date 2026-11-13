@@ -47,6 +47,10 @@ function run_dir = run_all_paper_analyses(cfg)
 %                'param_space'); absent or empty = all three.
 %   cfg.eig_heatmap_examples   the eig-heatmap stage's examples; absent or
 %                empty = its default three.
+% OPT-IN STAGES run only when cfg.stages names them, after the stages above;
+% "every stage" does not include them. paper_opt_in_stages lists them, and
+% each one's plan function documents the config fields it reads and checks
+% them in the pre-flight (mc_gain_sweep: mc_gain_sweep_stage_plan).
 % An unknown name is an error in the pre-flight, before any compute and
 % before the run directory is created (paper_stage_plan). A stage not run is
 % printed as SKIPPED in the summary and recorded in run_manifest
@@ -120,6 +124,13 @@ if isfield(cfg, 'eig_heatmap_examples') && ~isempty(cfg.eig_heatmap_examples)
     end
     eig_args = {'examples', ex};
 end
+
+% The opt-in stages this bundle selects (paper_opt_in_stages): each checks
+% its own part of the config here and returns the plan its run takes. One
+% the bundle does not select is not looked at.
+opt_in = paper_opt_in_stages();
+opt_in = opt_in(ismember({opt_in.name}, plan.stages));
+opt_in_plans = arrayfun(@(stage) stage.plan(cfg), opt_in, 'UniformOutput', false);
 
 %% PREFLIGHT: this session must have a pool allocation
 % Hours of sweeps on an unknown number of workers is not something to find
@@ -282,17 +293,22 @@ stages = { ...
 if isfield(cfg,'illustrations') && cfg.illustrations
     stages(end+1,:)={'paper_illustrations', @()run_paper_illustrations(cfg,run_dir)};
 end
+% The opt-in stages this bundle selected follow, in the registry's order.
+for k = 1:numel(opt_in)
+    stages(end+1, :) = {opt_in(k).name, @() opt_in(k).run(cfg, run_dir, opt_in_plans{k})}; %#ok<AGROW>
+end
 
 % Keep the selected stages (FD-023). The table above must hold exactly the
-% stages paper_stage_names lists after 'sweeps', in its order, or a selection
-% could name a stage that never runs. test_essential_mode checks that from
-% this file's text, without running anything; the assert is the backstop,
-% and it comes after the sweeps only because the table needs run_dir.
+% stages this bundle has (those it runs and those it skips, 'sweeps' apart),
+% in paper_stage_names' order, or a selection could name a stage that never
+% runs. test_essential_mode checks the fixed part from this file's text,
+% without running anything; the assert is the backstop, and it comes after
+% the sweeps only because the table needs run_dir.
 table_names = stages(:, 1)';
-want_names  = [plan.stages(~strcmp(plan.stages, 'sweeps')), ...
-               plan.stages_skipped(~strcmp(plan.stages_skipped, 'sweeps'))];
-all_names   = paper_stage_names();
-assert(isequal(table_names, all_names(ismember(all_names, want_names))), ...
+[all_names, ~, opt_in_names] = paper_stage_names();
+known_names = [all_names, opt_in_names];
+bundle_has  = setdiff([plan.stages, plan.stages_skipped], {'sweeps'});
+assert(isequal(table_names, known_names(ismember(known_names, bundle_has))), ...
     'run_all_paper_analyses:StageTableMismatch', ...
     'The stage table (%s) is not paper_stage_names'' list for this bundle.', strjoin(table_names, ', '));
 stages = stages(ismember(table_names, plan.stages), :);

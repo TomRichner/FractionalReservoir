@@ -1,7 +1,7 @@
 function [out_dir, results_file] = run_mc_gain_sweep(opts)
 % RUN_MC_GAIN_SWEEP Memory capacity and lambda_1 at every point of a gain-by-bias sweep.
 %
-%   out_dir = RUN_MC_GAIN_SWEEP()                          % the pilot ('essential')
+%   out_dir = RUN_MC_GAIN_SWEEP()                          % 'essential': a first look
 %   out_dir = RUN_MC_GAIN_SWEEP('run_mode', 'fast', 'output_dir', d)
 %   [out_dir, results_file] = RUN_MC_GAIN_SWEEP('gain_levels', g, 'bias_levels', b, ...
 %       'seeds', s, 'conditions', {'no_adaptation', 'sfa3_stdc2'})
@@ -44,13 +44,41 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 %                     (above 0.9) and silent (below 0.01), so a low memory
 %                     capacity can be read as saturated, silent or chaotic.
 %
-% SIZES, by run_mode (explicit gain_levels / bias_levels / seeds override):
-%   essential    9 gains x  7 biases x  2 seeds   (the pilot)
-%   fast         9 gains x  7 biases x  3 seeds
-%   medium(2)   13 gains x  9 biases x  5 seeds
-%   production  17 gains x 11 biases x 10 seeds
-% Gains are log-spaced from 0.1 to 3, biases linear from -0.2 to 0.8, seeds
+% SIZES, by run_mode (explicit gain_levels / bias_levels / seeds override;
+% the table is the local function grid_for_mode):
+%   essential    4 gains x  3 biases x  1 seed      12 jobs, about 10 min
+%   fast        11 gains x  7 biases x  2 seeds    154 jobs, about 2 h 40
+%   medium(2)   16 gains x  9 biases x  5 seeds    720 jobs, about 12 h
+%   production  21 gains x 13 biases x 10 seeds   2730 jobs, about 45 h
+% Times are for 12 pool workers, at the measured one job of four conditions
+% per minute (9 to 12 worker-minutes a job). 'essential' is the size agents
+% run: one job per worker, so it ends when one job does. 'fast' and larger
+% are runs for Tom to start.
+%   gains   fast        0.1 0.15 0.22 0.33 0.5 0.7 1 1.4 2 2.8 4
+%           essential   0.22 0.5 1 2 (four of fast's)
+%           medium      0.1 0.129 0.167 0.215 0.278 0.359 0.464 0.599 0.774
+%                       1 1.26 1.59 2 2.52 3.17 4
+%           production  0.1 0.121 0.147 0.178 0.215 0.261 0.316 0.383 0.464
+%                       0.562 0.681 0.825 1 1.19 1.41 1.68 2 2.38 2.83 3.36 4
+%   biases  fast        -0.6:0.2:0.6
+%           essential   -0.6 -0.2 0.2 (three of fast's)
+%           medium      -0.6:0.15:0.6
+%           production  -0.6:0.1:0.6
+% Every mode reaches gain 4 and has the preset's own point (gain 1, bias
+% 0.2) on its grid. Medium and production gains are log-spaced in two
+% pieces that meet at 1 (nine and twelve equal log steps from 0.1 to 1, six
+% and eight from 1 to 4), rounded to three significant figures. Seeds are
 % seed_net_base + 1, 2, ... The protocol is the same in every mode.
+% WHY THESE RANGES (FD-010, decisions 14, 18 and 21): above bias 0.6 the
+% network is silent; the no-adaptation peak lies at low bias, so the axis
+% runs down to -0.6; and at low bias the adapting conditions are still
+% stable, with their best memory capacity, at gain 2, so the gain axis runs
+% to 4 to bracket their collapse.
+% THE BIAS LEVELS ARE COLON RANGES, so the level "0.2" is the colon's
+% 0.19999999999999996, and job files are named by the exact value.
+% Essential takes its levels from fast's for that reason: its jobs are
+% fast's jobs, and a fast run into the same directory skips them. Figures
+% and statistics take the level nearest the preset's bias.
 %
 % RESUMABLE. Each finished job writes <out_dir>/jobs/job_*.mat; a rerun into
 % the same output directory skips the jobs that are there (and reruns the
@@ -85,7 +113,8 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 %   protocol      a struct overriding fields of mc_protocol (T_wash_sec,
 %                 T_train_sec, ...). FOR TESTS: a shorter training window
 %                 makes the readout under-determined at the paper's n.
-%   lya_K, lya_T_sec, lya_acc_sec   the Lyapunov run (5, 30 s, 20 s)
+%   lya_K, lya_T_sec, lya_acc_sec   the Lyapunov run: exponents kept, its
+%                 length, and the final stretch accumulated (5, 30 s, 20 s)
 %   segment_len   samples per integration segment of the lean path
 %   retry_failed  rerun the jobs an earlier run recorded as failed (true)
 %   use_parallel  false runs the jobs serially in the client (true)
@@ -94,7 +123,8 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 % serially.
 %
 % See also: SRNN_ESN_reservoir.run_memory_capacity_lean, mc_protocol,
-%           run_memory_capacity, read_mc_gain_sweep, verify_shared_build
+%           mc_gain_sweep_job_rows, read_mc_gain_sweep, read_mc_gain_sweep_jobs,
+%           run_memory_capacity, verify_shared_build
 
 arguments
     opts.preset_name  (1,:) char   = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain'
@@ -108,10 +138,10 @@ arguments
     opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     opts.model_args   (1,:) cell   = {}
     opts.protocol     (1,1) struct = struct()
-    opts.lya_K        (1,1) double = 5
-    opts.lya_T_sec    (1,1) double = 30
-    opts.lya_acc_sec  (1,1) double = 20
-    opts.segment_len  (1,1) double = 600
+    opts.lya_K        (1,1) double {mustBeInteger, mustBePositive} = 5
+    opts.lya_T_sec    (1,1) double {mustBePositive} = 30
+    opts.lya_acc_sec  (1,1) double {mustBePositive} = 20
+    opts.segment_len  (1,1) double {mustBeInteger, mustBeGreaterThanOrEqual(opts.segment_len, 2)} = 600
     opts.retry_failed (1,1) logical = true
     opts.use_parallel (1,1) logical = true
 end
@@ -121,18 +151,8 @@ t_start = tic;
 
 %% Sizes -- BEFORE any compute, so a bad mode fails in milliseconds
 P = mc_protocol();
-switch opts.run_mode
-    case 'essential',           n_gain = 9;  n_bias = 7;  n_seeds = 2;
-    case 'fast',                n_gain = 9;  n_bias = 7;  n_seeds = 3;
-    case {'medium', 'medium2'}, n_gain = 13; n_bias = 9;  n_seeds = 5;
-    case 'production',          n_gain = 17; n_bias = 11; n_seeds = 10;
-    otherwise
-        error('run_mc_gain_sweep:badMode', 'Unknown run_mode ''%s'' (expected %s).', ...
-            opts.run_mode, strjoin(run_mode_names(), ', '));
-end
-gain_levels = logspace(log10(0.1), log10(3), n_gain);
-bias_levels = linspace(-0.2, 0.8, n_bias);
-seeds       = P.seed_net_base + (1:n_seeds);
+[gain_levels, bias_levels, n_seeds] = grid_for_mode(opts.run_mode);
+seeds = P.seed_net_base + (1:n_seeds);
 if ~isempty(opts.gain_levels); gain_levels = opts.gain_levels; end
 if ~isempty(opts.bias_levels); bias_levels = opts.bias_levels; end
 if ~isempty(opts.seeds);       seeds       = opts.seeds;       end
@@ -147,9 +167,9 @@ end
 for k = 1:numel(over)
     P.(over{k}) = opts.protocol.(over{k});
 end
-if opts.lya_acc_sec <= 0 || opts.lya_acc_sec >= opts.lya_T_sec
+if opts.lya_acc_sec >= opts.lya_T_sec
     error('run_mc_gain_sweep:BadLyapunovWindow', ...
-        'lya_acc_sec must be positive and shorter than lya_T_sec.');
+        'lya_acc_sec must be shorter than lya_T_sec.');
 end
 
 %% The preset: the network, and its conditions
@@ -189,10 +209,7 @@ check_noise_settings(sigma, opts.ode_solver, 'run_mc_gain_sweep');
 
 %% What every reservoir of the run shares
 fs = P.fs;
-hold_len  = max(1, round(P.T_hold * fs));
-d_max     = round(P.d_max_sec * fs);
-d_max_eff = max(1, floor(d_max / hold_len));
-delay_s   = (1:d_max_eff) * (hold_len / fs);
+[delay_s, ~, d_max] = mc_delay_axis(P);
 
 J = struct();                       % the job recipe, sent to the workers
 J.base_args = [struct2namevalue(preset), opts.model_args, ...
@@ -206,13 +223,15 @@ J.mc_args = {'T_wash', round(P.T_wash_sec * fs), 'T_train', round(P.T_train_sec 
 % seconds), top-K with a fixed small K, accumulated over the last
 % lya_acc_sec. lya_T_interval is set explicitly: its default comes from
 % T_range, which the reservoir's input does not follow.
+LYA_DT = 0.05;          % s between re-orthonormalisations, as the sweeps use
+LYA_WARMUP_MAX = 5;     % s the basis aligns before accumulating (the class default)
 lya_n = round(opts.lya_T_sec * fs);
 lya_t_end = (lya_n - 1) / fs;
 lya_t0 = opts.lya_T_sec - opts.lya_acc_sec;
 J.lya_args = {'T_wash', round(lya_t0 * fs), 'T_train', lya_n - round(lya_t0 * fs), ...
     'T_test', 0, 'd_max', d_max, ...
-    'lya_method', 'topk', 'lya_K', opts.lya_K, 'lya_K_auto', false, 'lya_dt', 0.05, ...
-    'lya_T_interval', [lya_t0, lya_t_end], 'lya_warmup', min(5, lya_t0), ...
+    'lya_method', 'topk', 'lya_K', opts.lya_K, 'lya_K_auto', false, 'lya_dt', LYA_DT, ...
+    'lya_T_interval', [lya_t0, lya_t_end], 'lya_warmup', min(LYA_WARMUP_MAX, lya_t0), ...
     'store_decimated_state', false, 'store_full_state', false};
 J.cond_names = cond_names;
 J.cond_args = cond_args;
@@ -221,6 +240,8 @@ J.R2_threshold = P.R2_threshold_for_horizon;
 J.delay_s = delay_s;
 J.segment_len = opts.segment_len;
 J.seed_offset = P.seed_stim_base - P.seed_net_base;
+J.pinned_rate = 0.9;    % a neuron whose mean rate is above this counts as pinned
+J.silent_rate = 0.01;   % ... and below this as silent
 % What makes two runs the same experiment; a job file with another
 % signature is refused. Run-size choices (grid, seeds) are not part of it.
 J.signature = struct('preset_name', opts.preset_name, 'protocol', P, ...
@@ -304,7 +325,7 @@ end
 rows = cell(n_jobs, 1);
 for k = 1:n_jobs
     L = load(job_files{k}, 'job');
-    rows{k} = job_rows(L.job);
+    rows{k} = mc_gain_sweep_job_rows(L.job);
 end
 T = vertcat(rows{:});
 
@@ -312,11 +333,8 @@ settings = struct();
 settings.conditions  = cond_names;
 settings.delay_s     = delay_s;
 settings.preset_name = opts.preset_name;
-% The preset's own gain and bias (with model_args applied), read off a
-% reservoir constructed without a job's values.
-probe = SRNN_ESN_reservoir(J.base_args{:}, J.cond_args{1}{:});
-settings.preset_gain = probe.level_of_chaos;
-settings.preset_bias = probe.S_c;
+[settings.preset_gain, settings.preset_bias] = ...
+    mc_gain_sweep_preset_point(opts.preset_name, opts.model_args);
 settings.run_mode    = opts.run_mode;
 settings.gain_levels = gain_levels;
 settings.bias_levels = bias_levels;
@@ -329,7 +347,10 @@ settings.lya_T_sec   = opts.lya_T_sec;
 settings.lya_acc_sec = opts.lya_acc_sec;
 settings.lya_T_interval = [lya_t0, lya_t_end];
 settings.segment_len = opts.segment_len;
-settings.n          = probe.n;
+% What every job's reservoir shares, read off one constructed without a
+% job's values.
+probe = SRNN_ESN_reservoir(J.base_args{:}, J.cond_args{1}{:});
+settings.n           = probe.n;
 settings.eta         = probe.eta;               % ridge parameter (the class's)
 settings.rng_seed_input = probe.rng_seed_input; % input weights: the same in every job
 settings.n_jobs      = n_jobs;
@@ -352,6 +373,37 @@ vprintf(opts.verbose, 'minimal', '[mc_gain_sweep] %d jobs (%d run now, %d condit
 end
 
 %% ======================================================================
+function [gain_levels, bias_levels, n_seeds] = grid_for_mode(run_mode)
+% The size table; the header's SIZES section gives the reasons.
+fast_gains  = [0.1 0.15 0.22 0.33 0.5 0.7 1.0 1.4 2.0 2.8 4.0];
+fast_biases = -0.6:0.2:0.6;
+switch run_mode
+    case 'essential'
+        % Subsets of fast's levels, taken by index so that the values, and
+        % with them the job file names, are fast's to the bit.
+        gain_levels = fast_gains([3 5 7 9]);        % 0.22 0.5 1 2
+        bias_levels = fast_biases([1 3 5]);         % -0.6 -0.2 0.2
+        n_seeds = 1;
+    case 'fast'
+        gain_levels = fast_gains;
+        bias_levels = fast_biases;
+        n_seeds = 2;
+    case {'medium', 'medium2'}
+        gain_levels = [0.1 0.129 0.167 0.215 0.278 0.359 0.464 0.599 0.774 ...
+                       1 1.26 1.59 2 2.52 3.17 4];
+        bias_levels = -0.6:0.15:0.6;
+        n_seeds = 5;
+    case 'production'
+        gain_levels = [0.1 0.121 0.147 0.178 0.215 0.261 0.316 0.383 0.464 0.562 ...
+                       0.681 0.825 1 1.19 1.41 1.68 2 2.38 2.83 3.36 4];
+        bias_levels = -0.6:0.1:0.6;
+        n_seeds = 10;
+    otherwise
+        error('run_mc_gain_sweep:badMode', 'Unknown run_mode ''%s'' (expected %s).', ...
+            run_mode, strjoin(run_mode_names(), ', '));
+end
+end
+
 function job = run_one_job(J, spec, file)
 % One (gain, bias, seed): every condition on the same seeds. Writes its own
 % file, so a crash costs this job and not the run.
@@ -444,8 +496,8 @@ for c = 1:n_cond
         job.lle_noinput(c) = lle(2);
         job.rate_E(c)      = rate_E;
         job.rate_I(c)      = rate_I;
-        job.frac_pinned(c) = mean(rate > 0.9);
-        job.frac_silent(c) = mean(rate < 0.01);
+        job.frac_pinned(c) = mean(rate > J.pinned_rate);
+        job.frac_silent(c) = mean(rate < J.silent_rate);
     catch ME
         job.failed(c)  = true;
         job.message{c} = sprintf('%s: %s', ME.identifier, ME.message);
@@ -483,18 +535,6 @@ function s = number_tag(v)
 % characters a file name should not carry replaced.
 s = sprintf('%.17g', v);
 s = strrep(strrep(strrep(s, '-', 'm'), '.', 'p'), '+', '');
-end
-
-function T = job_rows(job)
-% One table row per condition of a job.
-n = numel(job.conditions);
-T = table(repmat(job.gain, n, 1), repmat(job.bias, n, 1), repmat(job.seed, n, 1), ...
-    repmat(job.seed_stim, n, 1), job.conditions(:), job.mc_total(:), job.horizon(:), ...
-    job.R2_delay, job.lle_input(:), job.lle_noinput(:), job.rate_E(:), job.rate_I(:), ...
-    job.frac_pinned(:), job.frac_silent(:), job.seconds(:), job.failed(:), job.message(:), ...
-    'VariableNames', {'gain', 'bias', 'seed', 'seed_stim', 'condition', 'mc_total', 'horizon', ...
-    'R2_delay', 'lle_input', 'lle_noinput', 'rate_E', 'rate_I', 'frac_pinned', 'frac_silent', ...
-    'seconds', 'failed', 'message'});
 end
 
 function s = failed_text(job)

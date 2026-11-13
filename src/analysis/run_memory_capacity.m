@@ -140,15 +140,10 @@ base_args_template = [ ...
 
 %% Delay grid + preallocation
 % Sized up front so R2_trials is fully allocated before the parfor (a sliced
-% output cannot be lazily grown). Mirrors the hold-unit decimation inside
-% SRNN_ESN_reservoir/run_memory_capacity.
-if strcmpi(cfg.input_type, 'sample_hold')
-    hold_len = round(cfg.T_hold * fs);
-else
-    hold_len = 1;
-end
-d_max_eff = max(1, floor(d_max / hold_len));
-delay_s   = (1:d_max_eff) * (hold_len / fs);
+% output cannot be lazily grown). mc_delay_axis is the hold-unit delay grid
+% the reservoir scores, shared with run_mc_gain_sweep.
+[delay_s, hold_len] = mc_delay_axis(cfg);
+d_max_eff = numel(delay_s);
 
 n_trials  = cfg.n_trials;
 MC_trials = nan(n_trials, n_cond);
