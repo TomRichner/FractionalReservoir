@@ -1,6 +1,112 @@
 # Chained multiple-timescale adaptation: the model equations
 
+## The model at a glance
+
+For a first reading: the model with one set of constants for the whole network,
+without cell types, routes or per-neuron constants. The equations tagged (S1) to
+(S10) are simplified forms of the numbered equations of
+[section 3](#3-the-full-system), and each line below names the equation it
+simplifies. A state variable carries the index of its neuron ($i$, or $j$ for
+the sender in the recurrent sum); a constant carries none. The symbols are
+defined in [section 2](#2-notation).
+
+**Dendritic state** (simplifies (1)): each neuron integrates its input, the
+synaptic outputs it receives, and noise.
+
+$$
+\tau_d\, dx_i = \left( -x_i + u_i + \sum_{j=1}^{N} w_{ij}\, \theta_j \right) dt + \sigma_u\, dW_i \tag{S1}
+$$
+
+**Firing rate** (simplifies (2)): the output of the nonlinearity, lowered by
+adaptation, before the synapse acts on it.
+
+$$
+r_i = \phi\!\left( x_i - a_0 - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right) \tag{S2}
+$$
+
+**Spike-frequency adaptation** (simplifies (3)): $K$ low-pass copies of the
+neuron's own rate, one per timescale.
+
+$$
+\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K \tag{S3}
+$$
+
+**Synaptic output** (simplifies (4)): the rate scaled by the releasable pool.
+
+$$
+\theta_i = r_i\, b_{i1} \tag{S4}
+$$
+
+**Releasable pool** (simplifies (5)): emptied by release, refilled from the
+reserve.
+
+$$
+\frac{db_{i1}}{dt} = \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} - \frac{b_{i1}\, r_i}{\tau_{rel}} \tag{S5}
+$$
+
+**Reserve** (simplifies (6)): refills slowly toward full, and loses what it
+hands to the releasable pool, divided by its relative capacity $n_2$.
+
+$$
+\frac{db_{i2}}{dt} = \frac{1 - b_{i2}}{\tau_{rec_2}} - \frac{1}{n_2}\, \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} \tag{S6}
+$$
+
+(S1) to (S6) are the multiple-timescale model of the paper's network.
+
+**Optional: release-coupled facilitation. Not used by the paper's network.** A
+synapse may also carry a release probability $g_i$ (relative to rest) and a
+calcium trace $h_i$.
+
+**Release probability** (simplifies (7)): decays to its resting value of one,
+and is driven toward its ceiling $G$ by the calcium trace.
+
+$$
+\frac{dg_i}{dt} = \frac{1 - g_i}{\tau_{dec}} + \frac{\left( G - g_i \right) h_i}{\tau_{fac}} \tag{S7}
+$$
+
+**Calcium trace** (simplifies (8)): a low-pass copy of the rate.
+
+$$
+\frac{dh_i}{dt} = \frac{r_i - h_i}{\tau_h} \tag{S8}
+$$
+
+**Synaptic output and releasable pool with facilitation** (simplify (4) and
+(5)): $g_i$ multiplies the output and the release term, so (S9) takes the place
+of (S4) and (S10) the place of (S5). (S6) is unchanged.
+
+$$
+\theta_i = r_i\, g_i\, b_{i1} \tag{S9}
+$$
+
+$$
+\frac{db_{i1}}{dt} = \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} - \frac{g_i\, b_{i1}\, r_i}{\tau_{rel}} \tag{S10}
+$$
+
+**What the simplified form leaves out, and where it is.**
+
+- **Routes.** Depression and facilitation are per route, from a presynaptic
+  cell type to a postsynaptic one, and $c$, $K$ and the $\tau_{a_k}$ are per
+  cell type: [section 3](#3-the-full-system).
+- **Per-neuron constants.** Each neuron draws its own time constants, reserve
+  capacity, ceiling and setpoint about the values written here, which are the
+  nominal ones: [section 6](#6-per-neuron-parameters).
+- **The single-timescale condition**, and the other forms a synapse can take
+  with a variable removed: [section 4](#4-reductions).
+
+The simplified equations are the full system with every route alike and every
+spread zero. With every route alike the route superscripts drop (the shorthand
+of section 3); with every spread zero ($\sigma_{\tau_a} = \sigma_{std} =
+\sigma_{stf} = \sigma_{S_c} = 0$) each neuron's constant is the nominal one and
+the neuron index drops from it. (S1) to (S3) and (S6) to (S8) are then (1) to
+(3) and (6) to (8), (S9) and (S10) are (4) and (5), and (S4) and (S5) are (4)
+and (5) on a synapse without facilitation, which is (11). Steady states are in
+[section 5](#5-steady-states-at-a-constant-rate) and the values of the
+constants in [section 8](#8-parameter-values).
+
 ## 1. What this file is
+
+The section above, "The model at a glance", is the simplified statement for a
+first reading. Sections 2 to 9 are the full statement.
 
 This file states the network model with multiple-timescale (MTS) adaptation in
 its **chained** form: spike-frequency adaptation with $K$ timescales, short-term
