@@ -12,6 +12,9 @@
 %   * with one seed the maps drop the blank spread row and say "one seed";
 %     the lambda_1 = 0 boundary is drawn;
 %   * a result is found by run_dir in <run_dir>/mc_gain_sweep;
+%   * fig_mc_vs_lambda1 draws four panels and one colorbar, writes its PNG,
+%     and its Pearson r, Spearman rho and counts for one condition, in
+%     out.stats and in the panel's text, match a direct computation;
 %   * read_mc_gain_sweep_jobs reads a folder of finished job files (half of
 %     them, plus a *.tmp save in progress it must skip) into the same table,
 %     without touching the folder;
@@ -115,6 +118,30 @@ run_dir = fullfile(tmp, 'run'); mkdir(fullfile(run_dir, 'mc_gain_sweep'));
 copyfile(f, fullfile(run_dir, 'mc_gain_sweep', 'mc_gain_sweep_results.mat'));
 o = fig_mc_robustness('run_dir', run_dir, 'conditions', three, 'save', false, 'visible', false);
 assert(contains(o.source, 'mc_gain_sweep_results.mat')); close(o.figs);
+
+%% Memory capacity against lambda_1: draws, writes its file, its statistics
+% match a direct computation (on the unclipped values of the finite runs)
+o = fig_mc_vs_lambda1('data', D, 'conditions', four, 'out_dir', tmp, 'visible', false);
+assert(numel(findall(o.figs, 'Type', 'axes')) == 4 && isscalar(findall(o.figs, 'Type', 'colorbar')));
+assert(any(endsWith(o.files, 'Fig_MC_vs_lambda1.png')) && isfile(fullfile(tmp, 'Fig_MC_vs_lambda1.png')));
+c = 'no_adaptation';
+k = strcmp(D.T.condition, c) & ~D.T.failed & isfinite(D.T.lle_input) & isfinite(D.T.mc_total);
+x = D.T.lle_input(k); y = D.T.mc_total(k);
+pearson_direct = @(a, b) sum((a - mean(a)) .* (b - mean(b))) / ...
+    sqrt(sum((a - mean(a)).^2) * sum((b - mean(b)).^2));
+avg_rank = @(v) sum(v' < v, 2) + (sum(v' == v, 2) + 1) / 2;   % ties share their mean rank
+r_direct = pearson_direct(x, y);
+rho_direct = pearson_direct(avg_rank(x), avg_rank(y));
+S = o.stats(strcmp(o.stats.condition, c), :);
+assert(abs(S.pearson_r - r_direct) < 1e-12 && abs(S.spearman_rho - rho_direct) < 1e-12);
+assert(S.n == nnz(k) && S.n_stable == nnz(x < 0) && S.n_unstable == nnz(x > 0) && ...
+    S.n_failed == nnz(strcmp(D.T.condition, c)) - nnz(k) && S.n_clipped == nnz(abs(x) > 5));
+ax = findall(o.figs, 'Type', 'axes');
+panel = ax(strcmp(arrayfun(@(a) char(a.Title.String), ax, 'UniformOutput', false), titles_by_name({c})));
+txt = findall(panel, 'Tag', 'mc_lambda1_stats');
+assert(isscalar(txt) && contains(txt.String{1}, sprintf('Pearson r = %.2f, n = %d', r_direct, nnz(k))) && ...
+    contains(txt.String{2}, sprintf('%.2f', rho_direct)), 'the panel''s statistics must match');
+close(o.figs);
 
 %% The statistics recover the generator's pattern
 [S, files, SB, SG] = mc_gain_bias_statistics('data', D, 'out_dir', tmp, 'verbose', 'near-none');
