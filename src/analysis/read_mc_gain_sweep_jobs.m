@@ -1,5 +1,5 @@
 function [D, info] = read_mc_gain_sweep_jobs(folder)
-% READ_MC_GAIN_SWEEP_JOBS Read a gain-by-bias run that is still in progress, from its job files (block C).
+% READ_MC_GAIN_SWEEP_JOBS Read a gain sweep of memory capacity that is still in progress, from its job files (block C).
 %
 %   D = READ_MC_GAIN_SWEEP_JOBS(folder)
 %   [D, info] = READ_MC_GAIN_SWEEP_JOBS(folder)
@@ -14,12 +14,14 @@ function [D, info] = read_mc_gain_sweep_jobs(folder)
 % READ-ONLY: nothing in the folder is written, moved or deleted. A job
 % still being saved is a *.tmp file and is not matched.
 %
-% D.gains, D.biases and D.seeds are the levels FOUND, not the run's planned
-% grid; a partial run's map has gaps (grey cells) where jobs have not
-% finished. D.settings carries what the job files hold: conditions,
-% preset_name, delay_s (mc_delay_axis of the signature's protocol),
-% preset_gain and preset_bias (mc_gain_sweep_preset_point of the
-% signature's preset and model_args), partial = true and n_job_files.
+% D.gains, D.second_levels and D.seeds are the levels FOUND, not the run's
+% planned grid; a partial run's map has gaps (gray cells) where jobs have
+% not finished. D.settings carries what the job files hold: conditions,
+% preset_name, second_axis (the signature's; the bias when it names none),
+% delay_s (mc_delay_axis of the signature's protocol), preset_gain and the
+% preset's value on the second axis (preset_bias for the bias;
+% mc_gain_sweep_preset_point of the signature's preset and model_args),
+% partial = true and n_job_files.
 %
 % info: job_dir, n_files, n_read, n_unreadable (a file that fails to load
 % is listed in info.unreadable and skipped with a warning), n_signatures
@@ -76,7 +78,7 @@ if info.n_read == 0
 end
 if info.n_signatures > 1
     error('read_mc_gain_sweep_jobs:MixedRuns', ...
-        '%s holds job files of %d different runs (preset, protocol, integrator or conditions differ).', ...
+        '%s holds job files of %d different runs (preset, protocol, integrator, conditions or second axis differ).', ...
         job_dir, info.n_signatures);
 end
 T = vertcat(rows{:});
@@ -86,8 +88,10 @@ settings = struct();
 settings.conditions  = cond_names;
 settings.preset_name = signature.preset_name;
 settings.delay_s     = mc_delay_axis(signature.protocol);
-[settings.preset_gain, settings.preset_bias] = ...
-    mc_gain_sweep_preset_point(signature.preset_name, signature.model_args);
+axis2 = mc_sweep_second_axis(signature);
+settings.second_axis = axis2.property;
+[settings.preset_gain, settings.(['preset_' axis2.column])] = ...
+    mc_gain_sweep_preset_point(signature.preset_name, signature.model_args, axis2.property);
 settings.partial     = true;
 settings.n_job_files = info.n_read;
 

@@ -1,5 +1,5 @@
 function out = fig_mc_robustness(cfg)
-% FIG_MC_ROBUSTNESS The distribution of memory capacity over the whole gain-by-bias map, per condition (block C).
+% FIG_MC_ROBUSTNESS The distribution of memory capacity over the whole map of gain by the sweep's second axis, per condition (block C).
 %
 %   out = FIG_MC_ROBUSTNESS('run_dir', d)
 %   out = FIG_MC_ROBUSTNESS('data_file', f)
@@ -85,8 +85,9 @@ xlim(ax_a, [0.4, nc + 0.6]);
 set(ax_a, 'XTick', 1:nc, 'XTickLabel', cellfun(@tick_label, cond_titles, 'UniformOutput', false), ...
     'TickLabelInterpreter', 'tex');
 ylabel(ax_a, 'Memory capacity', 'FontSize', st.label_fs - 2);
-title(ax_a, sprintf('Every job: %d gains x %d biases x %d seed(s)', numel(D.gains), numel(D.biases), ...
-    numel(D.seeds)), 'FontWeight', 'normal', 'FontSize', st.title_fs - 2);
+Q2 = mc_sweep_quantity(D.second_axis.column, D);   % the second axis's wording
+title(ax_a, sprintf('Every job: %d gains x %d %s x %d seed(s)', numel(D.gains), numel(D.second_levels), ...
+    Q2.plural, numel(D.seeds)), 'FontWeight', 'normal', 'FontSize', st.title_fs - 2);
 ylim(ax_a, [0, 1.05 * max(vmax, eps)]);
 xlim(ax_b, [0, 1.05 * max(vmax, eps)]); ylim(ax_b, [0 1.02]);
 xlabel(ax_b, 'Memory capacity x', 'FontSize', st.label_fs - 2);

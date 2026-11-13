@@ -1,5 +1,5 @@
 function out = fig_mc_gain_bias_maps(cfg)
-% FIG_MC_GAIN_BIAS_MAPS Memory capacity and lambda_1 on the gain-by-bias grid, one column per condition (block C).
+% FIG_MC_GAIN_BIAS_MAPS Memory capacity and lambda_1 on the grid of gain by the sweep's second axis (the bias by default), one column per condition (block C).
 %
 %   out = FIG_MC_GAIN_BIAS_MAPS('run_dir', d)
 %   out = FIG_MC_GAIN_BIAS_MAPS('data_file', f)
@@ -29,8 +29,11 @@ function out = fig_mc_gain_bias_maps(cfg)
 %      only when cfg.show_iqr (default true) AND some cell has more than one
 %      successful seed; with one seed the row would be blank, so it is
 %      dropped and the caption says "one seed".
-% x is the gain (level_of_chaos) on a log axis, y the bias S_c; the ticks
-% are the grid's own levels. Each cell is one grid point, drawn between the
+% x is the gain (level_of_chaos) on a log axis, y the result's second axis
+% (D.second_axis): the bias S_c, or whatever property the sweep ran, for
+% example the self-feedback k in units of R_W. Its label and its name in
+% the caption come from mc_sweep_quantity. The ticks are the grid's own
+% levels. Each cell is one grid point, drawn between the
 % midpoints to its neighbours, so an irregular grid is drawn as it is.
 %
 % THE lambda_1 = 0 LINE is drawn on every row as the cell boundaries that
@@ -40,7 +43,7 @@ function out = fig_mc_gain_bias_maps(cfg)
 % contour: on a coarse grid an interpolated contour invents a position
 % between levels and stops at the outermost cell centres.
 %
-% The preset's own point (D.preset_gain, D.preset_bias: gain 1, bias 0.2)
+% The preset's own point (D.preset_gain, D.preset_second: gain 1, bias 0.2)
 % is a white star, drawn where it is even when it is not a grid level. A
 % cell with no successful seed is left grey (the axes colour).
 %
@@ -89,7 +92,8 @@ cond_titles = titles_by_name(conds);
 cond_colors = mc_condition_colors(conds);
 
 %% The grids
-nb = numel(D.biases); ng = numel(D.gains);
+Q2 = mc_sweep_quantity(D.second_axis.column, D);   % the second axis: label and wording
+nb = numel(D.second_levels); ng = numel(D.gains);
 MC = nan(nb, ng, nc); L = MC; IQ = MC; PIN = MC; SIL = MC; NOK = MC;
 for c = 1:nc
     [MC(:, :, c), NOK(:, :, c)] = mc_gain_grid(D, conds{c}, 'mc_total');
@@ -145,10 +149,10 @@ nr = numel(rows);
 fig = figure('Color', 'w', 'Position', [60 60 270 * nc + 200, 260 * nr + 120]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 outer = tiledlayout(fig, nr, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-x = log10(D.gains); y = D.biases;
+x = log10(D.gains); y = D.second_levels;
 xe = edges(x); ye = edges(y);
 xtl = arrayfun(@(v) sprintf('%.3g', v), D.gains, 'UniformOutput', false);
-ytl = arrayfun(@(v) sprintf('%.3g', v), D.biases, 'UniformOutput', false);
+ytl = arrayfun(@(v) sprintf('%.3g', v), D.second_levels, 'UniformOutput', false);
 ax_all = gobjects(nr, nc);
 % A qualifier in parentheses goes to a second line, so that four long
 % titles ("... Adaptation (product)") do not run together. When any title
@@ -181,14 +185,14 @@ for r = 1:nr
         xlim(ax, xe([1 end])); ylim(ax, ye([1 end]));
         mark_flags(ax, x, y, PIN(:, :, c) >= cfg.flag_fraction, SIL(:, :, c) >= cfg.flag_fraction);
         zero_boundary(ax, xe, ye, L(:, :, c), st);
-        plot(ax, log10(D.preset_gain), D.preset_bias, 'p', 'MarkerSize', 11, ...
+        plot(ax, log10(D.preset_gain), D.preset_second, 'p', 'MarkerSize', 11, ...
             'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 0.8);
         if r == 1
             title(ax, titles{c}, 'FontSize', st.title_fs - 2, ...
                 'FontWeight', 'normal', 'Color', cond_colors(c, :));
         end
         if c == 1
-            ylabel(ax, {R.label, 'Bias S_c'}, 'FontSize', st.label_fs - 3);
+            ylabel(ax, {R.label, capitalized(Q2.label)}, 'FontSize', st.label_fs - 3);
         else
             set(ax, 'YTickLabel', []);
         end
@@ -213,8 +217,8 @@ end
 grey_txt = 'Grey: no successful job';
 if nr == 3; grey_txt = [grey_txt ' (spread row: fewer than two)']; end
 title(outer, {sprintf('%s. Green dashed: edge between cells with \\lambda_1 > 0 and \\lambda_1 \\leq 0.', seed_txt), ...
-    sprintf('Star: preset (gain %.3g, bias %.3g). + saturated, o silent (\\geq %.0f%% of neurons). %s.', ...
-        D.preset_gain, D.preset_bias, 100 * cfg.flag_fraction, grey_txt)}, ...
+    sprintf('Star: preset (gain %.3g, %s %.3g). + saturated, o silent (\\geq %.0f%% of neurons). %s.', ...
+        D.preset_gain, Q2.symbol, D.preset_second, 100 * cfg.flag_fraction, grey_txt)}, ...
     'FontSize', st.tick_fs - 5);
 
 %% Save
@@ -267,7 +271,7 @@ for b = 1:nb
         end
     end
 end
-for b = 1:nb - 1           % neighbours along bias: a horizontal edge
+for b = 1:nb - 1           % neighbours along the second axis: a horizontal edge
     for g = 1:ng
         if fin(b, g) && fin(b + 1, g) && pos(b, g) ~= pos(b + 1, g)
             X = [X, xe(g), xe(g + 1), NaN]; Y = [Y, ye(b + 1), ye(b + 1), NaN]; %#ok<AGROW>
@@ -276,6 +280,11 @@ for b = 1:nb - 1           % neighbours along bias: a horizontal edge
 end
 if isempty(X); return; end
 plot(ax, X, Y, '--', 'Color', st.zeroline_color, 'LineWidth', 2, 'Tag', 'lle_zero');
+end
+
+function s = capitalized(s)
+% The text with its first letter in upper case, for an axis label.
+if ~isempty(s); s(1) = upper(s(1)); end
 end
 
 function c = num_labels(v)

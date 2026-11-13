@@ -9,7 +9,8 @@ function out = make_block_C_figures(data, out_dir, cfg)
 % included. A bundle draws the same figures through make_all_paper_figures
 % and its registry (mu7chain_gainbias_config).
 %
-% data      the gain-by-bias result, any of: its mc_gain_sweep_results.mat;
+% data      the result of a gain sweep (against the bias, or whatever second
+%           axis the sweep ran; the figures and tables name it), any of: its mc_gain_sweep_results.mat;
 %           its mc_gain_sweep folder or the run directory above it (the
 %           consolidated file when it exists, else the job files, read with
 %           read_mc_gain_sweep_jobs); a jobs folder; or anything
@@ -37,7 +38,8 @@ function out = make_block_C_figures(data, out_dir, cfg)
 %
 % Per set, in <out_dir>/<set>/: Fig_MC_gain_bias_maps, Fig_MC_gain_curves,
 % Fig_MC_robustness, Fig_MC_vs_lambda1 (save_figure_stable's formats) and
-% MC_gain_bias_statistics.{csv,md} with _by_bias.csv and _by_gain.csv.
+% MC_gain_bias_statistics.{csv,md} with _by_bias.csv (named by the second
+% axis: _by_self_feedback.csv for a self-feedback sweep) and _by_gain.csv.
 %
 % out: source, notes (cellstr), and one field per set that was drawn (dir,
 % conditions, files, the statistics table S).

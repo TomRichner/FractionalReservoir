@@ -1,15 +1,17 @@
 function out = fig_mc_sweep_scatter(cfg)
-% FIG_MC_SWEEP_SCATTER One quantity of the gain-by-bias sweep against another, every run, one panel per condition (block C).
+% FIG_MC_SWEEP_SCATTER One quantity of the gain sweep of memory capacity against another, every run, one panel per condition (block C).
 %
 %   out = FIG_MC_SWEEP_SCATTER('run_dir', d, 'x', 'lle_input', 'y', 'mc_total')
 %   out = FIG_MC_SWEEP_SCATTER('data_file', f, 'x', 'bias', 'y', 'rate_mean', 'color_by', 'gain')
 %   out = FIG_MC_SWEEP_SCATTER('data', D, 'save', false)   % D from read_mc_gain_sweep, or a table
 %
-% Every run of run_mc_gain_sweep (every gain, bias and seed) is a point, x
-% against y, colored by a third quantity, one panel per condition. The
-% quantities are named, and defined once, by mc_sweep_quantity: the
-% table's columns (gain, bias, mc_total, horizon, lle_input, lle_noinput,
-% rate_E, rate_I, frac_pinned, frac_silent) and the derived rate_mean and
+% Every run of run_mc_gain_sweep (every gain, level of the second axis and
+% seed) is a point, x against y, colored by a third quantity, one panel per
+% condition. The quantities are named, and defined once, by
+% mc_sweep_quantity: the table's columns (gain, the result's second axis
+% under its own name, bias or self_feedback, then mc_total, horizon,
+% lle_input, lle_noinput, rate_E, rate_I, frac_pinned, frac_silent) and the
+% derived rate_mean and
 % frac_on_slope. Each brings its label, its axis scale (log for gain), its
 % axis limits and an optional clip. fig_mc_vs_lambda1 is this figure with
 % x = lle_input, y = mc_total, colored by gain.
@@ -175,8 +177,9 @@ elseif strcmp(Qc.scale, 'log')
 end
 cb.Label.String = cb_label;
 
-caption = sprintf('%s against %s, every run (%d gains x %d biases x %d seeds)', Qy.symbol, ...
-    Qx.symbol, numel(D.gains), numel(D.biases), numel(D.seeds));
+Q2 = quantity(D.second_axis.column);   % the sweep's second axis: what its levels are called
+caption = sprintf('%s against %s, every run (%d gains x %d %s x %d seeds)', Qy.symbol, ...
+    Qx.symbol, numel(D.gains), numel(D.second_levels), Q2.plural, numel(D.seeds));
 clipped_q = [Qx, Qy];
 clipped_q = clipped_q(~cellfun(@isempty, {clipped_q.clip}));
 if ~isempty(clipped_q)
