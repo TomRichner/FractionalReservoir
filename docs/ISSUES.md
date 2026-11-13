@@ -967,7 +967,28 @@ becomes an issue with an acceptance test.
   constant is the neuron's fastest MTS rung.
 - **Serves:** block C
 - **Depends on:** FD-007, FD-015.
-- **Result:** _(pending)_
+- **Result (quick test, 2026-11-13):** report
+  `docs/notes/Block_C_results_2026-11-13.md` (PDF beside it, not
+  tracked); proposed manuscript text
+  `../StochasticPlasticDynamicalSystemPaper/docs/Block_C_proposed_results.md`.
+  Runs: the pilot (45 jobs), the main map (11 gains 0.1 to 4 by 7 biases
+  -0.6 to 0.6 by seeds 3001 and 3002, four conditions, 154 jobs,
+  `data/mc_gain_sweep_main`), and the 3 : 2 and 2 : 3 networks (11 gains
+  at bias 0.2, seed 3001, `data/mc_gain_sweep_EI3to2`, `..._EI2to3`); no
+  failed job. Findings: adaptation of any kind widens the gain range with
+  good memory about fourfold (0.55 against 2.0 to 2.4 octaves at the
+  preset bias); memory is best just on the stable side of lambda_1 = 0 in
+  every condition, and adaptation moves that edge to higher gain, more so
+  at low bias; chained MTS and 1TS are not separated on the standard
+  network (paired median difference +0.03); the preset network sits on
+  the edge for 1TS and chained MTS; with excitation dominant no
+  adaptation saturates and chained MTS leads 1TS (one seed). Code:
+  `run_mc_gain_sweep` and its lean memory path, the opt-in stage and the
+  bundle `mu7chain_gainbias_config`, the figure set, after a code-quality
+  pass (merges `94926ad`, `f5ab69b`, `ae3a980`). Decision 19's first-seed
+  reading, written before the full result, held. Open, Tom's: the claim,
+  the single-network panel of Figure 6, main text or supplement, a
+  `medium` run.
   **FD-010, decisions by the lead during the work (2026-11-12 night):**
   9. *The references F3 moves are re-captured by a worker, on the lead's
      instruction, one per commit.* The lead may not run MATLAB over about
