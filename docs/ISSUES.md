@@ -1132,3 +1132,30 @@ becomes an issue with an acceptance test.
      separate calls of about 30, 15 and 15 minutes. The `essential` and
      `fast` entries of the stage's size table are to be sized the same way
      when the bundle branch is merged.
+
+### FD-024 Memory capacity across gain and self-negative feedback (block C, follow-on)
+
+- **Status:** in progress (planned with Tom, 2026-11-13). Build:
+  `matlab-fable-1`; the first run follows the merge.
+- **What and why:** the Jacobian derivation (`Equations_chained_MTS.md`,
+  section 10) shows the bias enters the no-adaptation Jacobian only through
+  the slopes Phi', and block C found the no-adaptation edge nearly
+  independent of bias. Tom: run the memory-capacity sweep with
+  self-negative feedback in W varied as well as gain.
+- **Tom's decisions (2026-11-13):** the feedback is the diagonal of W
+  (W_ii gets -k, through the neuron's synaptic output, depressed by its own
+  pools; breaks Dale's law for E cells, accepted and stated); independent
+  of the gain, W = g W_drawn - k R_W I with k in units of the bulk radius
+  at gain 1; first grid gain by k at the preset bias (0.2), one seed, four
+  conditions, about 30 jobs and 30 minutes.
+- **Done means:** a `1 x C` model property applied in `get_params` (no
+  branch in the dynamics or Jacobian functions; k = 0 bit-identical, the
+  ultrarapid and tolerance tiers unchanged); unit tests (diagonal,
+  finite-difference Jacobian, `jacobian_times`, eigenvalue shift); both
+  equation files; the sweep stage's second axis generalized from the bias
+  to any scalar model property, with existing results and job files still
+  read and resumed; the first grid run, and the maps and scatters drawn.
+- **Related exploration (2026-11-13, merged `1bb77c7`):** on the main
+  sweep, without adaptation bias sets the mean rate (r = -0.67) but does
+  not track lambda_1 (r = 0.00).
+- **Result:** _(pending)_
