@@ -210,11 +210,20 @@ assert_throws(@() paper_stage_plan(struct('stages', {{'paper_illustrations'}})),
 code = regexprep(fileread(which('run_all_paper_analyses')), '%[^\n]*', '');
 tok = regexp(code, '''(\w+)'',\s*@\(\)\s*run_', 'tokens');
 table_names = cellfun(@(t) t{1}, tok, 'UniformOutput', false);
-% Then the opt-in stages (FD-010), in paper_stage_names' order.
-[~, ~, opt_in] = paper_stage_names();
-assert(isequal(opt_in, {'mc_gain_sweep'}));
-assert(isequal(table_names, [all_stages(2:end), opt_in]), 'run_all_paper_analyses'' stage table is: %s', ...
+assert(isequal(table_names, all_stages(2:end)), 'run_all_paper_analyses'' stage table is: %s', ...
     strjoin(table_names, ', '));
+% The opt-in stages (FD-010) are not written in that table: the entry point
+% appends the ones a bundle selects from paper_opt_in_stages, which is also
+% where paper_stage_names takes their names from. Each has a plan and a run
+% function that exist.
+[~, ~, opt_in] = paper_stage_names();
+registry = paper_opt_in_stages();
+assert(isequal(opt_in, {registry.name}) && isequal(opt_in, {'mc_gain_sweep'}));
+assert(isempty(intersect(opt_in, all_stages)), 'an opt-in stage must not also be in the first list');
+for k = 1:numel(registry)
+    assert(exist(func2str(registry(k).plan), 'file') == 2 && exist(func2str(registry(k).run), 'file') == 2, ...
+        'opt-in stage %s: its plan or run function is missing', registry(k).name);
+end
 
 %% The pre-flight refuses a bad selection before anything exists
 probe_rel = 'data/__essential_preflight_probe__';

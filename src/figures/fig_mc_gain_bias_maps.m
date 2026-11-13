@@ -43,20 +43,19 @@ function out = fig_mc_gain_bias_maps(cfg)
 % cell with no successful seed is left grey (the axes colour).
 %
 % SATURATED AND SILENT CELLS: a cell whose median over seeds of the
-% fraction of neurons pinned above 0.9 is >= cfg.flag_fraction (0.9)
-% carries a small grey '+', one whose fraction silent below 0.01 is >=
-% cfg.flag_fraction a small grey 'o', so a low memory capacity there is
-% not read as chaos. 0.9 rather than 0.5: on the pilot the chained MTS at
-% bias 0.55 has 57 % of its neurons silent and still a memory capacity of
-% 5 to 9, so half silent is not a failed network; at bias 0.8 every
-% neuron is silent. Flags are per condition.
+% fraction of pinned neurons is >= cfg.flag_fraction (0.9) carries a small
+% grey '+', one whose fraction of silent neurons is >= cfg.flag_fraction a
+% small grey 'o', so a low memory capacity there is not read as chaos. 0.9
+% rather than 0.5: a network with more than half its neurons silent can
+% still hold a memory capacity of 5 to 9 (chained MTS at bias 0.55), so
+% half silent is not a failed network. Flags are per condition.
 %
 % WHICH CONDITIONS: cfg.conditions through select_conditions (empty = all the
-% result holds, in its order); titles and colours by name from
-% manuscript_style. Works for three and four columns.
+% result holds, in its order); titles and colours by name (titles_by_name,
+% mc_condition_colors). Any number of columns.
 %
-% The table is read by read_mc_gain_sweep (the one reader), located by
-% resolve_mc_gain_sweep.
+% The result is taken through resolve_mc_gain_sweep (data, data_file or
+% run_dir).
 %
 % See also: fig_mc_gain_curves, fig_mc_robustness, mc_gain_bias_statistics, symlog_lle
 
@@ -79,10 +78,12 @@ arguments
 end
 
 setup_paths();
-D = load_data(cfg);
-[conds, ~] = select_conditions(D.conditions, cfg.conditions);
+D = resolve_mc_gain_sweep('data', cfg.data, 'data_file', cfg.data_file, 'run_dir', cfg.run_dir);
+conds = select_conditions(D.conditions, cfg.conditions);
 nc = numel(conds);
 st = manuscript_style();
+cond_titles = titles_by_name(conds);
+cond_colors = mc_condition_colors(conds);
 
 %% The grids
 nb = numel(D.biases); ng = numel(D.gains);
@@ -96,8 +97,7 @@ for c = 1:nc
 end
 n_seeds = max([NOK(:); 0]);              % most successful seeds behind any cell
 % A cell with fewer than two successful seeds has no spread to show: grey,
-% not white. White would read as "the seeds agree", and on a run in
-% progress (seeds finishing unevenly) that was most of the row.
+% not white, which would read as "the seeds agree".
 IQ(NOK < 2) = NaN;
 mc_max = max([MC(:); eps]);
 switch cfg.mc_scale
@@ -115,15 +115,15 @@ end
 L_col = symlog_lle(L, cfg.lle_lin, cfg.lle_clip);
 iq_clim = [0, max([IQ(:); eps])];
 
-rows = {struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', seq_cmap(), ...
+rows = {struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', mc_cmap(), ...
                'label', 'Memory capacity', 'cb', mc_cb, ...
                'ticks', mc_f(mc_ticks), 'ticklabels', {num_labels(mc_ticks)})
-        struct('V', L_col, 'clim', l_lim, 'cmap', div_cmap(), ...
+        struct('V', L_col, 'clim', l_lim, 'cmap', lle_cmap(), ...
                'label', '\lambda_1, task input on', ...
                'cb', sprintf('\\lambda_1 (1/s), symmetric log, clipped at \\pm%g', cfg.lle_clip), ...
                'ticks', l_tp, 'ticklabels', {l_tl})};
 if cfg.show_iqr && n_seeds > 1
-    rows{end+1} = struct('V', IQ, 'clim', iq_clim, 'cmap', gray_cmap(), ...
+    rows{end+1} = struct('V', IQ, 'clim', iq_clim, 'cmap', spread_cmap(), ...
                          'label', 'Spread over seeds', 'cb', 'MC IQR over seeds', ...
                          'ticks', [], 'ticklabels', {{}});
 end
@@ -144,7 +144,7 @@ ax_all = gobjects(nr, nc);
 % qualifier), so the condition names stay on one baseline across the row.
 titles = cell(1, nc);
 for c = 1:nc
-    titles{c} = strsplit(regexprep(cond_title(st, conds{c}), '\s+(\(.*\))$', '\n$1'), newline);
+    titles{c} = strsplit(regexprep(cond_titles{c}, '\s+(\(.*\))$', '\n$1'), newline);
 end
 n_lines = max(cellfun(@numel, titles));
 for c = 1:nc
@@ -169,7 +169,7 @@ for r = 1:nr
             'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 0.8);
         if r == 1
             title(ax, titles{c}, 'FontSize', st.title_fs - 2, ...
-                'FontWeight', 'normal', 'Color', cond_color(st, conds{c}));
+                'FontWeight', 'normal', 'Color', cond_colors(c, :));
         end
         if c == 1
             ylabel(ax, {R.label, 'Bias S_c'}, 'FontSize', st.label_fs - 3);
@@ -211,14 +211,6 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function D = load_data(cfg)
-if ~isempty(cfg.data)
-    if isstruct(cfg.data) && isfield(cfg.data, 'gains'); D = cfg.data; else; D = read_mc_gain_sweep(cfg.data); end
-else
-    D = resolve_mc_gain_sweep(cfg.data_file, cfg.run_dir);
-end
-end
-
 function e = edges(v)
 % Cell edges: midpoints, extended by half a step at each end.
 v = v(:)';
@@ -274,27 +266,23 @@ function c = num_labels(v)
 c = arrayfun(@(x) sprintf('%g', x), v, 'UniformOutput', false);
 end
 
-function c = seq_cmap()
-k = [1 1 1; 0.99 0.88 0.55; 0.93 0.55 0.25; 0.70 0.18 0.18; 0.30 0.02 0.20];
-c = interp1(linspace(0, 1, size(k, 1)), k, linspace(0, 1, 256));
+function c = mc_cmap()
+% Memory capacity: white (none) through orange to dark red.
+c = interpolated_cmap([1 1 1; 0.99 0.88 0.55; 0.93 0.55 0.25; 0.70 0.18 0.18; 0.30 0.02 0.20]);
 end
 
-function c = div_cmap()
-k = [0.02 0.19 0.38; 0.26 0.58 0.76; 1 1 1; 0.84 0.38 0.30; 0.40 0.00 0.05];
-c = interp1(linspace(0, 1, size(k, 1)), k, linspace(0, 1, 256));
+function c = lle_cmap()
+% lambda_1: diverging, blue (stable) through white (zero) to red (chaotic).
+c = interpolated_cmap([0.02 0.19 0.38; 0.26 0.58 0.76; 1 1 1; 0.84 0.38 0.30; 0.40 0.00 0.05]);
 end
 
-function c = gray_cmap()
-% White to dark purple, not grey: grey is the colour of a cell with no data
-% (the axes colour), and a grey scale made the two indistinguishable.
-k = [1 1 1; 0.80 0.76 0.89; 0.55 0.45 0.72; 0.25 0.10 0.40];
-c = interp1(linspace(0, 1, size(k, 1)), k, linspace(0, 1, 256));
+function c = spread_cmap()
+% Spread over seeds: white to dark purple. Not a grey scale: grey is the
+% colour of a cell with no data (the axes colour).
+c = interpolated_cmap([1 1 1; 0.80 0.76 0.89; 0.55 0.45 0.72; 0.25 0.10 0.40]);
 end
 
-function t = cond_title(st, nm)
-if isKey(st.condition_title, nm); t = st.condition_title(nm); else; t = nm; end
-end
-
-function c = cond_color(st, nm)
-if isKey(st.condition_color, nm); c = st.condition_color(nm); else; c = [0.3 0.3 0.3]; end
+function c = interpolated_cmap(anchors)
+% 256 colours, linear between equally spaced anchor rows.
+c = interp1(linspace(0, 1, size(anchors, 1)), anchors, linspace(0, 1, 256));
 end

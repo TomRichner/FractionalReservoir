@@ -16,10 +16,10 @@ function plan = paper_stage_plan(cfg)
 % THE CONFIG FIELDS
 %   cfg.stages   cell of stage names (paper_stage_names). Absent or empty:
 %                every stage, exactly as before the field existed. An
-%                OPT-IN stage (paper_stage_names' third output, such as
-%                'mc_gain_sweep') runs only when named here; "every stage"
-%                never includes it, and a plan that does not name it does
-%                not mention it (not in stages_skipped, no field in runs).
+%                OPT-IN stage (paper_stage_names' third output) runs only
+%                when named here; "every stage" never includes it, and a
+%                plan that does not name it does not mention it (not in
+%                stages_skipped, no field in runs).
 %   cfg.sweeps   cell of sweep names, the analyses the 'sweeps' stage runs.
 %                Absent or empty: all three. Ignored (plan.sweeps is empty)
 %                when 'sweeps' itself is not selected.
@@ -64,10 +64,8 @@ if ~has_illustrations
 end
 
 %% Stages
-% An opt-in stage (paper_stage_names' third list) joins `available` only when
-% cfg.stages names it, so a bundle that does not name one has the plan it
-% had before opt-in stages existed: not in stages, not in stages_skipped,
-% no field in runs.
+% An opt-in stage joins `available` only when cfg.stages names it, so a
+% bundle that names none has a plan that does not mention them.
 want = selection(cfg, 'stages');
 if isempty(want)
     run_stage = true(size(available));
@@ -114,8 +112,9 @@ plan.runs = struct();
 for k = 1:numel(all_stages)
     plan.runs.(all_stages{k}) = ismember(all_stages{k}, plan.stages);
 end
-for k = 1:numel(opt_in)
-    if ismember(opt_in{k}, plan.stages); plan.runs.(opt_in{k}) = true; end
+selected_opt_in = opt_in(ismember(opt_in, plan.stages));
+for k = 1:numel(selected_opt_in)
+    plan.runs.(selected_opt_in{k}) = true;
 end
 end
 

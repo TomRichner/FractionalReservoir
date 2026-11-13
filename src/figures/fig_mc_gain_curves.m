@@ -6,9 +6,10 @@ function out = fig_mc_gain_curves(cfg)
 %   out = FIG_MC_GAIN_CURVES('data_file', {f_std, f_3to2, f_2to3}, ...
 %                            'row_labels', {'1 : 1', 'E : I = 3 : 2', 'E : I = 2 : 3'})
 %   out = FIG_MC_GAIN_CURVES('data', {D1, D2}, 'save', false)
+%   out = FIG_MC_GAIN_CURVES('run_dir', d, 'variants', {'EI3to2', 'EI2to3'})
 %
-% One ROW per result (the standard network, then the 3 : 2 and 2 : 3
-% networks of Plan C runs C3b and C3c), three columns:
+% One ROW per result (the standard network, then the variant networks:
+% E : I = 3 : 2 and 2 : 3 in block C), three columns:
 %   (1) memory capacity against gain (log axis),
 %   (2) lambda_1 with the memory-task input on against gain, zero line,
 %   (3) memory capacity against lambda_1.
@@ -33,13 +34,16 @@ function out = fig_mc_gain_curves(cfg)
 % the nearest bias level its result holds, and the row title states both,
 % so a result swept only along gain (one bias level) is drawn at that level.
 %
-% FROM A RUN DIRECTORY (cfg.run_dir, no data or data_file), the rows are the
-% main result (<run_dir>/mc_gain_sweep) and then every E:I gain-only run the
-% bundle's mc_gain_sweep stage made beside it,
-% <run_dir>/mc_gain_sweep_<suffix>/mc_gain_sweep/mc_gain_sweep_results.mat
-% (EI3to2 first, then EI2to3, then any other by name). None there: one row.
-% Nothing outside run_dir is read. cfg.ei_rows = false draws the main row
-% alone.
+% WHICH RESULTS, one row each (resolve_mc_gain_sweep):
+%   cfg.data       results in memory (one, or a cell of them)
+%   cfg.data_file  results files (one, or a cell of them)
+%   cfg.run_dir    a run directory: its main result, then the result of
+%                  each variant network named in cfg.variants (the tags a
+%                  bundle's mc_gain_sweep stage ran, in the order given). A
+%                  variant the run directory does not hold is an error.
+% ROW LABELS: cfg.row_labels, else each network's ratio of mean excitatory
+% to mean inhibitory weight read from its preset ("E : I = 3 : 2"), else
+% the file name.
 %
 % Rows share y limits per column, so the networks can be compared.
 % Conditions by cfg.conditions (select_conditions, against each result).
@@ -51,7 +55,8 @@ arguments
     cfg.run_dir     (1,:) char    = ''
     cfg.data_file                 = ''      % char, or a cell of files (one row each)
     cfg.data                      = []      % read_mc_gain_sweep output / table, or a cell of them
-    cfg.row_labels                = {}      % one per row; empty = from the preset name or file
+    cfg.variants    (1,:) cell    = {}      % with run_dir: variant networks to add as rows
+    cfg.row_labels                = {}      % one per row; empty = from each result's preset, or its file
     cfg.bias                      = []      % empty = each result's preset bias
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
@@ -61,7 +66,6 @@ arguments
     cfg.lle_lin     (1,1) double  = 0.05    % symlog_lle's linear scale (1/s)
     cfg.lle_clip    (1,1) double  = 10      % |lambda_1| clipped here (1/s)
     cfg.fig_tag     (1,:) char    = 'Fig_MC_gain_curves'
-    cfg.ei_rows     (1,1) logical = true    % with run_dir: add the E:I runs found there
 end
 
 setup_paths();
@@ -85,13 +89,14 @@ legend_h = gobjects(0); legend_t = {};
 for r = 1:n_rows
     D = Ds{r};
     conds = select_conditions(D.conditions, cfg.conditions);
+    cond_colors = mc_condition_colors(conds);
     b_want = cfg.bias; if isempty(b_want); b_want = D.preset_bias; end
     [~, ib] = min(abs(D.biases - b_want));
     b = D.biases(ib);
     g = D.gains;
     for k = 1:3; ax(r, k) = nexttile(tl); hold(ax(r, k), 'on'); end
     for c = 1:numel(conds)
-        col = cond_color(st, conds{c});
+        col = cond_colors(c, :);
         T = D.T(strcmp(D.T.condition, conds{c}) & D.T.bias == b & ~D.T.failed, :);
         [mc_m, mc_lo, mc_hi] = per_gain(T, g, 'mc_total');
         [l_m, l_lo, l_hi]    = per_gain(T, g, 'lle_input');
@@ -135,7 +140,7 @@ end
 set(ax, 'FontSize', st.tick_fs - 3, 'TickDir', 'out', 'Box', 'off');
 for k = 1:3; linkaxes(ax(:, k), 'y'); end
 linkaxes(ax(:, 3), 'x');
-lg = legend(ax(1, 3), legend_h, cellfun(@(n) cond_title(st, n), legend_t, 'UniformOutput', false), ...
+lg = legend(ax(1, 3), legend_h, titles_by_name(legend_t), ...
     'Box', 'off', 'FontSize', st.tick_fs - 4);
 lg.Layout.Tile = 'south';
 lg.Orientation = 'horizontal';
@@ -150,52 +155,46 @@ end
 
 %% ------------------------------------------------------------------------
 function Ds = load_all(cfg)
+% One result per row; the header's WHICH RESULTS says from where.
 if ~isempty(cfg.data)
-    src = cfg.data; if ~iscell(src); src = {src}; end
-    Ds = cellfun(@as_D, src, 'UniformOutput', false);
+    Ds = cellfun(@(d) resolve_mc_gain_sweep('data', d), as_cell(cfg.data), 'UniformOutput', false);
 elseif ~isempty(cfg.data_file)
-    src = cfg.data_file; if ~iscell(src); src = {src}; end
-    Ds = cellfun(@(f) read_mc_gain_sweep(char(f)), src, 'UniformOutput', false);
+    Ds = cellfun(@(f) resolve_mc_gain_sweep('data_file', char(f)), as_cell(cfg.data_file), ...
+        'UniformOutput', false);
 else
-    Ds = {resolve_mc_gain_sweep('', cfg.run_dir)};
-    if cfg.ei_rows
-        Ds = [Ds, ei_results(cfg.run_dir)];
-    end
+    Ds = [{resolve_mc_gain_sweep('run_dir', cfg.run_dir)}, ...
+        cellfun(@(v) resolve_mc_gain_sweep('run_dir', cfg.run_dir, 'variant', v), cfg.variants, ...
+        'UniformOutput', false)];
 end
 end
 
-function Ds = ei_results(run_dir)
-% The E:I gain-only runs a bundle made beside the main one (run_all_paper_
-% analyses' mc_gain_sweep stage): <run_dir>/mc_gain_sweep_<suffix>/
-% mc_gain_sweep/mc_gain_sweep_results.mat, each a further row. Only inside
-% run_dir; none is fine. Order: 3 : 2, then 2 : 3, then any other by name.
-Ds = {};
-L = dir(fullfile(run_dir, 'mc_gain_sweep_*'));
-L = L([L.isdir]);
-if isempty(L); return; end
-names = {L.name};
-first = {'mc_gain_sweep_EI3to2', 'mc_gain_sweep_EI2to3'};
-names = [first(ismember(first, names)), sort(setdiff(names, first))];
-for k = 1:numel(names)
-    f = fullfile(run_dir, names{k}, 'mc_gain_sweep', 'mc_gain_sweep_results.mat');
-    if isfile(f); Ds{end+1} = read_mc_gain_sweep(f); end %#ok<AGROW>
-end
-end
-
-function D = as_D(x)
-if isstruct(x) && isfield(x, 'gains'); D = x; else; D = read_mc_gain_sweep(x); end
+function c = as_cell(x)
+if iscell(x); c = x; else; c = {x}; end
 end
 
 function s = row_label(D)
+% The network's E : I ratio when its preset gives one, else the file name.
+s = '';
 if ~isempty(D.preset_name)
-    s = D.preset_name;
-    if endsWith(s, '_EI3to2'), s = 'E : I = 3 : 2';
-    elseif endsWith(s, '_EI2to3'), s = 'E : I = 2 : 3';
-    else, s = 'E : I = 1 : 1';
-    end
-else
+    s = ei_ratio_label(D.preset_name);
+end
+if isempty(s)
     [~, s] = fileparts(D.source);
 end
+end
+
+function s = ei_ratio_label(preset_name)
+% "E : I = p : q", the ratio of the mean excitatory to the mean inhibitory
+% weight (|mu_E| : |mu_I|, as a ratio of small integers), read from the
+% preset. Empty when the preset is not a two-type E, I network. A
+% model_args override of the weights is not seen here; pass row_labels.
+s = '';
+d = srnn_param_preset(preset_name);
+if ~(isfield(d, 'cell_type_names') && isequal(d.cell_type_names, {'E', 'I'})); return; end
+mu = d.mu_tilde_relative;                 % (post, pre), or a presynaptic row
+mu_by_pre = mean(mu, 1);
+[p, q] = rat(abs(mu_by_pre(1) / mu_by_pre(2)));
+s = sprintf('E : I = %d : %d', p, q);
 end
 
 function [m, lo, hi] = per_gain(T, g, field)
@@ -220,17 +219,16 @@ function mark_cluster(ax, l_m, mc_m, col, c, sl)
 % A run of stable per-gain medians whose lambda_1 barely moves: bracket it
 % and state the value, so the stack is not mistaken for a trend.
 % The statement goes in a list in the axes' lower-left corner (strongly
-% negative lambda_1 with low memory capacity, where a stable network does
-% not sit; the upper left holds the no-adaptation peak), one line
-% per clustered condition in its colour, stacked by the condition's index:
-% the chained and product MTS both cluster near -0.1, and labels placed
-% beside their brackets overlapped each other and the 1TS curve, and ran
-% past the left edge of the axes.
+% negative lambda_1 with low memory capacity, where no curve runs), one
+% line per clustered condition in its colour. Not beside the bracket: two
+% conditions that cluster at the same lambda_1 would overlap there.
+MIN_POINTS = 3;         % per-gain medians that make a cluster
+HALF_WIDTH = 0.03;      % 1/s around their median lambda_1
 k = find(isfinite(l_m) & isfinite(mc_m) & l_m < 0);
-if numel(k) < 3; return; end
+if numel(k) < MIN_POINTS; return; end
 lv = l_m(k);
-in = abs(lv - median(lv)) <= 0.03;
-if nnz(in) < 3; return; end
+in = abs(lv - median(lv)) <= HALF_WIDTH;
+if nnz(in) < MIN_POINTS; return; end
 lc = median(lv(in)); y = mc_m(k(in));
 x0 = sl(lc) - 0.15 - 0.08 * (c - 1);
 plot(ax, x0 * [1 1], [min(y) max(y)], '-', 'Color', col, 'LineWidth', 1, 'HandleVisibility', 'off');
@@ -249,10 +247,3 @@ if numel(xt) < 2; xt = gains([1 end]); end
 xtl = arrayfun(@(v) sprintf('%g', v), xt, 'UniformOutput', false);
 end
 
-function t = cond_title(st, nm)
-if isKey(st.condition_title, nm); t = st.condition_title(nm); else; t = nm; end
-end
-
-function c = cond_color(st, nm)
-if isKey(st.condition_color, nm); c = st.condition_color(nm); else; c = [0.3 0.3 0.3]; end
-end

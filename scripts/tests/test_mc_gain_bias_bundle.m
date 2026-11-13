@@ -12,17 +12,20 @@
 %      list; a typo is still refused.
 %   3. The bundle: its plan is exactly {'mc_gain_sweep'} (every other stage
 %      skipped, no sweep), its directories, registry, conditions per set,
-%      E:I presets, and that it is mu7chain_config's otherwise; a bad mode
-%      and a bad cfg.mc_gain_sweep field are refused before the run
-%      directory exists.
+%      variant networks, and that it is mu7chain_config's otherwise; the
+%      stage's plan (the main run, then one gain-only run per variant at
+%      its own bias, in its own folder); a bad mode, an unknown
+%      cfg.mc_gain_sweep field, an unknown variant preset and a tag that
+%      is no folder name are refused before the run directory exists.
 %   4. END TO END on a tiny case: run_all_paper_analyses on the bundle
 %      ('essential', 3cond) with a 50-neuron network, the shortened protocol
 %      of test_mc_gain_sweep, a 2 x 2 grid, one seed and three conditions,
 %      serial; then make_all_paper_figures from that run directory. The main
-%      result and the two E:I gain-only results (one bias level each, the
-%      preset's 0.2) are where the figures look; all four registry entries
-%      write files; the gain-curves figure has three rows, and one with
-%      ei_rows = false.
+%      result and the two variants' gain-only results (one bias level each,
+%      the preset's 0.2) are where the figures look; all four registry
+%      entries write files; the gain-curves figure has one row per network
+%      named, labelled by its E : I ratio, and a variant the run directory
+%      does not hold is an error.
 %
 % Asserts; prints one PASS line. About two minutes, serial, no pool needed.
 % Assumes setup_paths has run and a pool allocation is set (pool_set(0)
@@ -74,7 +77,12 @@ for md = {'essential', 'fast'}
         if strcmp(fs{1}, '3cond'); want = conds3; else; want = conds4; end
         assert(isequal(c.conditions, want));
         assert(isequal(c.figure_sets, base.figure_sets));
-        assert(isequal(c.mc_gain_sweep.ei_presets, {[base.mc_preset '_EI3to2'], [base.mc_preset '_EI2to3']}));
+        assert(isequal({c.mc_gain_sweep.variants.tag}, {'EI3to2', 'EI2to3'}));
+        assert(isequal({c.mc_gain_sweep.variants.preset}, ...
+            {[base.mc_preset '_EI3to2'], [base.mc_preset '_EI2to3']}));
+        curves = c.figures{strcmp(names, 'fig_mc_gain_curves')};
+        assert(isequal(curves.args, {'variants', {'EI3to2', 'EI2to3'}}), ...
+            'the gain-curves entry must name the variants the stage runs');
         differs = {'stages', 'sweeps', 'eig_heatmap_examples', 'mc_gain_sweep', 'run_dir', ...
             'fig_root', 'figures'};
         assert(isequal(rmfield(c, differs), rmfield(base, intersect(differs, fieldnames(base)))), ...
@@ -82,14 +90,51 @@ for md = {'essential', 'fast'}
     end
 end
 assert(throws(@() mu7chain_gainbias_config('fast2'), 'mu7chain_gainbias_config:BadRunMode'));
+assert(strcmp(mu7chain_gainbias_config().run_mode, 'essential'), 'the default is the size agents run');
+
+% The stage's plan: the main run into the run directory, then each variant
+% along gain only, at its own bias, into its own folder, with the main
+% run's options (and seeds, unless variant_seeds says otherwise).
+c = mu7chain_gainbias_config('essential');
+c.mc_gain_sweep.gain_levels = [0.5 1];
+c.mc_gain_sweep.bias_levels = [0 0.2];
+c.mc_gain_sweep.seeds = [3001 3002];
+pl = mc_gain_sweep_stage_plan(c);
+assert(isequal({pl.runs.label}, {'main', 'EI3to2', 'EI2to3'}));
+assert(isequal({pl.runs.folder}, {'', 'mc_gain_sweep_EI3to2', 'mc_gain_sweep_EI2to3'}));
+a = pl.runs(1).args;
+assert(strcmp(arg(a, 'preset_name'), c.mc_preset) && strcmp(arg(a, 'run_mode'), 'essential') && ...
+    strcmp(arg(a, 'ode_solver'), c.mc_ode_solver) && isequal(arg(a, 'gain_levels'), [0.5 1]) && ...
+    isequal(arg(a, 'bias_levels'), [0 0.2]) && isequal(arg(a, 'seeds'), [3001 3002]));
+for k = 2:3
+    a = pl.runs(k).args;
+    assert(strcmp(arg(a, 'preset_name'), c.mc_gain_sweep.variants(k - 1).preset) && ...
+        isequal(arg(a, 'gain_levels'), [0.5 1]) && isequal(arg(a, 'bias_levels'), 0.2) && ...
+        isequal(arg(a, 'seeds'), [3001 3002]), ...
+        '%s: gain only, at the preset''s own bias, with the main run''s gains and seeds', pl.runs(k).label);
+end
+c.mc_gain_sweep.variant_seeds = 3001;
+c.mc_gain_sweep.model_args = {'S_c', 0.3};
+pl = mc_gain_sweep_stage_plan(c);
+a = pl.runs(3).args;
+assert(isequal(arg(a, 'seeds'), 3001) && isequal(arg(a, 'bias_levels'), 0.3) && ...
+    isequal(arg(pl.runs(1).args, 'seeds'), [3001 3002]), ...
+    'variant_seeds and a model_args override of S_c reach the variant runs, not the main one');
+
 probe = fullfile(root, 'data', '__gainbias_preflight_probe__');
 assert(~isfolder(probe));
 bad = mu7chain_gainbias_config('essential'); bad.run_dir = probe;
 bad.mc_gain_sweep.gains = [1 2];
-assert(throws(@() run_all_paper_analyses(bad), 'run_all_paper_analyses:BadMcGainSweep'));
+assert(throws(@() run_all_paper_analyses(bad), 'mc_gain_sweep_stage_plan:BadConfig'));
 bad = mu7chain_gainbias_config('essential'); bad.run_dir = probe;
-bad.mc_gain_sweep.ei_presets = {'no_such_preset'};
+bad.mc_gain_sweep.variants(1).preset = 'no_such_preset';
 assert(throws(@() run_all_paper_analyses(bad), ''));
+bad = mu7chain_gainbias_config('essential'); bad.run_dir = probe;
+bad.mc_gain_sweep.variants(1).tag = 'E:I 3/2';
+assert(throws(@() run_all_paper_analyses(bad), 'mc_gain_sweep_variant_folder:BadTag'));
+bad = mu7chain_gainbias_config('essential'); bad.run_dir = probe;
+bad.mc_gain_sweep.variants(2).tag = bad.mc_gain_sweep.variants(1).tag;
+assert(throws(@() run_all_paper_analyses(bad), 'mc_gain_sweep_stage_plan:BadConfig'));
 assert(~isfolder(probe), 'a refused run must not create its run directory');
 
 %% 4. End to end, tiny
@@ -133,11 +178,19 @@ t_fig = toc(t0);
 assert(all([R.ok]) && numel(R) == 4, 'figures failed: %s', strjoin({R(~[R.ok]).name}, ', '));
 stat = R(strcmp({R.name}, 'mc_gain_bias_statistics'));
 assert(any(endsWith(stat.files, 'MC_gain_bias_statistics.csv')) && all(cellfun(@isfile, stat.files)));
-o = fig_mc_gain_curves('run_dir', tmp, 'conditions', conds3, 'save', false, 'visible', false);
-n3 = numel(findobj(o.figs, 'Type', 'axes')); close(o.figs);
-o = fig_mc_gain_curves('run_dir', tmp, 'conditions', conds3, 'save', false, 'visible', false, 'ei_rows', false);
+quiet = {'conditions', conds3, 'save', false, 'visible', false};
+o = fig_mc_gain_curves('run_dir', tmp, 'variants', {'EI3to2', 'EI2to3'}, quiet{:});
+ax = findobj(o.figs, 'Type', 'axes');
+row_titles = arrayfun(@(a) char(a.Title.String), ax, 'UniformOutput', false);
+n3 = numel(ax); close(o.figs);
+for want = {'E : I = 1 : 1', 'E : I = 3 : 2', 'E : I = 2 : 3'}
+    assert(nnz(startsWith(row_titles, want{1})) == 1, 'no row labelled %s', want{1});
+end
+o = fig_mc_gain_curves('run_dir', tmp, quiet{:});
 n1 = numel(findobj(o.figs, 'Type', 'axes')); close(o.figs);
-assert(n3 == 9 && n1 == 3, 'gain curves: %d axes with the E:I rows, %d without', n3, n1);
+assert(n3 == 9 && n1 == 3, 'gain curves: %d axes with the variants'' rows, %d without', n3, n1);
+assert(throws(@() fig_mc_gain_curves('run_dir', tmp, 'variants', {'EI1to4'}, quiet{:}), ...
+    'resolve_data_file:NotFound'), 'a variant the run directory does not hold must be an error');
 
 fprintf('PASS: test_mc_gain_bias_bundle -- plans unchanged, opt-in stage, bundle, end to end (run %.0f s, figures %.0f s).\n', ...
     t_run, t_fig);
@@ -150,6 +203,13 @@ p.sweeps = sweeps; p.sweeps_skipped = sweeps_skipped;
 p.is_selection = is_sel;
 p.runs = struct();
 for k = 1:numel(all_stages); p.runs.(all_stages{k}) = ismember(all_stages{k}, stages); end
+end
+
+function v = arg(args, name)
+% The value a name-value list gives name (the last one, as a call takes it).
+k = find(strcmp(args(1:2:end), name), 1, 'last');
+assert(~isempty(k), 'no argument %s', name);
+v = args{2 * k};
 end
 
 function tf = throws(fn, id)

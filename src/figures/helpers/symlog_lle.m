@@ -11,21 +11,31 @@ function [y, tick_pos, tick_lab, lim] = symlog_lle(lambda, lambda0, clip)
 % region sits at the slowest adaptation mode, about -0.10). Values beyond
 % +-clip are clipped to it; the caller states the clipping.
 %
-% tick_pos / tick_lab: tick positions (in y) and labels (in lambda) at
-% 0, +-lambda0 * {1, 2, 5} * 10^k up to clip; lim = [-1 1] * y(clip).
-%
-% Defaults: lambda0 = 0.05 (1/s), clip = 10 (1/s).
+%   lambda0   the linear scale (1/s), default 0.05
+%   clip      |lambda| is clipped here (1/s), default 10
+%   tick_pos  tick positions, in y: zero and both signs of each decade
+%             (0.1, 1, 10, 100) that lies between 1.5 lambda0 and clip
+%   tick_lab  their labels, in lambda
+%   lim       [-1 1] * y(clip), the axis or colour limits
 %
 % See also: fig_mc_gain_bias_maps, fig_mc_gain_curves
 
-if nargin < 2 || isempty(lambda0); lambda0 = 0.05; end
-if nargin < 3 || isempty(clip); clip = 10; end
-f = @(v) sign(v) .* log10(1 + min(abs(v), clip) / lambda0);
-y = f(lambda);
-lim = [-1 1] * f(clip);
-mags = [0.1 1 10 100];
-mags = mags(mags >= lambda0 * 1.5 & mags <= clip * 1.001);
-vals = [-fliplr(mags), 0, mags];
-tick_pos = f(vals);
-tick_lab = arrayfun(@(v) sprintf('%g', v), vals, 'UniformOutput', false);
+arguments
+    lambda  double
+    lambda0 (1,1) double {mustBePositive} = 0.05
+    clip    (1,1) double {mustBePositive} = 10
+end
+
+DECADES = [0.1 1 10 100];
+% A tick closer to zero than this many lambda0 would crowd the zero tick.
+MIN_TICK_IN_LAMBDA0 = 1.5;
+
+transform = @(v) sign(v) .* log10(1 + min(abs(v), clip) / lambda0);
+y = transform(lambda);
+lim = [-1 1] * transform(clip);
+% The small factor keeps a decade equal to clip despite round-off.
+magnitudes = DECADES(DECADES >= MIN_TICK_IN_LAMBDA0 * lambda0 & DECADES <= clip * 1.001);
+values = [-fliplr(magnitudes), 0, magnitudes];
+tick_pos = transform(values);
+tick_lab = arrayfun(@(v) sprintf('%g', v), values, 'UniformOutput', false);
 end
