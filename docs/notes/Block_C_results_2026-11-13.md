@@ -15,7 +15,9 @@ adaptation or none?
 $\lambda_1$ on the block A network, over a grid of 11 values of the overall
 connection gain (0.1 to 4.0) by 7 values of the nonlinearity's bias $S_c$
 (-0.6 to 0.6), for the four conditions, on two network seeds: 154 networks,
-616 network-condition pairs, none failed. This is a quick test (Tom,
+616 network-condition pairs, none failed; and a gain sweep at the preset
+bias on an excitation-dominated and an inhibition-dominated network, one
+seed each. This is a quick test (Tom,
 2026-11-13); more seeds and a finer grid are the stage's `medium` and
 `production` sizes, for later.
 
@@ -58,6 +60,11 @@ connection gain (0.1 to 4.0) by 7 values of the nonlinearity's bias $S_c$
    alone measures, in part, how far each condition's edge of stability lies
    from that point.** This bears directly on the manuscript's Figure 6,
    which compares at one network.
+6. **When excitation dominates (mean weights 3 : 2), no adaptation fails
+   outright** (it saturates; memory capacity at most 3.1) while every
+   adapting condition keeps memory over the whole gain range, and there
+   chained MTS is clearly ahead of 1TS (one seed). With inhibition dominant
+   (2 : 3) the picture is that of the standard network.
 
 What this means for the manuscript is left to Tom; a proposed Results
 paragraph and caption that state findings 1, 2 and 5, and say plainly that
@@ -284,8 +291,62 @@ not silence.
 
 ## 3.7 The excitation- and inhibition-dominated networks
 
-_(The two gain-only runs, mean weights 8.4 : 5.6 and 5.6 : 8.4 at bias 0.2,
-one seed, are running; this section is filled in when they end.)_
+The gain sweep at the preset bias (0.2), all four conditions, on two
+further networks with the sum of the mean weights held at 14:
+excitation-dominated (|mu_E| : |mu_I| = 8.4 : 5.6, written 3 : 2) and
+inhibition-dominated (5.6 : 8.4, 2 : 3). One seed each (3001); the
+standard network's seed-3001 values are given beside them so the
+comparison is like for like. "Half" is half the best of any condition
+within that network; a width marked + reaches the end of the gain grid.
+
+![Memory capacity against gain (left), $\lambda_1$ against gain (middle) and
+memory capacity against $\lambda_1$ (right) at bias 0.2, for the standard
+network (top, two seeds: points per seed, line the median, band the range)
+and the 3 : 2 and 2 : 3 networks (one seed). Three conditions; the
+four-condition version is beside it in `four_conditions/`.](../../figs/block_C/main/three_conditions/Fig_MC_gain_curves.png)
+
+| Network (half) | Condition | Peak MC (gain) | Width (octaves) | $\lambda_1$ turns positive | MC at gain 1 |
+|---|---|---|---|---|---|
+| 1 : 1 (6.86) | none | 8.1 (0.22) | 1.03 | 0.33–0.5 | 0.10 |
+| | 1TS | 13.7 (0.7) | 2.59 | 1–1.4 | 7.97 |
+| | chained MTS | 12.7 (0.7) | 2.71 | 0.7–1 | 10.16 |
+| | product MTS | 13.4 (1) | 2.09 | 1.4–2 | 13.35 |
+| 3 : 2 (7.77) | none | 3.1 (0.1) | 0 | never | 0.00 |
+| | 1TS | 7.8 (0.5) | (0.02) | never | 6.89 |
+| | chained MTS | 9.7 (1.4) | 3.51 | never | 9.58 |
+| | product MTS | 15.5 (2.8) | 2.48+ | never | 8.59 |
+| 2 : 3 (6.43) | none | 8.0 (0.33) | 1.04 | 0.33–0.5 | 0.10 |
+| | 1TS | 12.9 (0.7) | 3.07+ | 0.7–1 | 0.44 |
+| | chained MTS | 12.8 (0.7) | 3.07+ | 0.7–1 | 0.49 |
+| | product MTS | 12.2 (0.7) | 2.11 | 0.7–1 | 4.65 |
+
+(The 1 : 1 widths here are at that network's own half-best of seed 3001,
+6.86, so they differ from section 3.2's, which use the two-seed medians and
+the level 7.49.)
+
+- **No adaptation does much worse when excitation dominates**, the
+  to-do list's question. On the 3 : 2 network it saturates at every gain
+  (80 to 98 % of neurons pinned at the high gains, $\lambda_1$ about -6 to
+  -10), its memory capacity peaks at 3.1 at the lowest gain and is zero
+  from gain 0.7. On the 1 : 1 and 2 : 3 networks it peaks at about 8 in the
+  same narrow band as before (gain 0.22 to 0.33, edge at 0.33 to 0.5).
+- **On the 3 : 2 network nothing turns chaotic** up to gain 4: excess
+  excitation drives the network into saturation, not chaos. Here the
+  adapting conditions separate. Chained MTS keeps memory capacity 6.5 to 9.7
+  over the whole gain range (3.5 octaves above half its network's best),
+  1TS stays at 6 to 7.8 and only touches the half-best level at its peak,
+  and product MTS rises to 15.5 at gain 2.8.
+- **On the 2 : 3 network** the three adapting conditions are alike (peaks
+  12.2 to 12.9 at gain 0.7) and their edge is at gain 0.7 to 1, so the
+  preset gain of 1 is just past it: memory capacity at gain 1 is about 0.5
+  for 1TS and chained MTS.
+- **The order of the conditions changes between networks.** At 1 : 1 (this
+  seed) 1TS and product MTS lead narrowly; at 3 : 2 product MTS, then
+  chained MTS, well ahead of 1TS; at 2 : 3 the three are level. In all
+  three networks every adapting condition is far ahead of no adaptation.
+- One seed per variant network: these are indications, not results; the
+  3 : 2 separation between chained MTS and 1TS is the one worth a second
+  look with more seeds.
 
 # 4. Caveats
 
@@ -316,7 +377,7 @@ one seed, are running; this section is filled in when they end.)_
 
 # 5. What is not done
 
-- The two E:I networks (section 3.7) are running.
+- The two E:I networks have one seed each (section 3.7).
 - More seeds and a finer grid (`medium`, `production`) are for later, Tom's
   to start.
 - Whether the manuscript's Figure 6 changes is Tom's decision; the proposal
