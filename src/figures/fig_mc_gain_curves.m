@@ -33,6 +33,14 @@ function out = fig_mc_gain_curves(cfg)
 % the nearest bias level its result holds, and the row title states both,
 % so a result swept only along gain (one bias level) is drawn at that level.
 %
+% FROM A RUN DIRECTORY (cfg.run_dir, no data or data_file), the rows are the
+% main result (<run_dir>/mc_gain_sweep) and then every E:I gain-only run the
+% bundle's mc_gain_sweep stage made beside it,
+% <run_dir>/mc_gain_sweep_<suffix>/mc_gain_sweep/mc_gain_sweep_results.mat
+% (EI3to2 first, then EI2to3, then any other by name). None there: one row.
+% Nothing outside run_dir is read. cfg.ei_rows = false draws the main row
+% alone.
+%
 % Rows share y limits per column, so the networks can be compared.
 % Conditions by cfg.conditions (select_conditions, against each result).
 %
@@ -53,6 +61,7 @@ arguments
     cfg.lle_lin     (1,1) double  = 0.05    % symlog_lle's linear scale (1/s)
     cfg.lle_clip    (1,1) double  = 10      % |lambda_1| clipped here (1/s)
     cfg.fig_tag     (1,:) char    = 'Fig_MC_gain_curves'
+    cfg.ei_rows     (1,1) logical = true    % with run_dir: add the E:I runs found there
 end
 
 setup_paths();
@@ -149,6 +158,27 @@ elseif ~isempty(cfg.data_file)
     Ds = cellfun(@(f) read_mc_gain_sweep(char(f)), src, 'UniformOutput', false);
 else
     Ds = {resolve_mc_gain_sweep('', cfg.run_dir)};
+    if cfg.ei_rows
+        Ds = [Ds, ei_results(cfg.run_dir)];
+    end
+end
+end
+
+function Ds = ei_results(run_dir)
+% The E:I gain-only runs a bundle made beside the main one (run_all_paper_
+% analyses' mc_gain_sweep stage): <run_dir>/mc_gain_sweep_<suffix>/
+% mc_gain_sweep/mc_gain_sweep_results.mat, each a further row. Only inside
+% run_dir; none is fine. Order: 3 : 2, then 2 : 3, then any other by name.
+Ds = {};
+L = dir(fullfile(run_dir, 'mc_gain_sweep_*'));
+L = L([L.isdir]);
+if isempty(L); return; end
+names = {L.name};
+first = {'mc_gain_sweep_EI3to2', 'mc_gain_sweep_EI2to3'};
+names = [first(ismember(first, names)), sort(setdiff(names, first))];
+for k = 1:numel(names)
+    f = fullfile(run_dir, names{k}, 'mc_gain_sweep', 'mc_gain_sweep_results.mat');
+    if isfile(f); Ds{end+1} = read_mc_gain_sweep(f); end %#ok<AGROW>
 end
 end
 

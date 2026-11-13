@@ -210,7 +210,10 @@ assert_throws(@() paper_stage_plan(struct('stages', {{'paper_illustrations'}})),
 code = regexprep(fileread(which('run_all_paper_analyses')), '%[^\n]*', '');
 tok = regexp(code, '''(\w+)'',\s*@\(\)\s*run_', 'tokens');
 table_names = cellfun(@(t) t{1}, tok, 'UniformOutput', false);
-assert(isequal(table_names, all_stages(2:end)), 'run_all_paper_analyses'' stage table is: %s', ...
+% Then the opt-in stages (FD-010), in paper_stage_names' order.
+[~, ~, opt_in] = paper_stage_names();
+assert(isequal(opt_in, {'mc_gain_sweep'}));
+assert(isequal(table_names, [all_stages(2:end), opt_in]), 'run_all_paper_analyses'' stage table is: %s', ...
     strjoin(table_names, ', '));
 
 %% The pre-flight refuses a bad selection before anything exists

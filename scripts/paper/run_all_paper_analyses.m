@@ -47,6 +47,26 @@ function run_dir = run_all_paper_analyses(cfg)
 %                'param_space'); absent or empty = all three.
 %   cfg.eig_heatmap_examples   the eig-heatmap stage's examples; absent or
 %                empty = its default three.
+% OPT-IN STAGES (FD-010) run only when cfg.stages names them; "every stage"
+% does not include them (paper_stage_names, third output). One so far:
+%   mc_gain_sweep   block C, run_mc_gain_sweep into <run_dir>/mc_gain_sweep:
+%                   memory capacity and lambda_1 over gain x bias, on
+%                   cfg.mc_preset (the noise-free memory-capacity twin) with
+%                   cfg.mc_ode_solver when set (else the stage's 'sra1').
+%                   cfg.mc_gain_sweep (optional struct) carries, each
+%                   absent or empty = the stage's own table for the mode:
+%                     gain_levels, bias_levels, seeds, conditions
+%                     model_args, protocol, lya_K, lya_T_sec, lya_acc_sec,
+%                     segment_len   (run_mc_gain_sweep's; for tests)
+%                     ei_presets    cell of E:I preset names, each run gain
+%                                   only, at bias_levels = its own S_c, with
+%                                   the same gains, seeds and conditions,
+%                                   into <run_dir>/mc_gain_sweep_<suffix>
+%                                   (suffix: the name after its last '_',
+%                                   e.g. EI3to2); the result is in that
+%                                   folder's mc_gain_sweep/ like the main one
+%                     ei_seeds      seeds for the E:I runs (absent = seeds)
+%                   An unknown field is refused in the pre-flight.
 % An unknown name is an error in the pre-flight, before any compute and
 % before the run directory is created (paper_stage_plan). A stage not run is
 % printed as SKIPPED in the summary and recorded in run_manifest
@@ -119,6 +139,14 @@ if isfield(cfg, 'eig_heatmap_examples') && ~isempty(cfg.eig_heatmap_examples)
             'cfg.eig_heatmap_examples must be a struct array with fields label and overrides (see run_eig_heatmap).');
     end
     eig_args = {'examples', ex};
+end
+
+% The opt-in block C stage (FD-010), checked here when the bundle selects
+% it: its options, its E:I presets and their folders. A bundle that does
+% not select it is not looked at (cfg.mc_gain_sweep may be absent).
+gain_sweep = [];
+if ismember('mc_gain_sweep', plan.stages)
+    gain_sweep = mc_gain_sweep_plan(cfg);
 end
 
 %% PREFLIGHT: this session must have a pool allocation
@@ -282,17 +310,26 @@ stages = { ...
 if isfield(cfg,'illustrations') && cfg.illustrations
     stages(end+1,:)={'paper_illustrations', @()run_paper_illustrations(cfg,run_dir)};
 end
+% Opt-in stages (paper_stage_names' third list) follow, in that list's order.
+% They are always in the table and run only when the plan names them.
+stages(end+1,:) = {'mc_gain_sweep', @() run_mc_gain_stage(cfg, run_dir, gain_sweep)};
 
 % Keep the selected stages (FD-023). The table above must hold exactly the
-% stages paper_stage_names lists after 'sweeps', in its order, or a selection
-% could name a stage that never runs. test_essential_mode checks that from
-% this file's text, without running anything; the assert is the backstop,
-% and it comes after the sweeps only because the table needs run_dir.
+% stages paper_stage_names lists after 'sweeps', then its opt-in stages, in
+% that order, or a selection could name a stage that never runs.
+% test_essential_mode checks that from this file's text, without running
+% anything; the assert is the backstop, and it comes after the sweeps only
+% because the table needs run_dir. An opt-in stage the plan does not name is
+% in neither plan list, so it is compared only as a known name.
 table_names = stages(:, 1)';
 want_names  = [plan.stages(~strcmp(plan.stages, 'sweeps')), ...
                plan.stages_skipped(~strcmp(plan.stages_skipped, 'sweeps'))];
-all_names   = paper_stage_names();
-assert(isequal(table_names, all_names(ismember(all_names, want_names))), ...
+[all_names, ~, opt_names] = paper_stage_names();
+known_names = [all_names, opt_names];
+table_in    = table_names(ismember(table_names, want_names));
+assert(isequal(table_in, known_names(ismember(known_names, want_names))) && ...
+       isequal(table_names(ismember(table_names, opt_names)), opt_names) && ...
+       all(ismember(table_names, known_names)), ...
     'run_all_paper_analyses:StageTableMismatch', ...
     'The stage table (%s) is not paper_stage_names'' list for this bundle.', strjoin(table_names, ', '));
 stages = stages(ismember(table_names, plan.stages), :);
@@ -406,6 +443,99 @@ function print_selection(plan, verbose)
 if ~plan.is_selection; return; end
 vprintf(verbose, 'minimal', '  stages   : %s\n', list_or_none(plan.stages));
 vprintf(verbose, 'minimal', '  skipped  : %s (not selected by cfg.stages)\n', list_or_none(plan.stages_skipped));
+end
+
+function G = mc_gain_sweep_plan(cfg)
+% The block C stage's arguments from the bundle config, validated before any
+% compute. G.args: name-value pairs for run_mc_gain_sweep shared by the main
+% and the E:I runs; G.ei: struct array (preset, bias, folder, seeds_args).
+allowed = {'gain_levels', 'bias_levels', 'seeds', 'conditions', 'model_args', 'protocol', ...
+    'lya_K', 'lya_T_sec', 'lya_acc_sec', 'segment_len', 'ei_presets', 'ei_seeds'};
+if ~isfield(cfg, 'mc_preset') || isempty(cfg.mc_preset)
+    error('run_all_paper_analyses:BadMcGainSweep', ...
+        'The mc_gain_sweep stage runs on cfg.mc_preset, which this bundle does not set.');
+end
+gs = struct();
+if isfield(cfg, 'mc_gain_sweep') && ~isempty(cfg.mc_gain_sweep); gs = cfg.mc_gain_sweep; end
+if ~(isstruct(gs) && isscalar(gs))
+    error('run_all_paper_analyses:BadMcGainSweep', 'cfg.mc_gain_sweep must be a scalar struct.');
+end
+unknown = setdiff(fieldnames(gs), allowed);
+if ~isempty(unknown)
+    error('run_all_paper_analyses:BadMcGainSweep', ...
+        'cfg.mc_gain_sweep has unknown field(s) %s. Allowed: %s.', ...
+        strjoin(unknown', ', '), strjoin(allowed, ', '));
+end
+G = struct('args', {{}}, 'ei', struct('preset', {}, 'bias', {}, 'folder', {}, 'seeds_args', {}));
+pass = setdiff(allowed, {'bias_levels', 'ei_presets', 'ei_seeds'}, 'stable');
+for k = 1:numel(pass)
+    if isfield(gs, pass{k}) && ~isempty(gs.(pass{k}))
+        G.args = [G.args, {pass{k}, gs.(pass{k})}];
+    end
+end
+G.bias_args = {};
+if isfield(gs, 'bias_levels') && ~isempty(gs.bias_levels)
+    G.bias_args = {'bias_levels', gs.bias_levels};
+end
+if ~isfield(gs, 'ei_presets') || isempty(gs.ei_presets); return; end
+ei = cellstr(gs.ei_presets);
+ei_seeds = {};
+if isfield(gs, 'ei_seeds') && ~isempty(gs.ei_seeds); ei_seeds = {'seeds', gs.ei_seeds}; end
+model_args = {};
+if isfield(gs, 'model_args'); model_args = gs.model_args; end
+for k = 1:numel(ei)
+    d = srnn_param_preset(ei{k});                  % errors on an unknown name
+    % Gain only, at the network's own bias: the preset's S_c, or a model_args
+    % override of it (last one wins, as in the constructor).
+    if ~isfield(d, 'S_c')
+        error('run_all_paper_analyses:BadMcGainSweep', ...
+            'E:I preset ''%s'' sets no S_c, so its own bias is not known.', ei{k});
+    end
+    b = d.S_c;
+    i_sc = find(strcmp(model_args(1:2:end), 'S_c'), 1, 'last');
+    if ~isempty(i_sc); b = model_args{2 * i_sc}; end
+    parts = strsplit(ei{k}, '_');
+    G.ei(k) = struct('preset', ei{k}, 'bias', b, 'folder', ['mc_gain_sweep_' parts{end}], ...
+        'seeds_args', {ei_seeds});
+end
+folders = {G.ei.folder};
+if numel(unique(folders)) < numel(folders)
+    error('run_all_paper_analyses:BadMcGainSweep', ...
+        'cfg.mc_gain_sweep.ei_presets end in the same suffix, so their folders would clash: %s.', ...
+        strjoin(folders, ', '));
+end
+end
+
+function detail = run_mc_gain_stage(cfg, run_dir, G)
+% Block C: the gain-by-bias sweep into <run_dir>/mc_gain_sweep, then each E:I
+% gain-only run into <run_dir>/mc_gain_sweep_<suffix>/mc_gain_sweep. Each run
+% is tried in turn, so one failing does not cost the others; the stage then
+% fails with every error, or returns the result folders.
+common = {'run_mode', cfg.run_mode, 'verbose', cfg.verbose};
+if isfield(cfg, 'mc_ode_solver') && ~isempty(cfg.mc_ode_solver)
+    common = [common, {'ode_solver', cfg.mc_ode_solver}];
+end
+runs = struct('label', 'main', 'args', {[{'preset_name', cfg.mc_preset}, G.args, G.bias_args, ...
+    {'output_dir', run_dir}]});
+for k = 1:numel(G.ei)
+    e = G.ei(k);
+    runs(end+1) = struct('label', e.folder, 'args', {[{'preset_name', e.preset}, G.args, ...
+        e.seeds_args, {'bias_levels', e.bias, 'output_dir', fullfile(run_dir, e.folder)}]}); %#ok<AGROW>
+end
+dirs = {}; errs = {};
+for k = 1:numel(runs)
+    try
+        dirs{end+1} = run_mc_gain_sweep(common{:}, runs(k).args{:}); %#ok<AGROW>
+    catch ME
+        errs{end+1} = sprintf('%s: %s: %s', runs(k).label, ME.identifier, ME.message); %#ok<AGROW>
+        vfail('  mc_gain_sweep run %s FAILED: %s\n', runs(k).label, ME.message);
+    end
+end
+if ~isempty(errs)
+    error('run_all_paper_analyses:McGainSweepFailed', '%d of %d run(s) failed:\n%s', ...
+        numel(errs), numel(runs), strjoin(errs, '\n'));
+end
+detail = strjoin(dirs, '; ');
 end
 
 function s = list_or_none(names)
