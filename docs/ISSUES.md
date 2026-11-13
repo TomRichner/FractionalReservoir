@@ -1082,3 +1082,21 @@ becomes an issue with an acceptance test.
      Relaunched 08:15 with `matlab-opus-2`, pool 12. A worker's MATLAB
      does not outlive the worker; a run that must survive a lost login
      would have to be started outside an agent, which is Tom's to decide.
+  21. *Block C is a quick test now; the big grid is for production* (Tom,
+     2026-11-13 08:16: "do we really need all 252 for a test? ... a quick
+     test, and then when we do the production run, we would do a bigger
+     grid"). The relaunch of decision 20 was stopped before it computed
+     anything. The test's result is the two complete seeds already on
+     disk (3001 and 3002, the whole 9 x 7 grid, 126 jobs), plus two more
+     gain levels, 2.8 and 4.0, on the same two seeds (28 jobs; decision
+     18's reason stands: at low bias the adapting conditions' best cells
+     sit on gain 2.0), and the two E:I networks with one seed and the
+     eleven gains (11 jobs each). The partial seeds 3003 (39 jobs) and
+     3004 (8 jobs) stay on disk unused and are not finished; the report
+     is built from the consolidated table of the 154-job call, which
+     holds seeds 3001 and 3002 only, so every cell has the same seeds.
+     The first call also checks the stage's resume: it must report 126
+     jobs already done. To follow when the bundle branch is merged: the
+     stage's size table moves to this test (`fast` = eleven gains, 0.1 to
+     4.0, by seven biases, two seeds; `medium` and `production` take the
+     gain range to 4.0 as well), so `fast` reproduces the report's run.
