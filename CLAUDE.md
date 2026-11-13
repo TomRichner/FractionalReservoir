@@ -44,6 +44,12 @@ generalized, readible, maintainable, best practice code, not have the
 effort go into long runs." Where the work could go either way, it goes
 into the code.
 
+**US English from now on** (Tom, 2026-11-13): color, behavior, center,
+normalize, gray, in new docs, reports, comments, figure labels and
+commit messages. Existing text is not respelled unless asked, and
+identifiers that already use British spelling keep it (renaming one is
+an interface change).
+
 Two documents to read first:
 
 - **`../StochasticPlasticDynamicalSystemPaper/docs/final_draft_to_do.md`** is
