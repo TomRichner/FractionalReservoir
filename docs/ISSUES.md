@@ -968,3 +968,18 @@ becomes an issue with an acceptance test.
 - **Serves:** block C
 - **Depends on:** FD-007, FD-015.
 - **Result:** _(pending)_
+  **FD-010, decisions by the lead during the work (2026-11-12 night):**
+  9. *The references F3 moves are re-captured by a worker, on the lead's
+     instruction, one per commit.* The lead may not run MATLAB over about
+     30 s (Tom), and a worker may not replace a reference on its own; the
+     worker first confirms that every failing leaf belongs to a
+     one-SFA-timescale condition and stops at any that does not.
+  10. *The lean memory path is also offered to the existing
+     memory-capacity stage, off by default* (Tom, 2026-11-12: do the
+     memory-capacity figures without holding the whole state trajectory,
+     offloading to disk if that is what it takes). Nothing needs to go to
+     disk for the scoring; whether the bundle's stage switches over is
+     decided after the builder's equality check.
+  11. *The 1TS condition's lambda_1 changed sign on the regression network
+     with F3* (-0.060 to +0.087). Not a defect: the condition sits near
+     zero. To be watched in block C's 1TS column and stated in the report.

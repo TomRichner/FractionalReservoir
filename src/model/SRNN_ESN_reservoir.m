@@ -130,7 +130,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % neurons receive input, with weights drawn uniformly from
             % [-sigma_in/2, sigma_in/2].
 
-            rng(obj.rng_seed_input);
+            rng(obj.rng_seed_input, 'twister');
 
             % Initialize input weights to zero
             obj.W_in = zeros(obj.n, 1);
@@ -1025,7 +1025,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
             % 2. Generate scalar input sequence
             T_total = obj.T_wash + obj.T_train + obj.T_test;
-            rng(obj.rng_seeds(2));  % Use stimulus seed for reproducibility
+            rng(obj.rng_seeds(2), 'twister');  % Use stimulus seed for reproducibility
             obj.hold_len = 1;       % reset; only 'sample_hold' overrides this
 
             if strcmpi(obj.input_type, 'bandlimited')

@@ -1384,7 +1384,7 @@ classdef SRNNModel2 < handle
             % Subclasses can override for custom connectivity.
             
             % Set RNG seed for network generation
-            rng(obj.rng_seeds(1));
+            rng(obj.rng_seeds(1), 'twister');
             
             % The RMT tildes need no default-filling here: they are Dependent on
             % the _relative multipliers and F, so they are always defined and are
@@ -1542,7 +1542,7 @@ classdef SRNNModel2 < handle
                 seed = obj.rng_seeds(1) + 104729;
             end
             stream_state = rng;
-            rng(seed);
+            rng(seed, 'twister');
             z = randn(obj.n, 1);
             rng(stream_state);
 
@@ -1632,7 +1632,7 @@ classdef SRNNModel2 < handle
             % setpoints and x0 are bit-identical whether or not noise is drawn.
             n_steps = numel(obj.t_ex) - 1;
             stream_state = rng;
-            rng(seed);
+            rng(seed, 'twister');
             xi1 = randn(obj.n, n_steps);
             xi2 = randn(obj.n, n_steps);
             rng(stream_state);
@@ -3239,7 +3239,7 @@ classdef SRNNModel2 < handle
             end
             
             % Standard sparse step stimulus generation
-            rng(rng_seed);
+            rng(rng_seed, 'twister');
             
             dt = 1 / fs;
             t_ex = (0:dt:T)';

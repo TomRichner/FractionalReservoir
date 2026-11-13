@@ -50,7 +50,7 @@ function [u_ex, t_ex] = dc_staircase_stimulus(params, T, fs, rng_seed, input_con
     % band-limits it to ~Nyquist (fs/2), flat over our <100 Hz band. Seeded for
     % reproducibility.
     if isfield(input_config, 'noise_intensity') && input_config.noise_intensity > 0
-        rng(rng_seed);
+        rng(rng_seed, 'twister');
         u_ex = u_ex + input_config.noise_intensity * sqrt(fs) * randn(params.n, numel(t_ex));
     end
 end

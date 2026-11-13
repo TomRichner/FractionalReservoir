@@ -19,7 +19,17 @@
 %      log-linear interpolation of the drawn endpoints to 1e-12; a
 %      NON-logspaced nominal is reproduced exactly at sigma = 0 and keeps its
 %      own log positions at sigma > 0.
-%   5. K = 1 is the slow draw alone; K = 2 is the two endpoints.
+%   5. K = 1 is the FAST draw alone (Plan C, F3, 2026-11-12; it was the slow
+%      draw until then); K = 2 is the two endpoints. On one seed a
+%      one-timescale type's per-neuron constants are bit-identical to the
+%      first column of a three-timescale ladder with the same nominal first
+%      rung (0.25 s), on every neuron the ordering floor did not move: on
+%      the paper's ladder (0.25 to 10 s) at spread 0.25, where the floor
+%      moves none, on a short ladder (0.25 to 1 s) at spread 0.5, where it
+%      moves a good share (the count is printed) and those are the only
+%      ones that differ, and between the sfa1_std1 and sfa3_std2 regimes
+%      of the paper preset. A one-timescale type at zero spread keeps the
+%      nominal exactly.
 %   6. Validation: any spread builds; the minimum log-separation floor keeps every ladder ordered (clipped count recorded); just under the
 %      bound is accepted; negative / wrong-length spreads error.
 %   7. Seed control: reproducible; tau_a_seed and rng_seeds both move it;
@@ -147,11 +157,55 @@ m = tiny_model('tau_a', {10, ladder(0.25, 10, 2), []}, 'tau_a_spread', 0.1, 'tau
 m.build();
 seed_state = rng; rng(3, 'twister'); z = randn(m.n, 2); rng(seed_state);
 i1 = m.type_indices{1}; i2 = m.type_indices{2};
-all_passed = check('K = 1 is the slow draw alone', ...
-    max(abs(m.tau_a_matrix{1} - 10 * exp(0.1 * z(i1, 2)))) < 1e-12) && all_passed;
+all_passed = check('K = 1 is the fast draw alone (column 1 of the draw), not the slow one', ...
+    max(abs(m.tau_a_matrix{1} - 10 * exp(0.1 * z(i1, 1)))) < 1e-12 && ...
+    max(abs(m.tau_a_matrix{1} - 10 * exp(0.1 * z(i1, 2)))) > 1e-3) && all_passed;
 want2 = [0.25 * exp(0.1 * z(i2, 1)), 10 * exp(0.1 * z(i2, 2))];
 all_passed = check('K = 2 is the two endpoint draws', ...
     max(abs(m.tau_a_matrix{2}(:) - want2(:))) < 1e-12) && all_passed;
+
+% The single-timescale constant IS the neuron's fastest multiple-timescale
+% rung (Plan C, F3). Two models on one seed that differ only in type A's
+% ladder: one rung at 0.25 s against three rungs starting at 0.25 s. The
+% ordering floor moves the ENDS of a ladder whose two draws came too close,
+% and a one-rung type has no ordering to keep, so the equality is claimed
+% on the neurons the floor did not move; which those are is recomputed
+% here from the draw and checked against the model's own count.
+cases = { ...
+    'paper ladder 0.25-10 s, spread 0.25', ladder(0.25, 10, 3), 0.25, false
+    'short ladder 0.25-1 s, spread 0.5',   ladder(0.25, 1, 3),  0.50, true};
+for k = 1:size(cases, 1)
+    lad = cases{k, 2}; s = cases{k, 3};
+    args = {'n', 600, 'indegree', 20, 'tau_a_spread', [s 0 0], 'tau_a_seed', 11};
+    m1 = tiny_model(args{:}, 'tau_a', {lad(1), ladder(0.25, 10, 2), []});
+    m3 = tiny_model(args{:}, 'tau_a', {lad,    ladder(0.25, 10, 2), []});
+    m1.build(); m3.build();
+    seed_state = rng; rng(11, 'twister'); z = randn(m3.n, 2); rng(seed_state);
+    iA = m3.type_indices{1};
+    span = log(lad(end) / lad(1));
+    moved = span + s * (z(iA, 2) - z(iA, 1)) < span / 4;
+    one = m1.tau_a_matrix{1}; first = m3.tau_a_matrix{1}(:, 1);
+    fprintf('  %s: the floor moved %d of %d neurons\n', cases{k, 1}, nnz(moved), numel(moved));
+    all_passed = check(sprintf('%s: the floor count recomputed from the draw is the model''s (%d), and a one-rung type has none', ...
+        cases{k, 1}, m3.tau_a_clipped(1)), ...
+        nnz(moved) == m3.tau_a_clipped(1) && m1.tau_a_clipped(1) == 0 && ...
+        isequal(m1.type_indices{1}, iA)) && all_passed;
+    all_passed = check(sprintf('%s: one-timescale constants == first rung of the three-timescale ladder, bit for bit, on the %d unmoved neurons', ...
+        cases{k, 1}, nnz(~moved)), ...
+        nnz(~moved) > 0 && isequal(one(~moved), first(~moved))) && all_passed;
+    if cases{k, 4}
+        all_passed = check(sprintf('%s: the floor did move neurons, and every moved one has a faster first rung than its one-timescale constant', ...
+            cases{k, 1}), nnz(moved) > 0 && all(first(moved) < one(moved))) && all_passed;
+    else
+        all_passed = check(sprintf('%s: the floor moved no neuron, so the equality is on all of them', ...
+            cases{k, 1}), nnz(moved) == 0) && all_passed;
+    end
+end
+
+m = tiny_model('tau_a', {0.25, ladder(0.25, 10, 2), []}, 'tau_a_spread', [0 0.1 0]);
+m.build();
+all_passed = check('a one-timescale type at zero spread keeps the nominal exactly', ...
+    isequal(m.tau_a_matrix{1}, repmat(0.25, m.n_per_type(1), 1))) && all_passed;
 
 %% 6. Validation
 % The ordering floor (2026-09-14): any spread builds; every neuron keeps at
@@ -264,6 +318,22 @@ for i = 1:numel(names)
     fprintf('  %-14s n_a = %s, ladders %s\n', names{i}, mat2str(na), shapes);
 end
 all_passed = check('all three regimes build with a spread and the ladders have the right shapes', shape_ok) && all_passed;
+
+% The paper's comparison, on one seed: a neuron's SFA constant in the
+% single-timescale regime is its fastest rung in the multiple-timescale one.
+wide = [short, {'tau_a_spread', 0.25}];
+m1 = run_preset(P, 'sfa1_std1', wide);
+m3 = run_preset(P, 'sfa3_std2', wide);
+same_rung = true; n_types = 0;
+for q = 1:m1.n_cellTypes
+    if m1.n_a(q) == 1 && m3.n_a(q) >= 2
+        n_types = n_types + 1;
+        same_rung = same_rung && m1.tau_a{q} == m3.tau_a{q}(1) && m3.tau_a_clipped(q) == 0 && ...
+            isequal(m1.tau_a_matrix{q}, m3.tau_a_matrix{q}(:, 1));
+    end
+end
+all_passed = check(sprintf('paper preset, spread 0.25: sfa1_std1''s constants == first rung of sfa3_std2''s ladders, bit for bit (%d types, none moved by the floor)', ...
+    n_types), same_rung && n_types > 0) && all_passed;
 
 mS = run_preset(P, 'sfa3_std2', [base, {'tau_a_spread', 0.1}]);
 tau_slowest = max(cellfun(@(x) max([x(:); 0]), mS.tau_a_matrix));
