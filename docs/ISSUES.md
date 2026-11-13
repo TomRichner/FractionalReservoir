@@ -1050,8 +1050,8 @@ becomes an issue with an acceptance test.
      at gain 2, bias -0.6; product MTS has no lambda_1 crossing below
      gain 2 at bias 0 or less). A map whose best cell is on its edge does
      not show where the collapse is, and the width along gain, the number
-     that answers "who needs tuning", would be cut off for the adapting
-     conditions and so understated in their favour's opposite. The pilot's
+     that answers "who needs tuning", would be cut off, and so understated, for
+     the adapting conditions. The pilot's
      gain 3 was dead only at bias -0.2 and above, for the two conditions
      it ran. The bias axis is not extended further down: lower bias moves
      every edge to higher gain without end (saturated neurons have less
