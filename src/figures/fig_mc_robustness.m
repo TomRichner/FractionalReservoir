@@ -44,11 +44,14 @@ conds = select_conditions(D.conditions, cfg.conditions);
 nc = numel(conds);
 st = manuscript_style();
 
-fig = figure('Color', 'w', 'Position', [80 80 max(900, 230 * nc + 520) 420]);
+% Panel (a) is given 3/5 of the width and its tick labels are held
+% horizontal: at four conditions MATLAB otherwise rotated the multi-line
+% labels by 45 degrees, which made them hard to read.
+fig = figure('Color', 'w', 'Position', [80 80 max(1000, 260 * nc + 560) 440]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
-tl = tiledlayout(fig, 1, 2, 'TileSpacing', 'loose', 'Padding', 'compact');
-ax_a = nexttile(tl); hold(ax_a, 'on');
-ax_b = nexttile(tl); hold(ax_b, 'on');
+tl = tiledlayout(fig, 1, 5, 'TileSpacing', 'loose', 'Padding', 'compact');
+ax_a = nexttile(tl, [1 3]); hold(ax_a, 'on');
+ax_b = nexttile(tl, [1 2]); hold(ax_b, 'on');
 s = RandStream('mt19937ar', 'Seed', 1);   % jitter only, fixed so the figure is repeatable
 n_failed = 0;
 h = gobjects(1, nc);
@@ -89,6 +92,7 @@ ok = isgraphics(h);
 legend(ax_b, h(ok), cellfun(@(n) cond_title(st, n), conds(ok), 'UniformOutput', false), ...
     'Location', 'northeast', 'Box', 'off', 'FontSize', st.tick_fs - 4);
 set([ax_a ax_b], 'FontSize', st.tick_fs - 2, 'TickDir', 'out', 'Box', 'off');
+set(ax_a, 'XTickLabelRotation', 0);
 if n_failed > 0
     subtitle(ax_a, sprintf('%d failed job(s) left out', n_failed), 'FontSize', st.tick_fs - 5);
 end
