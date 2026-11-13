@@ -139,8 +139,15 @@ end
 mc_code = regexprep(fileread(which('run_memory_capacity')), '%[^\n]*', '');
 tok = regexp(mc_code, 'case\s*''essential''\s*cfg\.n_trials\s*=\s*(\d+)\s*;', 'tokens', 'once');
 assert(~isempty(tok) && str2double(tok{1}) == 3, 'run_memory_capacity: ''essential'' must be 3 trials');
-assert(numel(regexp(mc_code, 'cfg\.T_train_sec\s*=')) == 1, ...
-    'run_memory_capacity: the training window must be set once, for every mode');
+% The training window is a protocol constant, the same in every mode. Since
+% the gain-by-bias stage (FD-010) it is set in mc_protocol, which both
+% run_memory_capacity and run_mc_gain_sweep call; it must be set there once
+% and nowhere in run_memory_capacity.
+proto_code = regexprep(fileread(which('mc_protocol')), '%[^\n]*', '');
+assert(numel(regexp(proto_code, 'T_train_sec\s*=')) == 1, ...
+    'mc_protocol: the training window must be set once, for every mode');
+assert(isempty(regexp(mc_code, 'T_train_sec\s*=\s*\d', 'once')), ...
+    'run_memory_capacity must take the training window from mc_protocol, not set its own');
 % The illustrations stage has no cost table to teach.
 assert(~contains(fileread(which('run_paper_illustrations')), 'run_mode'));
 
