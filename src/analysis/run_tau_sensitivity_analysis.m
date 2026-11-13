@@ -176,7 +176,9 @@ psa.add_vector_parameter(tau_axis, ...
     'spacing', 'log', ...
     'level_spacing', 'linear');
 
-psa.add_grid_parameter('reps', 1:ctx.n_reps);
+% add_grid_levels, not add_grid_parameter: a two-element value is a [min max]
+% range to add_grid_parameter, so n_reps = 2 gave n_levels reps.
+psa.add_grid_levels('reps', 1:ctx.n_reps);
 
 psa.run();
 
