@@ -24,6 +24,12 @@
 %   6. Bad values (wrong length, NaN, Inf) error SRNNCellTypePairs:InvalidParams.
 %   7. The property round-trips through ParamSpaceAnalysis2's
 %      resolved_defaults and effective_param.
+%   8. self_coupling, the signed alias (s = -k, W_ii = +s R_W): sets and
+%      reads back, a scalar broadcasts, s = +1 adds R_W to the drawn
+%      diagonal, s = 0 is bit-identical to no setting (stored as +0), bad
+%      values are refused, the gain sweep reads the preset's point on it,
+%      and set through ParamSpaceAnalysis2's model_defaults it passes
+%      validation and resolved_defaults records self_feedback = -s.
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths.
 %
@@ -150,6 +156,59 @@ loaded = L.(char(fieldnames(L)));
 round_trip = round_trip && isequal(loaded.resolved_defaults.self_feedback, K);
 all_passed = check('self_feedback is frozen into resolved_defaults, read by effective_param and saved', round_trip) && all_passed;
 
+%% 8. self_coupling, the signed alias: W_ii = +s R_W, self_feedback = -s
+S_C = [-1 2];                       % by type: E negative, I positive feedback
+ma = make_model('sfa3_stdc2', 'self_coupling', S_C);
+all_passed = check('self_coupling = [-1 2] sets self_feedback = [1 -2] and reads back [-1 2]', ...
+    isequal(ma.self_feedback, -S_C) && isequal(ma.self_coupling, S_C)) && all_passed;
+mb = make_model('sfa3_stdc2', 'self_coupling', 0.5);
+all_passed = check('a scalar self_coupling is broadcast to every type', ...
+    isequal(mb.self_coupling, [0.5 0.5]) && isequal(mb.self_feedback, [-0.5 -0.5])) && all_passed;
+mp = make_model('sfa3_stdc2', 'self_coupling', 1);
+pp = mp.get_params();
+d_err = max(abs(full(diag(pp.W)) - (full(diag(p0.W)) + mp.R_gain1)));
+all_passed = check(sprintf('s = +1: diag(params.W) = drawn (scaled) diagonal + R_W (max error %.1e); off-diagonal unchanged', d_err), ...
+    d_err <= 4 * eps(mp.R_gain1) && isequal(off(pp.W), off(p0.W))) && all_passed;
+same = true;
+for value = {0, [0 0]}
+    mz = make_model('sfa3_stdc2', 'self_coupling', value{1});
+    pz = mz.get_params();
+    S = initial_state(mz);
+    Y = probe_columns(numel(S));
+    same = same && isequal(mz.self_feedback, [0 0]) && no_negative_zero(mz.self_feedback) ...
+        && no_negative_zero(mz.self_coupling) && isequal(pz.W, p0.W) ...
+        && isequal(rhs(mz, S), rhs(m0, S)) ...
+        && isequal(SRNNCellTypePairs.compute_Jacobian_fast(S, pz), SRNNCellTypePairs.compute_Jacobian_fast(S, p0)) ...
+        && isequal(SRNNCellTypePairs.jacobian_times(S, Y, pz), SRNNCellTypePairs.jacobian_times(S, Y, p0));
+end
+all_passed = check('s = 0 (scalar or row): +0 stored, W, RHS, Jacobian and jacobian_times bit-identical to no setting', same) && all_passed;
+all_passed = check('self_coupling refuses what self_feedback refuses (wrong length, NaN)', ...
+    throws_id(@() make_model('no_adaptation', 'self_coupling', [1 2 3]), 'SRNNCellTypePairs:InvalidParams') && ...
+    throws_id(@() make_model('no_adaptation', 'self_coupling', NaN), 'SRNNCellTypePairs:InvalidParams')) && all_passed;
+[g_pre, s_pre] = mc_gain_sweep_preset_point(preset_name(), {}, 'self_coupling');
+all_passed = check('the gain sweep reads the preset''s point on the self_coupling axis (+0)', ...
+    g_pre == 1 && s_pre == 0 && no_negative_zero(s_pre)) && all_passed;
+% Through ParamSpaceAnalysis2: accepted by validate_model_defaults, and
+% resolved_defaults records the underlying self_feedback, consistent with
+% the alias it was set through.
+tmp2 = tempname;
+cleanup2 = onCleanup(@() remove_dir(tmp2));
+psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 4, 'note', 'self_coupling_test', 'verbose', 'near-none');
+psa.model_class = model_class;
+psa.use_parallel = false;
+psa.output_dir = tmp2;
+psa.model_defaults = preset;
+for k = 1:2:numel(small); psa.model_defaults.(small{k}) = small{k + 1}; end
+psa.model_defaults.self_coupling = S_C;
+psa.model_defaults.lya_method = 'none';
+psa.set_conditions(conditions(1));
+psa.add_grid_parameter('level_of_chaos', [0.5 1]);
+psa.run();
+rd = psa.resolved_defaults;
+all_passed = check('self_coupling in model_defaults: resolved_defaults holds self_feedback = -s and self_coupling = s', ...
+    isequal(rd.self_feedback, -S_C) && isequal(rd.self_coupling, S_C) ...
+    && isequal(psa.effective_param([], 'self_feedback'), -S_C)) && all_passed;
+
 %% Banner
 fprintf('\n');
 if all_passed
@@ -217,6 +276,12 @@ try
 catch err
     tf = strcmp(err.identifier, id);
 end
+end
+
+function tf = no_negative_zero(v)
+% True when no zero in v is -0 (1 / -0 is -Inf), so a printed value reads 0.
+z = v(v == 0);
+tf = all(1 ./ z > 0);
 end
 
 function remove_dir(d)
