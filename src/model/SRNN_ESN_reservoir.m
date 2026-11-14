@@ -1539,121 +1539,17 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
         function verify_shared_build(esn_array, expected_to_differ, also_check_protected)
             % VERIFY_SHARED_BUILD Verify that built ESN objects share identical configuration
-            % Internalized from verify_shared_build
             %
             % SRNN_ESN_reservoir.verify_shared_build(esn_array, expected_to_differ, also_check_protected)
             %
-            % After building multiple ESN objects for a comparison experiment, this
-            % function verifies that all properties that SHOULD be shared are identical,
-            % and that properties expected to differ DO actually differ.
-
-            if numel(esn_array) < 2
-                vprintf(esn_array{1}.verbose, 'verbose', 'verify_shared_build: only 1 object, nothing to compare.\n');
-                return;
-            end
-
-            ref = esn_array{1};
-            mc = metaclass(ref);
-            n_obj = numel(esn_array);
-
-            always_skip = {'S0', 'cached_params', 'mc_results', 'u_interpolant', ...
-                           'ode_opts', 't_out', 'S_out', 'plot_data', 'lya_results', ...
-                           'noise_increments', 'verbose', ...
-                           'tau_a_matrix', 'tau_a_clipped'};   % derived from tau_a (2026-09-14)
-
-            n_checked = 0;
-            n_matched = 0;
-            n_skipped = 0;
-            checked_names = {};
-            skipped_names = {};
-
-            for p = 1:numel(mc.PropertyList)
-                prop = mc.PropertyList(p);
-                name = prop.Name;
-
-                if prop.Dependent
-                    skipped_names{end+1} = name; %#ok<AGROW>
-                    n_skipped = n_skipped + 1;
-                    continue;
-                end
-
-                if ismember(name, always_skip)
-                    skipped_names{end+1} = name; %#ok<AGROW>
-                    n_skipped = n_skipped + 1;
-                    continue;
-                end
-
-                if ismember(name, expected_to_differ)
-                    skipped_names{end+1} = name; %#ok<AGROW>
-                    n_skipped = n_skipped + 1;
-                    continue;
-                end
-
-                is_public_get = strcmp(prop.GetAccess, 'public');
-                is_in_also_check = ismember(name, also_check_protected);
-
-                if ~is_public_get && ~is_in_also_check
-                    skipped_names{end+1} = name; %#ok<AGROW>
-                    n_skipped = n_skipped + 1;
-                    continue;
-                end
-
-                for i = 2:n_obj
-                    obj = esn_array{i};
-                    val_ref = ref.(name);
-                    val_obj = obj.(name);
-
-                    if isa(val_ref, 'function_handle') && isa(val_obj, 'function_handle')
-                        match = strcmp(func2str(val_ref), func2str(val_obj));
-                    else
-                        match = isequaln(val_ref, val_obj);
-                    end
-
-                    if ~match
-                        error('verify_shared_build:Mismatch', ...
-                            'Property ''%s'' differs between condition 1 and %d.\nThis property was expected to be identical. If it should differ, add it to expected_to_differ.', ...
-                            name, i);
-                    end
-                end
-
-                n_checked = n_checked + 1;
-                n_matched = n_matched + 1;
-                checked_names{end+1} = name; %#ok<AGROW>
-            end
-
-            for k = 1:numel(expected_to_differ)
-                name = expected_to_differ{k};
-                prop_meta = findobj(mc.PropertyList, 'Name', name);
-                if isempty(prop_meta)
-                    warning('verify_shared_build:UnknownProperty', ...
-                        'Property ''%s'' in expected_to_differ does not exist on this class.', name);
-                    continue;
-                end
-
-                any_differs = false;
-                for i = 2:n_obj
-                    val_ref = ref.(name);
-                    val_obj = esn_array{i}.(name);
-                    if ~isequaln(val_ref, val_obj)
-                        any_differs = true;
-                        break;
-                    end
-                end
-
-                if ~any_differs
-                    warning('verify_shared_build:NoDifference', ...
-                        'Property ''%s'' is listed in expected_to_differ but is identical across all %d conditions.\nThis may indicate a misconfigured experiment.', ...
-                        name, n_obj);
-                end
-            end
-
-            vprintf(ref.verbose, 'verbose', 'verify_shared_build: %d properties checked, all matched across %d conditions.\n', ...
-                n_checked, n_obj);
-            vprintf(ref.verbose, 'verbose', '  Checked: %s\n', strjoin(checked_names, ', '));
-            vprintf(ref.verbose, 'verbose', '  Expected to differ: %s\n', strjoin(expected_to_differ, ', '));
-            if ~isempty(also_check_protected)
-                vprintf(ref.verbose, 'verbose', '  Also verified (protected): %s\n', strjoin(also_check_protected, ', '));
-            end
+            % Kept as a name for the scripts that call it this way. The check
+            % itself is the function verify_shared_build (src/util/), and this
+            % only forwards to it. It used to be a second copy of that function,
+            % and the copies drifted: the function learned to skip std_clipped
+            % (derived from the condition's routes) on 2026-11-12, this copy did
+            % not, and the memory-capacity example stage of a preset with a
+            % depression spread failed here on 2026-11-14.
+            verify_shared_build(esn_array, expected_to_differ, also_check_protected);
         end
     end
 end

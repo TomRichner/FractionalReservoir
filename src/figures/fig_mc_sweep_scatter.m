@@ -332,7 +332,7 @@ for k = 1:n
     else
         scatter(ax, k, 0, marker_area(values(k)), gray, 'filled', 'MarkerEdgeColor', 'none');
     end
-    text(ax, k, -0.55, sprintf('%g', values(k)), 'HorizontalAlignment', 'center', ...
+    text(ax, k, -0.55, sprintf('%.3g', values(k)),'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'top', 'FontSize', st.tick_fs - 4);
 end
 x_end = n + 0.8;
