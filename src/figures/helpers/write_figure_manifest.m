@@ -1,7 +1,8 @@
-function path = write_figure_manifest(fig_root, cfg, run_dir, root_mode, results, minutes)
+function path = write_figure_manifest(fig_root, cfg, run_dir, root_mode, results, minutes, notes)
 % WRITE_FIGURE_MANIFEST One record of what a figure run produced, at the root.
 %
 %   path = WRITE_FIGURE_MANIFEST(fig_root, cfg, run_dir, root_mode, results, minutes)
+%   path = WRITE_FIGURE_MANIFEST(..., notes)     % a partial pass; see below
 %
 % Writes <fig_root>/manifest.md. Replaces the per-figure README_*.txt and the
 % fifteen near-identical git_provenance.txt files that used to sit one per
@@ -21,6 +22,13 @@ function path = write_figure_manifest(fig_root, cfg, run_dir, root_mode, results
 % a note names every entry that drew all conditions because its function does
 % not declare the option.
 %
+% A PARTIAL PASS (make_all_paper_figures with cfg.only) writes the manifest of
+% the whole set: `results` then holds every entry, the redrawn ones from this
+% pass and the others as read_figure_manifest read them from the earlier
+% manifest, and `notes` holds one line per pass, written as the section
+% "Partial passes" (which entries, when, where that pass's git state is).
+% The "Elapsed" row is then the partial pass's own time.
+%
 % Written after the loop regardless of failures, so a partial run still describes
 % itself -- a manifest listing what did NOT build is more useful than no manifest.
 %
@@ -36,6 +44,7 @@ arguments
     root_mode (1,:) char
     results   struct
     minutes   (1,1) double
+    notes     cell = {}     % a partial pass's record, one line each; see the header
 end
 
 path = fullfile(fig_root, 'manifest.md');
@@ -105,6 +114,16 @@ for k = 1:numel(results)
     fprintf(fid, '  - `%s`\n', results(k).files{:});
 end
 fprintf(fid, '\n');
+
+% read_figure_manifest reads this section back by its heading and its "- "
+% lines, so a later partial pass carries the earlier ones forward.
+if ~isempty(notes)
+    fprintf(fid, '## Partial passes\n\n');
+    fprintf(fid, ['Some entries were redrawn after the full pass (`make_all_paper_figures` with `cfg.only`). ' ...
+        'The rows of the other entries are as the earlier manifest recorded them; "Elapsed" above is the last pass''s.\n\n']);
+    fprintf(fid, '- %s\n', notes{:});
+    fprintf(fid, '\n');
+end
 
 fprintf(fid, ['> Figures are regenerable: this directory is gitignored, and ' ...
     '`make_all_paper_figures` rebuilds it from the run directory and commit ' ...

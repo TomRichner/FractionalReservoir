@@ -8,6 +8,28 @@ function results = make_all_paper_figures(cfg)
 % Takes ONE argument, a config struct -- not name-value pairs. (This header used
 % to advertise an 'only' option the arguments block never accepted.)
 %
+% A PARTIAL PASS: cfg.only, a cell of registry entry names (2026-11-14).
+%
+%   cfg = mu7chain_AC_config('fast', '3cond');
+%   cfg.only = {'fig_memory_capacity_example', 'mc_statistics_bias'};
+%   results = make_all_paper_figures(cfg);
+%
+% Draws those entries alone, through their registry entries, into the same
+% <fig_root>/<entry name>/ folders; every other entry's folder is left as it
+% is. For when one stage of a run was completed or one figure corrected after
+% the full pass, and redrawing fifty figures to replace three would also
+% replace the record of what drew the other forty-seven. The figure root must
+% hold the manifest of an earlier pass: the new manifest lists the WHOLE set,
+% the redrawn rows from this pass and the others as that manifest recorded
+% them (read_figure_manifest), with a "Partial passes" section saying which
+% entries were redrawn and when. `results` is likewise the whole set. The
+% root's git_provenance.txt is left alone (it describes the code that drew
+% the rest); the partial pass's git state is written to
+% <fig_root>/redraws/<time>/. The transcript is appended to
+% command_window.log and the report is rebuilt from what is on disk. An
+% unknown name, or a root with no manifest, is refused before anything is
+% drawn. Absent or empty: every entry, as always.
+%
 % ENTRY POINT TWO OF TWO. The cheap half: pure replots, analytic figures, and a
 % handful that simulate but finish in seconds to minutes. Everything measured in
 % hours lives in run_all_paper_analyses.
@@ -140,6 +162,23 @@ else
     end
     root_mode = 'configured';
 end
+
+%% A partial pass: cfg.only
+% Checked before anything is created or drawn. The names must be entries of
+% the registry, and the figure root must hold the manifest of an earlier
+% pass, whose rows for the other entries are carried into the new manifest.
+only = {};
+if isfield(cfg, 'only') && ~isempty(cfg.only); only = cellstr(cfg.only); end
+partial = ~isempty(only);
+registry_names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
+if partial
+    unknown = setdiff(only, registry_names);
+    if ~isempty(unknown)
+        error('make_all_paper_figures:UnknownEntry', ...
+            'cfg.only names %s, which the figure registry does not hold.', strjoin(unknown, ', '));
+    end
+    prior = read_figure_manifest(fig_root);
+end
 if ~isfolder(fig_root); mkdir(fig_root); end
 % The transcript of the figure pass is saved beside the manifest (TR,
 % 2026-09-14), through vlog since 2026-09-15 (diary lost everything under the
@@ -170,6 +209,11 @@ if ~visible_figures
 end
 
 figs = cfg.figures;
+if partial
+    figs = figs(ismember(registry_names, only));     % in registry order
+    vprintf(verbose, 'minimal', 'Partial pass:  %d of %d entries (cfg.only); the others are left as they are\n', ...
+        numel(figs), numel(registry_names));
+end
 n = numel(figs);
 
 vprintf(verbose, 'verbose', '\n========================================================\n');
@@ -257,9 +301,25 @@ end
 % git_provenance.txt files. capture_git_provenance also writes
 % working_changes.patch when the tree is dirty, which is what lets a run made
 % from uncommitted work be reproduced.
+%
+% A partial pass records the whole set: the entries it drew, and the rows of
+% the others as the earlier manifest holds them. Its git state goes into
+% <fig_root>/redraws/<time>/, NOT over the root's git_provenance.txt, which
+% stays the record of the code that drew everything else.
 try
-    capture_git_provenance(fig_root, project_root);
-    write_figure_manifest(fig_root, cfg, run_dir, root_mode, results, toc(t_all)/60);
+    if partial
+        stamp = char(datetime('now', 'Format', 'yyyy-MM-dd_HHmmss'));
+        capture_git_provenance(fullfile(fig_root, 'redraws', stamp), project_root);
+        notes = prior.notes;
+        if isempty(notes); notes = {sprintf('Full pass: generated %s.', prior.generated)}; end
+        notes{end+1} = sprintf('%s: redrew %s; git state in `redraws/%s/git_provenance.txt`.', ...
+            char(datetime('now')), strjoin(strcat('`', {results.name}, '`'), ', '), stamp);
+        results = merge_results(prior.results, results, registry_names);
+    else
+        capture_git_provenance(fig_root, project_root);
+        notes = {};
+    end
+    write_figure_manifest(fig_root, cfg, run_dir, root_mode, results, toc(t_all)/60, notes);
 catch ME
     warning('make_all_paper_figures:ManifestFailed', ...
         'Could not write the manifest: %s', ME.message);
@@ -285,7 +345,11 @@ n_paper_ok = sum([results.ok] & [results.in_paper]);
 
 vprintf(verbose, 'verbose', '\n========================================================\n');
 vprintf(verbose, 'near-none', 'PAPER FIGURES COMPLETE in %.1f min: %d/%d succeeded (%d/%d in-paper), output %s\n', ...
-    toc(t_all)/60, n_ok, n, n_paper_ok, n_paper, fig_root);
+    toc(t_all)/60, n_ok, numel(results), n_paper_ok, n_paper, fig_root);
+if partial
+    vprintf(verbose, 'minimal', '  (a partial pass: %d entr%s drawn now, the other rows are the earlier manifest''s)\n', ...
+        n, plural_y(n));
+end
 vprintf(verbose, 'minimal', '--------------------------------------------------------\n');
 for k = 1:numel(results)
     r = results(k);
@@ -393,6 +457,23 @@ tf = (strcmp(ME.identifier, 'MATLAB:TooManyInputs') && ...
       contains(ME.message, sprintf('argument name ''%s''', name))) || ...
      (strcmp(ME.identifier, 'MATLAB:InputParser:UnmatchedParameter') && ...
       contains(ME.message, sprintf('''%s''', name)));
+end
+
+function results = merge_results(prior, drawn, registry_names)
+% The results of the whole set after a partial pass: the earlier manifest's
+% rows with the entries drawn now replaced (or added, when the earlier pass
+% did not have them), in registry order; a row of the earlier manifest that
+% the registry no longer names is kept, after the others.
+results = prior;
+for k = 1:numel(drawn)
+    i = find(strcmp({results.name}, drawn(k).name), 1);
+    if isempty(i); i = numel(results) + 1; end
+    results(i) = drawn(k);
+end
+[known, pos] = ismember({results.name}, registry_names);
+pos(~known) = numel(registry_names) + (1:nnz(~known));
+[~, order] = sort(pos);
+results = results(order);
 end
 
 function s = plural_y(k)
