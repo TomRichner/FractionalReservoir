@@ -298,8 +298,26 @@ and resume. **Self-negative feedback** is `SRNNCellTypePairs.self_feedback`
 (`1 x C`, k in units of `R_gain1`, the bulk radius at gain 1): applied in
 `get_params` only, after `level_of_chaos` and the route `scale`, as
 `W_sim = g W_drawn - diag(k) R_gain1`; it breaks Dale's law for E cells,
-accepted (Tom, 2026-11-13). Three fixes went in first, each of which
-moved numbers:
+accepted (Tom, 2026-11-13). `self_coupling` is its signed alias
+(`W_ii = +s R_gain1`, s < 0 negative feedback), the axis Tom's figures use.
+
+**Block C runs with block A since FD-025** (Tom, 2026-11-13 evening):
+`mu7chain_AC_run(run_mode)` (bundle `mu7chain_AC_config`, composed from
+`mu7chain_config` and the block C stage; `mu7chain_config` alone is
+unchanged; block B stays out). The block C stage runs a list of grids
+(`cfg.mc_gain_sweep.grids`), all jobs through one parfor: gain x bias
+(gains log-spaced 0.1 to 4, bias -0.6 to 0.6) with the two E:I networks
+along gain, and gain x self-coupling (gains linear 0.1 to 4, s -4 to 4),
+into `<run_dir>/mc_gain_sweep_bias/`, `..._bias_EI3to2/`, `..._bias_EI2to3/`
+and `mc_gain_sweep_selfcoupling/` (one function names them,
+`mc_gain_sweep_folder`; the old single-grid folder still reads). Sizes in
+one place, `mc_gain_sweep_grid` (levels per axis x networks): essential
+3 x 3 x 1 (about 20 min), fast 7 x 7 x 3 (about 4 h 25), medium 13 x 13 x 10
+(about 48 h, Tom's), production 17 x 17 x 10. Registered figures: maps
+with linear color scales for both grids, gain curves with two columns and
+the E:I rows, robustness for both, memory capacity against lambda_1 from
+the self-coupling grid, three free scatters, statistics. Three fixes
+went in first, each of which moved numbers:
 
 - **Every seeding call names its generator** (`rng(seed, 'twister')`;
   F1). A pool worker's default generator is not a client's, so a model
