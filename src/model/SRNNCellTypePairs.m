@@ -336,6 +336,23 @@ classdef SRNNCellTypePairs < handle
         sigma_u_noise = 0
         % Seed for the noise draw; empty derives it from rng_seeds(1).
         noise_seed = []
+        % A NOISE SEED THAT CHANGES DURING THE RUN. Empty (the default) is
+        % one path from noise_seed for the whole run, bit-identical to a
+        % model without this property. Otherwise rows of [t_start, seed]:
+        % the Wiener increments of every step that starts at or after
+        % t_start come from that seed's path, up to the next row's
+        % t_start; before the first row they come from noise_seed. Each
+        % seed's path is the one it would give alone, read at the same
+        % absolute time index, so copies of a network that share
+        % noise_seed are bit-identical up to and including the state at
+        % the first t_start and differ only after it, and a schedule
+        % naming noise_seed itself reproduces the unscheduled run exactly
+        % (wiener_increments has the definition). It is how
+        % run_noise_switch_rollouts makes copies share their noise and
+        % then stop sharing it. t_start must lie on the time grid,
+        % strictly inside the run; times strictly increasing; seeds
+        % integers. Ignored at sigma_u_noise = 0.
+        noise_seed_schedule = []
         input_config
         u_ex_scale = 1.0
         rng_seeds = [1 2]
@@ -914,12 +931,13 @@ classdef SRNNCellTypePairs < handle
                 seed = obj.rng_seeds(1) + 224737;
             end
 
+            % The draw, and the splice when noise_seed_schedule names later
+            % seeds, is wiener_increments; with no schedule it is the draw
+            % this method always made (xi1 then xi2 from one twister
+            % stream, the global stream restored).
             n_steps = numel(obj.t_ex) - 1;
-            stream_state = rng;
-            rng(seed, 'twister');
-            xi1 = randn(obj.n, n_steps);
-            xi2 = randn(obj.n, n_steps);
-            rng(stream_state);
+            [xi1, xi2] = wiener_increments(obj.n, n_steps, seed, ...
+                obj.noise_seed_schedule, obj.t_ex(1), obj.fs, 'SRNNCellTypePairs');
 
             % layout.x names the dendritic block directly, so unlike
             % SRNNModel2 this class does not have to derive it from N_sys_eqs.
@@ -1463,6 +1481,7 @@ classdef SRNNCellTypePairs < handle
             check_ode_solver(obj.ode_solver, 'SRNNCellTypePairs');
             check_noise_settings(obj.sigma_u_noise, obj.ode_solver, ...
                 'SRNNCellTypePairs');
+            check_noise_seed_schedule(obj.noise_seed_schedule, 'SRNNCellTypePairs');
 
             C = obj.n_cellTypes;
             if ~isscalar(C) || ~isfinite(C) || C < 1 || C ~= round(C)
