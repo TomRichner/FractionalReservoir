@@ -1,4 +1,4 @@
-function [out_dir, results_file] = run_mc_gain_sweep(opts)
+function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 % RUN_MC_GAIN_SWEEP Memory capacity and lambda_1 at every point of a sweep of gain against a second axis (the bias by default).
 %
 %   out_dir = RUN_MC_GAIN_SWEEP()                          % 'essential': a first look
@@ -14,18 +14,22 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 % the largest Lyapunov exponent over a grid of
 %   gain          level_of_chaos, the multiplier on every connection weight
 %   a second axis ONE other scalar model property, named by the option
-%                 second_axis. The default is the bias, S_c: the centre of
+%                 second_axis. The default is the bias, S_c: the center of
 %                 the per-neuron setpoint draw (the per-neuron spread
 %                 sigma_S_c stays as the preset has it). Any other settable
 %                 property that takes a scalar can be named instead, for
-%                 example 'self_feedback' (negative self-feedback on the
-%                 diagonal of W, in multiples of the bulk radius at gain 1;
-%                 a scalar there means every cell type). The stage holds no
-%                 code for a particular property: mc_sweep_second_axis turns
-%                 the property into the names used in the job files and the
-%                 table, and mc_sweep_quantity labels it in the figures.
+%                 example 'self_coupling' (the diagonal of W, in multiples
+%                 of the bulk radius at gain 1; a scalar there means every
+%                 cell type). The stage holds no code for a particular
+%                 property: mc_sweep_second_axis turns the property into the
+%                 names used in the job files and the table, and
+%                 mc_sweep_quantity labels it in the figures.
 % run_memory_capacity measures the same task at the preset network only.
 % Below, "bias" stands for the second axis wherever the default is described.
+%
+% THIS IS ONE RUN: one network preset, one second axis. It is a set of one
+% for run_mc_gain_sweep_set, which holds the code and runs several such
+% runs (a bundle's grids and variant networks) as one pool of jobs.
 %
 % ONE JOB is one (gain, second-axis value, seed). It builds every condition on the same
 % seeds -- the same W, input weights and input sequence, only the adaptation
@@ -56,43 +60,16 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 %                     (above 0.9) and silent (below 0.01), so a low memory
 %                     capacity can be read as saturated, silent or chaotic.
 %
-% SIZES, by run_mode (explicit gain_levels / bias_levels / seeds override;
-% the table is the local function grid_for_mode). The second-axis levels of
-% the table are BIAS levels: a run on another axis states its own levels
-% (second_levels), and takes gains and seeds from the table unless given:
-%   essential    4 gains x  3 biases x  1 seed      12 jobs, about 10 min
-%   fast        11 gains x  7 biases x  2 seeds    154 jobs, about 2 h 40
-%   medium(2)   16 gains x  9 biases x  5 seeds    720 jobs, about 12 h
-%   production  21 gains x 13 biases x 10 seeds   2730 jobs, about 45 h
-% Times are for 12 pool workers, at the measured one job of four conditions
-% per minute (9 to 12 worker-minutes a job). 'essential' is the size agents
-% run: one job per worker, so it ends when one job does. 'fast' and larger
-% are runs for Tom to start.
-%   gains   fast        0.1 0.15 0.22 0.33 0.5 0.7 1 1.4 2 2.8 4
-%           essential   0.22 0.5 1 2 (four of fast's)
-%           medium      0.1 0.129 0.167 0.215 0.278 0.359 0.464 0.599 0.774
-%                       1 1.26 1.59 2 2.52 3.17 4
-%           production  0.1 0.121 0.147 0.178 0.215 0.261 0.316 0.383 0.464
-%                       0.562 0.681 0.825 1 1.19 1.41 1.68 2 2.38 2.83 3.36 4
-%   biases  fast        -0.6:0.2:0.6
-%           essential   -0.6 -0.2 0.2 (three of fast's)
-%           medium      -0.6:0.15:0.6
-%           production  -0.6:0.1:0.6
-% Every mode reaches gain 4 and has the preset's own point (gain 1, bias
-% 0.2) on its grid. Medium and production gains are log-spaced in two
-% pieces that meet at 1 (nine and twelve equal log steps from 0.1 to 1, six
-% and eight from 1 to 4), rounded to three significant figures. Seeds are
-% seed_net_base + 1, 2, ... The protocol is the same in every mode.
-% WHY THESE RANGES (FD-010, decisions 14, 18 and 21): above bias 0.6 the
-% network is silent; the no-adaptation peak lies at low bias, so the axis
-% runs down to -0.6; and at low bias the adapting conditions are still
-% stable, with their best memory capacity, at gain 2, so the gain axis runs
-% to 4 to bracket their collapse.
-% THE BIAS LEVELS ARE COLON RANGES, so the level "0.2" is the colon's
-% 0.19999999999999996, and job files are named by the exact value.
-% Essential takes its levels from fast's for that reason: its jobs are
-% fast's jobs, and a fast run into the same directory skips them. Figures
-% and statistics take the level nearest the preset's bias.
+% SIZES, by run_mode: mc_gain_sweep_grid holds the one size table (levels
+% per axis and networks, with job counts and times) and the default ranges:
+% gains log-spaced 0.1 to 4, biases linear -0.6 to 0.6, seeds 3001, 3002,
+% ...; 'essential' is 3 x 3 levels on 1 network, 'fast' 7 x 7 on 3. A run
+% on another axis states its own levels (second_levels) and takes gains and
+% seeds from the table unless given. Explicit gain_levels, bias_levels /
+% second_levels and seeds override the table. The protocol is the same in
+% every mode. (Until 2026-11-13 the table was a list of hand-picked levels
+% per mode, fast = 11 gains x 7 biases x 2 seeds; a result made with it
+% still reads, and resumes when its levels are given explicitly.)
 %
 % RESUMABLE. Each finished job writes <out_dir>/jobs/job_*.mat; a rerun into
 % the same output directory skips the jobs that are there (and reruns the
@@ -118,17 +95,23 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 % settings: conditions, delay_s, preset_name, second_axis (the property),
 %   preset_gain, preset_bias, run_mode, gain_levels, bias_levels (for
 %   another axis preset_<column> and <column>_levels), seeds, protocol, ode_solver, the
-%   Lyapunov settings, model_args, n, n_jobs, n_failed, minutes, git.
+%   Lyapunov settings, model_args, n, n_jobs, n_failed, minutes (wall time
+%   of the call; the runs of a set share it), git.
 %
-% Options:
+% Options (mc_gain_sweep_options names them and holds the defaults):
+%   preset_name   a SRNNCellTypePairs preset with noise off (default the
+%                 mu7chain bundle's noise-free memory-capacity preset)
+%   run_mode      the size (default 'essential'); see SIZES
+%   gain_levels, seeds   explicit levels of the gain and network seeds
 %   second_axis   the model property of the second axis (default 'S_c')
 %   second_levels its levels. Required when second_axis is not the bias.
 %   bias_levels   the same option under the name it has for the default
 %                 axis; refused with another axis
-%   preset_name   a SRNNCellTypePairs preset with noise off (default the
-%                 mu7chain bundle's noise-free memory-capacity preset)
 %   conditions    names of the preset's conditions to run (default all)
+%   output_dir    where the run's mc_gain_sweep folder goes (default a
+%                 dated folder under data/)
 %   ode_solver    default 'sra1', as the bundle's memory capacity uses
+%   verbose       'minimal' (default) | 'verbose' | 'near-none'
 %   model_args    name-value overrides of the preset (cell), applied after
 %                 it and before the job's gain and second-axis value
 %   protocol      a struct overriding fields of mc_protocol (T_wash_sec,
@@ -143,481 +126,12 @@ function [out_dir, results_file] = run_mc_gain_sweep(opts)
 % The pool is the session's allocation (pool_set); with none the jobs run
 % serially.
 %
-% See also: SRNN_ESN_reservoir.run_memory_capacity_lean, mc_protocol,
+% See also: run_mc_gain_sweep_set, mc_gain_sweep_options, mc_gain_sweep_grid,
+%           SRNN_ESN_reservoir.run_memory_capacity_lean, mc_protocol,
 %           mc_sweep_second_axis, mc_gain_sweep_job_rows, read_mc_gain_sweep,
-%           read_mc_gain_sweep_jobs,
-%           run_memory_capacity, verify_shared_build
+%           read_mc_gain_sweep_jobs, run_memory_capacity, verify_shared_build
 
-arguments
-    opts.preset_name  (1,:) char   = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain'
-    opts.run_mode     (1,:) char   = 'essential'
-    opts.gain_levels  (1,:) double = []
-    opts.second_axis  (1,:) char   = 'S_c'
-    opts.second_levels (1,:) double = []
-    opts.bias_levels  (1,:) double = []     % second_levels, for the default axis
-    opts.seeds        (1,:) double = []
-    opts.conditions   (1,:) cell   = {}
-    opts.output_dir   (1,:) char   = ''
-    opts.ode_solver   (1,:) char   = 'sra1'
-    opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
-    opts.model_args   (1,:) cell   = {}
-    opts.protocol     (1,1) struct = struct()
-    opts.lya_K        (1,1) double {mustBeInteger, mustBePositive} = 5
-    opts.lya_T_sec    (1,1) double {mustBePositive} = 30
-    opts.lya_acc_sec  (1,1) double {mustBePositive} = 20
-    opts.segment_len  (1,1) double {mustBeInteger, mustBeGreaterThanOrEqual(opts.segment_len, 2)} = 600
-    opts.retry_failed (1,1) logical = true
-    opts.use_parallel (1,1) logical = true
-end
-
-setup_paths();
-t_start = tic;
-
-%% Sizes -- BEFORE any compute, so a bad mode fails in milliseconds
-P = mc_protocol();
-axis2 = mc_sweep_second_axis(opts.second_axis);
-[gain_levels, bias_levels, n_seeds] = grid_for_mode(opts.run_mode);
-seeds = P.seed_net_base + (1:n_seeds);
-if ~isempty(opts.gain_levels); gain_levels = opts.gain_levels; end
-if ~isempty(opts.seeds);       seeds       = opts.seeds;       end
-second_levels = second_axis_levels(axis2, opts, bias_levels);
-
-%% Protocol: mc_protocol, with the (test-only) overrides
-over = fieldnames(opts.protocol);
-unknown = setdiff(over, fieldnames(P));
-if ~isempty(unknown)
-    error('run_mc_gain_sweep:BadProtocolField', ...
-        'protocol has field(s) mc_protocol does not: %s.', strjoin(unknown', ', '));
-end
-for k = 1:numel(over)
-    P.(over{k}) = opts.protocol.(over{k});
-end
-if opts.lya_acc_sec >= opts.lya_T_sec
-    error('run_mc_gain_sweep:BadLyapunovWindow', ...
-        'lya_acc_sec must be shorter than lya_T_sec.');
-end
-
-%% The preset: the network, and its conditions
-[preset, model_class, conditions] = srnn_param_preset(opts.preset_name);
-if ~strcmp(model_class, 'SRNNCellTypePairs')
-    error('run_mc_gain_sweep:BadModelClass', ...
-        'Preset ''%s'' is written for %s; SRNN_ESN_reservoir subclasses SRNNCellTypePairs.', ...
-        opts.preset_name, model_class);
-end
-check_second_axis(axis2, preset, opts.preset_name);
-all_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
-if isempty(opts.conditions)
-    cond_names = all_names;
-else
-    cond_names = opts.conditions;
-    bad = setdiff(cond_names, all_names);
-    if ~isempty(bad)
-        error('run_mc_gain_sweep:NoSuchCondition', ...
-            'Preset ''%s'' has no condition %s (it has: %s).', ...
-            opts.preset_name, strjoin(bad, ', '), strjoin(all_names, ', '));
-    end
-end
-[~, where] = ismember(cond_names, all_names);
-cond_args = cellfun(@(c) struct2namevalue(rmfield(c, 'name')), conditions(where), ...
-    'UniformOutput', false);
-n_cond = numel(cond_names);
-
-% Noise is off for block C, and a stochastic preset would need the solver
-% checked against it: the model class's own check, before any compute.
-sigma = 0;
-if isfield(preset, 'sigma_u_noise'); sigma = preset.sigma_u_noise; end
-check_noise_settings(sigma, opts.ode_solver, 'run_mc_gain_sweep');
-
-%% What every reservoir of the run shares
-fs = P.fs;
-[delay_s, ~, d_max] = mc_delay_axis(P);
-
-J = struct();                       % the job recipe, sent to the workers
-J.base_args = [struct2namevalue(preset), opts.model_args, ...
-    {'fs', fs, 'ode_solver', opts.ode_solver, ...
-     'input_type', P.input_type, 'u_f_cutoff', P.u_f_cutoff, 'u_alpha', P.u_alpha, ...
-     'T_hold', P.T_hold, 'verbose', 'near-none'}];
-J.mc_args = {'T_wash', round(P.T_wash_sec * fs), 'T_train', round(P.T_train_sec * fs), ...
-    'T_test', round(P.T_test_sec * fs), 'd_max', d_max, ...
-    'lya_method', 'none', 'lean_input', true};
-% The Lyapunov run: lya_T_sec of the same task (the sequence's first
-% seconds), top-K with a fixed small K, accumulated over the last
-% lya_acc_sec. lya_T_interval is set explicitly: its default comes from
-% T_range, which the reservoir's input does not follow.
-LYA_DT = 0.05;          % s between re-orthonormalisations, as the sweeps use
-LYA_WARMUP_MAX = 5;     % s the basis aligns before accumulating (the class default)
-lya_n = round(opts.lya_T_sec * fs);
-lya_t_end = (lya_n - 1) / fs;
-lya_t0 = opts.lya_T_sec - opts.lya_acc_sec;
-J.lya_args = {'T_wash', round(lya_t0 * fs), 'T_train', lya_n - round(lya_t0 * fs), ...
-    'T_test', 0, 'd_max', d_max, ...
-    'lya_method', 'topk', 'lya_K', opts.lya_K, 'lya_K_auto', false, 'lya_dt', LYA_DT, ...
-    'lya_T_interval', [lya_t0, lya_t_end], 'lya_warmup', min(LYA_WARMUP_MAX, lya_t0), ...
-    'store_decimated_state', false, 'store_full_state', false};
-J.cond_names = cond_names;
-J.cond_args = cond_args;
-J.readout_signal = P.readout_signal;
-J.R2_threshold = P.R2_threshold_for_horizon;
-J.delay_s = delay_s;
-J.segment_len = opts.segment_len;
-J.seed_offset = P.seed_stim_base - P.seed_net_base;
-J.pinned_rate = 0.9;    % a neuron whose mean rate is above this counts as pinned
-J.silent_rate = 0.01;   % ... and below this as silent
-% What makes two runs the same experiment; a job file with another
-% signature is refused. Run-size choices (grid, seeds) are not part of it.
-% The second axis is part of it, as a field ONLY when it is not the bias:
-% the signature of a bias run is then the one its job files have carried
-% since before the axis could be chosen, so they still resume.
-J.signature = struct('preset_name', opts.preset_name, 'protocol', P, ...
-    'ode_solver', opts.ode_solver, 'model_args', {opts.model_args}, ...
-    'lya', [opts.lya_K, opts.lya_T_sec, opts.lya_acc_sec], 'conditions', {cond_names});
-if ~axis2.is_default
-    J.signature.second_axis = axis2.property;
-end
-J.axis2 = axis2;
-
-%% Output directory
-project_root = fileparts(which('setup_paths'));
-if isempty(opts.output_dir)
-    run_root = fullfile(project_root, 'data', ...
-        ['mc_gain_sweep_' char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'))]);
-else
-    run_root = opts.output_dir;
-end
-out_dir = fullfile(run_root, 'mc_gain_sweep');
-job_dir = fullfile(out_dir, 'jobs');
-if ~exist(job_dir, 'dir'); mkdir(job_dir); end
-
-%% The job table
-[G, B, S] = ndgrid(gain_levels, second_levels, seeds);
-jobs = struct('gain', num2cell(G(:)), 'second', num2cell(B(:)), 'seed', num2cell(S(:)));
-n_jobs = numel(jobs);
-job_files = cell(n_jobs, 1);
-todo = true(n_jobs, 1);
-for k = 1:n_jobs
-    job_files{k} = fullfile(job_dir, job_file_name(jobs(k), axis2));
-    if exist(job_files{k}, 'file')
-        old = load(job_files{k}, 'job');
-        if ~isequaln(old.job.signature, J.signature)
-            error('run_mc_gain_sweep:DifferentRun', ...
-                ['%s was made with a different preset, protocol, integrator, conditions, ' ...
-                 'second axis or model override. Use another output_dir; results are not mixed.'], job_files{k});
-        end
-        todo(k) = opts.retry_failed && any(old.job.failed);
-    end
-end
-vprintf(opts.verbose, 'minimal', ...
-    '[mc_gain_sweep] preset=%s run_mode=%s: %d gains x %d %s levels x %d seeds = %d jobs x %d conditions (%d already done)\n', ...
-    opts.preset_name, opts.run_mode, numel(gain_levels), numel(second_levels), axis2.column, numel(seeds), ...
-    n_jobs, n_cond, nnz(~todo));
-
-%% Fairness check, once: the first job's conditions share their build
-if any(todo) && n_cond > 1
-    chk = cell(1, n_cond);
-    for c = 1:n_cond
-        a = job_args(J, jobs(1), c);
-        chk{c} = SRNN_ESN_reservoir(a{:}, J.mc_args{:});
-        chk{c}.build();
-    end
-    % tau_a and synapse_config are what the conditions vary; the network,
-    % the input weights and the input sequence must be shared.
-    verify_shared_build(chk, {'tau_a', 'synapse_config'}, {'W', 'W_in', 'u_scalar', 't_ex'});
-    clear chk
-end
-
-%% Run
-pool = [];
-if opts.use_parallel
-    pool = pool_ensure('verbose', opts.verbose);
-end
-n_par = 0;
-if ~isempty(pool); n_par = pool.NumWorkers; end
-todo_idx = find(todo);
-todo_jobs = jobs(todo_idx);
-todo_files = job_files(todo_idx);
-n_todo = numel(todo_idx);
-verbose = opts.verbose;
-column = axis2.column;      % the job field and console name of the second axis
-parfor (k = 1:n_todo, n_par)
-    job = run_one_job(J, todo_jobs(k), todo_files{k});
-    vprintf(verbose, 'minimal', '  job %d/%d gain %.4g %s %.4g seed %d: %.0f s, MC %s%s\n', ...
-        k, n_todo, job.gain, column, job.(column), job.seed, sum(job.seconds), ...
-        strtrim(sprintf('%.2f ', job.mc_total)), failed_text(job));
-    if any(job.failed)
-        first = find(job.failed, 1);
-        vfail('[mc_gain_sweep] job gain %.4g %s %.4g seed %d, %s FAILED: %s\n', ...
-            job.gain, column, job.(column), job.seed, job.conditions{first}, job.message{first});
-    end
-end
-
-%% Consolidate from the job files (this run's and earlier ones')
-rows = cell(n_jobs, 1);
-for k = 1:n_jobs
-    L = load(job_files{k}, 'job');
-    rows{k} = mc_gain_sweep_job_rows(L.job);
-end
-T = vertcat(rows{:});
-
-settings = struct();
-settings.conditions  = cond_names;
-settings.delay_s     = delay_s;
-settings.preset_name = opts.preset_name;
-% The second axis's settings are named by its column: preset_bias and
-% bias_levels for S_c, preset_<property> and <property>_levels otherwise.
-settings.second_axis = axis2.property;
-[settings.preset_gain, settings.(['preset_' axis2.column])] = ...
-    mc_gain_sweep_preset_point(opts.preset_name, opts.model_args, axis2.property);
-settings.run_mode    = opts.run_mode;
-settings.gain_levels = gain_levels;
-settings.([axis2.column '_levels']) = second_levels;
-settings.seeds       = seeds;
-settings.protocol    = P;
-settings.ode_solver  = opts.ode_solver;
-settings.model_args  = opts.model_args;
-settings.lya_K       = opts.lya_K;
-settings.lya_T_sec   = opts.lya_T_sec;
-settings.lya_acc_sec = opts.lya_acc_sec;
-settings.lya_T_interval = [lya_t0, lya_t_end];
-settings.segment_len = opts.segment_len;
-% What every job's reservoir shares, read off one constructed without a
-% job's values.
-probe = SRNN_ESN_reservoir(J.base_args{:}, J.cond_args{1}{:});
-settings.n           = probe.n;
-settings.eta         = probe.eta;               % ridge parameter (the class's)
-settings.rng_seed_input = probe.rng_seed_input; % input weights: the same in every job
-settings.n_jobs      = n_jobs;
-settings.n_run       = n_todo;
-settings.n_failed    = nnz(T.failed);
-settings.n_workers   = n_par;
-settings.minutes     = toc(t_start) / 60;
-if verbose_level(opts.verbose) >= 2
-    settings.git = capture_git_provenance(out_dir, project_root);
-else
-    [~, settings.git] = evalc('capture_git_provenance(out_dir, project_root)');
-end
-
-results_file = fullfile(out_dir, 'mc_gain_sweep_results.mat');
-save(results_file, 'T', 'settings');
-writetable(removevars(T, 'R2_delay'), fullfile(out_dir, 'mc_gain_sweep_results.csv'));
-
-vprintf(opts.verbose, 'minimal', '[mc_gain_sweep] %d jobs (%d run now, %d condition rows failed), %.1f min -> %s\n', ...
-    n_jobs, n_todo, settings.n_failed, settings.minutes, results_file);
-end
-
-%% ======================================================================
-function second_levels = second_axis_levels(axis2, opts, bias_levels)
-% The levels of the second axis: second_levels, or for the bias its own
-% option bias_levels, or the size table's bias levels.
-if ~isempty(opts.second_levels) && ~isempty(opts.bias_levels)
-    error('run_mc_gain_sweep:TwoLevelOptions', ...
-        'Give second_levels or bias_levels (its name for the default axis), not both.');
-end
-if ~axis2.is_default && ~isempty(opts.bias_levels)
-    error('run_mc_gain_sweep:BiasLevelsOnOtherAxis', ...
-        'bias_levels are levels of S_c; the second axis is %s. Use second_levels.', axis2.property);
-end
-second_levels = [opts.second_levels, opts.bias_levels];   % at most one is non-empty
-if isempty(second_levels)
-    if ~axis2.is_default
-        error('run_mc_gain_sweep:NoSecondLevels', ...
-            ['second_levels is required with second_axis ''%s'': the size table holds ' ...
-             'bias levels only.'], axis2.property);
-    end
-    second_levels = bias_levels;
-end
-end
-
-function check_second_axis(axis2, preset, preset_name)
-% The second axis must be a property the reservoir lets a caller set, other
-% than the ones a job already sets; and the preset must not disable it.
-RESERVED = {'level_of_chaos', 'rng_seeds'};
-meta = ?SRNN_ESN_reservoir;
-prop = meta.PropertyList(strcmp({meta.PropertyList.Name}, axis2.property));
-if isempty(prop) || ~isequal(prop.SetAccess, 'public') || prop.Constant || ...
-        (prop.Dependent && isempty(prop.SetMethod)) || ismember(axis2.property, RESERVED)
-    error('run_mc_gain_sweep:BadSecondAxis', ...
-        ['second_axis ''%s'' is not a publicly settable property of SRNN_ESN_reservoir ' ...
-         '(or is one a job sets itself: %s).'], axis2.property, strjoin(RESERVED, ', '));
-end
-if strcmp(axis2.property, 'S_c') && isfield(preset, 'mu_S_c') && ~isempty(preset.mu_S_c)
-    error('run_mc_gain_sweep:PinnedSetpointMean', ...
-        ['Preset ''%s'' sets mu_S_c, which overrides S_c as the centre of the setpoint ' ...
-         'draw, so the bias axis (S_c) would do nothing.'], preset_name);
-end
-end
-
-function [gain_levels, bias_levels, n_seeds] = grid_for_mode(run_mode)
-% The size table; the header's SIZES section gives the reasons.
-fast_gains  = [0.1 0.15 0.22 0.33 0.5 0.7 1.0 1.4 2.0 2.8 4.0];
-fast_biases = -0.6:0.2:0.6;
-switch run_mode
-    case 'essential'
-        % Subsets of fast's levels, taken by index so that the values, and
-        % with them the job file names, are fast's to the bit.
-        gain_levels = fast_gains([3 5 7 9]);        % 0.22 0.5 1 2
-        bias_levels = fast_biases([1 3 5]);         % -0.6 -0.2 0.2
-        n_seeds = 1;
-    case 'fast'
-        gain_levels = fast_gains;
-        bias_levels = fast_biases;
-        n_seeds = 2;
-    case {'medium', 'medium2'}
-        gain_levels = [0.1 0.129 0.167 0.215 0.278 0.359 0.464 0.599 0.774 ...
-                       1 1.26 1.59 2 2.52 3.17 4];
-        bias_levels = -0.6:0.15:0.6;
-        n_seeds = 5;
-    case 'production'
-        gain_levels = [0.1 0.121 0.147 0.178 0.215 0.261 0.316 0.383 0.464 0.562 ...
-                       0.681 0.825 1 1.19 1.41 1.68 2 2.38 2.83 3.36 4];
-        bias_levels = -0.6:0.1:0.6;
-        n_seeds = 10;
-    otherwise
-        error('run_mc_gain_sweep:badMode', 'Unknown run_mode ''%s'' (expected %s).', ...
-            run_mode, strjoin(run_mode_names(), ', '));
-end
-end
-
-function job = run_one_job(J, spec, file)
-% One (gain, second-axis value, seed): every condition on the same seeds.
-% The job struct carries the second-axis value under the axis's column name
-% (job.bias for S_c; mc_sweep_second_axis). Writes its own
-% file, so a crash costs this job and not the run.
-%
-% The generator is named before anything is built: a pool worker's default
-% is not the client's, and a seed must mean the same network on both.
-rng(0, 'twister');
-n_cond = numel(J.cond_names);
-job = struct();
-column = J.axis2.column;
-job.gain = spec.gain;
-job.(column) = spec.second;
-job.seed = spec.seed;
-job.seed_stim = spec.seed + J.seed_offset;
-job.conditions = J.cond_names;
-job.signature = J.signature;
-job.mc_total    = nan(1, n_cond);
-job.horizon     = nan(1, n_cond);
-job.R2_delay    = nan(n_cond, numel(J.delay_s));
-job.lle_input   = nan(1, n_cond);
-job.lle_noinput = nan(1, n_cond);
-job.rate_E      = nan(1, n_cond);
-job.rate_I      = nan(1, n_cond);
-job.frac_pinned = nan(1, n_cond);
-job.frac_silent = nan(1, n_cond);
-job.seconds     = nan(1, n_cond);
-job.failed      = false(1, n_cond);
-job.message     = repmat({''}, 1, n_cond);
-
-for c = 1:n_cond
-    t_c = tic;
-    try
-        args = job_args(J, spec, c);
-
-        % Memory capacity, lean path.
-        esn = SRNN_ESN_reservoir(args{:}, J.mc_args{:});
-        esn.build();
-        [mc, r2, res] = esn.run_memory_capacity_lean('readout_signal', J.readout_signal, ...
-            'segment_len', J.segment_len, 'verbose', false);
-        r2 = r2(:)';
-        if numel(r2) ~= numel(J.delay_s)
-            error('run_mc_gain_sweep:DelayCount', 'Expected %d delays, got %d.', ...
-                numel(J.delay_s), numel(r2));
-        end
-        % The horizon, as run_memory_capacity defines it: the longest delay
-        % whose R^2 is above the threshold.
-        idx = find(r2 > J.R2_threshold, 1, 'last');
-        if isempty(idx); horizon = 0; else; horizon = J.delay_s(idx); end
-
-        % Rates: per-neuron time means over the training and test windows.
-        rate = res.rate_mean;
-        if ~all(isfinite(rate)) || ~all(isfinite(r2))
-            % compute_R2 clamps with max(0, min(1, .)), which turns a NaN
-            % into 1: a trajectory that left the finite numbers would
-            % otherwise score a perfect memory. It is a failed condition.
-            error('run_mc_gain_sweep:NonFinite', ...
-                'The trajectory or the R^2 curve is not finite (gain %g, %s %g).', ...
-                spec.gain, column, spec.second);
-        end
-        params = esn.cached_params;
-        by_type = mat2cell(rate, params.n_per_type(:), 1);
-        names = params.cell_type_names;
-        rate_E = NaN; rate_I = NaN;
-        if any(strcmp(names, 'E')); rate_E = mean(by_type{strcmp(names, 'E')}); end
-        if any(strcmp(names, 'I')); rate_I = mean(by_type{strcmp(names, 'I')}); end
-        esn = []; res = []; %#ok<NASGU>  release before the Lyapunov runs
-
-        % lambda_1, input on and off: a short run() of the same reservoir.
-        lle = nan(1, 2);
-        extra = {{}, {'u_scale', 0, 'u_offset', 0}};
-        for v = 1:2
-            m = SRNN_ESN_reservoir(args{:}, J.lya_args{:}, extra{v}{:});
-            m.build();
-            m.run();
-            lle(v) = m.lya_results.LLE;
-            m = []; %#ok<NASGU>
-        end
-        if ~all(isfinite(lle))
-            % The estimator returns NaN when the trajectory it follows is
-            % not finite. (The rate can hide that: a clipping nonlinearity
-            % maps a NaN potential to a finite rate.)
-            error('run_mc_gain_sweep:NonFiniteLyapunov', ...
-                'lambda_1 is not finite (gain %g, %s %g): the trajectory diverged.', ...
-                spec.gain, column, spec.second);
-        end
-
-        job.mc_total(c)    = mc;
-        job.horizon(c)     = horizon;
-        job.R2_delay(c, :) = r2;
-        job.lle_input(c)   = lle(1);
-        job.lle_noinput(c) = lle(2);
-        job.rate_E(c)      = rate_E;
-        job.rate_I(c)      = rate_I;
-        job.frac_pinned(c) = mean(rate > J.pinned_rate);
-        job.frac_silent(c) = mean(rate < J.silent_rate);
-    catch ME
-        job.failed(c)  = true;
-        job.message{c} = sprintf('%s: %s', ME.identifier, ME.message);
-    end
-    job.seconds(c) = toc(t_c);
-end
-save_job(file, job);
-end
-
-function args = job_args(J, spec, c)
-% Constructor arguments of one job's condition c: seeds, the preset and the
-% run's shared settings, the condition, then the job's gain and its value on
-% the second axis LAST (the constructor is last-write-wins, so the swept
-% values override the preset's).
-args = [{'rng_seeds', [spec.seed, spec.seed + J.seed_offset]}, J.base_args, ...
-    J.cond_args{c}, {'level_of_chaos', spec.gain, J.axis2.property, spec.second}];
-end
-
-function save_job(file, job)
-% Written to a temporary name and renamed, so an interrupted save never
-% leaves a file a rerun would take for a finished job.
-tmp = [file '.tmp'];
-save(tmp, 'job', '-mat');
-movefile(tmp, file, 'f');
-end
-
-function name = job_file_name(spec, axis2)
-% Named by the job's values, not its position, so a rerun with a different
-% grid still finds the jobs it shares with an earlier one. The second axis's
-% token is 'b' for the bias and the property's name otherwise.
-name = sprintf('job_g%s_%s%s_s%d.mat', number_tag(spec.gain), axis2.file_token, ...
-    number_tag(spec.second), spec.seed);
-end
-
-function s = number_tag(v)
-% A number as a file-name token that reads back exactly: %.17g, with the
-% characters a file name should not carry replaced.
-s = sprintf('%.17g', v);
-s = strrep(strrep(strrep(s, '-', 'm'), '.', 'p'), '+', '');
-end
-
-function s = failed_text(job)
-s = '';
-if any(job.failed)
-    s = sprintf('  (%d condition(s) FAILED)', nnz(job.failed));
-end
+[out_dirs, results_files] = run_mc_gain_sweep_set({varargin});
+out_dir = out_dirs{1};
+results_file = results_files{1};
 end

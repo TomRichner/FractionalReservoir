@@ -18,7 +18,8 @@ function out = fig_mc_robustness(cfg)
 %
 % Conditions by cfg.conditions (select_conditions), titles and colours by
 % name (titles_by_name, mc_condition_colors). The result is taken through
-% resolve_mc_gain_sweep (data, data_file or run_dir).
+% resolve_mc_gain_sweep (data, data_file, or run_dir with cfg.grid naming
+% which grid of the run directory).
 %
 % See also: mc_gain_bias_statistics, fig_mc_gain_bias_maps, fig_mc_gain_curves
 
@@ -27,6 +28,7 @@ arguments
     cfg.run_dir     (1,:) char    = ''
     cfg.data_file   (1,:) char    = ''
     cfg.data                      = []
+    cfg.grid        (1,:) char    = ''   % with run_dir: the grid's tag in the run directory
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
@@ -36,7 +38,8 @@ arguments
 end
 
 setup_paths();
-D = resolve_mc_gain_sweep('data', cfg.data, 'data_file', cfg.data_file, 'run_dir', cfg.run_dir);
+D = resolve_mc_gain_sweep('data', cfg.data, 'data_file', cfg.data_file, ...
+    'run_dir', cfg.run_dir, 'grid', cfg.grid);
 conds = select_conditions(D.conditions, cfg.conditions);
 nc = numel(conds);
 st = manuscript_style();

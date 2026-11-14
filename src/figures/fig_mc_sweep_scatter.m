@@ -43,7 +43,8 @@ function out = fig_mc_sweep_scatter(cfg)
 % still shows cfg.color_by. Markers are drawn largest first, so a small one
 % is never hidden under a large one. A row below the panels shows the
 % sizes of cfg.size_legend (default: the grid's levels when there are at
-% most seven, else five values spanning +-size_max). In this mode a
+% most seven, else five values spanning +-size_max), headed by the
+% quantity's label with its unit ("self-coupling s (R_W)"). In this mode a
 % clipped run is an OPEN SQUARE of fixed area at the axis edge (rings now
 % mean a negative value), named in the size legend and the title line.
 % Without size_by the figure is drawn as before (open circles for clipped
@@ -57,8 +58,8 @@ function out = fig_mc_sweep_scatter(cfg)
 % Conditions by cfg.conditions (select_conditions; empty = all the result
 % holds, in its order), titles and colors by name (titles_by_name,
 % mc_condition_colors). The result is taken through resolve_mc_gain_sweep
-% (data, data_file or run_dir). The file tag defaults to
-% Fig_MC_sweep_<y>_vs_<x>.
+% (data, data_file, or run_dir with cfg.grid naming which grid of the run
+% directory). The file tag defaults to Fig_MC_sweep_<y>_vs_<x>.
 %
 % out: figs, files, source, and stats (a table: condition, n, pearson_r,
 % spearman_rho, [n_stable, r_stable, n_unstable, r_unstable when x is split
@@ -72,6 +73,7 @@ arguments
     cfg.run_dir        (1,:) char    = ''
     cfg.data_file      (1,:) char    = ''
     cfg.data                         = []
+    cfg.grid           (1,:) char    = ''   % with run_dir: the grid's tag in the run directory
     cfg.out_dir        (1,:) char    = ''
     cfg.save           (1,1) logical = true
     cfg.visible        (1,1) logical = true
@@ -91,7 +93,8 @@ arguments
 end
 
 setup_paths();
-D = resolve_mc_gain_sweep('data', cfg.data, 'data_file', cfg.data_file, 'run_dir', cfg.run_dir);
+D = resolve_mc_gain_sweep('data', cfg.data, 'data_file', cfg.data_file, ...
+    'run_dir', cfg.run_dir, 'grid', cfg.grid);
 conds = select_conditions(D.conditions, cfg.conditions);
 nc = numel(conds);
 st = manuscript_style();
@@ -321,7 +324,7 @@ ax = axes(tl, 'Visible', 'off', 'Tag', 'mc_sweep_scatter_size_legend');
 ax.Layout.Tile = 'south';
 hold(ax, 'on');
 n = numel(values);
-text(ax, 0.4, 0, sprintf('%s:', Qs.symbol), 'HorizontalAlignment', 'right', ...
+text(ax, 0.4, 0, sprintf('%s:', Qs.label), 'HorizontalAlignment', 'right', ...
     'VerticalAlignment', 'middle', 'FontSize', st.tick_fs - 3);
 for k = 1:n
     if values(k) < 0

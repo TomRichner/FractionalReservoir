@@ -100,7 +100,9 @@ for sel = {three, four}
     end
 
     o = fig_mc_gain_curves('data', D, 'conditions', sel{1}, 'save', false, 'visible', false);
-    assert(numel(findall(o.figs, 'Type', 'axes')) == 3); close(o.figs);
+    assert(numel(findall(o.figs, 'Type', 'axes')) == 2, 'gain curves: two columns by default'); close(o.figs);
+    o = fig_mc_gain_curves('data', D, 'conditions', sel{1}, 'mc_vs_lambda1', true, 'save', false, 'visible', false);
+    assert(numel(findall(o.figs, 'Type', 'axes')) == 3, 'gain curves: the third column on request'); close(o.figs);
 
     o = fig_mc_robustness('data', D, 'conditions', sel{1}, 'save', false, 'visible', false);
     ax = findall(o.figs, 'Type', 'axes');
@@ -119,7 +121,7 @@ close(o.figs);
 D_gain_only = read_mc_gain_sweep(struct('T', T(T.bias == 0.2, :), 'settings', settings));
 o = fig_mc_gain_curves('data', {D, D2, D_gain_only}, 'conditions', three, ...
     'row_labels', {'1 : 1', '3 : 2', '2 : 3'}, 'bias', 0.25, 'save', false, 'visible', false);
-assert(numel(findall(o.figs, 'Type', 'axes')) == 9);
+assert(numel(findall(o.figs, 'Type', 'axes')) == 6);
 ttl = arrayfun(@(a) strjoin(cellstr(a.Title.String), ' '), findall(o.figs, 'Type', 'axes'), ...
     'UniformOutput', false);
 assert(nnz(contains(ttl, 'nearest to 0.25')) == 3, 'each row title must state the nearest bias level');

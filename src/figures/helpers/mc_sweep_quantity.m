@@ -47,7 +47,9 @@ function Q = mc_sweep_quantity(name, D, opts)
 %               there is none
 %   plural      what several levels of it are called in a caption ('biases')
 %   at          @(v) text stating one value ('bias S_c = 0.2')
-%   scale       'linear' or 'log' (gain is log, as in every block C figure)
+%   scale       'linear' or 'log'. The gain follows its grid: log for a
+%               log-spaced grid, linear for an evenly spaced one
+%               (mc_gain_axis_scale), as in every block C figure
 %   clip        [] or a positive bound: |value| beyond it is drawn at the
 %               axis edge as an open marker (lambda_1 at 5 1/s, as the maps);
 %               the option 'clip' replaces it, and the axis then spans
@@ -60,7 +62,7 @@ function Q = mc_sweep_quantity(name, D, opts)
 %   limits      @(v) [lo hi], the axis limits given the finite values drawn
 %
 % See also: fig_mc_sweep_scatter, mc_sweep_population_fractions, read_mc_gain_sweep,
-%           mc_sweep_second_axis
+%           mc_sweep_second_axis, mc_gain_axis_scale
 
 arguments
     name (1,:) char = ''
@@ -113,8 +115,10 @@ end
 switch name
     case 'gain'
         Q.values = T.gain;  Q.symbol = 'gain';  Q.label = 'gain';
-        Q.scale = 'log';  Q.levels = D.gains;  Q.plural = 'gains';
-        Q.limits = @(v) [min(v) / 1.25, max(v) * 1.25];
+        Q.scale = mc_gain_axis_scale(D.gains);  Q.levels = D.gains;  Q.plural = 'gains';
+        if strcmp(Q.scale, 'log')
+            Q.limits = @(v) [min(v) / 1.25, max(v) * 1.25];
+        end
     case 'mc_total'
         Q.values = T.mc_total;  Q.symbol = 'Memory capacity';  Q.label = 'Memory capacity';
         Q.limits = @(v) [0, ceil(max([v(:); 0]) + 0.5)];   % just above the largest

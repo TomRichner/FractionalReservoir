@@ -61,16 +61,18 @@ function out = fig_mc_gain_bias_maps(cfg)
 % result holds, in its order); titles and colours by name (titles_by_name,
 % mc_condition_colors). Any number of columns.
 %
-% The result is taken through resolve_mc_gain_sweep (data, data_file or
-% run_dir).
+% The result is taken through resolve_mc_gain_sweep (data, data_file, or
+% run_dir with cfg.grid naming which grid of the run directory).
 %
-% See also: fig_mc_gain_curves, fig_mc_robustness, mc_gain_bias_statistics, symlog_lle
+% See also: fig_mc_gain_curves, fig_mc_robustness, mc_gain_bias_statistics, symlog_lle,
+%           mc_gain_axis_scale
 
 arguments
     cfg.verbose       (1,:) char    = 'minimal'
     cfg.run_dir       (1,:) char    = ''
     cfg.data_file     (1,:) char    = ''
     cfg.data                        = []
+    cfg.grid          (1,:) char    = ''   % with run_dir: the grid's tag in the run directory
     cfg.out_dir       (1,:) char    = ''
     cfg.save          (1,1) logical = true
     cfg.visible       (1,1) logical = true
@@ -87,7 +89,8 @@ arguments
 end
 
 setup_paths();
-D = resolve_mc_gain_sweep('data', cfg.data, 'data_file', cfg.data_file, 'run_dir', cfg.run_dir);
+D = resolve_mc_gain_sweep('data', cfg.data, 'data_file', cfg.data_file, ...
+    'run_dir', cfg.run_dir, 'grid', cfg.grid);
 conds = select_conditions(D.conditions, cfg.conditions);
 nc = numel(conds);
 st = manuscript_style();
@@ -288,16 +291,9 @@ end
 
 function f = gain_axis_transform(gains, scale)
 % Where a gain sits along x: log10 on a log axis, the gain itself on a
-% linear one. 'auto' follows the grid: linear when the levels are evenly
-% spaced (a linspace grid on a log axis crowds its top levels and their
-% tick labels together), log otherwise (the size table's log-spaced grids).
-if strcmp(scale, 'auto')
-    d = diff(sort(gains(:)));
-    scale = 'log';
-    if numel(d) >= 2 && max(abs(d - mean(d))) <= 1e-6 * mean(d)
-        scale = 'linear';
-    end
-end
+% linear one. 'auto' follows the grid (mc_gain_axis_scale): linear when the
+% levels are evenly spaced, log otherwise.
+if strcmp(scale, 'auto'); scale = mc_gain_axis_scale(gains); end
 if strcmp(scale, 'linear')
     f = @(g) g;
 else
