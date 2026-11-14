@@ -1177,7 +1177,7 @@ becomes an issue with an acceptance test.
 
 ### FD-025 Block C in the essential, fast and medium runs
 
-- **Status:** in progress (Tom, 2026-11-13 evening). Build: `matlab-fable-1`;
+- **Status:** **done** (fast run complete, 2026-11-14). Was: in progress (Tom, 2026-11-13 evening). Build: `matlab-fable-1`;
   then the lead merges, an Opus worker makes an `essential` run of A + C,
   the lead reviews it, and an Opus worker makes a `fast` run.
 - **Tom's decisions:** both grids in every mode, gain by bias (gains
@@ -1192,3 +1192,4 @@ becomes an issue with an acceptance test.
   column. We should keep that in" is read as keep the gain curves, drop
   their third column.
 - **Result:** essential run of A + C passed (2026-11-13, 59 min, every stage and all 20 figures, `data/mu7chain_AC_essential`, `figs/mu7chain_AC_essential_4cond`); cosmetic points noted (stats box hides points in the rate scatter; zero-self-coupling markers tiny; slope-share x ticks; product line vs zero line in main 4). Before fast the lead set `cfg.mc_lean = true` in the A + C bundle (`203d4f6`): fast runs block A's memory capacity, and the full-trajectory path needs about 17 GB per trial. Fast run launched after it (`matlab-opus-2`, pool 12).
+  **Fast run (2026-11-13 20:42 to 2026-11-14 04:37, 7.6 h of analyses):** every block A stage and block C's two 7 x 7 x 3 grids with the E:I networks; 336 C jobs, none failed. One stage failed, `mc_example` (the reservoir's own copy of the shared-build check lacked the std_clipped rule of `4df667e`); fixed by making the check one function, rerun alone, figures redrawn; both manifests 48 of 48. The statistics' Gaussian fits are now bounded and rejected fits quoted as measured widths. The lead's `mc_lean` commit `203d4f6` had broken `test_mc_gain_bias_bundle` (not run before the commit); fixed in the same merge. Open, Tom's: block A figure layout (legend over R2 curves in the memory-capacity figure; no-adaptation curves leave main 4's y range; product's green line against the green zero line).
