@@ -6,8 +6,10 @@ function out = make_block_C_figures(data, out_dir, cfg)
 %   out = MAKE_BLOCK_C_FIGURES(data, out_dir, 'sets', {'three', {'no_adaptation', 'sfa3_stdc2'}})
 %
 % For looking at one result outside a bundle, a run still in progress
-% included. A bundle draws the same figures through make_all_paper_figures
-% and its registry (mu7chain_gainbias_config).
+% included, with the report's color scales (square-root memory capacity,
+% symmetric-log lambda_1). A bundle draws its own selection, per grid of
+% its run directory and with linear color scales, through
+% make_all_paper_figures and its registry (mu7chain_gainbias_config).
 %
 % data      the result of a gain sweep (against the bias, or whatever second
 %           axis the sweep ran; the figures and tables name it), any of: its mc_gain_sweep_results.mat;
