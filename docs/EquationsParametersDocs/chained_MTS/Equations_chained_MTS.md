@@ -109,7 +109,7 @@ The section above, "The model at a glance", is the simplified statement for a
 first reading. Sections 2 to 9 are the full statement, and
 [section 10](#10-the-jacobian-of-the-simplified-model) derives the Jacobian of
 the simplified model.
-[Section 11](#11-proposed-extension-spontaneous-quantal-release-as-the-noise)
+[Section 11](#11-proposed-extension-spontaneous-quantal-release-as-a-second-noise-source)
 is a proposed extension that is not in the code: spontaneous quantal release
 as a second noise source, beside the Wiener term.
 [Section 12](#12-proposed-extension-the-release-noise-as-a-gamma-process)
@@ -1172,7 +1172,7 @@ position, which depends on the rates and pool states the network settles into.
    in place of $\Phi'$: whether the slow gain or the frozen-adaptation gain
    tracks the edge says which timescale of (28) sets it.
 
-## 11. Proposed extension: spontaneous quantal release as the noise
+## 11. Proposed extension: spontaneous quantal release as a second noise source
 
 **Status: proposed (Tom, 2026-11-14). Not in the code, and nothing in
 sections 1 to 10 changes.** This section is self-contained: every equation of
@@ -1324,8 +1324,10 @@ step $\Delta t$ the value in one step is a count divided by $\Delta t$, whose
 variance grows as the step shrinks. A readout therefore uses the release over a
 stated window, for the memory task the hold:
 $y_i = \frac{1}{T_{hold}} \int_{hold} d\Theta_i$, or $\theta_i$ passed through
-a postsynaptic filter. The smooth states $x_i$, $a_{ik}$, $b_{i1}$, $b_{i2}$
-can be read at an instant as before.
+a postsynaptic filter. The states $x_i$, $a_{ik}$, $b_{i1}$, $b_{i2}$ have a
+value at every instant and can be read as before; $x_i$ and $b_{i1}$ now step
+at each release event (by $q\, w_{ij} / \tau_d$ and by $1 / n_v$), while
+$a_{ik}$ and $b_{i2}$ stay continuous.
 
 ### 11.5 Simulation and Lyapunov exponents
 
@@ -1337,12 +1339,16 @@ can be read at an instant as before.
   release part, so the step size has to be characterized again.
 - **Lyapunov exponents.** The additive Wiener term adds nothing to the
   tangent dynamics, as today. A count is not a differentiable function of the
-  state, so the tangent dynamics are taken from the mean dynamics along the
-  realized path: the Jacobian of section 10 with $g_i r_i$ replaced by
-  $g_i r_i + r_s$ in the pool and output terms, evaluated at the stored states
-  (the linear-noise approximation, valid for large $n_v$). The top-K method
-  then applies unchanged. An ensemble of copies with independent noise (the
-  spread of the state) is the check on it.
+  state, so for counts no tangent exists along a path with the random numbers
+  held fixed. The tangent dynamics are therefore **defined** from the mean
+  dynamics along the realized path: the Jacobian of section 10 with $g_i r_i$
+  replaced by $g_i r_i + r_s$ in the pool and output terms, evaluated at the
+  stored states (tangent (b) of section 12.6, where the alternatives are
+  compared). The top-K method then applies unchanged. An ensemble of copies
+  with independent noise (the spread of the state) is the check on it; the
+  noise covariance that drives that spread, including the cross term between
+  $x$ and $b_{i1}$ (one event moves both), is written in section 12.5 and is
+  the same for counts.
 
 ### 11.6 Choices to be made
 
@@ -1364,7 +1370,7 @@ can be read at an instant as before.
 
 **Status: proposed (Tom, 2026-11-14). Not in the code, and nothing in
 sections 1 to 10 changes.** It is the proposal of
-[section 11](#11-proposed-extension-spontaneous-quantal-release-as-the-noise)
+[section 11](#11-proposed-extension-spontaneous-quantal-release-as-a-second-noise-source)
 with one substitution: the Poisson counts of spontaneous release are replaced
 by the increments of a gamma process. This section is self-contained: every
 equation of the extended system is written out here. An equation that changes
