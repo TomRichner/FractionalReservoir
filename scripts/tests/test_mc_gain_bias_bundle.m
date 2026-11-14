@@ -244,9 +244,14 @@ for md = {'essential', 'fast'}
         grouped = ac.figures(startsWith(names, 'fig_main'));
         assert(~isempty(grouped) && all(cellfun(@(f) strcmp(arg(f.args, 'source_fig_root'), ac.fig_root), grouped)), ...
             'the grouped figures read their sources from this bundle''s figure root');
-        differs = {'stages', 'mc_gain_sweep', 'run_dir', 'fig_root', 'figures'};
+        % mc_lean: the bundle sets it so block A's two memory-capacity
+        % stages take the lean path (203d4f6; the same R^2 and memory
+        % capacity to the bit, test_mc_lean_path, without holding the state
+        % trajectory). mu7chain_config does not set it.
+        assert(isequal(ac.mc_lean, true), 'the bundle runs memory capacity on the lean path');
+        differs = {'stages', 'mc_gain_sweep', 'run_dir', 'fig_root', 'figures', 'mc_lean'};
         assert(isequal(rmfield(ac, differs), rmfield(A, intersect(differs, fieldnames(A)))), ...
-            'the bundle differs from mu7chain_config in more than its stages, directories and registry');
+            'the bundle differs from mu7chain_config in more than its stages, directories, registry and the lean memory-capacity path');
     end
 end
 assert(strcmp(mu7chain_AC_config().run_mode, 'essential'), 'the default is the size agents run');
