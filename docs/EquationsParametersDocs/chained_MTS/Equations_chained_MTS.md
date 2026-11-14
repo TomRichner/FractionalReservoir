@@ -111,7 +111,10 @@ first reading. Sections 2 to 9 are the full statement, and
 the simplified model.
 [Section 11](#11-proposed-extension-spontaneous-quantal-release-as-the-noise)
 is a proposed extension that is not in the code: spontaneous quantal release
-as the model's noise.
+as a second noise source, beside the Wiener term.
+[Section 12](#12-proposed-extension-the-release-noise-as-a-gamma-process)
+writes the same proposal with a gamma process in place of the Poisson counts,
+and works through its Jacobian and the estimation of its Lyapunov spectrum.
 
 This file states the network model with multiple-timescale (MTS) adaptation in
 its **chained** form: spike-frequency adaptation with $K$ timescales, short-term
@@ -1178,15 +1181,23 @@ number; one that does not is repeated with its old number and the words
 "unmodified from above".
 
 **The idea.** The model's noise today is a Wiener term added to the dendritic
-state, (S1). Here that term is removed and the noise is put where a synapse
-makes it: vesicles are also released spontaneously, one at a time, at a rate
-proportional to the number that are ready. The synaptic output $\theta_i$ is
-never negative, so the noise is a **Poisson** process of release events, not a
-Gaussian term that could make release negative. A released vesicle is gone from
-the pool, so spontaneous release depletes the releasable pool exactly as evoked
-release does. Because $\theta_i$ is both what the network receives and what the
-memory readout reads, this one process acts as process noise (it drives the
-dendritic states) and as measurement noise (the readout sees it).
+state, (S1). Here that term stays and a second noise source is added, where a
+synapse makes one: vesicles are also released spontaneously, one at a time, at
+a rate proportional to the number that are ready. The synaptic output
+$\theta_i$ is never negative, so this noise is a **Poisson** process of release
+events, not a Gaussian term that could make release negative. A released
+vesicle is gone from the pool, so spontaneous release depletes the releasable
+pool exactly as evoked release does. Because $\theta_i$ is both what the
+network receives and what the memory readout reads, this one process acts as
+process noise (it drives the dendritic states) and as measurement noise (the
+readout sees it).
+
+The model then has two noise sources. The Wiener term on $x_i$ is
+input-referred, independent from neuron to neuron and of constant size, and it
+is process noise only. The release process is in the synaptic output: its size
+depends on the state, it reaches the dendritic states through the weights, it
+depletes the pool, and the readout sees it. Each is switched off by its own
+constant, $\sigma_u = 0$ or $\nu = 0$.
 
 It is written for the simplified model of "The model at a glance" (one set of
 constants, no cell types, routes or per-neuron constants), with release-coupled
@@ -1214,12 +1225,12 @@ $$
 
 ### 11.2 The extended system
 
-**Dendritic state** (replaces (S1)): the Wiener term is gone; each
+**Dendritic state** (replaces (S1)): the Wiener term stays; added to it, each
 spontaneous release event of neuron $j$ arrives through the same weight
 $w_{ij}$ as that neuron's evoked output.
 
 $$
-\tau_d\, dx_i = \left( -x_i + u_i + \sum_{j=1}^{N} w_{ij}\, r_j\, g_j\, b_{j1} \right) dt + q \sum_{j=1}^{N} w_{ij}\, dP_j \tag{S12}
+\tau_d\, dx_i = \left( -x_i + u_i + \sum_{j=1}^{N} w_{ij}\, r_j\, g_j\, b_{j1} \right) dt + \sigma_u\, dW_i + q \sum_{j=1}^{N} w_{ij}\, dP_j \tag{S12}
 $$
 
 **Firing rate** ((S2), unmodified from above).
@@ -1273,7 +1284,7 @@ $$
 
 with $t_{i,m}$ the times of the spontaneous events of neuron $i$. With (S14),
 the two equations that changed read as one statement each: (S12) is
-$\tau_d\, dx_i = (-x_i + u_i)\, dt + \sum_j w_{ij}\, d\Theta_j$, and (S13) is
+$\tau_d\, dx_i = (-x_i + u_i)\, dt + \sigma_u\, dW_i + \sum_j w_{ij}\, d\Theta_j$, and (S13) is
 the refill minus $d\Theta_i / \tau_{rel}$. Everything a synapse releases, evoked
 or spontaneous, both reaches the postsynaptic neurons and leaves the pool.
 
@@ -1290,13 +1301,17 @@ or spontaneous, both reaches the postsynaptic neurons and leaves the pool.
   $q^2 \Lambda_i\, dt = (\tau_{rel} / n_v)\, r_s\, b_{i1}\, dt$. It grows with
   the pool $b_{i1}$ and does not depend on the firing rate. $r_s$ sets how much
   spontaneous release there is; $n_v$ sets how grainy it is.
-- **Limits.** $\nu = 0$ is the model of (S2) to (S10) without noise. With
-  $r_s$ fixed and $n_v \to \infty$ the fluctuation vanishes and a steady leak
-  $r_s\, b_{i1}$ remains.
-- **Structure of the noise in $x$.** A release event of neuron $j$ is felt by
-  every neuron that $j$ projects to, with the sign and size of its weight: the
-  noise is correlated across postsynaptic neurons and scales with the weights,
-  unlike the independent, input-referred Wiener term of (S1).
+- **Limits.** $\nu = 0$ is the model of (S1) to (S10), with its Wiener noise
+  as before. $\sigma_u = 0$ leaves the release process as the only noise. With
+  $r_s$ fixed and $n_v \to \infty$ the fluctuation of the release vanishes and
+  a steady leak $r_s\, b_{i1}$ remains.
+- **Structure of the noise in $x$.** The two terms of (S12) differ. The
+  Wiener term is independent from neuron to neuron, has the same size
+  $\sigma_u$ at every state, and does not scale with the weights or the gain.
+  A release event of neuron $j$ is felt by every neuron that $j$ projects to,
+  with the sign and size of its weight: that noise is correlated across
+  postsynaptic neurons, scales with the weights and the gain, and is larger
+  where the pools are fuller.
 - **An empty pool.** An event at $b_{i1} < 1 / n_v$ would take more than is
   there; such an event releases what remains. (With whole vesicles, binomial
   release from the vesicles present does this exactly.)
@@ -1314,12 +1329,14 @@ can be read at an instant as before.
 
 ### 11.5 Simulation and Lyapunov exponents
 
-- **Integration.** Each step draws the number of events from the state at the
-  start of the step, $\mathrm{Poisson}(\Lambda_i\, \Delta t)$, and applies
-  (S12) and (S13); the smooth terms can keep a higher-order step. The scheme
-  for Wiener noise (SRA1) does not apply. The step size has to be characterized
-  again.
-- **Lyapunov exponents.** A count is not a differentiable function of the
+- **Integration.** With both sources, the Wiener increment is added as it is
+  now. Each step also draws the number of events from the state at the start
+  of the step, $\mathrm{Poisson}(\Lambda_i\, \Delta t)$, and applies them as
+  the kicks of (S12) and (S13); the smooth terms can keep a higher-order step.
+  The order of the scheme for Wiener noise (SRA1) does not hold for the
+  release part, so the step size has to be characterized again.
+- **Lyapunov exponents.** The additive Wiener term adds nothing to the
+  tangent dynamics, as today. A count is not a differentiable function of the
   state, so the tangent dynamics are taken from the mean dynamics along the
   realized path: the Jacobian of section 10 with $g_i r_i$ replaced by
   $g_i r_i + r_s$ in the pool and output terms, evaluated at the stored states
@@ -1339,3 +1356,717 @@ can be read at an instant as before.
   slow colored process, is positive and differentiable, but it has no release
   at $r_i = 0$ and its variance grows as $\theta_i^2$: it models a fluctuating
   release probability, not quantal release.
+  [Section 12](#12-proposed-extension-the-release-noise-as-a-gamma-process)
+  gives another, which keeps the mechanism, mean and variance of this section:
+  the counts replaced by the increments of a gamma process.
+
+## 12. Proposed extension: the release noise as a gamma process
+
+**Status: proposed (Tom, 2026-11-14). Not in the code, and nothing in
+sections 1 to 10 changes.** It is the proposal of
+[section 11](#11-proposed-extension-spontaneous-quantal-release-as-the-noise)
+with one substitution: the Poisson counts of spontaneous release are replaced
+by the increments of a gamma process. This section is self-contained: every
+equation of the extended system is written out here. An equation that changes
+has a new number, continuing after (S14); one that does not is repeated with
+its old number and the words "unmodified from above". The equations of the
+analysis (12.5 onward) continue the same series.
+
+**The idea.** Section 11 adds spontaneous vesicle release to the synaptic
+output as a second noise source, beside the Wiener term on the dendritic
+state. A count of release events is an integer, and an integer is not a
+differentiable function of the state: with the random numbers held fixed, a
+small change of the pool either changes nothing or changes a count by one. The
+tangent dynamics along one noisy path are then undefined, and section 11.5
+falls back on the mean dynamics. Summing over all possible count paths
+instead is not feasible for a network, because the branches are joint counts
+of all neurons at every step. A **gamma process** keeps what the Poisson
+form was chosen for (release is never negative, it grows with the pool, it
+depletes the pool, the readout sees it) with the same mean and the same
+variance, and its increments are continuous numbers that depend smoothly on
+the state. The model then has a tangent along each path, and its Lyapunov
+spectrum can be estimated with the methods the code already has.
+
+As in section 11 it is written for the simplified model of "The model at a
+glance", with release-coupled facilitation included. Without facilitation set
+$g_i = 1$ and drop (S7) and (S8). The Wiener term of (S1) stays.
+
+### 12.1 What a gamma process is, and why it fits
+
+**The process.** A gamma process $\Gamma(t)$ only increases. Its increments
+over disjoint intervals are independent, non-negative and continuous-valued:
+over a time $dt$ the increment has a gamma distribution with shape $k\, dt$
+and scale $s$, so its mean is $k s\, dt$ and its variance $k s^2\, dt$. It is
+**infinitely divisible**: the sum of the increments over two half steps has
+exactly the law of the increment over the full step, so the process is
+defined on any time grid. $\Gamma(t)$ itself is cumulative; the equations use
+its increments, drawn afresh at each step, exactly as they use $dW_i$ or
+$dP_i$.
+
+**Why it is an appropriate choice.**
+
+1. **Sign.** $\theta_i = r_i\, g_i\, b_{i1} \ge 0$ always: $r_i \in [0, 1]$,
+   $b_{i1} \in [0, 1]$, $g_i \ge 1$, and the sign of a synapse is in $W$. A
+   Gaussian term added to $\theta_i$ would make release negative, half the
+   time in a silent neuron. A gamma increment is never negative.
+2. **It matches section 11 to second order.** With shape rate $\Lambda_i$ and
+   scale $q$ (12.2) the increment has the mean and the variance of $q\, dP_i$.
+   Anything that depends on the driver only through its mean and variance
+   rates is unchanged: the mean dynamics, the noise covariance, and in a
+   linear system the variance, autocorrelation and spectrum of every state.
+3. **It is smooth in the state.** The increment is a differentiable function
+   of the pool at fixed random numbers (12.6), which a count is not.
+4. **It needs no new constant.** The two constants of section 11, $n_v$ and
+   $\nu$, fix it.
+
+**What differs from Poisson.** The higher cumulants. Per unit time the driver
+$q\, dP$ has third and fourth cumulants $\Lambda q^3$ and $\Lambda q^4$; the
+gamma driver has $2 \Lambda q^3$ and $6 \Lambda q^4$ (in general
+$(n-1)!\, \Lambda q^n$). A first-order filter with time constant $\tau$ driven
+by either has the same mean and variance; its skewness is
+$0.94 / \sqrt{\Lambda \tau}$ for Poisson and twice that for gamma, and its
+excess kurtosis $1 / (\Lambda \tau)$ against $6 / (\Lambda \tau)$. With many
+events per time constant both outputs become Gaussian and the difference
+shrinks as $1 / \sqrt{\Lambda \tau}$. The two can never be equal: a gamma
+process is itself a sum of jumps, with a continuum of sizes (its jumps of size
+between $x$ and $x + dx$ arrive at the rate $\Lambda\, e^{-x/q}\, dx / x$), so
+it has infinitely many vanishingly small jumps where the Poisson form has
+jumps of one size. In the network, $x_i$ sums the release of about 100
+presynaptic neurons, which brings both forms close to Gaussian; the difference
+would show mostly in $b_{i1}$, whose random depletion is one neuron's own, and
+there the evoked depletion $g_i r_i b_{i1} / \tau_{rel}$ is usually the larger
+drain.
+
+**Biophysical reading.** The mechanism is the one of section 11: spontaneous
+release of whole vesicles, at roughly Poisson times, each removing a vesicle
+from the releasable pool. The gamma form is **not** a literal picture of one
+synapse: real quanta have a size peaked about a typical value, while a gamma
+process is dominated by very small jumps. It is an effective description of
+the total output of a rate unit, and an approximation, for three reasons.
+
+- A unit of this model stands for a neuron's many release sites, or a
+  population's. Its release over a time step is a sum of many quanta of
+  variable size, and a gamma distribution is a standard non-negative,
+  right-skewed approximation to such a sum.
+- Quantal size varies from vesicle to vesicle and from site to site. That
+  adds variance and skew to the summed release, in the same direction in which
+  gamma differs from Poisson.
+- $b_{i1}$ is already a continuous fraction of a pool, not a count of
+  vesicles, so depleting it by continuous amounts is consistent with the rest
+  of the model.
+
+So: the mechanism is quantal Poisson release (section 11), and the gamma form
+is its coarse-grained stand-in, chosen because it is never negative and is
+smooth in the state.
+
+### 12.2 Constants and the process
+
+The constants are those of section 11. Symbols new to this section are marked.
+
+| Symbol | Meaning | Unit |
+|:----------|:----------------------------------------------------------|:------|
+| $n_v$ | number of vesicles in a full releasable pool | vesicles |
+| $\nu$ | spontaneous release rate of one docked vesicle | 1/s |
+| $q = \tau_{rel} / n_v$ | what one vesicle adds to the time integral of $\theta_i$; here the **scale** of the gamma increments | s |
+| $r_s = \nu\, \tau_{rel}$ | the spontaneous release written as an equivalent firing rate | as $r_i$ |
+| $G_i(t)$ (new) | spontaneous release of neuron $i$ up to time $t$, in the units of $\int \theta_i\, dt$. Not the facilitation ceiling $G$ of (S7), which carries no index and no argument | s |
+| $\Lambda_i$ (new meaning) | shape of the increment of $G_i$ per unit time. In section 11 the same expression is the rate of events | 1/s |
+| $\Delta t$, $\alpha_i = \Lambda_i\, \Delta t$ (new) | simulation step, and the shape of one step's increment | s, -- |
+| $U_{i}$ (new) | the uniform random number on $(0, 1)$ behind one increment, independent between neurons and steps | -- |
+| $Q(U; \alpha)$ (new) | quantile function of the gamma distribution with shape $\alpha$ and scale one | -- |
+| $\kappa_i = \partial Q / \partial \alpha$ (new) | sensitivity of an increment to its shape at a fixed uniform (12.6) | -- |
+| $E_1(x) = \int_x^\infty e^{-y}\, dy / y$ (new) | exponential integral | -- |
+
+**Spontaneous release.** $G_i(t)$ only increases. Given the state, its
+increment over a short time $dt$ is gamma distributed, independently for each
+neuron, with a shape proportional to the vesicles neuron $i$ has ready:
+
+$$
+dG_i \sim \mathrm{Gamma}\big( \text{shape } \Lambda_i\, dt,\ \text{scale } q \big),
+\qquad \Lambda_i(t) = \nu\, n_v\, b_{i1}(t) \tag{S15}
+$$
+
+Its mean is $q \Lambda_i\, dt = r_s\, b_{i1}\, dt$ and its variance
+$q^2 \Lambda_i\, dt = (\tau_{rel} / n_v)\, r_s\, b_{i1}\, dt$, those of
+$q\, dP_i$ in section 11. In continuous time $G_i$ is one gamma process of
+unit shape rate and scale $q$ read on the clock $\int_0^t \Lambda_i\, ds$,
+which runs faster the fuller the pool.
+
+### 12.3 The extended system
+
+**Dendritic state** (replaces (S1); it is (S12) with $q\, dP_j$ replaced by
+$dG_j$): the Wiener term stays; added to it, the spontaneous release of neuron
+$j$ arrives through the same weight $w_{ij}$ as that neuron's evoked output.
+
+$$
+\tau_d\, dx_i = \left( -x_i + u_i + \sum_{j=1}^{N} w_{ij}\, r_j\, g_j\, b_{j1} \right) dt + \sigma_u\, dW_i + \sum_{j=1}^{N} w_{ij}\, dG_j \tag{S16}
+$$
+
+**Firing rate** ((S2), unmodified from above).
+
+$$
+r_i = \phi\!\left( x_i - a_0 - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right) \tag{S2}
+$$
+
+**Spike-frequency adaptation** ((S3), unmodified from above).
+
+$$
+\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K \tag{S3}
+$$
+
+**Releasable pool** (replaces (S10); it is (S13) with $dP_i / n_v$ replaced by
+$dG_i / \tau_{rel}$, which is the same thing since $q / \tau_{rel} = 1 / n_v$):
+what is released spontaneously leaves the pool.
+
+$$
+db_{i1} = \left[ \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} - \frac{g_i\, b_{i1}\, r_i}{\tau_{rel}} \right] dt - \frac{1}{\tau_{rel}}\, dG_i \tag{S17}
+$$
+
+**Reserve** ((S6), unmodified from above).
+
+$$
+\frac{db_{i2}}{dt} = \frac{1 - b_{i2}}{\tau_{rec_2}} - \frac{1}{n_2}\, \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} \tag{S6}
+$$
+
+**Release probability** ((S7), unmodified from above).
+
+$$
+\frac{dg_i}{dt} = \frac{1 - g_i}{\tau_{dec}} + \frac{\left( G - g_i \right) h_i}{\tau_{fac}} \tag{S7}
+$$
+
+**Calcium trace** ((S8), unmodified from above). Spontaneous release does not
+raise it.
+
+$$
+\frac{dh_i}{dt} = \frac{r_i - h_i}{\tau_h} \tag{S8}
+$$
+
+**Synaptic output** (replaces (S9); it is (S14) with $q\, dP_i$ replaced by
+$dG_i$), written for the amount released in $dt$:
+
+$$
+d\Theta_i = r_i\, g_i\, b_{i1}\, dt + dG_i \tag{S18}
+$$
+
+As in section 11, (S16) is
+$\tau_d\, dx_i = (-x_i + u_i)\, dt + \sigma_u\, dW_i + \sum_j w_{ij}\, d\Theta_j$
+and (S17) is the refill minus $d\Theta_i / \tau_{rel}$: everything a synapse
+releases, evoked or spontaneous, both reaches the postsynaptic neurons and
+leaves the pool.
+
+**One step of a simulation, with the cap at an empty pool.** Let $z_n$ be the
+state at the start of a step and $z^{det}$ the result of the present step
+without release noise: the drift by the scheme in use, plus the Wiener
+increment on $x$. The release of the step is drawn from the state at the
+start of the step and applied as a kick:
+
+$$
+\begin{aligned}
+\alpha_i &= \Lambda_i(z_n)\, \Delta t = \frac{r_s\, n_v\, b_{i1,n}\, \Delta t}{\tau_{rel}}, \qquad
+\Delta G_i = \min\!\Big( q\, Q(U_i;\, \alpha_i),\ \ \tau_{rel}\, b_{i1}^{det} \Big) \\
+x_{i,n+1} &= x_i^{det} + \frac{1}{\tau_d} \sum_{j=1}^{N} w_{ij}\, \Delta G_j, \qquad
+b_{i1,n+1} = b_{i1}^{det} - \frac{\Delta G_i}{\tau_{rel}}
+\end{aligned} \tag{S19}
+$$
+
+The minimum is the cap: a draw larger than what the pool holds releases what
+remains, so $b_{i1} \ge 0$. For a small shape the probability of a capped
+draw is about $\alpha_i\, E_1(n_v b_{i1})$, negligible unless the pool holds
+less than a few vesicles' worth. Writing the draw as the quantile of a uniform
+changes nothing in its law; it names the random number that is held fixed in
+12.6.
+
+### 12.4 What it does
+
+- **Never negative.** $d\Theta_i \ge 0$.
+- **Mean.** Given the state,
+  $\mathrm{E}[d\Theta_i] = b_{i1} \left( g_i\, r_i + r_s \right) dt$, as in
+  section 11: on average an added firing rate $r_s$ at the synapse, a mean
+  drive $r_s \sum_j w_{ij}\, b_{j1}$ to each neuron (near zero where
+  excitatory and inhibitory mean weights balance) and a mean depletion
+  $r_s\, b_{i1} / \tau_{rel}$ of each pool.
+- **Fluctuation.** The variance of the spontaneous part over $dt$ is
+  $(\tau_{rel} / n_v)\, r_s\, b_{i1}\, dt$, as in section 11. It grows with
+  the pool and does not depend on the firing rate. $r_s$ sets how much
+  spontaneous release there is, $n_v$ how grainy it is.
+- **Limits.** $\nu = 0$ is the model of (S1) to (S10), with its Wiener noise
+  as before. $\sigma_u = 0$ leaves the release as the only noise. With $r_s$
+  fixed and $n_v \to \infty$ the fluctuation of the release vanishes (the
+  scale goes to zero and the shape to infinity) and a steady leak
+  $r_s\, b_{i1}$ remains: the mean dynamics of 12.5.
+- **Paths.** $x_i$ and $b_{i1}$ are no longer continuous: they move in jumps,
+  most of them very small, on top of their drift (and of the Wiener path, for
+  $x_i$). Through (S2) so does $r_i$.
+- **Size against the Wiener term.** For a filter $\tau_d\, dx = -x\, dt + dL$
+  the stationary variance of $x$ is the driver's variance rate over
+  $2 \tau_d$. The Wiener term gives $\sigma_u^2 / (2 \tau_d)$. With the pools
+  held fixed and the recurrent amplification ignored, the release gives
+  $q\, r_s \sum_j w_{ij}^2\, b_{j1} / (2 \tau_d)$. On the paper's network
+  ($\sum_j w_{ij}^2 \approx 28.5$ at gain 1, from 100 inputs of mean size
+  $7F$ and spread $1.5F$) the two are equal, at $b_{j1} = 0.7$ and
+  $\sigma_u = 0.025$, when $r_s / n_v \approx 1.25 \times 10^{-4}$: for
+  example $r_s = 0.02$ with $n_v \approx 160$. This is an estimate of scale
+  for choosing values, not a calibration.
+- **Reading out $\theta_i$.** As in section 11.4, the output at one instant
+  is not defined; what exists is the amount released over a window. A readout
+  uses $y_i = \frac{1}{T_{hold}} \int_{hold} d\Theta_i$, or $\theta_i$ passed
+  through a postsynaptic filter. With the pool nearly constant over the hold,
+  the spontaneous part adds a variance
+  $(\tau_{rel} / n_v)\, r_s\, b_{i1} / T_{hold}$ to $y_i$, the same for the
+  Poisson and the gamma form.
+
+### 12.5 Mean dynamics and noise covariance
+
+From here on the notation is section 10's, and so are its simplifications (no
+facilitation, the state $z = (x;\ a_1;\ \dots;\ a_K;\ b_1;\ b_2)$, the
+diagonal matrices $\Phi'$, $R$, $B_1$, $B_2$). With facilitation, $R$ is
+replaced by $\mathrm{diag}(g_i r_i)$ in the two blocks of (S21), and the rows
+of $g_i$ and $h_i$ gain no term. The cap of (S19) is ignored. Because section
+10 uses $D$ for a matrix of the Jacobian and section 11 uses $P$ for the
+counts, the covariance of the state is written $C$ here and the covariance
+rate of the noise $\Sigma$.
+
+**Mean dynamics.** Replacing each noise increment by its mean given the state
+leaves the deterministic model with $r_s$ added to the rate wherever the pool
+is released:
+
+$$
+\begin{aligned}
+\tau_d\, \dot{x}_i &= -x_i + u_i + \sum_{j} w_{ij}\, b_{j1} \left( r_j + r_s \right) \\
+\dot{b}_{i1} &= \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} - \frac{b_{i1} \left( r_i + r_s \right)}{\tau_{rel}}
+\end{aligned} \tag{S20}
+$$
+
+with (S2), (S3) and (S6) unchanged.
+
+**Its Jacobian** $\bar{J}$ is (22) and (23) with two blocks changed, the two
+that are derivatives with respect to $b_1$:
+
+$$
+\bar{J}_{x b_1} = \frac{1}{\tau_d}\, W \left( R + r_s I \right), \qquad
+\bar{J}_{b_1 b_1} = -\left( \frac{1}{\tau_{rec_1}} B_2 + \frac{1}{\tau_{rel}} \left( R + r_s I \right) \right) \tag{S21}
+$$
+
+Every other block is as in (23). In the form (24), $U$, $\Phi'$ and $V$ are
+unchanged, because spontaneous release does not depend on the firing rate;
+only the rates-fixed matrix changes. In the reduction of 10.5,
+$d_{i1} = b_{i2} / \tau_{rec_1} + (r_i + r_s) / \tau_{rel}$ and the
+depression factor of (28) becomes
+$b_{i1} \left( 1 - (r_i + r_s)\, H_i(s) / \tau_{rel} \right)$: spontaneous
+release makes each pool a little faster and each neuron's column gain a
+little smaller at low frequency.
+
+**Noise covariance.** The Wiener increments act on $x$ alone, independently
+per neuron. One release increment $dG_j$ acts on two things at once: on the
+dendritic state of every neuron that $j$ projects to, through column $j$ of
+$W$, and on $j$'s own pool. With
+
+$$
+L = \begin{pmatrix} \tfrac{1}{\tau_d}\, W \\ 0 \\ -\tfrac{1}{\tau_{rel}}\, I \\ 0 \end{pmatrix}, \qquad
+E_x = \begin{pmatrix} I \\ 0 \\ 0 \\ 0 \end{pmatrix}
+$$
+
+(blocks in the order of $z$), the fluctuation of the state over $dt$ has the
+covariance $\Sigma\, dt$ with
+
+$$
+\Sigma = \frac{\sigma_u^2}{\tau_d^2}\, E_x E_x^{\top} + q\, r_s\, L\, B_1\, L^{\top} \tag{S22}
+$$
+
+$$
+\Sigma_{xx} = \frac{\sigma_u^2}{\tau_d^2}\, I + \frac{q\, r_s}{\tau_d^2}\, W B_1 W^{\top}, \qquad
+\Sigma_{x b_1} = \Sigma_{b_1 x}^{\top} = -\frac{q\, r_s}{\tau_d\, \tau_{rel}}\, W B_1, \qquad
+\Sigma_{b_1 b_1} = \frac{q\, r_s}{\tau_{rel}^2}\, B_1 = \frac{r_s}{n_v\, \tau_{rel}}\, B_1
+$$
+
+and zero in every other block. The Wiener part is diagonal and the same at
+every state. The release part is not diagonal in $x$ (two neurons with a
+common presynaptic neuron receive the same release), it scales with the
+weights and with the pools, and its cross block says that a release that
+excites or inhibits the targets of neuron $j$ also empties $j$'s pool by the
+matching amount. $\Sigma$ is the same for the Poisson form of section 11.
+
+**The covariance equation.** For small noise, the spread $C$ of an ensemble
+about its mean path obeys the linear-noise approximation, a Lyapunov
+equation driven by $\Sigma$:
+
+$$
+\frac{dC}{dt} = \bar{J}\, C + C\, \bar{J}^{\top} + \Sigma \tag{S23}
+$$
+
+with $\bar{J}$ and $\Sigma$ evaluated along the mean path. What it predicts
+for copies of one network started from the same state and run with
+independent noise (independent Wiener paths and independent release): their
+states spread with covariance $C$ about the mean, so two copies differ with
+covariance $2C$. Where the mean dynamics are stable $C$ settles to a
+stationary value at which the contraction of $\bar{J}$ balances the injection
+$\Sigma$; the release part contributes in proportion to $r_s / n_v$. Where
+they are chaotic $C$ grows at twice the leading exponent of $\bar{J}$ until
+the copies are as far apart as the attractor allows, and the approximation
+ends. The Jacobian in (S23) is $\bar{J}$, that of the mean dynamics, which is
+definition (b) below. (S23) was not checked numerically.
+
+### 12.6 Three tangent dynamics
+
+"The Jacobian" of a model with state-dependent noise can mean three things.
+All three are linear maps along one stored noisy path; they differ in how the
+release responds to a perturbation of the state. The additive Wiener term
+responds to nothing, so it enters none of them, as today.
+
+**(a) Release replayed as an external signal.** The realized increments
+$\Delta G_i$ are treated as a fixed input, like $u_i$. The tangent dynamics
+are those of the deterministic part: the Jacobian $J$ of section 10, (22) and
+(23), evaluated at the noisy states. This is what the present code would
+compute if it were handed such a path, and for the Wiener term it is exact.
+For release it answers a question the model does not pose: a perturbed pool
+would have released a different amount.
+
+**(b) The mean dynamics.** The release responds through its mean: $\bar{J}$
+of (S21), evaluated at the noisy states. It is the Jacobian of the
+linear-noise approximation (S23), and it describes how the mean of a small
+difference evolves. It is section 11.5's choice, and the only one available
+to the Poisson form.
+
+**(c) The pathwise derivative.** The random numbers $U_i$ are held fixed and
+the update map (S19) is differentiated. An increment depends on the state
+through its shape only:
+
+$$
+\frac{\partial\, \Delta G_i}{\partial b_{i1,n}} = q\, \frac{\partial Q}{\partial \alpha}(U_i;\, \alpha_i)\, \frac{\partial \alpha_i}{\partial b_{i1,n}} = r_s\, \Delta t\; \kappa_i,
+\qquad
+\kappa_i = \frac{\partial Q}{\partial \alpha}(U_i;\, \alpha_i) = -\left. \frac{\partial F(x;\, \alpha) / \partial \alpha}{f(x;\, \alpha)} \right|_{x = Q(U_i;\, \alpha_i)} \tag{S24}
+$$
+
+with $F$ and $f$ the distribution function and density of the unit-scale
+gamma distribution (the second form follows from $F(Q(U; \alpha); \alpha) = U$).
+Let $\delta z^{det}$ be the tangent step of the step without release noise,
+that is, of the drift scheme. The tangent step of (S19) adds the kick's
+derivative, in the $x$ rows and in the $b_1$ row:
+
+$$
+\begin{aligned}
+\delta x_{n+1} &= \delta x^{det} + \frac{r_s\, \Delta t}{\tau_d}\, W\, \mathrm{diag}(\kappa_n^{\bullet})\, \delta b_{1,n} \\
+\delta b_{1,n+1} &= \delta b_1^{det} - \frac{r_s\, \Delta t}{\tau_{rel}}\, \mathrm{diag}(\kappa_n^{\bullet})\, \delta b_{1,n}
+\end{aligned}
+\qquad
+\kappa_{i,n}^{\bullet} =
+\begin{cases}
+0 & \text{(a)} \\
+1 & \text{(b)} \\
+\kappa_{i,n} & \text{(c)}
+\end{cases} \tag{S25}
+$$
+
+The three definitions are one formula with three values of one number per
+neuron and step. With $\kappa^{\bullet} = 1$ the added terms are the Euler
+step of the two changed blocks (S21). (At a capped draw the derivative of the
+kick is $\tau_{rel}\, \delta b_{i1}^{det}$ instead.)
+
+**The expectation of (c) is (b).** The mean of a gamma variable equals its
+shape, $\int_0^1 Q(U; \alpha)\, dU = \alpha$, and differentiating under the
+integral gives
+
+$$
+\mathrm{E}[\kappa_i] = \int_0^1 \frac{\partial Q}{\partial \alpha}(U;\, \alpha)\, dU = 1 \tag{S26}
+$$
+
+so $\mathrm{E}[\partial\, \Delta G_i / \partial b_{i1}] = r_s\, \Delta t$, the
+scale $q$ times the derivative of the shape, which is (b)'s term. The uniform
+of step $n$ is independent of everything before it, so given the past the
+expected tangent step of (c) is the tangent step of (b). Also
+$\kappa_i > 0$: at a fixed uniform a larger shape gives a larger draw.
+
+**What is left over** is a zero-mean fluctuation, $r_s\, \Delta t\, (\kappa_{i,n} - 1)$,
+multiplying $\delta b_{i1}$ in both rows: **multiplicative noise in the
+tangent dynamics**. Its variance is $\mathrm{Var}[\kappa] = c(\alpha) / \alpha$
+with $c$ between $0.355$ (small shape) and $0.25$ (large shape) (12.7), so
+over a step the coefficient of $\delta b_{i1}$ in its own row has the variance
+
+$$
+\left( \frac{r_s\, \Delta t}{\tau_{rel}} \right)^2 \frac{c(\alpha_i)}{\alpha_i} = \sigma_{m,i}^2\, \Delta t,
+\qquad \sigma_{m,i}^2 = \frac{c\; r_s}{\tau_{rel}\; n_v\, b_{i1}} \tag{S27}
+$$
+
+It is proportional to the step, as for a diffusion, so it has a rate
+$\sigma_{m,i}^2$ that does not depend on the step except weakly through $c$.
+Against the mean coefficient $r_s / \tau_{rel}$ that (b) adds, its size is
+$c / (n_v b_{i1})$: it is controlled by **how many vesicles the pool holds**,
+not by how much spontaneous release there is. In the $x$ rows the
+fluctuation's covariance rate is
+$(c\, q\, r_s / \tau_d^2)\, W\, \mathrm{diag}(\delta b_{j1}^2 / b_{j1})\, W^{\top}$,
+the release part of $\Sigma_{xx}$ with each pool replaced by $c$ times the
+squared perturbation over the pool.
+
+**Lyapunov exponents of (c) need not equal those of (b).** An exponent is the
+average of the logarithm of growth, and the logarithm of an average is not
+the average of a logarithm: multiplicative noise in the tangent dynamics can
+shift exponents even though it has zero mean. For one pool on its own, whose
+tangent is the scalar $\delta b_{i1}$, the shift is toward stability,
+$-\sigma_{m,i}^2 / 2$ for $n_v b_{i1} \gg 1$, a fraction $c / (2 n_v b_{i1})$
+of the term $r_s / \tau_{rel}$ that (b) adds. In a network, where the
+fluctuation also enters the $x$ rows through $W$, the sign is not determined.
+(c) is the tangent of the model as a random dynamical system: its exponents
+are the rates at which two copies driven by the **same** random numbers
+separate or converge. (b) is the linearization that governs copies driven by
+**independent** noise, through (S23).
+
+**When they agree.**
+
+- Definition (c) approaches (b) when $n_v b_{i1} \gg 1$ for the neurons that carry the
+  tangent vector: many vesicles, fine-grained release. It does not need a
+  large shape per step, and it does not need $r_s$ small. At the scale of
+  12.4 ($r_s / n_v = 1.25 \times 10^{-4}$, $b_{i1} = 0.7$),
+  $\sigma_m^2 \approx 2.5 \times 10^{-4}$ per second, far below the exponents
+  of interest.
+- Definition (a) approaches (b) and (c) only when $r_s$ is small against the evoked
+  rates $g_i r_i$ at the synapses that matter, and it differs from them
+  systematically, not by a fluctuation: it leaves out a decay
+  $r_s / \tau_{rel}$ of every pool and a coupling $r_s W / \tau_d$ from the
+  pools to the dendrites.
+- In the toy network of 12.10, (c) and (b) gave $\lambda_1$ within about
+  $0.01$ per second of each other in every case, while (a) differed from
+  them by up to $0.08$ per second and in one case in sign.
+
+### 12.7 The low-rate regime
+
+At the values the model would use, the shape of one step's increment is far
+below one. With the release matched to today's Wiener noise (12.4) and steps
+of $1/800$ to $1/200$ s, $\alpha$ runs from about $7 \times 10^{-4}$
+($r_s = 0.005$, $n_v = 40$) to about $1$ ($r_s = 0.1$, $n_v = 800$); the range
+assumed here is $10^{-4}$ to $1$. A draw with $\alpha \ll 1$ is nearly always
+vanishingly small and occasionally of the order of the scale: release in a
+step is rare and comes in lumps, as it should. $\kappa$ inherits this.
+Computed from (S24) by quadrature:
+
+| Shape per step $\alpha$ | $\mathrm{E}[\kappa]$ | Coefficient of variation | $c = \alpha\, \mathrm{Var}[\kappa]$ | Largest $\alpha \kappa$ | $P(\kappa > 10)$ | Kurtosis |
+|---:|---:|---:|---:|---:|---:|---:|
+| $10^{-4}$ | 1.000 | 60 | 0.355 | 0.98 | 0.08 % | 7300 |
+| $10^{-3}$ | 1.000 | 19 | 0.355 | 0.98 | 0.6 % | 730 |
+| $10^{-2}$ | 1.000 | 5.9 | 0.354 | 1.02 | 2.8 % | 73 |
+| $0.1$ | 1.000 | 1.85 | 0.342 | 1.39 | 0.05 % | 7.7 |
+| $1$ | 1.000 | 0.54 | 0.290 | | 0 | 2.5 |
+| $10$ | 1.000 | 0.16 | 0.255 | | 0 | 2.9 |
+| $100$ | 1.000 | 0.05 | 0.251 | | 0 | 3.0 |
+
+(The largest $\alpha \kappa$ is not listed above $\alpha = 0.1$, where
+$\kappa$ is close to one and has no useful bound.)
+
+**What this means for (c).**
+
+- **The mean is exact at every shape**, (S26): no bias, however small the
+  shape.
+- **The tail is heavy but bounded.** For $\alpha \lesssim 0.01$,
+  $\kappa < 1.02 / \alpha$: the derivative of one kick never exceeds about
+  $\tau_{rel} / (n_v b_{i1})$, so the $b_1$ row's own factor over a step stays
+  above about $1 - 1 / (n_v b_{i1})$. Only a nearly empty pool
+  ($n_v b_{i1} \lesssim 1$) can have that factor near zero or negative.
+- **The variance does not blow up as the step shrinks.** The coefficient of
+  variation of $\kappa$ grows as $\sqrt{c / \alpha}$, but the kick's
+  derivative carries a factor $\Delta t$, and the product gives the
+  step-independent rate (S27). As $\alpha \to 0$,
+  $c \to \int_0^\infty x\, e^{x} E_1(x)^2\, dx = 0.3551$.
+- **The limit of small steps is a statement about jumps.** As $\alpha \to 0$,
+  $\alpha \kappa \to m(x) = x\, e^{x} E_1(x)$, with $x$ the size of the draw in
+  units of $q$; $m$ rises from 0 at $x = 0$ toward 1 for large $x$. A jump of
+  size $q x$ changes by $q\, m(x)\, \delta b_{i1} / b_{i1}$ when the pool is
+  perturbed: **the times of release do not move and the sizes do**, a large
+  jump by about one quantum per unit of relative change of the pool and a
+  small jump by less. So (c) has a limit as the step goes to zero and is not
+  an artifact of one step size.
+- **A larger step does not help much.** Drawing over a longer window raises
+  $\alpha$ and lowers $c$, but only from $0.355$ to $0.25$, and only when
+  $\alpha$ goes from far below one to far above it, a window hundreds of
+  times longer; the rate is then frozen over that window, which costs
+  accuracy in the path.
+- **A floor is not needed and would do harm.** $\kappa$ is bounded, and
+  clipping it would break (S26) and bias (c) away from (b).
+- **What it costs is averaging time.** The kurtosis of $\kappa$ is about
+  $0.73 / \alpha$: the fluctuation arrives in rare large values, so a
+  finite-time exponent of (c) converges more slowly than (b)'s on the same
+  path. The cure is a longer window, or a larger $n_v$.
+
+### 12.8 Estimating the Lyapunov spectrum
+
+In the terms of the present code, which has three estimators.
+
+**Top-K** (`lyapunov_topk`: an $N \times K$ basis advanced by a Heun step on
+`jacobian_times` at the stored states, with a QR every `lya_dt`).
+
+- (a): unchanged. The stored path is noisy, the Jacobian is section 10's.
+- (b): `jacobian_times` gains the two terms of (S21). Nothing else changes.
+  The method is then a second-order step of a continuous-time Jacobian, as
+  now.
+- (c): the tangent step has to be the derivative of the **discrete update
+  map** (S19), not a step of a continuous-time Jacobian: the Heun tangent
+  step of the drift, then the kick's derivative (S25). That needs one stored
+  number per neuron and step, $\partial\, \Delta G_i / \partial b_{i1}$,
+  computed during the run from (S24) (or the uniforms, from which it can be
+  recomputed): the same size as the stored noise is today. Two details. The
+  kick's derivative acts on the tangent vector at the **start** of the step.
+  And the stored state at the end of a step includes the kick, so the Heun
+  step's second Jacobian should be taken at the state before the kick
+  (stored state minus kick); taking it after the kick is an error of first
+  order in the kick, small when kicks are small.
+- With (c) the conditioning diagnostic deserves a look where pools run nearly
+  empty, because of the factor $1 - m / (n_v b_{i1})$ of 12.7.
+
+**Benettin** (a perturbed copy re-integrated from the stored state over each
+segment with the trajectory's own integrator and the same noise). It applies
+directly, and what it measures depends on what is stored and replayed.
+Replaying the **uniforms**, so that the copy draws its own release from its
+own pool by (S19), gives (c): the increments are smooth in the state, so a
+small perturbation stays small, which is not true of counts. Replaying the
+**realized increments** gives (a). It cannot give (b), which is not the
+derivative of any one path. Benettin with shared uniforms is therefore the
+finite-difference check on a top-K implementation of (c), as it is today for
+the deterministic Jacobian; in the toy network the two agreed to
+$7 \times 10^{-8}$ per second or better. The perturbation has to be small
+against the pool it perturbs ($d_0 \ll b_{i1}$), and a capped draw is a kink
+that a finite difference steps across.
+
+**The ode45 QR method** (the full spectrum from the variational equation
+integrated by `ode45` through interpolants of the stored states). It
+integrates a continuous-time Jacobian, so it can apply (a) or (b), not (c).
+And it loses its standing as the accurate reference: the stored path now has
+jumps in $x$ and $b_1$, which the interpolants smooth over and an adaptive
+solver gains nothing from. With release noise the reference for (b) is top-K
+at $K = N$, and for (c) Benettin.
+
+**Integration.** The Wiener increment is added as now. The release kick is of
+Euler type: its law uses the state at the start of the step. Infinite
+divisibility makes this exact for a rate that does not depend on the state
+(two half steps have the law of one full step, at any step size); with the
+rate following $b_{i1}$ it is first order, with an error set by how much the
+pool changes within a step, which is little (the pools' time constants are
+$0.25$ s and longer, the steps milliseconds). This holds for the Poisson
+form too. SRA1's order holds for the Wiener part and not for the release
+part, so the step size has to be characterized again.
+
+**The Ito reading.** The scheme is non-anticipating: the release of a step is
+drawn from the pool as it was before the step. That is what makes its mean
+given the state exactly $r_s\, b_{i1}\, \Delta t$, the mean dynamics exactly
+(S20), and (S26) hold step by step. A scheme that used the pool at the middle
+or the end of the step to set the shape would change the mean release at
+first order in the step and would correlate $\kappa$ with the vector it
+multiplies. For the additive Wiener term the distinction does not arise, as
+today.
+
+**Adjoint and covariant vectors.** For (a) and (b) everything carries over
+unchanged: they are tangent dynamics of the present kind. For (c) the tangent
+dynamics are a product of matrices, one per step, each the drift step's
+matrix plus the kick's term (S25), which is diagonal in the $b_1$ block and
+$W$ times a diagonal in the $x$ rows. The standard theory of products of
+random matrices applies to such a product, and the backward passes that give
+covariant vectors, and the adjoint (the transposed matrices, the kick's term
+transposed with them), work on it as on any stored sequence, provided the
+kick derivatives are stored. Not carried over: any argument that uses a
+continuous-time Jacobian between renormalizations, and the identity between
+the sum of the exponents and the mean trace of $J$, which for (c) becomes the
+mean logarithm of the determinant of the step matrices.
+
+### 12.9 The three noise sources compared
+
+| | Wiener term on $x$ (S1) | Poisson release (section 11) | Gamma release (this section) |
+|:----------------|:------------------|:------------------|:------------------|
+| Where it enters | $x_i$ only | $\theta_i$: into $x$ through $W$, and out of $b_{i1}$ | the same as Poisson |
+| Sign | both signs | release never negative; its effect on $x_i$ has the sign of $w_{ij}$ | the same as Poisson |
+| Mean given the state | zero | $r_s\, b_{i1}\, dt$ | the same |
+| Variance given the state | $\sigma_u^2\, dt$, constant | $(\tau_{rel} / n_v)\, r_s\, b_{i1}\, dt$ | the same |
+| Dependence on the state | none | on the pool $b_{i1}$, not on the rate | the same |
+| Dependence on the weights and the gain | none (input-referred) | scales with $w_{ij}$, so with the gain | the same |
+| Correlation across neurons | independent | neurons sharing a presynaptic neuron receive the same release | the same |
+| Reaches the pools directly | no | yes, depletes $b_{i1}$ | yes, the same |
+| Seen directly by the readout of $\theta_i$ | no | yes | yes |
+| Higher cumulants of the driver | none (Gaussian) | $\Lambda q^3$, $\Lambda q^4$ | $2 \Lambda q^3$, $6 \Lambda q^4$ |
+| Paths of $x_i$ | continuous | jumps of size $q\, w_{ij} / \tau_d$ | jumps of all sizes, mostly very small |
+| Differentiable in the state at fixed random numbers | yes, trivially: no dependence | **no** | **yes**, away from the cap |
+| Tangent dynamics available | none needed | (a), (b) | (a), (b), (c) |
+| Step-size consistency | exact | exact for a fixed rate, first order otherwise | the same as Poisson |
+| Integration scheme | SRA1 | Euler-type kick | Euler-type kick |
+| Literal biophysics | no (a stand-in for unmodeled input) | whole vesicles at random times, one size | no: a coarse-grained stand-in for the Poisson form |
+
+### 12.10 Checked numerically
+
+**Checked on 2026-11-14** by
+`scripts/explorations/check_gamma_release_noise.m`, which is standalone and
+uses nothing of the model class.
+
+- **Gamma increments** (shape per step 0.02, $4 \times 10^6$ draws): mean,
+  variance and third cumulant within 1.5 % of $\Lambda q\, \Delta t$,
+  $\Lambda q^2\, \Delta t$ and $2 \Lambda q^3\, \Delta t$; the sum of two half
+  steps has the law of one full step (two-sample Kolmogorov-Smirnov statistic
+  $1.7 \times 10^{-3}$ on $5 \times 10^5$ draws each, $p = 0.47$).
+- **A first-order filter driven by matched Poisson and gamma inputs**, at 1,
+  10 and 100 events per time constant: means equal within 0.5 % and variances
+  within 1 %; skewness 0.94, 0.30, 0.095 (Poisson) against 1.88, 0.60, 0.19
+  (gamma), ratio 2.00 to 2.03; excess kurtosis 0.99, 0.09, 0.006 against 6.0,
+  0.61, 0.057, as the formulas of 12.1 give.
+- **$\kappa$**: the table of 12.7; the mean is 1 to five decimals at every
+  shape from $10^{-4}$ to 100; $c(\alpha)$ falls from 0.3551 to 0.2506 and
+  its small-shape value equals the integral of 12.7 to four decimals;
+  $\alpha \kappa$ is within $4 \times 10^{-4}$ of $m(x)$ at
+  $\alpha = 10^{-4}$. A Monte Carlo through the quantile function itself gave
+  the same mean and variance at $\alpha = 0.1$ and $1$.
+- **A toy network**, in the table below: 40 neurons, a Gaussian $W$, the
+  simplified equations (S2), (S3), (S5), (S6) with the chain, a smooth
+  logistic nonlinearity, no facilitation, no Wiener term, the step (S19) with
+  a Heun drift step of $2.5$ ms, 1500 s per case. $\lambda_1$ from a Benettin
+  copy driven by the same uniforms, and from the tangent step (S25) in its
+  three versions, with the drift part the exact derivative of the Heun step.
+
+| Gain, $K$ | $r_s$ | $n_v$ | $n_v \bar{b}_1$ | Benettin | (c) | (b) | (a) | (c) $-$ (b) | (b) $-$ (a) |
+|:-----------|-----:|-----:|-----:|----------:|----------:|----------:|----------:|------------------:|------------------:|
+| High, 3 | 0.02 | 100 | 26 | $+0.4502$ | $+0.4502$ | $+0.4380$ | $+0.4870$ | $+0.012 \pm 0.006$ | $-0.049 \pm 0.009$ |
+| High, 3 | 0.05 | 30 | 6.2 | $-0.0399$ | $-0.0399$ | $-0.0509$ | $+0.0184$ | $+0.011 \pm 0.006$ | $-0.069 \pm 0.008$ |
+| High, 3 | 0.10 | 10 | 1.6 | $-0.1012$ | $-0.1012$ | $-0.1012$ | $-0.1012$ | $0.0000 \pm 0.0001$ | $0.0000 \pm 0.0001$ |
+| Low, 1 | 0.02 | 100 | 23 | $-0.2253$ | $-0.2253$ | $-0.2253$ | $-0.2060$ | $0.0000 \pm 0.0001$ | $-0.0193 \pm 0.0000$ |
+| Low, 1 | 0.10 | 10 | 1.6 | $-0.3069$ | $-0.3069$ | $-0.3059$ | $-0.2297$ | $-0.0009 \pm 0.0009$ | $-0.0762 \pm 0.0002$ |
+
+The gain is 30 (high) or 6 (low) times a Gaussian $W$ of unit variance over
+$N$; the low-gain cases have one fast SFA timescale so that their leading
+exponent is set by the pools. Exponents are per second; $\pm$ is the standard error over 20 blocks of the
+paired difference on the same path. Three things to read off. Benettin and
+(c) agree to $7 \times 10^{-8}$ or better in all five cases: (c) is the
+derivative of the simulated map. (c) and (b) agree within about $0.01$; the
+two high-gain differences are two standard errors from zero, which suggests a
+small shift and does not establish one. (a) differs systematically, and in
+the second case it reports chaos ($+0.018$) where the other two report
+stability. In the third case stronger release has ended the chaos of the
+first, and all three sit on the slow adaptation mode near $-1 / \tau_{a_3}$,
+which release does not touch. The cases with $n_v = 10$ ran with nearly empty
+pools ($n_v \bar{b}_1 = 1.6$, three to four thousand capped draws in
+$2.4 \times 10^{7}$).
+
+**Not checked.** The covariance equation (S23) against an ensemble; anything
+in the model class, where none of this exists; exponents beyond the first;
+facilitation; the paper's network size, weights and nonlinearity (the
+piecewise sigmoid has corners, where no tangent of any kind is smooth); the
+convergence of the scheme with the step; covariant vectors; and a run with
+the Wiener term and the release together (the Wiener term changes the path,
+not the tangent step).
+
+### 12.11 Open choices
+
+- **Which tangent the paper's exponents mean.** (c) is the sensitivity of the
+  noisy system to its initial state at fixed noise, and is what Benettin
+  measures; (b) is cheaper, needs nothing stored, and is the same for the
+  Poisson form. At the scale of 12.4 they should be close. Whichever is
+  used, it should be named.
+- **Should evoked release be random too?** Here only spontaneous release is.
+  A gamma increment with shape proportional to
+  $b_{i1} (g_i r_i + r_s)$ would make all release random with the same mean;
+  the shape would then depend on the rate, and through it on $x_i$ and the
+  $a_{ik}$, so the kick's derivative would enter the columns that carry
+  $\Phi'$ as well ($U$ of (24), not only its rates-fixed part).
+- **Should spontaneous release scale with $g_i$?** Here it does not. If it
+  did, the shape would depend on $g_i$ and the kick's derivative would gain a
+  term in the column of $g_i$.
+- **A factor for quantal size variability.** The scale could be
+  $q\, (1 + \mathrm{CV}_q^2)$ with the shape divided by the same factor: the
+  mean is unchanged and the variance is multiplied by
+  $1 + \mathrm{CV}_q^2$, the usual effect of a quantal size with coefficient
+  of variation $\mathrm{CV}_q$. It is one more constant, and it is not
+  distinguishable from a smaller $n_v$ in anything written here.
+- **The cap.** (S19) caps a draw at what the pool holds after the step's
+  drift. It is a kink in the update map, rare unless pools run nearly empty;
+  if they do, a smooth saturation would serve (c) better.
