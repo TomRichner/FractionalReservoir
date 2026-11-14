@@ -1216,3 +1216,41 @@ becomes an issue with an acceptance test.
   not comparable with lambda_1; the lead proposed replacing it with the
   power-law exponent.
 - **Result (2026-11-14):** merged `efc3692`: the opt-in stage `noise_switch` in `mu7chain_AC_config` for every mode, its figure entry, tests (the end-to-end one on the slow list). The fast run was completed with it (0.5 min on 4 workers) and both fast figure sets drawn. With the 10 s rollout the chained MTS copies do not reach independence in x, r or theta (plateau about 1.1 against sqrt(2), still rising), where the other conditions do. lambda_1 in the figure's legend comes from a 5 s window and is rough (1TS -0.14 in the first run, +0.17 in this one). Open: the growth-rate panel (Tom's).
+
+### FD-027 Release noise: a gamma process in the synaptic output
+
+- **Status:** in progress (planned with Tom and approved, 2026-11-14).
+  The plan is `docs/Plan_release_noise.md`; it has the design, the tests,
+  the order of work and the risks.
+- **What:** a second noise source beside the Wiener term: spontaneous
+  release as a non-negative gamma process in the synaptic output, reaching
+  the network through the weights, depleting the pools and seen by the
+  memory readout. Off by default; existing analyses keep it off and must
+  not move by a bit. New: three memory-capacity maps (gain by
+  sigma_gamma, self-coupling by sigma_gamma, gain by sigma_u) and two
+  time-series figures (four conditions at three noise levels, Wiener and
+  gamma), in the A + C bundle.
+- **Tom's decisions (2026-11-14):** the amplitude of the release noise
+  scales with the pool (release = F (r dt + dR), dR a gamma increment
+  that does not depend on the state; the equation he first wrote); the
+  noise axis is sigma_gamma at a fixed small leak; the new maps read the
+  release through a tau_d filter; a matching Wiener map is made too; top-K
+  on the mean-dynamics Jacobian with Benettin as the pathwise check; no
+  agent run over about 10 minutes except ONE essential run at the end (no
+  second one); the Fable worker writes the difficult numerical code, Opus
+  workers the figures, configurations and sweep plumbing; `SRNNModel2` is
+  defunct and gets no support.
+- **Lead's decisions:** names `release_rate` (r_s) and `release_sigma`
+  (sigma_gamma), `1 x C` by presynaptic type; r_s = 0.01 and sigma_gamma
+  up to about twice the Wiener-equivalent level for the new figures, the
+  constant to be measured; the three new maps share the filtered readout;
+  release noise on the lean memory path only; the realized release is
+  recovered from the stored state and the increment rather than kept as a
+  passive state variable (the design review proposed the state; Tom's rule
+  against state that means nothing to the dynamics decides it).
+- **Found while planning, reported, not fixed:**
+  `SRNN_ESN_reservoir.run_reservoir_esn` clears the noise increments before
+  `run_memory_capacity` computes Lyapunov exponents, so Benettin on a noisy
+  reservoir re-integrates without the noise. The sweeps do not use that
+  path.
+- **Result:** _(pending)_
