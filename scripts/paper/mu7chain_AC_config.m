@@ -54,7 +54,9 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %
 % HOW LONG, on 12 pool workers: block A's stages (about 35 minutes at
 % 'essential'; mu7chain_config) and then block C's (about 20 minutes at
-% 'essential', about 4 h 25 at 'fast'; mu7chain_gainbias_config). Agents
+% 'essential', about 4 h 25 at 'fast'; mu7chain_gainbias_config), then the
+% noise switch (0.5 min at 'fast' on 4 workers, measured 2026-11-14; its
+% figure entry about 45 s at 'fast'). Agents
 % run 'essential' and 'fast'; 'medium' and larger are Tom's to start.
 %
 % See also: mu7chain_AC_run, mu7chain_config, mu7chain_gainbias_config,
