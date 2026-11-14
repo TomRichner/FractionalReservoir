@@ -1191,4 +1191,4 @@ becomes an issue with an acceptance test.
 - **Confirmed by Tom (2026-11-13):** "I don't care for the third
   column. We should keep that in" is read as keep the gain curves, drop
   their third column.
-- **Result:** _(pending)_
+- **Result:** essential run of A + C passed (2026-11-13, 59 min, every stage and all 20 figures, `data/mu7chain_AC_essential`, `figs/mu7chain_AC_essential_4cond`); cosmetic points noted (stats box hides points in the rate scatter; zero-self-coupling markers tiny; slope-share x ticks; product line vs zero line in main 4). Before fast the lead set `cfg.mc_lean = true` in the A + C bundle (`203d4f6`): fast runs block A's memory capacity, and the full-trajectory path needs about 17 GB per trial. Fast run launched after it (`matlab-opus-2`, pool 12).
