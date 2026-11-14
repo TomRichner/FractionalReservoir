@@ -109,6 +109,9 @@ The section above, "The model at a glance", is the simplified statement for a
 first reading. Sections 2 to 9 are the full statement, and
 [section 10](#10-the-jacobian-of-the-simplified-model) derives the Jacobian of
 the simplified model.
+[Section 11](#11-proposed-extension-spontaneous-quantal-release-as-the-noise)
+is a proposed extension that is not in the code: spontaneous quantal release
+as the model's noise.
 
 This file states the network model with multiple-timescale (MTS) adaptation in
 its **chained** form: spike-frequency adaptation with $K$ timescales, short-term
@@ -1165,3 +1168,174 @@ position, which depends on the rates and pool states the network settles into.
 6. **For the adapting conditions,** the same with $G(0)$ and with $B_1 \Phi'$
    in place of $\Phi'$: whether the slow gain or the frozen-adaptation gain
    tracks the edge says which timescale of (28) sets it.
+
+## 11. Proposed extension: spontaneous quantal release as the noise
+
+**Status: proposed (Tom, 2026-11-14). Not in the code, and nothing in
+sections 1 to 10 changes.** This section is self-contained: every equation of
+the extended system is written out here. An equation that changes has a new
+number; one that does not is repeated with its old number and the words
+"unmodified from above".
+
+**The idea.** The model's noise today is a Wiener term added to the dendritic
+state, (S1). Here that term is removed and the noise is put where a synapse
+makes it: vesicles are also released spontaneously, one at a time, at a rate
+proportional to the number that are ready. The synaptic output $\theta_i$ is
+never negative, so the noise is a **Poisson** process of release events, not a
+Gaussian term that could make release negative. A released vesicle is gone from
+the pool, so spontaneous release depletes the releasable pool exactly as evoked
+release does. Because $\theta_i$ is both what the network receives and what the
+memory readout reads, this one process acts as process noise (it drives the
+dendritic states) and as measurement noise (the readout sees it).
+
+It is written for the simplified model of "The model at a glance" (one set of
+constants, no cell types, routes or per-neuron constants), with release-coupled
+facilitation included so the section covers the general synapse. Without
+facilitation set $g_i = 1$ and drop (S7) and (S8).
+
+### 11.1 Two new constants and one process
+
+| Symbol | Meaning | Unit |
+|---|---|---|
+| $n_v$ | number of vesicles in a full releasable pool | vesicles |
+| $\nu$ | spontaneous release rate of one docked vesicle | 1/s |
+| $q = \tau_{rel} / n_v$ | what one vesicle adds to the time integral of $\theta_i$ | s |
+| $r_s = \nu\, \tau_{rel}$ | the spontaneous release written as an equivalent firing rate | as $r_i$ |
+| $P_i(t)$ | number of spontaneous release events of neuron $i$ up to time $t$ | events |
+
+**Spontaneous release events.** $P_i(t)$ is a Poisson counting process whose
+rate is proportional to the vesicles neuron $i$ has ready: over a short time
+$dt$ it steps by $dP_i = 1$ with probability $\Lambda_i\, dt$ and by $0$
+otherwise, independently for each neuron given the state.
+
+$$
+\Lambda_i(t) = \nu\, n_v\, b_{i1}(t) \tag{S11}
+$$
+
+### 11.2 The extended system
+
+**Dendritic state** (replaces (S1)): the Wiener term is gone; each
+spontaneous release event of neuron $j$ arrives through the same weight
+$w_{ij}$ as that neuron's evoked output.
+
+$$
+\tau_d\, dx_i = \left( -x_i + u_i + \sum_{j=1}^{N} w_{ij}\, r_j\, g_j\, b_{j1} \right) dt + q \sum_{j=1}^{N} w_{ij}\, dP_j \tag{S12}
+$$
+
+**Firing rate** ((S2), unmodified from above).
+
+$$
+r_i = \phi\!\left( x_i - a_0 - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right) \tag{S2}
+$$
+
+**Spike-frequency adaptation** ((S3), unmodified from above).
+
+$$
+\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K \tag{S3}
+$$
+
+**Releasable pool** (replaces (S10)): each spontaneous event removes one
+vesicle, a fraction $1 / n_v$ of a full pool.
+
+$$
+db_{i1} = \left[ \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} - \frac{g_i\, b_{i1}\, r_i}{\tau_{rel}} \right] dt - \frac{1}{n_v}\, dP_i \tag{S13}
+$$
+
+**Reserve** ((S6), unmodified from above). It refills the releasable pool
+whatever emptied it, so it needs no new term.
+
+$$
+\frac{db_{i2}}{dt} = \frac{1 - b_{i2}}{\tau_{rec_2}} - \frac{1}{n_2}\, \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} \tag{S6}
+$$
+
+**Release probability** ((S7), unmodified from above).
+
+$$
+\frac{dg_i}{dt} = \frac{1 - g_i}{\tau_{dec}} + \frac{\left( G - g_i \right) h_i}{\tau_{fac}} \tag{S7}
+$$
+
+**Calcium trace** ((S8), unmodified from above). It follows the firing rate;
+spontaneous release does not raise it.
+
+$$
+\frac{dh_i}{dt} = \frac{r_i - h_i}{\tau_h} \tag{S8}
+$$
+
+**Synaptic output** (replaces (S9)): evoked release at the rate
+$r_i\, g_i\, b_{i1}$, plus one quantum $q$ at each spontaneous event. Written
+for the amount released in $dt$, because the events are instantaneous:
+
+$$
+d\Theta_i = r_i\, g_i\, b_{i1}\, dt + q\, dP_i,
+\qquad\text{that is,}\qquad
+\theta_i(t) = r_i\, g_i\, b_{i1} + q \sum_{m} \delta\!\left( t - t_{i,m} \right) \tag{S14}
+$$
+
+with $t_{i,m}$ the times of the spontaneous events of neuron $i$. With (S14),
+the two equations that changed read as one statement each: (S12) is
+$\tau_d\, dx_i = (-x_i + u_i)\, dt + \sum_j w_{ij}\, d\Theta_j$, and (S13) is
+the refill minus $d\Theta_i / \tau_{rel}$. Everything a synapse releases, evoked
+or spontaneous, both reaches the postsynaptic neurons and leaves the pool.
+
+### 11.3 What it does
+
+- **Never negative.** $d\Theta_i \ge 0$, so $\theta_i \ge 0$ always.
+- **Mean.** Given the state,
+  $\mathrm{E}[d\Theta_i] = b_{i1} \left( g_i\, r_i + r_s \right) dt$:
+  spontaneous release acts on average like an added firing rate $r_s$ at the
+  synapse. It adds a mean drive $r_s \sum_j w_{ij}\, b_{j1}$ to each neuron
+  (near zero where excitatory and inhibitory mean weights balance) and a mean
+  depletion $r_s\, b_{i1} / \tau_{rel}$ to each pool.
+- **Fluctuation.** The variance of the spontaneous part over $dt$ is
+  $q^2 \Lambda_i\, dt = (\tau_{rel} / n_v)\, r_s\, b_{i1}\, dt$. It grows with
+  the pool $b_{i1}$ and does not depend on the firing rate. $r_s$ sets how much
+  spontaneous release there is; $n_v$ sets how grainy it is.
+- **Limits.** $\nu = 0$ is the model of (S2) to (S10) without noise. With
+  $r_s$ fixed and $n_v \to \infty$ the fluctuation vanishes and a steady leak
+  $r_s\, b_{i1}$ remains.
+- **Structure of the noise in $x$.** A release event of neuron $j$ is felt by
+  every neuron that $j$ projects to, with the sign and size of its weight: the
+  noise is correlated across postsynaptic neurons and scales with the weights,
+  unlike the independent, input-referred Wiener term of (S1).
+- **An empty pool.** An event at $b_{i1} < 1 / n_v$ would take more than is
+  there; such an event releases what remains. (With whole vesicles, binomial
+  release from the vesicles present does this exactly.)
+
+### 11.4 Reading out the synaptic output
+
+$\theta_i$ now contains instantaneous events, so its value at one instant is not
+defined: what exists is the amount released over a window. In a simulation with
+step $\Delta t$ the value in one step is a count divided by $\Delta t$, whose
+variance grows as the step shrinks. A readout therefore uses the release over a
+stated window, for the memory task the hold:
+$y_i = \frac{1}{T_{hold}} \int_{hold} d\Theta_i$, or $\theta_i$ passed through
+a postsynaptic filter. The smooth states $x_i$, $a_{ik}$, $b_{i1}$, $b_{i2}$
+can be read at an instant as before.
+
+### 11.5 Simulation and Lyapunov exponents
+
+- **Integration.** Each step draws the number of events from the state at the
+  start of the step, $\mathrm{Poisson}(\Lambda_i\, \Delta t)$, and applies
+  (S12) and (S13); the smooth terms can keep a higher-order step. The scheme
+  for Wiener noise (SRA1) does not apply. The step size has to be characterized
+  again.
+- **Lyapunov exponents.** A count is not a differentiable function of the
+  state, so the tangent dynamics are taken from the mean dynamics along the
+  realized path: the Jacobian of section 10 with $g_i r_i$ replaced by
+  $g_i r_i + r_s$ in the pool and output terms, evaluated at the stored states
+  (the linear-noise approximation, valid for large $n_v$). The top-K method
+  then applies unchanged. An ensemble of copies with independent noise (the
+  spread of the state) is the check on it.
+
+### 11.6 Choices to be made
+
+- **Should all release be quantal?** Here only spontaneous release is random.
+  Making evoked release random too (each ready vesicle released with hazard
+  $g_i r_i / \tau_{rel} + \nu$, binomially from the vesicles present) keeps
+  the same mean and adds a fluctuation that grows with the firing rate.
+- **Should spontaneous release scale with $g_i$?** Here it does not.
+- **A smooth alternative.** Multiplicative log-normal noise on the output,
+  $\theta_i = r_i g_i b_{i1}\, e^{\sigma \eta_i - \sigma^2 / 2}$ with $\eta_i$ a
+  slow colored process, is positive and differentiable, but it has no release
+  at $r_i = 0$ and its variance grows as $\theta_i^2$: it models a fluctuating
+  release probability, not quantal release.
