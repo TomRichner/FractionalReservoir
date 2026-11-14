@@ -62,14 +62,36 @@ function [S, files, SB, SG] = mc_gain_bias_statistics(cfg)
 %                            fit_center_gain 10^c, fit_width_log10 w,
 %                            fit_fwhm_log10 = 2.355 w, fit_r2 = 1 -
 %                            SS_res / SS_tot on the medians.
+%   fit_status,              'accepted' | 'rejected' | 'none' (fewer than three
+%   fit_reject_reason        finite cells: nothing fitted). A fit is accepted
+%                            only when it describes a peak the data hold:
+%                              R^2 >= cfg.fit_r2_min (0.8);
+%                              its center lies inside the gains of the row;
+%                              its height is positive and at most
+%                              cfg.fit_height_max (2) times the row's largest
+%                              cell;
+%                              its FWHM is at most the span of the row's gains
+%                              (in log10 gain).
+%                            R^2 alone does not do this. A row that only
+%                            falls (its best cell at the lowest gain, then a
+%                            collapse) is matched closely by the flank of a
+%                            Gaussian centered far outside the grid: in the
+%                            fast run of 2026-11-14 the no-adaptation row at
+%                            self-coupling 0 gave height 248150, center
+%                            5e-08, width 10.5 octaves at R^2 0.997, and two
+%                            rows with a peak between two gain levels gave
+%                            heights 179 and 100 where the largest cells
+%                            were 15.4 and 13.6. The fitted values are kept
+%                            in the fit_* columns as fitted; the reason (every
+%                            rule that failed) says why they are not used.
 %   fwhm_meas_log10, _open   the MEASURED full width at half of the row's own
 %                            maximum, same interpolation (open = lower bound)
 %   width_used_oct,          the width to quote, in octaves: the fit's FWHM
-%   width_source             when fit_r2 >= cfg.fit_r2_min (0.8), else the
-%                            measured one ('fit' | 'measured'). A curve that
-%                            is flat and then collapses (chained MTS) is
-%                            not a Gaussian; its R^2 shows it and the
-%                            measured width is used.
+%   width_source             when the fit is accepted, else the measured one
+%                            ('fit' | 'measured'). A curve that is flat and
+%                            then collapses (chained MTS) is not a Gaussian;
+%                            the fit is rejected and the measured width is
+%                            used.
 %
 %   PAIRED with the reference (default sfa3_stdc2, the chained MTS):
 %   share_ref_higher         share of grid points where the median over seeds
@@ -93,7 +115,8 @@ arguments
     cfg.second_fit            = []      % level of the second axis for the fit; empty: D.preset_second
     cfg.reference  (1,:) char = 'sfa3_stdc2'
     cfg.fit_r2_min (1,1) double = 0.8
-    cfg.out_dir    (1,:) char = ''
+    cfg.fit_height_max (1,1) double {mustBePositive} = 2   % the fit's height, at most this many times the row's largest cell
+    cfg.out_dir   (1,:) char = ''
     cfg.tag        (1,:) char = 'MC_gain_bias_statistics'
     cfg.verbose    (1,:) char = 'minimal'
 end
@@ -187,7 +210,8 @@ for c = 1:nc
     [r.fit_height, r.fit_center_gain, r.fit_width_log10, r.fit_r2] = gauss_fit(x_log, y);
     r.fit_fwhm_log10 = 2 * sqrt(2 * log(2)) * r.fit_width_log10;
     [r.fwhm_meas_log10, ~, ~, r.fwhm_open] = above_range(x_log, y, max(y, [], 'omitnan') / 2);
-    if isfinite(r.fit_r2) && r.fit_r2 >= cfg.fit_r2_min
+    [r.fit_status, r.fit_reject_reason] = judge_fit(r, x_log, y, cfg);
+    if strcmp(r.fit_status, 'accepted')
         r.width_used_oct = r.fit_fwhm_log10 * log2(10); r.width_source = 'fit';
     else
         r.width_used_oct = r.fwhm_meas_log10 * log2(10); r.width_source = 'measured';
@@ -215,6 +239,8 @@ S = struct2table([rows{:}], 'AsArray', true);
 S.condition    = cellstr(S.condition);
 S.paired_ref   = cellstr(S.paired_ref);
 S.width_source = cellstr(S.width_source);
+S.fit_status   = cellstr(S.fit_status);
+S.fit_reject_reason = cellstr(S.fit_reject_reason);
 SB = struct2table([sb{:}], 'AsArray', true); SB.condition = cellstr(SB.condition);
 SG = struct2table([sg{:}], 'AsArray', true); SG.condition = cellstr(SG.condition);
 
@@ -287,6 +313,36 @@ end
 h = p(1); c_gain = 10^p(2); w = exp(p(3));
 ss_tot = sum((y - mean(y)).^2);
 r2 = 1 - best / max(ss_tot, eps);
+end
+
+function [status, reason] = judge_fit(r, x, y, cfg)
+% Whether the Gaussian fitted to one row describes a peak the row holds.
+% r: the row's fit_* values; x, y: log10 gain and the cell medians it was
+% fitted to. status 'accepted' | 'rejected' | 'none' (nothing was fitted);
+% reason: every rule that failed, joined by '; ', empty when accepted.
+% The rules and why R^2 alone is not enough: the header, under fit_status.
+if ~isfinite(r.fit_r2)
+    status = 'none'; reason = 'fewer than three finite cells'; return;
+end
+ok = isfinite(y);
+gain_lo = 10^min(x(ok)); gain_hi = 10^max(x(ok));
+span = max(x(ok)) - min(x(ok));
+y_max = max(y(ok));
+why = {};
+if r.fit_r2 < cfg.fit_r2_min
+    why{end+1} = sprintf('R^2 %.2f < %.2f', r.fit_r2, cfg.fit_r2_min);
+end
+if ~(r.fit_center_gain >= gain_lo && r.fit_center_gain <= gain_hi)
+    why{end+1} = sprintf('center %.3g outside the gains %.3g to %.3g', r.fit_center_gain, gain_lo, gain_hi);
+end
+if ~(r.fit_height > 0 && r.fit_height <= cfg.fit_height_max * y_max)
+    why{end+1} = sprintf('height %.3g not within 0 to %.3g x the largest cell %.3g', r.fit_height, cfg.fit_height_max, y_max);
+end
+if ~(r.fit_fwhm_log10 <= span)
+    why{end+1} = sprintf('FWHM %.3g > the span of the gains %.3g (log10)', r.fit_fwhm_log10, span);
+end
+reason = strjoin(why, '; ');
+if isempty(why); status = 'accepted'; else; status = 'rejected'; end
 end
 
 function [w, lo, hi, open] = above_range(x, y, thr)
@@ -373,14 +429,20 @@ for i = 1:height(S)
         strjoin(arrayfun(@(k) sprintf(' %.3f%s |', R.range(k), open_mark(R.open(k))), 1:height(R), 'UniformOutput', false), ''));
 end
 fprintf(fid, ['\n## Width at half of its own maximum, along gain at %s %.3g\n\n' ...
-    'The width quoted is the Gaussian fit''s when its R^2 >= %.2f, else the measured one.\n\n'], axis_name, S.fit_second(1), cfg.fit_r2_min);
-fprintf(fid, '| Condition | fit height | fit centre (gain) | fit FWHM (log10 gain) | fit R^2 | measured FWHM (log10 gain) | width quoted (octaves) | from | share of grid points %s higher | median paired diff | pairs |\n', cfg.reference);
-fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|\n');
+    'The width quoted is the Gaussian fit''s when the fit is accepted, else the measured one. ' ...
+    'A fit is accepted when its R^2 >= %.2f, its center lies inside the gains of the row, ' ...
+    'its height is positive and at most %.3g times the row''s largest cell, and its FWHM is at most the span of the gains; ' ...
+    'a rejected fit''s values are listed as fitted, with every rule it failed.\n\n'], ...
+    axis_name, S.fit_second(1), cfg.fit_r2_min, cfg.fit_height_max);
+fprintf(fid, '| Condition | fit height | fit center (gain) | fit FWHM (log10 gain) | fit R^2 | fit | measured FWHM (log10 gain) | width quoted (octaves) | from | share of grid points %s higher | median paired diff | pairs |\n', cfg.reference);
+fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     open_txt = ''; if S.fwhm_open(i); open_txt = ' (open, lower bound)'; end
-    fprintf(fid, '| %s | %.3f | %.3g | %.3f | %.3f | %.3f%s | %.2f | %s | %.2f | %+.3f | %d |\n', ...
+    fit_txt = S.fit_status{i};
+    if ~isempty(S.fit_reject_reason{i}); fit_txt = sprintf('%s: %s', fit_txt, S.fit_reject_reason{i}); end
+    fprintf(fid, '| %s | %.3g | %.3g | %.3f | %.3f | %s | %.3f%s | %.2f | %s | %.2f | %+.3f | %d |\n', ...
         titles{i}, S.fit_height(i), S.fit_center_gain(i), S.fit_fwhm_log10(i), ...
-        S.fit_r2(i), S.fwhm_meas_log10(i), open_txt, S.width_used_oct(i), S.width_source{i}, ...
+        S.fit_r2(i), fit_txt, S.fwhm_meas_log10(i), open_txt, S.width_used_oct(i), S.width_source{i}, ...
         S.share_ref_higher(i), S.median_paired_diff(i), S.n_pairs(i));
 end
 end

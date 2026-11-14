@@ -31,6 +31,11 @@
 %     without touching the folder;
 %   * the tuning width at half the best of any condition, on a 4-point
 %     example worked by hand (2 octaves closed; 3 octaves open);
+%   * a Gaussian fit with a high R^2 that describes no peak in the data (a
+%     row that only falls; a height far above the largest cell) is
+%     rejected with its reason, in the table and the markdown, and the
+%     measured width is quoted; a bell inside the grid is accepted;
+%   * the size legend prints its levels to three significant digits;
 %   * make_block_C_figures writes a set's figures and tables for a result
 %     that lacks one of the set's conditions, with a note;
 %   * mc_gain_bias_statistics recovers what the generator put in: each
@@ -225,6 +230,15 @@ o_plain = fig_mc_sweep_scatter('data', D, 'conditions', {'no_adaptation'}, ...
 assert(isequaln(o.stats, o_plain.stats), 'size_by must not change the statistics');
 assert(isempty(findall(o_plain.figs, 'Tag', 'mc_sweep_scatter_clipped')), 'without size_by, the old clip mark');
 close([o.figs, o_plain.figs]);
+% The size legend prints its values to three significant digits: levels
+% such as -8/3 and 4/3 used to read -2.66667 and 1.33333.
+o = fig_mc_sweep_scatter('data', D, 'conditions', {'no_adaptation'}, 'size_by', 'bias', ...
+    'size_legend', [-8/3 4/3], 'save', false, 'visible', false);
+lg = findall(o.figs, 'Type', 'axes', 'Tag', 'mc_sweep_scatter_size_legend');
+labels = arrayfun(@(t) char(t.String), findall(lg, 'Type', 'text'), 'UniformOutput', false);
+assert(all(ismember({'-2.67', '1.33'}, labels)) && ~any(contains(labels, '66667')), ...
+    'size legend labels: %s', strjoin(labels, ' | '));
+close(o.figs);
 
 %% The statistics recover the generator's pattern
 [S, files, SB, SG] = mc_gain_bias_statistics('data', D, 'out_dir', tmp, 'verbose', 'near-none');
@@ -269,6 +283,47 @@ Sh = mc_gain_bias_statistics('data', Th, 'reference', 'B', 'verbose', 'near-none
 assert(abs(Sh.gain_oct_fitbias(1) - 2) < 1e-12 && ~Sh.gain_oct_fitbias_open(1));
 assert(abs(Sh.gain_oct_best(2) - 3) < 1e-12 && Sh.gain_oct_best_open(2));
 assert(Sh.best_any(1) == 10 && Sh.share_half_any(1) == 0.5);
+
+%% A Gaussian fit that describes no peak in the data is rejected
+% The rows of the fast run of 2026-11-14 at self-coupling 0 (rounded), whose
+% fits passed on R^2 alone: 'fall' has its best cell at the lowest gain and
+% then collapses, and is matched by the flank of a Gaussian centered far
+% below the grid (height 2.5e5, center 5e-08, R^2 0.997); 'between' peaks
+% at the second gain and its fit put a height of 179 between two levels
+% where the largest cell is 15.4. 'bell' is a Gaussian in log10 gain inside
+% the grid, and is accepted.
+g7 = [0.1 0.75 1.4 2.05 2.7 3.35 4]';
+curves = struct('fall', [4.51 0.090 0.105 0.124 0.103 0.107 0.111]', ...
+    'between', [6.32 15.41 0.182 0.141 0.095 0.104 0.113]', ...
+    'bell', 10 * exp(-(log10(g7) - log10(1.4)).^2 / (2 * 0.2^2)));
+cn = fieldnames(curves)';
+Tf = table(repmat(g7, 3, 1), zeros(21, 1), ones(21, 1), repelem(cn', 7), ...
+    [curves.fall; curves.between; curves.bell], ...
+    'VariableNames', {'gain', 'bias', 'seed', 'condition', 'mc_total'});
+dir_fit = fullfile(tmp, 'fit');
+[Sf, files_f] = mc_gain_bias_statistics('data', Tf, 'reference', 'bell', 'out_dir', dir_fit, 'verbose', 'near-none');
+rf = @(n) find(strcmp(Sf.condition, n));
+assert(isequal(Sf.fit_status([rf('fall'), rf('between'), rf('bell')])', {'rejected', 'rejected', 'accepted'}), ...
+    'fit status: %s', strjoin(Sf.fit_status', ', '));
+assert(Sf.fit_r2(rf('fall')) > 0.8 && Sf.fit_r2(rf('between')) > 0.8, ...
+    'the case is the one R^2 passes; if the fit moved, pick curves that still fool it');
+assert(contains(Sf.fit_reject_reason{rf('fall')}, 'center') && contains(Sf.fit_reject_reason{rf('between')}, 'height'), ...
+    'reasons: %s | %s', Sf.fit_reject_reason{rf('fall')}, Sf.fit_reject_reason{rf('between')});
+assert(isempty(Sf.fit_reject_reason{rf('bell')}) && strcmp(Sf.width_source{rf('bell')}, 'fit') && ...
+    abs(Sf.fit_center_gain(rf('bell')) - 1.4) < 1e-3 && abs(Sf.fit_height(rf('bell')) - 10) < 1e-3);
+% A rejected fit quotes the measured width, in octaves
+for n = {'fall', 'between'}
+    k = rf(n{1});
+    assert(strcmp(Sf.width_source{k}, 'measured') && ...
+        abs(Sf.width_used_oct(k) - Sf.fwhm_meas_log10(k) * log2(10)) < 1e-12 && ...
+        Sf.width_used_oct(k) <= log2(g7(end) / g7(1)) + 1e-12, 'a rejected fit must quote the measured width');
+end
+md = fileread(files_f{endsWith(files_f, '.md')});
+assert(contains(md, ['rejected: ' Sf.fit_reject_reason{rf('fall')}]) && contains(md, '| accepted |'), ...
+    'the markdown must mark each fit accepted or rejected, with the reason');
+% Too few cells to fit: nothing fitted, said so
+S2 = mc_gain_bias_statistics('data', Tf(ismember(Tf.gain, g7(1:2)), :), 'reference', 'bell', 'verbose', 'near-none');
+assert(all(strcmp(S2.fit_status, 'none')) && all(strcmp(S2.width_source, 'measured')));
 
 %% A run in progress: its job files read back into the same table
 % The signature carries what the reader takes the delays and the preset's
