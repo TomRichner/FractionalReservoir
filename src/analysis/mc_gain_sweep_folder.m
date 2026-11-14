@@ -8,7 +8,8 @@ function folder = mc_gain_sweep_folder(grid, variant)
 %
 % A bundle's mc_gain_sweep stage makes several runs (mc_gain_sweep_stage_plan):
 % each GRID it lists, named by the grid's tag, and for a grid each VARIANT
-% network swept along gain only, named by the variant's tag. Every run
+% network swept along the grid's first axis only (the gain, by default),
+% named by the variant's tag. Every run
 % writes to <run_dir>/<folder>/mc_gain_sweep (run_mc_gain_sweep appends the
 % last part). The stage writes there and the figures read there
 % (resolve_mc_gain_sweep), so the name is formed in this one place.

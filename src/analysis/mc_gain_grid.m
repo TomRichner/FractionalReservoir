@@ -1,13 +1,14 @@
 function [G, n_ok] = mc_gain_grid(D, condition, field, stat)
-% MC_GAIN_GRID One quantity of the block C table on the grid of the second axis (the bias, by default) by gain.
+% MC_GAIN_GRID One quantity of the block C table on the grid of the second axis by the first (the bias by the gain, by default).
 %
 %   [G, n_ok] = MC_GAIN_GRID(D, condition, field)          % median over seeds
 %   [G, n_ok] = MC_GAIN_GRID(D, condition, field, stat)    % 'median' | 'iqr' |
 %                                                          % 'p25' | 'p75' | function handle
 %
 %   D          from read_mc_gain_sweep
-%   G          numel(D.second_levels) x numel(D.gains): row = level of the
-%              result's second axis (D.second_axis), column = gain level.
+%   G          numel(D.second_levels) x numel(D.first_levels): row = level of
+%              the result's second axis (D.second_axis), column = level of
+%              its first axis (D.first_axis).
 %              A cell with no successful job is NaN.
 %   n_ok       the number of successful seeds behind each cell
 %
@@ -30,11 +31,11 @@ else
 end
 
 T = D.T(strcmp(D.T.condition, condition), :);
-nb = numel(D.second_levels); ng = numel(D.gains);
+nb = numel(D.second_levels); ng = numel(D.first_levels);
 G = nan(nb, ng);
 n_ok = zeros(nb, ng);
 [~, ib] = ismember(T.(D.second_axis.column), D.second_levels);
-[~, ig] = ismember(T.gain, D.gains);
+[~, ig] = ismember(T.(D.first_axis.column), D.first_levels);
 v = T.(field);
 for b = 1:nb
     for g = 1:ng

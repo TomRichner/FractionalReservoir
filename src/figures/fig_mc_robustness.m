@@ -88,9 +88,10 @@ xlim(ax_a, [0.4, nc + 0.6]);
 set(ax_a, 'XTick', 1:nc, 'XTickLabel', cellfun(@tick_label, cond_titles, 'UniformOutput', false), ...
     'TickLabelInterpreter', 'tex');
 ylabel(ax_a, 'Memory capacity', 'FontSize', st.label_fs - 2);
-Q2 = mc_sweep_quantity(D.second_axis.column, D);   % the second axis's wording
-title(ax_a, sprintf('Every job: %d gains x %d %s x %d seed(s)', numel(D.gains), numel(D.second_levels), ...
-    Q2.plural, numel(D.seeds)), 'FontWeight', 'normal', 'FontSize', st.title_fs - 2);
+Q1 = mc_sweep_quantity(D.first_axis.column, D);    % the axes' wording
+Q2 = mc_sweep_quantity(D.second_axis.column, D);
+title(ax_a, sprintf('Every job: %d %s x %d %s x %d seed(s)', numel(D.first_levels), Q1.plural, ...
+    numel(D.second_levels), Q2.plural, numel(D.seeds)), 'FontWeight', 'normal', 'FontSize', st.title_fs - 2);
 ylim(ax_a, [0, 1.05 * max(vmax, eps)]);
 xlim(ax_b, [0, 1.05 * max(vmax, eps)]); ylim(ax_b, [0 1.02]);
 xlabel(ax_b, 'Memory capacity x', 'FontSize', st.label_fs - 2);

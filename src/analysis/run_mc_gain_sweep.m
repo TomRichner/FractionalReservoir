@@ -7,12 +7,20 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %       'seeds', s, 'conditions', {'no_adaptation', 'sfa3_stdc2'})
 %   out_dir = RUN_MC_GAIN_SWEEP('gain_levels', g, 'second_axis', 'self_feedback', ...
 %       'second_levels', k, 'seeds', s, 'output_dir', d)
+%   out_dir = RUN_MC_GAIN_SWEEP('first_axis', 'self_coupling', 'first_levels', s, ...
+%       'second_axis', 'sigma_u_noise', 'second_levels', sig, 'output_dir', d)
 %
 % Block C (FD-010): is the memory-capacity result a property of adaptation
 % or of one well-tuned network? For every adaptation condition of the
 % preset, on several network seeds, this measures total memory capacity and
-% the largest Lyapunov exponent over a grid of
-%   gain          level_of_chaos, the multiplier on every connection weight
+% the largest Lyapunov exponent over a grid of two axes, each one scalar
+% model property:
+%   a first axis  named by the option first_axis. The default is the gain,
+%                 level_of_chaos, the multiplier on every connection weight.
+%                 Any other settable scalar property can be named instead
+%                 (its levels: first_levels); the gain then stays the
+%                 preset's. The options gain_levels (and mc_gain_sweep_grid's
+%                 gain_range, gain_spacing) are its names on the gain.
 %   a second axis ONE other scalar model property, named by the option
 %                 second_axis. The default is the bias, S_c: the center of
 %                 the per-neuron setpoint draw (the per-neuron spread
@@ -21,9 +29,13 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %                 example 'self_coupling' (the diagonal of W, in multiples
 %                 of the bulk radius at gain 1; a scalar there means every
 %                 cell type). The stage holds no code for a particular
-%                 property: mc_sweep_second_axis turns the property into the
-%                 names used in the job files and the table, and
-%                 mc_sweep_quantity labels it in the figures.
+%                 property on either axis: mc_sweep_axis turns the property
+%                 into the names used in the job files, the table and the
+%                 settings, and mc_sweep_quantity labels it in the figures.
+% THE MODEL OF EVERY GRID POINT IS CHECKED BEFORE ANY COMPUTE: constructed
+% with the point's own values, in every condition, so an axis that changes
+% what the model accepts (a noise level, which the integrator must allow)
+% is checked at each of its levels (run_mc_gain_sweep:BadJobModel).
 % run_memory_capacity measures the same task at the preset network only.
 % Below, "bias" stands for the second axis wherever the default is described.
 %
@@ -85,16 +97,17 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %   mc_gain_sweep_results.csv   T without the R^2 curve
 %   jobs/job_*.mat              one per job
 %   git_provenance.txt          (+ working_changes.patch when dirty)
-% T has one row per (gain, second-axis value, seed, condition). The second
-% axis's column is named 'bias' for S_c and by the property otherwise
-% (mc_sweep_second_axis):
+% T has one row per (first-axis value, second-axis value, seed, condition).
+% The axes' columns are named 'gain' for level_of_chaos and 'bias' for S_c,
+% and by the property otherwise (mc_sweep_axis):
 %   gain, bias, seed, seed_stim, condition, mc_total, horizon (s),
 %   R2_delay (1 x n_delay, R^2 against delay), lle_input, lle_noinput (1/s),
 %   rate_E, rate_I, frac_pinned, frac_silent, seconds (wall time of the
 %   condition), failed (logical), message (the error text of a failed row).
-% settings: conditions, delay_s, preset_name, second_axis (the property),
-%   preset_gain, preset_bias, run_mode, gain_levels, bias_levels (for
-%   another axis preset_<column> and <column>_levels), seeds, protocol, ode_solver, the
+% settings: conditions, delay_s, preset_name, first_axis and second_axis
+%   (the properties), preset_gain, preset_bias, run_mode, gain_levels,
+%   bias_levels (for another axis preset_<column> and <column>_levels),
+%   seeds, protocol, ode_solver, the
 %   Lyapunov settings, model_args, n, n_jobs, n_failed, minutes (wall time
 %   of the call; the runs of a set share it), git.
 %
@@ -102,7 +115,12 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %   preset_name   a SRNNCellTypePairs preset with noise off (default the
 %                 mu7chain bundle's noise-free memory-capacity preset)
 %   run_mode      the size (default 'essential'); see SIZES
-%   gain_levels, seeds   explicit levels of the gain and network seeds
+%   first_axis    the model property of the first axis (default
+%                 'level_of_chaos', the gain)
+%   first_levels  its levels. Required when first_axis is not the gain.
+%   gain_levels   the same option under the name it has for the default
+%                 axis; refused with another axis
+%   seeds         network seeds
 %   second_axis   the model property of the second axis (default 'S_c')
 %   second_levels its levels. Required when second_axis is not the bias.
 %   bias_levels   the same option under the name it has for the default
@@ -128,7 +146,7 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %
 % See also: run_mc_gain_sweep_set, mc_gain_sweep_options, mc_gain_sweep_grid,
 %           SRNN_ESN_reservoir.run_memory_capacity_lean, mc_protocol,
-%           mc_sweep_second_axis, mc_gain_sweep_job_rows, read_mc_gain_sweep,
+%           mc_sweep_axis, mc_gain_sweep_job_rows, read_mc_gain_sweep,
 %           read_mc_gain_sweep_jobs, run_memory_capacity, verify_shared_build
 
 [out_dirs, results_files] = run_mc_gain_sweep_set({varargin});
