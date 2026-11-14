@@ -34,6 +34,39 @@ Entry template:
 
 ---
 
+## 2026-11-14 05:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block C explorations; A + C essential and fast runs)
+
+**Issues touched:** FD-024 (self-negative feedback; first grid recorded),
+FD-025 (block C in the essential, fast and medium runs: in progress ->
+done).
+**Tom's instructions this stretch (in CLAUDE.md and memory):** runs
+minimal, preferably 10 min, effort into code quality; US English; full
+links to figures in every report; figure decisions in the manuscript
+repo's `docs/final_draft/Figure_plan.md`; the lead pushes main after a
+reviewed merge.
+**Done:** linear-scale maps and the memory capacity against lambda_1
+scatter (both chosen for the paper); the Jacobian in block form
+(`Equations_chained_MTS.md` section 10); one general sweep scatter with
+signed marker size; self-feedback and its signed alias self-coupling on
+W's diagonal, with the sweep's second axis generalized; the lab-meeting
+figure report (73 figures); block C wired into `mu7chain_AC_run` with two
+grids per run; the essential run (59 min, all passed) and the fast run
+(7.6 h; one stage failed and was fixed and rerun).
+**Verified:** targeted tests on each merge; the essential and fast runs'
+manifests (20 of 20; 48 of 48 per set after the rerun); figures looked at
+by workers and the lead.
+**Not verified / known gaps:** the quick suite was not rerun as a whole
+this stretch (each merge ran its targeted tests and the ultrarapid
+tiers); the lead's `203d4f6` broke a test that was not run before it was
+committed (fixed in `a6a1095`).
+**Raised, not acted on (Tom's):** block A figure layout (memory-capacity
+legend over the R2 curves; main 4's y range and green-on-green lines);
+the essential run's cosmetic points (stats box over points, tiny zero
+markers, slope-share ticks); `call_tolerating_run_dir` retries on any
+error mentioning run_dir; the quick suite is about 14 min.
+**Next:** Tom reviews the fast run; a `medium` run (13 x 13 x 10, about
+48 h for block C) is his to start.
+
 ## 2026-11-13 09:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block C done as a quick test)
 
 **Issues touched:** FD-010 (in progress -> done as a quick test; what
