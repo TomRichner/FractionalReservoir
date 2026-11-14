@@ -316,7 +316,20 @@ one place, `mc_gain_sweep_grid` (levels per axis x networks): essential
 (about 48 h, Tom's), production 17 x 17 x 10. Registered figures: maps
 with linear color scales for both grids, gain curves with two columns and
 the E:I rows, robustness for both, memory capacity against lambda_1 from
-the self-coupling grid, three free scatters, statistics. Three fixes
+the self-coupling grid, three free scatters, statistics.
+
+**The noise-switch rollouts run with it too** (FD-026, 2026-11-14): the
+opt-in stage `noise_switch` (`noise_switch_stage_plan`,
+`run_noise_switch_stage`, into `<run_dir>/noise_switch/`). Copies of one
+network share the noise for 10 s and then each runs on its own noise
+seed (`SRNNCellTypePairs.noise_seed_schedule`, rows of [t_start, seed],
+spliced by `wiener_increments` at the same absolute time index, so copies
+are bit-identical up to the switch); `run_noise_switch_rollouts` measures
+how fast the copies drift apart per state variable, and
+`fig_noise_switch_rollouts` draws a time series per condition and a
+summary. This is the spread of the state under independent noise, not a
+Lyapunov exponent (there the copies share the noise). Sizes: essential 4
+copies and a 5 s rollout, fast 8 and 10 s, medium 16 and 20 s. Three fixes
 went in first, each of which moved numbers:
 
 - **Every seeding call names its generator** (`rng(seed, 'twister')`;

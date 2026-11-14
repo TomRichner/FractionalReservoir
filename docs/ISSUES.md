@@ -1196,7 +1196,7 @@ becomes an issue with an acceptance test.
 
 ### FD-026 Noise-switch rollouts in the runs
 
-- **Status:** in progress (Tom, 2026-11-14). Registration: `matlab-opus-3`.
+- **Status:** **done** (2026-11-14). Was: in progress (Tom, 2026-11-14). Registration: `matlab-opus-3`.
 - **What:** copies of one network share the noise for 10 s and then each
   runs on its own noise seed; how fast the copies drift apart, per state
   variable and condition. Built and merged at `afd4531`
@@ -1215,4 +1215,4 @@ becomes an issue with an acceptance test.
   rate" panel fits an exponential to a rise that is a power law, so it is
   not comparable with lambda_1; the lead proposed replacing it with the
   power-law exponent.
-- **Result:** _(pending)_
+- **Result (2026-11-14):** merged `efc3692`: the opt-in stage `noise_switch` in `mu7chain_AC_config` for every mode, its figure entry, tests (the end-to-end one on the slow list). The fast run was completed with it (0.5 min on 4 workers) and both fast figure sets drawn. With the 10 s rollout the chained MTS copies do not reach independence in x, r or theta (plateau about 1.1 against sqrt(2), still rising), where the other conditions do. lambda_1 in the figure's legend comes from a 5 s window and is rough (1TS -0.14 in the first run, +0.17 in this one). Open: the growth-rate panel (Tom's).
