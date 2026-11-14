@@ -61,6 +61,13 @@ stages_A = A.stages;
 if isempty(stages_A); stages_A = paper_stage_names(); end
 cfg.stages = [stages_A, C.stages];
 cfg.mc_gain_sweep = C.mc_gain_sweep;
+% Block A's memory-capacity stages take the lean path here: the same R^2
+% and total memory capacity to the bit (test_mc_lean_path), at tens of MB
+% per trial instead of about 17 GB. At 'fast' and above the bundle runs
+% every block A stage, memory capacity among them, beside block C's grids
+% on the same 12 workers, and the full-trajectory path would not fit in
+% memory. mu7chain_config on its own is unchanged (lead, FD-025).
+cfg.mc_lean = true;
 
 %% Where things land -- apart from either part's own directories
 cfg.run_dir  = ['data/mu7chain_AC_' run_mode];
