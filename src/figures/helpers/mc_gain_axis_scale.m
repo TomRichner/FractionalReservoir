@@ -1,7 +1,7 @@
 function scale = mc_gain_axis_scale(gains)
 % MC_GAIN_AXIS_SCALE How a gain sweep's gain axis is drawn: 'linear' for evenly spaced levels, else 'log'.
 %
-%   scale = MC_GAIN_AXIS_SCALE(D.gains)     % 'log' or 'linear'
+%   scale = MC_GAIN_AXIS_SCALE(D.first_levels)     % 'log' or 'linear'
 %
 % A block C grid spaces its gains logarithmically (gain against the bias) or
 % evenly (gain against the self-coupling), and every figure draws the gain
@@ -16,6 +16,11 @@ function scale = mc_gain_axis_scale(gains)
 % in a million. Fewer than three levels do not show a spacing; they are
 % drawn on a log axis, as the gain always was.
 %
+% THE SAME RULE SERVES ANY FIRST AXIS (mc_sweep_axis): the self-coupling or
+% a noise level in place of the gain. Levels that are not all positive
+% have no log axis and are drawn linear, however they are spaced (a noise
+% axis that starts at 0, a self-coupling that changes sign).
+%
 % See also: mc_sweep_quantity, fig_mc_gain_bias_maps, fig_mc_gain_curves
 
 arguments
@@ -25,6 +30,9 @@ RELATIVE_TOLERANCE = 1e-6;
 steps = diff(sort(gains(:)));
 scale = 'log';
 if numel(steps) >= 2 && max(abs(steps - mean(steps))) <= RELATIVE_TOLERANCE * mean(steps)
+    scale = 'linear';
+end
+if any(gains(:) <= 0)
     scale = 'linear';
 end
 end

@@ -22,6 +22,19 @@ function [S, files, SB, SG] = mc_gain_bias_statistics(cfg)
 % code computes with axis-neutral names and renames the columns once, at
 % the end (name_columns).
 %
+% THE FIRST AXIS IS THE RESULT'S TOO (D.first_axis): the gain, or another
+% property, for example the self-coupling s. Below it is written for the
+% gain, and "gain" in a column name stands for the first axis's column
+% (peak_self_coupling, self_coupling_oct_fit..., SG's key column and the
+% file <tag>_by_self_coupling.csv). Widths and fits along the first axis
+% are taken logarithmically when every level is positive (the gain on any
+% grid): in octaves and log10 units, as below. On an axis with a level at
+% or below zero (a self-coupling that changes sign, a noise level from 0)
+% they are in the axis's own units, and the columns say so: "oct" becomes "range"
+% (self_coupling_range_best, width_used_range), SB's octaves column
+% becomes range, and the _log10 suffix is dropped (fit_width, fit_fwhm,
+% fwhm_meas); the Gaussian is then fitted against the axis itself.
+%
 % S, per condition (Plan C, section 5):
 %   n_jobs, n_failed         rows of the condition; failed rows are skipped
 %   mc_median, mc_iqr,       memory capacity over the WHOLE map: every grid
@@ -130,15 +143,23 @@ else
 end
 conds = select_conditions(D.conditions, cfg.conditions);
 nc = numel(conds);
-levels2 = D.second_levels;                      % the second axis: its levels,
-column2 = D.second_axis.column;                 % its column in the table,
-Q2 = mc_sweep_quantity(column2, D);             % and its wording
+levels1 = D.first_levels;                       % the first axis: its levels,
+column1 = D.first_axis.column;                  % its column in the table,
+Q1 = mc_sweep_quantity(column1, D);             % and its wording
+levels2 = D.second_levels;                      % the same for the second axis
+column2 = D.second_axis.column;
+Q2 = mc_sweep_quantity(column2, D);
 second_fit = cfg.second_fit;
 if isempty(second_fit); second_fit = D.preset_second; end
 [~, ib_fit] = min(abs(levels2 - second_fit));
-[~, ig_pre] = min(abs(log(D.gains) - log(D.preset_gain)));
-x_log = log10(D.gains);
-x_oct = log2(D.gains);
+% Along the first axis, widths and the fit are taken as the axis is drawn:
+% for a log axis widths in octaves (log2) and the fit in log10, for a
+% linear one both in the axis's own units. to_w / from_w map a level to
+% the width coordinate and back, to_f / from_f to the fit coordinate.
+X = first_axis_coordinates(levels1);
+[~, ig_pre] = min(abs(X.to_w(levels1) - X.to_w(D.preset_first)));
+x_fit = X.to_f(levels1);
+x_w = X.to_w(levels1);
 
 % Best cell of any selected condition
 M = cell(1, nc);
@@ -170,64 +191,68 @@ for c = 1:nc
     r.best_any = best_any;
     [r.peak_mc, k] = max(m(:), [], 'omitnan');
     if isempty(k) || isnan(r.peak_mc)
-        r.peak_gain = NaN; r.peak_second = NaN;
+        r.peak_first = NaN; r.peak_second = NaN;
     else
         [bk, gk] = ind2sub(size(m), k);
-        r.peak_gain = D.gains(gk); r.peak_second = levels2(bk);
+        r.peak_first = levels1(gk); r.peak_second = levels2(bk);
     end
 
-    % Tuning width along gain (octaves), every level of the second axis
+    % Tuning width along the first axis (octaves, or its own units), every
+    % level of the second axis
     oct = zeros(1, numel(levels2)); oct_open = false(1, numel(levels2));
     for b = 1:numel(levels2)
-        [w, lo, hi, op] = above_range(x_oct, m(b, :), half_any);
+        [w, lo, hi, op] = above_range(x_w, m(b, :), half_any);
         oct(b) = w; oct_open(b) = op;
         [pk, kk] = max(m(b, :), [], 'omitnan');
-        pg = NaN; if ~isempty(kk) && isfinite(pk); pg = D.gains(kk); end
+        pg = NaN; if ~isempty(kk) && isfinite(pk); pg = levels1(kk); end
         sb{end+1, 1} = struct('condition', conds{c}, 'second', levels2(b), 'row_peak_mc', pk, ...
-            'row_peak_gain', pg, 'gain_lo', 2^lo, 'gain_hi', 2^hi, 'octaves', w, 'open', op); %#ok<AGROW>
+            'row_peak_first', pg, 'first_lo', X.from_w(lo), 'first_hi', X.from_w(hi), ...
+            'octaves', w, 'open', op); %#ok<AGROW>
     end
-    r.gain_oct_fitsecond = oct(ib_fit); r.gain_oct_fitsecond_open = oct_open(ib_fit);
-    [r.gain_oct_best, kb] = max(oct);
-    r.gain_oct_best_second = levels2(kb); r.gain_oct_best_open = oct_open(kb);
+    r.first_oct_fitsecond = oct(ib_fit); r.first_oct_fitsecond_open = oct_open(ib_fit);
+    [r.first_oct_best, kb] = max(oct);
+    r.first_oct_best_second = levels2(kb); r.first_oct_best_open = oct_open(kb);
 
-    % Tuning width along the second axis (in its own units), every gain
-    rng_b = zeros(1, numel(D.gains)); rng_open = false(1, numel(D.gains));
-    for g = 1:numel(D.gains)
+    % Tuning width along the second axis (in its own units), every level of
+    % the first
+    rng_b = zeros(1, numel(levels1)); rng_open = false(1, numel(levels1));
+    for g = 1:numel(levels1)
         [w, lo, hi, op] = above_range(levels2, m(:, g)', half_any);
         rng_b(g) = w; rng_open(g) = op;
         [pk, kk] = max(m(:, g), [], 'omitnan');
         pb = NaN; if ~isempty(kk) && isfinite(pk); pb = levels2(kk); end
-        sg{end+1, 1} = struct('condition', conds{c}, 'gain', D.gains(g), 'col_peak_mc', pk, ...
+        sg{end+1, 1} = struct('condition', conds{c}, 'first', levels1(g), 'col_peak_mc', pk, ...
             'col_peak_second', pb, 'second_lo', lo, 'second_hi', hi, 'range', w, 'open', op); %#ok<AGROW>
     end
-    r.second_range_presetgain = rng_b(ig_pre); r.second_range_presetgain_open = rng_open(ig_pre);
+    r.second_range_presetfirst = rng_b(ig_pre); r.second_range_presetfirst_open = rng_open(ig_pre);
     [r.second_range_best, kg] = max(rng_b);
-    r.second_range_best_gain = D.gains(kg); r.second_range_best_open = rng_open(kg);
+    r.second_range_best_first = levels1(kg); r.second_range_best_open = rng_open(kg);
 
-    % Along gain at the fit level: Gaussian fit and measured width
+    % Along the first axis at the fit level: Gaussian fit and measured width
     y = m(ib_fit, :);
     r.fit_second = levels2(ib_fit);
-    [r.fit_height, r.fit_center_gain, r.fit_width_log10, r.fit_r2] = gauss_fit(x_log, y);
+    [r.fit_height, r.fit_center_first, r.fit_width_log10, r.fit_r2] = gauss_fit(x_fit, y);
+    r.fit_center_first = X.from_f(r.fit_center_first);   % fitted in the fit coordinate
     r.fit_fwhm_log10 = 2 * sqrt(2 * log(2)) * r.fit_width_log10;
-    [r.fwhm_meas_log10, ~, ~, r.fwhm_open] = above_range(x_log, y, max(y, [], 'omitnan') / 2);
-    [r.fit_status, r.fit_reject_reason] = judge_fit(r, x_log, y, cfg);
+    [r.fwhm_meas_log10, ~, ~, r.fwhm_open] = above_range(x_fit, y, max(y, [], 'omitnan') / 2);
+    [r.fit_status, r.fit_reject_reason] = judge_fit(r, x_fit, y, cfg, X, Q1);
     if strcmp(r.fit_status, 'accepted')
-        r.width_used_oct = r.fit_fwhm_log10 * log2(10); r.width_source = 'fit';
+        r.width_used_oct = r.fit_fwhm_log10 * X.f_to_w; r.width_source = 'fit';
     else
-        r.width_used_oct = r.fwhm_meas_log10 * log2(10); r.width_source = 'measured';
+        r.width_used_oct = r.fwhm_meas_log10 * X.f_to_w; r.width_source = 'measured';
     end
 
-    % Paired with the reference, same gain, second-axis value and seed
+    % Paired with the reference, same grid point and seed
     r.paired_ref = cfg.reference;
     r.share_ref_higher = NaN; r.median_paired_diff = NaN; r.n_pairs = 0;
     if has_ref && ~strcmp(conds{c}, cfg.reference)
-        A = T(ok, {'gain', column2, 'seed', 'mc_total'});
-        B = Tref(~Tref.failed, {'gain', column2, 'seed', 'mc_total'});
+        A = T(ok, {column1, column2, 'seed', 'mc_total'});
+        B = Tref(~Tref.failed, {column1, column2, 'seed', 'mc_total'});
         B = renamevars(B, 'mc_total', 'mc_ref');
-        P = innerjoin(A, B, 'Keys', {'gain', column2, 'seed'});
+        P = innerjoin(A, B, 'Keys', {column1, column2, 'seed'});
         if height(P) > 0
             P.diff = P.mc_ref - P.mc_total;
-            G = groupsummary(P, {'gain', column2}, 'median', 'diff');
+            G = groupsummary(P, {column1, column2}, 'median', 'diff');
             r.share_ref_higher   = mean(G.median_diff > 0);
             r.median_paired_diff = median(P.diff);
             r.n_pairs            = height(P);
@@ -244,40 +269,71 @@ S.fit_reject_reason = cellstr(S.fit_reject_reason);
 SB = struct2table([sb{:}], 'AsArray', true); SB.condition = cellstr(SB.condition);
 SG = struct2table([sg{:}], 'AsArray', true); SG.condition = cellstr(SG.condition);
 
-vprintf(cfg.verbose, 'minimal', '[mc_gain_bias_statistics] %d conditions, %d gains x %d %s x %d seeds; fit at %s; half the best of any = %.3g\n', ...
-    nc, numel(D.gains), numel(levels2), Q2.plural, numel(D.seeds), Q2.at(levels2(ib_fit)), half_any);
+vprintf(cfg.verbose, 'minimal', '[mc_gain_bias_statistics] %d conditions, %d %s x %d %s x %d seeds; fit at %s; half the best of any = %.3g\n', ...
+    nc, numel(levels1), Q1.plural, numel(levels2), Q2.plural, numel(D.seeds), Q2.at(levels2(ib_fit)), half_any);
 
 % The markdown is written from the tables as computed; the tables then
-% leave, and are saved, under the second axis's own column names.
+% leave, and are saved, under the axes' own column names.
 files = {};
 write_files = ~isempty(cfg.out_dir);
 if write_files
     if ~isfolder(cfg.out_dir); mkdir(cfg.out_dir); end
     f_md = fullfile(cfg.out_dir, [cfg.tag '.md']);
-    write_md(f_md, S, SB, SG, D, Q2, second_fit, cfg, half_any, D.gains(ig_pre));
+    write_md(f_md, S, SB, SG, D, Q1, Q2, X, second_fit, cfg, half_any, levels1(ig_pre));
 end
-S  = name_columns(S, column2);
-SB = name_columns(SB, column2);
-SG = name_columns(SG, column2);
+S  = name_columns(S, column1, column2, X.is_log);
+SB = name_columns(SB, column1, column2, X.is_log);
+SG = name_columns(SG, column1, column2, X.is_log);
 if write_files
     f_csv = fullfile(cfg.out_dir, [cfg.tag '.csv']);
     writetable(S, f_csv);
     f_sb = fullfile(cfg.out_dir, [cfg.tag '_by_' column2 '.csv']);
     writetable(SB, f_sb);
-    f_sg = fullfile(cfg.out_dir, [cfg.tag '_by_gain.csv']);
+    f_sg = fullfile(cfg.out_dir, [cfg.tag '_by_' column1 '.csv']);
     writetable(SG, f_sg);
     files = {f_csv, f_md, f_sb, f_sg};
 end
 end
 
 %% ------------------------------------------------------------------------
-function T = name_columns(T, column)
-% The statistics are computed with the second axis called "second"
-% (peak_second, second_range_best, ...). A table leaves with the axis's own
-% column name in its place: peak_bias for the bias, as these columns were
-% always called, peak_self_feedback for the self-feedback.
+function X = first_axis_coordinates(levels)
+% The coordinates along the first axis in which widths and the Gaussian
+% fit are taken: logarithmic when every level is positive (the gain,
+% whether its grid is log- or evenly spaced, as these statistics always
+% took it), the axis's own units when a level is zero or negative (a
+% self-coupling that changes sign, a noise axis from 0). to_w / from_w for
+% widths (log2, octaves, when logarithmic), to_f / from_f for the fit
+% (log10), f_to_w the factor from a fit-coordinate width to a
+% width-coordinate one (log2(10)).
+X.is_log = all(levels > 0);
+if X.is_log
+    X.to_w = @log2;  X.from_w = @(u) 2.^u;
+    X.to_f = @log10; X.from_f = @(u) 10.^u;
+    X.f_to_w = log2(10);
+else
+    X.to_w = @(v) v; X.from_w = @(u) u;
+    X.to_f = @(v) v; X.from_f = @(u) u;
+    X.f_to_w = 1;
+end
+end
+
+function T = name_columns(T, column1, column2, is_log)
+% The statistics are computed with the axes called "first" and "second"
+% (peak_first, peak_second, second_range_best, ...). A table leaves with
+% the axes' own column names in their place: peak_gain and peak_bias for
+% the default axes, as these columns were always called, peak_self_coupling
+% for the self-coupling. On a linear first axis the units in the names
+% follow the axis: "oct" becomes "range", octaves becomes range, and the
+% _log10 suffix goes.
 names = T.Properties.VariableNames;
-T.Properties.VariableNames = regexprep(names, '(^|_|fit)second(_|$)', ['$1' column '$2']);
+names = regexprep(names, '(^|_|fit)second(_|$)', ['$1' column2 '$2']);
+names = regexprep(names, '(^|_|preset)first(_|$)', ['$1' column1 '$2']);
+if ~is_log
+    names = regexprep(names, '(^|_)oct(_|$)', '$1range$2');
+    names = regexprep(names, '^octaves$', 'range');
+    names = regexprep(names, '_log10$', '');
+end
+T.Properties.VariableNames = names;
 end
 
 %% ------------------------------------------------------------------------
@@ -289,13 +345,13 @@ function v = pct(x, p)
 if isempty(x); v = NaN; else; v = prctile(x, p); end
 end
 
-function [h, c_gain, w, r2] = gauss_fit(x, y)
+function [h, c, w, r2] = gauss_fit(x, y)
 % Least squares on the finite medians; parameters (h, c, log w), the best
 % of several starts (centre at each of the three highest cells, three
 % widths), so a curve with a plateau does not trap the fit in a poor local
-% minimum.
+% minimum. x is the fit coordinate (log10 gain); c and w are in it.
 ok = isfinite(y);
-h = NaN; c_gain = NaN; w = NaN; r2 = NaN;
+h = NaN; c = NaN; w = NaN; r2 = NaN;
 if nnz(ok) < 3; return; end
 x = x(ok); y = y(ok);
 model = @(p, x) p(1) * exp(-(x - p(2)).^2 / (2 * exp(2 * p(3))));
@@ -310,36 +366,41 @@ for k = order(1:min(3, numel(order)))
         if cost(q) < best; best = cost(q); p = q; end
     end
 end
-h = p(1); c_gain = 10^p(2); w = exp(p(3));
+h = p(1); c = p(2); w = exp(p(3));
 ss_tot = sum((y - mean(y)).^2);
 r2 = 1 - best / max(ss_tot, eps);
 end
 
-function [status, reason] = judge_fit(r, x, y, cfg)
+function [status, reason] = judge_fit(r, x, y, cfg, X, Q1)
 % Whether the Gaussian fitted to one row describes a peak the row holds.
-% r: the row's fit_* values; x, y: log10 gain and the cell medians it was
-% fitted to. status 'accepted' | 'rejected' | 'none' (nothing was fitted);
-% reason: every rule that failed, joined by '; ', empty when accepted.
+% r: the row's fit_* values; x, y: the fit coordinate of the first axis
+% (log10 gain) and the cell medians it was fitted to; X, Q1: the axis's
+% coordinates and wording. status 'accepted' | 'rejected' | 'none'
+% (nothing was fitted); reason: every rule that failed, joined by '; ',
+% empty when accepted.
 % The rules and why R^2 alone is not enough: the header, under fit_status.
 if ~isfinite(r.fit_r2)
     status = 'none'; reason = 'fewer than three finite cells'; return;
 end
 ok = isfinite(y);
-gain_lo = 10^min(x(ok)); gain_hi = 10^max(x(ok));
+first_lo = X.from_f(min(x(ok))); first_hi = X.from_f(max(x(ok)));
 span = max(x(ok)) - min(x(ok));
 y_max = max(y(ok));
+plural = strrep(Q1.plural, '\_', '_');
+span_unit = '';
+if X.is_log; span_unit = ' (log10)'; end
 why = {};
 if r.fit_r2 < cfg.fit_r2_min
     why{end+1} = sprintf('R^2 %.2f < %.2f', r.fit_r2, cfg.fit_r2_min);
 end
-if ~(r.fit_center_gain >= gain_lo && r.fit_center_gain <= gain_hi)
-    why{end+1} = sprintf('center %.3g outside the gains %.3g to %.3g', r.fit_center_gain, gain_lo, gain_hi);
+if ~(r.fit_center_first >= first_lo && r.fit_center_first <= first_hi)
+    why{end+1} = sprintf('center %.3g outside the %s %.3g to %.3g', r.fit_center_first, plural, first_lo, first_hi);
 end
 if ~(r.fit_height > 0 && r.fit_height <= cfg.fit_height_max * y_max)
     why{end+1} = sprintf('height %.3g not within 0 to %.3g x the largest cell %.3g', r.fit_height, cfg.fit_height_max, y_max);
 end
 if ~(r.fit_fwhm_log10 <= span)
-    why{end+1} = sprintf('FWHM %.3g > the span of the gains %.3g (log10)', r.fit_fwhm_log10, span);
+    why{end+1} = sprintf('FWHM %.3g > the span of the %s %.3g%s', r.fit_fwhm_log10, plural, span, span_unit);
 end
 reason = strjoin(why, '; ');
 if isempty(why); status = 'accepted'; else; status = 'rejected'; end
@@ -370,78 +431,96 @@ end
 w = hi - lo;
 end
 
-function write_md(file, S, SB, SG, D, Q2, second_fit, cfg, half_any, gain_at_preset)
+function write_md(file, S, SB, SG, D, Q1, Q2, X, second_fit, cfg, half_any, first_at_preset)
 % The three tables as one markdown file, from the tables under their
-% axis-neutral column names. Q2: the second axis's wording
-% (mc_sweep_quantity). second_fit: the level asked for the fit.
-% gain_at_preset: the gain level nearest the preset's, where the width
-% along the second axis is quoted.
+% axis-neutral column names. Q1, Q2: the axes' wording (mc_sweep_quantity);
+% X: the first axis's coordinates (first_axis_coordinates). second_fit:
+% the level asked for the fit. first_at_preset: the level of the first
+% axis nearest the preset's, where the width along the second axis is
+% quoted.
 fid = fopen(file, 'w');
 if fid < 0; warning('mc_gain_bias_statistics:Write', 'Cannot write %s', file); return; end
 c = onCleanup(@() fclose(fid));
 titles = titles_by_name(S.condition');
+levels1 = D.first_levels;
 levels2 = D.second_levels;
+name1   = plain(Q1.symbol);                      % 'gain', 'self-coupling'
+short1  = plain(Q1.variable);                    % its symbol in a column head: 'g', 's'
+if isempty(short1); short1 = D.first_axis.file_token; end
+plural1 = plain(Q1.plural);                      % 'gains'
+if X.is_log                                      % how widths and the fit are measured along it
+    width1 = 'octaves';
+    fit1   = ['log10 ' name1];
+else
+    width1 = plain(Q1.unit);
+    if isempty(width1); width1 = [name1 ' units']; end
+    fit1   = name1;
+end
 axis_name = plain(Q2.symbol);                    % 'bias', 'self-feedback'
 axis_var  = plain(Q2.variable);                  % 'S_c', 'k'
 axis_unit = plain(Q2.unit);                      % '', 'R_W'
+if isempty(axis_var); axis_var = D.second_axis.file_token; end
 if isempty(axis_unit); axis_unit = axis_var; end % the bias is quoted in S_c
-fprintf(fid, '# Memory capacity across gain and %s: robustness statistics\n\n', axis_name);
+fprintf(fid, '# Memory capacity across %s and %s: robustness statistics\n\n', name1, axis_name);
 fprintf(fid, 'Source: `%s`\n\n', D.source);
-fprintf(fid, ['%d gains (%.3g to %.3g, level_of_chaos) x %d %s (%s %.3g to %.3g) x %d seed(s). ' ...
+fprintf(fid, ['%d %s (%.3g to %.3g, %s) x %d %s (%s %.3g to %.3g) x %d seed(s). ' ...
     'Map statistics pool every grid point and seed; shares, peaks and widths use the median over seeds per grid point. ' ...
     'Half the best cell of any condition: %.3f. ' ...
-    'Gaussian fit against log10 gain at %s %.3g (the nearest level to %.3g). ' ...
-    'Paired differences are %s minus the row''s condition, same gain, %s and seed.\n\n'], ...
-    numel(D.gains), min(D.gains), max(D.gains), numel(levels2), plain(Q2.plural), axis_var, min(levels2), max(levels2), ...
-    numel(D.seeds), half_any, axis_name, S.fit_second(1), second_fit, cfg.reference, axis_name);
+    'Gaussian fit against %s at %s %.3g (the nearest level to %.3g). ' ...
+    'Paired differences are %s minus the row''s condition, same %s, %s and seed.\n\n'], ...
+    numel(levels1), plural1, min(levels1), max(levels1), D.first_axis.property, ...
+    numel(levels2), plain(Q2.plural), axis_var, min(levels2), max(levels2), ...
+    numel(D.seeds), half_any, fit1, axis_name, S.fit_second(1), second_fit, cfg.reference, name1, axis_name);
 fprintf(fid, '## The map\n\n');
-fprintf(fid, '| Condition | jobs (failed) | MC median | IQR | 5th | 95th | share >= half own best | share >= half best of any | peak MC | at gain | at %s |\n', axis_name);
+fprintf(fid, '| Condition | jobs (failed) | MC median | IQR | 5th | 95th | share >= half own best | share >= half best of any | peak MC | at %s | at %s |\n', name1, axis_name);
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     fprintf(fid, '| %s | %d (%d) | %.3f | %.3f | %.3f | %.3f | %.2f | %.2f | %.3f | %.3g | %.3g |\n', ...
         titles{i}, S.n_jobs(i), S.n_failed(i), S.mc_median(i), S.mc_iqr(i), ...
         S.mc_p05(i), S.mc_p95(i), S.share_half_own(i), S.share_half_any(i), S.peak_mc(i), ...
-        S.peak_gain(i), S.peak_second(i));
+        S.peak_first(i), S.peak_second(i));
 end
 fprintf(fid, ['\n## Tuning width: where MC >= %.3f (half the best of any condition)\n\n' ...
     'Contiguous stretch around the row''s (column''s) best cell; "+" marks a stretch that reaches the grid''s edge (a lower bound).\n\n'], half_any);
-fprintf(fid, '| Condition | along gain at %s %.3g (octaves) | widest along gain (octaves) | at %s | along %s at gain %.3g (%s) | widest along %s (%s) | at gain |\n', ...
-    axis_name, S.fit_second(1), axis_name, axis_name, gain_at_preset, axis_unit, axis_name, axis_unit);
+fprintf(fid, '| Condition | along %s at %s %.3g (%s) | widest along %s (%s) | at %s | along %s at %s %.3g (%s) | widest along %s (%s) | at %s |\n', ...
+    name1, axis_name, S.fit_second(1), width1, name1, width1, axis_name, axis_name, name1, first_at_preset, ...
+    axis_unit, axis_name, axis_unit, name1);
 fprintf(fid, '|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     fprintf(fid, '| %s | %.2f%s | %.2f%s | %.3g | %.3f%s | %.3f%s | %.3g |\n', titles{i}, ...
-        S.gain_oct_fitsecond(i), open_mark(S.gain_oct_fitsecond_open(i)), S.gain_oct_best(i), open_mark(S.gain_oct_best_open(i)), ...
-        S.gain_oct_best_second(i), S.second_range_presetgain(i), open_mark(S.second_range_presetgain_open(i)), ...
-        S.second_range_best(i), open_mark(S.second_range_best_open(i)), S.second_range_best_gain(i));
+        S.first_oct_fitsecond(i), open_mark(S.first_oct_fitsecond_open(i)), S.first_oct_best(i), open_mark(S.first_oct_best_open(i)), ...
+        S.first_oct_best_second(i), S.second_range_presetfirst(i), open_mark(S.second_range_presetfirst_open(i)), ...
+        S.second_range_best(i), open_mark(S.second_range_best_open(i)), S.second_range_best_first(i));
 end
-fprintf(fid, '\n### Along gain, every %s (octaves)\n\n| Condition |%s\n|---|%s\n', axis_name, ...
+fprintf(fid, '\n### Along %s, every %s (%s)\n\n| Condition |%s\n|---|%s\n', name1, axis_name, width1, ...
     sprintf([' ' axis_var ' %.3g |'], levels2), repmat('---|', 1, numel(levels2)));
 for i = 1:height(S)
     R = SB(strcmp(SB.condition, S.condition{i}), :);
     fprintf(fid, '| %s |%s\n', titles{i}, ...
         strjoin(arrayfun(@(k) sprintf(' %.2f%s |', R.octaves(k), open_mark(R.open(k))), 1:height(R), 'UniformOutput', false), ''));
 end
-fprintf(fid, '\n### Along %s, every gain (%s units)\n\n| Condition |%s\n|---|%s\n', axis_name, axis_unit, ...
-    sprintf(' g %.3g |', D.gains), repmat('---|', 1, numel(D.gains)));
+fprintf(fid, '\n### Along %s, every %s (%s units)\n\n| Condition |%s\n|---|%s\n', axis_name, name1, axis_unit, ...
+    sprintf([' ' short1 ' %.3g |'], levels1), repmat('---|', 1, numel(levels1)));
 for i = 1:height(S)
     R = SG(strcmp(SG.condition, S.condition{i}), :);
     fprintf(fid, '| %s |%s\n', titles{i}, ...
         strjoin(arrayfun(@(k) sprintf(' %.3f%s |', R.range(k), open_mark(R.open(k))), 1:height(R), 'UniformOutput', false), ''));
 end
-fprintf(fid, ['\n## Width at half of its own maximum, along gain at %s %.3g\n\n' ...
+fprintf(fid, ['\n## Width at half of its own maximum, along %s at %s %.3g\n\n' ...
     'The width quoted is the Gaussian fit''s when the fit is accepted, else the measured one. ' ...
-    'A fit is accepted when its R^2 >= %.2f, its center lies inside the gains of the row, ' ...
-    'its height is positive and at most %.3g times the row''s largest cell, and its FWHM is at most the span of the gains; ' ...
+    'A fit is accepted when its R^2 >= %.2f, its center lies inside the %s of the row, ' ...
+    'its height is positive and at most %.3g times the row''s largest cell, and its FWHM is at most the span of the %s; ' ...
     'a rejected fit''s values are listed as fitted, with every rule it failed.\n\n'], ...
-    axis_name, S.fit_second(1), cfg.fit_r2_min, cfg.fit_height_max);
-fprintf(fid, '| Condition | fit height | fit center (gain) | fit FWHM (log10 gain) | fit R^2 | fit | measured FWHM (log10 gain) | width quoted (octaves) | from | share of grid points %s higher | median paired diff | pairs |\n', cfg.reference);
+    name1, axis_name, S.fit_second(1), cfg.fit_r2_min, plural1, cfg.fit_height_max, plural1);
+fprintf(fid, '| Condition | fit height | fit center (%s) | fit FWHM (%s) | fit R^2 | fit | measured FWHM (%s) | width quoted (%s) | from | share of grid points %s higher | median paired diff | pairs |\n', ...
+    name1, fit1, fit1, width1, cfg.reference);
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|---|\n');
 for i = 1:height(S)
     open_txt = ''; if S.fwhm_open(i); open_txt = ' (open, lower bound)'; end
     fit_txt = S.fit_status{i};
     if ~isempty(S.fit_reject_reason{i}); fit_txt = sprintf('%s: %s', fit_txt, S.fit_reject_reason{i}); end
     fprintf(fid, '| %s | %.3g | %.3g | %.3f | %.3f | %s | %.3f%s | %.2f | %s | %.2f | %+.3f | %d |\n', ...
-        titles{i}, S.fit_height(i), S.fit_center_gain(i), S.fit_fwhm_log10(i), ...
+        titles{i}, S.fit_height(i), S.fit_center_first(i), S.fit_fwhm_log10(i), ...
         S.fit_r2(i), fit_txt, S.fwhm_meas_log10(i), open_txt, S.width_used_oct(i), S.width_source{i}, ...
         S.share_ref_higher(i), S.median_paired_diff(i), S.n_pairs(i));
 end

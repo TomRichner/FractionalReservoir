@@ -14,12 +14,13 @@ function [D, info] = read_mc_gain_sweep_jobs(folder)
 % READ-ONLY: nothing in the folder is written, moved or deleted. A job
 % still being saved is a *.tmp file and is not matched.
 %
-% D.gains, D.second_levels and D.seeds are the levels FOUND, not the run's
-% planned grid; a partial run's map has gaps (gray cells) where jobs have
-% not finished. D.settings carries what the job files hold: conditions,
-% preset_name, second_axis (the signature's; the bias when it names none),
-% delay_s (mc_delay_axis of the signature's protocol), preset_gain and the
-% preset's value on the second axis (preset_bias for the bias;
+% D.first_levels, D.second_levels and D.seeds are the levels FOUND, not the
+% run's planned grid; a partial run's map has gaps (gray cells) where jobs
+% have not finished. D.settings carries what the job files hold:
+% conditions, preset_name, first_axis and second_axis (the signature's; the
+% gain and the bias when it names none), delay_s (mc_delay_axis of the
+% signature's protocol), the preset's value on each axis (preset_gain and
+% preset_bias for the default axes, preset_<column> otherwise;
 % mc_gain_sweep_preset_point of the signature's preset and model_args),
 % partial = true and n_job_files.
 %
@@ -88,10 +89,12 @@ settings = struct();
 settings.conditions  = cond_names;
 settings.preset_name = signature.preset_name;
 settings.delay_s     = mc_delay_axis(signature.protocol);
-axis2 = mc_sweep_second_axis(signature);
+axis1 = mc_sweep_axis('first', signature);
+axis2 = mc_sweep_axis('second', signature);
+settings.first_axis  = axis1.property;
 settings.second_axis = axis2.property;
-[settings.preset_gain, settings.(['preset_' axis2.column])] = ...
-    mc_gain_sweep_preset_point(signature.preset_name, signature.model_args, axis2.property);
+[settings.(['preset_' axis1.column]), settings.(['preset_' axis2.column])] = ...
+    mc_gain_sweep_preset_point(signature.preset_name, signature.model_args, axis2.property, axis1.property);
 settings.partial     = true;
 settings.n_job_files = info.n_read;
 

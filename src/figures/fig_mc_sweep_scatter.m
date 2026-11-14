@@ -5,16 +5,17 @@ function out = fig_mc_sweep_scatter(cfg)
 %   out = FIG_MC_SWEEP_SCATTER('data_file', f, 'x', 'bias', 'y', 'rate_mean', 'color_by', 'gain')
 %   out = FIG_MC_SWEEP_SCATTER('data', D, 'save', false)   % D from read_mc_gain_sweep, or a table
 %
-% Every run of run_mc_gain_sweep (every gain, level of the second axis and
-% seed) is a point, x against y, colored by a third quantity, one panel per
-% condition. The quantities are named, and defined once, by
-% mc_sweep_quantity: the table's columns (gain, the result's second axis
-% under its own name, bias or self_feedback, then mc_total, horizon,
-% lle_input, lle_noinput, rate_E, rate_I, frac_pinned, frac_silent) and the
-% derived rate_mean and
-% frac_on_slope. Each brings its label, its axis scale (log for gain), its
-% axis limits and an optional clip. fig_mc_vs_lambda1 is this figure with
-% x = lle_input, y = mc_total, colored by gain.
+% Every run of run_mc_gain_sweep (every level of the first axis, level of
+% the second axis and seed) is a point, x against y, colored by a third
+% quantity (cfg.color_by; empty, the default, is the result's first axis:
+% the gain of a gain sweep), one panel per condition. The quantities are
+% named, and defined once, by mc_sweep_quantity: the table's columns (the
+% result's two axes under their own names, gain, bias, self_coupling, ...,
+% then mc_total, horizon, lle_input, lle_noinput, rate_E, rate_I,
+% frac_pinned, frac_silent) and the derived rate_mean and frac_on_slope.
+% Each brings its label, its axis scale (log for a log-spaced first axis),
+% its axis limits and an optional clip. fig_mc_vs_lambda1 is this figure
+% with x = lle_input, y = mc_total, colored by the first axis.
 %
 % CLIPPED QUANTITIES (lambda_1 at +-5 1/s): a run beyond the clip on
 % either axis is drawn at the axis edge as an open marker and counted in
@@ -81,7 +82,7 @@ arguments
     cfg.conditions                   = {}
     cfg.x              (1,:) char    = 'lle_input'
     cfg.y              (1,:) char    = 'mc_total'
-    cfg.color_by       (1,:) char    = 'gain'
+    cfg.color_by       (1,:) char    = ''         % empty = the result's first axis (the gain, by default)
     cfg.size_by        (1,:) char    = ''         % a quantity drawn as marker area, its sign as filled / ring
     cfg.size_range     (1,2) double {mustBePositive} = [8 160]   % marker area (points^2) at 0 and at size_max
     cfg.size_max       double {mustBeScalarOrEmpty, mustBePositive} = []   % |value| drawn at the largest area
@@ -104,7 +105,9 @@ T = D.T;
 quantity = @(name) mc_sweep_quantity(name, D, 'clip', clip_override(cfg.clip, name));
 Qx = quantity(cfg.x);
 Qy = quantity(cfg.y);
-Qc = quantity(cfg.color_by);
+color_by = cfg.color_by;
+if isempty(color_by); color_by = D.first_axis.column; end
+Qc = quantity(color_by);
 fig_tag = cfg.fig_tag;
 if isempty(fig_tag); fig_tag = sprintf('Fig_MC_sweep_%s_vs_%s', cfg.y, cfg.x); end
 
@@ -226,9 +229,10 @@ elseif strcmp(Qc.scale, 'log')
 end
 cb.Label.String = cb_label;
 
-Q2 = quantity(D.second_axis.column);   % the sweep's second axis: what its levels are called
-caption = sprintf('%s against %s, every run (%d gains x %d %s x %d seeds)', Qy.symbol, ...
-    Qx.symbol, numel(D.gains), numel(D.second_levels), Q2.plural, numel(D.seeds));
+Q1 = quantity(D.first_axis.column);    % the sweep's axes: what their levels are called
+Q2 = quantity(D.second_axis.column);
+caption = sprintf('%s against %s, every run (%d %s x %d %s x %d seeds)', Qy.symbol, ...
+    Qx.symbol, numel(D.first_levels), Q1.plural, numel(D.second_levels), Q2.plural, numel(D.seeds));
 clipped_q = [Qx, Qy];
 clipped_q = clipped_q(~cellfun(@isempty, {clipped_q.clip}));
 clip_text = '';

@@ -11,9 +11,10 @@ function out = fig_mc_vs_lambda1(cfg)
 %
 % It is fig_mc_sweep_scatter with x = lambda_1 (cfg.lle_field, default
 % lle_input: with the memory task's input on), y = total memory capacity,
-% colored by gain on the grid's own scale (cfg.color_by = 'gain', the default; the
-% name of the result's second axis, 'bias' or 'self_feedback', colors by it
-% instead; any quantity of mc_sweep_quantity is accepted), lambda_1 linear
+% colored by the result's first axis on the grid's own scale (cfg.color_by
+% empty, the default: the gain for a gain sweep; the name of the result's
+% second axis, 'bias' or 'self_feedback', colors by it instead; any
+% quantity of mc_sweep_quantity is accepted), lambda_1 linear
 % and clipped at
 % +-cfg.lle_clip (default 5 1/s). cfg.size_by names a signed quantity drawn
 % as the marker's area, filled above zero and a ring below (the
@@ -42,7 +43,7 @@ arguments
     cfg.conditions                = {}
     cfg.lle_clip    (1,1) double  {mustBePositive} = 5   % |lambda_1| clipped here (1/s)
     cfg.lle_field   (1,:) char    {mustBeMember(cfg.lle_field, {'lle_input', 'lle_noinput'})} = 'lle_input'
-    cfg.color_by    (1,:) char    = 'gain'   % a quantity of mc_sweep_quantity, which checks it
+    cfg.color_by    (1,:) char    = ''       % a quantity of mc_sweep_quantity; empty = the first axis
     cfg.size_by     (1,:) char    = ''       % a signed quantity drawn as marker area; empty = one size
     cfg.fig_tag     (1,:) char    = 'Fig_MC_vs_lambda1'
 end

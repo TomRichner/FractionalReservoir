@@ -14,7 +14,9 @@ function opts = mc_gain_sweep_options(opts)
 arguments
     opts.preset_name  (1,:) char   = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain'
     opts.run_mode     (1,:) char   = 'essential'
-    opts.gain_levels  (1,:) double = []
+    opts.first_axis   (1,:) char   = 'level_of_chaos'
+    opts.first_levels (1,:) double = []
+    opts.gain_levels  (1,:) double = []     % first_levels, for the default axis
     opts.second_axis  (1,:) char   = 'S_c'
     opts.second_levels (1,:) double = []
     opts.bias_levels  (1,:) double = []     % second_levels, for the default axis

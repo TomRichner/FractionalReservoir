@@ -1,5 +1,5 @@
 function out = fig_mc_gain_bias_maps(cfg)
-% FIG_MC_GAIN_BIAS_MAPS Memory capacity and lambda_1 on the grid of gain by the sweep's second axis (the bias by default), one column per condition (block C).
+% FIG_MC_GAIN_BIAS_MAPS Memory capacity and lambda_1 on the grid of the sweep's two axes (gain by bias by default), one column per condition (block C).
 %
 %   out = FIG_MC_GAIN_BIAS_MAPS('run_dir', d)
 %   out = FIG_MC_GAIN_BIAS_MAPS('data_file', f)
@@ -29,13 +29,15 @@ function out = fig_mc_gain_bias_maps(cfg)
 %      only when cfg.show_iqr (default true) AND some cell has more than one
 %      successful seed; with one seed the row would be blank, so it is
 %      dropped and the caption says "one seed".
-% x is the gain (level_of_chaos), on a log axis for a log-spaced grid and a
-% linear one for an evenly spaced grid (cfg.gain_scale, 'auto' by default;
-% 'log' or 'linear' to force one), y the result's second axis
-% (D.second_axis): the bias S_c, or whatever property the sweep ran, for
-% example the self-feedback k in units of R_W. Its label and its name in
-% the caption come from mc_sweep_quantity. The ticks are the grid's own
-% levels. Each cell is one grid point, drawn between the
+% x is the result's first axis (D.first_axis): the gain (level_of_chaos),
+% or whatever property the sweep ran there, for example the self-coupling
+% s; on a log axis for a log-spaced grid of positive levels and a linear
+% one otherwise (cfg.first_scale, 'auto' by default; 'log' or 'linear' to
+% force one). y is the result's second axis (D.second_axis): the bias S_c,
+% or whatever property the sweep ran, for example the self-feedback k in
+% units of R_W or the input noise sigma_u. Both axes' labels and their
+% names in the caption come from mc_sweep_quantity. The ticks are the
+% grid's own levels. Each cell is one grid point, drawn between the
 % midpoints to its neighbours, so an irregular grid is drawn as it is.
 %
 % THE lambda_1 = 0 LINE is drawn on every row as the cell boundaries that
@@ -45,8 +47,8 @@ function out = fig_mc_gain_bias_maps(cfg)
 % contour: on a coarse grid an interpolated contour invents a position
 % between levels and stops at the outermost cell centres.
 %
-% The preset's own point (D.preset_gain, D.preset_second: gain 1, bias 0.2)
-% is a white star, drawn where it is even when it is not a grid level. A
+% The preset's own point (D.preset_first, D.preset_second: gain 1, bias
+% 0.2) is a white star, drawn where it is even when it is not a grid level. A
 % cell with no successful seed is left grey (the axes colour).
 %
 % SATURATED AND SILENT CELLS: a cell whose median over seeds of the
@@ -85,7 +87,7 @@ arguments
     cfg.lle_lin       (1,1) double  = 0.05 % symlog_lle's linear scale (1/s)
     cfg.lle_clip      (1,1) double  = 10   % |lambda_1| clipped here (1/s)
     cfg.fig_tag       (1,:) char    = 'Fig_MC_gain_bias_maps'
-    cfg.gain_scale    (1,:) char    {mustBeMember(cfg.gain_scale, {'auto', 'log', 'linear'})} = 'auto'
+    cfg.first_scale   (1,:) char    {mustBeMember(cfg.first_scale, {'auto', 'log', 'linear'})} = 'auto'
 end
 
 setup_paths();
@@ -98,8 +100,9 @@ cond_titles = titles_by_name(conds);
 cond_colors = mc_condition_colors(conds);
 
 %% The grids
-Q2 = mc_sweep_quantity(D.second_axis.column, D);   % the second axis: label and wording
-nb = numel(D.second_levels); ng = numel(D.gains);
+Q1 = mc_sweep_quantity(D.first_axis.column, D);    % the first axis (x): label and wording
+Q2 = mc_sweep_quantity(D.second_axis.column, D);   % the second axis (y)
+nb = numel(D.second_levels); ng = numel(D.first_levels);
 MC = nan(nb, ng, nc); L = MC; IQ = MC; PIN = MC; SIL = MC; NOK = MC;
 for c = 1:nc
     [MC(:, :, c), NOK(:, :, c)] = mc_gain_grid(D, conds{c}, 'mc_total');
@@ -155,10 +158,10 @@ nr = numel(rows);
 fig = figure('Color', 'w', 'Position', [60 60 270 * nc + 200, 260 * nr + 120]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 outer = tiledlayout(fig, nr, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-gain_x = gain_axis_transform(D.gains, cfg.gain_scale);
-x = gain_x(D.gains); y = D.second_levels;
+x_of = axis_transform(D.first_levels, cfg.first_scale);
+x = x_of(D.first_levels); y = D.second_levels;
 xe = edges(x); ye = edges(y);
-xtl = arrayfun(@(v) sprintf('%.3g', v), D.gains, 'UniformOutput', false);
+xtl = arrayfun(@(v) sprintf('%.3g', v), D.first_levels, 'UniformOutput', false);
 ytl = arrayfun(@(v) sprintf('%.3g', v), D.second_levels, 'UniformOutput', false);
 ax_all = gobjects(nr, nc);
 % A qualifier in parentheses goes to a second line, so that four long
@@ -192,7 +195,7 @@ for r = 1:nr
         xlim(ax, xe([1 end])); ylim(ax, ye([1 end]));
         mark_flags(ax, x, y, PIN(:, :, c) >= cfg.flag_fraction, SIL(:, :, c) >= cfg.flag_fraction);
         zero_boundary(ax, xe, ye, L(:, :, c), st);
-        plot(ax, gain_x(D.preset_gain), D.preset_second, 'p','MarkerSize', 11, ...
+        plot(ax, x_of(D.preset_first), D.preset_second, 'p','MarkerSize', 11, ...
             'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 0.8);
         if r == 1
             title(ax, titles{c}, 'FontSize', st.title_fs - 2, ...
@@ -204,7 +207,7 @@ for r = 1:nr
             set(ax, 'YTickLabel', []);
         end
         if r == nr
-            xlabel(ax, 'Gain', 'FontSize', st.label_fs - 3);
+            xlabel(ax, capitalized(Q1.label), 'FontSize', st.label_fs - 3);
         else
             set(ax, 'XTickLabel', []);
         end
@@ -224,8 +227,8 @@ end
 grey_txt = 'Grey: no successful job';
 if nr == 3; grey_txt = [grey_txt ' (spread row: fewer than two)']; end
 title(outer, {sprintf('%s. Green dashed: edge between cells with \\lambda_1 > 0 and \\lambda_1 \\leq 0.', seed_txt), ...
-    sprintf('Star: preset (gain %.3g, %s %.3g). + saturated, o silent (\\geq %.0f%% of neurons). %s.', ...
-        D.preset_gain, Q2.symbol, D.preset_second, 100 * cfg.flag_fraction, grey_txt)}, ...
+    sprintf('Star: preset (%s %.3g, %s %.3g). + saturated, o silent (\\geq %.0f%% of neurons). %s.', ...
+        Q1.symbol, D.preset_first, Q2.symbol, D.preset_second, 100 * cfg.flag_fraction, grey_txt)}, ...
     'FontSize', st.tick_fs - 5);
 
 %% Save
@@ -272,7 +275,7 @@ pos = Lc > 0; fin = isfinite(Lc);
 X = []; Y = [];
 [nb, ng] = size(Lc);
 for b = 1:nb
-    for g = 1:ng - 1       % neighbours along gain: a vertical edge
+    for g = 1:ng - 1       % neighbours along the first axis: a vertical edge
         if fin(b, g) && fin(b, g + 1) && pos(b, g) ~= pos(b, g + 1)
             X = [X, xe(g + 1), xe(g + 1), NaN]; Y = [Y, ye(b), ye(b + 1), NaN]; %#ok<AGROW>
         end
@@ -289,13 +292,18 @@ if isempty(X); return; end
 plot(ax, X, Y, '--', 'Color', st.zeroline_color, 'LineWidth', 2, 'Tag', 'lle_zero');
 end
 
-function f = gain_axis_transform(gains, scale)
-% Where a gain sits along x: log10 on a log axis, the gain itself on a
-% linear one. 'auto' follows the grid (mc_gain_axis_scale): linear when the
-% levels are evenly spaced, log otherwise.
-if strcmp(scale, 'auto'); scale = mc_gain_axis_scale(gains); end
+function f = axis_transform(levels, scale)
+% Where a level of the first axis sits along x: log10 on a log axis, the
+% value itself on a linear one. 'auto' follows the grid
+% (mc_gain_axis_scale): linear when the levels are evenly spaced or not
+% all positive, log otherwise.
+if strcmp(scale, 'auto'); scale = mc_gain_axis_scale(levels); end
+if strcmp(scale, 'log') && any(levels <= 0)
+    error('fig_mc_gain_bias_maps:LogOfNonPositive', ...
+        'first_scale ''log'' needs positive levels of the first axis; they run from %g.', min(levels));
+end
 if strcmp(scale, 'linear')
-    f = @(g) g;
+    f = @(v) v;
 else
     f = @log10;
 end

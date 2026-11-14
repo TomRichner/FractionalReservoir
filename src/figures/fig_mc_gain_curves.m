@@ -39,6 +39,12 @@ function out = fig_mc_gain_curves(cfg)
 % the caption says that lambda_1 is an outcome, not a controlled variable,
 % and that with MTS it stays near the slowest adaptation rate.
 %
+% ALONG THE FIRST AXIS: the curves run along each result's first axis, the
+% gain by default. For a sweep whose first axis is another property (the
+% self-coupling, say) x is that property, labeled by mc_sweep_quantity,
+% and the row title says what the curves run along ("along self-coupling
+% at input noise \sigma_u = 0.02, the preset's gain").
+%
 % THE LEVEL OF THE SECOND AXIS: cfg.second (default each result's own
 % preset value on its second axis: bias 0.2, or self-feedback 0). Each row
 % uses the nearest level its result holds, and the row title states both
@@ -112,21 +118,24 @@ for r = 1:n_rows
     D = Ds{r};
     conds = select_conditions(D.conditions, cfg.conditions);
     cond_colors = mc_condition_colors(conds);
-    Q2 = mc_sweep_quantity(D.second_axis.column, D);
+    Q1 = mc_sweep_quantity(D.first_axis.column, D);   % along it: the x axis
+    Q2 = mc_sweep_quantity(D.second_axis.column, D);  % held at one level
     b_want = second_wanted; if isempty(b_want); b_want = D.preset_second; end
     [~, ib] = min(abs(D.second_levels - b_want));
     b = D.second_levels(ib);
-    g = D.gains;
+    g = D.first_levels;
     for k = 1:n_cols; ax(r, k) = nexttile(tl); hold(ax(r, k), 'on'); end
     for c = 1:numel(conds)
         col = cond_colors(c, :);
-        T = D.T(strcmp(D.T.condition, conds{c}) & Q2.values == b & ~D.T.failed, :);
-        [mc_m, mc_lo, mc_hi] = per_gain(T, g, 'mc_total');
-        [l_m, l_lo, l_hi]    = per_gain(T, g, 'lle_input');
+        keep = strcmp(D.T.condition, conds{c}) & Q2.values == b & ~D.T.failed;
+        T = D.T(keep, :);
+        x = Q1.values(keep);
+        [mc_m, mc_lo, mc_hi] = per_level(x, T.mc_total, g);
+        [l_m, l_lo, l_hi]    = per_level(x, T.lle_input, g);
         band(ax(r, 1), g, mc_lo, mc_hi, col);
         band(ax(r, 2), g, sl(l_lo), sl(l_hi), col);
-        scatter(ax(r, 1), T.gain, T.mc_total, 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
-        scatter(ax(r, 2), T.gain, sl(T.lle_input), 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
+        scatter(ax(r, 1), x, T.mc_total, 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
+        scatter(ax(r, 2), x, sl(T.lle_input), 14, col, 'filled', 'MarkerFaceAlpha', 0.45);
         h = plot(ax(r, 1), g, mc_m, '-', 'Color', col, 'LineWidth', st.line_lw);
         plot(ax(r, 2), g, sl(l_m), '-', 'Color', col, 'LineWidth', st.line_lw);
         if cfg.mc_vs_lambda1
@@ -141,8 +150,10 @@ for r = 1:n_rows
     set(ax(r, 2), 'YTick', l_tp, 'YTickLabel', l_tl);
     ylim(ax(r, 2), l_lim);
     for k = 1:2
-        set_gain_axis(ax(r, k), g);
-        xline(ax(r, k), D.preset_gain, ':', 'Color', [0.5 0.5 0.5]);
+        set_first_axis(ax(r, k), g);
+        if isfinite(D.preset_first)
+            xline(ax(r, k), D.preset_first, ':', 'Color', [0.5 0.5 0.5]);
+        end
     end
     ylabel(ax(r, 1), 'Memory capacity', 'FontSize', st.label_fs - 3);
     ylabel(ax(r, 2), '\lambda_1 (1/s), symmetric log', 'FontSize', st.label_fs - 3);
@@ -154,11 +165,19 @@ for r = 1:n_rows
     end
     level_txt = Q2.at(b);
     if abs(b - b_want) > 1e-9; level_txt = sprintf('%s (nearest to %.3g)', level_txt, b_want); end
+    if ~D.first_axis.is_default
+        % Not along the gain: say what the curves run along, and, when the
+        % gain is on neither axis, that it is the network's own.
+        level_txt = sprintf('along %s at %s', Q1.symbol, level_txt);
+        if ~strcmp(D.second_axis.property, 'level_of_chaos')
+            level_txt = sprintf('%s, the preset''s gain', level_txt);
+        end
+    end
     title(ax(r, 1), sprintf('%s, %s', labels{r}, level_txt), 'FontSize', st.title_fs - 3, ...
         'FontWeight', 'normal', 'HorizontalAlignment', 'left', 'Units', 'normalized', 'Position', [0 1.02 0]);
     if r == n_rows
-        xlabel(ax(r, 1), 'Gain', 'FontSize', st.label_fs - 3);
-        xlabel(ax(r, 2), 'Gain', 'FontSize', st.label_fs - 3);
+        xlabel(ax(r, 1), capitalized(Q1.label), 'FontSize', st.label_fs - 3);
+        xlabel(ax(r, 2), capitalized(Q1.label), 'FontSize', st.label_fs - 3);
         if cfg.mc_vs_lambda1
             xlabel(ax(r, 3), '\lambda_1 (1/s), task input on, symmetric log', 'FontSize', st.label_fs - 3);
         end
@@ -226,14 +245,20 @@ mu_by_pre = mean(mu, 1);
 s = sprintf('E : I = %d : %d', p, q);
 end
 
-function [m, lo, hi] = per_gain(T, g, field)
-m = nan(size(g)); lo = m; hi = m;
-for k = 1:numel(g)
-    v = T.(field)(T.gain == g(k));
+function [m, lo, hi] = per_level(x, values, levels)
+% Median and quartiles of the values at each level of the first axis.
+m = nan(size(levels)); lo = m; hi = m;
+for k = 1:numel(levels)
+    v = values(x == levels(k));
     v = v(isfinite(v));
     if isempty(v); continue; end
     m(k) = median(v); lo(k) = prctile(v, 25); hi(k) = prctile(v, 75);
 end
+end
+
+function s = capitalized(s)
+% The text with its first letter in upper case, for an axis label.
+if ~isempty(s); s(1) = upper(s(1)); end
 end
 
 function band(ax, x, lo, hi, col)
@@ -244,11 +269,12 @@ fill(ax, [x, fliplr(x)], [hi, fliplr(lo)], col, 'FaceAlpha', 0.15, 'EdgeColor', 
     'HandleVisibility', 'off');
 end
 
-function set_gain_axis(ax, gains)
-% The gain axis as the grid was laid out (mc_gain_axis_scale): a linear
+function set_first_axis(ax, gains)
+% The first axis as the grid was laid out (mc_gain_axis_scale): a linear
 % axis with MATLAB's own ticks, or a log axis with ticks in 1, 3, 10 steps.
 if strcmp(mc_gain_axis_scale(gains), 'linear')
     pad = 0.04 * (max(gains) - min(gains));
+    if pad == 0; pad = 0.5; end          % one level: any span around it
     xlim(ax, [min(gains) - pad, max(gains) + pad]);
     return
 end

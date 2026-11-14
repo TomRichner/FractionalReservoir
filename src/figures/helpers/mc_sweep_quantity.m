@@ -12,19 +12,24 @@ function Q = mc_sweep_quantity(name, D, opts)
 % figure and table that names the sweep's second axis takes its wording from
 % here (Q.label, Q.symbol, Q.variable, Q.unit, Q.plural, Q.at).
 %
-% COLUMNS: gain, mc_total, horizon, lle_input, lle_noinput, rate_E, rate_I,
-% frac_pinned, frac_silent (see read_mc_gain_sweep), and THE SECOND AXIS of
-% the result, under its column name (D.second_axis.column):
+% COLUMNS: mc_total, horizon, lle_input, lle_noinput, rate_E, rate_I,
+% frac_pinned, frac_silent (see read_mc_gain_sweep), and THE TWO AXES of
+% the result, under their column names (D.first_axis.column,
+% D.second_axis.column), with wording here for
+%   gain           level_of_chaos, the multiplier on every weight
+%   sigma_u_noise  sigma_u, the input-referred Wiener noise on x
 %   bias           S_c, the center of the per-neuron setpoint draw
 %   self_feedback  k, the negative self-feedback on the diagonal of W, in
 %                  multiples of R_W, the bulk radius of W at gain 1
 %   self_coupling  s = -k, the same diagonal term signed as a connection:
 %                  s < 0 negative, s > 0 positive feedback (the model's
 %                  alias SRNNCellTypePairs.self_coupling)
-% A result has one of them; asking for the other is an error. A second axis
-% on a property with no entry here is still a quantity, labeled by its
-% property name: give it an entry (the local function second_axis_wording)
-% when it should read better than that.
+% A result has two of them; asking for another is an error. An axis on a
+% property with no entry here is still a quantity, labeled by its property
+% name: give it an entry (the local function axis_wording) when it should
+% read better than that. The FIRST axis takes its scale from its levels'
+% spacing (mc_gain_axis_scale: log for a log-spaced grid of positive
+% levels, else linear); the second is linear.
 % DERIVED:
 %   rate_mean      population mean rate, f_E rate_E + f_I rate_I, with the
 %                  network's E and I fractions from mc_sweep_population_fractions
@@ -47,8 +52,8 @@ function Q = mc_sweep_quantity(name, D, opts)
 %               there is none
 %   plural      what several levels of it are called in a caption ('biases')
 %   at          @(v) text stating one value ('bias S_c = 0.2')
-%   scale       'linear' or 'log'. The gain follows its grid: log for a
-%               log-spaced grid, linear for an evenly spaced one
+%   scale       'linear' or 'log'. The first axis follows its grid: log for
+%               a log-spaced grid, linear for an evenly spaced one
 %               (mc_gain_axis_scale), as in every block C figure
 %   clip        [] or a positive bound: |value| beyond it is drawn at the
 %               axis edge as an open marker (lambda_1 at 5 1/s, as the maps);
@@ -57,12 +62,12 @@ function Q = mc_sweep_quantity(name, D, opts)
 %   zero_split  true when the sign of the quantity splits the statistics
 %               (lambda_1: stable and unstable sides)
 %   zero_line   true when a green dashed line marks zero (lambda_1)
-%   levels      the grid's levels when the quantity is a grid axis (gain,
-%               the second axis), else []: used for colorbar ticks
+%   levels      the grid's levels when the quantity is one of the result's
+%               two axes, else []: used for colorbar ticks
 %   limits      @(v) [lo hi], the axis limits given the finite values drawn
 %
 % See also: fig_mc_sweep_scatter, mc_sweep_population_fractions, read_mc_gain_sweep,
-%           mc_sweep_second_axis, mc_gain_axis_scale
+%           mc_sweep_axis, mc_gain_axis_scale
 
 arguments
     name (1,:) char = ''
@@ -72,13 +77,19 @@ end
 
 LLE_CLIP = 5;   % 1/s, as the linear lambda_1 map and fig_mc_vs_lambda1
 
-SECOND_AXES = {'bias', 'self_feedback', 'self_coupling'};   % the second axes with wording of their own
-names = [{'gain'}, SECOND_AXES, {'mc_total', 'horizon', 'lle_input', 'lle_noinput', ...
+WORDED_AXES = {'gain', 'bias', 'self_feedback', 'self_coupling', 'sigma_u_noise'};   % axes with wording of their own
+names = [WORDED_AXES, {'mc_total', 'horizon', 'lle_input', 'lle_noinput', ...
     'rate_E', 'rate_I', 'rate_mean', 'frac_pinned', 'frac_silent', 'frac_on_slope'}];
-second_column = '';
-if isfield(D, 'second_axis'); second_column = D.second_axis.column; end
-if ~isempty(second_column) && ~any(strcmp(second_column, names))
-    names = [names, {second_column}];      % a second axis with no wording here
+axis_columns = {'', ''};                   % the result's first and second axis
+positions = {'first', 'second'};
+for a = 1:2
+    field = [positions{a} '_axis'];
+    if isfield(D, field); axis_columns{a} = D.(field).column; end
+end
+for a = 1:2
+    if ~isempty(axis_columns{a}) && ~any(strcmp(axis_columns{a}, names))
+        names = [names, axis_columns(a)];  %#ok<AGROW>  an axis with no wording here
+    end
 end
 if isempty(name)
     Q = names;
@@ -99,26 +110,31 @@ Q = struct('name', name, 'values', [], 'symbol', name, 'label', name, 'variable'
     'unit', '', 'note', '', 'plural', '', 'at', [], 'scale', 'linear', ...
     'clip', [], 'zero_split', false, 'zero_line', false, 'levels', [], 'limits', padded);
 
-is_second_axis = any(strcmp(name, SECOND_AXES)) || strcmp(name, second_column);
-if is_second_axis
+is_axis = any(strcmp(name, WORDED_AXES)) || any(strcmp(name, axis_columns));
+if is_axis
     if ~any(strcmp(name, T.Properties.VariableNames))
         error('mc_sweep_quantity:NotInResult', ...
-            'This result has no column ''%s''; its second axis is ''%s''.', name, second_column);
+            'This result has no column ''%s''; its axes are ''%s'' and ''%s''.', ...
+            name, axis_columns{1}, axis_columns{2});
     end
-    [Q.symbol, Q.variable, Q.unit, Q.plural, Q.note] = second_axis_wording(name);
+    [Q.symbol, Q.variable, Q.unit, Q.plural, Q.note] = axis_wording(name);
     Q.label = strtrim(sprintf('%s %s', Q.symbol, Q.variable));
     if ~isempty(Q.unit); Q.label = sprintf('%s (%s)', Q.label, Q.unit); end
     Q.values = T.(name);
-    if strcmp(name, second_column); Q.levels = D.second_levels; end
-end
-
-switch name
-    case 'gain'
-        Q.values = T.gain;  Q.symbol = 'gain';  Q.label = 'gain';
-        Q.scale = mc_gain_axis_scale(D.gains);  Q.levels = D.gains;  Q.plural = 'gains';
+    if strcmp(name, axis_columns{1})
+        % The first axis is drawn as its grid was laid out: log for a
+        % log-spaced grid, linear for an evenly spaced one.
+        Q.levels = D.first_levels;
+        Q.scale = mc_gain_axis_scale(D.first_levels);
         if strcmp(Q.scale, 'log')
             Q.limits = @(v) [min(v) / 1.25, max(v) * 1.25];
         end
+    elseif strcmp(name, axis_columns{2})
+        Q.levels = D.second_levels;
+    end
+end
+
+switch name
     case 'mc_total'
         Q.values = T.mc_total;  Q.symbol = 'Memory capacity';  Q.label = 'Memory capacity';
         Q.limits = @(v) [0, ceil(max([v(:); 0]) + 0.5)];   % just above the largest
@@ -167,14 +183,19 @@ end
 end
 
 %% ------------------------------------------------------------------------
-function [symbol, variable, unit, plural, note] = second_axis_wording(column)
-% How a second axis of the sweep reads: its name in words, its mathematical
-% symbol, its unit, what several of its levels are called, and a gloss of
-% how to read its sign where that is not obvious. THE ONE PLACE a new
-% second axis gets its wording; without an entry it goes by its column
+function [symbol, variable, unit, plural, note] = axis_wording(column)
+% How an axis of the sweep reads, on either axis: its name in words, its
+% mathematical symbol, its unit, what several of its levels are called,
+% and a gloss of how to read its sign where that is not obvious. THE ONE
+% PLACE a new axis gets its wording; without an entry it goes by its column
 % name (underscores escaped for the tex interpreter).
 note = '';
 switch column
+    case 'gain'
+        symbol = 'gain';  variable = '';  unit = '';  plural = 'gains';
+    case 'sigma_u_noise'
+        symbol = 'input noise';  variable = '\sigma_u';  unit = '';
+        plural = 'input-noise levels';
     case 'bias'
         symbol = 'bias';  variable = 'S_c';  unit = '';  plural = 'biases';
     case 'self_feedback'

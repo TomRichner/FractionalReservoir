@@ -1,13 +1,16 @@
 function G = mc_gain_sweep_grid(run_mode, spec)
-% MC_GAIN_SWEEP_GRID The levels and seeds of one gain sweep of memory capacity at a run mode: the stage's one size table.
+% MC_GAIN_SWEEP_GRID The levels and seeds of one block C sweep of memory capacity at a run mode: the stage's one size table.
 %
 %   G = MC_GAIN_SWEEP_GRID('fast')                       % gain x bias, the default grid
 %   G = MC_GAIN_SWEEP_GRID('fast', 'second_axis', 'self_coupling', ...
 %           'gain_spacing', 'linear', 'second_range', [-4 4])
+%   G = MC_GAIN_SWEEP_GRID('fast', 'first_axis', 'self_coupling', 'first_range', [-4 4], ...
+%           'second_axis', 'sigma_u_noise', 'second_range', [0 0.05])
 %   G = MC_GAIN_SWEEP_GRID(run_mode, 'gain_levels', g, 'second_levels', b, 'seeds', s)
 %
-% A grid is a RANGE and a SPACING per axis; the run mode says how many
-% levels each axis gets and how many networks (seeds) run at every point.
+% A grid is two axes, each a scalar model property with a RANGE and a
+% SPACING (mc_sweep_axis names them); the run mode says how many levels
+% each axis gets and how many networks (seeds) run at every point.
 % run_mc_gain_sweep takes its default grid from here, and a bundle's stage
 % (mc_gain_sweep_stage_plan) resolves every grid it lists through here, so
 % the sizes are written once.
@@ -29,13 +32,19 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % 'production' is the lead's choice of a size above medium (17 levels keeps
 % the count odd, so zero stays a level of a symmetric axis).
 %
-% THE AXES
-%   gain          gain_range (default [0.1 4]), 'log' (default) or 'linear'
-%                 spacing
-%   second axis   second_range, linear spacing. For the bias (second_axis
-%                 'S_c', the default) the range defaults to [-0.6 0.6];
-%                 another axis has no default range and must give one, or
-%                 its levels.
+% THE AXES (each named by a model property; mc_sweep_axis)
+%   first axis    first_axis, default 'level_of_chaos' (the gain).
+%                 first_range, and first_spacing 'log' or 'linear'. For the
+%                 gain the range defaults to [0.1 4] and the spacing to 'log',
+%                 and the options also go by gain_range, gain_spacing and
+%                 gain_levels; another property has no default range (give
+%                 one, or its levels) and is spaced linearly unless told.
+%   second axis   second_axis, default 'S_c' (the bias). second_range,
+%                 linear spacing. For the bias the range defaults to
+%                 [-0.6 0.6], and its levels also go by bias_levels; another
+%                 property has no default range.
+% An option under an axis's default name (gain_*, bias_levels) is refused
+% on another axis, and the two names of one option are not both given.
 % WHY THESE RANGES (FD-010, decisions 14, 18 and 21): above bias 0.6 the
 % network is silent; the no-adaptation peak lies at low bias, so the axis
 % runs down to -0.6; and at low bias the adapting conditions are still
@@ -47,83 +56,132 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % value, and a figure asks for "the level 0.2".
 % Seeds are mc_protocol's seed_net_base + 1, 2, ... (3001, 3002, ...).
 %
-% EXPLICIT LEVELS OR SEEDS (gain_levels, second_levels, seeds) replace the
-% table's for that axis, as given (not rounded).
+% EXPLICIT LEVELS OR SEEDS (first_levels / gain_levels, second_levels /
+% bias_levels, seeds) replace the table's for that axis, as given (not
+% rounded).
 %
-% G: gain_levels, second_levels, seeds (rows), n_jobs (their product), and
-% worker_minutes, the estimate n_jobs x WORKER_MINUTES_PER_JOB.
+% G: first_axis, second_axis (mc_sweep_axis descriptors), first_levels,
+% second_levels, seeds (rows), n_jobs (their product), and worker_minutes,
+% the estimate n_jobs x WORKER_MINUTES_PER_JOB.
 %
 % Errors carry the stage's identifiers: run_mc_gain_sweep:badMode (an
-% unknown run mode) and run_mc_gain_sweep:NoSecondLevels (an axis other
-% than the bias with neither a range nor levels).
+% unknown run mode), :NoFirstLevels / :NoSecondLevels (an axis with no
+% default range given neither a range nor levels), :TwoLevelOptions /
+% :TwoAxisOptions (both names of one
+% option), and :<Default><Option>OnOtherAxis (GainLevelsOnOtherAxis,
+% BiasLevelsOnOtherAxis, ...: an option under the default axis's name on
+% another axis).
 %
-% See also: run_mc_gain_sweep, mc_gain_sweep_stage_plan, mc_sweep_second_axis,
+% See also: run_mc_gain_sweep, mc_gain_sweep_stage_plan, mc_sweep_axis,
 %           mc_protocol, run_mode_names
 
 arguments
     run_mode (1,:) char
+    spec.first_axis    (1,:) char   = 'level_of_chaos'
     spec.second_axis   (1,:) char   = 'S_c'
+    spec.first_range   double {mustBeEmptyOrRange} = []
     spec.gain_range    double {mustBeEmptyOrRange} = []
+    spec.first_spacing (1,:) char   = ''
     spec.gain_spacing  (1,:) char   = ''
-    spec.second_range  double {mustBeEmptyOrRange} = []
+    spec.first_levels  (1,:) double = []
     spec.gain_levels   (1,:) double = []
+    spec.second_range  double {mustBeEmptyOrRange} = []
     spec.second_levels (1,:) double = []
+    spec.bias_levels   (1,:) double = []
     spec.seeds         (1,:) double = []
 end
 
 WORKER_MINUTES_PER_JOB = 9.5;      % one job of four conditions; see the header
-DEFAULT_GAIN_RANGE     = [0.1 4];
-DEFAULT_GAIN_SPACING   = 'log';
-DEFAULT_BIAS_RANGE     = [-0.6 0.6];
-LEVEL_DECIMALS         = 10;
+DEFAULT_RANGE   = struct('first', [0.1 4], 'second', [-0.6 0.6]);   % of the default axes
+DEFAULT_SPACING = struct('first', 'log', 'second', 'linear');       % of the default axes
+LEVEL_DECIMALS  = 10;
 
 [n_levels, n_seeds] = size_for_mode(run_mode);
-axis2 = mc_sweep_second_axis(spec.second_axis);
+axes = {mc_sweep_axis('first', spec.first_axis), mc_sweep_axis('second', spec.second_axis)};
 
-gain_range = spec.gain_range;
-if isempty(gain_range); gain_range = DEFAULT_GAIN_RANGE; end
-gain_spacing = spec.gain_spacing;
-if isempty(gain_spacing); gain_spacing = DEFAULT_GAIN_SPACING; end
-second_range = spec.second_range;
-if isempty(second_range) && axis2.is_default; second_range = DEFAULT_BIAS_RANGE; end
-
-G = struct();
-G.gain_levels = spec.gain_levels;
-if isempty(G.gain_levels)
-    switch gain_spacing
-        case 'log'
-            if gain_range(1) <= 0
-                error('mc_gain_sweep_grid:BadGainRange', ...
-                    'A log-spaced gain axis needs a positive range; got [%g %g].', gain_range);
-            end
-            levels = logspace(log10(gain_range(1)), log10(gain_range(2)), n_levels);
-        case 'linear'
-            levels = linspace(gain_range(1), gain_range(2), n_levels);
-        otherwise
-            error('mc_gain_sweep_grid:BadGainSpacing', ...
-                'gain_spacing is ''log'' or ''linear''; got ''%s''.', gain_spacing);
+G = struct('first_axis', axes{1}, 'second_axis', axes{2});
+for a = 1:2
+    A = axes{a};
+    levels = axis_option(spec, A, 'levels');
+    range = axis_option(spec, A, 'range');
+    spacing = axis_option(spec, A, 'spacing');
+    if isempty(spacing)
+        spacing = 'linear';
+        if A.is_default; spacing = DEFAULT_SPACING.(A.position); end
     end
-    G.gain_levels = round(levels, LEVEL_DECIMALS);
-end
-G.second_levels = spec.second_levels;
-if isempty(G.second_levels)
-    if isempty(second_range)
-        error('run_mc_gain_sweep:NoSecondLevels', ...
-            ['The second axis ''%s'' needs its levels (second_levels) or a range ' ...
-             '(second_range): the size table has a default range for the bias only.'], axis2.property);
+    if isempty(levels)
+        if isempty(range) && A.is_default; range = DEFAULT_RANGE.(A.position); end
+        if isempty(range)
+            error(['run_mc_gain_sweep:No' capitalized(A.position) 'Levels'], ...
+                ['The %s axis ''%s'' needs its levels (%s_levels) or a range (%s_range): ' ...
+                 'the size table has a default range for the gain and the bias only.'], ...
+                A.position, A.property, A.generic_option, A.generic_option);
+        end
+        levels = round(spaced(range, n_levels, spacing, A), LEVEL_DECIMALS);
     end
-    G.second_levels = round(linspace(second_range(1), second_range(2), n_levels), LEVEL_DECIMALS);
+    G.([A.position '_levels']) = levels;
 end
 G.seeds = spec.seeds;
 if isempty(G.seeds)
     P = mc_protocol();
     G.seeds = P.seed_net_base + (1:n_seeds);
 end
-G.n_jobs = numel(G.gain_levels) * numel(G.second_levels) * numel(G.seeds);
+G.n_jobs = numel(G.first_levels) * numel(G.second_levels) * numel(G.seeds);
 G.worker_minutes = G.n_jobs * WORKER_MINUTES_PER_JOB;
 end
 
 %% ------------------------------------------------------------------------
+function v = axis_option(spec, A, what)
+% The value of one option of axis A ('levels', 'range' or 'spacing'), under
+% its generic name (first_levels) or the default axis's name (gain_levels).
+% The default name is refused on another axis, and both names together are
+% refused. Empty when neither is given (or the option does not exist for
+% this axis: the second axis has no spacing).
+generic = [A.generic_option '_' what];
+default_axis = mc_sweep_axis(A.position);
+own = [default_axis.option '_' what];
+v = field_value(spec, generic);
+v_own = field_value(spec, own);
+if isempty(v_own); return; end
+if ~A.is_default
+    error(['run_mc_gain_sweep:' capitalized(default_axis.option) capitalized(what) 'OnOtherAxis'], ...
+        '%s is the option of the %s axis when it is %s; this %s axis is %s. Use %s.', ...
+        own, A.position, default_axis.property, A.position, A.property, generic);
+end
+if ~isempty(v)
+    if strcmp(what, 'levels'); id = 'TwoLevelOptions'; else; id = 'TwoAxisOptions'; end
+    error(['run_mc_gain_sweep:' id], 'Give %s or %s (its name for the default axis), not both.', ...
+        generic, own);
+end
+v = v_own;
+end
+
+function v = field_value(s, name)
+v = [];
+if isfield(s, name); v = s.(name); end
+end
+
+function levels = spaced(range, n, spacing, A)
+switch spacing
+    case 'log'
+        if range(1) <= 0
+            error('mc_gain_sweep_grid:BadRange', ...
+                'A log-spaced axis needs a positive range; the %s axis %s has [%g %g].', ...
+                A.position, A.property, range);
+        end
+        levels = logspace(log10(range(1)), log10(range(2)), n);
+    case 'linear'
+        levels = linspace(range(1), range(2), n);
+    otherwise
+        error('mc_gain_sweep_grid:BadSpacing', ...
+            'The spacing of the %s axis is ''log'' or ''linear''; got ''%s''.', A.position, spacing);
+end
+end
+
+function s = capitalized(s)
+s(1) = upper(s(1));
+end
+
 function [n_levels, n_seeds] = size_for_mode(run_mode)
 % The size table: levels per axis and networks per grid point.
 switch run_mode
