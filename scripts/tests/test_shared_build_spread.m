@@ -17,7 +17,9 @@
 %      and the draws are equal;
 %   3. the DRAWS are still compared: a condition built with another
 %      std_seed, so that its neurons have other depression parameters, is
-%      refused. That is what keeps a trial paired.
+%      refused. That is what keeps a trial paired;
+%   4. SRNN_ESN_reservoir.verify_shared_build, the static method some
+%      callers use, is the same check (it forwards) and not a second copy.
 % Asserts; prints one PASS line.
 
 preset = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain';
@@ -67,5 +69,25 @@ catch err
     if ~threw, rethrow(err); end
 end
 assert(threw, 'a condition with other depression draws must fail the fairness check');
+
+%% 4. The class's static method is the same check, not a second copy
+% SRNN_ESN_reservoir.verify_shared_build was once a copy of the function; it
+% did not learn to skip std_clipped, and the memory-capacity example stage
+% of the mu7chain bundle failed in it (2026-11-14). It forwards now, so it
+% accepts what the function accepts and refuses what the function refuses.
+SRNN_ESN_reservoir.verify_shared_build(esn, {'tau_a', 'synapse_config'}, {'W', 'W_in', 'u_scalar', 'u_ex', 't_ex'});
+threw = false;
+try
+    SRNN_ESN_reservoir.verify_shared_build(tampered, {'tau_a', 'synapse_config'}, {'W', 'W_in', 'u_scalar', 'u_ex', 't_ex'});
+catch err
+    threw = strcmp(err.identifier, 'verify_shared_build:Mismatch') && ...
+        (contains(err.message, 'std_draws') || contains(err.message, 'std_seed'));
+    if ~threw, rethrow(err); end
+end
+assert(threw, 'the static method must refuse other depression draws, as the function does');
+% One implementation: the class file holds no comparison of its own.
+class_text = fileread(which('SRNN_ESN_reservoir'));
+assert(~contains(class_text, 'always_skip'), ...
+    'SRNN_ESN_reservoir carries its own copy of the shared-build check again; it must forward to verify_shared_build');
 
 fprintf('test_shared_build_spread: PASS\n');
