@@ -1193,3 +1193,26 @@ becomes an issue with an acceptance test.
   their third column.
 - **Result:** essential run of A + C passed (2026-11-13, 59 min, every stage and all 20 figures, `data/mu7chain_AC_essential`, `figs/mu7chain_AC_essential_4cond`); cosmetic points noted (stats box hides points in the rate scatter; zero-self-coupling markers tiny; slope-share x ticks; product line vs zero line in main 4). Before fast the lead set `cfg.mc_lean = true` in the A + C bundle (`203d4f6`): fast runs block A's memory capacity, and the full-trajectory path needs about 17 GB per trial. Fast run launched after it (`matlab-opus-2`, pool 12).
   **Fast run (2026-11-13 20:42 to 2026-11-14 04:37, 7.6 h of analyses):** every block A stage and block C's two 7 x 7 x 3 grids with the E:I networks; 336 C jobs, none failed. One stage failed, `mc_example` (the reservoir's own copy of the shared-build check lacked the std_clipped rule of `4df667e`); fixed by making the check one function, rerun alone, figures redrawn; both manifests 48 of 48. The statistics' Gaussian fits are now bounded and rejected fits quoted as measured widths. The lead's `mc_lean` commit `203d4f6` had broken `test_mc_gain_bias_bundle` (not run before the commit); fixed in the same merge. Open, Tom's: block A figure layout (legend over R2 curves in the memory-capacity figure; no-adaptation curves leave main 4's y range; product's green line against the green zero line).
+
+### FD-026 Noise-switch rollouts in the runs
+
+- **Status:** in progress (Tom, 2026-11-14). Registration: `matlab-opus-3`.
+- **What:** copies of one network share the noise for 10 s and then each
+  runs on its own noise seed; how fast the copies drift apart, per state
+  variable and condition. Built and merged at `afd4531`
+  (`noise_seed_schedule` on the model, `run_noise_switch_rollouts`,
+  `fig_noise_switch_rollouts`); gates on main passed there (quick suite 84
+  of 84, stages tier exact). Tom: "it should be added to our set of
+  analyses and figures which get generated when a fast, medium or other
+  run is done."
+- **Lead's decisions:** an opt-in stage `noise_switch` named by
+  `mu7chain_AC_config` in every mode (not a stage of every bundle); sizes
+  essential 4 copies and 5 s rollout, fast 8 and 10 s, medium 16 and 20 s,
+  production 32 and 20 s (the first run's 5 s left several variables short
+  of their plateau); the existing fast run is completed by running this
+  stage alone into its run directory and drawing only its figures.
+- **Not changed, waiting on Tom:** the summary figure's "early growth
+  rate" panel fits an exponential to a rise that is a power law, so it is
+  not comparable with lambda_1; the lead proposed replacing it with the
+  power-law exponent.
+- **Result:** _(pending)_
