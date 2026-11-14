@@ -25,8 +25,10 @@
 %      the other job finishes; retry_failed = false then leaves it alone.
 %   7. An unknown run_mode, condition or protocol field errors before any
 %      compute.
-%   8. THE SECOND AXIS IS THE CALLER'S. The bias run's job files carry no
-%      trace of the option. A run with second_axis = 'self_feedback' (2
+%   8. THE SECOND AXIS IS THE CALLER'S. The default run's job files carry
+%      no trace of either axis option: job fields, their order, the
+%      signature's fields and the file names are those of every job file
+%      made before the axes could be chosen. A run with second_axis = 'self_feedback' (2
 %      gains x 2 k, one seed): the column, the job files and the settings
 %      are named by the property; each condition's row is bit-identical to
 %      a reservoir built by hand with self_feedback set, on the same drawn
@@ -34,9 +36,29 @@
 %      statistics and every block C figure take the axis and its wording
 %      ("self-feedback k (R_W)") from the result; options that do not fit
 %      the axis are refused before any compute.
+%   9. THE FIRST AXIS IS THE CALLER'S TOO, and a grid may have no gain
+%      axis: self_coupling (2 levels) by the bias, at the preset's gain.
+%      Column, job field and files are named by the property, the
+%      signature names first_axis only; each condition's row is
+%      bit-identical to a hand-built reservoir with self_coupling and S_c
+%      set and no gain, on the same drawn W (paired); both readers,
+%      mc_sweep_quantity (linear, "self-coupling s (R_W)"), the statistics
+%      (columns and markdown in R_W, no octaves, no gain) and the maps and
+%      gain curves (x label, the star, what the curves run along) take the
+%      axis from the result; options that do not fit it are refused.
+%  10. A NOISE LEVEL AS AN AXIS: gain by sigma_u_noise (0 and 0.05). Each
+%      job runs at its own noise (the noisy row equals the hand-built noisy
+%      reservoir on the full-trajectory path, bit for bit, and differs from
+%      the quiet one); the maps and statistics name the axis; with rk4 the
+%      noisy level is refused before any compute (BadJobModel), with no
+%      folder made, because every grid point's model is checked.
+%  11. A bundle's stage (mc_gain_sweep_stage_plan) plans a self-coupling by
+%      sigma_u_noise grid from ranges, passing first_levels and
+%      second_levels; gain_levels on that grid is refused; a default grid
+%      still passes gain_levels and bias_levels. No compute.
 %
 % Prints [PASS]/[FAIL] per check and errors at the end if anything failed.
-% About 80 s. Assumes setup_paths has run.
+% About 110 s. Assumes setup_paths has run.
 
 n_fail = 0;
 preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain';
@@ -204,10 +226,17 @@ fprintf('\n=== 8. gain by self-feedback ===\n');
 % The default axis first: a bias run's job files carry no trace of the
 % option (the files of earlier runs must still match).
 first = load(fullfile(job_files(1).folder, job_files(1).name), 'job');
-n_fail = n_fail + report(isfield(first.job, 'bias') && ~isfield(first.job.signature, 'second_axis') ...
-    && ~isempty(regexp(job_files(1).name, '^job_g[\dp]+_b[\dp]+_s3001\.mat$', 'once')) ...
-    && strcmp(s.second_axis, 'S_c') && isequal(s.bias_levels, biases), ...
-    'the bias run: job field bias, file job_g*_b*_s*, no second_axis in the signature');
+want_job_fields = {'gain', 'bias', 'seed', 'seed_stim', 'conditions', 'signature', 'mc_total', ...
+    'horizon', 'R2_delay', 'lle_input', 'lle_noinput', 'rate_E', 'rate_I', 'frac_pinned', ...
+    'frac_silent', 'seconds', 'failed', 'message'};
+want_sig_fields = {'preset_name', 'protocol', 'ode_solver', 'model_args', 'lya', 'conditions'};
+n_fail = n_fail + report(isequal(fieldnames(first.job)', want_job_fields) ...
+    && isequal(fieldnames(first.job.signature)', want_sig_fields) ...
+    && all(~cellfun(@isempty, regexp({job_files.name}, '^job_g[\dp]+_b[\dp]+_s3001\.mat$', 'once'))) ...
+    && strcmp(s.second_axis, 'S_c') && strcmp(s.first_axis, 'level_of_chaos') ...
+    && isequal(s.bias_levels, biases) && isequal(s.gain_levels, gains), ...
+    ['the default run: job fields gain, bias, ... in their order, files job_g*_b*_s*, ' ...
+     'a signature with neither first_axis nor second_axis']);
 
 ks = [0 1];
 tmp8 = fullfile(tmp, 'selffb');
@@ -308,6 +337,171 @@ n_fail = n_fail + report( ...
     && ~isfolder(fullfile(tmp, 'never')), ...
     'no levels, bias_levels on another axis, both level options, an unknown or reserved property: refused');
 
+%% ---- 9. the first axis is the caller's: self-coupling by bias, no gain axis ----
+fprintf('\n=== 9. self-coupling by bias (no gain axis) ===\n');
+ss = [-1 1];
+tmp9 = fullfile(tmp, 'selfc_bias');
+[out9, f9] = run_mc_gain_sweep(common{:}, 'first_axis', 'self_coupling', 'first_levels', ss, ...
+    'bias_levels', biases, 'output_dir', tmp9);
+L9 = load(f9);
+T9 = L9.T;  s9 = L9.settings;
+files9 = dir(fullfile(out9, 'jobs', 'job_*.mat'));
+job9 = load(fullfile(files9(1).folder, files9(1).name), 'job');
+n_fail = n_fail + report(isequal(T9.Properties.VariableNames, strrep(want_cols, 'gain', 'self_coupling')) ...
+    && height(T9) == 8 && ~any(T9.failed) && isequal(unique(T9.self_coupling)', ss) ...
+    && isequal(unique(T9.bias)', biases) && numel(files9) == 4 ...
+    && all(~cellfun(@isempty, regexp({files9.name}, '^job_self_coupling[\dpm]+_b[\dp]+_s3001\.mat$', 'once'))) ...
+    && isequal(fieldnames(job9.job)', strrep(want_job_fields, 'gain', 'self_coupling')) ...
+    && strcmp(job9.job.signature.first_axis, 'self_coupling') && ~isfield(job9.job.signature, 'second_axis'), ...
+    ['2 s x 2 biases x 1 seed x 2 conditions: column, job field and files named self_coupling; ' ...
+     'the signature names first_axis only']);
+n_fail = n_fail + report(strcmp(s9.first_axis, 'self_coupling') && isequal(s9.self_coupling_levels, ss) ...
+    && s9.preset_self_coupling == 0 && isequal(s9.bias_levels, biases) && s9.preset_bias == 0.2 ...
+    && ~isfield(s9, 'gain_levels') && ~isfield(s9, 'preset_gain'), ...
+    'settings: first_axis, self_coupling_levels, preset_self_coupling 0, the bias as before, no gain');
+
+% The values reached the model, the gain stayed the preset's, and the
+% conditions are paired: each row equals a reservoir built by hand with
+% self_coupling = 1 and S_c = 0.1 and no level_of_chaos, on the same drawn W.
+W_drawn = cell(1, numel(conds));
+paired = true;
+for c = 1:numel(conds)
+    cond = conditions{strcmp(names, conds{c})};
+    esn = hand_built(d, cond, seed, model_args, protocol, P, {'self_coupling', ss(2), 'S_c', biases(1)});
+    esn.build();
+    W_drawn{c} = esn.W;
+    paired = paired && esn.level_of_chaos == 1;
+    [mc_ref, r2_ref] = esn.run_memory_capacity('readout_signal', P.readout_signal, ...
+        'store_timeseries', false, 'verbose', false);
+    row = T9(T9.self_coupling == ss(2) & T9.bias == biases(1) & strcmp(T9.condition, conds{c}), :);
+    paired = paired && height(row) == 1 && isequal(row.R2_delay, r2_ref(:)') && row.mc_total == mc_ref;
+end
+paired = paired && isequal(W_drawn{1}, W_drawn{2});
+at9 = @(v) T9.mc_total(T9.self_coupling == v & T9.bias == biases(1));
+n_fail = n_fail + report(paired && ~isequal(at9(ss(1)), at9(ss(2))), ...
+    's = 1, S_c = 0.1: each condition is the hand-built reservoir at the preset''s gain, same W; s = -1 differs');
+
+% Readers, wording, statistics and figures take the first axis from the result.
+D9 = read_mc_gain_sweep(f9);
+D9j = read_mc_gain_sweep_jobs(tmp9);
+key9 = {'self_coupling', 'bias', 'seed', 'condition'};
+Q9 = mc_sweep_quantity('self_coupling', D9);
+n_fail = n_fail + report(strcmp(D9.first_axis.property, 'self_coupling') && isequal(D9.first_levels, ss) ...
+    && D9.preset_first == 0 && ~isfield(D9, 'gains') && ~isfield(D9, 'preset_gain') ...
+    && isequal(D9.biases, biases) && isequaln(sortrows(D9j.T, key9), sortrows(D9.T, key9)) ...
+    && D9j.preset_first == 0 && strcmp(D9j.first_axis.column, 'self_coupling') ...
+    && strcmp(Q9.label, 'self-coupling s (R_W)') && strcmp(Q9.scale, 'linear') && isequal(Q9.levels, ss) ...
+    && strcmp(error_id(@() mc_sweep_quantity('gain', D9)), 'mc_sweep_quantity:NotInResult'), ...
+    'both readers and mc_sweep_quantity: first axis self-coupling s (R_W), linear, no gain in this result');
+fig_dir9 = fullfile(tmp, 'selfc_bias_figs');
+drawn9 = make_block_C_figures(f9, fig_dir9, 'sets', {'both', conds}, 'reference', conds{2}, ...
+    'verbose', 'near-none');
+S9 = drawn9.both.S;
+md9 = fileread(fullfile(fig_dir9, 'both', 'MC_gain_bias_statistics.md'));
+n_fail = n_fail + report(all(cellfun(@(f) exist(f, 'file') == 2, drawn9.both.files)) ...
+    && any(endsWith(drawn9.both.files, '_by_self_coupling.csv')) && any(endsWith(drawn9.both.files, '_by_bias.csv')) ...
+    && all(ismember({'peak_self_coupling', 'peak_bias', 'self_coupling_range_fitbias', ...
+        'bias_range_presetself_coupling', 'fit_center_self_coupling', 'fit_fwhm', 'width_used_range'}, ...
+        S9.Properties.VariableNames)) ...
+    && ~any(contains(S9.Properties.VariableNames, {'gain', 'oct', 'log10'})) ...
+    && contains(md9, 'across self-coupling and bias') && ~contains(md9, 'octaves') ...
+    && ~contains(md9, 'log10') && ~contains(md9, '| at gain'), ...
+    'make_block_C_figures draws the set; the statistics name the self-coupling, in R_W, never the gain or octaves');
+[x_labels, titles9] = axis_texts(fig_mc_gain_bias_maps('data', D9, 'save', false, 'visible', false));
+[x_curves, t_curves] = axis_texts(fig_mc_gain_curves('data', D9, 'save', false, 'visible', false));
+n_fail = n_fail + report(any(strcmp(x_labels, 'Self-coupling s (R_W)')) && ~any(contains(x_labels, 'Gain')) ...
+    && any(contains(titles9, 'Star: preset (self-coupling 0, bias 0.2)')) ...
+    && any(strcmp(x_curves, 'Self-coupling s (R_W)')) ...
+    && any(contains(t_curves, 'along self-coupling at bias S_c = ')) ...
+    && any(contains(t_curves, 'the preset''s gain')), ...
+    'maps and curves: x reads "Self-coupling s (R_W)", the star and the slice say where they are');
+
+% Options that do not fit the first axis fail before any compute.
+other = [common, {'first_axis', 'self_coupling', 'bias_levels', biases, 'output_dir', fullfile(tmp, 'never9')}];
+n_fail = n_fail + report( ...
+    strcmp(error_id(@() run_mc_gain_sweep(other{:})), 'run_mc_gain_sweep:NoFirstLevels') ...
+    && strcmp(error_id(@() run_mc_gain_sweep(other{:}, 'gain_levels', gains)), 'run_mc_gain_sweep:GainLevelsOnOtherAxis') ...
+    && strcmp(error_id(@() run_mc_gain_sweep(common{:}, 'first_levels', gains, 'gain_levels', gains)), 'run_mc_gain_sweep:TwoLevelOptions') ...
+    && strcmp(error_id(@() run_mc_gain_sweep(common{:}, 'first_axis', 'rng_seeds', 'first_levels', 1)), 'run_mc_gain_sweep:BadFirstAxis') ...
+    && strcmp(error_id(@() run_mc_gain_sweep(common{:}, 'first_axis', 'S_c', 'first_levels', 1)), 'run_mc_gain_sweep:BadSecondAxis') ...
+    && strcmp(error_id(@() mc_gain_sweep_grid('fast', 'first_axis', 'self_coupling', 'gain_range', [0 1])), ...
+        'run_mc_gain_sweep:GainRangeOnOtherAxis') ...
+    && ~isfolder(fullfile(tmp, 'never9')), ...
+    'no levels, gain_levels on another axis, both level names, a reserved property, one property on both axes: refused');
+
+%% ---- 10. a noise level as an axis: gain by sigma_u_noise ----
+fprintf('\n=== 10. gain by sigma_u_noise ===\n');
+sigmas = [0 0.05];
+tmp10 = fullfile(tmp, 'gain_noise');
+[out10, f10] = run_mc_gain_sweep(common{:}, 'gain_levels', gains, 'second_axis', 'sigma_u_noise', ...
+    'second_levels', sigmas, 'output_dir', tmp10);
+L10 = load(f10);
+T10 = L10.T;  s10 = L10.settings;
+files10 = dir(fullfile(out10, 'jobs', 'job_*.mat'));
+n_fail = n_fail + report(isequal(T10.Properties.VariableNames, strrep(want_cols, 'bias', 'sigma_u_noise')) ...
+    && height(T10) == 8 && ~any(T10.failed) && isequal(unique(T10.sigma_u_noise)', sigmas) ...
+    && all(~cellfun(@isempty, regexp({files10.name}, '^job_g[\dp]+_sigma_u_noise[\dpe]+_s3001\.mat$', 'once'))) ...
+    && s10.preset_sigma_u_noise == 0 && isequal(s10.sigma_u_noise_levels, sigmas) && s10.preset_gain == 1, ...
+    '2 gains x 2 noise levels: column, files and settings named sigma_u_noise; the preset is noise-free');
+% Each job ran at its own noise level: the noisy row is the hand-built
+% reservoir with sigma_u_noise = 0.05 on the existing full-trajectory path
+% (the lean path reproduces it with noise too), and differs from sigma = 0.
+noisy = true;
+for c = 1:numel(conds)
+    cond = conditions{strcmp(names, conds{c})};
+    esn = hand_built(d, cond, seed, model_args, protocol, P, ...
+        {'level_of_chaos', gains(2), 'sigma_u_noise', sigmas(2)});
+    esn.build();
+    [mc_ref, r2_ref] = esn.run_memory_capacity('readout_signal', P.readout_signal, ...
+        'store_timeseries', false, 'verbose', false);
+    row = T10(T10.gain == gains(2) & T10.sigma_u_noise == sigmas(2) & strcmp(T10.condition, conds{c}), :);
+    quiet = T10(T10.gain == gains(2) & T10.sigma_u_noise == 0 & strcmp(T10.condition, conds{c}), :);
+    noisy = noisy && height(row) == 1 && isequal(row.R2_delay, r2_ref(:)') && row.mc_total == mc_ref ...
+        && row.mc_total ~= quiet.mc_total;
+end
+n_fail = n_fail + report(noisy, ...
+    'sigma_u = 0.05: each condition is the hand-built noisy reservoir, bit for bit, and differs from sigma_u = 0');
+D10 = read_mc_gain_sweep(f10);
+Q10 = mc_sweep_quantity('sigma_u_noise', D10);
+[y10, ~] = axis_texts(fig_mc_gain_bias_maps('data', D10, 'save', false, 'visible', false), 'YLabel');
+S10 = mc_gain_bias_statistics('data', D10, 'reference', conds{2}, 'verbose', 'near-none');
+n_fail = n_fail + report(strcmp(Q10.label, 'input noise \sigma_u') && isequal(D10.gains, gains) ...
+    && any(contains(y10, 'Input noise \sigma_u')) && height(S10) == numel(conds) ...
+    && all(ismember({'peak_gain', 'peak_sigma_u_noise', 'gain_oct_fitsigma_u_noise'}, S10.Properties.VariableNames)), ...
+    'the maps'' y axis reads "Input noise \sigma_u"; the statistics key on sigma_u_noise beside the gain');
+% The noise is checked against the integrator at every level, before any
+% compute: rk4 is legal at sigma 0 and refused at 0.05.
+never10 = fullfile(tmp, 'never10');
+[id10, msg10] = error_id(@() run_mc_gain_sweep(common{:}, 'gain_levels', gains, 'second_axis', 'sigma_u_noise', ...
+    'second_levels', sigmas, 'ode_solver', 'rk4', 'output_dir', never10));
+n_fail = n_fail + report(strcmp(id10, 'run_mc_gain_sweep:BadJobModel') && contains(msg10, 'sigma_u_noise 0.05') ...
+    && ~isfolder(never10), ...
+    'with rk4 the job at sigma_u_noise 0.05 is refused by name before any compute, and no folder is made');
+
+%% ---- 11. a bundle's stage plans a grid with no gain axis ----
+fprintf('\n=== 11. the stage plan ===\n');
+grid_c = struct('tag', 'selfc_noise', 'first_axis', 'self_coupling', 'first_range', [-2 2], ...
+    'second_axis', 'sigma_u_noise', 'second_range', [0 0.04]);
+cfg11 = struct('mc_preset', preset_name, 'run_mode', 'essential', 'verbose', 'near-none', ...
+    'mc_gain_sweep', struct('grids', grid_c));
+pl = mc_gain_sweep_stage_plan(cfg11);
+a11 = pl.runs(1).args;
+val = @(name) a11{find(strcmp(a11(1:2:end), name)) * 2};
+n_fail = n_fail + report(isscalar(pl.runs) && strcmp(val('first_axis'), 'self_coupling') ...
+    && isequal(val('first_levels'), [-2 0 2]) && strcmp(val('second_axis'), 'sigma_u_noise') ...
+    && isequal(val('second_levels'), [0 0.02 0.04]) && ~any(strcmp(a11(1:2:end), 'gain_levels')) ...
+    && pl.runs(1).n_jobs == 9 && strcmp(pl.runs(1).folder, 'mc_gain_sweep_selfc_noise'), ...
+    'self_coupling x sigma_u_noise at essential: 3 x 3 linear levels, passed as first_levels / second_levels, no gain');
+bad11 = cfg11;
+bad11.mc_gain_sweep.grids.gain_levels = [1 2];
+default11 = cfg11;
+default11.mc_gain_sweep.grids = struct('tag', 'bias');
+pl_default = mc_gain_sweep_stage_plan(default11);
+ad = pl_default.runs(1).args;
+n_fail = n_fail + report(strcmp(error_id(@() mc_gain_sweep_stage_plan(bad11)), 'mc_gain_sweep_stage_plan:BadConfig') ...
+    && any(strcmp(ad(1:2:end), 'gain_levels')) && any(strcmp(ad(1:2:end), 'bias_levels')), ...
+    'gain_levels on a self-coupling axis is refused; a default grid still passes gain_levels and bias_levels');
+
 %% ---- Verdict ----
 fprintf('\n');
 if n_fail == 0
@@ -317,13 +511,40 @@ else
 end
 
 %% ---- helpers ----
-function id = error_id(fn)
-id = '';
+function [id, msg] = error_id(fn)
+id = ''; msg = '';
 try
     fn();
 catch ME
     id = ME.identifier;
+    msg = ME.message;
 end
+end
+
+function esn = hand_built(d, cond, seed, model_args, protocol, P, swept)
+% A reservoir built by hand as a job builds it: seeds, the preset, the
+% overrides, the protocol, the condition, then the swept values.
+fs = P.fs;
+cond_args = struct2namevalue(rmfield(cond, 'name'));
+preset_args = struct2namevalue(d);
+esn = SRNN_ESN_reservoir('rng_seeds', [seed, seed + 1000], preset_args{:}, model_args{:}, ...
+    'fs', fs, 'ode_solver', 'sra1', 'input_type', P.input_type, 'T_hold', P.T_hold, ...
+    'T_wash', protocol.T_wash_sec * fs, 'T_train', protocol.T_train_sec * fs, ...
+    'T_test', protocol.T_test_sec * fs, 'd_max', protocol.d_max_sec * fs, ...
+    cond_args{:}, swept{:}, 'verbose', 'near-none');
+end
+
+function [labels, titles] = axis_texts(fig_out, which)
+% The x labels (or which = 'YLabel') of every axes of a figure, and every
+% title text in it (axes and layout titles), as cellstr; the figure closed.
+if nargin < 2; which = 'XLabel'; end
+ax = findobj(fig_out.figs, 'Type', 'axes');
+labels = arrayfun(@(a) strjoin(cellstr(a.(which).String), ' | '), ax, 'UniformOutput', false);
+t = [findobj(fig_out.figs, 'Type', 'text'); arrayfun(@(a) a.Title, ax)];
+layouts = findobj(fig_out.figs, 'Type', 'tiledlayout');
+t = [t; arrayfun(@(l) l.Title, layouts)];
+titles = arrayfun(@(h) strjoin(cellstr(h.String), ' | '), t, 'UniformOutput', false);
+close(fig_out.figs);
 end
 
 function failed = report(ok, label)
