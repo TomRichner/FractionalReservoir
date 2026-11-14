@@ -1174,3 +1174,21 @@ becomes an issue with an acceptance test.
   but not memory; adaptation's slow, rate-dependent feedback buys both.
   One seed: a first look. Small open item: the scatter's size legend lacks
   "(R_W)".
+
+### FD-025 Block C in the essential, fast and medium runs
+
+- **Status:** in progress (Tom, 2026-11-13 evening). Build: `matlab-fable-1`;
+  then the lead merges, an Opus worker makes an `essential` run of A + C,
+  the lead reviews it, and an Opus worker makes a `fast` run.
+- **Tom's decisions:** both grids in every mode, gain by bias (gains
+  log-spaced) and gain by self-coupling (gains linear, s from -4 to 4);
+  sizes essential 3 x 3 x 1 network, fast 7 x 7 x 3, medium 13 x 13 x 10;
+  the E:I networks along gain for the gain curves; figures: linear-scale
+  maps for both grids, gain curves without the third column, robustness,
+  memory capacity against lambda_1 from the self-coupling grid, the free
+  exploration scatters, statistics. Block B stays out. The figure choices
+  are in the manuscript repo's `docs/final_draft/Figure_plan.md`.
+- **Lead's reading, to confirm with Tom:** "I don't care for the third
+  column. We should keep that in" is read as keep the gain curves, drop
+  their third column.
+- **Result:** _(pending)_
