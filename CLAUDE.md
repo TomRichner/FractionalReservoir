@@ -202,7 +202,10 @@ asleep stops all progress for hours, and he does not want that. So:
   a tolerance or replace a reference on their own (they report, the lead
   decides); a reference is replaced only deliberately, with the reason
   in the commit;
-  nothing is pushed; the scope is Plan A as written, and work the lead
+  the lead pushes this repo's `main` to origin after a reviewed merge
+  whose gates passed (Tom, 2026-11-13: he is the only one working on it;
+  never a force-push, never a worker branch; the manuscript repo only
+  when Tom says); the scope is Plan A as written, and work the lead
   would like to add beyond it is noted in `ISSUES.md` or the worklog as a
   suggestion, not done.
 - Decisions that record what the paper will say (parameter values,
