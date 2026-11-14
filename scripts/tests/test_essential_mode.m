@@ -218,7 +218,7 @@ assert(isequal(table_names, all_stages(2:end)), 'run_all_paper_analyses'' stage 
 % function that exist.
 [~, ~, opt_in] = paper_stage_names();
 registry = paper_opt_in_stages();
-assert(isequal(opt_in, {registry.name}) && isequal(opt_in, {'mc_gain_sweep'}));
+assert(isequal(opt_in, {registry.name}) && isequal(opt_in, {'mc_gain_sweep', 'noise_switch'}));
 assert(isempty(intersect(opt_in, all_stages)), 'an opt-in stage must not also be in the first list');
 for k = 1:numel(registry)
     assert(exist(func2str(registry(k).plan), 'file') == 2 && exist(func2str(registry(k).run), 'file') == 2, ...

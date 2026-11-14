@@ -24,8 +24,11 @@
 %   5. The form with one unnamed grid still plans as it did (the main run
 %      into the run directory, variants into mc_gain_sweep_<tag>); bad
 %      settings are refused before the run directory exists.
-%   6. mu7chain_AC_config: block A's stages then block C's, both registries,
-%      its own directories, the grouped figures pointed at its figure root.
+%   6. mu7chain_AC_config: block A's stages then block C's, then the
+%      opt-in 'noise_switch' (which neither part runs); both registries and
+%      the noise-switch entry; its own directories; the grouped figures
+%      pointed at its figure root. (The noise-switch stage's size table and
+%      its end-to-end run are test_noise_switch_stage.)
 %   7. END TO END on a tiny case: run_all_paper_analyses on the bundle
 %      ('essential', 3cond) with a 50-neuron network, the shortened protocol
 %      of test_mc_gain_sweep, 2 x 2 levels per grid, one seed and three
@@ -64,7 +67,7 @@ end
 
 %% 2. The opt-in stage runs only when named
 [st, ~, opt_in] = paper_stage_names();
-assert(isequal(st, all10) && isequal(opt_in, {'mc_gain_sweep'}));
+assert(isequal(st, all10) && isequal(opt_in, {'mc_gain_sweep', 'noise_switch'}));
 pl = paper_stage_plan(struct('illustrations', true, 'stages', {{'mc_gain_sweep', 'dc_lle'}}));
 assert(isequal(pl.stages, {'dc_lle', 'mc_gain_sweep'}), 'opt-in stages run after the first list');
 assert(isequal(pl.stages_skipped, setdiff(all10, {'dc_lle'}, 'stable')) && pl.runs.mc_gain_sweep);
@@ -230,8 +233,10 @@ for md = {'essential', 'fast'}
         C = mu7chain_gainbias_config(md{1}, fs{1});
         pl = paper_stage_plan(ac);
         if strcmp(md{1}, 'essential'); stages_A = ess_stages; else; stages_A = all10; end
-        assert(isequal(pl.stages, [stages_A, {'mc_gain_sweep'}]), ...
-            '%s: block A''s stages, then block C''s', md{1});
+        assert(isequal(pl.stages, [stages_A, {'mc_gain_sweep', 'noise_switch'}]), ...
+            '%s: block A''s stages, then block C''s, then the noise switch', md{1});
+        assert(pl.runs.noise_switch && ~ismember('noise_switch', [paper_stage_plan(A).stages, ...
+            paper_stage_plan(C).stages]), 'only the A + C bundle runs the noise switch');
         pl_A = paper_stage_plan(A);
         assert(isequal(pl.sweeps, pl_A.sweeps) && isequal(pl.stages_skipped, pl_A.stages_skipped));
         assert(isequal(mc_gain_sweep_stage_plan(ac), mc_gain_sweep_stage_plan(C)), ...
@@ -239,8 +244,16 @@ for md = {'essential', 'fast'}
         assert(strcmp(ac.run_dir, ['data/mu7chain_AC_' md{1}]) && ...
             strcmp(ac.fig_root, ['figs/mu7chain_AC_' md{1} '_' fs{1}]));
         names = cellfun(@(f) f.name, ac.figures, 'UniformOutput', false);
-        assert(isequal(names, [cellfun(@(f) f.name, A.figures, 'UniformOutput', false), entry_names]) && ...
-            numel(unique(names)) == numel(names), 'block A''s entries, then block C''s');
+        assert(isequal(names, [cellfun(@(f) f.name, A.figures, 'UniformOutput', false), entry_names, ...
+            {'fig_noise_switch_rollouts'}]) && numel(unique(names)) == numel(names), ...
+            'block A''s entries, then block C''s, then the noise switch''s');
+        ns = ac.figures{end};
+        assert(isequal(ns.fn, @fig_noise_switch_rollouts) && isempty(ns.args) && ~ns.in_paper, ...
+            'the noise-switch entry draws through fig_noise_switch_rollouts with the bundle''s arguments only');
+        ns_plan = noise_switch_stage_plan(ac);
+        assert(strcmp(ns_plan.folder, 'noise_switch') && strcmp(arg(ns_plan.args, 'preset_name'), ac.preset_name) && ...
+            isequal(ns_plan.conditions, conds4), ...
+            'the noise switch runs the bundle''s noisy preset, every condition, into noise_switch/');
         grouped = ac.figures(startsWith(names, 'fig_main'));
         assert(~isempty(grouped) && all(cellfun(@(f) strcmp(arg(f.args, 'source_fig_root'), ac.fig_root), grouped)), ...
             'the grouped figures read their sources from this bundle''s figure root');
