@@ -12,7 +12,8 @@ function [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %
 %   run_dir   data/mu7chain_AC_<run_mode>: block A's stage folders, and
 %             block C's mc_gain_sweep_bias/, mc_gain_sweep_selfcoupling/,
-%             mc_gain_sweep_bias_EI3to2/ and mc_gain_sweep_bias_EI2to3/
+%             mc_gain_sweep_bias_EI3to2/ and mc_gain_sweep_bias_EI2to3/,
+%             and the noise-switch rollouts' noise_switch/
 %   figures   figs/mu7chain_AC_<run_mode>_3cond   (no adaptation, 1TS, chained MTS: the paper's)
 %             figs/mu7chain_AC_<run_mode>_4cond   (the same plus product MTS: for review)
 %             'essential' draws the four-condition set alone (cfg.figure_sets)

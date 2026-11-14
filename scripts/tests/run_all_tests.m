@@ -143,6 +143,7 @@ function names = slow_test_names()
         'test_sweep_figures_conditions'     %  66 s  the sweep figures with a selection of conditions; needs the same regression run
         'test_RMTBlocks_predictions'        %  37 s  eigenvalue statistics over many draws
         'test_eig_heatmap_stage'            %  33 s  analysis stage + three figures
+        'test_noise_switch_stage'           %  73 s  the noise-switch stage end to end through both entry points (figure pass 54 s of it, 4 workers)
         };
 end
 
