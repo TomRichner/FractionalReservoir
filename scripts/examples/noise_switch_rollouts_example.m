@@ -7,7 +7,7 @@
 % on 4 pool workers; without a pool the copies run serially in the client.
 % Give the session a pool first if one is wanted: pool_set(N).
 %
-% Output: data/noise_switch_rollouts/noise_switch_rollouts_data.mat and
+% Output: data/noise_switch/noise_switch_rollouts_data.mat and
 % figs/noise_switch_rollouts/ (one time-series figure per condition, the
 % summary figure and its table), both under the project root.
 %

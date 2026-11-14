@@ -6,8 +6,10 @@ function out = fig_noise_switch_rollouts(cfg)
 %
 % Draws what run_noise_switch_rollouts saved: copies of one network that see
 % the identical Wiener path up to a switch time and independent noise seeds
-% after it. It reads one run directory (<run_dir>/noise_switch_rollouts/)
-% or the file given, and simulates nothing.
+% after it. It reads one run directory (<run_dir>/noise_switch/, where the
+% opt-in stage 'noise_switch' of run_all_paper_analyses writes, and where
+% run_noise_switch_rollouts writes under data/ when run on its own) or the
+% file given, errors when neither holds it, and simulates nothing.
 %
 % ONE TIME-SERIES FIGURE PER CONDITION, tag
 % Fig_noise_switch_timeseries_<condition>_copies. Rows: x, r, the synaptic
@@ -66,7 +68,7 @@ out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 st      = manuscript_style();
 
 data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
-    {fullfile(cfg.run_dir, 'noise_switch_rollouts')}, ...
+    {fullfile(cfg.run_dir, 'noise_switch')}, ...
     'noise_switch_rollouts_data.mat', 'Run run_noise_switch_rollouts first');
 D = load(data_file);
 [~, idx] = select_conditions({D.results.name}, cfg.conditions);

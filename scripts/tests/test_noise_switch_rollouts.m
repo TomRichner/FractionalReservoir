@@ -37,7 +37,7 @@ t_shared = 2; t_rollout = 1; M = 3;
 run_dir = fullfile(tempdir, 'noise_switch_rollouts_test');
 if exist(run_dir, 'dir'), rmdir(run_dir, 's'); end
 mkdir(run_dir);
-stage_dir = fullfile(run_dir, 'noise_switch_rollouts');
+stage_dir = fullfile(run_dir, 'noise_switch');       % where the figure looks
 
 evalc(['d = run_noise_switch_rollouts(''preset_name'', P, ''conditions'', conds, ' ...
     '''t_shared'', t_shared, ''t_rollout'', t_rollout, ''n_copies'', M, ''n_show_E'', 5, ' ...

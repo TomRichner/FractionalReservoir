@@ -77,7 +77,9 @@ function out_dir = run_noise_switch_rollouts(cfg)
 % every block, and the full state vector at the switch time) and that
 % they differ afterwards.
 %
-% THE FILE, <out_dir>/noise_switch_rollouts_data.mat: settings, cond_names
+% THE FILE, <out_dir>/noise_switch_rollouts_data.mat (out_dir defaults to
+% data/noise_switch; in a bundle it is <run_dir>/noise_switch, written by the
+% opt-in stage 'noise_switch', run_noise_switch_stage): settings, cond_names
 % and results, one element per condition (name, title, lambda_1, t,
 % blocks, block_labels, stats.<block>, example). Statistics are stored at
 % cfg.store_fs (default 200 Hz: every other sample of a 400 Hz run, plain
@@ -164,7 +166,9 @@ store_fs     = P.fs / P.store_deci;
 example_deci = whole_ratio(store_fs, cfg.example_fs, 'example_fs');
 
 if isempty(cfg.out_dir)
-    out_dir = fullfile(project_root, 'data', 'noise_switch_rollouts');
+    % <run_dir>/noise_switch with run_dir = data/: the folder the bundle's
+    % stage (run_noise_switch_stage) writes and fig_noise_switch_rollouts reads.
+    out_dir = fullfile(project_root, 'data', 'noise_switch');
 else
     out_dir = cfg.out_dir;
 end
