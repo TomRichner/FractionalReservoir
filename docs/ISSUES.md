@@ -1188,7 +1188,7 @@ becomes an issue with an acceptance test.
   memory capacity against lambda_1 from the self-coupling grid, the free
   exploration scatters, statistics. Block B stays out. The figure choices
   are in the manuscript repo's `docs/final_draft/Figure_plan.md`.
-- **Lead's reading, to confirm with Tom:** "I don't care for the third
+- **Confirmed by Tom (2026-11-13):** "I don't care for the third
   column. We should keep that in" is read as keep the gain curves, drop
   their third column.
 - **Result:** _(pending)_
