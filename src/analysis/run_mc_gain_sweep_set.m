@@ -222,6 +222,16 @@ J.axis1 = axis1;
 J.axis2 = axis2;
 J.verbose = opts.verbose;
 
+%% Every model of the run is valid -- before any compute or any folder
+% Each grid point's model, in every condition, constructed with the
+% point's own values on both axes: the constructor validates the model
+% (among other things its noise against the integrator), so an axis that
+% changes what is legal -- a noise level, say -- is checked at every level
+% it takes, not once at the preset's. Seed-independent, so the first seed
+% stands for all; a few ms a model.
+[P1, P2] = ndgrid(first_levels, second_levels);
+check_job_models(J, struct('first', num2cell(P1(:)), 'second', num2cell(P2(:)), 'seed', seeds(1)));
+
 %% Output directory
 project_root = fileparts(which('setup_paths'));
 if isempty(opts.output_dir)
@@ -250,7 +260,7 @@ for k = 1:n_jobs
         if ~isequaln(old.job.signature, J.signature)
             error('run_mc_gain_sweep:DifferentRun', ...
                 ['%s was made with a different preset, protocol, integrator, conditions, ' ...
-                 'second axis or model override. Use another output_dir; results are not mixed.'], job_files{k});
+                 'axes or model override. Use another output_dir; results are not mixed.'], job_files{k});
         end
         todo(k) = opts.retry_failed && any(old.job.failed);
     end
@@ -259,17 +269,6 @@ vprintf(opts.verbose, 'minimal', ...
     '[mc_gain_sweep] preset=%s run_mode=%s: %d %s x %d %s levels x %d seeds = %d jobs x %d conditions (%d already done)\n', ...
     opts.preset_name, opts.run_mode, numel(first_levels), axis1.column, numel(second_levels), axis2.column, ...
     numel(seeds), n_jobs, n_cond, nnz(~todo));
-
-%% Every model of the run is valid, before any compute
-% Each grid point's model, in every condition, constructed with the job's
-% own values on both axes: the constructor validates the model (among
-% other things its noise against the integrator), so an axis that changes
-% what is legal -- a noise level, say -- is checked at every level it
-% takes, not once at the preset's. Seed-independent, so the first seed
-% stands for all; a few ms a model.
-if any(todo)
-    check_job_models(J, jobs([jobs.seed] == seeds(1)));
-end
 
 %% Fairness check, once: the first job's conditions share their build
 if any(todo) && n_cond > 1
