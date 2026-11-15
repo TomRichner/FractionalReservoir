@@ -106,7 +106,9 @@ function model = route_model(name)
 %                              and the amount released, npre x 1.
 %   dTheta = released(s_after, dRc, P)
 %                              The same amount, from the state AFTER the
-%                              kick and dRc.
+%                              kick and dRc. Also for nt steps at once:
+%                              s_after npre x ns x nt, dRc npre x 1 x nt,
+%                              dTheta npre x 1 x nt.
 % In `depression`, `facilitation`, `output` and `steady_state` the arrays
 % have ONE ROW PER PRESYNAPTIC NEURON OF THE ROUTE (npre rows) whenever
 % P.jittered: a parameter is then indexed by row.
