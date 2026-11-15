@@ -229,7 +229,16 @@ function tf = preset_is_stochastic(p)
 % seen here and would get the deterministic solver -- that fails safe, since
 % ParamSpaceAnalysis2.validate_noise_settings rejects the pairing before the
 % output directory is created, but it is not handled.
-tf = isstruct(p) && isfield(p, 'sigma_u_noise') && any(p.sigma_u_noise(:) > 0);
+%
+% Noise is on when EITHER source is on: the Wiener term (sigma_u_noise) or
+% the release noise of SRNNCellTypePairs (release_sigma, or its scalar
+% alias release_sigma_all). A release RATE alone is a leak in the drift,
+% not noise.
+tf = false;
+if ~isstruct(p), return; end
+for name = {'sigma_u_noise', 'release_sigma', 'release_sigma_all'}
+    tf = tf || (isfield(p, name{1}) && isnumeric(p.(name{1})) && any(p.(name{1})(:) > 0));
+end
 end
 
 function cfg = pack(n_levels, n_reps, ode_solver, fs, T_range, lya_T_interval, sde_solver)

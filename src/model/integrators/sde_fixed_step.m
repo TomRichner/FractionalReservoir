@@ -60,6 +60,21 @@ function [t, Y] = sde_fixed_step(odefun, tspan, y0, ~, noise, scheme)
 %   one common noise path, the additive noise cancels in their difference to
 %   first order, and the Benettin estimate stays valid at any noise level.
 %
+%   A KICK AFTER EACH STEP (opt-in). A noise struct may also carry
+%     .kick        a handle, y = kick(y, j): applied to the state after the
+%                  whole step j of the scheme, the final Wiener update
+%                  included, and never inside a stage. j is the ABSOLUTE
+%                  step, the same index that addresses the columns of xi1.
+%     .kick_steps  how many steps the kick can be asked for (1..kick_steps).
+%   It is how a noise that is not an additive Wiener term enters: the
+%   release noise of SRNNCellTypePairs, whose kick depends on the state
+%   (SRNNCellTypePairs.release_kick). The scheme's order statement above is
+%   for the Wiener part; a kick is first order in the step. With a kick
+%   and sigma = 0 the struct needs only sigma, t0 and fs beside them (no
+%   xi1, xi2, idx): the Wiener term and the kick are switched on
+%   separately, and noise is "on" when either is. Without the field this
+%   function is what it was.
+%
 %   See also ODE_RK4, SRNNMODEL2.
 
     if numel(tspan) < 3
@@ -102,12 +117,25 @@ function [t, Y] = sde_fixed_step(odefun, tspan, y0, ~, noise, scheme)
         end
     end
 
+    has_kick = ~isempty(noise) && isfield(noise, 'kick') && ~isempty(noise.kick);
+    if has_kick
+        sde_fixed_step_check_kick(noise, t);
+        i0   = round((t(1) - noise.t0) * noise.fs) + 1;
+        last = i0 + nt - 2;
+        if i0 < 1 || last > noise.kick_steps
+            error('sde_fixed_step:NoiseOutOfRange', ...
+                ['tspan [%g, %g] needs the kicks of steps %d..%d, but they ' ...
+                 'start at t0 = %g and cover %d steps.'], ...
+                t(1), t(end), i0, last, noise.t0, noise.kick_steps);
+        end
+    end
+
     dW = 0; dZ = 0;
     for k = 1:nt-1
         h  = t(k+1) - t(k);
         tk = t(k);
+        j  = i0 + k - 1;
         if has_noise
-            j  = i0 + k - 1;
             rh = sqrt(h);
             dW = (s * rh) * noise.xi1(:, j);
             dZ = (s * rh) * noise.xi2(:, j);
@@ -139,7 +167,34 @@ function [t, Y] = sde_fixed_step(odefun, tspan, y0, ~, noise, scheme)
                 if has_noise, y(idx) = y(idx) + dW; end
         end
 
+        if has_kick
+            y = noise.kick(y, j);
+        end
+
         Y(k+1, :) = y.';
+    end
+end
+
+function sde_fixed_step_check_kick(noise, t)
+% The kick's part of the noise struct, and the grid it is indexed on (the
+% check of the Wiener tensors below does the same for theirs).
+    required = {'kick_steps', 't0', 'fs'};
+    missing = required(~isfield(noise, required));
+    if ~isempty(missing)
+        error('sde_fixed_step:BadNoiseStruct', ...
+            'noise has a kick but is missing field(s): %s.', strjoin(missing, ', '));
+    end
+    if ~isa(noise.kick, 'function_handle')
+        error('sde_fixed_step:BadNoiseStruct', ...
+            'noise.kick must be a function handle, y = kick(y, j).');
+    end
+    dt_nominal = 1 / noise.fs;
+    dt_actual = diff(t);
+    if max(abs(dt_actual - dt_nominal)) > 1e-9 * dt_nominal
+        error('sde_fixed_step:GridMismatch', ...
+            ['tspan is not on the 1/fs = %g s grid the kicks were generated ' ...
+             'on (max deviation %.3g s). Kicks would be paired with the ' ...
+             'wrong steps.'], dt_nominal, max(abs(dt_actual - dt_nominal)));
     end
 end
 
