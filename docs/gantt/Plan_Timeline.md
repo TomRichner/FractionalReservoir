@@ -56,7 +56,15 @@ It is just to help the user estimate how the plan is shaping up."
     the medium run, 7 its figures). `C_3_U` is Tom's decision of
     2026-11-13 morning that made block C a quick test (FD-010, decision
     21); the main run's lost-login interruption, 03:48 to 08:11, is
-    left as a gap between bars, not drawn as working time. Block B's step 0 is its pilots and
+    left as a gap between bars, not drawn as working time. The
+    follow-ons Tom asked for after block C's report continue its
+    numbering in the order they were taken up: 8 the explorations and
+    the lab-meeting report, 9 self-coupling (FD-024), 10 block C in the
+    A + C runs with their essential and fast runs (FD-025), 11 the
+    noise-switch rollouts (FD-026), 12 release noise (FD-027: the
+    plan's steps P1 to P3 and N1 to N3 are tasks `C_12_B1` to `C_12_T2`,
+    each name saying which, then the gate and the one essential run),
+    13 a fast run with the noise grids, if Tom starts one. Block B's step 0 is its pilots and
     their report; its later steps, and all of block D, are not planned in
     detail and are numbered 1, 2, ... in order.
   - *the medium run*: there is one, for blocks A, B and C together, drawn
@@ -128,7 +136,9 @@ of 15, for tasks not finished. For block A they are the lead's; where a
 duration is a guess (`guess = true`) the hover box and the bar say so.
 Block C's are the lead's (from Plan C and its measured
 pilot) up to Tom's review; blocks B and D, and the medium run, are
-guesses.
+guesses. The fast and medium runs with the noise grids are drawn from
+the run-time table in `src/analysis/mc_gain_sweep_grid.m` plus an
+allowance for block A, and are marked as guesses.
 
 **Estimate of record.** When a task starts, its estimate at that moment
 is copied into `estimate_of_record` (with `estimate_of_record_source`)
