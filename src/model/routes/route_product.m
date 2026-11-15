@@ -12,18 +12,25 @@ function model = route_product()
 % THE EQUATIONS, per presynaptic neuron with rate r. The state is
 % s = [b_1 .. b_M, g_1 .. g_L]:
 %
-%   db_m/dt = (1 - b_m)/tau_rec_m - b_m r/tau_rel_m           depression
+%   db_m/dt = (1 - b_m)/tau_rec_m - b_m rho/tau_rel_m         depression
 %   dg_l/dt = (1 - g_l)/tau_dec_l + (G_l - g_l) r/tau_fac_l   facilitation
 %
+% rho = r + r_s is the RELEASE DRIVE (route_model, "RELEASE NOISE"): the
+% rate plus the route's spontaneous release rate r_s (opts.release_rate;
+% 0 unless the model class's release_rate is set, and rho is then r to
+% the bit). Release empties the pools, so depression is driven by rho;
+% facilitation follows the rate alone.
+%
 % Both are the same equation: a variable that relaxes to 1 at rest, with
-% time constant tau_rest, and is driven by the rate toward a target, with
-% time constant tau_drive / r. The target is 0 for depression and the
-% ceiling G for facilitation:
+% time constant tau_rest, and is driven toward a target, with time
+% constant tau_drive / (its drive). The target is 0 for depression and
+% the ceiling G for facilitation:
 %
-%   ds_k/dt = (1 - s_k)/tau_rest_k + (target_k - s_k) r/tau_drive_k
+%   ds_k/dt = (1 - s_k)/tau_rest_k + (target_k - s_k) (r + leak_k)/tau_drive_k
 %
-% and that one line is what rhs evaluates. Nothing couples the components,
-% so the linearisation A = d(ds)/ds is diagonal.
+% with leak_k = r_s on the depression columns and 0 on the facilitation
+% columns, and that one line is what rhs evaluates. Nothing couples the
+% components, so the linearisation A = d(ds)/ds is diagonal.
 %
 % THE OUTPUT FACTOR is F = D * prod_l g_l, with the depression factor D
 % made from P_b = prod_m b_m in two optional steps:
@@ -37,6 +44,25 @@ function model = route_product()
 % Facilitation acts on the output only: g appears in no depression
 % equation. (Release-coupled facilitation is another model.)
 %
+% THE RELEASE KICK (route_model, "RELEASE NOISE"). A kick is an amount
+% dRc of release drive applied at once, at a fixed rate and facilitation.
+% Along it every pool obeys db_m/da = -b_m/tau_rel_m, so after the kick
+%   b_m -> b_m exp(-dRc/tau_rel_m)
+% exactly, and no pool can go negative whatever dRc is. The output factor
+% falls along the kick as F exp(-a/tau_e), with
+%   1/tau_e = sum_m 1/tau_rel_m           the product combine
+%   1/tau_e = (1/M) sum_m 1/tau_rel_m     the geometric mean
+% so the amount released along it is the integral of F da,
+%   dTheta = -F tau_e expm1(-dRc/tau_e)
+% (F the factor BEFORE the kick; F dRc to first order, and never more than
+% F tau_e). A route with no pool (M = 0) releases dTheta = F dRc and its
+% state does not move: that is the PASS-THROUGH route of a presynaptic
+% type with no synapse dynamics, F = 1 and dTheta = dRc. `released` is the
+% same amount from the state AFTER the kick, F_after tau_e expm1(dRc/tau_e).
+% The zero floor has no kick (the floor's map is not a pool, and a kick
+% can take the product below p_min): compile refuses the floor on a route
+% with depression and a release rate (<prefix>:ReleaseZeroFloor).
+%
 % CONFIGURATION (synapse_config.<pre>.<post>):
 %   std.tau_rec   1 x M positive   recovery time constants
 %   std.tau_rel   scalar or 1 x M  release time constants
@@ -49,6 +75,8 @@ function model = route_product()
 %   tau_rest   npre x ns   [tau_rec, tau_dec]
 %   tau_drive  npre x ns   [tau_rel, tau_fac]
 %   target     npre x ns   [zeros,   G]
+%   release    (route_model) .rate, the spontaneous release rate r_s, and
+%              .leak, 1 x ns: [r_s on the depression columns, zeros]
 %   geomean    logical: the geometric-mean combine is in force (M > 1)
 %   zero_floor logical: the zero floor is in force (M > 0)
 %   p_min      npre x 1: the floor's p_min ([] when M = 0)
@@ -92,6 +120,7 @@ model = struct('name', 'product', ...
     'compile', @compile, 'initial', @initial, 'rhs', @rhs, 'output', @output, ...
     'linearize', @linearize, 'steady_state', @steady_state, ...
     'depression', @depression_of_b, 'facilitation', @facilitation_of_g, ...
+    'release_drive', @release_drive, 'kick', @kick, 'released', @released, ...
     'combine', @combine, 'zero_floor', @zero_floor);
 end
 
@@ -100,8 +129,12 @@ end
 function P = compile(std_cfg, stf_cfg, opts)
 if nargin < 3, opts = struct(); end
 opts = fill_defaults(opts, struct('npre', 1, 'zero_floor', false, 'label', 'route', ...
-    'err_id_prefix', 'route_product', 'std_sigma', 0, 'stf_sigma', 0));
+    'err_id_prefix', 'route_product', 'std_sigma', 0, 'stf_sigma', 0, 'release_rate', 0));
 err_id = [opts.err_id_prefix ':InvalidSynapseConfig'];
+if ~(isnumeric(opts.release_rate) && isscalar(opts.release_rate) && ...
+        isfinite(opts.release_rate) && opts.release_rate >= 0)
+    error(err_id, 'release_rate on route %s must be a finite nonnegative scalar.', opts.label);
+end
 nominal = struct('tau_rec', [], 'tau_rel', [], 'tau_dec', [], 'tau_fac', [], 'G', [], ...
     'combine', 'product', 'zero_floor', logical(opts.zero_floor));
 
@@ -174,6 +207,18 @@ P.jittered = ~isempty(z_std) || ~isempty(z_stf);
 P.geomean = strcmp(nominal.combine, 'geomean') && P.n_b > 1;
 P.coupling = logical(eye(P.ns));      % no component's derivative depends on another
 
+% Spontaneous release (header: the release drive, the release kick). The
+% leak is on the depression columns only.
+if opts.zero_floor && P.n_b > 0 && opts.release_rate > 0
+    error([opts.err_id_prefix ':ReleaseZeroFloor'], ...
+        ['std_zero_floor cannot be used with spontaneous release (release_rate = %g on ' ...
+        'route %s). The floor maps the depression factor at the steady state of r = 1 ' ...
+        'to zero, and a release kick can take the factor below that value.'], ...
+        opts.release_rate, opts.label);
+end
+P.release = struct('rate', double(opts.release_rate), ...
+    'leak', [repmat(double(opts.release_rate), 1, P.n_b), zeros(1, P.n_g)]);
+
 % The floor's p_min: the depression factor, before the floor, at the
 % steady state of r = 1.
 P.zero_floor = false;
@@ -190,9 +235,10 @@ function s0 = initial(P)
 s0 = ones(1, P.ns);
 end
 
-function [ds, F] = rhs(s, r, P)
-ds = (1 - s) ./ P.tau_rest + ((P.target - s) .* r) ./ P.tau_drive;
+function [ds, F, drive] = rhs(s, r, P)
+ds = (1 - s) ./ P.tau_rest + ((P.target - s) .* (r + P.release.leak)) ./ P.tau_drive;
 F = output(s, P);
+drive = r + P.release.rate;
 end
 
 function F = output(s, P)
@@ -203,11 +249,12 @@ else
 end
 end
 
-function [A, B, F, Fs] = linearize(s, r, P)
+function [A, B, F, Fs, drive] = linearize(s, r, P)
 npre = size(s, 1);
 ns = P.ns;
+drive = r + P.release.rate;
 A = zeros(npre, ns * ns);
-A(:, 1:ns + 1:end) = -1 ./ P.tau_rest - r ./ P.tau_drive;    % the diagonal (m, m)
+A(:, 1:ns + 1:end) = -1 ./ P.tau_rest - (r + P.release.leak) ./ P.tau_drive;    % the diagonal (m, m)
 A = reshape(A, npre, ns, ns);
 B = (P.target - s) ./ P.tau_drive;
 
@@ -228,12 +275,56 @@ end
 end
 
 function ss = steady_state(r, P)
-% ds/dt = 0 at constant r: s = (1 + target k r) / (1 + k r), k = tau_rest/tau_drive.
-% Depression (target 0): 1/(1 + r tau_rec/tau_rel). Facilitation (target
-% G): (1 + G k r)/(1 + k r).
+% ds/dt = 0 at constant r: s = (1 + target k d) / (1 + k d), k = tau_rest/tau_drive
+% and d the column's drive. Depression (target 0, driven by the release
+% drive rho = r + r_s): 1/(1 + rho tau_rec/tau_rel). Facilitation (target
+% G, driven by the rate): (1 + G k r)/(1 + k r).
 k = P.tau_rest ./ P.tau_drive;
-ss.s = (1 + P.target .* k .* r) ./ (1 + k .* r);
+d = r + P.release.leak;
+ss.s = (1 + P.target .* k .* d) ./ (1 + k .* d);
 ss.F = output(ss.s, P);
+end
+
+%% Spontaneous release
+
+function drive = release_drive(r, P)
+%RELEASE_DRIVE The release drive rho = r + r_s, which multiplies the output
+% factor in the synaptic output: theta = F rho. r may be npre x nt.
+drive = r + P.release.rate;
+end
+
+function [s, dTheta] = kick(s, dRc, P)
+%KICK Apply the release-drive increment dRc (npre x 1) at once: the pools
+% by their exact solution, and the amount released along the way (header).
+F = output(s, P);
+if P.n_b == 0
+    dTheta = F .* dRc;                    % no pool: the factor does not move
+    return;
+end
+tau_e = kick_release_time(P);
+dTheta = -F .* tau_e .* expm1(-dRc ./ tau_e);
+s(:, 1:P.n_b) = s(:, 1:P.n_b) .* exp(-dRc ./ P.tau_drive(:, 1:P.n_b));
+end
+
+function dTheta = released(s_after, dRc, P)
+%RELEASED The amount kick released, from the state AFTER it and dRc.
+F = output(s_after, P);
+if P.n_b == 0
+    dTheta = F .* dRc;
+else
+    tau_e = kick_release_time(P);
+    dTheta = F .* tau_e .* expm1(dRc ./ tau_e);
+end
+end
+
+function tau_e = kick_release_time(P)
+% tau_e (header: the release kick), npre x 1, each neuron's own: the time
+% constant with which the output factor falls along a kick. For a route
+% with at least one pool.
+tau_e = 1 ./ sum(1 ./ P.tau_drive(:, 1:P.n_b), 2);
+if P.geomean
+    tau_e = P.n_b .* tau_e;
+end
 end
 
 %% The depression factor, and its two steps

@@ -28,7 +28,9 @@ function model = route_model(name)
 %          npre (default 1), label (the route's name in error messages,
 %          'E->I'), err_id_prefix (the class named in error identifiers),
 %          the per-neuron spread (std_sigma, std_z, stf_sigma, stf_z: see
-%          THE SPREAD below) and model options. P always has
+%          THE SPREAD below), release_rate (the presynaptic type's
+%          spontaneous release rate r_s, default 0: see RELEASE NOISE
+%          below) and model options. P always has
 %            model      the model's name
 %            n_b, n_g   columns of s that live in the state vector's
 %                       b-block and g-block, in that order (ns = n_b + n_g)
@@ -50,6 +52,9 @@ function model = route_model(name)
 %                       and not ns^2.
 %            jittered   logical: some per-neuron value of the route was
 %                       drawn (a spread is in force on it)
+%            release    a struct with the field rate, r_s
+%                       (opts.release_rate, a scalar); a model adds what
+%                       else its release terms read
 %          and the parameters the equations read, PER NEURON (npre x k):
 %          the nominal row replicated, or with a spread the drawn values.
 %          rhs, output, linearize and steady_state read those columns and
@@ -89,9 +94,52 @@ function model = route_model(name)
 %                              SRNNCellTypePairs.stf_route_factor, which
 %                              calls it for every model and returns []
 %                              itself for a route without facilitation.
+%   rho = release_drive(r, P)  The release drive (RELEASE NOISE below):
+%                              r + r_s. r npre x 1 or npre x nt. rhs and
+%                              linearize return it too, as a third and a
+%                              fifth output, [ds, F, rho] and
+%                              [A, B, F, Fs, rho], so the class's hot
+%                              functions make no extra call.
+%   [s, dTheta] = kick(s, dRc, P)
+%                              Apply an increment dRc (npre x 1) of the
+%                              release drive at once: the state after it,
+%                              and the amount released, npre x 1.
+%   dTheta = released(s_after, dRc, P)
+%                              The same amount, from the state AFTER the
+%                              kick and dRc.
 % In `depression`, `facilitation`, `output` and `steady_state` the arrays
 % have ONE ROW PER PRESYNAPTIC NEURON OF THE ROUTE (npre rows) whenever
 % P.jittered: a parameter is then indexed by row.
+%
+% RELEASE NOISE (FD-027; docs/Plan_release_noise.md). A presynaptic neuron
+% can release spontaneously: over a step dt its release drive is
+% r dt + dR, with dR >= 0 a gamma increment of mean r_s dt and variance
+% sigma_gamma^2 dt that does not depend on the state (release_increments;
+% SRNNCellTypePairs.release_rate and release_sigma, by presynaptic type).
+% Wherever a route's equations use the rate to drive RELEASE (the synaptic
+% output, and the depletion of its pools) they use that drive; what
+% follows the rate itself (facilitation, a calcium trace, and SFA in the
+% class) does not. It reaches a route in two parts.
+%   THE MEAN, in the drift. opts.release_rate is r_s (default 0) and the
+%     RELEASE DRIVE is rho = r + r_s: a steady leak. A model's rhs,
+%     linearize and steady_state use rho in the depletion terms of its
+%     pools, and the class forms the synaptic output as theta = F rho. So
+%     the Jacobian is that of the mean dynamics. At r_s = 0, rho is r to
+%     the bit and every result is what it was.
+%   THE REST, dRc = dR - r_s dt (zero mean, never below -r_s dt), as a
+%     KICK after each whole step of the integrator (sde_fixed_step; never
+%     inside a stage): `kick` moves the pools by the exact solution of
+%     ds/da = (the release terms alone) over a = 0..dRc, so that no pool
+%     can go negative and kick(kick(s, a), b) = kick(s, a + b), and
+%     returns the amount released along the way, the integral of F da.
+%     That is F dRc to first order and less for a large dRc, because the
+%     pool empties as it releases. The class adds W dTheta / tau_d to x
+%     (SRNNCellTypePairs.release_kick). `released` recovers dTheta from
+%     the state after the kick, so nothing has to be stored for a readout
+%     of the realized release. A route whose model has no pool releases
+%     F dRc and its state does not move.
+% The increments are per presynaptic NEURON and shared by its routes, so
+% two routes of one neuron with the same configuration stay identical.
 %
 % THE SPREAD (FD-015). SRNNCellTypePairs.std_spread and stf_spread give
 % each presynaptic neuron its own depression and facilitation parameters.
@@ -127,7 +175,8 @@ function model = route_model(name)
 % was optional until every model had it.)
 %
 % F DEPENDS ON THE STATE ONLY, never on the rate: the class carries the
-% rate dependence of theta = r .* F.
+% rate dependence of theta = rho .* F (rho the release drive, which is the
+% rate r unless the route's presynaptic type releases spontaneously).
 %
 % THE MODELS, and how a route gets one (SRNNCellTypePairs.compile_route):
 %   'product'  route_product: product depression times output-only

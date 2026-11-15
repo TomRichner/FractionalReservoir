@@ -15,12 +15,16 @@ function model = route_pool()
 %   g   the release probability, relative to its resting value  1 at rest
 %   h   a calcium trace, a low-pass copy of the rate            0 at rest
 %
-%   db1/dt = b2 (1 - b1)/tau_rec1 - g b1 r/tau_rel                    (C1)
+%   db1/dt = b2 (1 - b1)/tau_rec1 - g b1 rho/tau_rel                  (C1)
 %   db2/dt = (1 - b2)/tau_rec2 - (1/n2) b2 (1 - b1)/tau_rec1          (C2)
 %   dg/dt  = (1 - g)/tau_dec + (G - g) d/tau_fac                      (C5)
 %   dh/dt  = (r - h)/tau_h                                            (C6)
 %   F      = g b1                                                     (C3)
-% with the drive d = h.
+% with the drive d = h, and rho = r + r_s the RELEASE DRIVE (route_model,
+% "RELEASE NOISE"): the rate plus the route's spontaneous release rate
+% r_s (opts.release_rate; 0 unless the model class's release_rate is set,
+% and rho is then r to the bit). Only the release term of (C1) reads rho:
+% release probability and the calcium trace follow the rate alone.
 %
 % Term by term: the releasable pool empties by release, g b1 r/tau_rel,
 % and is refilled from the reserve at a rate proportional to what the
@@ -64,9 +68,24 @@ function model = route_pool()
 % (G - 1) d/tau_fac >= 0 and at g = G it is (1 - G)/tau_dec <= 0; at h = 0
 % its derivative is r/tau_h >= 0 and at h = 1 it is (r - 1)/tau_h <= 0.
 %
+% THE RELEASE KICK (route_model, "RELEASE NOISE"). A kick is an amount
+% dRc of release drive applied at once, at a fixed release probability.
+% Along it the releasable pool obeys db1/da = -g b1/tau_rel, so after it
+%   b1 -> b1 exp(-g dRc/tau_rel)
+% exactly (the pool cannot go negative whatever dRc is), and the amount
+% released, the integral of F da = g b1 da, is tau_rel times what the pool
+% lost:
+%   dTheta = -tau_rel b1 expm1(-g dRc/tau_rel)
+% (b1 the pool BEFORE the kick; g = 1 without facilitation). The reserve,
+% g and h do not move: the reserve feeds the pool in the drift, and g and
+% h follow the rate. A route without depression has no pool:
+% dTheta = g dRc and no state moves. `released` is the same amount from
+% the state AFTER the kick, tau_rel b1_after expm1(g dRc/tau_rel).
+%
 % THE LINEARISATION, with u = 1/tau_rec1, v = 1/tau_rec2, w = 1/tau_rel,
 % q = 1/n2 (A(i, m, k) = d(ds_m)/d(s_k), B = d(ds)/dr, Fs = dF/ds), for the
-% route with all four variables:
+% route with all four variables (r in the first row is the release drive
+% rho where there is spontaneous release):
 %
 %            d/db1          d/db2             d/dg               d/dh           d/dr
 %   db1/dt  -b2 u - g r w   (1 - b1) u       -b1 r w              0            -g b1 w
@@ -90,8 +109,9 @@ function model = route_pool()
 %
 %   g = (1 + G kappa r)/(1 + kappa r),   kappa = tau_dec/tau_fac
 %
-% The pools then see the EFFECTIVE RATE rho = g r (rho = r without
-% facilitation). With k1 = rho tau_rec1/tau_rel,
+% The pools then see the EFFECTIVE RATE rho = g (r + r_s) (rho = r + r_s
+% without facilitation; r_s = 0 without spontaneous release). With
+% k1 = rho tau_rec1/tau_rel,
 % k2 = rho tau_rec2/(n2 tau_rel) and m = 1 + k1 - k2, (C2) = 0 gives
 % b2 = 1 - k2 b1 and (C1) = 0 then k2 b1^2 - (1 + k1 + k2) b1 + 1 = 0, whose
 % root in [0, 1] is
@@ -154,6 +174,7 @@ function model = route_pool()
 % P, beyond the fields every model has (route_model):
 %   has_g, has_h   logical: the route carries g; it carries h
 %   s0             1 x ns, the starting state
+%   release        (route_model) .rate, the spontaneous release rate r_s
 %   PER NEURON, npre x 1, only those the variant has:
 %     tau_rec1, tau_rel        depression
 %     tau_rec2, n2             the reserve
@@ -204,7 +225,8 @@ function model = route_pool()
 model = struct('name', 'pool', ...
     'compile', @compile, 'initial', @initial, 'rhs', @rhs, 'output', @output, ...
     'linearize', @linearize, 'steady_state', @steady_state, ...
-    'depression', @depression, 'facilitation', @facilitation);
+    'depression', @depression, 'facilitation', @facilitation, ...
+    'release_drive', @release_drive, 'kick', @kick, 'released', @released);
 end
 
 %% The interface
@@ -212,10 +234,14 @@ end
 function P = compile(std_cfg, stf_cfg, opts)
 if nargin < 3, opts = struct(); end
 opts = fill_defaults(opts, struct('npre', 1, 'zero_floor', false, 'label', 'route', ...
-    'err_id_prefix', 'route_pool', 'std_sigma', 0, 'stf_sigma', 0));
+    'err_id_prefix', 'route_pool', 'std_sigma', 0, 'stf_sigma', 0, 'release_rate', 0));
 prefix = opts.err_id_prefix;
 label = opts.label;
 err_id = [prefix ':InvalidSynapseConfig'];
+if ~(isnumeric(opts.release_rate) && isscalar(opts.release_rate) && ...
+        isfinite(opts.release_rate) && opts.release_rate >= 0)
+    error(err_id, 'release_rate on route %s must be a finite nonnegative scalar.', label);
+end
 has_std = ~is_absent(std_cfg);
 has_stf = ~is_absent(stf_cfg);
 
@@ -400,6 +426,7 @@ P.coupling = coupling(present, present);
 % Pools start full and release probability at rest, their values at
 % r = 0; the calcium trace starts at 0, likewise.
 P.s0 = [ones(1, P.n_b + P.has_g), zeros(1, P.has_h)];
+P.release = struct('rate', double(opts.release_rate));
 
 % Per neuron, the nominal value replicated; only what the variant has.
 npre = opts.npre;
@@ -462,8 +489,9 @@ function s0 = initial(P)
 s0 = P.s0;
 end
 
-function [ds, F] = rhs(s, r, P)
+function [ds, F, drive] = rhs(s, r, P)
 n_b = P.n_b;
+drive = r + P.release.rate;                   % the release drive rho
 if P.has_g
     g = s(:, n_b + 1);
     if P.has_h
@@ -480,9 +508,9 @@ if P.has_g
 end
 b1 = s(:, 1);
 if P.has_g
-    release = g .* b1 .* r ./ P.tau_rel;      % release probability speeds the pool's use
+    release = g .* b1 .* drive ./ P.tau_rel;  % release probability speeds the pool's use
 else
-    release = b1 .* r ./ P.tau_rel;
+    release = b1 .* drive ./ P.tau_rel;
 end
 if n_b == 2
     b2 = s(:, 2);
@@ -510,9 +538,12 @@ else
 end
 end
 
-function [A, B, F, Fs] = linearize(s, r, P)
+function [A, B, F, Fs, drive] = linearize(s, r, P)
 % A(i, m, k) = d(ds_m)/d(s_k) is written at column (k - 1) ns + m of an
 % npre x ns^2 array and reshaped at the end. Entries not written are zero.
+% The release term of the releasable pool reads the release drive
+% rho = r + r_s; d(rho)/dr = 1, so B is what it is without a leak.
+drive = r + P.release.rate;
 npre = size(s, 1);
 ns = P.ns;
 n_b = P.n_b;
@@ -543,14 +574,14 @@ if P.has_g
 end
 b1 = s(:, 1);
 if P.has_g
-    use = g .* r ./ P.tau_rel;                % -d(release)/d(b1)
-    A(:, (cg - 1) * ns + 1) = -b1 .* r ./ P.tau_rel;             % (b1, g)
+    use = g .* drive ./ P.tau_rel;            % -d(release)/d(b1)
+    A(:, (cg - 1) * ns + 1) = -b1 .* drive ./ P.tau_rel;         % (b1, g)
     B(:, 1) = -g .* b1 ./ P.tau_rel;          % the rate enters the release term
     F = g .* b1;
     Fs(:, 1) = g;
     Fs(:, cg) = b1;
 else
-    use = r ./ P.tau_rel;
+    use = drive ./ P.tau_rel;
     B(:, 1) = -b1 ./ P.tau_rel;
     F = b1;
     Fs(:, 1) = 1;
@@ -573,12 +604,13 @@ end
 
 function ss = steady_state(r, P)
 % See the header: h = r, g from (C5) = 0, the pools from (C4) at the
-% effective rate rho = g r.
-rho = r;
+% effective rate rho = g (r + r_s). Facilitation is driven by the rate
+% alone; the spontaneous release rate r_s reaches the pools only.
+rho = r + P.release.rate;
 if P.has_g
     kappa = P.tau_dec ./ P.tau_fac;
     g = (1 + P.G .* kappa .* r) ./ (1 + kappa .* r);
-    rho = g .* r;
+    rho = g .* rho;
     g_block = g;
     if P.has_h
         g_block = [g, r .* ones(size(g))];
@@ -610,6 +642,43 @@ elseif P.has_g
 else
     ss.s = b_block;
     ss.F = b1;
+end
+end
+
+%% Spontaneous release
+
+function drive = release_drive(r, P)
+%RELEASE_DRIVE The release drive rho = r + r_s, which multiplies the output
+% factor in the synaptic output: theta = F rho. r may be npre x nt.
+drive = r + P.release.rate;
+end
+
+function [s, dTheta] = kick(s, dRc, P)
+%KICK Apply the release-drive increment dRc (npre x 1) at once: the
+% releasable pool by its exact solution, and the amount released along the
+% way (header). The reserve, g and h do not move.
+if P.has_g
+    dRc = s(:, P.n_b + 1) .* dRc;             % release probability scales the drive
+end
+if P.n_b == 0
+    dTheta = dRc;                             % no pool: F = g does not move
+    return;
+end
+b1 = s(:, 1);
+used = dRc ./ P.tau_rel;
+dTheta = -P.tau_rel .* b1 .* expm1(-used);
+s(:, 1) = b1 .* exp(-used);
+end
+
+function dTheta = released(s_after, dRc, P)
+%RELEASED The amount kick released, from the state AFTER it and dRc.
+if P.has_g
+    dRc = s_after(:, P.n_b + 1) .* dRc;
+end
+if P.n_b == 0
+    dTheta = dRc;
+else
+    dTheta = P.tau_rel .* s_after(:, 1) .* expm1(dRc ./ P.tau_rel);
 end
 end
 
