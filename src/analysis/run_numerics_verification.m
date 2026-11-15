@@ -143,6 +143,15 @@ setup_paths();
 switch cfg.run_mode
     case {'essential', 'fast'}      % 'essential' takes 'fast's sizes (run_mode_names)
         T_free = 6;  T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_reshoot = 1;  n_lle = 2;
+    case 'fastmedium'
+        % Between the two (Tom, 2026-11-15; about 20 min of the mu7chain_AC
+        % bundle). The header says fast windows fail L and C by design, so L
+        % and C take medium's windows (T_lle 20 s, T_small [-10, 10]); A and
+        % B keep fast's. Trials fill one round of a 12-worker pool, so they
+        % cost little wall time: medium's 5 reshoot trials, and 6 LLE trials
+        % (L runs 2 x 6 = 12 jobs, C 6). Fast took 11.1 min (2026-11-13);
+        % with L and C about twice as long, about 18 min.
+        T_free = 6;  T_lle = 20;  T_noisy = 3;    n_small = 30;  T_small = [-10, 10]; max_restarts = 400;  n_reshoot = 5;  n_lle = 6;
     case {'medium', 'medium2'}
         T_free = 12;  T_lle = 20;  T_noisy = 4.5;  n_small = 40;  T_small = [-10, 10]; max_restarts = 800;  n_reshoot = 5;  n_lle = 25;
     case 'production'

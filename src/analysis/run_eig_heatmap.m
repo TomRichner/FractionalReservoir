@@ -87,6 +87,12 @@ if ~isfolder(out_dir); mkdir(out_dir); end
 % Same collapse as run_memory_capacity and run_dc_lle_analysis.
 switch cfg.run_mode
     case {'essential', 'fast'},    T_range = [0 40];  n_samples = 40;   fs = 200;   % 'essential' takes 'fast's sizes
+    % 'fastmedium' (Tom, 2026-11-15; about 20 min of the mu7chain_AC bundle):
+    % twice fast's samples on a 60-s run, whose LLE window is medium's 30 s,
+    % at fast's fs. Fast took 9.6 min (2026-11-13), the reference example
+    % alone 7.7 (essential, 2026-11-14), so at most 2 x 7.7 + 1.5 x 1.9 =
+    % 18 min, the non-reference examples at n = 250 with medium's 60 samples.
+    case 'fastmedium',             T_range = [0 60];  n_samples = 80;   fs = 200;
     case {'medium', 'medium2'},    T_range = [0 100]; n_samples = 150;  fs = 400;
     case 'production',             T_range = [0 200]; n_samples = 300;  fs = 400;
     otherwise
@@ -136,14 +142,14 @@ if ~any(strcmp({examples.label}, 'reference'))
 end
 n_ex = numel(examples);
 n_examples_override = cfg.n_override;
-if ismember(cfg.run_mode, {'essential', 'fast'}) && cfg.n_override == 0
+if ismember(cfg.run_mode, {'essential', 'fast', 'fastmedium'}) && cfg.n_override == 0
     n_examples_override = 250;      % a dense eig at N = 4000 is ~30 s; fast keeps the examples affordable
 end
 n_samples_ex = cfg.n_samples_examples;
 if n_samples_ex == 0
     switch cfg.run_mode
         case {'essential', 'fast'}, n_samples_ex = 40;
-        case {'medium', 'medium2'}, n_samples_ex = 60;
+        case {'fastmedium', 'medium', 'medium2'}, n_samples_ex = 60;
         case 'production',          n_samples_ex = 150;
     end
 end

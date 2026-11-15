@@ -3,6 +3,7 @@ function [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %
 %   mu7chain_AC_run                 % 'essential': about an hour on 12 workers
 %   mu7chain_AC_run('fast')
+%   mu7chain_AC_run('fastmedium')   % about 19 h on 12 workers (mu7chain_AC_config)
 %   [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %
 %   setup_paths is called on the first line. Every setting comes from
@@ -24,7 +25,7 @@ function [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 % be absent or empty. The analyses then run ONCE, over all four conditions,
 % and the figures are drawn once per set from that one run directory.
 %
-% Agents run 'essential' and 'fast'. 'medium' and larger are Tom's to start.
+% Agents run 'essential' and 'fast'. 'fastmedium' and larger are Tom's to start.
 % RERUNNING REQUIRES DELETING data/mu7chain_AC_<run_mode> FIRST.
 % The analysis transcript is written to <run_dir>/command_window.log and each
 % figure pass's to <fig_root>/command_window.log, by vlog.

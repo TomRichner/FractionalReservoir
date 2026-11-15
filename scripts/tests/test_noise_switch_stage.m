@@ -28,7 +28,8 @@
 
 %% 1. The plan in every run mode
 root = fileparts(which('setup_paths'));
-sizes = {'essential', 4, 5; 'fast', 8, 10; 'medium', 16, 20; 'medium2', 16, 20; 'production', 32, 20};
+sizes = {'essential', 4, 5; 'fast', 8, 10; 'fastmedium', 16, 20; 'medium', 16, 20; 'medium2', 16, 20; ...
+         'production', 32, 20};
 assert(isequal(sizes(:, 1)', run_mode_names()), 'the size table below must cover run_mode_names');
 for m = 1:size(sizes, 1)
     [md, n_copies, t_rollout] = sizes{m, :};

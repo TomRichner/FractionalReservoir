@@ -275,7 +275,10 @@ function cfg = dc_lle_run_config(run_mode, preset_defaults, ode_solver_override)
 switch run_mode
     case {'essential', 'fast'}      % 'essential' takes 'fast's sizes (run_mode_names)
         cfg = pack(5);
-    case {'medium', 'medium2'}
+    case {'fastmedium', 'medium', 'medium2'}
+        % 'fastmedium' takes medium's 15 seeds: the parfor is over seeds, so
+        % fast's 5 ran as one round of 9.7 min (2026-11-13) and 15 on 12
+        % workers are two rounds, about 19 min.
         cfg = pack(15);
     case 'production'
         cfg = pack(30);

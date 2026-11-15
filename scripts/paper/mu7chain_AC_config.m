@@ -63,8 +63,33 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 % has the table); then the noise switch (0.5 min at 'fast' on 4 workers,
 % measured 2026-11-14; its figure entry about 45 s at 'fast'). The figures
 % add the two noise-level time series, about a minute each. So an
-% 'essential' run of this bundle is about 1 h 20 to 1 h 30. Agents run
-% 'essential' and 'fast'; 'medium' and larger are Tom's to start.
+% 'essential' run of this bundle is about 1 h 20 to 1 h 30. (Block C's
+% per-job cost is 10.24 worker-minutes since 2026-11-15, measured on the
+% fast run, and 1.35 times that with release noise; mc_gain_sweep_grid.)
+%
+% 'fastmedium' (Tom, 2026-11-15) IS SIZED FOR ABOUT 19 HOURS, no more than
+% 20, on 12 workers. Each stage's estimate is the fast run's measured time
+% (2026-11-13) scaled by the ratio of work; the sizes are in each stage's
+% table, which gives the reasoning:
+%   sweeps              84 min   1-D 11 levels x 7 reps (28), tau 11 x 7 on
+%                                medium's 50-s window (16), joint 4 levels,
+%                                192 points (40)
+%   memory_capacity     15       medium's 15 trials (two rounds)
+%   mc_example           5       medium's protocol
+%   eig_heatmap         18       T 60 s, 80 samples, examples 60
+%   numerics            18       L and C on medium's windows, 5 / 6 trials
+%   lyapunov_spectrum    8       T 40 s, 1 seed, K 50
+%   transient_gain      76       fast's size
+%   local_lyapunov       8       K 50, the bundle's own
+%   dc_lle              19       medium's 15 seeds (two rounds)
+%   paper_illustrations  3
+%   mc_gain_sweep      819       9 x 9 levels x 2 networks: 846 jobs, 324
+%                                with release noise (13 h 40)
+%   noise_switch         3       medium's 16 copies x 20 s
+%   two figure passes   30       about 10 min each at 'fast'
+% about 18 h 25 in all: block A 4 h 15, block C 13 h 40, figures 0 h 30.
+% Agents run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to
+% start.
 %
 % See also: mu7chain_AC_run, mu7chain_config, mu7chain_gainbias_config,
 %           run_all_paper_analyses, paper_opt_in_stages

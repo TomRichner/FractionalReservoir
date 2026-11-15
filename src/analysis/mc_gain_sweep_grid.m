@@ -18,22 +18,32 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % THE SIZE TABLE (Tom, 2026-11-13): levels per axis x networks, the same for
 % every grid of a mode.
 %   mode         levels    networks   one grid   the mu7chain bundle
-%   essential     3 x  3       1         9 jobs     51 jobs, about 45 min
-%   fast          7 x  7       3       147 jobs    777 jobs, about 11 h 40
-%   medium(2)    13 x 13      10      1690 jobs   8710 jobs, about 131 h
-%   production   17 x 17      10      2890 jobs  14790 jobs, about 223 h
+%   essential     3 x  3       1         9 jobs     51 jobs, about 50 min (58.9 measured)
+%   fast          7 x  7       3       147 jobs    777 jobs, about 12 h 30
+%   fastmedium    9 x  9       2       162 jobs    846 jobs, about 13 h 40
+%   medium(2)    13 x 13      10      1690 jobs   8710 jobs, about 141 h
+%   production   17 x 17      10      2890 jobs  14790 jobs, about 239 h
 % "The mu7chain bundle" is mu7chain_gainbias_config: five grids (gain x
 % bias, gain x self-coupling, and since FD-027 gain x release noise,
 % self-coupling x release noise, gain x Wiener noise) and two networks swept
-% along gain only, so (5 n^2 + 2 n) x networks jobs for n levels. Times are
-% for 12 pool workers at WORKER_MINUTES_PER_JOB = 9.5 worker-minutes per job
-% of four conditions (measured on the first block C runs: 9 to 12), about
-% 12.9 for the two release-noise grids' jobs (their condition-runs take
-% about 157 s against 116 s), with every job of the stage in one parfor
-% (run_mc_gain_sweep_set). G.worker_minutes counts 9.5 for every job.
-% Agents run 'essential' and 'fast'; 'medium' and larger are Tom's to start.
-% 'production' is the lead's choice of a size above medium (17 levels keeps
-% the count odd, so zero stays a level of a symmetric axis).
+% along gain only, so (5 n^2 + 2 n) x networks jobs for n levels, of which
+% the two release-noise grids' 2 n^2 x networks. Times are for 12 pool
+% workers, with every job of the stage in one parfor (run_mc_gain_sweep_set),
+% at WORKER_MINUTES_PER_JOB = 10.24 worker-minutes per job of four
+% conditions (the fast run of 2026-11-13: 336 jobs without release noise in
+% 286.7 min on 12 workers; the first block C runs gave 9 to 12) and
+% RELEASE_NOISE_COST = 1.35 times that for a job of a grid with the release
+% noise on (its condition-runs took about 157 s against 116 s, FD-027 N2;
+% the calibration runs of 2026-11-14 170 to 200 s against 124 to 130 s).
+% G.worker_minutes counts a job at that cost when the grid is told
+% release_noise = true (mc_gain_sweep_stage_plan decides it from the grid's
+% axes and fixed arguments); until 2026-11-15 it counted 9.5 for every job.
+% 'fastmedium' (Tom, 2026-11-15) is sized for mu7chain_AC_run to finish in
+% about 19 h: 9 levels keep the count odd (zero stays a level of the
+% symmetric axes), and 3 networks at 9 x 9 would be about 20.5 h alone.
+% Agents run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to
+% start. 'production' is the lead's choice of a size above medium (17
+% levels keeps the count odd, so zero stays a level of a symmetric axis).
 %
 % THE AXES (each named by a model property; mc_sweep_axis)
 %   first axis    first_axis, default 'level_of_chaos' (the gain).
@@ -77,9 +87,13 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % bias_levels, seeds) replace the table's for that axis, as given (not
 % rounded).
 %
+% THE COST. release_noise (default false) says the grid's runs have the
+% release noise on; it changes the estimate only.
+%
 % G: first_axis, second_axis (mc_sweep_axis descriptors), first_levels,
 % second_levels, seeds (rows), n_jobs (their product), and worker_minutes,
-% the estimate n_jobs x WORKER_MINUTES_PER_JOB.
+% the estimate n_jobs x WORKER_MINUTES_PER_JOB, times RELEASE_NOISE_COST
+% with release_noise.
 %
 % Errors carry the stage's identifiers: run_mc_gain_sweep:badMode (an
 % unknown run mode), :NoFirstLevels / :NoSecondLevels (an axis with no
@@ -107,9 +121,11 @@ arguments
     spec.second_levels (1,:) double = []
     spec.bias_levels   (1,:) double = []
     spec.seeds         (1,:) double = []
+    spec.release_noise (1,1) logical = false
 end
 
-WORKER_MINUTES_PER_JOB = 9.5;      % one job of four conditions; see the header
+WORKER_MINUTES_PER_JOB = 10.24;    % one job of four conditions; see the header
+RELEASE_NOISE_COST     = 1.35;     % a job with the release noise on, relative to one without
 DEFAULT_RANGE   = struct('first', [0.1 4], 'second', [-0.6 0.6]);   % of the default axes
 DEFAULT_SPACING = struct('first', 'log', 'second', 'linear');       % of the default axes
 LEVEL_DECIMALS  = 10;
@@ -145,7 +161,9 @@ if isempty(G.seeds)
     G.seeds = P.seed_net_base + (1:n_seeds);
 end
 G.n_jobs = numel(G.first_levels) * numel(G.second_levels) * numel(G.seeds);
-G.worker_minutes = G.n_jobs * WORKER_MINUTES_PER_JOB;
+minutes_per_job = WORKER_MINUTES_PER_JOB;
+if spec.release_noise; minutes_per_job = minutes_per_job * RELEASE_NOISE_COST; end
+G.worker_minutes = G.n_jobs * minutes_per_job;
 end
 
 %% ------------------------------------------------------------------------
@@ -221,6 +239,8 @@ switch run_mode
         n_levels = 3;   n_seeds = 1;
     case 'fast'
         n_levels = 7;   n_seeds = 3;
+    case 'fastmedium'
+        n_levels = 9;   n_seeds = 2;
     case {'medium', 'medium2'}
         n_levels = 13;  n_seeds = 10;
     case 'production'

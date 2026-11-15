@@ -17,10 +17,13 @@ function run_dir = run_all_analyses(preset_name, run_mode, opts)
 % INPUTS
 %   preset_name  which network to simulate. See srnn_param_preset.
 %                Carries the model class and the adaptation conditions too.
-%   run_mode     how much compute to spend: 'essential' | 'fast' | 'medium' |
-%                'medium2' | 'production' (run_mode_names). See
-%                analysis_run_config.m for the per-analysis numbers. 'fast' is
-%                the smoke test; 'essential' is below it, for a first look.
+%   run_mode     how much compute to spend: 'essential' | 'fast' |
+%                'fastmedium' | 'medium' | 'medium2' | 'production'
+%                (run_mode_names). See analysis_run_config.m for the
+%                per-analysis numbers. 'fast' is the smoke test; 'essential'
+%                is below it, for a first look; 'fastmedium' sits between
+%                'fast' and 'medium', sized for a run of about 19 h of the
+%                mu7chain_AC bundle.
 %   save_figs    write extra figure formats alongside each sweep (default true).
 %   output_dir   override the dated directory (default: create one).
 %   assemble     stack the 1-D sensitivity sheets after the sweeps (default true).

@@ -21,6 +21,11 @@ function mat_file = run_lyapunov_spectrum(cfg)
 % Run modes (the network keeps the preset's n: shrinking it would change the
 % thing being measured, cf. run_eig_heatmap):
 %   fast         T = 20 s, 1 seed,  K = 50   (smoke: minutes)
+%   fastmedium   T = 40 s, 1 seed,  K = 50   (medium's window, fast's seeds and K:
+%                the eight runs, 4 conditions x noise on/off, still fill one
+%                round of 12 workers, so about 2 x fast's 4.0 min = 8 min;
+%                medium's 3 seeds would take two rounds and K = 200
+%                several times longer per run)
 %   medium(2)    T = 40 s, 3 seeds, K = 200
 %   production   T = 100 s, 5 seeds, K = 300
 % Accumulation over the second half of T after a warm-up of T/4;
@@ -50,6 +55,7 @@ setup_paths();
 %% Cost table -- BEFORE any compute, so a bad mode fails in milliseconds
 switch cfg.run_mode
     case {'essential', 'fast'}  , T = 20;  n_seeds = 1; K = 50;     % 'essential' takes 'fast's sizes
+    case 'fastmedium'           , T = 40;  n_seeds = 1; K = 50;     % see the header
     case {'medium', 'medium2'}  , T = 40;  n_seeds = 3; K = 200;
     case 'production'           , T = 100; n_seeds = 5; K = 300;
     otherwise

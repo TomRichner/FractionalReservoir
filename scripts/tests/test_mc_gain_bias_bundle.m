@@ -170,7 +170,11 @@ assert(throws(@() mu7chain_gainbias_config('fast2'), 'mu7chain_gainbias_config:B
 assert(strcmp(mu7chain_gainbias_config().run_mode, 'essential'), 'the default is the size agents run');
 
 %% 4. The stage's plan in every run mode: both grids, the variants, the sizes
-sizes = {'essential', 3, 1; 'fast', 7, 3; 'medium', 13, 10; 'medium2', 13, 10; 'production', 17, 10};
+sizes = {'essential', 3, 1; 'fast', 7, 3; 'fastmedium', 9, 2; 'medium', 13, 10; 'medium2', 13, 10; ...
+         'production', 17, 10};
+% The estimate: 10.24 worker-minutes a job, 1.35 times that for the two
+% release-noise grids (runs 5 and 6; mc_gain_sweep_grid), 2 n^2 x networks jobs.
+MINUTES = 10.24; RELEASE = 1.35;
 assert(isequal(sizes(:, 1)', run_mode_names()), 'the size table below must cover run_mode_names');
 for m = 1:size(sizes, 1)
     [md, n, n_seeds] = sizes{m, :};
@@ -233,11 +237,33 @@ for m = 1:size(sizes, 1)
         isequal(arg(a, 'model_args'), wiener_fixed) && strcmp(arg(a, 'readout_signal'), 'release_filtered'), ...
         '%s: gain x Wiener noise', md);
     assert(isequal([pl.runs.n_jobs], [n^2, n, n, n^2, n^2, n^2, n^2] * n_seeds) && ...
-        pl.n_jobs == (5 * n^2 + 2 * n) * n_seeds && abs(pl.worker_minutes - 9.5 * pl.n_jobs) < 1e-9, ...
-        '%s: job counts', md);
+        pl.n_jobs == (5 * n^2 + 2 * n) * n_seeds, '%s: job counts', md);
+    n_release = 2 * n^2 * n_seeds;
+    want_minutes = MINUTES * ((pl.n_jobs - n_release) + RELEASE * n_release);
+    assert(abs(pl.worker_minutes - want_minutes) < 1e-6 * want_minutes, ...
+        '%s: worker-minutes %g, expected %g', md, pl.worker_minutes, want_minutes);
 end
 % The essential stage holds 51 jobs: 24 before the noise grids, 27 of them.
 assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential')).n_jobs == 51);
+% 'fastmedium' (Tom, 2026-11-15): 846 jobs, 324 with release noise, about
+% 13.6 h on 12 workers.
+pl = mc_gain_sweep_stage_plan(mu7chain_gainbias_config('fastmedium'));
+assert(pl.n_jobs == 846 && abs(pl.worker_minutes / 12 / 60 - 13.64) < 0.01);
+% The release-noise cost follows the grid's axes and its fixed arguments,
+% not its tag: an axis that is a release-noise amplitude, or model_args that
+% set one above zero, and a zero set there does not count.
+G0 = mc_gain_sweep_grid('fast');
+G1 = mc_gain_sweep_grid('fast', 'release_noise', true);
+assert(abs(G0.worker_minutes - MINUTES * 147) < 1e-9 && abs(G1.worker_minutes - RELEASE * G0.worker_minutes) < 1e-9);
+c = mu7chain_gainbias_config('essential');
+c.mc_gain_sweep.grids = c.mc_gain_sweep.grids(1);
+c.mc_gain_sweep.grids.variants = [];
+wm = @(c) mc_gain_sweep_stage_plan(c).worker_minutes;
+base_minutes = wm(c);
+c.mc_gain_sweep.grids.model_args = {'release_sigma_all', 1e-3};
+assert(abs(wm(c) - RELEASE * base_minutes) < 1e-9, 'release noise set in model_args costs more');
+c.mc_gain_sweep.grids.model_args = {'release_sigma_all', 1e-3, 'release_sigma_all', 0};
+assert(abs(wm(c) - base_minutes) < 1e-9, 'the last value given counts');
 
 % zero_log is a spacing of the grid table, on either axis, for any property.
 G = mc_gain_sweep_grid('fast', 'second_axis', 'self_coupling', 'second_range', [0.01 1], ...
