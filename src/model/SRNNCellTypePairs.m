@@ -351,8 +351,51 @@ classdef SRNNCellTypePairs < handle
         % run_noise_switch_rollouts makes copies share their noise and
         % then stop sharing it. t_start must lie on the time grid,
         % strictly inside the run; times strictly increasing; seeds
-        % integers. Ignored at sigma_u_noise = 0.
+        % integers. Ignored when no noise source is on. The release noise
+        % below is spliced at the same steps.
         noise_seed_schedule = []
+        % RELEASE NOISE (FD-027; route_model, "RELEASE NOISE"): spontaneous
+        % synaptic release, a second noise source beside the Wiener term
+        % on x. One value per PRESYNAPTIC cell type (1 x C; a scalar is
+        % broadcast; [] = zeros = off, the default, and every result is
+        % then what it was without these properties).
+        %   release_rate   r_s, the mean spontaneous release drive, in the
+        %                  units of the rate r
+        %   release_sigma  sigma_gamma, its noise amplitude: the variance
+        %                  of the release drive per unit time is
+        %                  sigma_gamma^2
+        % Over a step dt each presynaptic neuron j draws ONE gamma
+        % increment dR_j >= 0 with mean r_s dt and variance
+        % sigma_gamma^2 dt, independent of the state and shared by all its
+        % routes, and its release drive over the step is r_j dt + dR_j
+        % wherever a route releases:
+        %   synaptic output   dTheta_j = F_j (r_j dt + dR_j), never negative
+        %   pools             depleted by the same drive
+        %   dendrites         tau_d dx_i = (-x_i + u_i) dt
+        %                         + sum_j w_ij dTheta_j + sigma_u dW_i
+        % SFA, facilitation and a calcium trace follow the rate r_j alone.
+        % The Wiener term stays; either source alone, or both.
+        % HOW IT IS INTEGRATED. The mean is in the drift: every route's
+        % release drive is rho = r + r_s (a steady leak), so the Jacobian
+        % and the top-K Lyapunov spectrum are those of the mean dynamics.
+        % The zero-mean rest, dR - r_s dt, is a KICK after each whole
+        % step of the integrator (release_kick, sde_fixed_step): pools by
+        % the exact solution, so none can go negative, and
+        % W dTheta / tau_d onto x with the W the drift uses.
+        %   release_sigma = 0, release_rate > 0   the exact leak: no draw
+        %       and no kick, on any integrator.
+        %   release_sigma > 0   needs release_rate > 0 on that type and a
+        %       stochastic integrator ('euler', 'heun', 'sra1'), like
+        %       sigma_u_noise > 0.
+        % The increments come from the run's noise seed (noise_seed, or
+        % rng_seeds(1) + 224737) through release_increments, which draws
+        % each step from its own substream: a run integrated in segments
+        % consumes what a single pass does, and noise_seed_schedule
+        % splices them where it splices the Wiener path. Refused with
+        % std_zero_floor on a route with depression (a kick can take the
+        % factor below the floor).
+        release_rate = []
+        release_sigma = []
         input_config
         u_ex_scale = 1.0
         rng_seeds = [1 2]
@@ -440,6 +483,16 @@ classdef SRNNCellTypePairs < handle
         %              sign reversed (self_feedback = -s); see that property.
         %              Any number of types.
         self_coupling
+        %   release_rate_all, release_sigma_all -- ONE spontaneous release
+        %              rate, and one release-noise amplitude, for EVERY
+        %              cell type, as scalars: a sweep axis has to be a
+        %              scalar property, and release_rate / release_sigma
+        %              are 1 x C rows. Writing one sets every type;
+        %              reading one asserts the types agree
+        %              (SRNNCellTypePairs:ReleaseMismatch). Any number of
+        %              types.
+        release_rate_all
+        release_sigma_all
         activation_function             % Built from activation + S_a/S_c
         activation_function_derivative
         sigma_x_raw                     % Raw diffusion coefficient = sigma_u_noise / tau_d
@@ -494,8 +547,10 @@ classdef SRNNCellTypePairs < handle
         % Zeros when nothing was drawn.
         std_clipped = []
 
-        % Pre-generated Wiener increments for the current run, or empty. Built
-        % at the top of run(), kept alive through compute_lyapunov so Benettin
+        % Pre-generated noise increments for the current run (the Wiener
+        % tensors, and the release kick with its increments when the release
+        % noise is on; build_noise lists the fields), or empty. Built at the
+        % top of run(), kept alive through compute_lyapunov so Benettin
         % sees the same path, then cleared. Regenerable from noise_seed, so it
         % is never saved. See SRNNModel2.noise_increments.
         noise_increments = []
@@ -736,6 +791,22 @@ classdef SRNNCellTypePairs < handle
             obj.self_feedback = v;
         end
 
+        function v = get.release_rate_all(obj)
+            v = obj.shared_type_value('release_rate');
+        end
+
+        function set.release_rate_all(obj, v)
+            obj.release_rate = SRNNCellTypePairs.scalar_for_all_types(v, 'release_rate_all');
+        end
+
+        function v = get.release_sigma_all(obj)
+            v = obj.shared_type_value('release_sigma');
+        end
+
+        function set.release_sigma_all(obj, v)
+            obj.release_sigma = SRNNCellTypePairs.scalar_for_all_types(v, 'release_sigma_all');
+        end
+
         function set.verbose(obj, v)
             obj.verbose = verbose_name(v);
 
@@ -871,9 +942,12 @@ classdef SRNNCellTypePairs < handle
             end
             rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, params);
 
-            % Pre-generate the Wiener increments (a no-op at sigma_u_noise = 0)
-            % before both the trajectory and compute_lyapunov, since Benettin
-            % re-integrates segments against the same increments.
+            % Pre-generate the noise increments (a no-op when neither the
+            % Wiener term nor the release noise is on) before both the
+            % trajectory and compute_lyapunov, since Benettin re-integrates
+            % segments against the same increments, through the same
+            % solver closure: its perturbed trajectory gets the release
+            % kicks of the same steps.
             obj.build_noise();
 
             vprintf(obj.verbose, 'verbose', 'Integrating SRNNCellTypePairs equations\n');
@@ -919,10 +993,29 @@ classdef SRNNCellTypePairs < handle
         end
 
         function build_noise(obj)
-            % BUILD_NOISE Pre-generate the Wiener increments for this run.
-            % Twin of SRNNModel2.build_noise; see there for the reasoning.
+            % BUILD_NOISE Pre-generate the noise increments for this run.
+            % Twin of SRNNModel2.build_noise for the Wiener term; see there
+            % for the reasoning.
+            %
+            % NOISE IS ON WHEN EITHER SOURCE IS ON: the Wiener term on x
+            % (sigma_u_noise > 0) or the release noise (any
+            % release_sigma > 0). With both off noise_increments stays
+            % empty and the integrator takes its deterministic path. The
+            % struct is the one sde_fixed_step reads:
+            %   xi1, xi2, t0, fs, sigma, idx   the Wiener term; xi1 and xi2
+            %                    are empty and sigma is 0 when it is off
+            % and, only when the release noise is on,
+            %   kick, kick_steps  the kick applied after each step
+            %                    (release_kick with that step's increments)
+            %   release          what the kick consumes, for whoever needs
+            %                    the realized release afterwards: dRc, the
+            %                    centered increments dR - r_s dt, n x n_steps
+            %                    (zero rows for a type without release
+            %                    noise), and the seed they were drawn from.
             obj.noise_increments = [];
-            if obj.sigma_u_noise == 0
+            wiener_on = obj.sigma_u_noise ~= 0;
+            release_on = any(obj.release_sigma > 0);
+            if ~wiener_on && ~release_on
                 return;
             end
 
@@ -936,8 +1029,12 @@ classdef SRNNCellTypePairs < handle
             % this method always made (xi1 then xi2 from one twister
             % stream, the global stream restored).
             n_steps = numel(obj.t_ex) - 1;
-            [xi1, xi2] = wiener_increments(obj.n, n_steps, seed, ...
-                obj.noise_seed_schedule, obj.t_ex(1), obj.fs, 'SRNNCellTypePairs');
+            xi1 = [];
+            xi2 = [];
+            if wiener_on
+                [xi1, xi2] = wiener_increments(obj.n, n_steps, seed, ...
+                    obj.noise_seed_schedule, obj.t_ex(1), obj.fs, 'SRNNCellTypePairs');
+            end
 
             % layout.x names the dendritic block directly, so unlike
             % SRNNModel2 this class does not have to derive it from N_sys_eqs.
@@ -946,6 +1043,27 @@ classdef SRNNCellTypePairs < handle
                 't0', obj.t_ex(1), 'fs', obj.fs, ...
                 'sigma', obj.sigma_x_raw, ...
                 'idx', obj.cached_params.state_layout.x);
+
+            if release_on
+                % One row per presynaptic neuron, its type's rate and sigma.
+                params = obj.cached_params;
+                rate = zeros(obj.n, 1);
+                sigma = zeros(obj.n, 1);
+                for q = 1:obj.n_cellTypes
+                    rate(params.type_indices{q}) = obj.release_rate(q);
+                    sigma(params.type_indices{q}) = obj.release_sigma(q);
+                end
+                % Centered on the mean r_s dt, which is in the drift. A type
+                % without release noise has no kick: its rows are the leak
+                % minus itself (the generator's own expression), zero.
+                dRc = release_increments(rate, sigma, obj.fs, [1, n_steps], seed, ...
+                    obj.noise_seed_schedule, obj.t_ex(1), n_steps, 'SRNNCellTypePairs') ...
+                    - rate .* (1 / obj.fs);
+                obj.noise_increments.kick = ...
+                    @(S, j) SRNNCellTypePairs.release_kick(S, dRc(:, j), params);
+                obj.noise_increments.kick_steps = n_steps;
+                obj.noise_increments.release = struct('dRc', dRc, 'seed', seed);
+            end
         end
 
         function compute_lyapunov(obj)
@@ -1147,6 +1265,11 @@ classdef SRNNCellTypePairs < handle
             pair = obj.compile_synapse_config(obj.n_per_type);
             params.std_spread = obj.std_spread;
             params.stf_spread = obj.stf_spread;
+            % The release noise, by presynaptic type. The rate is also in
+            % every route's P (the route models read it there); the sigma
+            % is read by release_kick, to know which types are kicked.
+            params.release_rate = obj.release_rate;
+            params.release_sigma = obj.release_sigma;
             params.n_b_pairs = pair.n_b;
             params.tau_b_rec = pair.tau_b_rec;
             params.tau_b_rel = pair.tau_b_rel;
@@ -1290,6 +1413,22 @@ classdef SRNNCellTypePairs < handle
             obj.(name) = M;
         end
 
+        function v = shared_type_value(obj, name)
+            % The one value a per-type row holds for every cell type, as a
+            % scalar (0 for a row not set yet): what the *_all aliases read.
+            row = obj.(name);
+            if isempty(row)
+                v = 0;
+                return;
+            end
+            v = row(1);
+            if any(row(:) ~= v)
+                error('SRNNCellTypePairs:ReleaseMismatch', ...
+                    ['%s_all reads one value shared by every cell type, but %s is %s. ' ...
+                    'Read %s directly.'], name, name, mat2str(row), name);
+            end
+        end
+
         function assert_two_types(obj)
             if ~isequal(obj.n_cellTypes, 2)
                 error('SRNNCellTypePairs:NotTwoTypes', ...
@@ -1431,9 +1570,10 @@ classdef SRNNCellTypePairs < handle
             end
             obj.tau_a_spread = reshape(obj.tau_a_spread, 1, []);
 
-            % Synapse-parameter spreads and the self-feedback: the same
-            % broadcasting.
-            for name = {'std_spread', 'stf_spread', 'self_feedback'}
+            % Synapse-parameter spreads, the self-feedback and the release
+            % noise: the same broadcasting.
+            for name = {'std_spread', 'stf_spread', 'self_feedback', ...
+                    'release_rate', 'release_sigma'}
                 value = obj.(name{1});
                 if isempty(value)
                     value = zeros(1, C);
@@ -1479,14 +1619,33 @@ classdef SRNNCellTypePairs < handle
             % Catch an ode_solver assigned after construction, so a typo fails
             % here rather than at the first solver call inside run().
             check_ode_solver(obj.ode_solver, 'SRNNCellTypePairs');
-            check_noise_settings(obj.sigma_u_noise, obj.ode_solver, ...
-                'SRNNCellTypePairs');
             check_noise_seed_schedule(obj.noise_seed_schedule, 'SRNNCellTypePairs');
 
             C = obj.n_cellTypes;
             if ~isscalar(C) || ~isfinite(C) || C < 1 || C ~= round(C)
                 error('SRNNCellTypePairs:InvalidParams', 'n_cellTypes must be a positive integer.');
             end
+            % The two noise sources. The release rows are checked first,
+            % so that what reaches the pairing with the integrator is
+            % numeric; noise is on when either source is.
+            for name = {'release_rate', 'release_sigma'}
+                row = obj.(name{1});
+                if ~isnumeric(row) || ~isreal(row) || numel(row) ~= C || ...
+                        any(~isfinite(row)) || any(row < 0)
+                    error('SRNNCellTypePairs:InvalidParams', ...
+                        ['%s must be empty, a scalar, or a finite nonnegative 1 x %d row ' ...
+                        '(one value per presynaptic cell type).'], name{1}, C);
+                end
+            end
+            if any(obj.release_sigma > 0 & obj.release_rate == 0)
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    ['release_sigma > 0 needs release_rate > 0 on the same cell type: the ' ...
+                    'release increments are gamma variates with mean release_rate dt, and ' ...
+                    'none exists at mean zero (release_rate = %s, release_sigma = %s).'], ...
+                    mat2str(obj.release_rate), mat2str(obj.release_sigma));
+            end
+            check_noise_settings(obj.sigma_u_noise, obj.ode_solver, ...
+                'SRNNCellTypePairs', obj.release_sigma);
             if numel(obj.cell_type_names) ~= C || ...
                     any(~cellfun(@isvarname, obj.cell_type_names)) || ...
                     numel(unique(obj.cell_type_names)) ~= C
@@ -1726,6 +1885,15 @@ classdef SRNNCellTypePairs < handle
             if with_std || with_stf
                 type_rows = obj.spread_type_rows(counts);
             end
+            % The spontaneous release rate of each presynaptic type, in
+            % the shapes the property may still have when a Dependent
+            % count is read before complete_type_defaults has run.
+            release_rate = obj.release_rate;
+            if isempty(release_rate)
+                release_rate = zeros(1, C);
+            elseif isscalar(release_rate)
+                release_rate = repmat(release_rate, 1, C);
+            end
             for pre = 1:C
                 pre_name = names{pre};
                 spread = struct('std_sigma', 0, 'std_z', [], 'stf_sigma', 0, 'stf_z', []);
@@ -1793,7 +1961,8 @@ classdef SRNNCellTypePairs < handle
                         'label', [pre_name '->' post_name], ...
                         'err_id_prefix', 'SRNNCellTypePairs', ...
                         'std_sigma', spread.std_sigma, 'std_z', spread.std_z, ...
-                        'stf_sigma', spread.stf_sigma, 'stf_z', spread.stf_z));
+                        'stf_sigma', spread.stf_sigma, 'stf_z', spread.stf_z, ...
+                        'release_rate', release_rate(pre)));
                     pair.route{pre, post} = compiled;
 
                     nominal = compiled.P.nominal;
@@ -2546,6 +2715,17 @@ classdef SRNNCellTypePairs < handle
             val(rel == 0) = 0;
         end
 
+        function v = scalar_for_all_types(v, alias)
+            % What a *_all alias writes: the scalar itself, which
+            % complete_type_defaults broadcasts to every type and validate
+            % checks. Anything but one number is refused here, where the
+            % alias is named.
+            if ~(isnumeric(v) && isscalar(v))
+                error('SRNNCellTypePairs:InvalidParams', ...
+                    '%s takes one number, the value of every cell type.', alias);
+            end
+        end
+
         function val = pick(override, fallback)
             % PICK The override when set, else the fallback.
             if isempty(override), val = fallback; else, val = override; end
@@ -2762,9 +2942,11 @@ classdef SRNNCellTypePairs < handle
 
             % The routes. Each route's model advances the route's state (one
             % row per presynaptic neuron), driven by the presynaptic rate,
-            % and returns the output factor F; the route's synaptic output
-            % is theta = F .* rate. What a route's state is and how it moves
-            % is the model's business (src/model/routes; route_model).
+            % and returns the output factor F and the release drive (the
+            % rate, plus the route's spontaneous release rate where it has
+            % one); the route's synaptic output is theta = F .* drive. What
+            % a route's state is and how it moves is the model's business
+            % (src/model/routes; route_model).
             recurrent = zeros(params.n, 1);
             for pre = 1:C
                 pre_idx = params.type_indices{pre};
@@ -2774,14 +2956,70 @@ classdef SRNNCellTypePairs < handle
                     R = route{pre, post};
                     model = R.model;
                     P = R.P;
-                    [ds, F] = model.rhs(reshape(S(R.idx), npre, P.ns), pre_rate, P);
+                    [ds, F, drive] = model.rhs(reshape(S(R.idx), npre, P.ns), pre_rate, P);
                     dS(R.idx) = ds;
                     post_idx = params.type_indices{post};
                     recurrent(post_idx) = recurrent(post_idx) + ...
-                        params.W(post_idx, pre_idx) * (F .* pre_rate);
+                        params.W(post_idx, pre_idx) * (F .* drive);
                 end
             end
             dS(layout.x) = (-x + recurrent + u) ./ params.tau_d;
+        end
+
+        function S = release_kick(S, dRc, params)
+            %RELEASE_KICK The release noise of one step, applied to the state.
+            %
+            %   S = SRNNCellTypePairs.release_kick(S, dRc, params)
+            %
+            % S is the state after a whole deterministic step; dRc (n x 1)
+            % is each presynaptic neuron's release-drive increment for that
+            % step with its mean taken out, dR - r_s dt (the mean is in the
+            % drift: route_model, "RELEASE NOISE"). Every route of a
+            % presynaptic type with release noise (params.release_sigma > 0)
+            % is kicked by its model: its pools move by the exact solution,
+            % and the amount dTheta released along the kick reaches the
+            % dendrites as
+            %
+            %   x_post  <-  x_post + W(post, pre) * dTheta / tau_d
+            %
+            % with params.W, the matrix dynamics_fast uses (level_of_chaos,
+            % the route scale and the self-feedback in it). All routes read
+            % the state before the kick; nothing else moves (SFA, release
+            % probability and a calcium trace follow the rate).
+            %
+            % The integrator calls it after each step through the noise
+            % struct's kick handle (build_noise, sde_fixed_step). The
+            % realized release of a route is recovered afterwards with its
+            % model's `released`, from the state this returns and dRc.
+            %
+            % (The products with W are made as ONE product of the whole
+            % matrix with an n x C array, column q holding what every
+            % presynaptic neuron releases onto type q, and not block by
+            % block as dynamics_fast does: taking a block out of a sparse
+            % matrix costs several times the product, and nothing here
+            % has to match another function bit for bit. Measured at
+            % n = 500, 2026-11-14: 55 to 110 microseconds a kick, by
+            % condition, against 180 to 230.)
+            C = params.n_cellTypes;
+            x_rows = params.state_layout.x;
+            route = SRNNCellTypePairs.active_routes(params);
+            dTheta = zeros(params.n, C);
+            for pre = find(params.release_sigma > 0)
+                pre_idx = params.type_indices{pre};
+                npre = params.n_per_type(pre);
+                pre_dRc = dRc(pre_idx);
+                for post = 1:C
+                    R = route{pre, post};
+                    [s, dTheta(pre_idx, post)] = ...
+                        R.model.kick(reshape(S(R.idx), npre, R.P.ns), pre_dRc, R.P);
+                    S(R.idx) = s;
+                end
+            end
+            to_x = params.W * dTheta;         % column q is read on the rows of type q
+            for post = 1:C
+                rows = x_rows(params.type_indices{post});
+                S(rows) = S(rows) + to_x(params.type_indices{post}, post) ./ params.tau_d;
+            end
         end
 
         function D = std_route_factor(b, params, pre, post)
@@ -2948,11 +3186,15 @@ classdef SRNNCellTypePairs < handle
             %   (s, s)  A, per presynaptic neuron
             %   (s, x)  B phi'             on the presynaptic neuron's x
             %   (s, a)  -c_eff B phi'      on each of its SFA variables
-            %   (x, s)  W_block diag(r Fs(:, k)) / tau_d
+            %   (x, s)  W_block diag(rho Fs(:, k)) / tau_d
             %   (x, x)  -1/tau_d  +  W_block diag(F phi') / tau_d
             %   (x, a)  -c_eff W_block diag(F phi') / tau_d
             % because the rate is r = phi(x - c_eff sum_k a_k) and a route's
-            % synaptic output is theta = r F(s).
+            % synaptic output is theta = rho F(s), rho the route's release
+            % drive: the rate, plus the spontaneous release rate where the
+            % presynaptic type has one (d rho / d r = 1). With release
+            % noise this is the Jacobian of the MEAN dynamics; the kicks
+            % are not in it.
             %
             % ANY CHANGE HERE OR IN dynamics_fast MUST BE MIRRORED IN
             % jacobian_times (see its header).
@@ -3013,7 +3255,7 @@ classdef SRNNCellTypePairs < handle
                     P = R.P;
                     ns = P.ns;
                     row_s = R.idx;
-                    [A, B, F, Fs] = model.linearize(reshape(S(row_s), npre, ns), pre_rate, P);
+                    [A, B, F, Fs, drive] = model.linearize(reshape(S(row_s), npre, ns), pre_rate, P);
                     W_block = params.W(post_idx, pre_idx);
 
                     if ns > 0
@@ -3037,8 +3279,8 @@ classdef SRNNCellTypePairs < handle
                             J(row_s, row_a) = kron(sparse(ones(1, na)), stack);
                         end
 
-                        % (x, s): theta = r F, so d theta / d s_k = r dF/ds_k.
-                        to_theta = pre_rate .* Fs;                       % npre x ns
+                        % (x, s): theta = rho F, so d theta / d s_k = rho dF/ds_k.
+                        to_theta = drive .* Fs;                          % npre x ns
                         D = sparse(repmat(neuron, ns, 1), at(:), to_theta(:), npre, n_s);
                         J(row_x(post_idx), row_s) = (W_block * D) ./ params.tau_d;
                     end
@@ -3096,8 +3338,10 @@ classdef SRNNCellTypePairs < handle
             %     s   rows  : A * Ys + B .* dr_pre       (per neuron of the route)
             %     x   rows  : (-Yx + sum over routes W_block * dtheta) / tau_d
             %   where Ys is the route's slice of Y and
-            %     dtheta = F .* dr_pre + r .* (Fs * Ys)
-            %   is the perturbation of the route's synaptic output theta = r F(s).
+            %     dtheta = F .* dr_pre + rho .* (Fs * Ys)
+            %   is the perturbation of the route's synaptic output
+            %   theta = rho F(s), rho the route's release drive (the rate,
+            %   plus the spontaneous release rate where there is one).
             %
             % See also: compute_Jacobian_fast, dynamics_fast, lyapunov_topk,
             %           route_model, test_jacobian_times
@@ -3153,7 +3397,7 @@ classdef SRNNCellTypePairs < handle
                     model = R.model;
                     P = R.P;
                     ns = P.ns;
-                    [A, B, F, Fs] = model.linearize(reshape(S(R.idx), npre, ns), pre_rate, P);
+                    [A, B, F, Fs, drive] = model.linearize(reshape(S(R.idx), npre, ns), pre_rate, P);
 
                     dtheta = F .* dr_pre;                          % npre x K
                     if ns > 0
@@ -3169,7 +3413,7 @@ classdef SRNNCellTypePairs < handle
                         end
                         Zs = Zs + B .* dr_pre3;
                         Z(R.idx, :) = reshape(Zs, npre * ns, K);
-                        dtheta = dtheta + pre_rate .* reshape(sum(Fs .* Ys, 2), npre, K);
+                        dtheta = dtheta + drive .* reshape(sum(Fs .* Ys, 2), npre, K);
                     end
                     Z(layout.x(post_idx), :) = Z(layout.x(post_idx), :) + ...
                         (params.W(post_idx, pre_idx) * dtheta) ./ params.tau_d;
@@ -3305,6 +3549,20 @@ classdef SRNNCellTypePairs < handle
             end
             if sig.n_g > 0 && isfield(params, 'stf_spread') && ~isempty(params.stf_spread)
                 sig.stf_spread = params.stf_spread(pre);
+            end
+            % The release noise of the route's PRESYNAPTIC type (0 where
+            % it has none): the leak is part of the route's dynamics and
+            % the increments are per presynaptic neuron, shared by its
+            % routes, so two routes of one type stay identical and routes
+            % of types that release differently do not carry the same
+            % dynamics.
+            sig.release_rate = 0;
+            sig.release_sigma = 0;
+            if isfield(params, 'release_rate') && ~isempty(params.release_rate)
+                sig.release_rate = params.release_rate(pre);
+            end
+            if isfield(params, 'release_sigma') && ~isempty(params.release_sigma)
+                sig.release_sigma = params.release_sigma(pre);
             end
         end
 
@@ -3624,9 +3882,16 @@ classdef SRNNCellTypePairs < handle
                     if P.n_g > 0
                         g_named.(pre_name).(post_name) = s(:, P.n_b + 1:end, :);
                     end
-                    % Synaptic output = the model's output factor times the rate.
+                    % Synaptic output = the model's output factor times the
+                    % release drive (the rate, plus the route's spontaneous
+                    % release rate where it has one). It is the output of
+                    % the mean dynamics: what the release kicks added in
+                    % each step is not a function of the stored state alone
+                    % (the route model's `released` recovers it from the
+                    % state and the increments).
                     synaptic_output_named.(pre_name).(post_name) = ...
-                        reshape(R.model.output(s, P), npre, nt) .* rate(pre_idx, :);
+                        reshape(R.model.output(s, P), npre, nt) .* ...
+                        R.model.release_drive(rate(pre_idx, :), P);
                 end
             end
             x_named = SRNNCellTypePairs.split_by_type(x_all, params, 1);
