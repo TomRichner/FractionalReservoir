@@ -68,7 +68,8 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %   lambda_1          by a separate short run() of the same reservoir with
 %                     the top-K estimator (lya_K exponents, no retry;
 %                     lya_T_sec seconds, accumulated over the last
-%                     lya_acc_sec): once with the memory-task input on
+%                     lya_acc_sec), or with Benettin's when the option
+%                     lya_method says so: once with the memory-task input on
 %                     (lle_input, the value plotted: it is the first
 %                     lya_T_sec of the same input sequence) and once with no
 %                     input (lle_noinput).
@@ -146,8 +147,16 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %                 Default: mc_protocol's, 'synaptic'. It is recorded in
 %                 settings.readout_signal and settings.protocol, and is
 %                 part of what makes two runs the same experiment.
-%   lya_K, lya_T_sec, lya_acc_sec   the Lyapunov run: exponents kept, its
-%                 length, and the final stretch accumulated (5, 30 s, 20 s)
+%   lya_method    the estimator of the Lyapunov run: 'topk' (default; the
+%                 Jacobian of the mean dynamics along the stored trajectory)
+%                 or 'benettin' (a perturbed trajectory re-integrated with
+%                 the same noise increments, release kicks included: the
+%                 pathwise exponent, for a run with release noise). Part of
+%                 a run's signature when it is not the default, and
+%                 recorded in settings.lya_method.
+%   lya_K, lya_T_sec, lya_acc_sec   the Lyapunov run: exponents kept (top-K
+%                 only), its length, and the final stretch accumulated
+%                 (5, 30 s, 20 s)
 %   segment_len   samples per integration segment of the lean path
 %   retry_failed  rerun the jobs an earlier run recorded as failed (true)
 %   use_parallel  false runs the jobs serially in the client (true)

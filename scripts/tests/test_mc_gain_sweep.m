@@ -66,9 +66,16 @@
 %      the settings and the job signature, so the default readout into the
 %      same folder is refused as a different run; rk4 is refused at the
 %      noisy level before any compute; mc_sweep_quantity words the axis.
+%  13. THE LYAPUNOV RUN'S ESTIMATOR IS THE CALLER'S (lya_method): the
+%      gain by release_sigma_all grid again with Benettin, whose perturbed
+%      trajectory gets the release kicks. Memory capacity is the top-K
+%      run's bit for bit, lambda_1 is another finite number, a job run
+%      alone repeats its exponents, the estimator is in the settings and,
+%      when it is not top-K, in the job signature (a top-K run's signature
+%      is unchanged), and the two are never mixed in one folder.
 %
 % Prints [PASS]/[FAIL] per check and errors at the end if anything failed.
-% About 160 s. Assumes setup_paths has run.
+% About 200 s. Assumes setup_paths has run.
 
 n_fail = 0;
 preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain';
@@ -577,6 +584,56 @@ n_fail = n_fail + report(strcmp(Q12.label, 'release noise \sigma_\gamma') ...
 % The other release axis has wording too.
 n_fail = n_fail + report(all(ismember({'release_sigma_all', 'release_rate_all', 'sigma_u_noise'}, mc_sweep_quantity())), ...
     'mc_sweep_quantity words release_sigma_all, release_rate_all and sigma_u_noise');
+
+%% ---- 13. the Lyapunov run's estimator is the caller's: Benettin ----
+% The default, top-K, follows the Jacobian of the mean dynamics; under
+% release noise Benettin's perturbed trajectory gets the kicks too. The
+% same gain x release_sigma_all grid as section 12 with lya_method
+% 'benettin': the memory capacity is the top-K run's to the bit (the
+% estimator touches the Lyapunov run only), lambda_1 is another number, the
+% estimator is in the settings and, because it is not the default, in the
+% job signature; a top-K run's signature does not name it.
+fprintf('\n=== 13. lya_method = ''benettin'' ===\n');
+G13 = grids12(1);
+axes13 = [G13.axis_args, {'second_axis', 'release_sigma_all', 'readout_signal', 'release_filtered'}];
+tmp13 = fullfile(tmp, 'release_benettin');
+[out13, f13] = run_mc_gain_sweep(common12{:}, axes13{:}, 'second_levels', release_levels, ...
+    'lya_method', 'benettin', 'output_dir', tmp13);
+L13 = load(f13);
+T13 = L13.T;
+Ltop = load(fullfile(tmp, 'release_gain', 'mc_gain_sweep', 'mc_gain_sweep_results.mat'));
+Ttop = Ltop.T;
+J13 = load(fullfile(out13, 'jobs', getfield(dir(fullfile(out13, 'jobs', 'job_*.mat')), {1}, 'name')));
+Jtop = load(fullfile(tmp, 'release_gain', 'mc_gain_sweep', 'jobs', ...
+    getfield(dir(fullfile(tmp, 'release_gain', 'mc_gain_sweep', 'jobs', 'job_*.mat')), {1}, 'name')));
+lle13 = [T13.lle_input, T13.lle_noinput];
+lletop = [Ttop.lle_input, Ttop.lle_noinput];
+n_fail = n_fail + report(height(T13) == 8 && ~any(T13.failed) && all(isfinite(lle13(:))) ...
+    && isequal(T13(:, {'gain', 'release_sigma_all', 'seed', 'condition'}), Ttop(:, {'gain', 'release_sigma_all', 'seed', 'condition'})) ...
+    && isequal(T13.mc_total, Ttop.mc_total) && isequal(T13.R2_delay, Ttop.R2_delay) ...
+    && all(lle13(:) ~= lletop(:)), ...
+    sprintf(['Benettin: 8 rows, lambda_1 finite and not the top-K number; memory capacity is the top-K run''s ' ...
+    'bit for bit (largest |lambda_1 difference| %.2f 1/s on this 3 s window)'], max(abs(lle13(:) - lletop(:)))));
+n_fail = n_fail + report(strcmp(L13.settings.lya_method, 'benettin') && strcmp(Ltop.settings.lya_method, 'topk') ...
+    && strcmp(s.lya_method, 'topk') && isfield(J13.job.signature, 'lya_method') ...
+    && strcmp(J13.job.signature.lya_method, 'benettin') && ~isfield(Jtop.job.signature, 'lya_method'), ...
+    'the estimator is in the settings; in the job signature only when it is not top-K');
+% One job of it again, alone, into another folder: the same exponents, so a
+% job's perturbation does not depend on what else the run holds.
+[~, f13b] = run_mc_gain_sweep(common12{:}, 'gain_levels', gains(2), 'second_axis', 'release_sigma_all', ...
+    'readout_signal', 'release_filtered', 'second_levels', release_levels(2), 'lya_method', 'benettin', ...
+    'output_dir', fullfile(tmp, 'release_benettin_one'));
+T13b = getfield(load(f13b), 'T');
+same13 = T13(T13.gain == gains(2) & T13.release_sigma_all == release_levels(2), :);
+n_fail = n_fail + report(height(T13b) == 2 && isequal(T13b.lle_input, same13.lle_input) ...
+    && isequal(T13b.lle_noinput, same13.lle_noinput) && isequal(T13b.mc_total, same13.mc_total), ...
+    'a Benettin job run alone gives the exponents it gave in the grid');
+n_fail = n_fail + report(strcmp(error_id(@() run_mc_gain_sweep(common12{:}, axes13{:}, 'second_levels', release_levels, ...
+        'output_dir', tmp13)), 'run_mc_gain_sweep:DifferentRun') ...
+    && contains(error_id(@() run_mc_gain_sweep(common12{:}, axes13{:}, 'second_levels', release_levels, ...
+        'lya_method', 'qr', 'output_dir', fullfile(tmp, 'never13'))), 'validat', 'IgnoreCase', true) ...
+    && ~isfolder(fullfile(tmp, 'never13')), ...
+    'a top-K run into the Benettin run''s folder is a different run; an unknown estimator is refused');
 
 %% ---- Verdict ----
 fprintf('\n');
