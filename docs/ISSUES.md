@@ -1253,4 +1253,30 @@ becomes an issue with an acceptance test.
   `run_memory_capacity` computes Lyapunov exponents, so Benettin on a noisy
   reservoir re-integrates without the noise. The sweeps do not use that
   path.
+- **Progress (2026-11-14):** merged: P2 the noise-levels time-series
+  figure (`5ffbef3`), P1 the sweep's general first axis (`cd3b891`), N1
+  release noise in the model class (`76201a0`; quick suite on its branch
+  86 of 86, no reference touched). Running: N2 the reservoir's lean path
+  and filtered readout (`matlab-fable-1`); the gate on merged main and the
+  gamma time-series figure (`matlab-opus-3`).
+- **Lead's decision after N1, the noise axis stays as planned:** r_s = 0.01
+  and sigma_gamma from 0 to 0.014. N1 measured that no single
+  Wiener-equivalent level exists: equating the variance injected into x
+  with sigma_u = 0.025 gives sigma_gamma of 0.0047 (no adaptation), 0.0089
+  (1TS), 0.0115 (chain) and 0.0259 (product), because the release is
+  scaled by each condition's pools. So the axis is read in its own units
+  and the maps' captions give these values; the plan's sentence "equal
+  positions on the two axes mean about equal noise" is withdrawn. The axis
+  is not widened: at a fixed leak a larger sigma_gamma means rarer, larger
+  events (at 0.014 the equivalent pool is about 13 vesicles; at 0.05 it
+  would be one), and a larger leak moves the mean network (r_s = 0.01
+  alone moves the 1TS lambda_1 from +0.37 to +0.11). Reaching the product
+  form's equivalent would need a larger leak: a choice for Tom after he
+  sees the first maps.
+- **Also from N1:** the net release of a step is not exactly non-negative
+  (with a zero draw the leak and the kick cancel to second order in the
+  step, about -1e-4 of r_s dt); pools never go negative. Entry points that
+  choose their solver from `sigma_u_noise` alone (`run_memory_capacity`,
+  `run_dc_lle_analysis`, the sweep driver's pre-flight) are being checked
+  in N2 to fail loudly rather than run without kicks.
 - **Result:** _(pending)_
