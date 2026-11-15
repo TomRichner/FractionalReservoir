@@ -672,13 +672,15 @@ end
 
 function dTheta = released(s_after, dRc, P)
 %RELEASED The amount kick released, from the state AFTER it and dRc.
+% s_after may be npre x ns x nt with dRc npre x 1 x nt (nt steps);
+% dTheta is then npre x 1 x nt.
 if P.has_g
-    dRc = s_after(:, P.n_b + 1) .* dRc;
+    dRc = s_after(:, P.n_b + 1, :) .* dRc;
 end
 if P.n_b == 0
     dTheta = dRc;
 else
-    dTheta = P.tau_rel .* s_after(:, 1) .* expm1(dRc ./ P.tau_rel);
+    dTheta = P.tau_rel .* s_after(:, 1, :) .* expm1(dRc ./ P.tau_rel);
 end
 end
 

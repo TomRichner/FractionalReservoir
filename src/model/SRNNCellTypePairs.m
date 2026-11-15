@@ -1019,10 +1019,7 @@ classdef SRNNCellTypePairs < handle
                 return;
             end
 
-            seed = obj.noise_seed;
-            if isempty(seed)
-                seed = obj.rng_seeds(1) + 224737;
-            end
+            seed = obj.noise_base_seed();
 
             % The draw, and the splice when noise_seed_schedule names later
             % seeds, is wiener_increments; with no schedule it is the draw
@@ -1045,14 +1042,8 @@ classdef SRNNCellTypePairs < handle
                 'idx', obj.cached_params.state_layout.x);
 
             if release_on
-                % One row per presynaptic neuron, its type's rate and sigma.
                 params = obj.cached_params;
-                rate = zeros(obj.n, 1);
-                sigma = zeros(obj.n, 1);
-                for q = 1:obj.n_cellTypes
-                    rate(params.type_indices{q}) = obj.release_rate(q);
-                    sigma(params.type_indices{q}) = obj.release_sigma(q);
-                end
+                [rate, sigma] = obj.release_noise_rows();
                 % Centered on the mean r_s dt, which is in the drift. A type
                 % without release noise has no kick: its rows are the leak
                 % minus itself (the generator's own expression), zero.
@@ -1063,6 +1054,30 @@ classdef SRNNCellTypePairs < handle
                     @(S, j) SRNNCellTypePairs.release_kick(S, dRc(:, j), params);
                 obj.noise_increments.kick_steps = n_steps;
                 obj.noise_increments.release = struct('dRc', dRc, 'seed', seed);
+            end
+        end
+
+        function seed = noise_base_seed(obj)
+            % NOISE_BASE_SEED The seed both noise sources are drawn from:
+            % noise_seed, or rng_seeds(1) + 224737 when it is empty. (The
+            % release increments add their own offset: release_increments.)
+            seed = obj.noise_seed;
+            if isempty(seed)
+                seed = obj.rng_seeds(1) + 224737;
+            end
+        end
+
+        function [rate, sigma] = release_noise_rows(obj)
+            % RELEASE_NOISE_ROWS r_s and sigma_gamma of every presynaptic
+            % neuron, n x 1 each, in type order: its cell type's
+            % release_rate and release_sigma, as release_increments takes
+            % them. For a built model.
+            params = obj.cached_params;
+            rate = zeros(obj.n, 1);
+            sigma = zeros(obj.n, 1);
+            for q = 1:obj.n_cellTypes
+                rate(params.type_indices{q}) = obj.release_rate(q);
+                sigma(params.type_indices{q}) = obj.release_sigma(q);
             end
         end
 
@@ -3019,6 +3034,101 @@ classdef SRNNCellTypePairs < handle
             for post = 1:C
                 rows = x_rows(params.type_indices{post});
                 S(rows) = S(rows) + to_x(params.type_indices{post}, post) ./ params.tau_d;
+            end
+        end
+
+        function kicked = released_by_kick(S_after, dRc, params)
+            %RELEASED_BY_KICK What each step's release kick released, per route, from the stored states.
+            %
+            %   kicked = SRNNCellTypePairs.released_by_kick(S_after, dRc, params)
+            %
+            % S_after  nt x N: the states at the END of nt steps, one row a
+            %          step, as the integrator stores them (after the
+            %          step's kick).
+            % dRc      n x nt: each presynaptic neuron's centered
+            %          release-drive increment of those steps, dR - r_s dt
+            %          (column c belongs to the step that ended at row c);
+            %          or [] when the run has no release noise.
+            % kicked   keyed by route as synaptic_output is
+            %          (kicked.E.I, ...), npre x nt: the amount dTheta the
+            %          kick of each step released on that route, the
+            %          quantity release_kick added to the dendrites as
+            %          W dTheta / tau_d. Zeros for a presynaptic type
+            %          without release noise.
+            %
+            % NOTHING IS STORED DURING THE RUN FOR THIS: the amount is a
+            % function of the state after the kick and the increment (the
+            % route model's `released`), so it is recovered here and the
+            % model carries no variable for it. It is the zero-mean part
+            % of a step's release. The mean part is in the drift: the
+            % synaptic output theta = F (r + r_s) of
+            % unpack_and_compute_states, per unit time (release_per_step
+            % adds the two).
+            %
+            % See also: release_kick, release_per_step, route_model
+            nt = size(S_after, 1);
+            route = SRNNCellTypePairs.active_routes(params);
+            kicked = struct();
+            for pre = 1:params.n_cellTypes
+                pre_name = params.cell_type_names{pre};
+                pre_idx = params.type_indices{pre};
+                npre = params.n_per_type(pre);
+                noisy = ~isempty(dRc) && ~isempty(params.release_sigma) ...
+                    && params.release_sigma(pre) > 0;
+                kicked.(pre_name) = struct();
+                for post = 1:params.n_cellTypes
+                    post_name = params.cell_type_names{post};
+                    if ~noisy
+                        kicked.(pre_name).(post_name) = zeros(npre, nt);
+                        continue
+                    end
+                    R = route{pre, post};
+                    s = reshape(S_after(:, R.idx)', npre, R.P.ns, nt);
+                    kicked.(pre_name).(post_name) = reshape(R.model.released(s, ...
+                        reshape(dRc(pre_idx, :), npre, 1, nt), R.P), npre, nt);
+                end
+            end
+        end
+
+        function [release, theta, kicked] = release_per_step(S, dRc, params, dt)
+            %RELEASE_PER_STEP The realized release of every route over each step of a stored trajectory.
+            %
+            %   [release, theta, kicked] = SRNNCellTypePairs.release_per_step(S, dRc, params, dt)
+            %
+            % S      nt x N: consecutive stored samples, dt apart.
+            % dRc    n x (nt - 1): the centered release-drive increments of
+            %        the steps between them (column k is the step from row
+            %        k to row k + 1), or [] without release noise.
+            % All three outputs are keyed by route (.E.I, ...):
+            %   theta    npre x nt        the synaptic output of the mean
+            %                             dynamics at each sample,
+            %                             F (r + r_s), per unit time
+            %   kicked   npre x (nt - 1)  what each step's kick released
+            %                             (released_by_kick)
+            %   release  npre x (nt - 1)  the release over each step: the
+            %                             mean part, theta integrated over
+            %                             the step by the trapezoid of its
+            %                             two samples, plus the kick.
+            % Dividing `release` by dt gives a release rate per step whose
+            % average over many steps is the mean synaptic output; with
+            % release noise off it is the trapezoid average of theta. The
+            % stored state at the end of a step is the state after its
+            % kick, so theta at a sample is the mean output just after the
+            % kick that landed there.
+            %
+            % See also: released_by_kick, release_kick,
+            %           SRNN_ESN_reservoir.filter_release
+            [~, ~, ~, ~, theta] = SRNNCellTypePairs.unpack_and_compute_states(S, params);
+            kicked = SRNNCellTypePairs.released_by_kick(S(2:end, :), dRc, params);
+            release = struct();
+            for pre = 1:params.n_cellTypes
+                pre_name = params.cell_type_names{pre};
+                for post = 1:params.n_cellTypes
+                    post_name = params.cell_type_names{post};
+                    th = theta.(pre_name).(post_name);
+                    release.(pre_name).(post_name) = ...
+                        (dt / 2) .* (th(:, 1:end - 1) + th(:, 2:end)) + kicked.(pre_name).(post_name);
+                end
             end
         end
 

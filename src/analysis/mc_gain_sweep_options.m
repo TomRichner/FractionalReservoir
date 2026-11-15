@@ -27,6 +27,7 @@ arguments
     opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     opts.model_args   (1,:) cell   = {}
     opts.protocol     (1,1) struct = struct()
+    opts.readout_signal (1,:) char {mustBeMember(opts.readout_signal, {'', 'rate', 'synaptic', 'release_filtered'})} = ''   % '' = mc_protocol's
     opts.lya_K        (1,1) double {mustBeInteger, mustBePositive} = 5
     opts.lya_T_sec    (1,1) double {mustBePositive} = 30
     opts.lya_acc_sec  (1,1) double {mustBePositive} = 20

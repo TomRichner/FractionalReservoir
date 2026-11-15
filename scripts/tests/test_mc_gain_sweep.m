@@ -56,9 +56,19 @@
 %      sigma_u_noise grid from ranges, passing first_levels and
 %      second_levels; gain_levels on that grid is refused; a default grid
 %      still passes gain_levels and bias_levels. No compute.
+%  12. RELEASE NOISE AS AN AXIS (FD-027): gain by release_sigma_all and
+%      self_coupling by release_sigma_all, with model_args turning the
+%      Wiener term off and the spontaneous release rate on, read through
+%      the 'release_filtered' readout (the option readout_signal). Each
+%      job runs at its own release noise (the noisy row is the hand-built
+%      reservoir on the lean path, bit for bit; memory capacity and
+%      lambda_1 differ from the leak alone); the readout is recorded in
+%      the settings and the job signature, so the default readout into the
+%      same folder is refused as a different run; rk4 is refused at the
+%      noisy level before any compute; mc_sweep_quantity words the axis.
 %
 % Prints [PASS]/[FAIL] per check and errors at the end if anything failed.
-% About 110 s. Assumes setup_paths has run.
+% About 160 s. Assumes setup_paths has run.
 
 n_fail = 0;
 preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain';
@@ -501,6 +511,72 @@ ad = pl_default.runs(1).args;
 n_fail = n_fail + report(strcmp(error_id(@() mc_gain_sweep_stage_plan(bad11)), 'mc_gain_sweep_stage_plan:BadConfig') ...
     && any(strcmp(ad(1:2:end), 'gain_levels')) && any(strcmp(ad(1:2:end), 'bias_levels')), ...
     'gain_levels on a self-coupling axis is refused; a default grid still passes gain_levels and bias_levels');
+
+%% ---- 12. release noise as an axis, read through the filtered readout ----
+fprintf('\n=== 12. gain by release_sigma_all, self_coupling by release_sigma_all ===\n');
+release_levels = [0 0.014];
+release_args = [model_args, {'sigma_u_noise', 0, 'release_rate', 0.01}];
+common12 = common;
+common12{find(strcmp(common12, 'model_args')) + 1} = release_args;
+grids12 = struct('label', {'gain', 'self_coupling'}, 'first_levels', {gains, [-1 0]}, ...
+    'axis_args', {{'gain_levels', gains}, {'first_axis', 'self_coupling', 'first_levels', [-1 0]}}, ...
+    'property', {'level_of_chaos', 'self_coupling'});
+for g = 1:numel(grids12)
+    G12 = grids12(g);
+    tmp12 = fullfile(tmp, ['release_' G12.label]);
+    [out12, f12] = run_mc_gain_sweep(common12{:}, G12.axis_args{:}, 'second_axis', 'release_sigma_all', ...
+        'second_levels', release_levels, 'readout_signal', 'release_filtered', 'output_dir', tmp12);
+    L12 = load(f12);
+    T12 = L12.T;  s12 = L12.settings;
+    J12 = load(fullfile(out12, 'jobs', getfield(dir(fullfile(out12, 'jobs', 'job_*.mat')), {1}, 'name')));
+    num12 = [T12.mc_total, T12.lle_input, T12.lle_noinput, T12.rate_E, T12.rate_I];
+    n_fail = n_fail + report(height(T12) == 8 && ~any(T12.failed) && all(isfinite(num12(:))) ...
+        && isequal(unique(T12.release_sigma_all)', release_levels) ...
+        && isequal(unique(T12.(G12.label))', sort(G12.first_levels)) ...
+        && strcmp(s12.readout_signal, 'release_filtered') ...
+        && strcmp(s12.protocol.readout_signal, 'release_filtered') ...
+        && strcmp(J12.job.signature.protocol.readout_signal, 'release_filtered') ...
+        && s12.preset_release_sigma_all == 0 && strcmp(s12.ode_solver, 'sra1'), ...
+        sprintf(['%s x release_sigma_all: 8 rows, none failed, memory capacity, lambda_1 and rates finite; ' ...
+        'the readout is in the settings and in the job signature'], G12.label));
+    % Each job ran at its own release noise: the noisy row is the hand-built
+    % reservoir on the lean path in a single pass, and differs from sigma = 0;
+    % lambda_1 differs too (the Lyapunov run has the kicks).
+    noisy12 = true;
+    for c = 1:numel(conds)
+        cond = conditions{strcmp(names, conds{c})};
+        first_value = G12.first_levels(2);
+        esn = hand_built(d, cond, seed, release_args, protocol, P, ...
+            {G12.property, first_value, 'release_sigma_all', release_levels(2)});
+        esn.build();
+        [mc_ref, r2_ref] = esn.run_memory_capacity_lean('readout_signal', 'release_filtered', ...
+            'segment_len', 1e6, 'verbose', false);
+        at = T12.(G12.label) == first_value & strcmp(T12.condition, conds{c});
+        row = T12(at & T12.release_sigma_all == release_levels(2), :);
+        quiet = T12(at & T12.release_sigma_all == 0, :);
+        noisy12 = noisy12 && height(row) == 1 && isequal(row.R2_delay, r2_ref(:)') && row.mc_total == mc_ref ...
+            && row.mc_total ~= quiet.mc_total && row.lle_input ~= quiet.lle_input;
+    end
+    n_fail = n_fail + report(noisy12, sprintf( ...
+        ['%s x release_sigma_all: at sigma_gamma = 0.014 each condition is the hand-built reservoir ' ...
+         'with release noise, bit for bit, and differs from the leak alone in memory capacity and lambda_1'], G12.label));
+end
+D12 = read_mc_gain_sweep(f12);          % the self-coupling grid
+Q12 = mc_sweep_quantity('release_sigma_all', D12);
+never12 = fullfile(tmp, 'never12');
+[id12, msg12] = error_id(@() run_mc_gain_sweep(common12{:}, 'gain_levels', gains, 'second_axis', 'release_sigma_all', ...
+    'second_levels', release_levels, 'ode_solver', 'rk4', 'output_dir', never12));
+n_fail = n_fail + report(strcmp(Q12.label, 'release noise \sigma_\gamma') ...
+    && strcmp(getfield(mc_sweep_quantity('self_coupling', D12), 'label'), 'self-coupling s (R_W)') ...
+    && strcmp(error_id(@() run_mc_gain_sweep(common12{:}, grids12(2).axis_args{:}, 'second_axis', 'release_sigma_all', ...
+        'second_levels', release_levels, 'output_dir', tmp12)), 'run_mc_gain_sweep:DifferentRun') ...
+    && strcmp(id12, 'run_mc_gain_sweep:BadJobModel') && contains(msg12, 'release_sigma_all 0.014') ...
+    && ~isfolder(never12) && strcmp(s.readout_signal, 'synaptic'), ...
+    ['the axis reads "release noise \sigma_\gamma"; the default readout into the same folder is a different run; ' ...
+     'with rk4 the job at release_sigma_all 0.014 is refused before any compute; a default run records ''synaptic''']);
+% The other release axis has wording too.
+n_fail = n_fail + report(all(ismember({'release_sigma_all', 'release_rate_all', 'sigma_u_noise'}, mc_sweep_quantity())), ...
+    'mc_sweep_quantity words release_sigma_all, release_rate_all and sigma_u_noise');
 
 %% ---- Verdict ----
 fprintf('\n');
