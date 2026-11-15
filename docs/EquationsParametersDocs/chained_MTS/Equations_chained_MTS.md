@@ -115,6 +115,10 @@ as a second noise source, beside the Wiener term.
 [Section 12](#12-proposed-extension-the-release-noise-as-a-gamma-process)
 writes the same proposal with a gamma process in place of the Poisson counts,
 and works through its Jacobian and the estimation of its Lyapunov spectrum.
+Neither was built.
+[Section 13](#13-release-noise-as-implemented) states the release noise that
+is in the code: a gamma process whose increments do not depend on the state,
+scaled by the pool.
 
 This file states the network model with multiple-timescale (MTS) adaptation in
 its **chained** form: spike-frequency adaptation with $K$ timescales, short-term
@@ -1174,6 +1178,10 @@ position, which depends on the rates and pool states the network settles into.
 
 ## 11. Proposed extension: spontaneous quantal release as a second noise source
 
+**This section and section 12 are alternatives that were not implemented;
+the release noise as it is in the code is
+[section 13](#13-release-noise-as-implemented).**
+
 **Status: proposed (Tom, 2026-11-14). Not in the code, and nothing in
 sections 1 to 10 changes.** This section is self-contained: every equation of
 the extended system is written out here. An equation that changes has a new
@@ -1367,6 +1375,10 @@ $a_{ik}$ and $b_{i2}$ stay continuous.
   the counts replaced by the increments of a gamma process.
 
 ## 12. Proposed extension: the release noise as a gamma process
+
+**This section and section 11 are alternatives that were not implemented;
+the release noise as it is in the code is
+[section 13](#13-release-noise-as-implemented).**
 
 **Status: proposed (Tom, 2026-11-14). Not in the code, and nothing in
 sections 1 to 10 changes.** It is the proposal of
@@ -2076,3 +2088,427 @@ not the tangent step).
 - **The cap.** (S19) caps a draw at what the pool holds after the step's
   drift. It is a kink in the update map, rare unless pools run nearly empty;
   if they do, a smooth saturation would serve (c) better.
+
+## 13. Release noise as implemented
+
+**Status: in the code since 2026-11-14 (FD-027), off by default.** Sections 11
+and 12 proposed two forms of spontaneous release. Neither was built. What was
+built is a third, simpler form, the one Tom first wrote:
+$\theta = r\, g\, b_1 + g\, b_1 \cdot \text{noise}$, with a noise that does not
+depend on the state. This section is self-contained: every equation of the
+system is written out. An equation that changes has a new number, continuing
+after (S27); one that does not is repeated with its old number and the words
+"unmodified from above". As in sections 11 and 12 it is written for the
+simplified model of "The model at a glance", with release-coupled
+facilitation included; without facilitation set $g_i = 1$ and drop (S7) and
+(S8). The Wiener term of (S1) stays.
+[`../Equations_stability_paper.md`](../Equations_stability_paper.md), section
+"Release noise", states the same thing per route for every route model, and is
+the statement the code is checked against.
+
+**How it differs from sections 11 and 12.**
+
+- **The increment does not depend on the state.** In sections 11 and 12 the
+  rate or shape of the release process is proportional to the pool
+  ($\Lambda_i = \nu\, n_v\, b_{i1}$). Here each neuron draws from one fixed
+  gamma law, and the pool enters as a factor on what is drawn.
+- **The amplitude scales with the pool.** The spontaneous release of a step is
+  $g_i\, b_{i1}\, \Delta R_i$. Its mean is $g_i\, b_{i1}\, r_s\, \Delta t$ and
+  its **variance is proportional to the pool squared**,
+  $(g_i\, b_{i1})^2 \sigma_\gamma^2\, \Delta t$; in sections 11 and 12 the
+  variance is proportional to the pool,
+  $(\tau_{rel} / n_v)\, r_s\, b_{i1}\, \Delta t$.
+- **Release probability scales it too.** Spontaneous release is multiplied by
+  $g_i$ like evoked release (12.11 left that open and chose no).
+- **Two parameters of the noise itself**, $r_s$ and $\sigma_\gamma$, in place
+  of a vesicle count $n_v$ and a rate $\nu$.
+- **The mean is in the drift, as a leak**, and only the zero-mean rest is
+  applied as a kick (13.3). Sections 11 and 12 apply the whole increment as a
+  kick.
+- **The kick is the exact solution of the release terms**, so a pool cannot
+  go negative and no cap is needed; the cap of (S19) is gone.
+- **Release is non-negative except to second order in the step**: when a draw
+  is zero the kick cancels the leak of that step to first order only.
+- **The increments are smooth in the state trivially** (they do not depend on
+  it), so the pathwise tangent of 12.6 needs no derivative of a quantile
+  function: $\kappa$ of (S24) does not appear.
+
+### 13.1 Two parameters and one process
+
+| Symbol | Meaning | Unit | In the code |
+|:--------------|:------------------------------------------------|:------|:--------------------|
+| $r_s$ | mean spontaneous release drive, an added rate at the synapse | as $r_i$ | `release_rate` |
+| $\sigma_\gamma$ | noise amplitude: the variance of the release drive per unit time is $\sigma_\gamma^2$ | $\sqrt{\text{s}}$ | `release_sigma` |
+| $R_i(t)$ | spontaneous release drive of neuron $i$ up to time $t$, a gamma process | s | |
+| $\Delta t$ | the simulation step | s | `1 / fs` |
+| $\Delta R_i$, $\Delta R^c_i = \Delta R_i - r_s\, \Delta t$ | one step's increment, and its centered part | s | `release_increments`, `dRc` |
+| $\rho_i = r_i + r_s$ | the release drive of the mean dynamics | as $r_i$ | `release_drive` |
+| $\Delta\Theta_i$ | what one step's kick releases | s | `kick`, `released` |
+
+In the code both parameters are given per presynaptic cell type.
+
+**The process.** $R_i(t)$ only increases. Its increments over disjoint
+intervals are independent, independent between neurons, and independent of
+the state:
+
+$$
+dR_i \sim \mathrm{Gamma}\!\left( \text{shape } \frac{r_s^2}{\sigma_\gamma^2}\, dt,\ \ \text{scale } \frac{\sigma_\gamma^2}{r_s} \right),
+\qquad \mathrm{E}[dR_i] = r_s\, dt, \qquad \mathrm{Var}[dR_i] = \sigma_\gamma^2\, dt \tag{S28}
+$$
+
+The gamma law is infinitely divisible, so (S28) holds on any time grid and the
+sum of the increments of two half steps is the increment of the full step.
+$\sigma_\gamma = 0$ with $r_s > 0$ is the limit of a steady leak,
+$dR_i = r_s\, dt$. $\sigma_\gamma > 0$ needs $r_s > 0$. At a fixed $r_s$ a
+larger $\sigma_\gamma$ means rarer, larger events: the shape of one step's
+increment is $r_s^2 \Delta t / \sigma_\gamma^2$, about $0.01$ at
+$(r_s, \sigma_\gamma) = (0.01, 0.007)$ and $2 \times 10^{-4}$ at
+$(0.002, 0.01)$ with $\Delta t = 5$ ms.
+
+### 13.2 The system
+
+The release drive of neuron $i$ over a time $dt$ is $r_i\, dt + dR_i$. It
+stands wherever the rate drives release: in the synaptic output and in the
+depletion of the releasable pool. What follows the rate itself (adaptation,
+release probability, the calcium trace) does not see it.
+
+**Synaptic output** (replaces (S9)), written for the amount released in $dt$:
+
+$$
+d\Theta_i = g_i\, b_{i1} \left( r_i\, dt + dR_i \right) \tag{S29}
+$$
+
+**Dendritic state** (replaces (S1)): everything a synapse releases reaches
+the neurons it projects to, through the same weights.
+
+$$
+\tau_d\, dx_i = \left( -x_i + u_i \right) dt + \sum_{j=1}^{N} w_{ij}\, d\Theta_j + \sigma_u\, dW_i \tag{S30}
+$$
+
+**Firing rate** ((S2), unmodified from above).
+
+$$
+r_i = \phi\!\left( x_i - a_0 - \frac{c}{K} \sum_{k=1}^{K} a_{ik} \right) \tag{S2}
+$$
+
+**Spike-frequency adaptation** ((S3), unmodified from above).
+
+$$
+\frac{da_{ik}}{dt} = \frac{-a_{ik} + r_i}{\tau_{a_k}}, \qquad k = 1, \dots, K \tag{S3}
+$$
+
+**Releasable pool** (replaces (S10)): everything released leaves the pool.
+
+$$
+db_{i1} = \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}}\, dt - \frac{g_i\, b_{i1}}{\tau_{rel}} \left( r_i\, dt + dR_i \right) \tag{S31}
+$$
+
+**Reserve** ((S6), unmodified from above).
+
+$$
+\frac{db_{i2}}{dt} = \frac{1 - b_{i2}}{\tau_{rec_2}} - \frac{1}{n_2}\, \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} \tag{S6}
+$$
+
+**Release probability** ((S7), unmodified from above).
+
+$$
+\frac{dg_i}{dt} = \frac{1 - g_i}{\tau_{dec}} + \frac{\left( G - g_i \right) h_i}{\tau_{fac}} \tag{S7}
+$$
+
+**Calcium trace** ((S8), unmodified from above). Spontaneous release does not
+raise it.
+
+$$
+\frac{dh_i}{dt} = \frac{r_i - h_i}{\tau_h} \tag{S8}
+$$
+
+(S31) is the refill minus $d\Theta_i / \tau_{rel}$, as in sections 11 and 12.
+
+### 13.3 How it is computed: a leak and a kick
+
+The increment of a step is split into its mean and a zero-mean rest,
+
+$$
+\Delta R_i = r_s\, \Delta t + \Delta R^c_i, \qquad \mathrm{E}[\Delta R^c_i] = 0, \qquad \Delta R^c_i \ge -r_s\, \Delta t \tag{S32}
+$$
+
+**The mean is in the drift.** With $\rho_i = r_i + r_s$ the drift of (S29) to
+(S31) is the model of (S1) to (S10) with the rate replaced by $\rho_i$ at the
+synapse, and nowhere else:
+
+$$
+\begin{aligned}
+\bar{\theta}_i &= \rho_i\, g_i\, b_{i1} \\
+\tau_d\, \dot{x}_i &= -x_i + u_i + \sum_{j} w_{ij}\, \rho_j\, g_j\, b_{j1} \\
+\dot{b}_{i1} &= \frac{b_{i2} \left( 1 - b_{i1} \right)}{\tau_{rec_1}} - \frac{g_i\, b_{i1}\, \rho_i}{\tau_{rel}}
+\end{aligned} \tag{S33}
+$$
+
+with (S2), (S3), (S6), (S7) and (S8) unchanged. These are the **mean
+dynamics**. The integrator advances them one step by its own scheme (SRA1 in
+the sweeps), Wiener increment included.
+
+**The rest is a kick**, applied to the state after the whole step. The
+releasable pool moves by the exact solution of its release term alone,
+$db_{i1} / dR = -g_i b_{i1} / \tau_{rel}$, over the drive $\Delta R^c_i$, at
+the release probability the step ended with; what the pool loses, times
+$\tau_{rel}$, is what was released, and that goes to the dendrites:
+
+$$
+\begin{aligned}
+\alpha_i &= \frac{g_i\, \Delta R^c_i}{\tau_{rel}}, \qquad
+b_{i1}^{+} = b_{i1}\, e^{-\alpha_i}, \qquad
+\Delta\Theta_i = \tau_{rel} \left( b_{i1} - b_{i1}^{+} \right) = \tau_{rel}\, b_{i1} \left( 1 - e^{-\alpha_i} \right) \\
+x_i^{+} &= x_i + \frac{1}{\tau_d} \sum_{j=1}^{N} w_{ij}\, \Delta\Theta_j
+\end{aligned} \tag{S34}
+$$
+
+Nothing else moves: $a_{ik}$, $b_{i2}$, $g_i$ and $h_i$ are not kicked.
+$\Delta\Theta_i$ is $g_i\, b_{i1}\, \Delta R^c_i$ to first order in the draw,
+the linear law of (S29), and less for a large draw, because the pool empties
+as it releases. A negative $\Delta R^c_i$ (a draw below the mean) gives back
+part of what the leak took in the step: $\Delta\Theta_i < 0$ and the pool
+rises.
+
+**The released amount is recovered, not stored.** From the state after the
+kick,
+
+$$
+\Delta\Theta_i = \tau_{rel}\, b_{i1}^{+} \left( e^{\alpha_i} - 1 \right) \tag{S35}
+$$
+
+so the model carries no variable for it (a filter state per neuron would add
+$N$ exponents at $-1 / \tau_d$ that mean nothing to the dynamics).
+
+**Properties of the exact kick.**
+
+- $b_{i1}^{+} > 0$ whatever the draw: no cap.
+- Kicks compose: a kick by $\alpha$ then by $\alpha'$ is one kick by
+  $\alpha + \alpha'$.
+- **Mean.** Averaged over the draws at a fixed state, a step's spontaneous
+  release (leak plus kick) is, to first order in $\Delta t$, that of the
+  linear law with $r_s$ replaced by $r_s^{\mathrm{eff}}$ of (S36). With
+  $\tau_{rel} = 0.25$ s and $g_i = 1$: $0.990\, r_s$ at
+  $(r_s, \sigma_\gamma) = (0.01, 0.007)$, $0.963\, r_s$ at $(0.01, 0.014)$,
+  $0.912\, r_s$ at $(0.002, 0.01)$.
+- **Sign.** A step's total release is the drift's
+  $\bar{\theta}_i\, \Delta t$ plus $\Delta\Theta_i$. It is positive except
+  when the draw is zero ($\Delta R^c_i = -r_s \Delta t$), where the kick
+  cancels the leak to first order and a remainder of second order in the
+  step is left, about $-10^{-4}\, r_s\, \Delta t$ at the values used.
+- **Order.** The kick is exact for the release term; what is first order in
+  the step is its splitting from the drift. Measured strong order 1.0
+  (0.9 to 1.0 with the chain), error 0.2 to 0.3 % of the state's norm after
+  0.5 s at $\Delta t = 5$ ms.
+
+$$
+r_s^{\mathrm{eff}} = \frac{\tau_{rel}\, r_s^2}{g_i\, \sigma_\gamma^2}\, \ln\!\left( 1 + \frac{g_i\, \sigma_\gamma^2}{r_s\, \tau_{rel}} \right) \approx r_s \left( 1 - \frac{g_i\, \sigma_\gamma^2}{2\, r_s\, \tau_{rel}} \right) \tag{S36}
+$$
+
+### 13.4 The other synapse forms
+
+The same construction on the other forms a synapse can take
+([section 4](#4-reductions), and the product form of
+[section 7](#7-how-this-differs-from-the-product-form)). In each the drift
+uses $\rho_i$ in the synaptic output and in the pools' release terms, and the
+kick is the exact solution of those terms over $\Delta R^c_i$.
+
+- **Single pool (1TS):** (S34), with the reserve absent from the drift.
+- **Product of $M$ pools**, with $F_i = \prod_m b_{im}$:
+
+$$
+b_{im}^{+} = b_{im}\, e^{-\Delta R^c_i / \tau_{rel_m}}, \qquad
+\Delta\Theta_i = F_i\, \tau_e \left( 1 - e^{-\Delta R^c_i / \tau_e} \right), \qquad
+\frac{1}{\tau_e} = \sum_{m=1}^{M} \frac{1}{\tau_{rel_m}} \tag{S37}
+$$
+
+- **No depression:** $\Delta\Theta_i = g_i\, \Delta R^c_i$ ($g_i = 1$ without
+  facilitation), and no state of the synapse moves.
+
+A network without adaptation has the last form with $g_i = 1$: its release
+noise is additive and state-independent,
+$x_i^{+} = x_i + \tau_d^{-1} \sum_j w_{ij}\, \Delta R^c_j$, a noise on $x$
+like the Wiener term but with the covariance of $W W^{\top}$ and a gamma law.
+
+### 13.5 What it does
+
+- **Mean dynamics**: (S33), a steady leak $r_s$ at every synapse. The leak
+  alone moves the network a little: on the paper's network $r_s = 0.01$
+  moves the 1TS $\lambda_1$ from $+0.37$ to $+0.11$ per second.
+- **Fluctuation.** Given the state, the spontaneous release of a step has the
+  variance $(g_i b_{i1})^2 \sigma_\gamma^2 \Delta t$. It reaches $x$ through
+  the weights, so it scales with the gain, and neurons that share a
+  presynaptic neuron receive the same release.
+- **Size against the Wiener term.** Because the release is scaled by each
+  condition's pools there is no one $\sigma_\gamma$ equivalent to $\sigma_u$.
+  At $r_s = 0.01$ and gain 1 on the paper's network, the $\sigma_\gamma$ that
+  injects the same variance into $x$ as $\sigma_u = 0.025$ is 0.0047 without
+  adaptation, 0.0089 for 1TS, 0.0115 for chained MTS and 0.0259 for product
+  MTS.
+- **Limits.** $r_s = 0$ is the model of (S1) to (S10) to the bit.
+  $\sigma_\gamma = 0$ is the mean dynamics. $\sigma_u = 0$ leaves the release
+  as the only noise.
+- **Paths.** $x_i$ and $b_{i1}$ jump at the end of each step: most draws are
+  far below their mean, so most kicks are small and give back the step's
+  leak, and a few are large releases.
+
+### 13.6 The increments on a time grid
+
+The increment of a step is a function of the noise seed and the step's
+absolute index and of nothing else: one uniform $U_{i,n}$ per neuron from the
+step's own substream of the seed's random stream, turned into the variate by
+the inverse of the gamma distribution function,
+$\Delta R_{i,n} = (\sigma_\gamma^2 / r_s)\; Q\big( U_{i,n};\ r_s^2 \Delta t / \sigma_\gamma^2 \big)$
+with $Q$ the quantile function of 12.2. So a run integrated in segments
+consumes what a single pass consumes; a perturbed copy re-integrated over
+part of a run gets the kicks of the same steps; a seed schedule switches the
+release at the same step as the Wiener path; and two runs that differ only in
+$\sigma_\gamma$ get the same events, scaled.
+
+### 13.7 Reading out the release
+
+The output at one instant is not defined under release noise; what exists is
+the amount released over a window (11.4). The readout added for the new maps
+is each neuron's release through a first-order filter with the dendritic time
+constant, which is the term the model's own dendrites receive from that
+neuron, before the weights:
+
+$$
+\tau_d\, dy_i = -y_i\, dt + d\Theta_i \tag{S38}
+$$
+
+sampled at the end of each hold of the memory task. On the time grid, with
+$\bar{\theta}_i$ taken as the straight line between its stored values and a
+step's kick as an impulse at the end of the step, the filter's response is
+exact:
+
+$$
+y_{i,n+1} = \beta\, y_{i,n} + c_0\, \bar{\theta}_{i,n} + c_1\, \bar{\theta}_{i,n+1} + \frac{\Delta\Theta_{i,n+1}}{\tau_d},
+\qquad \beta = e^{-\Delta t / \tau_d}, \quad
+c_1 = 1 - \frac{\tau_d}{\Delta t} \left( 1 - \beta \right), \quad
+c_0 = \left( 1 - \beta \right) - c_1 \tag{S39}
+$$
+
+with $y_{i,1} = \bar{\theta}_{i,1}$. It is computed after the run from the
+stored states and the increments, by (S35). With release noise off it is the
+synaptic output low-passed at $\tau_d$.
+
+### 13.8 The Jacobian, and the three tangent dynamics in this form
+
+Notation and simplifications of section 10 (no facilitation, the state
+$z = (x;\ a_1;\ \dots;\ a_K;\ b_1;\ b_2)$, the diagonal matrices $\Phi'$,
+$R$, $B_1$, $B_2$).
+
+**The Jacobian of the mean dynamics** $\bar{J}$ is (22) and (23) with the two
+blocks that are derivatives with respect to $b_1$ changed. They have the form
+of (S21):
+
+$$
+\bar{J}_{x b_1} = \frac{1}{\tau_d}\, W \left( R + r_s I \right), \qquad
+\bar{J}_{b_1 b_1} = -\left( \frac{1}{\tau_{rec_1}} B_2 + \frac{1}{\tau_{rel}} \left( R + r_s I \right) \right) \tag{S40}
+$$
+
+Every other block is as in (23), because the leak does not depend on the
+rate. With facilitation $R + r_s I$ becomes $\mathrm{diag}(g_i \rho_i)$ in
+both, and the block $\partial \dot{b}_1 / \partial g$ is
+$-\mathrm{diag}(b_{i1} \rho_i) / \tau_{rel}$. This is the Jacobian the code
+has (`compute_Jacobian_fast`, `jacobian_times`), and the one top-K propagates
+along the stored noisy path.
+
+**The three definitions of 12.6, in this form.**
+
+- **(a) Release left out.** The Jacobian $J$ of section 10 at the noisy
+  states, without the leak. It differs from the other two systematically, by
+  a decay $r_s / \tau_{rel}$ of every pool and a coupling $r_s W / \tau_d$.
+  Not used.
+- **(b) The mean dynamics.** $\bar{J}$ of (S40) at the noisy states. What
+  top-K computes.
+- **(c) The pathwise derivative.** The increments do not depend on the state,
+  so holding the random numbers fixed is holding the increments fixed, and
+  the tangent step is the tangent step of the drift followed by the
+  derivative of the kick (S34), which is (S41). This is what Benettin
+  measures: its perturbed copy is re-integrated with the same increments.
+
+$$
+\begin{aligned}
+\delta b_{1}^{+} &= \mathrm{diag}\!\left( e^{-\alpha_i} \right) \delta b_{1} \\
+\delta x^{+} &= \delta x + \frac{\tau_{rel}}{\tau_d}\, W\, \mathrm{diag}\!\left( 1 - e^{-\alpha_j} \right) \delta b_{1}
+\end{aligned} \tag{S41}
+$$
+
+With facilitation (S41) gains the terms in $\delta g$:
+$-b_{i1}\, e^{-\alpha_i}\, (\Delta R^c_i / \tau_{rel})\, \delta g_i$ in the
+pool's row and
+$\tau_d^{-1}\, W\, \mathrm{diag}( b_{j1}\, e^{-\alpha_j}\, \Delta R^c_j )\, \delta g$
+in the $x$ rows.
+
+**How (c) differs from (b).** (b) is (c) with the kick's derivative left out.
+The factor on $\delta b_{i1}$ in its own row is $e^{-\alpha_i}$, and
+$\alpha_i$ has mean zero, so **the logarithm of that factor has mean zero**:
+for a pool on its own the pathwise exponent is exactly that of the mean
+dynamics, with no shift from the multiplicative noise (in section 12 that
+shift was $-\sigma_m^2 / 2$). What remains is the coupling of (S41) into the
+$x$ rows, whose coefficient $1 - e^{-\alpha_j}$ is $\alpha_j$ to first order,
+with mean zero and variance $(g_j / \tau_{rel})^2 \sigma_\gamma^2\, \Delta t$:
+a zero-mean multiplicative noise in the tangent dynamics whose rate,
+$\sigma_\gamma^2 / \tau_{rel}^2$, is $1.6 \times 10^{-3}$ per second at
+$\sigma_\gamma = 0.01$. Without depression the kick has no derivative at all
+and (b) and (c) are the same tangent.
+
+**What was measured** (2026-11-14, step N3). $\lambda_1$ by top-K (b) and by
+Benettin (c) on one stored trajectory per case, the memory-task input on,
+$\Delta t = 5$ ms: the regression network ($n = 100$, accumulated over 300 s)
+and the paper's network ($n = 500$, 100 s), four conditions each. The largest
+$|$top-K $-$ Benettin$|$ over the four conditions, per second, by
+$(r_s, \sigma_\gamma)$:
+
+| $r_s$ | $\sigma_\gamma$ | $n = 100$, gain 1 | $n = 500$, gain 1 | $n = 500$, gain 2 |
+|------:|------:|------:|------:|------:|
+| 0.002 | 0 | 0.001 | 0.007 | |
+| 0.002 | 0.0005 | 0.004 | 0.022 | |
+| 0.002 | 0.005 | 0.012 | 0.024 | |
+| 0.002 | 0.01 | 0.014 | 0.015 | 0.020 |
+| 0.01 | 0 | 0.003 | 0.010 | 0.016 |
+| 0.01 | 0.014 | 0.008 | 0.031 | 0.022 |
+
+(The rows with $\sigma_\gamma = 0$ are the leak alone.) Benettin's own
+scatter over two or three perturbation directions is 0.000 to 0.040,
+typically 0.005. The difference between the estimators exceeds that scatter
+in a number of cases, but it has no trend in $\sigma_\gamma$, no consistent
+sign, and is of the same size with the leak alone, where there is no kick,
+and without depression, where the kick has no derivative (the largest value
+in the table, 0.031, is the no-adaptation condition). It is the difference
+between two finite-time estimators on a window of 100 s, not a bias of the
+mean-dynamics tangent. Against it, $\lambda_1$ spans about $-3$ to $+6$ over
+these cases and the noise itself moves $\lambda_1$ by up to $0.6$ (no
+adaptation, $n = 50$, 300 s: $-2.14$ with the leak alone, $-2.78$ at
+$\sigma_\gamma = 0.014$, by both estimators). **So the maps' $\lambda_1$ is
+top-K's, up to $\sigma_\gamma = 0.01$ at $r_s = 0.002$ and $0.014$ at
+$r_s = 0.01$, the largest values measured.** The sweep can be switched to
+Benettin (`lya_method`).
+
+**Step size** (the same quantities at $\Delta t = 2.5$ ms and 5 ms on one
+release path, the coarse increments the sums of the fine ones; $r_s = 0.01$,
+$\sigma_\gamma = 0.007$ and $0.014$, regression network, 150 s). Where the
+path is stable the two steps give the same path to 1 to 2 % of the spread of
+$x$, $\lambda_1$ within 0.008, the mean release within 0.05 % and its
+variance within 0.2 %. Where the network is chaotic the paths decorrelate, as
+they do with the leak alone, and $\lambda_1$ differs between the two steps by
+0.02 to 0.3, which is what two noise realizations at one step differ by (0.07
+to 0.4). 5 ms is enough for the maps.
+
+### 13.9 Where it is in the code
+
+| What | Where |
+|:------------------------------|:------------------------------------------|
+| the leak in the drift, the kick (S34), the recovered release (S35), (S37) | `route_pool`, `route_product`: `rhs`, `linearize`, `steady_state`, `kick`, `released` |
+| the kick into $x$; the release of each step of a stored run | `SRNNCellTypePairs.release_kick`, `release_per_step` |
+| the increments (S28), 13.6 | `release_increments` |
+| the kick after each step of the scheme | `sde_fixed_step` |
+| the readout (S38), (S39) | `SRNN_ESN_reservoir.filter_release`, `readout_signal = 'release_filtered'` |
+| tests of the equations | `test_release_noise`, `test_release_noise_model`, `test_release_noise_reservoir` |
+| references | `test_regression_rapid_release` (exact), `test_regression_tolerance_release` (20 deliberate errors shown to be caught) |
+
+**Not checked.** The covariance equation (S23) in this form; exponents beyond
+the first under the pathwise tangent; a top-K implementation of (c) (not
+built: Benettin is the pathwise estimator).

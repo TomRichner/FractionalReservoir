@@ -395,6 +395,197 @@ matrix $W$ itself: for a network without adaptation,
 $J = \frac{1}{\tau_d}\left(-I + (g W^{0} - k R_W I)\, \Phi'\right)$.
 `test_self_feedback` checks the diagonal, the Jacobians and that expression.
 
+## Release noise: a gamma process in the synaptic output (optional)
+
+Added 2026-11-14 (FD-027). A second noise source beside the Wiener term on
+$x$: spontaneous synaptic release. **Off by default** (`release_rate` and
+`release_sigma` zero), and with both zero every number is what it was. Two
+parameters per presynaptic cell type $q$:
+
+| Symbol | Property | Meaning | Unit |
+|:--|:--|:--|:--|
+| $r_s$ | `release_rate` (`1 x C`; scalar alias `release_rate_all`) | mean spontaneous release drive | as the rate $r$ |
+| $\sigma_\gamma$ | `release_sigma` (`1 x C`; scalar alias `release_sigma_all`) | noise amplitude: the variance of the release drive per unit time is $\sigma_\gamma^2$ | $\sqrt{\text{s}}$ |
+
+**The law.** Over a step $\Delta t = 1/f_s$ each presynaptic neuron $j$ draws
+one non-negative increment, independent across neurons and steps and
+**independent of the state**, shared by all of that neuron's routes:
+
+$$
+\Delta R_j \sim \mathrm{Gamma}\!\left( \text{shape } \frac{r_s^2\, \Delta t}{\sigma_\gamma^2},\ \text{scale } \frac{\sigma_\gamma^2}{r_s} \right),
+\qquad \mathrm{E}[\Delta R_j] = r_s\, \Delta t, \qquad \mathrm{Var}[\Delta R_j] = \sigma_\gamma^2\, \Delta t .
+$$
+
+The neuron's **release drive** over the step is $r_j\, dt + dR_j$, and it
+stands wherever a route's equations use the rate to drive release: in the
+synaptic output and in the depletion of the route's pools. What follows the
+rate itself does not see it: SFA, the facilitation variables and the calcium
+trace. With $F_j$ the route's output factor ($\prod_m b_{jm} \prod_n g_{jn}$
+on a product route, $g_j b_{j1}$ on a pool route, 1 on a route without synapse
+dynamics):
+
+$$
+\begin{aligned}
+d\Theta_j &= F_j \left( r_j\, dt + dR_j \right) \\[4pt]
+\tau_d\, dx_i &= \left( -x_i + u_i \right) dt + \sum_j w_{ij}\, d\Theta_j + \sigma_u\, dW_i \\[4pt]
+db_{jm} &= \frac{1 - b_{jm}}{\tau_{rec_m}}\, dt - \frac{b_{jm}}{\tau_{rel_m}} \left( r_j\, dt + dR_j \right) && \text{(product route)} \\[4pt]
+db_{j1} &= \frac{b_{j2} \left( 1 - b_{j1} \right)}{\tau_{rec_1}}\, dt - \frac{g_j\, b_{j1}}{\tau_{rel}} \left( r_j\, dt + dR_j \right) && \text{(pool route)}
+\end{aligned}
+$$
+
+So the amplitude of the noise in the output scales with the pool (the factor
+$F_j$), the variance of a step's spontaneous release is $F_j^2 \sigma_\gamma^2
+\Delta t$, and what is released spontaneously leaves the pool.
+
+**How the code computes it: a leak and a kick.** The increment is split as
+$\Delta R_j = r_s \Delta t + \Delta R^c_j$, with the centered part
+$\Delta R^c_j \ge -r_s \Delta t$ of mean zero.
+
+*The mean is in the drift.* With $\rho_j = r_j + r_s$,
+
+$$
+\theta_j = F_j\, \rho_j, \qquad
+\frac{db_{jm}}{dt} = \frac{1 - b_{jm}}{\tau_{rec_m}} - \frac{b_{jm}\, \rho_j}{\tau_{rel_m}}, \qquad
+\frac{db_{j1}}{dt} = \frac{b_{j2} \left( 1 - b_{j1} \right)}{\tau_{rec_1}} - \frac{g_j\, b_{j1}\, \rho_j}{\tau_{rel}},
+$$
+
+and every other equation is unchanged (the facilitation and calcium-trace
+equations keep $r_j$). This is the **mean dynamics**: the model of the sections
+above with $r \to r + r_s$ at the synapse. With $\sigma_\gamma = 0$ and
+$r_s > 0$ it is the whole model (the exact leak, nothing drawn).
+
+*The rest is a kick* applied to the state after each whole step of the
+integrator (after the step's final Wiener update, never inside a stage). Each
+route is moved by the exact solution of its release terms alone over the drive
+$\Delta R^c_j$, and the amount released along the way goes to the dendrites:
+
+$$
+\begin{aligned}
+\text{pool route:}\quad & a_j = g_j\, \Delta R^c_j, \qquad
+b_{j1} \leftarrow b_{j1}\, e^{-a_j / \tau_{rel}}, \qquad
+\Delta\Theta_j = \tau_{rel}\, b_{j1} \left( 1 - e^{-a_j / \tau_{rel}} \right) \\[4pt]
+\text{product route:}\quad & b_{jm} \leftarrow b_{jm}\, e^{-\Delta R^c_j / \tau_{rel_m}}, \qquad
+\Delta\Theta_j = F_j\, \tau_e \left( 1 - e^{-\Delta R^c_j / \tau_e} \right), \qquad
+\frac{1}{\tau_e} = \sum_m \frac{1}{\tau_{rel_m}} \\[4pt]
+\text{no pool:}\quad & \Delta\Theta_j = F_j\, \Delta R^c_j \\[4pt]
+\text{dendrites:}\quad & x_i \leftarrow x_i + \frac{1}{\tau_d} \sum_j w_{ij}\, \Delta\Theta_j
+\end{aligned}
+$$
+
+with $b$ and $F$ on the right the values before the kick ($g_j = 1$ on a pool
+route without facilitation; with the geometric-mean combine
+$1/\tau_e = \frac{1}{M} \sum_m 1/\tau_{rel_m}$; a route without depression but
+with release-coupled facilitation releases $g_j \Delta R^c_j$). The reserve,
+$g$, $h$ and the SFA variables are not kicked. $w_{ij}$ is the simulated
+weight (gain, route `scale` and self-feedback included). Consequences of the
+exact form:
+
+- a pool cannot go negative, whatever the draw, and two kicks compose:
+  kick($a$) then kick($b$) is kick($a + b$);
+- $\Delta\Theta_j$ is $F_j \Delta R^c_j$ to first order and smaller for a
+  large draw, because the pool empties as it releases. On one pool the mean
+  spontaneous release is that of the linear law with $r_s$ replaced by
+  $r_s^{\mathrm{eff}} = \dfrac{\tau_{rel}\, r_s^2}{g\, \sigma_\gamma^2}
+  \ln\!\left( 1 + \dfrac{g\, \sigma_\gamma^2}{r_s\, \tau_{rel}} \right)$:
+  $0.990\, r_s$ at $(r_s, \sigma_\gamma) = (0.01, 0.007)$, $0.963\, r_s$ at
+  $(0.01, 0.014)$ and $0.912\, r_s$ at $(0.002, 0.01)$, with
+  $\tau_{rel} = 0.25$ s and $g = 1$;
+- the amount a kick released is recovered from the state **after** it,
+  $\Delta\Theta_j = \tau_{rel}\, b_{j1}^{+} \left( e^{a_j / \tau_{rel}} - 1 \right)$
+  (product: $F_j^{+} \tau_e ( e^{\Delta R^c_j / \tau_e} - 1 )$), so nothing is
+  stored for it and the model has no state variable for it;
+- a step's total release, the drift's $F_j \rho_j \Delta t$ plus the kick, is
+  non-negative except to second order in the step: with a zero draw
+  ($\Delta R^c_j = -r_s \Delta t$) the kick cancels the leak to first order
+  and leaves a remainder of about $-10^{-4}\, r_s \Delta t$.
+
+**The increments** (`release_increments`) are a function of (noise seed,
+absolute step) and nothing else: step $n$ is drawn from substream $n$ of the
+seed's own `mrg32k3a` stream, one uniform per neuron, turned into the gamma
+variate by the inverse of its distribution function. A run integrated in
+segments therefore consumes exactly what a single pass consumes, Benettin's
+perturbed trajectory gets the kicks of the same steps, a
+`noise_seed_schedule` splices at the same absolute step as the Wiener path,
+and runs that differ only in $\sigma_\gamma$ get the same events, scaled.
+
+**Requirements.** $\sigma_\gamma > 0$ needs $r_s > 0$ on that type and a
+stochastic integrator (`'euler'`, `'heun'`, `'sra1'`; SRA1's order 1.5 is for
+the Wiener part, the kick is first order). `std_zero_floor` is refused with a
+release rate (a kick can take the product below the floor's $p_{min}$). In
+`SRNN_ESN_reservoir`, release noise runs on the lean memory path only.
+
+**The Jacobian is that of the mean dynamics.** `compute_Jacobian_fast` and
+`jacobian_times` are the blocks of the sections above with $\rho_j$ in place
+of $r_j$ wherever the rate multiplies a route's release: with
+$\theta_j = \rho_j F_j$,
+
+$$
+\frac{\partial \theta_j}{\partial s_{jk}} = \rho_j\, \frac{\partial F_j}{\partial s_{jk}}, \qquad
+\frac{\partial \theta_j}{\partial r_j} = F_j, \qquad
+\frac{\partial \dot{b}_{jm}}{\partial b_{jm}} = -\frac{1}{\tau_{rec_m}} - \frac{\rho_j}{\tau_{rel_m}}, \qquad
+\frac{\partial \dot{b}_{j1}}{\partial b_{j1}} = -\frac{b_{j2}}{\tau_{rec_1}} - \frac{g_j\, \rho_j}{\tau_{rel}}, \qquad
+\frac{\partial \dot{b}_{j1}}{\partial g_j} = -\frac{b_{j1}\, \rho_j}{\tau_{rel}},
+$$
+
+and the derivatives with respect to the rate are unchanged, since
+$\partial \rho_j / \partial r_j = 1$. The kicks are not in it. The closed-form
+steady states are those above at the release drive: $1/(1 + \rho\,
+\tau_{rec}/\tau_{rel})$ for a pool of a product route, and the chain's with
+$k_1$ and $k_2$ evaluated at $g\,(r + r_s)$; $g$ and $h$ follow $r$.
+
+**Lyapunov exponents.** Top-K propagates that Jacobian along the stored noisy
+trajectory, so it leaves out the derivative of the kicks. Benettin
+re-integrates a perturbed trajectory with the same increments and has it.
+Measured 2026-11-14 on the regression network ($n = 100$, 300 s) and the
+paper's network ($n = 500$, gains 1 and 2, 100 s), four conditions,
+$(r_s, \sigma_\gamma)$ from $(0.002, 0.0005)$ to $(0.002, 0.01)$ and
+$(0.01, 0.014)$: the two estimates of $\lambda_1$ differ by at most 0.03 per
+second, with no trend in $\sigma_\gamma$, and by as much (up to 0.016) with
+the leak alone, where there is no kick. So top-K is used for the maps;
+`run_mc_gain_sweep`'s option `lya_method = 'benettin'` switches a run to the
+pathwise estimate. For one pool on its own the two agree exactly: the kick
+multiplies a perturbation of the pool by $e^{-a_j / \tau_{rel}}$, whose
+logarithm has mean zero.
+
+**The filtered-release readout** (`readout_signal = 'release_filtered'`,
+`SRNN_ESN_reservoir.filter_release`). The memory readout can read each
+neuron's realized release through a first-order filter with the model's
+$\tau_d$, the term the model's own dendrites receive from that neuron before
+the weights:
+
+$$
+\tau_d\, dy_j = -y_j\, dt + d\Theta_j ,
+$$
+
+sampled at the end of each hold. It is computed after the fact from the
+stored states and the increments. Taking $\theta_j$ as the straight line
+between its stored samples and a step's kick as an impulse at the end of the
+step, the filter's response is exact:
+
+$$
+y_j(k+1) = \alpha\, y_j(k) + c_0\, \theta_j(k) + c_1\, \theta_j(k+1) + \frac{\Delta\Theta_j(k+1)}{\tau_d},
+\qquad \alpha = e^{-\Delta t / \tau_d}, \quad
+c_1 = 1 - \frac{\tau_d}{\Delta t} \left( 1 - \alpha \right), \quad
+c_0 = \left( 1 - \alpha \right) - c_1,
+$$
+
+with $y_j(1) = \theta_j(1)$. With release noise off it is the synaptic output
+low-passed at $\tau_d$.
+
+**Size against the Wiener term.** No single $\sigma_\gamma$ matches
+$\sigma_u$, because the release is scaled by each condition's pools. At
+$r_s = 0.01$ and gain 1 on the paper's network, the $\sigma_\gamma$ that
+injects the same variance into $x$ as $\sigma_u = 0.025$ is 0.0047 (no
+adaptation), 0.0089 (1TS), 0.0115 (chained MTS) and 0.0259 (product MTS).
+
+In the code: the route models' `rhs`, `linearize`, `steady_state`, `kick` and
+`released` (`src/model/routes/`; `route_model`'s header, "RELEASE NOISE"),
+`SRNNCellTypePairs.release_kick`, `build_noise` and `release_per_step`, the
+kick hook of `sde_fixed_step`, and `release_increments`. Tests:
+`test_release_noise`, `test_release_noise_model`,
+`test_release_noise_reservoir`; references: `test_regression_rapid_release`
+(exact) and `test_regression_tolerance_release`.
+
 ## Notes
 
 **$a_{0_i}$ is the setpoint of the nonlinearity**, i.e. the property `S_c`, and
@@ -412,7 +603,8 @@ may be drawn per neuron: set `mu_S_c` / `sigma_S_c` and `build()` fills `S_c_vec
 > `abscissa_0`, and concluding the *quantity* was absent — when the code calls it
 > `S_c`. Restored 2026-08-28.
 
-**Noise enters only $x$.** That is what keeps the diffusion constant, which in
+**The Wiener noise enters only $x$** (the release noise of the section above
+is a separate, optional source and is state-dependent). That is what keeps the diffusion constant, which in
 turn makes Itô and Stratonovich coincide, kills the Milstein term, leaves the QR
 variational equation untouched, and makes the noise cancel in Benettin's
 trajectory difference — so the largest Lyapunov exponent stays measurable at any
