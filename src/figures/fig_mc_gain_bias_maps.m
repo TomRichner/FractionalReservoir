@@ -37,7 +37,14 @@ function out = fig_mc_gain_bias_maps(cfg)
 % or whatever property the sweep ran, for example the self-feedback k in
 % units of R_W or the input noise sigma_u. Both axes' labels and their
 % names in the caption come from mc_sweep_quantity. The ticks are the
-% grid's own levels. Each cell is one grid point, drawn between the
+% grid's own levels.
+% AN AXIS OF A ZERO LEVEL THEN LOG-SPACED LEVELS (mc_gain_sweep_grid's
+% 'zero_log', a noise amplitude; either axis, the first under 'auto') is
+% drawn as its log ladder, every cell the same width, with the zero one log
+% step below the lowest positive level and its tick labelled 0
+% (mc_axis_spacing); the caption says the axis is broken there. Drawn at
+% its values instead, such an axis would squeeze every level but the top
+% one or two into a sliver beside the zero. Each cell is one grid point, drawn between the
 % midpoints to its neighbours, so an irregular grid is drawn as it is.
 %
 % THE lambda_1 = 0 LINE is drawn on every row as the cell boundaries that
@@ -159,7 +166,16 @@ fig = figure('Color', 'w', 'Position', [60 60 270 * nc + 200, 260 * nr + 120]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 outer = tiledlayout(fig, nr, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 x_of = axis_transform(D.first_levels, cfg.first_scale);
-x = x_of(D.first_levels); y = D.second_levels;
+% The second axis at its values, unless it is a zero then log-spaced axis
+% (a noise amplitude), which is drawn as its log ladder (mc_axis_spacing).
+[spacing2, y_of] = mc_axis_spacing(D.second_levels);
+if ~strcmp(spacing2, 'zero_log'); y_of = @(v) v; end
+broken = {};
+if strcmp(spacing2, 'zero_log'); broken{end+1} = Q2.symbol; end
+if strcmp(cfg.first_scale, 'auto') && strcmp(mc_axis_spacing(D.first_levels), 'zero_log')
+    broken{end+1} = Q1.symbol;
+end
+x = x_of(D.first_levels); y = y_of(D.second_levels);
 xe = edges(x); ye = edges(y);
 xtl = arrayfun(@(v) sprintf('%.3g', v), D.first_levels, 'UniformOutput', false);
 ytl = arrayfun(@(v) sprintf('%.3g', v), D.second_levels, 'UniformOutput', false);
@@ -195,7 +211,7 @@ for r = 1:nr
         xlim(ax, xe([1 end])); ylim(ax, ye([1 end]));
         mark_flags(ax, x, y, PIN(:, :, c) >= cfg.flag_fraction, SIL(:, :, c) >= cfg.flag_fraction);
         zero_boundary(ax, xe, ye, L(:, :, c), st);
-        plot(ax, x_of(D.preset_first), D.preset_second, 'p','MarkerSize', 11, ...
+        plot(ax, x_of(D.preset_first), y_of(D.preset_second), 'p','MarkerSize', 11, ...
             'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 0.8);
         if r == 1
             title(ax, titles{c}, 'FontSize', st.title_fs - 2, ...
@@ -226,10 +242,14 @@ else
 end
 grey_txt = 'Grey: no successful job';
 if nr == 3; grey_txt = [grey_txt ' (spread row: fewer than two)']; end
-title(outer, {sprintf('%s. Green dashed: edge between cells with \\lambda_1 > 0 and \\lambda_1 \\leq 0.', seed_txt), ...
+caption = {sprintf('%s. Green dashed: edge between cells with \\lambda_1 > 0 and \\lambda_1 \\leq 0.', seed_txt), ...
     sprintf('Star: preset (%s %.3g, %s %.3g). + saturated, o silent (\\geq %.0f%% of neurons). %s.', ...
-        Q1.symbol, D.preset_first, Q2.symbol, D.preset_second, 100 * cfg.flag_fraction, grey_txt)}, ...
-    'FontSize', st.tick_fs - 5);
+        Q1.symbol, D.preset_first, Q2.symbol, D.preset_second, 100 * cfg.flag_fraction, grey_txt)};
+if ~isempty(broken)
+    caption{end+1} = sprintf(['%s: 0, then log-spaced levels; cells evenly spaced, the axis broken ' ...
+        'between 0 and the lowest positive level.'], capitalized(strjoin(broken, ' and ')));
+end
+title(outer, caption, 'FontSize', st.tick_fs - 5);
 
 %% Save
 out = struct('figs', fig, 'files', {{}}, 'source', D.source);
@@ -297,7 +317,13 @@ function f = axis_transform(levels, scale)
 % value itself on a linear one. 'auto' follows the grid
 % (mc_gain_axis_scale): linear when the levels are evenly spaced or not
 % all positive, log otherwise.
-if strcmp(scale, 'auto'); scale = mc_gain_axis_scale(levels); end
+% A zero then log-spaced axis (a noise amplitude) is drawn as its log
+% ladder under 'auto' (mc_axis_spacing).
+if strcmp(scale, 'auto')
+    [spacing, f] = mc_axis_spacing(levels);
+    if strcmp(spacing, 'zero_log'); return; end
+    scale = mc_gain_axis_scale(levels);
+end
 if strcmp(scale, 'log') && any(levels <= 0)
     error('fig_mc_gain_bias_maps:LogOfNonPositive', ...
         'first_scale ''log'' needs positive levels of the first axis; they run from %g.', min(levels));
