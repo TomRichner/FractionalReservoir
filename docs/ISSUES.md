@@ -1435,4 +1435,36 @@ becomes an issue with an acceptance test.
      within a per-stage budget (sweeps 90 min, resolution before reps;
      transient gain stays at `fast`'s 76 min); the noise switch takes
      `medium`'s size. With the figure passes the estimate is about 19 h.
-- **Result:** _(pending)_
+- **Built and merged (2026-11-15):** the mode `fastmedium` (worker's
+  commit `60e08d8`), gated on its branch: quick suite 90 of 90 (16.9
+  min), stages tier exact; every existing mode's planning outputs
+  `isequaln` to before, except the block C stage's time estimate, which
+  now counts a release-noise job at 1.35 times a plain one. Sizes (fast /
+  fastmedium / medium) and estimates:
+  - 1-D sweeps 5 x 5 / 11 x 7 at fast's window / 11 x 15: 28 min
+  - tau sweep 7 x 7 / 11 x 7 at medium's 50 s window / 11 x 25: 16 min
+  - joint sample 128 points / 192 points, 4 levels / 128 at fs 400: 40 min
+  - memory capacity 5 / 15 / 15 trials: 15 min; mc_example medium's: 5 min
+  - eig heatmap T 40, 40 samples / T 60, 80 samples / T 100, 150: 18 min
+  - numerics: medium's windows for checks L and C, fast's for A and B: 18 min
+  - Lyapunov spectrum T 20 / T 40, 1 seed, K 50 / T 40, 3 seeds, K 200: 8 min
+  - transient gain: fast's: 76 min; local Lyapunov: 8 min; dc_lle 15 seeds: 19 min
+  - noise switch 16 copies x 20 s: 3 min
+  - block C 9 x 9 x 2: 846 jobs (324 with release noise), 819 min
+  - total about 18 h 25: block A 4 h 15, block C 13 h 40, the rest 0.5 h.
+- **Lead's decisions at the merge:**
+  5. **The bias axis stays nine evenly spaced levels** (-0.6 to 0.6 in
+     steps of 0.15), so the preset's bias 0.2 is not a level. The maps
+     are unaffected. In the gain-curves figure the main network's row is
+     drawn at bias 0.15 and labeled "nearest to 0.2", while the E:I
+     networks run at 0.2. Adding 0.2 as a tenth level would make the map's
+     bias axis irregular; the mismatch is stated in the figure and here.
+     If Tom wants the rows at exactly one bias, the main network can be
+     run along gain at its own bias as a variant (18 jobs).
+  6. The worker's note that `mc_example` failed in the fast run refers
+     to the first pass of that run; the cause was fixed and merged
+     (`a6a1095`) and the stage passed when rerun.
+  7. The least certain estimates are numerics and the eigenvalue heatmap
+     (the logs give no per-block times); the margin to 20 h is about
+     1.5 h.
+- **Result:** _(pending: the run)_
