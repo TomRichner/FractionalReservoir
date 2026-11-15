@@ -1399,3 +1399,40 @@ becomes an issue with an acceptance test.
     about 11 h 40 with the noise grids); the leak's size (a larger leak
     is needed to reach the product form's Wiener-equivalent level); the
     reservoir's Benettin-without-noise defect noted above.
+
+### FD-028 A run mode between fast and medium, sized for about 20 hours
+
+- **Status:** in progress (asked for by Tom, 2026-11-15).
+- **What:** a run mode `fastmedium` between `fast` and `medium`, sized so
+  that `mu7chain_AC_run('fastmedium')` (blocks A and C, both figure sets)
+  takes about 19 hours on 12 pool workers and no more than 20; then that
+  run, launched by an Opus worker in its own MATLAB session. Tom: "rather
+  than 13 by 13, maybe you go with 9 by 9 on some of those memory
+  capacity tests ... scale things reasonably. I still want as high of
+  resolution as I can, but we have to fit within 20 hours." This run is
+  Tom's explicit instruction; the rule that agents do not start `medium`
+  or larger runs is otherwise unchanged.
+- **Done means:** the mode is in `run_mode_names` and every stage's size
+  table, no existing mode moves, the quick suite and the stages tier
+  pass, the run is launched and its result reported.
+- **Lead's decisions:**
+  1. **No new essential run for the timing.** Tom suggested one; two runs
+     on the same code already give per-stage times: the essential run of
+     2026-11-14 (1 h 40, with the noise grids) and the fast run of
+     2026-11-13 (7.6 h). Repeating an essential run would cost 1 h 40 and
+     add nothing.
+  2. **The timing model for block C:** 10.24 worker-minutes per job
+     without release noise (fast run: 336 jobs in 286.7 min on 12
+     workers), 1.35 times that with it (157 s against 116 s per
+     condition-run, FD-027). It reproduces the essential run's 58.9 min
+     once the partly idle last wave of 51 jobs on 12 workers is counted.
+  3. **Block C is 9 x 9 levels x 2 networks:** 846 jobs, 324 with release
+     noise, about 13.6 h. 9 x 9 x 3 would be 20.5 h for block C alone and
+     11 x 11 x 2 20.2 h; an even count would lose the zero level of the
+     symmetric axes (bias 0, self-coupling 0). Two networks give a median
+     and a spread per cell.
+  4. **Block A gets about 4.5 h**, each stage between `fast` and `medium`
+     within a per-stage budget (sweeps 90 min, resolution before reps;
+     transient gain stays at `fast`'s 76 min); the noise switch takes
+     `medium`'s size. With the figure passes the estimate is about 19 h.
+- **Result:** _(pending)_
