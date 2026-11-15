@@ -1,7 +1,7 @@
 function names = run_mode_names()
 % RUN_MODE_NAMES The run modes every stage of the pipeline must support.
 %
-%   names = RUN_MODE_NAMES()   % {'essential', 'fast', 'medium', 'medium2', 'production'}
+%   names = RUN_MODE_NAMES()   % {'essential', 'fast', 'fastmedium', 'medium', 'medium2', 'production'}
 %
 % ONE list, because there used to be four and they disagreed. analysis_run_config
 % accepted five modes; run_memory_capacity, run_memory_capacity_example and
@@ -34,8 +34,18 @@ function names = run_mode_names()
 % run makes is a separate knob, cfg.stages / cfg.sweeps (paper_stage_plan): a
 % mode names sizes only, and every stage accepts every mode.
 %
+% 'fastmedium' (Tom, 2026-11-15) sits between 'fast' and 'medium': the
+% largest sizes with which mu7chain_AC_run (blocks A and C, every stage, both
+% figure sets) finishes in about 19 hours on 12 pool workers, and no more
+% than 20. Each stage's table names its own size for it, with the estimate
+% beside it, scaled from the measured 'fast' run of 2026-11-13: block C's
+% grids are 9 x 9 levels on 2 networks (about 13.6 h), block A's stages
+% together about 4.3 h, each between 'fast' and 'medium' ('medium's own size
+% where that fitted the stage's share of the time, 'fast's for the transient
+% gain, which is already 76 minutes at 'fast').
+%
 % See also: analysis_run_config, run_all_paper_analyses, test_run_modes,
 %           paper_stage_plan
 
-names = {'essential', 'fast', 'medium', 'medium2', 'production'};
+names = {'essential', 'fast', 'fastmedium', 'medium', 'medium2', 'production'};
 end

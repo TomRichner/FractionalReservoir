@@ -29,10 +29,14 @@ function plan = noise_switch_stage_plan(cfg)
 %   mode          copies   shared   rollout
 %   essential        4      10 s      5 s
 %   fast             8      10 s     10 s
+%   fastmedium      16      10 s     20 s
 %   medium(2)       16      10 s     20 s
 %   production      32      10 s     20 s
 % The first run (8 copies, 5 s) showed several blocks still rising at 5 s,
-% hence the longer rollouts above 'essential'.
+% hence the longer rollouts above 'essential'. 'fastmedium' takes medium's
+% row (Tom, 2026-11-15): 64 runs of 30 s, a few minutes on 12 workers. Its
+% integrator rate is the joint sweep's at the mode (200 Hz at fastmedium,
+% 400 at medium; analysis_run_config).
 %
 % WHICH CONDITIONS. Every one the preset states, as every analysis of the
 % bundle runs them all: one run directory serves both figure sets, each of
@@ -55,6 +59,7 @@ end
 %            mode          copies  t_shared  t_rollout
 SIZES = {   'essential',    4,      10,       5; ...
             'fast',         8,      10,       10; ...
+            'fastmedium',   16,     10,       20; ...
             'medium',       16,     10,       20; ...
             'medium2',      16,     10,       20; ...
             'production',   32,     10,       20};

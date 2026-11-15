@@ -41,7 +41,10 @@ end
 setup_paths();
 switch cfg.run_mode
     case {'essential', 'fast'}, K = 30;      % 'essential' takes 'fast's sizes
-    case {'medium', 'medium2'}, K = 100;
+    % 'fastmedium' takes medium's K (Tom, 2026-11-15). The mu7chain bundles
+    % name K = 50 themselves (cfg.local_lyapunov_K), which ran 8.0 min at
+    % 'fast' (2026-11-13), so there the mode changes nothing.
+    case {'fastmedium', 'medium', 'medium2'}, K = 100;
     case 'production',          K = 100;
     otherwise
         error('run_local_lyapunov:badMode', 'Unknown run_mode ''%s'' (expected %s).', ...

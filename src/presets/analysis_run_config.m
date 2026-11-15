@@ -32,7 +32,14 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 %                  (cfg.stages / cfg.sweeps, paper_stage_plan). Two reps per
 %                  level give medians, not usable interquartile bands.
 %   'fast'       - few levels/reps, fs=200, short T_range; finishes quickly
-%   'medium'     - roughly halfway; for a usable but not publication-size run
+%   'fastmedium' - between fast and medium (Tom, 2026-11-15), sized so the
+%                  three sweeps of the mu7chain_AC bundle take about 85 min
+%                  on 12 workers against fast's 39 (measured 2026-11-13:
+%                  1-D sweeps 9.0 min, tau 2.0, joint 26.4): medium's levels
+%                  on the two 1-D sweeps with 7 reps, medium's longer window
+%                  on the tau sweep, and medium's 4 levels with 192 points
+%                  on the joint grid. Each row says its estimate.
+%   'medium'    - roughly halfway; for a usable but not publication-size run
 %   'medium2'    - between medium and production, at fs=800, for overnight
 %                  STOCHASTIC runs. See the note below on why its sweep sizes
 %                  sit nearer medium than the true midpoint.
@@ -113,6 +120,12 @@ switch analysis
                 % 5 levels x 5 reps (TR, 2026-09-15; was 4 x 3): 25 jobs per
                 % condition per sweep, about twice the 2026-09-14 fast sweeps.
                 cfg = pack(5,  5,  'rk4',   200, [0, 10], [5, 10]);
+            case 'fastmedium'
+                % medium's 11 levels (resolution first), 7 reps, fast's
+                % window: 77 jobs per condition per sweep against fast's 25,
+                % so about 77/25 x 9.0 = 28 min for the seven sweeps. medium's
+                % window (fs 400, [0, 20]) would be four times that.
+                cfg = pack(11, 7,  'rk4',   200, [0, 10], [5, 10]);
             case 'medium'
                 cfg = pack(11, 15, 'rk4',   400, [0, 20], [10, 20]);
             case 'medium2'
@@ -143,6 +156,14 @@ switch analysis
                 % NOTE: this window is far shorter than the swept tau, so long-tau
                 % LLE reflects a transient -- accepted for fast qualitative runs.
                 cfg = pack(7,  7,  'rk4',   200, [0, 20], [10, 20]);
+            case 'fastmedium'
+                % medium's window and 11 levels, 7 reps. The window is what
+                % the note above says a short run gets wrong (the swept tau
+                % reaches 60 s), and here it fits: 77 jobs against fast's
+                % 49, each about 5x longer (2.5x the time, 2x fs, the
+                % class-default LLE interval), so about 77/49 x 5 x 2.0 =
+                % 16 min.
+                cfg = pack(11, 7,  'rk4',   400, [0, 50], []);
             case 'medium'
                 % rk4 rather than ode45, so the deterministic column reads the
                 % same everywhere: rk4 up to medium, ode45 only at production.
@@ -185,6 +206,14 @@ switch analysis
             case 'fast'
                 cfg = pack(3, [], 'rk4',   200, [0, 20], [10, 20]);
                 cfg.n_grid_points = 128;
+            case 'fastmedium'
+                % medium's 4 levels and half again fast's sample, at fast's
+                % fs. 192 points against fast's 128, about 1.5 x 26.4 =
+                % 40 min (the n axis averages 550 at 3 levels and at 4, so
+                % the 4th level does not raise the cost per point). medium's
+                % fs 400 would double it.
+                cfg = pack(4, [], 'rk4',   200, [0, 20], [10, 20]);
+                cfg.n_grid_points = 192;
             case 'medium'
                 cfg = pack(4, [], 'rk4',   400, [0, 20], [10, 20]);
                 cfg.n_grid_points = 128;

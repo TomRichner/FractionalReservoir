@@ -78,7 +78,11 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %               explicit
 %     n_jobs    its jobs (first-axis levels x second-axis levels x seeds)
 %   plan.n_jobs, plan.worker_minutes   the stage's total, and the estimate
-%               of its compute (mc_gain_sweep_grid's worker-minutes a job)
+%               of its compute (mc_gain_sweep_grid's worker-minutes a job,
+%               at the release-noise cost for a grid whose axis is a
+%               release-noise amplitude, release_sigma or release_sigma_all,
+%               or whose model_args set one above zero; a preset that
+%               carries release noise of its own is not looked at)
 %
 % See also: run_mc_gain_sweep_stage, run_mc_gain_sweep_set, mc_gain_sweep_grid,
 %           mc_gain_sweep_folder, paper_opt_in_stages
@@ -171,8 +175,6 @@ for g = 1:numel(grids)
                 A.position, A.property, A.generic_option);
         end
     end
-    shape = given(grid, GRID_SHAPE);
-    G = mc_gain_sweep_grid(cfg.run_mode, shape{:}, seeds{:});
     % The grid's own run options: its model_args after the stage's (the run
     % applies them in order, so the grid's win), its readout in place of the
     % stage's. Neither is passed when nothing sets it, so a grid that sets
@@ -183,6 +185,10 @@ for g = 1:numel(grids)
         bad_config('Grid ''%s'': model_args must be a cell of name-value pairs.', grid.tag);
     end
     model_args = [stage_model_args, grid_model_args];
+    % The estimate only: a grid with the release noise on costs more a job.
+    release_noise = has_release_noise({first_axis.property, second_axis.property}, model_args);
+    shape = given(grid, GRID_SHAPE);
+    G = mc_gain_sweep_grid(cfg.run_mode, shape{:}, seeds{:}, 'release_noise', release_noise);
     readout = field_or_empty(grid, 'readout_signal');
     if isempty(readout); readout = stage_readout; end
     run_options = {};
@@ -212,7 +218,8 @@ for g = 1:numel(grids)
             first_axis.property);   % errors on an unknown preset
         V = mc_gain_sweep_grid(cfg.run_mode, 'first_axis', first_axis.property, ...
             'second_axis', second_axis.property, ...
-            'first_levels', G.first_levels, 'second_levels', own_value, 'seeds', variant_seeds);
+            'first_levels', G.first_levels, 'second_levels', own_value, 'seeds', variant_seeds, ...
+            'release_noise', release_noise);
         runs(end+1) = new_run(grid.tag, v.tag, V, [{'preset_name', v.preset}, on_axis, ...
             {second_axis.levels_option, V.second_levels, 'seeds', V.seeds}]); %#ok<AGROW>
         worker_minutes = worker_minutes + V.worker_minutes;
@@ -233,6 +240,22 @@ label = strjoin(tags(~cellfun(@isempty, tags)), '_');
 if isempty(label); label = 'main'; end
 run = struct('label', label, 'grid', grid_tag, 'variant', variant_tag, ...
     'folder', mc_gain_sweep_folder(grid_tag, variant_tag), 'args', {args}, 'n_jobs', G.n_jobs);
+end
+
+function tf = has_release_noise(axis_properties, model_args)
+% Whether a grid's runs have the release noise on, for the estimate: an axis
+% is a release-noise amplitude, or the fixed arguments set one above zero
+% (the last value given for a name is the one the run applies).
+RELEASE_SIGMA = {'release_sigma', 'release_sigma_all'};
+tf = any(ismember(axis_properties, RELEASE_SIGMA));
+names = model_args(1:2:end);
+for p = RELEASE_SIGMA
+    k = find(strcmp(names, p{1}), 1, 'last');
+    if ~isempty(k)
+        v = model_args{2 * k};
+        tf = tf || (isnumeric(v) && any(v(:) > 0));
+    end
+end
 end
 
 function args = given(s, names)

@@ -42,6 +42,12 @@ all_passed = check('''fast2'' is gone (removed 2026-09-03)', ...
 % stage files' text in test_essential_mode (the gap described above).
 all_passed = check('''essential'' is in the list, below ''fast''', ...
     numel(modes) >= 2 && strcmp(modes{1}, 'essential') && strcmp(modes{2}, 'fast')) && all_passed;
+% 'fastmedium' (Tom, 2026-11-15) sits between 'fast' and 'medium'. The
+% message checks below match names as substrings, so 'fast' and 'medium'
+% alone would pass inside 'fastmedium'; the mode is checked as a whole word
+% there too.
+all_passed = check('''fastmedium'' is in the list, between ''fast'' and ''medium''', ...
+    isequal(modes(2:4), {'fast', 'fastmedium', 'medium'})) && all_passed;
 
 %% analysis_run_config accepts exactly the canonical list
 fprintf('\n-- analysis_run_config accepts exactly it --\n');
@@ -83,7 +89,7 @@ stages = { ...
     'run_dc_lle_analysis',         @() run_dc_lle_analysis('run_mode', 'no_such_mode')};
 for k = 1:size(stages, 1)
     [threw, msg, id] = capture(stages{k, 2});
-    names_all = threw && all(cellfun(@(m) contains(msg, m), modes));
+    names_all = threw && all(cellfun(@(m) ~isempty(regexp(msg, ['(?<!\w)' m '(?!\w)'], 'once')), modes));
     is_bad_mode = threw && endsWith(id, ':badMode');
     all_passed = check(sprintf('%-30s rejects and lists all %d modes', ...
         stages{k, 1}, numel(modes)), names_all && is_bad_mode) && all_passed;

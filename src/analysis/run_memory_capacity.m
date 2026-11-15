@@ -442,7 +442,10 @@ switch run_mode
         cfg.n_trials = 3;
     case 'fast'
         cfg.n_trials = 5;      % plumbing check; p cannot go below 0.0625
-    case {'medium', 'medium2'}
+    case {'fastmedium', 'medium', 'medium2'}
+        % 'fastmedium' takes medium's 15 trials (Tom, 2026-11-15): fast's 5
+        % lean trials ran as one round of 7.4 min (mu7chain_AC, 2026-11-13),
+        % so 15 on 12 workers are two rounds, about 15 min.
         % medium2 runs at medium effort here. It differs from medium only in
         % SWEEP dimensions -- more grid levels, fewer reps, a finer fs for the
         % stochastic integrator -- and memory capacity has no grid and no reps.

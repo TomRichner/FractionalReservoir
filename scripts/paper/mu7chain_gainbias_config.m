@@ -45,20 +45,24 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 % HOW BIG AND HOW LONG. The sizes are mc_gain_sweep_grid's table, the same
 % for every grid: levels per axis x networks (seeds 3001, 3002, ...).
 %   mode         levels    jobs   of which release noise   on 12 workers
-%   essential    3 x  3 x  1    51      18                about 45 min
-%   fast         7 x  7 x  3   777     294                about 11 h 40
-%   medium(2)   13 x 13 x 10  8710    3380                about 131 h
-%   production  17 x 17 x 10 14790    5780                about 223 h
+%   essential    3 x  3 x  1    51      18                about 50 min (58.9 measured)
+%   fast         7 x  7 x  3   777     294                about 12 h 30
+%   fastmedium   9 x  9 x  2   846     324                about 13 h 40
+%   medium(2)   13 x 13 x 10  8710    3380                about 141 h
+%   production  17 x 17 x 10 14790    5780                about 239 h
 % (5 n^2 + 2 n) x networks jobs at n levels, all of the stage's jobs in one
-% parfor. A job of four conditions is about 9.5 worker-minutes, and about
-% 12.9 with the release noise on (its condition-runs measured 157 s against
-% 116 s, FD-027 N2; the calibration runs of 2026-11-14 took 170 to 200 s
-% with release noise against 124 to 130 s without, the Wiener noise costing
-% nothing). The stage's own estimate (plan.worker_minutes) counts 9.5 for
-% every job and so falls short by about a quarter. Without the noise grids
-% (the first four alone) the stage was 24 jobs, about 20 min, at
-% 'essential' and 336, about 4 h 25, at 'fast'. Agents run 'essential' and
-% 'fast'; 'medium' and larger are Tom's to start.
+% parfor. A job of four conditions is about 10.24 worker-minutes (the fast
+% run of 2026-11-13: 336 jobs without release noise in 286.7 min on 12
+% workers), and 1.35 times that with the release noise on (its
+% condition-runs measured 157 s against 116 s, FD-027 N2; the calibration
+% runs of 2026-11-14 took 170 to 200 s with release noise against 124 to
+% 130 s without, the Wiener noise costing nothing). The stage's own
+% estimate (plan.worker_minutes) counts both (mc_gain_sweep_grid). Without
+% the noise grids (the first four alone) the stage was 24 jobs, about 20
+% min, at 'essential' and 336, 4 h 47 measured, at 'fast'. 'fastmedium'
+% (Tom, 2026-11-15) is the size at which mu7chain_AC_run, blocks A and C
+% together, takes about 19 h. Agents run 'essential' and 'fast';
+% 'fastmedium' and larger are Tom's to start.
 %
 % DERIVED FROM mu7chain_config, so nothing about the network is restated:
 % the preset, the memory-capacity twin (cfg.mc_preset), its integrator
@@ -182,6 +186,7 @@ variants = struct('tag', variant_tags, 'preset', strcat(cfg.mc_preset, '_', vari
 % Levels by mode (rounded to 10 decimals by the grid table):
 %   essential  sigma_gamma 0, 1e-3, 1e-2              sigma_u 0, 2.5e-3, 0.025
 %   fast       sigma_gamma 0, 2.15e-4 ... 1e-2 (x2.15) sigma_u 0, 5.39e-4 ... 0.025 (x2.15)
+%   fastmedium sigma_gamma 0, 1.78e-4 ... 1e-2 (x1.78) sigma_u 0, 4.45e-4 ... 0.025 (x1.78)
 %   medium     sigma_gamma 0, 1.47e-4 ... 1e-2 (x1.47) sigma_u 0, 3.67e-4 ... 0.025 (x1.47)
 LEAK = 0.002;
 GAMMA_LADDER = [1e-4 1e-2];

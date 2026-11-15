@@ -31,7 +31,7 @@
 
 %% The mode exists, first in the list
 modes = run_mode_names();
-assert(isequal(modes, {'essential', 'fast', 'medium', 'medium2', 'production'}), ...
+assert(isequal(modes, {'essential', 'fast', 'fastmedium', 'medium', 'medium2', 'production'}), ...
     'run_mode_names: %s', strjoin(modes, ', '));
 
 %% analysis_run_config: essential's sizes, fast's everything else
@@ -68,8 +68,14 @@ assert(strcmp(es.model.ode_solver, 'sra1') && es.is_stochastic);
 %% Every existing mode's numbers are unchanged
 % {analysis, mode, n_levels, n_reps ([] = no reps axis), det solver, fs,
 %  T_range, lya_T_interval ([] = class default), n_grid_points ([] = none)}
+% The 'fastmedium' rows (Tom, 2026-11-15) are its sizes as chosen, stated
+% here so a change to them is seen; the rest were read off the function at
+% 0bc35ca and are unchanged by the mode's addition.
 was = { ...
     'sensitivity',     'fast',       5,  5,  'rk4',   200, [0 10], [5 10],    []; ...
+    'sensitivity',     'fastmedium', 11, 7,  'rk4',   200, [0 10], [5 10],    []; ...
+    'tau_sensitivity', 'fastmedium', 11, 7,  'rk4',   400, [0 50], [],        []; ...
+    'param_space',     'fastmedium', 4,  [], 'rk4',   200, [0 20], [10 20],   192; ...
     'sensitivity',     'medium',     11, 15, 'rk4',   400, [0 20], [10 20],   []; ...
     'sensitivity',     'medium2',    13, 12, 'rk4',   800, [0 25], [12.5 25], []; ...
     'sensitivity',     'production', 25, 25, 'ode45', 400, [0 50], [20 50],   []; ...
@@ -120,7 +126,9 @@ own_case = {'run_memory_capacity'};
 for k = 1:numel(stage_files)
     txt = fileread(which(stage_files{k}));
     code = regexprep(txt, '%[^\n]*', '');                       % comments off
-    n_shared = numel(regexp(code, 'case\s*\{''essential'',\s*''fast''\}'));
+    % The shared case may name further modes after 'fast' ('fastmedium' in
+    % run_transient_gain, which takes 'fast's sizes there).
+    n_shared = numel(regexp(code, 'case\s*\{''essential'',\s*''fast''\s*[,}]'));
     n_own    = numel(regexp(code, 'case\s*''essential'''));
     n_fast   = numel(regexp(code, 'case\s*''fast'''));
     assert(n_shared + n_own >= 1, '%s has no case for ''essential''', stage_files{k});
@@ -132,6 +140,9 @@ for k = 1:numel(stage_files)
     end
     assert(isempty(regexp(code, 'strcmp\([^)]*run_mode,\s*''fast''\)', 'once')), ...
         '%s tests run_mode against ''fast'' alone', stage_files{k});
+    % 'fastmedium' (Tom, 2026-11-15) is named in a case of every stage's table.
+    assert(~isempty(regexp(code, 'case\s*(\{[^}\n]*)?''fastmedium''', 'once')), ...
+        '%s has no case for ''fastmedium''', stage_files{k});
 end
 % Memory capacity at 'essential': three trials, and the durations it shares
 % with every mode untouched (read from the cost table's text; the table is
@@ -315,7 +326,7 @@ assert(isequal(rmfield(cfg, differs), rmfield(fast, differs)), ...
     'essential differs from fast in more than: %s', strjoin(differs, ', '));
 
 %% The other modes select nothing
-for md = {'fast', 'medium', 'medium2', 'production'}
+for md = {'fast', 'fastmedium', 'medium', 'medium2', 'production'}
     for st = {'3cond', '4cond'}
         c = mu7chain_config(md{1}, st{1});
         assert(isempty(c.stages) && isempty(c.sweeps) && isempty(c.eig_heatmap_examples), ...
