@@ -1279,4 +1279,33 @@ becomes an issue with an acceptance test.
   choose their solver from `sigma_u_noise` alone (`run_memory_capacity`,
   `run_dc_lle_analysis`, the sweep driver's pre-flight) are being checked
   in N2 to fail loudly rather than run without kicks.
+- **Progress (2026-11-14, later):** gate on main at `76201a0`: quick suite
+  87 of 87 (864 s), stages tier exact. Merged: N2 (`bd2de69`), release
+  noise in the reservoir on the lean path, the increments held per segment
+  (`wiener_segments`, bit-identical to one pass), the readout
+  `'release_filtered'` (the release through a tau_d filter, computed from
+  the stored states and the increments, no model state), the sweep's
+  `readout_signal` option; the non-lean path refuses release noise.
+  Running: N3 (`matlab-fable-1`: top-K against Benettin, step size, the
+  exact tier `rapid_release`, the tolerance suite `release`, mutations,
+  equations) and P3 (`matlab-opus-1`: the three grids and their figures in
+  the bundle).
+- **Lead's decision after N2, which replaces "the noise axis stays as
+  planned" above: the noise axes are a zero level followed by log-spaced
+  levels, and the leak is r_s = 0.002.** N2 measured memory capacity on
+  the chained MTS network at the preset point with the filtered readout:
+  11.2 with no noise, 16.1 with the leak alone at r_s = 0.01, 7.1 at
+  sigma_gamma = 0.0014, 0.9 at 0.014, and 0.8 at sigma_u = 0.025. So a
+  linear axis from 0 to 0.014 would be floor at every level but the first,
+  and the planned leak by itself moves memory capacity by almost half,
+  which would make the zero-noise column of the new maps a different
+  network from the existing maps. Starting values: sigma_gamma in {0,
+  5e-5 to 5e-3 log-spaced}, sigma_u in {0, 2.5e-4 to 0.025 log-spaced};
+  P3 calibrates both ends with at most eight single runs (where memory
+  capacity is still within about 10 % of the leak-only value, and where it
+  has fallen to about 1) and writes the measurements beside the levels in
+  the config. What turned out wrong: the plan sized the axes from the
+  variance injected into x, and memory capacity is far more sensitive to
+  noise than that scale suggests (the paper's sigma_u = 0.025 leaves less
+  than one unit of memory capacity on this readout).
 - **Result:** _(pending)_
