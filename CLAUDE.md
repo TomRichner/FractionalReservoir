@@ -347,6 +347,80 @@ went in first, each of which moved numbers:
   constant equals the first rung of the MTS ladder on the same seed. It
   moved every one-timescale result with `tau_a_spread > 0`.
 
+**Release noise: a second noise source, off by default** (FD-027,
+2026-11-14; plan `docs/Plan_release_noise.md`; equations in
+`Equations_stability_paper.md`, section "Release noise", and section 13
+of `Equations_chained_MTS.md`). Spontaneous synaptic release as a gamma
+process: the release of presynaptic neuron j in a step is
+`F_j (r_j dt + dR_j)`, with `F_j` the route's output factor and `dR_j` a
+gamma increment of mean `r_s dt` and variance `sigma_gamma^2 dt` that does
+not depend on the state, one draw per neuron shared by its routes. It
+reaches the network through the weights, depletes the pools and is seen
+by the memory readout; SFA sees the rate only. The Wiener term stays, and
+the two can be on together.
+
+- **Properties** on `SRNNCellTypePairs`: `release_rate` (r_s) and
+  `release_sigma` (sigma_gamma), `1 x C` by presynaptic type, both 0 by
+  default, with scalar aliases `release_rate_all` and `release_sigma_all`
+  for sweep axes. With both at 0 the code path is the earlier one to the
+  bit (`release_noise_off_reference.mat`, and every existing tier).
+- **How it is computed: a leak and a kick.** The mean goes into the
+  drift: a route supplies its release drive `r + r_s` for the synaptic
+  output and the depletion of its pools (not for facilitation or the
+  calcium trace), so `dynamics_fast`, `compute_Jacobian_fast`,
+  `jacobian_times` and `unpack_and_compute_states` hold no branch for it
+  and the Jacobian is that of the mean dynamics. The zero-mean remainder
+  is a kick applied after the whole deterministic step
+  (`SRNNCellTypePairs.release_kick`, the route interface's `kick` and
+  `released`; a hook in `sde_fixed_step`): pools are updated by the exact
+  solution of the kick, so a pool never goes negative. The increments are
+  a function of (seed, absolute step) (`release_increments`), so a
+  segmented run equals a single pass. Release noise needs a stochastic
+  solver (`'euler'`, `'heun'`, `'sra1'`); noise is "on" when either
+  source is on.
+- **Memory capacity: the lean path only** (the other path refuses it),
+  with the noise held per segment (`wiener_segments`). The readout
+  `'release_filtered'` is the realized release through a tau_d filter,
+  computed from the stored states and the increments; no state variable
+  is added for it.
+- **Lyapunov exponents:** top-K runs unchanged on the mean-dynamics
+  Jacobian. Against Benettin on the same increments it agrees to about
+  0.03 1/s at every noise level of the maps, the size of their difference
+  with the kicks off, so the maps use top-K;
+  `run_mc_gain_sweep(..., 'lya_method', 'benettin')` is the pathwise
+  alternative. 200 Hz is enough.
+- **References of its own:** the exact tier `rapid_release`
+  (`run_all_tests('test_regression_rapid_release')`,
+  `make_regression_reference('rapid_release')`) and the tolerance suite
+  `release` (`regression_tol_check('release')`,
+  `regression_tol_release.mat`, 20 mutations in
+  `regression_tol_mutations_release.m`, all caught). Both are in the
+  quick suite.
+- **In the A + C bundle, every mode:** three more grids of the block C
+  stage, all read through `'release_filtered'`: gain x sigma_gamma
+  (`mc_gain_sweep_releasenoise/`), self-coupling x sigma_gamma
+  (`mc_gain_sweep_selfcoupling_releasenoise/`), both at the leak
+  r_s = 0.002 with the Wiener noise off, and gain x sigma_u
+  (`mc_gain_sweep_wienernoise/`) with release off. A noise axis is a zero
+  level followed by log-spaced levels (the grid table's spacing
+  `'zero_log'`, on either axis; sigma_gamma 1e-4 to 1e-2, sigma_u 2.5e-4
+  to 0.025; the calibration is in `mu7chain_gainbias_config`), and the
+  maps draw it as its log ladder with the zero one step below
+  (`mc_axis_spacing`). A grid may carry its own `model_args` and
+  `readout_signal`. With them block C is 51 jobs at `essential` (about
+  45 min), 777 at `fast` (about 11 h 40) and 8710 at `medium` (about
+  131 h); the sizes quoted above are the first two grids alone. The leak
+  alone moves the network (memory capacity 11.2 to 12.5 on chained MTS),
+  so the zero-noise row of a release map is not the network of the other
+  maps.
+- **Time series:** `fig_noise_levels_timeseries` draws the conditions at
+  several levels of any scalar property; the bundle registers it for
+  sigma_u and for sigma_gamma (`Fig_noise_levels_wiener`,
+  `Fig_noise_levels_gamma`).
+- **`SRNNModel2` is defunct** (Tom, 2026-11-14): it has no release noise,
+  gets no new support and is left as it is. Statements below that name it
+  as the default class predate this.
+
 Decisions already made that affect the code: depression gains a **chained
 vesicle-pool model** as an opt-in per route, beside the current product,
 which stays the default and gives the same numbers to round-off (FD-004).
@@ -497,8 +571,9 @@ about 20 s each. A pre-edit capture of a suite other than the base one is
 model added after the chain gets a suite of its own the same way:
 release-coupled facilitation has the suite `stf_chain`
 (`regression_tol_stf_chain.mat`, `test_regression_tolerance_stf_chain`,
-2026-11-12). Whether it also gets a mutation list, and how long a one,
-is decided by "When to run mutation checks" above.
+2026-11-12), and release noise the suite `release` with the exact tier
+`rapid_release` (2026-11-14). Whether it also gets a mutation list, and
+how long a one, is decided by "When to run mutation checks" above.
 
 **Route models, in one paragraph** (Plan A, sections 4.0 and 4.6; the
 equations are in `Equations_stability_paper.md`). Depression and
@@ -960,7 +1035,7 @@ anything.
 
 **Path convention:** scripts do not assume they sit at any particular depth under `scripts/`. Derive the project root as `project_root = fileparts(which('setup_paths'))` (depth-independent) rather than with a fixed-depth `fileparts(mfilename)` chain. Scripts that need their *own* folder (to locate a sibling data file or write a figure next to themselves) still use `this_dir = fileparts(mfilename('fullpath'))` — that is a data path, not a path bootstrap, and is fine to keep.
 
-When working on the current pipeline, default to `SRNNModel2` + `ParamSpaceAnalysis2`.
+When working on the current pipeline, default to `SRNNCellTypePairs` + `ParamSpaceAnalysis2` (`SRNNModel2` is defunct since 2026-11-14 and gets no new support).
 
 ## Data conventions
 

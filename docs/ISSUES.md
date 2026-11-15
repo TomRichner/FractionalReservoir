@@ -1308,4 +1308,56 @@ becomes an issue with an acceptance test.
   variance injected into x, and memory capacity is far more sensitive to
   noise than that scale suggests (the paper's sigma_u = 0.025 leaves less
   than one unit of memory capacity on this readout).
+- **Merged (2026-11-14 evening): P3 (`3e0c43f`) and N3 (`cdf3afd`).** P3:
+  the grid table's spacing `'zero_log'` on either axis, a grid's own
+  `model_args` and `readout_signal`, the three noise grids, their maps,
+  robustness and statistics, the two time-series entries; block C is 51
+  jobs at essential. N3: the sweep's `lya_method` option, the exact tier
+  `rapid_release`, the tolerance suite `release` (20 of 20 mutations
+  caught), the equations as implemented (a section in
+  `Equations_stability_paper.md`; section 13 of the chained-MTS file).
+  N3's worker was cut off once by a server error and resumed from its
+  transcript; nothing was lost.
+- **Lead's decisions at these merges:**
+  1. **The leak is r_s = 0.002.** P3's calibration (chained MTS, gain 1,
+     filtered readout): memory capacity 11.2 with no noise, 12.5 with the
+     leak alone (16.1 at r_s = 0.01). It still moves the network by about
+     12 %, so the zero-noise row of a release map is not the network of
+     the other maps; the report says so. A smaller leak would shrink that
+     but makes events larger at a given sigma_gamma.
+  2. **sigma_gamma runs 0, then 1e-4 to 1e-2 (log).** The worker chose a
+     top of 2e-2 to reach the floor; the lead set 1e-2. At the leak the
+     mean event size is sigma_gamma^2 / r_s: at 2e-2 that is 0.2 against
+     tau_rel = 0.25, one event per pool about once per 100 s per neuron,
+     which is not spontaneous release; at 1e-2 it is 0.05 (a pool of about
+     five vesicles) and memory capacity is already 1.56. Calibration: 12.24
+     at 1e-4, 10.34 at 5e-4, 5.95 at 2e-3, 1.56 at 1e-2.
+  3. **sigma_u runs 0, then 2.5e-4 to 0.025 (log)**: memory capacity
+     10.32 at 5e-4, 7.44 at 2.5e-3, 2.76 at 1e-2, 0.8 at 0.025.
+  4. **The maps' lambda_1 stays on top-K under release noise.** N3: top-K
+     (mean-dynamics Jacobian) against Benettin (same increments), four
+     conditions, n = 100 over 300 s and n = 500 over 100 s, at (r_s,
+     sigma_gamma) from (0.002, 0) to (0.01, 0.014): largest difference
+     0.031 1/s, no trend in sigma_gamma, no consistent sign, the same size
+     with the leak alone. The plan's risk of a bias growing as
+     sigma_gamma^2 does not apply: with state-independent increments the
+     pathwise tangent multiplies a pool's perturbation by a factor whose
+     logarithm has mean zero. The N2 case (n = 50, -2.14 against -2.84) was
+     a path effect of a 3 s window: on 300 s both estimators give -2.14
+     with the leak alone and -2.78 with kicks. `lya_method = 'benettin'`
+     is an option of `run_mc_gain_sweep`; the stage plan does not pass it
+     on (a one-word addition to its run options if a bundle ever wants
+     it; suggestion, not done).
+  5. **200 Hz stays.** Same increments at 400 and 200 Hz: stable cases
+     agree to 1 to 2 % of the spread of x and 0.008 in lambda_1; chaotic
+     cases differ by no more than a second noise realization does.
+  6. The new tolerance reference is 15 MB, in line with the other suites
+     (9 to 14 MB); kept.
+  7. To make room for the one essential run, the essential run of
+     2026-11-13 was renamed, not deleted:
+     `data/mu7chain_AC_essential_2026-11-13` and
+     `figs/mu7chain_AC_essential_4cond_2026-11-13`.
+- **Also from N3, for the report:** at (0.002, 0.01) the exact kick's mean
+  spontaneous release is 0.91 r_s (the exact pool update releases less
+  than the linear law for large events).
 - **Result:** _(pending)_
