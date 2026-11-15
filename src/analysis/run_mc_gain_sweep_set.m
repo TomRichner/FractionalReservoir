@@ -190,9 +190,22 @@ J.mc_args = {'T_wash', round(P.T_wash_sec * fs), 'T_train', round(P.T_train_sec 
     'T_test', round(P.T_test_sec * fs), 'd_max', d_max, ...
     'lya_method', 'none', 'lean_input', true};
 % The Lyapunov run: lya_T_sec of the same task (the sequence's first
-% seconds), top-K with a fixed small K, accumulated over the last
-% lya_acc_sec. lya_T_interval is set explicitly: its default comes from
-% T_range, which the reservoir's input does not follow.
+% seconds), accumulated over the last lya_acc_sec. lya_T_interval is set
+% explicitly: its default comes from T_range, which the reservoir's input
+% does not follow. The estimator is opts.lya_method:
+%   'topk'      (the default) lya_K exponents by the discrete QR method on
+%               the stored trajectory, with the Jacobian of the mean
+%               dynamics. Under release noise that tangent leaves out the
+%               derivative of the release kicks.
+%   'benettin'  lambda_1 from a perturbed trajectory re-integrated with the
+%               same integrator and the SAME noise increments, kicks
+%               included: the pathwise exponent. Same window, warmup and
+%               renormalisation interval; lya_K is not used. The
+%               perturbation's direction is drawn from the global stream,
+%               which run_one_job seeds per job, so a job is reproducible.
+% Measured 2026-11-14 (FD-027 step N3): the two agree to 0.03 1/s at every
+% release-noise level of the maps, which is also the size of their
+% difference with the kicks off, so the default stays top-K.
 LYA_DT = 0.05;          % s between re-orthonormalisations, as the sweeps use
 LYA_WARMUP_MAX = 5;     % s the basis aligns before accumulating (the class default)
 lya_n = round(opts.lya_T_sec * fs);
@@ -200,7 +213,7 @@ lya_t_end = (lya_n - 1) / fs;
 lya_t0 = opts.lya_T_sec - opts.lya_acc_sec;
 J.lya_args = {'T_wash', round(lya_t0 * fs), 'T_train', lya_n - round(lya_t0 * fs), ...
     'T_test', 0, 'd_max', d_max, ...
-    'lya_method', 'topk', 'lya_K', opts.lya_K, 'lya_K_auto', false, 'lya_dt', LYA_DT, ...
+    'lya_method', opts.lya_method, 'lya_K', opts.lya_K, 'lya_K_auto', false, 'lya_dt', LYA_DT, ...
     'lya_T_interval', [lya_t0, lya_t_end], 'lya_warmup', min(LYA_WARMUP_MAX, lya_t0), ...
     'store_decimated_state', false, 'store_full_state', false};
 J.cond_names = cond_names;
@@ -225,6 +238,11 @@ for A = [axis1, axis2]
     if ~A.is_default
         J.signature.(A.signature_field) = A.property;
     end
+end
+% The estimator, likewise only when it is not the default: a top-K run's
+% signature is the one its job files have always carried.
+if ~strcmp(opts.lya_method, 'topk')
+    J.signature.lya_method = opts.lya_method;
 end
 J.axis1 = axis1;
 J.axis2 = axis2;
@@ -268,7 +286,7 @@ for k = 1:n_jobs
         if ~isequaln(old.job.signature, J.signature)
             error('run_mc_gain_sweep:DifferentRun', ...
                 ['%s was made with a different preset, protocol, integrator, conditions, ' ...
-                 'axes or model override. Use another output_dir; results are not mixed.'], job_files{k});
+                 'axes, Lyapunov estimator or model override. Use another output_dir; results are not mixed.'], job_files{k});
         end
         todo(k) = opts.retry_failed && any(old.job.failed);
     end
@@ -330,6 +348,7 @@ settings.protocol    = R.P;
 settings.readout_signal = R.P.readout_signal;   % what the memory readout saw (also in protocol)
 settings.ode_solver  = opts.ode_solver;
 settings.model_args  = opts.model_args;
+settings.lya_method  = opts.lya_method;         % 'topk' or 'benettin'
 settings.lya_K       = opts.lya_K;
 settings.lya_T_sec   = opts.lya_T_sec;
 settings.lya_acc_sec = opts.lya_acc_sec;
