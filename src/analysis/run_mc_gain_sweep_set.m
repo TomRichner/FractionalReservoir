@@ -138,6 +138,14 @@ end
 for k = 1:numel(over)
     P.(over{k}) = opts.protocol.(over{k});
 end
+% The readout: mc_protocol's unless the run names another. It is a field of
+% the protocol, and so of the settings and of every job's signature: a run
+% on the default readout carries the protocol, and the signature, it always
+% has (its job files still resume), and a run on another readout is a
+% different experiment that is never mixed with it.
+if ~isempty(opts.readout_signal)
+    P.readout_signal = opts.readout_signal;
+end
 if opts.lya_acc_sec >= opts.lya_T_sec
     error('run_mc_gain_sweep:BadLyapunovWindow', ...
         'lya_acc_sec must be shorter than lya_T_sec.');
@@ -319,6 +327,7 @@ settings.([axis1.column '_levels']) = R.first_levels;
 settings.([axis2.column '_levels']) = R.second_levels;
 settings.seeds       = R.seeds;
 settings.protocol    = R.P;
+settings.readout_signal = R.P.readout_signal;   % what the memory readout saw (also in protocol)
 settings.ode_solver  = opts.ode_solver;
 settings.model_args  = opts.model_args;
 settings.lya_K       = opts.lya_K;

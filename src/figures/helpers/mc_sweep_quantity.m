@@ -18,6 +18,10 @@ function Q = mc_sweep_quantity(name, D, opts)
 % D.second_axis.column), with wording here for
 %   gain           level_of_chaos, the multiplier on every weight
 %   sigma_u_noise  sigma_u, the input-referred Wiener noise on x
+%   release_sigma_all  sigma_gamma, the amplitude of the release noise
+%                  (SRNNCellTypePairs.release_sigma, one value for every
+%                  cell type)
+%   release_rate_all   r_s, the spontaneous release rate (release_rate)
 %   bias           S_c, the center of the per-neuron setpoint draw
 %   self_feedback  k, the negative self-feedback on the diagonal of W, in
 %                  multiples of R_W, the bulk radius of W at gain 1
@@ -77,7 +81,8 @@ end
 
 LLE_CLIP = 5;   % 1/s, as the linear lambda_1 map and fig_mc_vs_lambda1
 
-WORDED_AXES = {'gain', 'bias', 'self_feedback', 'self_coupling', 'sigma_u_noise'};   % axes with wording of their own
+WORDED_AXES = {'gain', 'bias', 'self_feedback', 'self_coupling', 'sigma_u_noise', ...
+    'release_sigma_all', 'release_rate_all'};   % axes with wording of their own
 names = [WORDED_AXES, {'mc_total', 'horizon', 'lle_input', 'lle_noinput', ...
     'rate_E', 'rate_I', 'rate_mean', 'frac_pinned', 'frac_silent', 'frac_on_slope'}];
 axis_columns = {'', ''};                   % the result's first and second axis
@@ -196,6 +201,12 @@ switch column
     case 'sigma_u_noise'
         symbol = 'input noise';  variable = '\sigma_u';  unit = '';
         plural = 'input-noise levels';
+    case 'release_sigma_all'
+        symbol = 'release noise';  variable = '\sigma_\gamma';  unit = '';
+        plural = 'release-noise levels';
+    case 'release_rate_all'
+        symbol = 'spontaneous release rate';  variable = 'r_s';  unit = '';
+        plural = 'spontaneous release rates';
     case 'bias'
         symbol = 'bias';  variable = 'S_c';  unit = '';  plural = 'biases';
     case 'self_feedback'

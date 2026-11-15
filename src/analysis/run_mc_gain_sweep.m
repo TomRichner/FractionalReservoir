@@ -58,7 +58,13 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %                     run_memory_capacity, integrated segment by segment so
 %                     no state trajectory and no n x T input table is held.
 %                     Bit-identical to the existing path
-%                     (test_mc_lean_path), at tens of MB instead of GB.
+%                     (test_mc_lean_path), at tens of MB instead of GB,
+%                     with either noise source on too (the increments are
+%                     held a segment at a time). An axis or a model_args
+%                     entry may turn on the Wiener term (sigma_u_noise) or
+%                     the release noise (release_sigma_all at a
+%                     release_rate above zero); the default integrator,
+%                     'sra1', takes both.
 %   lambda_1          by a separate short run() of the same reservoir with
 %                     the top-K estimator (lya_K exponents, no retry;
 %                     lya_T_sec seconds, accumulated over the last
@@ -135,6 +141,11 @@ function [out_dir, results_file] = run_mc_gain_sweep(varargin)
 %   protocol      a struct overriding fields of mc_protocol (T_wash_sec,
 %                 T_train_sec, ...). FOR TESTS: a shorter training window
 %                 makes the readout under-determined at the paper's n.
+%   readout_signal  what the memory readout sees: 'rate', 'synaptic' or
+%                 'release_filtered' (SRNN_ESN_reservoir.run_memory_capacity_lean).
+%                 Default: mc_protocol's, 'synaptic'. It is recorded in
+%                 settings.readout_signal and settings.protocol, and is
+%                 part of what makes two runs the same experiment.
 %   lya_K, lya_T_sec, lya_acc_sec   the Lyapunov run: exponents kept, its
 %                 length, and the final stretch accumulated (5, 30 s, 20 s)
 %   segment_len   samples per integration segment of the lean path
