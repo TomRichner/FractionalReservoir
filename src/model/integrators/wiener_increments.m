@@ -34,7 +34,7 @@ function [xi1, xi2] = wiener_increments(n_rows, n_steps, seed, schedule, t0, fs,
 % The global random stream is saved and restored, so the caller's W,
 % stimulus and initial condition are untouched.
 %
-% See also: check_noise_seed_schedule, sde_fixed_step,
+% See also: check_noise_seed_schedule, noise_schedule_columns, sde_fixed_step,
 %           SRNNCellTypePairs.noise_seed_schedule
 
 if nargin < 4, schedule = []; end
@@ -43,7 +43,7 @@ if nargin < 7 || isempty(err_id_prefix), err_id_prefix = 'wiener_increments'; en
 first_col = zeros(1, 0);
 if ~isempty(schedule)
     check_noise_seed_schedule(schedule, err_id_prefix);
-    first_col = switch_columns(schedule(:, 1), n_steps, t0, fs, err_id_prefix);
+    first_col = noise_schedule_columns(schedule(:, 1), n_steps, t0, fs, err_id_prefix);
 end
 
 stream_state = rng;
@@ -67,25 +67,4 @@ function [xi1, xi2] = draw_path(n_rows, n_steps, seed)
 rng(seed, 'twister');
 xi1 = randn(n_rows, n_steps);
 xi2 = randn(n_rows, n_steps);
-end
-
-% -------------------------------------------------------------------------
-function cols = switch_columns(t_start, n_steps, t0, fs, err_id_prefix)
-% The column (step index) at which each schedule row takes over.
-pos  = (t_start(:)' - t0) * fs;          % steps after the first sample
-cols = round(pos) + 1;
-off_grid = abs(pos - round(pos)) > 1e-6;
-if any(off_grid)
-    error([err_id_prefix ':InvalidNoiseSchedule'], ...
-        ['noise_seed_schedule: t_start = %s is not on the run''s time grid ' ...
-         '(t0 = %g s, fs = %g Hz).'], mat2str(t_start(off_grid)'), t0, fs);
-end
-outside = cols < 2 | cols > n_steps;
-if any(outside)
-    error([err_id_prefix ':InvalidNoiseSchedule'], ...
-        ['noise_seed_schedule: t_start = %s is not strictly inside the run ' ...
-         '(%g, %g) s. The base seed owns the first step; a switch at or ' ...
-         'after the last sample would change nothing.'], ...
-        mat2str(t_start(outside)'), t0, t0 + n_steps / fs);
-end
 end
