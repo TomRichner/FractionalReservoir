@@ -25,7 +25,7 @@ function [spacing, to_position] = mc_axis_spacing(levels)
 %
 % The test: the first level (after sorting) is exactly 0, at least two
 % levels are positive, and with three or more positive levels their log
-% steps agree to one part in a million. Two positive levels are always a
+% steps agree to one part in a thousand (the levels are rounded). Two positive levels are always a
 % log ladder, so three levels {0, a, b} with 0 < a < b are zero_log unless
 % they are evenly spaced (b = 2a), which stays linear.
 %
@@ -38,11 +38,16 @@ arguments
     levels double
 end
 RELATIVE_TOLERANCE = 1e-6;
+% The log steps are compared more loosely: the grid table rounds levels to
+% 10 decimals, which at levels near 1e-4 moves a log step by about 1e-6 of
+% itself (1.2e-6 on the production sigma_gamma ladder, where 1e-6 refused
+% it). A ladder that was not designed as one misses by far more than 1e-3.
+LOG_TOLERANCE = 1e-3;
 v = sort(levels(:))';
 spacing = mc_gain_axis_scale(v);
 if numel(v) >= 3 && v(1) == 0 && all(v(2:end) > 0) && strcmp(spacing, 'linear') && ...
         ~evenly_spaced(v, RELATIVE_TOLERANCE) && ...
-        (numel(v) == 3 || evenly_spaced(log(v(2:end)), RELATIVE_TOLERANCE))
+        (numel(v) == 3 || evenly_spaced(log(v(2:end)), LOG_TOLERANCE))
     spacing = 'zero_log';
 end
 switch spacing

@@ -23,7 +23,7 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 %                               bias; the gain curves' extra rows
 %   mc_gain_sweep_releasenoise  gain (log-spaced 0.1 to 4) x the release
 %                               noise sigma_gamma (release_sigma_all; 0,
-%                               then log-spaced to 0.02) at the leak
+%                               then log-spaced to 0.01) at the leak
 %                               r_s = 0.002, Wiener off (FD-027)
 %   mc_gain_sweep_selfcoupling_releasenoise   self-coupling (linear -4 to
 %                               4) x sigma_gamma, at the preset's gain, the
@@ -166,18 +166,25 @@ variants = struct('tag', variant_tags, 'preset', strcat(cfg.mc_preset, '_', vari
 %   (sigma_u = 0.025, the lead's measurement)              MC 0.8
 % So the leak is r_s = 0.002 (it still moves memory capacity by +12 %; the
 % 0.01 of the plan moved it by +44 %), and the ladders are
-%   sigma_gamma  1e-4 to 2e-2:   memory capacity within 10 % of the leak's
-%                below about 2.4e-4, the lowest positive level at 'fast';
-%                about 1 near the top (1.56 at 1e-2)
+%   sigma_gamma  1e-4 to 1e-2:   memory capacity within 10 % of the leak's
+%                below about 2.4e-4 (2.15e-4 is the lowest positive level at
+%                'fast'); 1.56 at the top, the floor the brief asked for
 %   sigma_u      2.5e-4 to 0.025: within 10 % of no noise below about 6e-4
 %                (5.4e-4 is the lowest positive level at 'fast'); 0.8 at the
 %                top, the paper's noise level
+% WHY THE sigma_gamma TOP IS 1e-2 AND NOT HIGHER (lead, after review): at the
+% leak r_s the mean size of a release event is sigma_gamma^2 / r_s. At 2e-2
+% (first proposed, to bring memory capacity nearer 1) that is 0.2 against
+% tau_rel = 0.25: one event empties about a whole pool (an equivalent pool of
+% about one vesicle, events about once per 100 s per neuron), which is not
+% spontaneous release. At 1e-2 it is 0.05, a pool of about five vesicles,
+% and memory capacity is already at its floor.
 % Levels by mode (rounded to 10 decimals by the grid table):
-%   essential  sigma_gamma 0, 1.41e-3, 0.02          sigma_u 0, 2.5e-3, 0.025
-%   fast       sigma_gamma 0, 2.42e-4 ... 0.02 (x2.42) sigma_u 0, 5.39e-4 ... 0.025 (x2.15)
-%   medium     sigma_gamma 0, 1.56e-4 ... 0.02 (x1.56) sigma_u 0, 3.67e-4 ... 0.025 (x1.47)
+%   essential  sigma_gamma 0, 1e-3, 1e-2              sigma_u 0, 2.5e-3, 0.025
+%   fast       sigma_gamma 0, 2.15e-4 ... 1e-2 (x2.15) sigma_u 0, 5.39e-4 ... 0.025 (x2.15)
+%   medium     sigma_gamma 0, 1.47e-4 ... 1e-2 (x1.47) sigma_u 0, 3.67e-4 ... 0.025 (x1.47)
 LEAK = 0.002;
-GAMMA_LADDER = [1e-4 2e-2];
+GAMMA_LADDER = [1e-4 1e-2];
 WIENER_LADDER = [2.5e-4 0.025];
 release_fixed = {'sigma_u_noise', 0, 'release_rate_all', LEAK};   % the gamma grids: Wiener off, the leak
 wiener_fixed  = {'release_rate_all', 0, 'release_sigma_all', 0};  % the Wiener grid: release off

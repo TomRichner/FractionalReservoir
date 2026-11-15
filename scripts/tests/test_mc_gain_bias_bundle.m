@@ -101,7 +101,7 @@ entry_grids = [{'bias', 'selfcoupling', 'bias', 'bias', 'selfcoupling', 'selfcou
     'bias', 'bias', 'bias', 'bias', 'selfcoupling'}, noise_grids, noise_grids, noise_grids, {'', ''}];
 % The noise grids (FD-027 P3): the leak, the noise ladders and what each holds fixed.
 LEAK = 0.002;
-gamma_ladder = [1e-4 2e-2]; wiener_ladder = [2.5e-4 0.025];
+gamma_ladder = [1e-4 1e-2]; wiener_ladder = [2.5e-4 0.025];
 release_fixed = {'sigma_u_noise', 0, 'release_rate_all', LEAK};
 wiener_fixed  = {'release_rate_all', 0, 'release_sigma_all', 0};
 for md = {'essential', 'fast'}
@@ -141,7 +141,7 @@ for md = {'essential', 'fast'}
             isequal(arg(ts{1}.args, 'levels'), [0 0.0025 0.025]) && ...
             isequal(arg(ts{1}.args, 'model_args'), wiener_fixed), 'the Wiener time series');
         assert(strcmp(arg(ts{2}.args, 'level_name'), 'release_sigma_all') && ...
-            isequal(arg(ts{2}.args, 'levels'), round([0 sqrt(prod(gamma_ladder)) gamma_ladder(2)], 10)) && ...
+            isequal(arg(ts{2}.args, 'levels'), [0 1e-3 1e-2]) && ...
             isequal(arg(ts{2}.args, 'model_args'), release_fixed), 'the gamma time series');
         assert(isequal({grids(1).variants.preset}, strcat(base.mc_preset, '_', variant_tags)));
         curves = c.figures{strcmp(names, 'fig_mc_gain_curves')};
