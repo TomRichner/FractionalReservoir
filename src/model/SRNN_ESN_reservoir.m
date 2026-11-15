@@ -190,7 +190,9 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                                        % full-res states/trajectory, skips the LLE)
             readout_signal = 'rate';   % 'rate' => read out r = phi(x_eff); 'synaptic'
                                        % => read out the synaptic output, r times
-                                       % the route's output factor
+                                       % the route's output factor;
+                                       % 'release_filtered' => the synaptic output
+                                       % through the dendritic filter (filter_release)
             for i = 1:2:length(varargin)
                 switch lower(varargin{i})
                     case 'verbose',          verbose = verbose_level(varargin{i+1}) >= 2;
@@ -225,7 +227,17 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % n x T matrix in TYPE ORDER: 'rate' or 'synaptic'. One definition,
             % readout_from_states, shared with run_memory_capacity_lean.
             params = obj.cached_params;
-            R_all = SRNN_ESN_reservoir.readout_from_states(r_all, syn_all, params, readout_signal);
+            if strcmpi(readout_signal, 'release_filtered')
+                % The synaptic output through the dendritic filter, over
+                % the whole trajectory at once. There are no release kicks
+                % on this path (run_reservoir_esn refuses release noise).
+                theta = SRNN_ESN_reservoir.readout_from_states(r_all, syn_all, params, 'synaptic');
+                R_all = SRNN_ESN_reservoir.filter_release(theta, zeros(size(theta)), [], ...
+                    params.tau_d, 1 / obj.fs);
+                theta = []; %#ok<NASGU>
+            else
+                R_all = SRNN_ESN_reservoir.readout_from_states(r_all, syn_all, params, readout_signal);
+            end
 
             %% Step 2b: Sample-and-hold -> decimate to one state per hold so MC is
             % measured in hold units (canonical i.i.d.-input MC). Other input
@@ -325,14 +337,22 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % share their end points changes no step: the states are the same
             % bits, and so are the readout matrix, the R^2 curve and MC
             % (test_mc_lean_path asserts isequal). With noise on it is exact
-            % too: the Wiener increments are generated once for the whole
-            % sequence (build_noise) and sde_fixed_step addresses them by
-            % ABSOLUTE time, so a segment consumes the increments the single
-            % call would have. (The noise tensor is 2 n by the number of
-            % steps, so with noise on this path is exact but less lean.) With
-            % an adaptive integrator ('ode45', 'ode15s') a segment boundary
-            % restarts the step-size control, and the result differs within
-            % the tolerance.
+            % too, AND THE NOISE IS HELD ONE SEGMENT AT A TIME (segment_noise):
+            % a segment is handed the increments of its own steps, which
+            % are the numbers the single call consumes over those steps.
+            % The Wiener increments come from wiener_segments, which reads
+            % the run's two tensors (build_noise's draw, 1.2 GB at n = 500
+            % over 760 s) window by window, bit for bit; the release
+            % increments from release_increments, a function of the seed
+            % and the absolute step. With an adaptive integrator ('ode45',
+            % 'ode15s') a segment boundary restarts the step-size control,
+            % and the result differs within the tolerance.
+            %
+            % RELEASE NOISE (release_sigma > 0) runs on this path only:
+            % run_memory_capacity and run_reservoir_esn refuse it. Every
+            % readout is defined with it. 'rate' and 'synaptic' read the
+            % state as it is after each step's kick; 'release_filtered'
+            % also sees what the kicks released (filter_release).
             %
             % THE SCORING IS SHARED: mc_readout_plan (decimation, split, delay
             % grid), readout_from_states (which signal is read out),
@@ -340,15 +360,25 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             % pack_mc_results are the methods run_memory_capacity calls.
             %
             % Name-value options:
-            %   'readout_signal'  'rate' (default) | 'synaptic', as run_memory_capacity
-            %   'segment_len'     samples integrated per call (default 600; >= 2)
+            %   'readout_signal'  'rate' (default) | 'synaptic', as
+            %                     run_memory_capacity, | 'release_filtered':
+            %                     each presynaptic neuron's release through
+            %                     a first-order filter with the dendritic
+            %                     time constant, what a downstream dendrite
+            %                     sees of that neuron (filter_release has
+            %                     the definition). The same bits for every
+            %                     segment_len.
+            %   'segment_len'    samples integrated per call (default 600; >= 2)
             %   'verbose'         as run_memory_capacity
             %   'trace_window'    [t_lo t_hi] in seconds, default [] (nothing).
             %                     Keeps, for the samples in that window only,
             %                     what a figure of the time series draws:
             %                     results.trace with t, the input u_ex, and
             %                     x, a, b, r, synaptic_output, g keyed as
-            %                     run_memory_capacity's stored series are.
+            %                     run_memory_capacity's stored series are; and
+            %                     with the 'release_filtered' readout,
+            %                     release_filtered, that readout at the
+            %                     window's samples (n x samples).
             %
             % results has run_memory_capacity's fields (lya_results empty, no
             % state series), and:
@@ -395,7 +425,16 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 obj.ode_opts = odeset('RelTol', 1e-5, 'AbsTol', 1e-5, 'MaxStep', 1 / obj.fs);
             end
             rhs_params = params;
-            obj.build_noise();
+            % An unknown readout, or routes a per-neuron readout cannot
+            % read, is refused now and not after the first segment.
+            SRNN_ESN_reservoir.check_readout_signal(readout_signal, params);
+            filtered = strcmpi(readout_signal, 'release_filtered');
+            filter_state = [];          % the readout filter, carried across segments
+            wiener = [];                % the Wiener increments, read in order
+            if obj.sigma_u_noise ~= 0
+                wiener = wiener_segments(obj.n, T_total - 1, obj.noise_base_seed(), ...
+                    obj.noise_seed_schedule, t_all(1), obj.fs, 'SRNNCellTypePairs');
+            end
             W_in_col = obj.W_in;
             u_seq = obj.u_scalar;
 
@@ -417,6 +456,7 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 trace_rows = find(t_all >= trace_window(1) & t_all <= trace_window(2));
             end
             S_trace = zeros(numel(trace_rows), numel(obj.S0));
+            R_trace = zeros(obj.n, numel(trace_rows));   % the filtered readout there
             n_traced = 0;
 
             if verbose
@@ -437,6 +477,9 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 rhs_params.u_interpolant = griddedInterpolant(t_all(g), ...
                     (W_in_col * u_seq(g)')', 'linear', 'none');
                 rhs = @(t, S) SRNNCellTypePairs.dynamics_fast(t, S, rhs_params);
+                % The noise of this segment's steps (s0 .. s1 - 1), and of
+                % no others; dRc is what its release kicks consumed.
+                [obj.noise_increments, dRc] = obj.segment_noise(s0, s1 - 1, wiener);
                 [~, S_seg] = obj.integrate(rhs, t_all(s0:s1), S_cur);
                 S_cur = S_seg(end, :).';
                 if s0 == 1
@@ -449,7 +492,19 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 [~, ~, ~, r_seg, syn_seg] = ...
                     SRNNCellTypePairs.unpack_and_compute_states(S_seg, params);
                 is_col = col_of(rows) > 0;
-                if any(is_col)
+                if filtered
+                    % Every sample goes through the filter, a readout
+                    % column or not: its state is carried to the next
+                    % segment. Row 1 of the run ends no step.
+                    theta = SRNN_ESN_reservoir.readout_from_states(r_seg, syn_seg, params, 'synaptic');
+                    ends_step = rows > 1;
+                    kicked = zeros(obj.n, numel(rows));
+                    kicked(:, ends_step) = SRNN_ESN_reservoir.first_route_signal( ...
+                        SRNNCellTypePairs.released_by_kick(S_seg(ends_step, :), dRc, params), params);
+                    [R_seg, filter_state] = SRNN_ESN_reservoir.filter_release(theta, kicked, ...
+                        filter_state, params.tau_d, 1 / obj.fs);
+                    R_dec(:, col_of(rows(is_col))) = R_seg(:, is_col);
+                elseif any(is_col)
                     R_seg = SRNN_ESN_reservoir.readout_from_states(r_seg, syn_seg, params, readout_signal);
                     R_dec(:, col_of(rows(is_col))) = R_seg(:, is_col);
                 end
@@ -463,6 +518,9 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                     in_trace = rows >= trace_rows(1) & rows <= trace_rows(end);
                     k = nnz(in_trace);
                     S_trace(n_traced + (1:k), :) = S_seg(in_trace, :);
+                    if filtered
+                        R_trace(:, n_traced + (1:k)) = R_seg(:, in_trace);
+                    end
                     n_traced = n_traced + k;
                 end
                 s0 = s1;
@@ -487,6 +545,9 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
                 tr.u_ex = W_in_col * u_seq(trace_rows)';
                 [tr.x, tr.a, tr.b, tr.r, tr.synaptic_output, tr.g] = ...
                     SRNNCellTypePairs.unpack_and_compute_states(S_trace, params);
+                if filtered
+                    tr.release_filtered = R_trace;   % n x samples, neurons in type order
+                end
                 mc_results.trace = tr;
             end
             obj.mc_results = mc_results;
@@ -648,6 +709,15 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
 
             params = obj.cached_params;
             dt = 1 / obj.fs;
+            if any(obj.release_sigma > 0)
+                error('SRNN_ESN_reservoir:ReleaseNoiseNeedsLeanPath', ...
+                    ['release_sigma = %s: release noise is supported on the lean memory-capacity ' ...
+                     'path only. Use run_memory_capacity_lean (every readout_signal is defined ' ...
+                     'there, and ''release_filtered'' reads the realized release); ' ...
+                     'run_memory_capacity and run_reservoir_esn hold the whole trajectory and ' ...
+                     'do not keep the release increments the readout would need.'], ...
+                    mat2str(obj.release_sigma));
+            end
             if obj.lean_input
                 error('SRNN_ESN_reservoir:LeanInput', ...
                     ['This reservoir was built with lean_input = true, so it has no ' ...
@@ -1137,6 +1207,52 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
         end
     end
 
+    methods (Access = protected)
+        function [noise, dRc] = segment_noise(obj, first_step, last_step, wiener)
+            % SEGMENT_NOISE The noise struct for steps first_step..last_step of the run, and nothing beyond them.
+            %
+            % What build_noise makes for the whole run, for one window of
+            % ABSOLUTE steps (step j goes from sample j to sample j + 1):
+            % the struct sde_fixed_step reads, with t0 the window's first
+            % sample, so the integrator's absolute-time index is the
+            % column within the window. [] when neither noise source is on.
+            %   wiener   the run's wiener_segments ([] with sigma_u_noise
+            %            = 0). It is read IN ORDER: each call must ask for
+            %            the steps that follow the previous call's.
+            %   dRc      n x (number of steps): the centered release-drive
+            %            increments dR - r_s dt the window's kicks apply
+            %            (build_noise's expression, so the same bits), or
+            %            [] without release noise. Returned for the
+            %            readout, which recovers the realized release
+            %            from them.
+            noise = [];
+            dRc = [];
+            wiener_on = ~isempty(wiener);
+            release_on = any(obj.release_sigma > 0);
+            if ~wiener_on && ~release_on
+                return;
+            end
+            n_window = last_step - first_step + 1;
+            xi1 = [];
+            xi2 = [];
+            if wiener_on
+                [xi1, xi2] = wiener.next(n_window);
+            end
+            params = obj.cached_params;
+            noise = struct('xi1', xi1, 'xi2', xi2, ...
+                't0', obj.t_ex(first_step), 'fs', obj.fs, ...
+                'sigma', obj.sigma_x_raw, 'idx', params.state_layout.x);
+            if release_on
+                [rate, sigma] = obj.release_noise_rows();
+                dRc = release_increments(rate, sigma, obj.fs, [first_step, last_step], ...
+                    obj.noise_base_seed(), obj.noise_seed_schedule, obj.t_ex(1), ...
+                    numel(obj.t_ex) - 1, 'SRNNCellTypePairs') - rate .* (1 / obj.fs);
+                noise.kick = @(S, j) SRNNCellTypePairs.release_kick(S, dRc(:, j), params);
+                noise.kick_steps = n_window;
+            end
+        end
+    end
+
     %% Static Methods for Ridge Regression and R^2
     methods (Access = protected)
         function plot_types(~, t, named, test_indices, names, tcolors, order)
@@ -1193,27 +1309,146 @@ classdef SRNN_ESN_reservoir < SRNNCellTypePairs
             %               here: unpack_and_compute_states takes it from
             %               the model's `output`, so syn_all is right for
             %               every route model. Without STD it equals r, so
-            %               those conditions are unchanged.
+            %               those conditions are unchanged. (With a
+            %               spontaneous release rate r_s it is the factor
+            %               times r + r_s, the output of the mean dynamics.)
+            % 'release_filtered' is not made here: it is a filter along the
+            % trajectory, of this 'synaptic' signal and the release kicks
+            % (filter_release).
             switch lower(readout_signal)
                 case 'rate'
                     R = SRNN_ESN_reservoir.stack_by_type(r_all, params);
                 case 'synaptic'
-                    % Per-route on this class: a presynaptic neuron has one
-                    % synaptic output PER TARGET TYPE. They coincide only when
-                    % all of that neuron's outgoing routes carry identical
-                    % synaptic dynamics -- which this refuses to assume.
+                    R = SRNN_ESN_reservoir.first_route_signal(syn_all, params);
+                case 'release_filtered'
+                    error('SRNN_ESN_reservoir:BadReadoutSignal', ...
+                        ['The ''release_filtered'' readout is not a function of the states at ' ...
+                         'one sample: it is a filter run along the trajectory ' ...
+                         '(SRNN_ESN_reservoir.filter_release). Both memory-capacity paths ' ...
+                         'compute it themselves.']);
+                otherwise
+                    SRNN_ESN_reservoir.check_readout_signal(readout_signal, params);
+            end
+        end
+
+        function check_readout_signal(readout_signal, params)
+            % CHECK_READOUT_SIGNAL Refuse a readout this reservoir cannot give.
+            %
+            % The names are 'rate', 'synaptic' and 'release_filtered'
+            % (readout_from_states, filter_release). The last two read ONE
+            % signal per presynaptic neuron, so each neuron's routes must
+            % carry the same dynamics (assert_route_redundancy).
+            switch lower(char(string(readout_signal)))
+                case 'rate'
+                case {'synaptic', 'release_filtered'}
                     SRNN_ESN_reservoir.assert_route_redundancy(params);
-                    first_route = struct();
-                    for q = 1:params.n_cellTypes
-                        name = params.cell_type_names{q};
-                        posts = fieldnames(syn_all.(name));
-                        first_route.(name) = syn_all.(name).(posts{1});
-                    end
-                    R = SRNN_ESN_reservoir.stack_by_type(first_route, params);
                 otherwise
                     error('SRNN_ESN_reservoir:BadReadoutSignal', ...
-                        'readout_signal must be ''rate'' or ''synaptic'' (got ''%s'').', readout_signal);
+                        ['readout_signal must be ''rate'', ''synaptic'' or ''release_filtered'' ' ...
+                         '(got ''%s'').'], char(string(readout_signal)));
             end
+        end
+
+        function R = first_route_signal(by_route, params)
+            % FIRST_ROUTE_SIGNAL One signal per presynaptic neuron from a per-route one, n x T in type order.
+            %
+            % by_route is keyed by route (.E.I, ...), each field npre x T:
+            % a synaptic output, or the release of the kicks
+            % (SRNNCellTypePairs.released_by_kick). Per-route on this
+            % class: a presynaptic neuron has one such signal PER TARGET
+            % TYPE. They coincide only when all of that neuron's outgoing
+            % routes carry identical synaptic dynamics -- which this
+            % refuses to assume (assert_route_redundancy). The first
+            % outgoing route of each type is then every route's.
+            SRNN_ESN_reservoir.assert_route_redundancy(params);
+            first_route = struct();
+            for q = 1:params.n_cellTypes
+                name = params.cell_type_names{q};
+                posts = fieldnames(by_route.(name));
+                first_route.(name) = by_route.(name).(posts{1});
+            end
+            R = SRNN_ESN_reservoir.stack_by_type(first_route, params);
+        end
+
+        function [Y, state] = filter_release(theta, kicked, state, tau, dt)
+            % FILTER_RELEASE The 'release_filtered' readout: each neuron's release through a first-order filter.
+            %
+            %   [Y, state] = SRNN_ESN_reservoir.filter_release(theta, kicked, state, tau, dt)
+            %
+            % WHAT IT IS. A downstream dendrite with time constant tau
+            % (the model's tau_d) and unit weight from presynaptic neuron
+            % j alone would hold
+            %
+            %   tau dy_j = -y_j dt + dTheta_j ,
+            %
+            % with dTheta_j the neuron's realized release: over a step,
+            % the mean part theta_j dt (theta = F (r + r_s), the synaptic
+            % output of the mean dynamics) plus what the step's release
+            % kick released. It is the term the model's own dendrites
+            % receive from neuron j (SRNNCellTypePairs.release_kick adds
+            % W dTheta / tau_d to x), before the weights. With release
+            % noise off it is the synaptic output low-passed at tau, and
+            % it is defined with or without the Wiener term.
+            %
+            % THE FORM, exact for it. Between two samples theta is taken
+            % as the straight line through its two stored values, and a
+            % step's kick as an impulse at the END of the step, where the
+            % integrator applies it. With a = exp(-dt/tau):
+            %
+            %   y(k+1) = a y(k) + c0 theta(k) + c1 theta(k+1) + kicked(k+1)/tau
+            %   c1 = 1 - (tau/dt)(1 - a),   c0 = (1 - a) - c1
+            %
+            % which is the filter's exact response to that input (no
+            % step-size error of its own; c0 + c1 = 1 - a, so a constant
+            % theta is passed unchanged). The stored state at a sample is
+            % the state after the kick that landed there, so theta(k+1) is
+            % the mean output just after it. The filter starts at rest on
+            % its input, y(1) = theta(1).
+            %
+            % NO STATE VARIABLE IS ADDED TO THE MODEL for it: it is
+            % computed from the stored states and the increments, after
+            % the fact, and nothing in the dynamics reads it.
+            %
+            %   theta   n x m: the synaptic output at m consecutive samples
+            %   kicked  n x m: column k is what the kick of the step that
+            %           ENDED at sample k released (zeros without release
+            %           noise). When `state` is empty, sample 1 starts the
+            %           run, no step ends there and column 1 is not read.
+            %   state   [] to start; else the struct this returned for the
+            %           samples just before (y and theta at the last one)
+            %   Y       n x m: the filter's output at the m samples
+            %
+            % INDEPENDENT OF HOW THE RUN IS CUT, to the bit: each sample's
+            % update is the same arithmetic on the same numbers whether
+            % the previous sample was in this call or the one before.
+            %
+            % See also: SRNNCellTypePairs.released_by_kick,
+            %           SRNNCellTypePairs.release_per_step, run_memory_capacity_lean
+            m = size(theta, 2);
+            Y = zeros(size(theta));
+            a = exp(-dt ./ tau);
+            c1 = 1 - (tau ./ dt) .* (-expm1(-dt ./ tau));
+            c0 = -expm1(-dt ./ tau) - c1;
+            first = 1;
+            if isempty(state)
+                y = theta(:, 1);
+                theta_before = theta(:, 1);
+                Y(:, 1) = y;
+                first = 2;
+            else
+                y = state.y;
+                theta_before = state.theta;
+            end
+            if m >= first
+                % What each step adds, then the recursion over the steps.
+                drive = c0 .* [theta_before, theta(:, first:m - 1)] + c1 .* theta(:, first:m) ...
+                    + kicked(:, first:m) ./ tau;
+                for k = first:m
+                    y = a .* y + drive(:, k - first + 1);
+                    Y(:, k) = y;
+                end
+            end
+            state = struct('y', y, 'theta', theta(:, m));
         end
 
         function R = stack_by_type(named, params)
