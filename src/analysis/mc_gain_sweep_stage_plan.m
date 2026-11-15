@@ -29,12 +29,21 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %                       gain_spacing (default [0.1 4], 'log'). Another
 %                       property must give a range or its levels, and is
 %                       spaced linearly unless told.
-%       second_range    the second axis: [lo hi], linear (the bias has the
-%                       default [-0.6 0.6]; another axis must give a range
-%                       or its levels)
+%       second_range, second_spacing   the second axis: [lo hi] and 'linear'
+%                       (the default), 'log' or 'zero_log' (the bias has the
+%                       default range [-0.6 0.6]; another axis must give a
+%                       range or its levels). Either axis takes any of the
+%                       three spacings; mc_gain_sweep_grid defines them.
 %       first_levels, second_levels   explicit levels, in place of the range
 %                       and the mode's count (gain_levels and bias_levels on
 %                       the default axes)
+%       model_args      name-value overrides of the preset for THIS grid's
+%                       runs (its variants' too), applied after the stage's
+%                       model_args: the arguments the grid holds fixed (a
+%                       noise grid's leak, the other noise off)
+%       readout_signal  the memory readout of this grid's runs, in place of
+%                       the stage's ('rate', 'synaptic', 'release_filtered';
+%                       run_mc_gain_sweep)
 %       variants        struct array with fields tag and preset: further
 %                       networks, each swept along THE FIRST AXIS ONLY, on
 %                       this grid's levels of it, at its own value of the
@@ -42,13 +51,16 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %                       mc_gain_sweep_preset_point)
 %       variant_seeds   seeds of the variant runs; absent = the grid's
 %     seeds             network seeds of every grid (default: the mode's)
-%     conditions, model_args, protocol, lya_K, lya_T_sec, lya_acc_sec,
-%     segment_len       run_mc_gain_sweep's options of those names, the same
-%                       for every run (the last five are for tests)
+%     conditions, model_args, readout_signal, protocol, lya_K, lya_T_sec,
+%     lya_acc_sec, segment_len   run_mc_gain_sweep's options of those names,
+%                       the same for every run (the last five are for
+%                       tests); a grid adds its own model_args after these
+%                       and may name its own readout_signal
 %   ONE UNNAMED GRID, the form from before a stage could hold several, is
 %   still read: with no grids field, the grid's own fields (first_axis,
 %   second_axis, gain_range, ..., variants, variant_seeds) are fields of
-%   cfg.mc_gain_sweep itself.
+%   cfg.mc_gain_sweep itself (its model_args and readout_signal are then
+%   the stage's).
 %   That grid has the empty tag: it writes to <run_dir>/mc_gain_sweep and
 %   its variants to <run_dir>/mc_gain_sweep_<variant>, where the results of
 %   such a bundle have always been.
@@ -75,10 +87,15 @@ arguments
     cfg (1,1) struct
 end
 
-RUN_OPTIONS  = {'conditions', 'model_args', 'protocol', 'lya_K', 'lya_T_sec', 'lya_acc_sec', 'segment_len'};
+RUN_OPTIONS  = {'conditions', 'model_args', 'readout_signal', 'protocol', 'lya_K', 'lya_T_sec', ...
+                'lya_acc_sec', 'segment_len'};
 GRID_SHAPE   = {'first_axis', 'second_axis', 'first_range', 'first_spacing', 'first_levels', ...
-                'gain_range', 'gain_spacing', 'gain_levels', 'second_range', 'second_levels', 'bias_levels'};
-GRID_FIELDS  = [{'tag'}, GRID_SHAPE, {'variants', 'variant_seeds'}];
+                'gain_range', 'gain_spacing', 'gain_levels', 'second_range', 'second_spacing', ...
+                'second_levels', 'bias_levels'};
+% A grid's own run options: added to (model_args) or replacing (readout_signal)
+% the stage's, for that grid and its variants only.
+GRID_RUN     = {'model_args', 'readout_signal'};
+GRID_FIELDS  = [{'tag'}, GRID_SHAPE, GRID_RUN, {'variants', 'variant_seeds'}];
 % The options that go by a default axis's own name: refused on another axis.
 DEFAULT_NAMED = struct('first', {{'gain_range', 'gain_spacing', 'gain_levels'}}, ...
                        'second', {{'bias_levels'}});
@@ -92,7 +109,9 @@ if isfield(cfg, 'mc_gain_sweep') && ~isempty(cfg.mc_gain_sweep); opts = cfg.mc_g
 if ~(isstruct(opts) && isscalar(opts))
     bad_config('cfg.mc_gain_sweep must be a scalar struct.');
 end
-single_grid_fields = setdiff(GRID_FIELDS, {'tag'}, 'stable');
+% The unnamed grid's fields sit beside the stage's; its run options ARE the
+% stage's (model_args, readout_signal), so they are not listed twice.
+single_grid_fields = setdiff(GRID_FIELDS, [{'tag'}, GRID_RUN], 'stable');
 allowed = [STAGE_FIELDS, RUN_OPTIONS, single_grid_fields];
 unknown = setdiff(fieldnames(opts), allowed);
 if ~isempty(unknown)
@@ -129,9 +148,10 @@ shared = {'run_mode', cfg.run_mode, 'verbose', cfg.verbose};
 if isfield(cfg, 'mc_ode_solver') && ~isempty(cfg.mc_ode_solver)
     shared = [shared, {'ode_solver', cfg.mc_ode_solver}];
 end
-shared = [shared, given(opts, RUN_OPTIONS)];
-model_args = field_or_empty(opts, 'model_args');
-if isempty(model_args); model_args = {}; end
+shared = [shared, given(opts, setdiff(RUN_OPTIONS, GRID_RUN, 'stable'))];
+stage_model_args = field_or_empty(opts, 'model_args');
+if isempty(stage_model_args); stage_model_args = {}; end
+stage_readout = field_or_empty(opts, 'readout_signal');
 seeds = given(opts, {'seeds'});
 
 %% One run per grid, then one per variant network of that grid
@@ -153,9 +173,24 @@ for g = 1:numel(grids)
     end
     shape = given(grid, GRID_SHAPE);
     G = mc_gain_sweep_grid(cfg.run_mode, shape{:}, seeds{:});
+    % The grid's own run options: its model_args after the stage's (the run
+    % applies them in order, so the grid's win), its readout in place of the
+    % stage's. Neither is passed when nothing sets it, so a grid that sets
+    % neither plans the arguments it always has.
+    grid_model_args = field_or_empty(grid, 'model_args');
+    if isempty(grid_model_args); grid_model_args = {}; end
+    if ~(iscell(grid_model_args) && mod(numel(grid_model_args), 2) == 0)
+        bad_config('Grid ''%s'': model_args must be a cell of name-value pairs.', grid.tag);
+    end
+    model_args = [stage_model_args, grid_model_args];
+    readout = field_or_empty(grid, 'readout_signal');
+    if isempty(readout); readout = stage_readout; end
+    run_options = {};
+    if ~isempty(model_args); run_options = [run_options, {'model_args', model_args}]; end %#ok<AGROW>
+    if ~isempty(readout); run_options = [run_options, {'readout_signal', readout}]; end %#ok<AGROW>
     % The run takes each axis's levels under the axis's own option name
     % (gain_levels and bias_levels for the default axes), as it always has.
-    on_axis = [shared, {'first_axis', first_axis.property, 'second_axis', second_axis.property, ...
+    on_axis = [shared, run_options, {'first_axis', first_axis.property, 'second_axis', second_axis.property, ...
         first_axis.levels_option, G.first_levels}];
     runs(end+1) = new_run(grid.tag, '', G, [{'preset_name', cfg.mc_preset}, on_axis, ...
         {second_axis.levels_option, G.second_levels, 'seeds', G.seeds}]); %#ok<AGROW>

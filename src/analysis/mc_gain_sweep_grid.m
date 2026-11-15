@@ -18,16 +18,19 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % THE SIZE TABLE (Tom, 2026-11-13): levels per axis x networks, the same for
 % every grid of a mode.
 %   mode         levels    networks   one grid   the mu7chain bundle
-%   essential     3 x  3       1         9 jobs     24 jobs, about 20 min
-%   fast          7 x  7       3       147 jobs    336 jobs, about 4 h 25
-%   medium(2)    13 x 13      10      1690 jobs   3640 jobs, about 48 h
-%   production   17 x 17      10      2890 jobs   6120 jobs, about 81 h
-% "The mu7chain bundle" is mu7chain_gainbias_config: two grids (gain x bias,
-% gain x self-coupling) and two networks swept along gain only, so
-% (2 n^2 + 2 n) x networks jobs for n levels. Times are for 12 pool workers
-% at WORKER_MINUTES_PER_JOB = 9.5 worker-minutes per job of four conditions
-% (measured on the first block C runs: 9 to 12), with every job of the stage
-% in one parfor (run_mc_gain_sweep_set), so the time is jobs x 9.5 / 12.
+%   essential     3 x  3       1         9 jobs     51 jobs, about 45 min
+%   fast          7 x  7       3       147 jobs    777 jobs, about 11 h 40
+%   medium(2)    13 x 13      10      1690 jobs   8710 jobs, about 131 h
+%   production   17 x 17      10      2890 jobs  14790 jobs, about 223 h
+% "The mu7chain bundle" is mu7chain_gainbias_config: five grids (gain x
+% bias, gain x self-coupling, and since FD-027 gain x release noise,
+% self-coupling x release noise, gain x Wiener noise) and two networks swept
+% along gain only, so (5 n^2 + 2 n) x networks jobs for n levels. Times are
+% for 12 pool workers at WORKER_MINUTES_PER_JOB = 9.5 worker-minutes per job
+% of four conditions (measured on the first block C runs: 9 to 12), about
+% 12.9 for the two release-noise grids' jobs (their condition-runs take
+% about 157 s against 116 s), with every job of the stage in one parfor
+% (run_mc_gain_sweep_set). G.worker_minutes counts 9.5 for every job.
 % Agents run 'essential' and 'fast'; 'medium' and larger are Tom's to start.
 % 'production' is the lead's choice of a size above medium (17 levels keeps
 % the count odd, so zero stays a level of a symmetric axis).
@@ -39,10 +42,24 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 %                 and the options also go by gain_range, gain_spacing and
 %                 gain_levels; another property has no default range (give
 %                 one, or its levels) and is spaced linearly unless told.
-%   second axis   second_axis, default 'S_c' (the bias). second_range,
-%                 linear spacing. For the bias the range defaults to
-%                 [-0.6 0.6], and its levels also go by bias_levels; another
-%                 property has no default range.
+%   second axis   second_axis, default 'S_c' (the bias). second_range, and
+%                 second_spacing (default 'linear'). For the bias the range
+%                 defaults to [-0.6 0.6], and its levels also go by
+%                 bias_levels; another property has no default range.
+% THE SPACINGS, the same on either axis:
+%   'linear'    n levels evenly spaced from lo to hi
+%   'log'       n levels evenly spaced in log from lo to hi (lo > 0)
+%   'zero_log'  a ZERO LEVEL, then log-spaced levels: the n-level log ladder
+%               from lo to hi with its lowest rung, lo, replaced by 0. The
+%               top level is hi, the zero stands one log step below the
+%               lowest positive level (where the maps draw it:
+%               mc_axis_spacing), and at 3 levels the axis is zero, the
+%               middle of the ladder and the top. Written for a noise
+%               amplitude (FD-027, P3), whose zero is "off" and whose effect
+%               grows over decades: linear levels would be mostly floor, and
+%               log levels would lack the noise-free reference. The lowest
+%               positive level is lo (hi/lo)^(1/(n-1)), so it moves with the
+%               mode's n; lo itself is never a level.
 % An option under an axis's default name (gain_*, bias_levels) is refused
 % on another axis, and the two names of one option are not both given.
 % WHY THESE RANGES (FD-010, decisions 14, 18 and 21): above bias 0.6 the
@@ -86,6 +103,7 @@ arguments
     spec.first_levels  (1,:) double = []
     spec.gain_levels   (1,:) double = []
     spec.second_range  double {mustBeEmptyOrRange} = []
+    spec.second_spacing (1,:) char  = ''
     spec.second_levels (1,:) double = []
     spec.bias_levels   (1,:) double = []
     spec.seeds         (1,:) double = []
@@ -135,8 +153,9 @@ function v = axis_option(spec, A, what)
 % The value of one option of axis A ('levels', 'range' or 'spacing'), under
 % its generic name (first_levels) or the default axis's name (gain_levels).
 % The default name is refused on another axis, and both names together are
-% refused. Empty when neither is given (or the option does not exist for
-% this axis: the second axis has no spacing).
+% refused. Empty when neither is given. (The second axis's spacing and
+% range have no default-axis name: there is no bias_spacing or bias_range,
+% so for it only second_spacing and second_range count.)
 generic = [A.generic_option '_' what];
 default_axis = mc_sweep_axis(A.position);
 own = [default_axis.option '_' what];
@@ -167,14 +186,27 @@ switch spacing
         if range(1) <= 0
             error('mc_gain_sweep_grid:BadRange', ...
                 'A log-spaced axis needs a positive range; the %s axis %s has [%g %g].', ...
-                A.position, A.property, range);
+                A.position, A.property, range(1), range(2));
         end
         levels = logspace(log10(range(1)), log10(range(2)), n);
     case 'linear'
         levels = linspace(range(1), range(2), n);
+    case 'zero_log'
+        % The n-level log ladder from lo to hi, its lowest rung replaced by 0.
+        if range(1) <= 0
+            error('mc_gain_sweep_grid:BadRange', ...
+                ['A zero_log axis needs a positive range (the ends of its log ladder); ' ...
+                 'the %s axis %s has [%g %g].'], A.position, A.property, range(1), range(2));
+        end
+        if n < 2
+            error('mc_gain_sweep_grid:BadSpacing', 'A zero_log axis needs at least two levels.');
+        end
+        levels = logspace(log10(range(1)), log10(range(2)), n);
+        levels(1) = 0;
     otherwise
         error('mc_gain_sweep_grid:BadSpacing', ...
-            'The spacing of the %s axis is ''log'' or ''linear''; got ''%s''.', A.position, spacing);
+            'The spacing of the %s axis is ''linear'', ''log'' or ''zero_log''; got ''%s''.', ...
+            A.position, spacing);
 end
 end
 
