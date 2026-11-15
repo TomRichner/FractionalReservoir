@@ -5,6 +5,7 @@ function out_file = make_regression_tol_reference(name, opts)
 %   out_file = make_regression_tol_reference('chain')
 %   out_file = make_regression_tol_reference('stf_chain')
 %   out_file = make_regression_tol_reference('spread')
+%   out_file = make_regression_tol_reference('release')
 %   out_file = make_regression_tol_reference('before_jacobian_edit')
 %   out_file = make_regression_tol_reference('before_jacobian_edit', 'overwrite', true)
 %   out_file = make_regression_tol_reference('before_facilitation', 'suite', 'chain')
@@ -60,6 +61,14 @@ function out_file = make_regression_tol_reference(name, opts)
 %              networks that run on them. Replaced only deliberately,
 %              exactly as 'chain' is.
 %
+%   'release'  scripts/tests/fixtures/regression_tol_release.mat, kept in
+%              git (force-added). The RELEASE suite (the tier's fifth),
+%              captured when the release noise was final (FD-027, step
+%              N3): the leak in every route model's drift and Jacobian,
+%              the kicks and what they released, the increments, the
+%              filtered readout, and stable networks that run with them.
+%              Replaced only deliberately, exactly as 'chain' is.
+%
 %   any other name   data/regression_tol/<name>.mat, gitignored, never
 %              committed. A PRE-EDIT reference of any suite ('suite',
 %              default 'base'): capture one before a critical edit (the
@@ -75,7 +84,9 @@ function out_file = make_regression_tol_reference(name, opts)
 %                            src/model/SRNNCellTypePairs.m,
 %                            src/model/SRNN_ESN_reservoir.m,
 %                            src/analysis/ParamSpaceAnalysis2.m and the
-%                            three route-model files (git hash-object, so
+%                            three route-model files, and (since the
+%                            release suite) sde_fixed_step.m and
+%                            release_increments.m (git hash-object, so
 %                            they equal `git ls-tree` on a clean tree)
 %   matlab_release, machine, cores, threads   where it ran; THREADS is
 %                            maxNumCompThreads, which moves results at
@@ -84,13 +95,13 @@ function out_file = make_regression_tol_reference(name, opts)
 % (The anchor predates meta.suite and the route files' blobs; a reference
 % without meta.suite is the base suite.)
 %
-% The four fixtures need `git add -f` (*.mat is gitignored repo-wide).
+% The five fixtures need `git add -f` (*.mat is gitignored repo-wide).
 %
 % See also: regression_tol_run, regression_tol_check, regression_tol_settings
 arguments
     name (1,:) char {mustBeNonempty}
     opts.overwrite (1,1) logical = false
-    opts.suite (1,:) char {mustBeMember(opts.suite, {'', 'base', 'chain', 'stf_chain', 'spread'})} = ''
+    opts.suite (1,:) char {mustBeMember(opts.suite, {'', 'base', 'chain', 'stf_chain', 'spread', 'release'})} = ''
 end
 if isempty(regexp(name, '^[A-Za-z0-9_\-]+$', 'once'))
     error('make_regression_tol_reference:BadName', ...
@@ -98,9 +109,10 @@ if isempty(regexp(name, '^[A-Za-z0-9_\-]+$', 'once'))
 end
 project_root = fileparts(which('setup_paths'));
 [out_file, committed] = regression_tol_reference_file(name);
-% The four committed references each belong to one suite.
+% The five committed references each belong to one suite.
 suite = opts.suite;
-fixed_suite = struct('anchor', 'base', 'chain', 'chain', 'stf_chain', 'stf_chain', 'spread', 'spread');
+fixed_suite = struct('anchor', 'base', 'chain', 'chain', 'stf_chain', 'stf_chain', 'spread', 'spread', ...
+    'release', 'release');
 if committed
     if ~isempty(suite) && ~strcmp(suite, fixed_suite.(name))
         error('make_regression_tol_reference:BadSuite', ...
@@ -148,7 +160,8 @@ if committed
 end
 tracked = {'src/model/SRNNCellTypePairs.m', 'src/model/SRNN_ESN_reservoir.m', ...
     'src/analysis/ParamSpaceAnalysis2.m', 'src/model/routes/route_model.m', ...
-    'src/model/routes/route_product.m', 'src/model/routes/route_pool.m'};
+    'src/model/routes/route_product.m', 'src/model/routes/route_pool.m', ...
+    'src/model/integrators/sde_fixed_step.m', 'src/model/integrators/release_increments.m'};
 blobs = struct('file', tracked, 'blob', '');
 for k = 1:numel(tracked)
     [status, h] = system(sprintf('git -C "%s" hash-object "%s"', project_root, tracked{k}));

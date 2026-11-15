@@ -24,7 +24,11 @@ function [ok, leaves, info] = regression_tol_check(name, opts)
 %          the per-neuron spread and any later edit to it). 'spread':
 %          .../fixtures/regression_tol_spread.mat, networks whose
 %          depression and facilitation parameters differ per neuron
-%          (std_spread, stf_spread) as first built. Any
+%          (std_spread, stf_spread) as first built. 'release':
+%          .../fixtures/regression_tol_release.mat, runs with spontaneous
+%          release on (FD-027: the leak in every route model, the kicks,
+%          the increments, the filtered readout), run by
+%          test_regression_tolerance_release. Any
 %          other name: a pre-edit reference made by
 %          make_regression_tol_reference(NAME), in data/regression_tol/.
 %          The reference says which suite of cases it holds

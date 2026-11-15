@@ -6,8 +6,14 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 %   R = regression_tol_run([], 'chain') % the CHAIN suite (below), capture
 %   R = regression_tol_run(ref_data, 'chain')
 %   R = regression_tol_run([], 'stf_chain')   % the STF_CHAIN suite (below)
-%   R = regression_tol_run([], 'spread')      % the SPREAD suite (last in this header)
+%   R = regression_tol_run([], 'spread')      % the SPREAD suite (near the end of this header)
+%   R = regression_tol_run([], 'release')     % the RELEASE suite (last in this header)
 %   [R, seconds] = regression_tol_run(...)
+%
+% (A fifth suite, 'release', was added with the release noise, FD-027:
+% runs with spontaneous release on, reference regression_tol_release.mat.
+% It is described at the very end of this header. The count "four" below
+% is of the suites that existed before it.)
 %
 % FOUR SUITES, each with a reference of its own. The fourth, 'spread'
 % (networks with a per-neuron spread on the synapse parameters; reference
@@ -309,12 +315,79 @@ function [R, seconds] = regression_tol_run(ref_data, suite)
 % stable networks on one I neuron of schain (n = 40) and on two PV
 % neurons and one VIP neuron of smixed.
 %
+% THE RELEASE SUITE (suite 'release'; FD-027, docs/Plan_release_noise.md,
+% section 4; reference scripts/tests/fixtures/regression_tol_release.mat).
+% Spontaneous release: a presynaptic neuron's release drive over a step is
+% r dt + dR, dR a gamma increment (route_model, "RELEASE NOISE"). Its mean
+% r_s is a leak in the drift of every route model (the release drive
+% rho = r + r_s in the depletion terms and in theta = F rho, so in
+% dynamics_fast, both Jacobians and the steady state); the rest is a kick
+% after each step (SRNNCellTypePairs.release_kick; the models' `kick` and
+% `released`). No other suite has release_rate or release_sigma above
+% zero, so this is the reference that says "the release noise is
+% unchanged". One function, release_suite, with networks of every route
+% model:
+%   no_adaptation  the regression network without synapse dynamics: the
+%                  pass-through route (dTheta = dRc)
+%   sfa1_std1      one pool (route_product, one component)
+%   chain          the chained pool (route_pool) on all four routes
+%   sfa3_std2      the product of two pools (route_product)
+%   facil          the chain with release-coupled facilitation and a
+%                  calcium trace (the stf_chain suite's uniform network):
+%                  the release probability g scales the kick
+% each with r_s = 0.01 and sigma_gamma = 0.007 in both cell types and the
+% Wiener term off, and
+%   rmixed         the stf_chain suite's four-cell-type network (every pool
+%                  variant, a geometric-mean product, output-only
+%                  facilitation on a product route, a facilitating route
+%                  with no pool, a route scale) with a different release in
+%                  each presynaptic type, r_s [0.01 0.02 0.005 0.01] and
+%                  sigma_gamma [0.007 0.01 0 0.005] (one type has the leak
+%                  alone), and the Wiener term on.
+%
+% LAYER 1, POINTWISE, as the stf_chain suite's (dS, J, JY, the parameter
+% view, whose route fields carry release_rate and release_sigma, rates,
+% synaptic outputs = F (r + r_s), the factors) at the states of
+% pick_pool_states, from the five networks at full gain, their stable
+% twins and rmixed at both gains. And under `release` in each case:
+%   dRc         a fixed pattern of centered increments, one column per
+%               state: over the neurons in turn a zero draw (-r_s dt, the
+%               most negative a kick can be), a small one, a large one
+%               (40 r_s dt) and one larger than tau_rel (0.3)
+%   kick_S      the state after release_kick of each state by its column
+%   kicked      what those kicks released on every route, by
+%               released_by_kick from ALL the kicked states at once (so a
+%               step reading another step's increment shows)
+%   steady      every route model's steady_state at rates 0, 0.05, 0.3, 1
+%   run_dRc     the first 25 columns of the increments build_noise makes
+%               for the run (centered; from the model's seed)
+%   run_kick    the run's own kick handle applied to the first state at
+%               step 7 (the increment of step 7, and no other)
+%   dR          release_increments itself for steps 3 to 12 of a fixed seed
+% One more pointwise case, `filter`: SRNN_ESN_reservoir.filter_release on
+% a fixed input, whole and cut in two.
+%
+% LAYER 2, STABLE END TO END (the stable presets, gain 0.2, staircase;
+% integrator 'sra1'): the five networks with release noise and rmixed at
+% gain 0.2, each with the trajectory, top-K results, the factors along
+% the run and the realized release of every route per step
+% (release_per_step: `release` and `kicked`, every fifth step); the chain
+% with BOTH sources (chain_both); transient gain and the
+% finite-difference Jacobian on the chain; Benettin on a reduced chain
+% network (the perturbed trajectory gets the kicks); a sweep with
+% release_sigma_all as a grid axis (0 and 0.014; the chain and the single
+% pool); and lean memory capacity with the 'release_filtered' readout on
+% the chain and the product network.
+%
+% HOW STABLE (measured 2026-11-14; top-K lambda_1 in 1/s): see the table
+% in release_suite below.
+%
 % See also: regression_tol_compare, regression_tol_check,
 %           make_regression_tol_reference, regression_tol_settings,
 %           regression_tol_band_check, regression_rapid_run
 arguments
     ref_data = []
-    suite (1,:) char {mustBeMember(suite, {'base', 'chain', 'stf_chain', 'spread'})} = 'base'
+    suite (1,:) char {mustBeMember(suite, {'base', 'chain', 'stf_chain', 'spread', 'release'})} = 'base'
 end
 if strcmp(suite, 'chain')
     [R, seconds] = pool_suite(ref_data, chain_spec());
@@ -324,6 +397,9 @@ elseif strcmp(suite, 'stf_chain')
     return;
 elseif strcmp(suite, 'spread')
     [R, seconds] = pool_suite(ref_data, spread_spec());
+    return;
+elseif strcmp(suite, 'release')
+    [R, seconds] = release_suite(ref_data);
     return;
 end
 t_all = tic;
@@ -1221,6 +1297,320 @@ end
 idx = unique([1, i1, i2]);
 S = [S, m.S_out(idx, :)', depleted, reserve_full];
 t = [t, m.t_out(idx)', m.t_out(i_mid), m.t_out(i_mid)];
+end
+
+%% ------------------------------------------------------------------------
+function [R, seconds] = release_suite(ref_data)
+% The release suite (see the header): runs with spontaneous release on.
+% Same rules as the other suites (a capture rethrows, a check records a
+% case that threw and goes on).
+%
+% HOW STABLE its layer-2 networks are (measured 2026-11-14 with the
+% settings below; exponents in 1/s):
+%                  top-K lambda_1   its largest LOCAL rate
+%   no_adaptation  -4.191           -3.102
+%   sfa1_std1      -0.859           -0.726
+%   chain          -0.168           -0.129
+%   sfa3_std2      -0.153           -0.100
+%   facil          -0.355           -0.155
+%   chain_both     -0.167           -0.126
+%   rmixed         -0.584           -0.343
+% Benettin on the reduced chain network: -0.285. The 8 sweep jobs have
+% lambda_1 between -1.21 and -0.22. lya_K_auto never retries. Every
+% network is the stable twin (gain 0.2) of one the other suites hold; the
+% kicks move the pools and x by amounts of order sigma_gamma sqrt(dt), and
+% nothing chaotic is compared along a trajectory. Between 1 and 14
+% computational threads 22 of 2887 float leaves move, all within
+% tolerance (the largest are the orth_defect_max leaves, as in the other
+% suites).
+%
+% DO NOT RETUNE the settings below; if they must change, the reference
+% changes with them and the commit says why.
+t_all = tic;
+capture = isempty(ref_data);
+rng_at_entry = rng;
+restore_rng = onCleanup(@() rng(rng_at_entry));
+
+P_full   = 'regression_pairs_noStim_noise0_dualStd_3cond';        % full gain, Wiener off
+P_stable = 'regression_stable_steps_noise0_dualStd_3cond';        % gain 0.2, staircase, Wiener off
+P_both   = 'regression_stable_steps_noise0p025_dualStd_3cond';    % ... Wiener on
+chain = struct('model', 'chain', 'tau_rec', [2 5], 'tau_rel', 0.25, 'n2', 2);
+sc4 = struct();
+sc4.E.E.std = chain; sc4.E.I.std = chain; sc4.I.E.std = chain; sc4.I.I.std = chain;
+facil = stf_chain_spec();
+R_S = 0.01;
+SIGMA_G = 0.007;
+release = {'release_rate', [R_S R_S], 'release_sigma', [SIGMA_G SIGMA_G]};
+mixed_release = {'release_rate', [0.01 0.02 0.005 0.01], 'release_sigma', [0.007 0.01 0 0.005]};
+% name, condition of the preset, what replaces its routes
+nets = struct('name', {'no_adaptation', 'sfa1_std1', 'chain', 'sfa3_std2', 'facil'}, ...
+    'cond', {'no_adaptation', 'sfa1_std1', 'sfa3_std2', 'sfa3_std2', 'sfa3_std2'}, ...
+    'args', {{}, {}, {'synapse_config', sc4}, {}, {'synapse_config', facil.sc4}});
+
+R = struct('pointwise', struct(), 'stable', struct(), 'info', struct());
+R.info.threads = maxNumCompThreads;
+errors = {};
+
+%% Layer 1a. The five networks at full gain: states only, then single evaluations
+full_args = {'rng_seeds', [5 6], 'T_range', [0 4], 'fs', 200, 'store_full_state', true, ...
+    'lya_method', 'none', 'verbose', 'near-none', 'ode_solver', 'sra1'};
+for q = 1:numel(nets)
+    key = {'pointwise', [nets(q).name '_full']};
+    try
+        m = build_from_preset(P_full, nets(q).cond, full_args{:}, nets(q).args{:}, release{:});
+        if capture
+            m.run();
+            [S, t] = pick_pool_states(m);
+        else
+            [S, t] = stored_states(ref_data, key(2:end));
+        end
+        R = setfield(R, key{:}, release_pointwise(m, S, t));
+    catch err
+        [R, errors] = failed(R, errors, capture, err, key);
+    end
+end
+
+%% Layer 1b. The readout filter on a fixed input, whole and cut in two
+key = {'pointwise', 'filter'};
+try
+    k = 0:11;
+    theta = 0.2 + 0.1 * cos((1:6)' * (0.3 * k)) + 0.05 * sin((1:6)' + k);
+    kicked = 1e-3 * (mod((1:6)' * (k + 1), 5) - 1);        % some negative, some zero
+    tau = 0.1; dt = 1 / 200;
+    [Y, state] = SRNN_ESN_reservoir.filter_release(theta, kicked, [], tau, dt);
+    [Y1, s1] = SRNN_ESN_reservoir.filter_release(theta(:, 1:5), kicked(:, 1:5), [], tau, dt);
+    [Y2, s2] = SRNN_ESN_reservoir.filter_release(theta(:, 6:end), kicked(:, 6:end), s1, tau, dt);
+    R = setfield(R, key{:}, struct('theta', theta, 'kicked', kicked, 'Y', Y, 'y_end', state.y, ...
+        'Y_cut', [Y1, Y2], 'y_end_cut', s2.y, 'theta_end', s2.theta));
+catch err
+    [R, errors] = failed(R, errors, capture, err, key);
+end
+
+%% Layer 2a. The stable networks: five with release noise, the chain with both sources, the mixed one
+stable_args = {'rng_seeds', [5 6], 'T_range', [0 5], 'fs', 200, 'store_full_state', true, ...
+    'lya_method', 'topk', 'lya_K', 10, 'lya_K_auto', true, 'lya_dt', 0.05, ...
+    'lya_T_interval', [1.5 5], 'lya_warmup', 1.5, 'verbose', 'near-none', 'ode_solver', 'sra1'};
+runs = [{nets.name}, {'chain_both', 'rmixed'}];
+for q = 1:numel(runs)
+    key_run = {'stable', 'model', runs{q}};
+    key_pw  = {'pointwise', [runs{q} '_stable']};
+    keys = {key_run, key_pw};
+    with_extra = strcmp(runs{q}, 'chain');
+    if with_extra; keys{end + 1} = {'stable', 'extra'}; end %#ok<AGROW>
+    try
+        if q <= numel(nets)
+            m = build_from_preset(P_stable, nets(q).cond, stable_args{:}, nets(q).args{:}, release{:});
+        elseif strcmp(runs{q}, 'chain_both')
+            m = build_from_preset(P_both, 'sfa3_std2', stable_args{:}, 'synapse_config', sc4, release{:});
+        else
+            m = stf_mixed_model(0.2, 'sra1', mixed_release);
+        end
+        m.run();
+        R = setfield(R, key_run{:}, release_along_run(stf_along_run(end_to_end(m), m), m));
+        if capture
+            [S, t] = pick_pool_states(m);
+        else
+            [S, t] = stored_states(ref_data, key_pw(2:end));
+        end
+        R = setfield(R, key_pw{:}, release_pointwise(m, S, t));
+
+        % 2b. On the chain: the transient gain in its three variants, and
+        % the finite-difference Jacobian (of the mean dynamics, leak in).
+        if with_extra
+            p = m.get_params();
+            p.u_interpolant = m.u_interpolant;
+            extra = struct();
+            i0 = find(m.t_out >= 2.5, 1);
+            for variant = {'frozen_x', 'frozen_full', 'active'}
+                [G, g_info] = SRNNCellTypePairs.transient_gain(m.S_out, m.t_out, i0, p, 0.5, ...
+                    struct('variant', variant{1}));
+                extra.transient_gain.(variant{1}) = struct('G', G, 'info', drop_volatile(g_info));
+            end
+            extra.finite_difference_J = SRNNCellTypePairs.finite_difference_jacobian( ...
+                m.S_out(end, :)', p, 1e-6);
+            R.stable.extra = extra;
+        end
+    catch err
+        [R, errors] = failed(R, errors, capture, err, keys{:});
+    end
+end
+
+%% Layer 1c. The mixed network at gain 1, as the other pool suites have it
+key = {'pointwise', 'rmixed_gain1'};
+try
+    mm = stf_mixed_model(1, 'sra1', mixed_release);
+    if capture
+        mm.run();
+        [S, t] = pick_pool_states(mm);
+    else
+        [S, t] = stored_states(ref_data, key(2:end));
+    end
+    R = setfield(R, key{:}, release_pointwise(mm, S, t));
+catch err
+    [R, errors] = failed(R, errors, capture, err, key);
+end
+
+%% Layer 2c. Benettin on a reduced stable chain network: the perturbed trajectory gets the kicks
+% The perturbation's direction comes from the global stream, seeded here.
+key = {'stable', 'estimators', 'chain'};
+try
+    mb = build_from_preset(P_stable, 'sfa3_std2', 'n', 12, 'indegree', 4, 'F_ref_n', 12, 'F_ref_indegree', 4, ...
+        'rng_seeds', [5 6], 'fs', 200, 'verbose', 'near-none', 'T_range', [0 3], 'lya_T_interval', [1.5 3], ...
+        'lya_warmup', 1, 'ode_solver', 'sra1', 'lya_method', 'benettin', 'synapse_config', sc4, release{:});
+    rng(17, 'twister');
+    mb.run();
+    R = setfield(R, key{:}, struct('benettin', drop_volatile(mb.lya_results)));
+catch err
+    [R, errors] = failed(R, errors, capture, err, key);
+end
+
+%% Layer 2e. A sweep with the release noise as a grid axis
+scratch = tempname;
+try
+    ctx = resolve_run_context('param_space', 'preset_name', P_stable, ...
+        'run_mode', 'fast', 'verbose', 'near-none');
+    c_one  = ctx.conditions{2};
+    c_full = ctx.conditions{3};
+    sweep_conditions = { ...
+        struct('name', 'chain_all', 'tau_a', {c_full.tau_a}, 'synapse_config', sc4), ...
+        struct('name', 'sfa1_std1', 'tau_a', {c_one.tau_a},  'synapse_config', c_one.synapse_config)};
+    d = ctx.model_defaults;
+    d.T_range = [0 4]; d.lya_T_interval = [2 4]; d.lya_warmup = 1;
+    d.ode_solver = 'sra1';
+    d.release_rate = [R_S R_S];
+    psa = ParamSpaceAnalysis2('n_levels', 2, 'batch_size', 4, 'note', 'regression_tol_release', ...
+        'randomize_order', false, 'verbose', 'near-none', 'use_parallel', false);
+    psa.model_class    = ctx.model_class;
+    psa.integer_params = ctx.integer_params;
+    psa.model_defaults = d;
+    psa.output_dir     = scratch;
+    psa.set_conditions(sweep_conditions);
+    psa.add_grid_parameter('release_sigma_all', [0, 0.014]);
+    psa.add_grid_parameter('reps', 1:2);
+    psa.run();
+    sweep = struct();
+    for i = 1:numel(sweep_conditions)
+        rc = psa.results.(sweep_conditions{i}.name);
+        sweep.(sweep_conditions{i}.name) = cellfun(@drop_volatile, rc, 'UniformOutput', false);
+    end
+    R.stable.sweep = sweep;
+catch err
+    [R, errors] = failed(R, errors, capture, err, {'stable', 'sweep'});
+end
+if isfolder(scratch); rmdir(scratch, 's'); end
+
+%% Layer 2f. Lean memory capacity, the release read through the tau_d filter
+[preset_mc, ~, conditions_mc] = srnn_param_preset(P_stable);
+fs = 200;
+c_chain = conditions_mc{end};
+c_chain.synapse_config = sc4;
+mc_cases = {'chain', c_chain; 'sfa3_std2', conditions_mc{end}};
+base_args = struct2namevalue(preset_mc);
+for q = 1:size(mc_cases, 1)
+    key = {'stable', 'mc', mc_cases{q, 1}};
+    try
+        cargs = struct2namevalue(rmfield(mc_cases{q, 2}, 'name'));
+        esn = SRNN_ESN_reservoir(base_args{:}, 'fs', fs, 'ode_solver', 'sra1', 'rng_seeds', [3 4], ...
+            'input_type', 'sample_hold', 'T_hold', 0.3, 'verbose', 'near-none', ...
+            'T_wash', 5 * fs, 'T_train', 30 * fs, 'T_test', 15 * fs, 'd_max', 3 * fs, ...
+            'lya_method', 'none', 'lean_input', true, cargs{:}, release{:});
+        esn.build();
+        [MC, R2, res] = esn.run_memory_capacity_lean('readout_signal', 'release_filtered', ...
+            'segment_len', 700, 'verbose', false);
+        R = setfield(R, key{:}, struct('MC', MC, 'R2', R2, 'delay_s', res.delay_s, ...
+            'hold_len', res.hold_len, 'rate_mean', res.rate_mean, 'W', esn.W, 'W_in', esn.W_in));
+    catch err
+        [R, errors] = failed(R, errors, capture, err, key);
+    end
+end
+
+if ~capture
+    R.info.errors = errors;
+end
+seconds = toc(t_all);
+end
+
+function c = release_pointwise(m, S, t)
+% stf_pointwise, and what only a network with spontaneous release has (the
+% header's list): kicks of the states by a fixed pattern of increments,
+% what they released, the route models' steady states, the run's own
+% increments and kick handle, and the generator.
+c = stf_pointwise(m, S, t);
+p = m.get_params();
+[N, ns] = size(S); %#ok<ASGLU>
+[rate, sigma] = m.release_noise_rows();
+dt = 1 / m.fs;
+rel = struct();
+
+% A fixed pattern, one column per state, shifted by one neuron per column:
+% a zero draw, a small increment, a large one, one larger than tau_rel.
+draws = [0, 0.3, 40];
+dRc = zeros(m.n, ns);
+for k = 1:ns
+    which = mod((1:m.n)' + k, 4);
+    col = zeros(m.n, 1);
+    for j = 1:3
+        col(which == j - 1) = draws(j);
+    end
+    col = col .* rate .* dt;
+    col(which == 3) = 0.3;
+    dRc(:, k) = col - rate .* dt;
+end
+dRc(sigma == 0, :) = 0;                      % a type with the leak alone has no kick
+rel.dRc = dRc;
+rel.kick_S = zeros(size(S));
+for k = 1:ns
+    rel.kick_S(:, k) = SRNNCellTypePairs.release_kick(S(:, k), dRc(:, k), p);
+end
+rel.kicked = SRNNCellTypePairs.released_by_kick(rel.kick_S', dRc, p);
+
+% Every route model's closed-form steady state, leak in.
+rates = [0, 0.05, 0.3, 1];
+route = SRNNCellTypePairs.active_routes(p);
+names = m.cell_type_names;
+for pre = 1:numel(names)
+    for post = 1:numel(names)
+        Rt = route{pre, post};
+        s = zeros(Rt.P.npre, Rt.P.ns, numel(rates));
+        F = zeros(Rt.P.npre, numel(rates));
+        for j = 1:numel(rates)
+            ss = Rt.model.steady_state(rates(j) .* ones(Rt.P.npre, 1), Rt.P);
+            if Rt.P.ns > 0; s(:, :, j) = ss.s; end
+            F(:, j) = ss.F .* ones(Rt.P.npre, 1);
+        end
+        rel.steady.([names{pre} '_to_' names{post}]) = struct('s', s, 'F', F);
+    end
+end
+
+% The run's own increments and kick, as build_noise makes them.
+m.build_noise();
+nz = m.noise_increments;
+rel.run_dRc = nz.release.dRc(:, 1:25);
+rel.run_kick = nz.kick(S(:, 1), 7);
+% The generator itself (not centered), steps 3 to 12 of a fixed seed.
+rel.dR = release_increments(rate, sigma, m.fs, [3, 12], 99);
+c.release = rel;
+end
+
+function e2e = release_along_run(e2e, m)
+% The realized release of every route over each step of the run (the mean
+% part plus what the step's kick released) and the kicks' part alone, at
+% every fifth step; the increments are drawn again from the model's seed
+% (run() clears them).
+p = m.get_params();
+[rate, sigma] = m.release_noise_rows();
+n_steps = numel(m.t_out) - 1;
+dRc = release_increments(rate, sigma, m.fs, [1, n_steps], m.noise_base_seed(), ...
+    m.noise_seed_schedule, m.t_out(1), n_steps, 'SRNNCellTypePairs') - rate .* (1 / m.fs);
+[release, ~, kicked] = SRNNCellTypePairs.release_per_step(m.S_out, dRc, p, 1 / m.fs);
+keep = 1:5:n_steps;
+names = m.cell_type_names;
+for pre = 1:numel(names)
+    for post = 1:numel(names)
+        e2e.release.(names{pre}).(names{post}) = release.(names{pre}).(names{post})(:, keep);
+        e2e.kicked.(names{pre}).(names{post}) = kicked.(names{pre}).(names{post})(:, keep);
+    end
+end
 end
 
 %% ------------------------------------------------------------------------
