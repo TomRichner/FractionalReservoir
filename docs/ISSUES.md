@@ -1219,9 +1219,9 @@ becomes an issue with an acceptance test.
 
 ### FD-027 Release noise: a gamma process in the synaptic output
 
-- **Status:** in progress (planned with Tom and approved, 2026-11-14).
-  The plan is `docs/Plan_release_noise.md`; it has the design, the tests,
-  the order of work and the risks.
+- **Status:** done (2026-11-14 night; planned with Tom and approved the
+  same day). The plan is `docs/Plan_release_noise.md`; it has the design,
+  the tests, the order of work and the risks.
 - **What:** a second noise source beside the Wiener term: spontaneous
   release as a non-negative gamma process in the synaptic output, reaching
   the network through the weights, depleting the pools and seen by the
@@ -1360,4 +1360,42 @@ becomes an issue with an acceptance test.
 - **Also from N3, for the report:** at (0.002, 0.01) the exact kick's mean
   spontaneous release is 0.91 r_s (the exact pool update releases less
   than the linear law for large events).
-- **Result:** _(pending)_
+- **Result (2026-11-14 night):** built, merged (`76201a0`, `bd2de69`,
+  `3e0c43f`, `cdf3afd`), gated at `cdf3afd` (quick suite 90 of 90 in
+  1034 s; stages tier exact, 1245 of 1245 leaves) and pushed (`70bec07`).
+  **The one essential run** of `mu7chain_AC_run('essential')` at `70bec07`
+  on 12 workers: 1 h 40, every selected stage ok, 51 of 51 block C jobs
+  with no failed row (58.9 min), 32 of 32 figures; data
+  `data/mu7chain_AC_essential`, figures
+  `figs/mu7chain_AC_essential_4cond`. The worker did not use a timer (a
+  timer callback does not run in a worker's no-desktop MATLAB); it made
+  one blocking call through a wrapper outside the repo with marker files.
+  - Memory capacity / lambda_1 (input on), one seed, filtered readout.
+    Gain 0.632, release noise sigma_gamma = 0 / 1e-3 / 1e-2 (leak 0.002):
+    none 0.11 / 0.09 / 0.12; 1TS 12.4 / 4.3 / 1.1; chained MTS 11.6 / 4.1
+    / 1.1; product MTS 9.1 / 3.0 / 0.9. Gain 0.632, Wiener sigma_u = 0 /
+    2.5e-3 / 2.5e-2: none 0.11 / 0.11 / 0.11; 1TS 12.6 / 4.1 / 0.7;
+    chained 11.7 / 3.8 / 0.7; product 9.2 / 2.8 / 0.5. Gain 1 (the
+    self-coupling grid at s = 0), sigma_gamma = 0 / 1e-3 / 1e-2: none
+    0.08 / 0.15 / 0.12; 1TS 9.5 / 6.2 / 1.1; chained 12.5 / 8.5 / 1.6;
+    product 13.4 / 5.0 / 1.6.
+  - Read with care (3 x 3 levels, one seed): either noise source at its
+    middle level cuts memory capacity to about a third at gain 0.632 and
+    to about 1 at the top; lambda_1 of the stable adapting networks does
+    not move with noise (1TS -0.39, both MTS forms -0.10 at gain 0.632);
+    at gain 1 the chained form keeps the most at the middle level. At
+    gain 0.632 the leak alone changes memory capacity by about 1 %
+    (against 12 % at gain 1).
+  - Consistency: the Wiener grid's sigma_u = 0 row and the self-coupling
+    grid's s = 0 row are the same network at gains 0.1 and 4; lambda_1 is
+    identical to all 16 digits in the four conditions; memory capacity
+    differs by the readout only (6.78 filtered against 6.52 synaptic for
+    chained MTS at gain 0.1).
+  - Cosmetic, not fixed: the maps' caption says the noise axis is broken
+    below the lowest positive level but no break mark is drawn; in the
+    time-series figures the product column's lowest x tick touches the
+    neighboring panel.
+  - Open, Tom's: whether these go into the paper; a fast run (block C
+    about 11 h 40 with the noise grids); the leak's size (a larger leak
+    is needed to reach the product form's Wiener-equivalent level); the
+    reservoir's Benettin-without-noise defect noted above.

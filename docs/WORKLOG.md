@@ -34,6 +34,48 @@ Entry template:
 
 ---
 
+## 2026-11-14 23:15 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: noise-switch rollouts; release noise)
+
+**Issues touched:** FD-026 (noise-switch rollouts: -> done), FD-027
+(release noise: opened -> done).
+**Commits:** FD-026 `efc3692`. FD-027: plan and issue `1b264e1`; P2
+`5ffbef3`, `6fcf962`; P1 `cd3b891`; N1 `76201a0`; N2 `bd2de69`; P3
+`3e0c43f`; N3 `cdf3afd`; docs `3bb2674`, `70bec07`. Manuscript repo:
+`bd551ee` (figure plan, not pushed).
+**Done:** spontaneous release as a gamma process in `SRNNCellTypePairs`
+(off by default; a leak in the drift and an exact kick after the step),
+on the reservoir's lean path with the tau_d-filtered release readout; the
+sweep's first axis general; three noise grids (gain x sigma_gamma,
+self-coupling x sigma_gamma, gain x sigma_u), their maps, robustness and
+statistics, and two time-series figures in the A + C bundle; the exact
+tier `rapid_release` and the tolerance suite `release`; the equations
+(`Equations_stability_paper.md`; section 13 of the chained-MTS file);
+`CLAUDE.md`. The lead's decisions are numbered under FD-027.
+**Verified:** quick suite 90 of 90 and the stages tier exact at
+`cdf3afd`; 20 of 20 release mutations caught; top-K against Benettin
+under release noise (largest difference 0.031 1/s, no trend); the one
+essential run at `70bec07` (1 h 40, every stage ok, 51 of 51 block C
+jobs, 32 of 32 figures); lambda_1 identical between the Wiener grid's
+zero row and the self-coupling grid's zero row; the lead looked at the
+three new maps and both time-series figures.
+**Not verified / known gaps:** the noise maps exist at essential size
+only (3 x 3, one seed); no fast run with the noise grids; the full
+regression tier is still deferred; the stage plan does not pass
+`lya_method` to the sweep; the stage's time estimate is about a quarter
+low for release-noise jobs (the bundle headers give the corrected times).
+**Raised, not acted on:** `run_reservoir_esn` clears the noise increments
+before `run_memory_capacity`'s Lyapunov run (Benettin on a noisy
+reservoir runs without the noise); `ParamSpaceAnalysis2`'s pre-flight
+sees `sigma_u_noise` only; no break mark on the maps' zero-then-log axis;
+a tick label touching the neighboring panel in the time-series figures;
+the quick suite is now about 17 minutes.
+**Housekeeping:** the essential run of 2026-11-13 was renamed
+(`data/mu7chain_AC_essential_2026-11-13`,
+`figs/mu7chain_AC_essential_4cond_2026-11-13`), not deleted.
+**Next:** Tom: whether the noise figures go in the paper and whether to
+start a fast run; the open block C and block B decisions. The timeline
+in `docs/gantt/` is being updated for these merges.
+
 ## 2026-11-14 05:30 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: block C explorations; A + C essential and fast runs)
 
 **Issues touched:** FD-024 (self-negative feedback; first grid recorded),
