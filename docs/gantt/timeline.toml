@@ -49,7 +49,7 @@ rough = true
 
 [[block]]
 id = "C"
-name = "Block C: memory capacity across gain and bias (Plan C)"
+name = "Block C: memory capacity across gain, bias and noise (Plan C)"
 rough = false
 
 [[block]]
@@ -1552,7 +1552,523 @@ gate = "Tom's decisions recorded in the to-do list."
 depends = ["C_5_T"]
 estimate = 60
 guess = true
-note = "Next on the chart. Waiting since the close-out (09:26); placed at now because the chart shows working time, not waiting."
+note = "Waiting since the close-out (2026-11-13 09:26); placed at now because the chart shows working time, not waiting. Tom has looked at the report and asked for the follow-ons drawn below it (steps 8 to 12: explorations, self-coupling, block C in the A + C runs, the noise-switch rollouts, release noise), but the four decisions are not yet recorded."
+
+# ---------------------------------------------------------------- block C, follow-ons with Tom (2026-11-13 and 14)
+
+[[task]]
+id = "C_8_B1"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Explorations: maps, scatters, Jacobian"
+who = "workers"
+issue = "FD-010"
+status = "done"
+what = "Asked for by Tom after reading block C's report: the maps with a linear color scale, memory capacity against lambda_1 as a pipeline figure (Tom wants it in the paper), one general scatter over the sweep with a third quantity as signed marker size, and the Jacobian of the chained MTS model in block form (Equations_chained_MTS.md section 10), which shows why the no-adaptation edge hardly depends on the bias."
+gate = "The lead's review of each diff and figure before its merge."
+depends = ["C_5_T"]
+start = 2026-11-13T14:01:45-06:00
+end = 2026-11-13T15:19:48-06:00
+took_min = 78
+approx_start = false
+rule = "brief to merge: start 14:01:45, the first worker's worktree created; end f06e745 (the lead's last change to the gain curves)"
+merge = "259fd27, 0db984d, ea12322, 1bb77c7, 1d3d88c"
+commits = "2372bbc, f06e745 (the lead)"
+note = "Five worker branches, most in parallel; no estimate was recorded before they ran."
+
+[[task]]
+id = "C_8_B2"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Lab-meeting figure report (blocks A, B, C)"
+who = "lead"
+status = "done"
+what = "For Tom's lab meeting: every four-condition figure of blocks A, B and C so far, with the question and the takeaway per figure, a link to the chained-MTS equations, and the first self-feedback run."
+gate = "The lead's reading."
+depends = ["C_8_B1"]
+start = 2026-11-13T15:24:02-06:00
+end = 2026-11-13T16:40:17-06:00
+took_min = 76
+approx_start = true
+rule = "commits on main: start bc3ba35 (the lead's previous commit); end b9ed6d5"
+commits = "2929d49, 454998f, 4e3fb8a, ac0624b, be03edd, b9ed6d5, on main"
+note = "Covers all three blocks; drawn in block C because it was made in this stretch. No estimate was recorded before it ran."
+
+[[task]]
+id = "C_9_B1"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Self-feedback on W's diagonal (FD-024)"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-024"
+status = "done"
+what = "Planned with Tom: self-negative feedback on the diagonal of W, independent of the gain, in units of the bulk radius at gain 1; and the sweep's second axis generalized from the bias to any scalar model property. Zero feedback reproduces the model without it."
+gate = "Unit tests (diagonal, finite-difference Jacobian, jacobian_times, eigenvalue shift); ultrarapid tier 0 differences in 994 leaves."
+depends = ["C_8_B1"]
+start = 2026-11-13T14:51:01-06:00
+end = 2026-11-13T15:23:32-06:00
+took_min = 33
+approx_start = false
+rule = "brief to merge: start 14:51:01, the worker's worktree created (e467ccc, FD-024 planned, 14:51); end merge"
+merge = "b0d29a4"
+note = "Built beside the last explorations. No estimate was recorded before it ran."
+
+[[task]]
+id = "C_9_T"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "First self-feedback grid (28 jobs)"
+who = "workers"
+issue = "FD-024"
+status = "done"
+what = "7 gains by 4 feedback strengths at the preset bias, one seed, four conditions. Self-feedback moves the no-adaptation edge to higher gain, which the bias could not do, but memory without adaptation does not follow: a fixed, instantaneous self-inhibition buys stability but not memory."
+gate = "No failed job; the zero-feedback row reproduces the main run's values."
+depends = ["C_9_B1"]
+start = 2026-11-13T15:23:32-06:00
+end = 2026-11-13T15:59:44-06:00
+took_min = 36
+approx_start = true
+rule = "merge to result commit: start the merge b0d29a4; end 65411e8 (result recorded under FD-024)"
+estimate_of_record = 30
+estimate_of_record_text = "about 30 jobs and 30 minutes"
+estimate_of_record_source = "FD-024, Tom's decisions (e467ccc), written before the run"
+note = "The run itself took 30 min. Output data/mc_gain_sweep_selffb, figures figs/block_C/selffb/."
+
+[[task]]
+id = "C_9_B2"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Signed self-coupling; a linear gain axis"
+who = "workers"
+issue = "FD-024"
+status = "done"
+what = "Self-coupling as a signed alias of the self-feedback (below zero negative feedback, above zero positive), the axis Tom's figures use, and a gain axis drawn linear when its levels are evenly spaced, for Tom's linear grid (gain 0.1 to 4 by self-coupling -4 to 4)."
+gate = "Unit tests; the lead's review."
+depends = ["C_9_T"]
+start = 2026-11-13T16:38:56-06:00
+end = 2026-11-13T17:20:44-06:00
+took_min = 42
+approx_start = false
+rule = "brief to merge: start 16:38:56, the worker's worktree created; end merge"
+merge = "7d688b9"
+note = "No estimate was recorded before it ran."
+
+[[task]]
+id = "C_10_U"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Tom: grids, sizes, figures for the runs"
+who = "lead+tom"
+issue = "FD-025"
+status = "done"
+what = "Tom decided that block C runs with block A: both grids (gain by bias, gain by self-coupling) in every run mode, the E:I networks along gain, sizes 3 x 3 x 1 (essential), 7 x 7 x 3 (fast), 13 x 13 x 10 (medium), and which figures. Block B stays out."
+gate = "Tom's decisions recorded under FD-025 and in the figure plan."
+depends = ["C_9_B2"]
+start = 2026-11-13T17:20:44-06:00
+end = 2026-11-13T19:10:19-06:00
+took_min = 110
+approx_start = true
+rule = "commits on main: start the merge 7d688b9; end 61db305 (FD-025 with Tom's sizes and figure choices)"
+note = "Includes pauses that git does not show."
+
+[[task]]
+id = "C_10_B1"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Block C in the A + C runs (FD-025)"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-025"
+status = "done"
+what = "The block C stage runs a list of grids through one parallel loop, inside one command for blocks A and C together (mu7chain_AC_run), with Tom's sizes and figures."
+gate = "Unit tests; the lead's review; then the essential run (C_10_T)."
+depends = ["C_10_U"]
+start = 2026-11-13T19:10:03-06:00
+end = 2026-11-13T19:36:28-06:00
+took_min = 26
+approx_start = false
+rule = "brief to merge: start 19:10:03, the worker's worktree created (a few seconds before 61db305 records the brief); end merge"
+merge = "6bae2c4"
+note = "No estimate was recorded before it ran."
+
+[[task]]
+id = "C_10_T"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Essential run of A + C"
+who = "opus"
+issue = "FD-025"
+status = "done"
+what = "The first run of the A + C bundle at essential size: every selected block A stage and block C's two grids with the E:I networks, and all figures."
+gate = "Every stage and all 20 figures written."
+depends = ["C_10_B1"]
+start = 2026-11-13T19:37:25-06:00
+end = 2026-11-13T20:36:29-06:00
+took_min = 59
+approx_start = false
+rule = "the run's own files: start git_provenance.txt of the run directory (19:37:25); end the figure manifest (20:36:29)"
+note = "Data and figures since renamed to data/mu7chain_AC_essential_2026-11-13 and figs/mu7chain_AC_essential_4cond_2026-11-13. Before the fast run the lead set the bundle's memory capacity to the lean path (203d4f6). No estimate was recorded for the whole run before it began."
+
+[[task]]
+id = "C_10_B2"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Fast run of A + C (overnight)"
+who = "opus"
+worker = "matlab-opus-2"
+issue = "FD-025"
+status = "done"
+what = "The fast run of blocks A and C on 12 workers: every block A stage, and block C's two 7 x 7 x 3 grids with the E:I networks (336 jobs, none failed). One stage, the memory-capacity example, failed on a copy of a check that had not been updated (C_10_B3)."
+gate = "Every stage finishes; both figure manifests complete."
+depends = ["C_10_T"]
+start = 2026-11-13T20:42:31-06:00
+end = 2026-11-14T04:37:00-06:00
+took_min = 474
+approx_start = false
+rule = "the run's own files and FD-025: start git_provenance.txt of the run directory (20:42:31); end 04:37 as recorded under FD-025"
+note = "7.6 h of analyses, of which block C's grids were about 4 h 25 (FD-025's sizes). Data data/mu7chain_AC_fast, figures figs/mu7chain_AC_fast_3cond and _4cond. No estimate was recorded for the whole run before it began."
+
+[[task]]
+id = "C_10_B3"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Fixes from the fast run; one stage rerun"
+who = "workers"
+issue = "FD-025"
+status = "done"
+what = "The shared-build check made one function (the reservoir's own copy lacked a rule added earlier, which failed the memory-capacity example), bounded Gaussian fits in the statistics, a way to redraw named figure entries only; the failed stage rerun alone and its figures redrawn."
+gate = "Both figure manifests 48 of 48; the bundle test fixed (the lead's lean-path commit had broken it)."
+depends = ["C_10_B2"]
+start = 2026-11-14T04:40:00-06:00
+end = 2026-11-14T04:59:19-06:00
+took_min = 19
+approx_start = false
+rule = "brief to merge: start 04:40:00, the worker's worktree created; end merge"
+merge = "a6a1095"
+
+[[task]]
+id = "C_11_B1"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Noise-switch rollouts: model, run, figure"
+who = "workers"
+issue = "FD-026"
+status = "done"
+what = "Tom's request: copies of one network share the noise for 10 s and then each runs on its own noise seed; how fast the copies drift apart per state variable and condition. This is the spread of the state under independent noise, not a Lyapunov exponent."
+gate = "Unit tests; quick suite 84 of 84 and stages tier exact on main."
+depends = ["C_10_B3"]
+start = 2026-11-14T12:02:14-06:00
+end = 2026-11-14T12:21:02-06:00
+took_min = 19
+approx_start = false
+rule = "brief to merge: start 12:02:14, the worker's worktree created; end merge"
+merge = "afd4531"
+commits = "951eda7, bb1f07b"
+note = "No estimate was recorded before it ran."
+
+[[task]]
+id = "C_11_B2"
+block = "C"
+group = "Block C follow-ons with Tom (steps 8 to 11)"
+name = "Noise switch as a stage of the A + C runs"
+who = "opus"
+worker = "matlab-opus-3"
+issue = "FD-026"
+status = "done"
+what = "Tom: 'it should be added to our set of analyses and figures which get generated when a fast, medium or other run is done.' An opt-in stage of the A + C bundle in every mode, with the lead's sizes; the fast run was completed with it (0.5 min) and both fast figure sets drawn."
+gate = "Tests (the end-to-end one on the slow list); both fast figure manifests."
+depends = ["C_11_B1"]
+start = 2026-11-14T12:40:19-06:00
+end = 2026-11-14T12:52:28-06:00
+took_min = 12
+approx_start = false
+rule = "brief to merge: start 12:40:19, the worker's worktree created; end merge"
+merge = "efc3692"
+commits = "0b09cf0, f2eea85, bbd5a61"
+note = "Open, Tom's: the summary figure's early-growth-rate panel fits an exponential to a rise that is a power law; the lead proposed the power-law exponent instead."
+
+# ---------------------------------------------------------------- block C, release noise (FD-027)
+
+[[task]]
+id = "C_12_P1"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Release noise in the equations (proposal)"
+who = "workers"
+issue = "FD-027"
+status = "done"
+what = "Tom's idea written as equations before any code: spontaneous release as the model's noise, first as a Poisson process (section 11 of Equations_chained_MTS.md, the lead, 12:04), then as a gamma process in the synaptic output beside the Wiener term (section 12, a worker)."
+gate = "The lead's review; three corrections the worker raised went into section 11."
+depends = ["C_11_B2"]
+start = 2026-11-14T13:30:17-06:00
+end = 2026-11-14T13:59:57-06:00
+took_min = 30
+approx_start = false
+rule = "brief to merge: start 13:30:17, the section 12 worker's worktree created; end 43f1840 (section 11 corrected, after the merge 1cd6f0a)"
+merge = "1cd6f0a"
+commits = "d4f20b2 (section 11, the lead), f1a20bd, 43f1840"
+note = "Section 11 (d4f20b2, 12:04) was written before this bar; its start is not recorded."
+
+[[task]]
+id = "C_12_P2"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Plan and FD-027 written; Tom approves"
+who = "lead+tom"
+issue = "FD-027"
+status = "done"
+what = "docs/Plan_release_noise.md and FD-027: the design (a non-negative gamma process in the synaptic output, scaled by the pool, off by default), the tests, the order of work (P1 to P3 Opus, N1 to N3 Fable), the risks, and Tom's rule of one essential run at the end and nothing else over about 10 minutes."
+gate = "Tom approved the plan."
+depends = ["C_12_P1"]
+start = 2026-11-14T13:59:57-06:00
+end = 2026-11-14T17:24:30-06:00
+took_min = 205
+approx_start = true
+rule = "commits on main: start 43f1840 (the lead's previous commit); end e859784 (plan and issue, approved by Tom)"
+note = "Includes the conversation with Tom and pauses that git does not show."
+
+[[task]]
+id = "C_12_B1"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "P2: noise-levels time-series figure"
+who = "opus"
+issue = "FD-027"
+status = "done"
+what = "Every condition at three levels of one noise parameter, as time series, drawn first for the Wiener noise; the gamma version followed once the model had it (C_12_T1)."
+gate = "Unit test; the lead's look at the figure."
+depends = ["C_12_P2"]
+start = 2026-11-14T17:25:56-06:00
+end = 2026-11-14T17:34:42-06:00
+took_min = 9
+approx_start = false
+rule = "brief to merge: start 17:25:56, the worker's worktree created; end merge"
+merge = "5ffbef3"
+commits = "1cec70c"
+note = "No estimate was recorded for the step before it ran."
+
+[[task]]
+id = "C_12_B2"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "P1: the sweep's first axis made general"
+who = "opus"
+issue = "FD-027"
+status = "done"
+what = "The block C sweep's first axis may be any scalar model property, not only the gain, so a noise level can be an axis; the gain keeps its names and existing results read unchanged."
+gate = "test_mc_gain_sweep with a first axis other than the gain; every grid point's model checked before the output folder is made."
+depends = ["C_12_P2"]
+start = 2026-11-14T17:25:56-06:00
+end = 2026-11-14T17:59:04-06:00
+took_min = 33
+approx_start = false
+rule = "brief to merge: start 17:25:56, the worker's worktree created; end merge"
+merge = "cd3b891"
+commits = "f328803, 63f4b3a, bee992f"
+
+[[task]]
+id = "C_12_B3"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "N1: release noise in the model class"
+who = "fable"
+issue = "FD-027"
+status = "done"
+what = "The gamma process in the synaptic output: a leak in the drift and an exact kick to the pools after each step, in the integrators, the route models and the model class; off by default, and off means bit-identical to before."
+gate = "Quick suite on the branch 86 of 86; a fixture for 'off means identical'; no reference touched."
+depends = ["C_12_P2"]
+start = 2026-11-14T17:25:56-06:00
+end = 2026-11-14T18:36:17-06:00
+took_min = 70
+approx_start = false
+rule = "brief to merge: start 17:25:56, the worker's worktree created; end merge"
+merge = "76201a0"
+commits = "52d2471, ff73df6, 098976b, b95954b"
+note = "N1 also measured that no single Wiener-equivalent release level exists (the release is scaled by each condition's pools)."
+
+[[task]]
+id = "C_12_T1"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Gate on N1; the gamma time-series figure"
+who = "opus"
+worker = "matlab-opus-3"
+issue = "FD-027"
+status = "done"
+what = "The quick suite and the stages tier on main after N1, and the noise-levels figure drawn for the release noise (its title names the fixed model arguments)."
+gate = "Quick suite 87 of 87 (864 s); stages tier exact."
+depends = ["C_12_B3", "C_12_B1"]
+start = 2026-11-14T18:37:01-06:00
+end = 2026-11-14T19:21:58-06:00
+took_min = 45
+approx_start = false
+rule = "brief to gates commit: start 18:37:01, the worker's worktree created; end 3bb2674 (the gate logged under FD-027)"
+merge = "6fcf962"
+commits = "1dda8e7"
+
+[[task]]
+id = "C_12_B4"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "N2: release noise in the reservoir"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-027"
+status = "done"
+what = "Release noise on the lean memory-capacity path, the noise held a segment at a time (bit-identical to one pass), and a readout of the release through a tau_d filter computed from the stored states, with no extra model state. Its measurements changed the noise axes to a zero level and then log-spaced levels."
+gate = "Tests of the release noise in the reservoir and two release grids in the sweep; the non-lean path refuses release noise."
+depends = ["C_12_B3"]
+start = 2026-11-14T18:37:01-06:00
+end = 2026-11-14T19:19:18-06:00
+took_min = 42
+approx_start = false
+rule = "brief to merge: start 18:37:01, the worker's worktree created; end merge"
+merge = "bd2de69"
+commits = "a552893..d0c2c2b"
+
+[[task]]
+id = "C_12_B5"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "P3: three noise grids and their figures"
+who = "opus"
+worker = "matlab-opus-1"
+issue = "FD-027"
+status = "done"
+what = "Three memory-capacity maps (gain by release noise, self-coupling by release noise, gain by Wiener noise), their robustness and statistics, and the two time-series figures, in the A + C bundle; both noise axes calibrated with a few single runs (leak 0.002; release noise 0, then 1e-4 to 1e-2; Wiener noise 0, then 2.5e-4 to 0.025)."
+gate = "Unit tests; the lead's review, which lowered the release-noise top from 2e-2 to 1e-2."
+depends = ["C_12_B4", "C_12_B2"]
+start = 2026-11-14T19:20:27-06:00
+end = 2026-11-14T20:04:58-06:00
+took_min = 45
+approx_start = false
+rule = "brief to merge: start 19:20:27, the worker's worktree created; end merge"
+merge = "3e0c43f"
+commits = "94f64ef, e39979d, d39f71f, 1e7dfc2"
+
+[[task]]
+id = "C_12_T2"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "N3: release noise checked and pinned"
+who = "fable"
+worker = "matlab-fable-1"
+issue = "FD-027"
+status = "done"
+what = "The leading exponent under release noise by the top-K method against Benettin (largest difference 0.031 1/s, no trend), the step size checked, an exact regression tier and a tolerance suite for release noise with 20 targeted mutations, and the equations as implemented in both equation files."
+gate = "20 of 20 mutations caught; two new references captured; the lead's review."
+depends = ["C_12_B4"]
+start = 2026-11-14T19:20:30-06:00
+end = 2026-11-14T20:48:56-06:00
+took_min = 88
+approx_start = false
+rule = "brief to merge: start 19:20:30, the worker's worktree created; end merge"
+merge = "cdf3afd"
+commits = "f308560, e01732b, fc3ca35, 0676873, 07e97e7"
+note = "The worker was cut off once by a server error and resumed from its transcript; nothing was lost."
+
+[[task]]
+id = "C_12_T3"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Gate on merged main"
+who = "opus"
+issue = "FD-027"
+status = "done"
+what = "The quick suite and the stages tier on main with all of FD-027 merged, before the one essential run."
+gate = "Quick suite 90 of 90 (1034 s); stages tier exact, 1245 of 1245 leaves."
+depends = ["C_12_T2", "C_12_B5", "C_12_T1"]
+start = 2026-11-14T20:49:28-06:00
+end = 2026-11-14T21:11:53-06:00
+took_min = 22
+approx_start = false
+rule = "brief to the start of the next step: start 20:49:28, the worker's worktree created; end 21:11:53, the essential run's directory created"
+note = "The quick suite is now about 17 min, above Tom's 10-minute preference; raised in the worklog, not acted on."
+
+[[task]]
+id = "C_12_T4"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "The one essential run of A + C"
+who = "opus"
+worker = "matlab-opus-2"
+issue = "FD-027"
+status = "done"
+what = "Tom's one end-of-work run: mu7chain_AC_run('essential') with everything, on 12 workers. Every stage ok, 51 of 51 block C jobs, 32 of 32 figures. Either noise source at its middle level cuts memory capacity to about a third, and to about 1 at the top; lambda_1 of the stable adapting networks does not move with noise."
+gate = "Every stage and figure in the manifest; the lead looked at the three new maps and both time-series figures."
+depends = ["C_12_T3"]
+start = 2026-11-14T21:11:53-06:00
+end = 2026-11-14T22:51:37-06:00
+took_min = 100
+approx_start = false
+rule = "the run's own files: start the run directory created (21:11:53); end the figure manifest (22:51:37)"
+estimate_of_record = 90
+estimate_of_record_text = "about 1 h 30"
+estimate_of_record_source = "docs/Plan_release_noise.md (e859784), written before the run"
+note = "Block C's stage took 58.9 min against the bundle header's 45 (51 jobs on 12 workers is five rounds, so load balance costs more at this size than it will at fast). Data data/mu7chain_AC_essential, figures figs/mu7chain_AC_essential_4cond (with report.pdf). 3 x 3 levels and one seed: read with care."
+
+[[task]]
+id = "C_12_T5"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Lead reviews the run; FD-027 done"
+who = "lead"
+issue = "FD-027"
+status = "done"
+what = "The essential run's result written under FD-027 and in the worklog, with a consistency check (the Wiener grid's zero row and the self-coupling grid's zero row give identical lambda_1) and the cosmetic points left for Tom."
+gate = "FD-027 set done."
+depends = ["C_12_T4"]
+start = 2026-11-14T22:51:37-06:00
+end = 2026-11-14T22:54:40-06:00
+took_min = 3
+approx_start = true
+rule = "commits on main: start the run's end; end 52f8f5a (FD-027 done)"
+note = "The lead looked at the figures while the figure pass ran, so the bar understates the review."
+
+[[task]]
+id = "C_12_U"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Tom: do the noise figures go in the paper?"
+who = "tom"
+issue = "FD-027"
+status = "tom"
+what = "Tom looks at the three noise maps and the two time-series figures (and the noise-switch summary) and decides which go into the paper, and whether the leak should be larger to reach the product form's Wiener-equivalent level. Figure decisions go into the manuscript repo's Figure_plan.md."
+gate = "Tom's decision recorded in Figure_plan.md."
+depends = ["C_12_T5"]
+estimate = 30
+guess = true
+note = "Waiting since 22:54; placed at now because the chart shows working time, not waiting."
+
+[[task]]
+id = "C_13_U"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Tom: a fast run with the noise grids?"
+who = "tom"
+issue = "FD-027"
+status = "tom"
+what = "Whether to start a fast run of the A + C bundle with the noise grids (block C alone about 11 h 40), or to go to the medium run instead. The noise maps exist at essential size only (3 x 3, one seed)."
+gate = "Tom's decision."
+depends = ["C_12_T5"]
+estimate = 15
+guess = true
+
+[[task]]
+id = "C_13_B"
+block = "C"
+group = "Release noise (step 12, FD-027)"
+name = "Fast run of A + C with the noise grids"
+who = "opus"
+issue = "FD-027"
+status = "tom"
+what = "If Tom chooses it: the fast run of blocks A and C with the noise grids, 777 block C jobs, on 12 workers, run by an Opus worker once Tom starts it, and both figure sets."
+gate = "Every stage finishes; both figure manifests complete."
+depends = ["C_13_U"]
+estimate = 900
+guess = true
+note = "15 h: block A's stages about 3 h 10 (the fast run of 2026-11-13 less its block C grids), block C 11 h 40 (mc_gain_sweep_grid's table), figures about 10 min. Not scaled by the essential run's overrun, which comes mostly from load balance at 51 jobs."
 
 [[task]]
 id = "C_6_U"
@@ -1564,7 +2080,7 @@ issue = "FD-009"
 status = "tom"
 what = "The medium run is Tom's to start, and not before block C is done (Tom, 2026-11-12: 'we will not be doing a medium run until we get done with stage C'). Drawn after block B's fast run as well, because the run is to carry blocks A, B and C together."
 gate = "Tom starts it."
-depends = ["C_5_U", "B_5_T"]
+depends = ["C_5_U", "B_5_T", "C_13_U"]
 estimate = 15
 guess = true
 
@@ -1576,12 +2092,12 @@ name = "Medium run, blocks A, B and C (Tom)"
 who = "tom"
 issue = "FD-009, FD-010"
 status = "tom"
-what = "The one medium run of the paper's analyses for blocks A, B and C together: block A's sweeps, memory capacity, stability and transient analyses on all four conditions, block B's stimulation experiments, and block C's gain-by-bias sweep. Only Tom says when it is done."
+what = "The one medium run of the paper's analyses for blocks A, B and C together: block A's sweeps, memory capacity, stability and transient analyses on all four conditions, block B's stimulation experiments, and block C's grids (gain by bias, gain by self-coupling, the three noise grids) with the E:I networks. Only Tom says when it is done."
 gate = "Tom's judgement."
 depends = ["C_6_U"]
-estimate = 2400
+estimate = 9000
 guess = true
-note = "Duration not known. The 40 h bar is the sum of earlier placeholder guesses, not an estimate from a measured run. For scale: block C's stage alone at its medium size (16 gains by 9 biases by 5 seeds) is about 12 h on 12 workers (Block C report). Whether a medium run is made is one of Tom's decisions in C_5_U."
+note = "Estimate raised from 40 h to 150 h at the update after FD-027. Block C alone at its medium size, 13 x 13 x 10 with the E:I networks and the three noise grids (8710 jobs), is about 131 h on 12 workers (mc_gain_sweep_grid's table; 48 h before the noise grids); about 19 h is allowed for block A's stages and block B's experiments, which have not been timed at medium. Whether a medium run is made, and with which grids, are Tom's decisions (C_5_U, C_13_U)."
 
 [[task]]
 id = "C_7_B"
