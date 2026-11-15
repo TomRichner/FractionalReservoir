@@ -3,6 +3,7 @@ function out_file = make_regression_reference(tier, opts)
 %
 %   out_file = make_regression_reference('rapid')
 %   out_file = make_regression_reference('rapid_chain')
+%   out_file = make_regression_reference('rapid_release')
 %   out_file = make_regression_reference('stages')
 %   out_file = make_regression_reference('full')                    % from the run tagged 'reference'
 %   out_file = make_regression_reference('full', 'tag', 'reference', 'ignore', patterns, 'notes', text)
@@ -14,6 +15,11 @@ function out_file = make_regression_reference(tier, opts)
 %            ultrarapid tier's twin for networks with chained vesicle-pool
 %            depression, which the other three references do not hold.
 %            Writes .../fixtures/regression_rapid_chain_digest.mat.
+%   'rapid_release'  runs regression_rapid_release_run now (about 30 s):
+%            the ultrarapid tier's twin for runs with release noise on (the
+%            gamma process in the synaptic output, FD-027), which no other
+%            reference holds. Writes
+%            .../fixtures/regression_rapid_release_digest.mat.
 %   'stages' runs regression_stages_run now (a few minutes), digests it,
 %            and writes .../fixtures/regression_stages_digest.mat.
 %   'full'   digests an EXISTING run of the full bundle,
@@ -43,7 +49,7 @@ function out_file = make_regression_reference(tier, opts)
 % See also: regression_rapid_run, regression_fast_run, regression_digest,
 %           regression_rapid_check, regression_check
 arguments
-    tier (1,:) char {mustBeMember(tier, {'rapid', 'rapid_chain', 'stages', 'full'})}
+    tier (1,:) char {mustBeMember(tier, {'rapid', 'rapid_chain', 'rapid_release', 'stages', 'full'})}
     opts.tag (1,:) char = 'reference'
     opts.ignore cell = {}
     opts.notes (1,:) char = ''
@@ -52,6 +58,7 @@ end
 project_root = fileparts(which('setup_paths'));
 names = struct('rapid', 'regression_rapid_digest.mat', ...
     'rapid_chain', 'regression_rapid_chain_digest.mat', ...
+    'rapid_release', 'regression_rapid_release_digest.mat', ...
     'stages', 'regression_stages_digest.mat', 'full', 'regression_fast_digest.mat');
 out_file = fullfile(project_root, 'scripts', 'tests', 'fixtures', names.(tier));
 if isfile(out_file)
@@ -91,6 +98,14 @@ switch tier
         rmdir(run_dir, 's');
         preset_name = ['regression_pairs_noStim_noise0p025_dualStd_3cond, routes replaced by ' ...
             'std.model = ''chain'' in regression_rapid_chain_run'];
+        run_mode = 'none (direct calls)';
+        tag = '';
+    case 'rapid_release'
+        run_dir = regression_rapid_release_run();
+        digest = regression_digest(run_dir);
+        rmdir(run_dir, 's');
+        preset_name = ['regression_pairs_noStim_noise0_dualStd_3cond with release_rate and release_sigma ' ...
+            'set (and the chain condition) in regression_rapid_release_run'];
         run_mode = 'none (direct calls)';
         tag = '';
     case 'stages'
