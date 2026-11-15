@@ -13,8 +13,10 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %       its stages (all of them, or 'essential''s four), sweeps, presets,
 %       conditions per set and figure registry
 %   mu7chain_gainbias_config(run_mode, figure_set)   block C: the opt-in
-%       stage 'mc_gain_sweep' with its two grids and two variant networks
-%       (cfg.mc_gain_sweep), and its figure registry
+%       stage 'mc_gain_sweep' with its five grids (bias, self-coupling, and
+%       the three noise grids of FD-027) and two variant networks
+%       (cfg.mc_gain_sweep), and its figure registry, which includes the
+%       two noise-level time-series figures
 %   the opt-in stage 'noise_switch'                  copies of the network
 %       that share the noise for 10 s, then run on noise seeds of their own
 %       (run_noise_switch_rollouts; Tom, 2026-11-14: "it should be added to
@@ -53,11 +55,16 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 % noise_switch_stage_plan). This one does not set it.
 %
 % HOW LONG, on 12 pool workers: block A's stages (about 35 minutes at
-% 'essential'; mu7chain_config) and then block C's (about 20 minutes at
-% 'essential', about 4 h 25 at 'fast'; mu7chain_gainbias_config), then the
-% noise switch (0.5 min at 'fast' on 4 workers, measured 2026-11-14; its
-% figure entry about 45 s at 'fast'). Agents
-% run 'essential' and 'fast'; 'medium' and larger are Tom's to start.
+% 'essential'; mu7chain_config) and then block C's: 51 jobs at 'essential'
+% (24 before the noise grids of FD-027), about 45 minutes, and 777 jobs at
+% 'fast', about 11 h 40 (4 h 25 before), from about 9.5 worker-minutes a
+% job and about 12.9 for the 18 (essential) or 294 (fast) jobs with release
+% noise on (157 s against 116 s per condition-run; mu7chain_gainbias_config
+% has the table); then the noise switch (0.5 min at 'fast' on 4 workers,
+% measured 2026-11-14; its figure entry about 45 s at 'fast'). The figures
+% add the two noise-level time series, about a minute each. So an
+% 'essential' run of this bundle is about 1 h 20 to 1 h 30. Agents run
+% 'essential' and 'fast'; 'medium' and larger are Tom's to start.
 %
 % See also: mu7chain_AC_run, mu7chain_config, mu7chain_gainbias_config,
 %           run_all_paper_analyses, paper_opt_in_stages
