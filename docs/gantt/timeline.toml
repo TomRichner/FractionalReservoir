@@ -2044,31 +2044,121 @@ note = "Waiting since 22:54; placed at now because the chart shows working time,
 [[task]]
 id = "C_13_U"
 block = "C"
-group = "Release noise (step 12, FD-027)"
-name = "Tom: a fast run with the noise grids?"
+group = "Fast-medium run (step 13, FD-028)"
+name = "Tom: a run between fast and medium"
 who = "tom"
-issue = "FD-027"
-status = "tom"
-what = "Whether to start a fast run of the A + C bundle with the noise grids (block C alone about 11 h 40), or to go to the medium run instead. The noise maps exist at essential size only (3 x 3, one seed)."
-gate = "Tom's decision."
+issue = "FD-028"
+status = "done"
+what = "Tom answered whether to make a fast run with the noise grids or go to medium: neither, a run between the two sized for about 20 hours."
+gate = "Tom's decision, recorded as FD-028."
 depends = ["C_12_T5"]
-estimate = 15
+start = 2026-11-14T23:01:00-06:00
+end = 2026-11-14T23:08:53-06:00
+took_min = 8
+approx_start = true
+rule = "commits on main: start the timeline merge 0cedf01; end 386a242 (FD-028 opened)"
+estimate_of_record = 15
+estimate_of_record_text = "15 min (guess)"
+estimate_of_record_source = "timeline.toml at 971821f"
+
+[[task]]
+id = "C_13_B1"
+block = "C"
+group = "Fast-medium run (step 13, FD-028)"
+name = "Run mode fastmedium"
+who = "opus"
+issue = "FD-028"
+status = "done"
+what = "A new run size, fastmedium, between fast and medium: block C at 9 x 9 levels with two networks (846 jobs), block A between fast and medium stage by stage, sized for about 19 hours on 12 workers."
+gate = "Quick suite 90 of 90 and the stages tier exact on the branch; no existing mode's sizes moved."
+depends = ["C_13_U"]
+start = 2026-11-14T23:08:53-06:00
+end = 2026-11-14T23:48:35-06:00
+took_min = 40
+approx_start = false
+rule = "brief to merge: start 386a242 (issue opened); end merge ca47bcb"
+merge = "ca47bcb"
+commits = "60e08d8, 06ef945"
+
+[[task]]
+id = "C_13_B2"
+block = "C"
+group = "Fast-medium run (step 13, FD-028)"
+name = "Fast-medium run of A + C"
+who = "opus"
+issue = "FD-028"
+status = "done"
+what = "mu7chain_AC_run('fastmedium') on 12 workers, with the noise grids: 12 of 12 stages ok, 846 of 846 block C jobs, 60 of 60 figures in each set. It took the place of the fast run first proposed (a 15 h guess)."
+gate = "Every stage and figure in the manifests; the lead looked at the three noise maps."
+depends = ["C_13_B1"]
+start = 2026-11-14T23:50:00-06:00
+end = 2026-11-15T19:18:00-06:00
+took_min = 1168
+approx_start = false
+rule = "worklog: the run from 23:50 to 19:18"
+estimate_of_record = 1140
+estimate_of_record_text = "about 19 h"
+estimate_of_record_source = "FD-028 in docs/ISSUES.md (06ef945), written before the run"
+note = "Measured cost about 12.4 worker-minutes per block C job over the five grids; the Wiener grid's jobs are heavier than the table assumed. The numerics stage's verdict is FAIL on two claims at these windows."
+
+[[task]]
+id = "C_13_T"
+block = "C"
+group = "Fast-medium run (step 13, FD-028)"
+name = "Lead reviews the run; FD-028 done"
+who = "lead"
+issue = "FD-028"
+status = "done"
+what = "The run's result written under FD-028 and in the worklog; the three noise maps looked at."
+gate = "FD-028 set done."
+depends = ["C_13_B2"]
+start = 2026-11-15T19:18:00-06:00
+end = 2026-11-15T19:21:06-06:00
+took_min = 3
+approx_start = true
+rule = "commits on main: start the run's end; end fe04c8e (FD-028 done)"
+
+[[task]]
+id = "C_14_U1"
+block = "C"
+group = "Fast-medium run (step 13, FD-028)"
+name = "Tom: paper figures from this run or medium?"
+who = "tom"
+issue = "FD-028"
+status = "tom"
+what = "Whether the paper's figures are drawn from the fast-medium run or from a medium run (block C alone about 131 h by the grid table, about 150 h at the measured 12.4 worker-minutes a job)."
+gate = "Tom's decision, recorded in Figure_plan.md."
+depends = ["C_13_T"]
+estimate = 30
 guess = true
 
 [[task]]
-id = "C_13_B"
+id = "C_14_U2"
 block = "C"
-group = "Release noise (step 12, FD-027)"
-name = "Fast run of A + C with the noise grids"
-who = "opus"
-issue = "FD-027"
+group = "Fast-medium run (step 13, FD-028)"
+name = "Tom: numerics verdict FAIL on two claims"
+who = "tom"
+issue = "FD-028"
 status = "tom"
-what = "If Tom chooses it: the fast run of blocks A and C with the noise grids, 777 block C jobs, on 12 workers, run by an Opus worker once Tom starts it, and both figure sets."
-gate = "Every stage finishes; both figure manifests complete."
-depends = ["C_13_U"]
-estimate = 900
+what = "The numerics stage judged two manuscript claims FAIL at the fast-medium windows. Not yet investigated; Tom decides whether it is looked into now or judged on a longer run."
+gate = "Tom's decision."
+depends = ["C_13_T"]
+estimate = 30
 guess = true
-note = "15 h: block A's stages about 3 h 10 (the fast run of 2026-11-13 less its block C grids), block C 11 h 40 (mc_gain_sweep_grid's table), figures about 10 min. Not scaled by the essential run's overrun, which comes mostly from load balance at 51 jobs."
+
+[[task]]
+id = "C_14_U3"
+block = "C"
+group = "Fast-medium run (step 13, FD-028)"
+name = "Tom: open block C and B decisions"
+who = "tom"
+issue = "FD-010"
+status = "tom"
+what = "The decisions left open in blocks C and B, among them the lambda_1 = 0 edge where chained MTS sits at zero, the gain-curve rows at bias 0.15 against 0.2, and block B's pilots."
+gate = "Tom's decisions, recorded in ISSUES.md and the to-do list."
+depends = ["C_13_T"]
+estimate = 60
+guess = true
 
 [[task]]
 id = "C_6_U"
@@ -2080,7 +2170,7 @@ issue = "FD-009"
 status = "tom"
 what = "The medium run is Tom's to start, and not before block C is done (Tom, 2026-11-12: 'we will not be doing a medium run until we get done with stage C'). Drawn after block B's fast run as well, because the run is to carry blocks A, B and C together."
 gate = "Tom starts it."
-depends = ["C_5_U", "B_5_T", "C_13_U"]
+depends = ["C_5_U", "B_5_T", "C_14_U1"]
 estimate = 15
 guess = true
 
@@ -2095,9 +2185,9 @@ status = "tom"
 what = "The one medium run of the paper's analyses for blocks A, B and C together: block A's sweeps, memory capacity, stability and transient analyses on all four conditions, block B's stimulation experiments, and block C's grids (gain by bias, gain by self-coupling, the three noise grids) with the E:I networks. Only Tom says when it is done."
 gate = "Tom's judgement."
 depends = ["C_6_U"]
-estimate = 9000
+estimate = 10140
 guess = true
-note = "Estimate raised from 40 h to 150 h at the update after FD-027. Block C alone at its medium size, 13 x 13 x 10 with the E:I networks and the three noise grids (8710 jobs), is about 131 h on 12 workers (mc_gain_sweep_grid's table; 48 h before the noise grids); about 19 h is allowed for block A's stages and block B's experiments, which have not been timed at medium. Whether a medium run is made, and with which grids, are Tom's decisions (C_5_U, C_13_U)."
+note = "Estimate raised from 150 h to 169 h at the update after FD-028: the fast-medium run measured about 12.4 worker-minutes per block C job, which over 8710 jobs on 12 workers is about 150 h for block C alone rather than the table's 131 h; 19 h kept for blocks A and B. Raised earlier from 40 h to 150 h at the update after FD-027. Block C alone at its medium size, 13 x 13 x 10 with the E:I networks and the three noise grids (8710 jobs), is about 131 h on 12 workers (mc_gain_sweep_grid's table; 48 h before the noise grids); about 19 h is allowed for block A's stages and block B's experiments, which have not been timed at medium. Whether a medium run is made, and with which grids, are Tom's decisions (C_5_U, C_14_U1)."
 
 [[task]]
 id = "C_7_B"
