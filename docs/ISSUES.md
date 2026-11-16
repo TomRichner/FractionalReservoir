@@ -1501,3 +1501,32 @@ becomes an issue with an acceptance test.
   - The request was first dated 2026-11-15 in this entry, `CLAUDE.md` and
     code comments; it was made and merged late on 2026-11-14 and the
     dates were corrected after the run.
+
+### FD-029 The memory-capacity grid figure restyled; one grid in the runs
+
+- **Status:** in progress (asked for by Tom, 2026-11-16, from Brian's
+  feedback:
+  `../StochasticPlasticDynamicalSystemPaper/docs/final_draft/feedback_from_Brian/memory_capacity_grid_figure_feedback.md`).
+- **What:** (1) the maps: no ticks on the top and right, no lambda_1 = 0
+  line, no saturated or silent markers, no spread row; a three-color
+  diverging colormap with a dark center for lambda_1 and a white-to-that-
+  color map for memory capacity. (2) The grid: self-coupling -4 to 6, gain
+  0.05 to 5; 11 x 11 at `fastmedium`, 21 x 21 at `medium`, at least five
+  networks per cell at both. (3) Only the gain by self-coupling grid runs
+  in the bundle from now on. (4) A revised figure drawn from the run of
+  2026-11-15 into `figs/revised_figures/`; the new sizes wait for Tom's
+  next run.
+- **Done means:** the options exist with tests, existing figures unchanged
+  unless the bundle asks for the new style, the quick suite and stages
+  tier pass, the revised figure is drawn and looked at.
+- **Lead's decisions:**
+  1. The style changes are options of `fig_mc_gain_bias_maps` whose
+     defaults keep today's figure; the bundle's entry sets them. The grids
+     that no longer run stay defined and selectable (`cfg` names which
+     grids run), so nothing is deleted and an old run still draws.
+  2. The gain axis of the self-coupling grid stays linear, as it is now;
+     the feedback gives its range only. With 0.05 to 5 the preset's gain
+     of 1 is not a level at 11 or 21 levels; flagged for Tom.
+  3. `essential` and `fast` keep their sizes (3 x 3 x 1, 7 x 7 x 3) with
+     the new ranges; the feedback names fastmedium and medium only.
+- **Result:** _(pending)_
