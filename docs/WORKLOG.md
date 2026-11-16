@@ -34,6 +34,34 @@ Entry template:
 
 ---
 
+## 2026-11-15 19:45 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: the fastmedium mode and its run)
+
+**Issues touched:** FD-028 (opened -> done).
+**Commits:** `386a242` issue; `60e08d8` and its merge, the mode
+`fastmedium`; `06ef945` docs; then the result and date corrections.
+Manuscript repo: `750c0fc`, `b463e98` and the next (figure plan, not
+pushed).
+**Done:** a run mode between `fast` and `medium` sized for about 19 h
+(block C 9 x 9 levels x 2 networks, 846 jobs; block A between fast and
+medium stage by stage); `mu7chain_AC_run('fastmedium')` made by an Opus
+worker on 12 workers. Tom decided the three noise maps of memory
+capacity go in the paper, at least the supplement.
+**Verified:** quick suite 90 of 90 and the stages tier exact on the
+mode's branch; no existing mode's sizes moved; the run: 19 h 28, 12 of 12
+stages ok, 846 of 846 block C jobs, 60 of 60 figures in each set; the
+lead looked at the three noise maps.
+**Not verified / known gaps:** the numerics stage's verdict is FAIL on
+two claims at these windows (FD-028, result), not investigated; the mode
+has two networks per cell, so spreads are from two seeds; the full
+regression tier is still deferred; the date comments were corrected
+after the gate (comment lines only, no test rerun).
+**Raised, not acted on:** the numerics verdict; the zigzag lambda_1 = 0
+edge where chained MTS sits at zero; the gain-curves rows at bias 0.15
+against 0.2; block C's estimate should count the Wiener grid's jobs as
+heavier (about 12.4 worker-minutes a job over the five grids).
+**Next:** Tom: which run the paper's figures are drawn from, the open
+block C and block B decisions, the numerics verdict.
+
 ## 2026-11-14 23:15 (session cc2136bc-6794-4ea6-962d-9eb831682265, continued: noise-switch rollouts; release noise)
 
 **Issues touched:** FD-026 (noise-switch rollouts: -> done), FD-027

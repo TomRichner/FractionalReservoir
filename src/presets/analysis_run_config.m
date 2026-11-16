@@ -32,7 +32,7 @@ function cfg = analysis_run_config(analysis, run_mode, preset_defaults)
 %                  (cfg.stages / cfg.sweeps, paper_stage_plan). Two reps per
 %                  level give medians, not usable interquartile bands.
 %   'fast'       - few levels/reps, fs=200, short T_range; finishes quickly
-%   'fastmedium' - between fast and medium (Tom, 2026-11-15), sized so the
+%   'fastmedium' - between fast and medium (Tom, 2026-11-14), sized so the
 %                  three sweeps of the mu7chain_AC bundle take about 85 min
 %                  on 12 workers against fast's 39 (measured 2026-11-13:
 %                  1-D sweeps 9.0 min, tau 2.0, joint 26.4): medium's levels

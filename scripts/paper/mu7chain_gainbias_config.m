@@ -60,7 +60,7 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 % estimate (plan.worker_minutes) counts both (mc_gain_sweep_grid). Without
 % the noise grids (the first four alone) the stage was 24 jobs, about 20
 % min, at 'essential' and 336, 4 h 47 measured, at 'fast'. 'fastmedium'
-% (Tom, 2026-11-15) is the size at which mu7chain_AC_run, blocks A and C
+% (Tom, 2026-11-14) is the size at which mu7chain_AC_run, blocks A and C
 % together, takes about 19 h. Agents run 'essential' and 'fast';
 % 'fastmedium' and larger are Tom's to start.
 %

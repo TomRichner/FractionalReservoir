@@ -34,7 +34,7 @@ function plan = noise_switch_stage_plan(cfg)
 %   production      32      10 s     20 s
 % The first run (8 copies, 5 s) showed several blocks still rising at 5 s,
 % hence the longer rollouts above 'essential'. 'fastmedium' takes medium's
-% row (Tom, 2026-11-15): 64 runs of 30 s, a few minutes on 12 workers. Its
+% row (Tom, 2026-11-14): 64 runs of 30 s, a few minutes on 12 workers. Its
 % integrator rate is the joint sweep's at the mode (200 Hz at fastmedium,
 % 400 at medium; analysis_run_config).
 %

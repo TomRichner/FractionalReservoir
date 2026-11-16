@@ -1402,7 +1402,8 @@ becomes an issue with an acceptance test.
 
 ### FD-028 A run mode between fast and medium, sized for about 20 hours
 
-- **Status:** in progress (asked for by Tom, 2026-11-15).
+- **Status:** done (asked for by Tom on the evening of 2026-11-14; the
+  run ended 2026-11-15 19:18).
 - **What:** a run mode `fastmedium` between `fast` and `medium`, sized so
   that `mu7chain_AC_run('fastmedium')` (blocks A and C, both figure sets)
   takes about 19 hours on 12 pool workers and no more than 20; then that
@@ -1435,7 +1436,7 @@ becomes an issue with an acceptance test.
      within a per-stage budget (sweeps 90 min, resolution before reps;
      transient gain stays at `fast`'s 76 min); the noise switch takes
      `medium`'s size. With the figure passes the estimate is about 19 h.
-- **Built and merged (2026-11-15):** the mode `fastmedium` (worker's
+- **Built and merged (2026-11-14):** the mode `fastmedium` (worker's
   commit `60e08d8`), gated on its branch: quick suite 90 of 90 (16.9
   min), stages tier exact; every existing mode's planning outputs
   `isequaln` to before, except the block C stage's time estimate, which
@@ -1467,4 +1468,36 @@ becomes an issue with an acceptance test.
   7. The least certain estimates are numerics and the eigenvalue heatmap
      (the logs give no per-block times); the margin to 20 h is about
      1.5 h.
-- **Result:** _(pending: the run)_
+- **Result (2026-11-15):** `mu7chain_AC_run('fastmedium')` at `06ef945`
+  on 12 workers, launched by an Opus worker in its own MATLAB session:
+  **19 h 28** (2026-11-14 23:50 to 2026-11-15 19:18), inside the 20 h
+  limit. All 12 stages ok; block C 846 of 846 jobs, no failed row; both
+  figure sets 60 of 60. Data `data/mu7chain_AC_fastmedium`; figures
+  `figs/mu7chain_AC_fastmedium_3cond` (the paper's three conditions) and
+  `..._4cond`.
+  - Times against the estimates (min): sweeps 83.2 / 84; memory capacity
+    15.7 / 15; mc_example 3.6 / 5; eig heatmap 16.6 / 18; numerics 20.6 /
+    18; Lyapunov spectrum 8.0 / 8; transient gain 77.2 / 76; local
+    Lyapunov 7.9 / 8; dc_lle 28.3 / 19; block C 873.4 / 819; noise switch
+    1.4 / 3; the two figure passes about 29. Block C ran 7 % over: 64
+    jobs an hour on the first grids, about 48 once the noise grids
+    dominated, so the Wiener grid's jobs cost more than a plain job too
+    (the model counted only the release grids as heavier). For the next
+    estimate: about 12.4 worker-minutes a job averaged over the five
+    grids.
+  - **The numerics stage's verdict is FAIL on two claims** (a verdict,
+    not a stage failure), at this mode's windows (medium's for checks L
+    and C): L (SRA1 against ode45, Benettin) no adaptation 0.252 against
+    0.05 (scatter 0.674), chained MTS 0.0422, inside 0.05 but above its
+    scatter limit 0.0366; C (Benettin and top-K against QR, reduced
+    network) chained MTS 0.0211 and 0.0237 against 0.05 and 0.02. 1TS and
+    product MTS pass both; the Jacobian check passes in all four
+    conditions (about 1e-10). Not investigated; raised for Tom.
+  - Drawn as designed, reads oddly: in the chained-MTS columns of the
+    three noise maps lambda_1 at gain 1 sits at about zero, so the
+    lambda_1 = 0 edge zigzags between cells. In the gain-curves figure
+    the main network's row is at bias 0.15 (labeled nearest to 0.2) and
+    the E:I rows at 0.2 (decision 5).
+  - The request was first dated 2026-11-15 in this entry, `CLAUDE.md` and
+    code comments; it was made and merged late on 2026-11-14 and the
+    dates were corrected after the run.

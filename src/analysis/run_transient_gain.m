@@ -70,7 +70,7 @@ setup_paths();
 switch cfg.run_mode
     % 'essential' and 'fastmedium' take 'fast's sizes: at 'fast' this stage is
     % already 76 min of the mu7chain_AC bundle (2026-11-13), and 'fastmedium'
-    % is sized to fit about 19 h (Tom, 2026-11-15).
+    % is sized to fit about 19 h (Tom, 2026-11-14).
     case {'essential', 'fast', 'fastmedium'}, T = 20; n_seeds = 1; n_regular = 6;  n_exc = 4;  horizon = 1;
     case {'medium', 'medium2'}  , T = 40; n_seeds = 2; n_regular = 12; n_exc = 8;  horizon = 2;
     case 'production'           , T = 60; n_seeds = 3; n_regular = 20; n_exc = 10; horizon = 3;

@@ -245,7 +245,7 @@ for m = 1:size(sizes, 1)
 end
 % The essential stage holds 51 jobs: 24 before the noise grids, 27 of them.
 assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential')).n_jobs == 51);
-% 'fastmedium' (Tom, 2026-11-15): 846 jobs, 324 with release noise, about
+% 'fastmedium' (Tom, 2026-11-14): 846 jobs, 324 with release noise, about
 % 13.6 h on 12 workers.
 pl = mc_gain_sweep_stage_plan(mu7chain_gainbias_config('fastmedium'));
 assert(pl.n_jobs == 846 && abs(pl.worker_minutes / 12 / 60 - 13.64) < 0.01);

@@ -144,7 +144,7 @@ switch cfg.run_mode
     case {'essential', 'fast'}      % 'essential' takes 'fast's sizes (run_mode_names)
         T_free = 6;  T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_reshoot = 1;  n_lle = 2;
     case 'fastmedium'
-        % Between the two (Tom, 2026-11-15; about 20 min of the mu7chain_AC
+        % Between the two (Tom, 2026-11-14; about 20 min of the mu7chain_AC
         % bundle). The header says fast windows fail L and C by design, so L
         % and C take medium's windows (T_lle 20 s, T_small [-10, 10]); A and
         % B keep fast's. Trials fill one round of a 12-worker pool, so they

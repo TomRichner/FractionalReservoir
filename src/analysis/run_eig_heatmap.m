@@ -87,7 +87,7 @@ if ~isfolder(out_dir); mkdir(out_dir); end
 % Same collapse as run_memory_capacity and run_dc_lle_analysis.
 switch cfg.run_mode
     case {'essential', 'fast'},    T_range = [0 40];  n_samples = 40;   fs = 200;   % 'essential' takes 'fast's sizes
-    % 'fastmedium' (Tom, 2026-11-15; about 20 min of the mu7chain_AC bundle):
+    % 'fastmedium' (Tom, 2026-11-14; about 20 min of the mu7chain_AC bundle):
     % twice fast's samples on a 60-s run, whose LLE window is medium's 30 s,
     % at fast's fs. Fast took 9.6 min (2026-11-13), the reference example
     % alone 7.7 (essential, 2026-11-14), so at most 2 x 7.7 + 1.5 x 1.9 =

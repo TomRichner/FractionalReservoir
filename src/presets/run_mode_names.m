@@ -34,7 +34,7 @@ function names = run_mode_names()
 % run makes is a separate knob, cfg.stages / cfg.sweeps (paper_stage_plan): a
 % mode names sizes only, and every stage accepts every mode.
 %
-% 'fastmedium' (Tom, 2026-11-15) sits between 'fast' and 'medium': the
+% 'fastmedium' (Tom, 2026-11-14) sits between 'fast' and 'medium': the
 % largest sizes with which mu7chain_AC_run (blocks A and C, every stage, both
 % figure sets) finishes in about 19 hours on 12 pool workers, and no more
 % than 20. Each stage's table names its own size for it, with the estimate

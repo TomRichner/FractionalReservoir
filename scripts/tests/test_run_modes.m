@@ -42,7 +42,7 @@ all_passed = check('''fast2'' is gone (removed 2026-09-03)', ...
 % stage files' text in test_essential_mode (the gap described above).
 all_passed = check('''essential'' is in the list, below ''fast''', ...
     numel(modes) >= 2 && strcmp(modes{1}, 'essential') && strcmp(modes{2}, 'fast')) && all_passed;
-% 'fastmedium' (Tom, 2026-11-15) sits between 'fast' and 'medium'. The
+% 'fastmedium' (Tom, 2026-11-14) sits between 'fast' and 'medium'. The
 % message checks below match names as substrings, so 'fast' and 'medium'
 % alone would pass inside 'fastmedium'; the mode is checked as a whole word
 % there too.

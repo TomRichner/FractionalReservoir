@@ -64,10 +64,10 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 % measured 2026-11-14; its figure entry about 45 s at 'fast'). The figures
 % add the two noise-level time series, about a minute each. So an
 % 'essential' run of this bundle is about 1 h 20 to 1 h 30. (Block C's
-% per-job cost is 10.24 worker-minutes since 2026-11-15, measured on the
+% per-job cost is 10.24 worker-minutes since 2026-11-14, measured on the
 % fast run, and 1.35 times that with release noise; mc_gain_sweep_grid.)
 %
-% 'fastmedium' (Tom, 2026-11-15) IS SIZED FOR ABOUT 19 HOURS, no more than
+% 'fastmedium' (Tom, 2026-11-14) IS SIZED FOR ABOUT 19 HOURS, no more than
 % 20, on 12 workers. Each stage's estimate is the fast run's measured time
 % (2026-11-13) scaled by the ratio of work; the sizes are in each stage's
 % table, which gives the reasoning:

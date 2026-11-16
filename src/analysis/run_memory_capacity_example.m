@@ -71,7 +71,7 @@ end
 % a 30-s fast test window used to show half a trace.
 switch opts.run_mode
     case {'essential', 'fast'}, T_train_sec = 120; T_test_sec = 75;  d_max_sec = 5;    % 'essential' takes 'fast's sizes
-    % 'fastmedium' takes medium's protocol (Tom, 2026-11-15): one trial of
+    % 'fastmedium' takes medium's protocol (Tom, 2026-11-14): one trial of
     % 390 s per condition, about half a memory-capacity trial (7.4 min at
     % 'fast', 2026-11-13), so about 5 min.
     case {'fastmedium', 'medium', 'medium2'}, T_train_sec = 300; T_test_sec = 90;  d_max_sec = 10;

@@ -68,7 +68,7 @@ assert(strcmp(es.model.ode_solver, 'sra1') && es.is_stochastic);
 %% Every existing mode's numbers are unchanged
 % {analysis, mode, n_levels, n_reps ([] = no reps axis), det solver, fs,
 %  T_range, lya_T_interval ([] = class default), n_grid_points ([] = none)}
-% The 'fastmedium' rows (Tom, 2026-11-15) are its sizes as chosen, stated
+% The 'fastmedium' rows (Tom, 2026-11-14) are its sizes as chosen, stated
 % here so a change to them is seen; the rest were read off the function at
 % 0bc35ca and are unchanged by the mode's addition.
 was = { ...
@@ -140,7 +140,7 @@ for k = 1:numel(stage_files)
     end
     assert(isempty(regexp(code, 'strcmp\([^)]*run_mode,\s*''fast''\)', 'once')), ...
         '%s tests run_mode against ''fast'' alone', stage_files{k});
-    % 'fastmedium' (Tom, 2026-11-15) is named in a case of every stage's table.
+    % 'fastmedium' (Tom, 2026-11-14) is named in a case of every stage's table.
     assert(~isempty(regexp(code, 'case\s*(\{[^}\n]*)?''fastmedium''', 'once')), ...
         '%s has no case for ''fastmedium''', stage_files{k});
 end

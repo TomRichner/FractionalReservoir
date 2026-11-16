@@ -37,8 +37,8 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % the calibration runs of 2026-11-14 170 to 200 s against 124 to 130 s).
 % G.worker_minutes counts a job at that cost when the grid is told
 % release_noise = true (mc_gain_sweep_stage_plan decides it from the grid's
-% axes and fixed arguments); until 2026-11-15 it counted 9.5 for every job.
-% 'fastmedium' (Tom, 2026-11-15) is sized for mu7chain_AC_run to finish in
+% axes and fixed arguments); until 2026-11-14 it counted 9.5 for every job.
+% 'fastmedium' (Tom, 2026-11-14) is sized for mu7chain_AC_run to finish in
 % about 19 h: 9 levels keep the count odd (zero stays a level of the
 % symmetric axes), and 3 networks at 9 x 9 would be about 20.5 h alone.
 % Agents run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to
