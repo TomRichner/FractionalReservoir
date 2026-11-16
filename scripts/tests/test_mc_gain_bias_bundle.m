@@ -17,12 +17,20 @@
 %      skipped, no sweep), its directories, registry (no file tag a prefix
 %      of another), conditions per set, grids and variant networks, and
 %      that it is mu7chain_config's otherwise.
-%   4. The stage's plan in EVERY run mode: the gain x bias grid, its two
+%      Since FD-029 the bundle runs the gain x self-coupling grid alone
+%      (run_grids) and registers that grid's entries and the time series,
+%      the maps in the new style; with 'all' (or a subset) as the config's
+%      third argument the grids and their entries come back. The checks
+%      below on the full set use 'all'.
+%   4. The bundle's plan in every mode: the self-coupling grid alone, gain
+%      linear 0.05 to 5, s linear -4 to 6, the sizes of FD-029 (fastmedium
+%      11 x 11 x 5, medium 21 x 21 x 5), s = 0 a level exactly at 11 and 21
+%      levels, gain 1 at none, its jobs and estimate. Then with every grid:
+%      the gain x bias grid, its two
 %      variants (gain only, on its gains, at their own bias) and the gain x
 %      self-coupling grid, each in its own folder, with the size table's
-%      levels and seeds (3 x 3 x 1, 7 x 7 x 3, 13 x 13 x 10, 17 x 17 x 10),
-%      the gains log-spaced on the bias grid and evenly spaced on the
-%      self-coupling grid, zero a self-coupling level, and the job count.
+%      levels and seeds, the gains log-spaced on the bias grid and evenly
+%      spaced on the self-coupling grid, and the job count.
 %      The noise grids: a zero then the mode's log ladder on the noise axis,
 %      their fixed model_args and the filtered readout, the self-coupling
 %      noise grid with no gain axis; the first four runs plan exactly the
@@ -31,14 +39,16 @@
 %   5. The form with one unnamed grid still plans as it did (the main run
 %      into the run directory, variants into mc_gain_sweep_<tag>); a grid's
 %      model_args follow the stage's and its readout replaces the stage's;
-%      bad settings are refused before the run directory exists.
+%      bad settings are refused before the run directory exists, in a grid
+%      that does not run as in one that does, and so is a run_grids tag
+%      that names no grid.
 %   6. mu7chain_AC_config: block A's stages then block C's, then the
 %      opt-in 'noise_switch' (which neither part runs); both registries and
 %      the noise-switch entry; its own directories; the grouped figures
 %      pointed at its figure root. (The noise-switch stage's size table and
 %      its end-to-end run are test_noise_switch_stage.)
 %   7. END TO END on a tiny case: run_all_paper_analyses on the bundle
-%      ('essential', 3cond) with a 50-neuron network, the shortened protocol
+%      ('essential', 3cond, every grid) with a 50-neuron network, the shortened protocol
 %      of test_mc_gain_sweep, 2 x 2 levels per grid, one seed and three
 %      conditions; then make_all_paper_figures from that run directory.
 %      Every grid's results and the two variants' are where the figures
@@ -91,14 +101,26 @@ conds3 = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'};
 conds4 = [conds3, {'sfa3_std2'}];
 variant_tags = {'EI3to2', 'EI2to3'};
 noise_grids = {'releasenoise', 'selfcoupling_releasenoise', 'wienernoise'};
-entry_names = [{'fig_mc_maps_bias', 'fig_mc_maps_selfcoupling', 'fig_mc_gain_curves', ...
+all_grids = [{'bias', 'selfcoupling'}, noise_grids];
+% The registry with every grid running ('all', as before FD-029) ...
+entry_names_all = [{'fig_mc_maps_bias', 'fig_mc_maps_selfcoupling', 'fig_mc_gain_curves', ...
     'fig_mc_robustness_bias', 'fig_mc_robustness_selfcoupling', 'fig_mc_vs_lambda1', ...
     'fig_lambda1_vs_bias', 'fig_rate_vs_lambda1', 'fig_slope_share_vs_gain', ...
     'mc_statistics_bias', 'mc_statistics_selfcoupling'}, ...
     strcat('fig_mc_maps_', noise_grids), strcat('fig_mc_robustness_', noise_grids), ...
     strcat('mc_statistics_', noise_grids), {'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}];
-entry_grids = [{'bias', 'selfcoupling', 'bias', 'bias', 'selfcoupling', 'selfcoupling', ...
+entry_grids_all = [{'bias', 'selfcoupling', 'bias', 'bias', 'selfcoupling', 'selfcoupling', ...
     'bias', 'bias', 'bias', 'bias', 'selfcoupling'}, noise_grids, noise_grids, noise_grids, {'', ''}];
+% ... and the bundle's own (FD-029): the self-coupling grid's entries and
+% those that read no grid, in the same order.
+registered = ismember(entry_grids_all, {'selfcoupling', ''});
+entry_names = entry_names_all(registered);
+entry_grids = entry_grids_all(registered);
+assert(isequal(entry_names, {'fig_mc_maps_selfcoupling', 'fig_mc_robustness_selfcoupling', 'fig_mc_vs_lambda1', ...
+    'mc_statistics_selfcoupling', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}));
+% The maps' style (FD-029), on every registered map.
+MAP_STYLE = {'mc_scale', 'linear', 'lle_scale', 'linear', 'lle_clip', 5, 'ticks_top_right', false, ...
+    'show_zero_line', false, 'show_flags', false, 'show_iqr', false, 'mc_colormap', 'lle_center'};
 % The noise grids (FD-027 P3): the leak, the noise ladders and what each holds fixed.
 LEAK = 0.002;
 gamma_ladder = [1e-4 1e-2]; wiener_ladder = [2.5e-4 0.025];
@@ -117,11 +139,31 @@ for md = {'essential', 'fast'}
         assert(isequal(names, entry_names), 'the registry is: %s', strjoin(names, ', '));
         assert(isequal(cellfun(@(f) arg_or_empty(f.args, 'grid'), c.figures, 'UniformOutput', false), entry_grids), ...
             'every entry names the grid it reads (the time series read none)');
+        assert(isequal(c.mc_gain_sweep.run_grids, {'selfcoupling'}), 'only the self-coupling grid runs (FD-029)');
+        maps = c.figures(startsWith(names, 'fig_mc_maps_'));
+        assert(isscalar(maps) && all(cellfun(@(f) all(arrayfun(@(k) isequal(arg(f.args, MAP_STYLE{k}), MAP_STYLE{k + 1}), ...
+            1:2:numel(MAP_STYLE))) && ismember(arg(f.args, 'lle_colormap'), dark_center_colormaps()), maps)), ...
+            'the registered map: linear scales, lambda_1 clipped at 5, the style of FD-029 and a dark-centered map');
+        % Every grid stays defined: the full registry and plan follow a
+        % selection of all of them ('all'), or any subset, by tag.
+        c_all = mu7chain_gainbias_config(md{1}, fs{1}, 'all');
+        assert(isequal(c_all.mc_gain_sweep.run_grids, all_grids) && ...
+            isequal(rmfield(c_all.mc_gain_sweep, 'run_grids'), rmfield(c.mc_gain_sweep, 'run_grids')));
+        c_two = mu7chain_gainbias_config(md{1}, fs{1}, {'selfcoupling', 'bias'});
+        two = cellfun(@(f) f.name, c_two.figures, 'UniformOutput', false);
+        assert(isequal(two, entry_names_all(ismember(entry_grids_all, {'selfcoupling', 'bias', ''}))), ...
+            'a grid brought back brings its figure entries');
+        c = c_all;
+        names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
+        assert(isequal(names, entry_names_all), 'the full registry is: %s', strjoin(names, ', '));
+        assert(isequal(cellfun(@(f) arg_or_empty(f.args, 'grid'), c.figures, 'UniformOutput', false), entry_grids_all));
         if strcmp(fs{1}, '3cond'); want = conds3; else; want = conds4; end
         assert(isequal(c.conditions, want));
         assert(isequal(c.figure_sets, base.figure_sets));
         grids = c.mc_gain_sweep.grids;
-        assert(isequal({grids.tag}, [{'bias', 'selfcoupling'}, noise_grids]) && ...
+        assert(isequal(grids(2).gain_range, [0.05 5]) && isequal(grids(2).second_range, [-4 6]), ...
+            'the self-coupling grid: gain 0.05 to 5, s -4 to 6 (FD-029)');
+        assert(isequal({grids.tag}, all_grids) && ...
             isequal({grids.second_axis}, {'S_c', 'self_coupling', 'release_sigma_all', ...
                 'release_sigma_all', 'sigma_u_noise'}) && ...
             isequal({grids.gain_spacing}, {'log', 'linear', 'log', [], 'log'}) && ...
@@ -170,7 +212,8 @@ assert(throws(@() mu7chain_gainbias_config('fast2'), 'mu7chain_gainbias_config:B
 assert(strcmp(mu7chain_gainbias_config().run_mode, 'essential'), 'the default is the size agents run');
 
 %% 4. The stage's plan in every run mode: both grids, the variants, the sizes
-sizes = {'essential', 3, 1; 'fast', 7, 3; 'fastmedium', 9, 2; 'medium', 13, 10; 'medium2', 13, 10; ...
+% FD-029: fastmedium 11 x 11 x 5 and medium 21 x 21 x 5 networks.
+sizes = {'essential', 3, 1; 'fast', 7, 3; 'fastmedium', 11, 5; 'medium', 21, 5; 'medium2', 21, 5; ...
          'production', 17, 10};
 % The estimate: 10.24 worker-minutes a job, 1.35 times that for the two
 % release-noise grids (runs 5 and 6; mc_gain_sweep_grid), 2 n^2 x networks jobs.
@@ -178,7 +221,24 @@ MINUTES = 10.24; RELEASE = 1.35;
 assert(isequal(sizes(:, 1)', run_mode_names()), 'the size table below must cover run_mode_names');
 for m = 1:size(sizes, 1)
     [md, n, n_seeds] = sizes{m, :};
-    c = mu7chain_gainbias_config(md);
+    seeds = 3000 + (1:n_seeds);
+    self_gains = round(linspace(0.05, 5, n), 10);
+    self_s = round(linspace(-4, 6, n), 10);
+    % The bundle as it is: the gain x self-coupling grid alone, no variants.
+    pl = mc_gain_sweep_stage_plan(mu7chain_gainbias_config(md));
+    assert(isequal({pl.runs.label}, {'selfcoupling'}) && isequal({pl.runs.folder}, {'mc_gain_sweep_selfcoupling'}), md);
+    a = pl.runs.args;
+    assert(isequal(arg(a, 'gain_levels'), self_gains) && isequal(arg(a, 'second_levels'), self_s) && ...
+        isequal(arg(a, 'seeds'), seeds) && strcmp(mc_gain_axis_scale(self_gains), 'linear'), ...
+        '%s: gains linear 0.05 to 5, s linear -4 to 6, the mode''s seeds', md);
+    % s = 0 is a level where (n - 1) is a multiple of 5 (11 and 21 levels);
+    % the preset's gain 1 is a level at no mode of the table.
+    assert(nnz(self_s == 0) == (mod(n - 1, 5) == 0) && ~any(self_gains == 1), ...
+        '%s: s = 0 a level %d, gain 1 a level %d', md, any(self_s == 0), any(self_gains == 1));
+    assert(pl.n_jobs == n^2 * n_seeds && abs(pl.worker_minutes - MINUTES * n^2 * n_seeds) < 1e-6, ...
+        '%s: %d jobs, %g worker-minutes', md, pl.n_jobs, pl.worker_minutes);
+    % Every grid, as before FD-029.
+    c = mu7chain_gainbias_config(md, '4cond', 'all');
     pl = mc_gain_sweep_stage_plan(c);
     assert(isequal({pl.runs.label}, [{'bias', 'bias_EI3to2', 'bias_EI2to3', 'selfcoupling'}, noise_grids]), md);
     assert(isequal({pl.runs.folder}, [{'mc_gain_sweep_bias', 'mc_gain_sweep_bias_EI3to2', ...
@@ -188,7 +248,6 @@ for m = 1:size(sizes, 1)
         assert(~any(strcmp(a(1:2:end), 'model_args')) && ~any(strcmp(a(1:2:end), 'readout_signal')), ...
             '%s, %s: the first four runs plan the arguments they always had', md, pl.runs(k).label);
     end
-    seeds = 3000 + (1:n_seeds);
     log_gains = round(logspace(-1, log10(4), n), 10);
     a = pl.runs(1).args;
     assert(strcmp(arg(a, 'preset_name'), c.mc_preset) && strcmp(arg(a, 'run_mode'), md) && ...
@@ -207,11 +266,9 @@ for m = 1:size(sizes, 1)
     a = pl.runs(4).args;
     s_levels = arg(a, 'second_levels');
     assert(strcmp(arg(a, 'preset_name'), c.mc_preset) && strcmp(arg(a, 'second_axis'), 'self_coupling'));
-    assert(isequal(arg(a, 'gain_levels'), round(linspace(0.1, 4, n), 10)) && ...
-        isequal(s_levels, round(linspace(-4, 4, n), 10)) && isequal(arg(a, 'seeds'), seeds), ...
-        '%s: the gain x self-coupling grid', md);
-    assert(strcmp(mc_gain_axis_scale(arg(a, 'gain_levels')), 'linear') && nnz(s_levels == 0) == 1 && ...
-        s_levels(1) == -4 && s_levels(end) == 4, '%s: evenly spaced gains; s = 0 is a level', md);
+    assert(isequal(arg(a, 'gain_levels'), self_gains) && isequal(s_levels, self_s) && ...
+        isequal(arg(a, 'seeds'), seeds), '%s: the gain x self-coupling grid', md);
+    assert(s_levels(1) == -4 && s_levels(end) == 6, '%s: s from -4 to 6', md);
     % The noise grids: a zero level, then the mode's log ladder without its
     % lowest rung; fixed arguments and the readout per grid.
     zero_log = @(ladder) round([0, ladder(1) * (ladder(2) / ladder(1)).^((1:n-1) / (n - 1))], 10);
@@ -243,12 +300,13 @@ for m = 1:size(sizes, 1)
     assert(abs(pl.worker_minutes - want_minutes) < 1e-6 * want_minutes, ...
         '%s: worker-minutes %g, expected %g', md, pl.worker_minutes, want_minutes);
 end
-% The essential stage holds 51 jobs: 24 before the noise grids, 27 of them.
-assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential')).n_jobs == 51);
-% 'fastmedium' (Tom, 2026-11-14): 846 jobs, 324 with release noise, about
-% 13.6 h on 12 workers.
+% With every grid, the essential stage holds 51 jobs: 24 before the noise
+% grids, 27 of them. The bundle itself, the self-coupling grid alone: 9.
+assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential', '4cond', 'all')).n_jobs == 51);
+assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential')).n_jobs == 9);
+% 'fastmedium' (FD-029): 605 jobs, about 8.6 h on 12 workers.
 pl = mc_gain_sweep_stage_plan(mu7chain_gainbias_config('fastmedium'));
-assert(pl.n_jobs == 846 && abs(pl.worker_minutes / 12 / 60 - 13.64) < 0.01);
+assert(pl.n_jobs == 605 && abs(pl.worker_minutes / 12 / 60 - 8.604) < 0.01);
 % The release-noise cost follows the grid's axes and its fixed arguments,
 % not its tag: an axis that is a release-noise amplitude, or model_args that
 % set one above zero, and a zero set there does not count.
@@ -257,6 +315,7 @@ G1 = mc_gain_sweep_grid('fast', 'release_noise', true);
 assert(abs(G0.worker_minutes - MINUTES * 147) < 1e-9 && abs(G1.worker_minutes - RELEASE * G0.worker_minutes) < 1e-9);
 c = mu7chain_gainbias_config('essential');
 c.mc_gain_sweep.grids = c.mc_gain_sweep.grids(1);
+c.mc_gain_sweep.run_grids = {};
 c.mc_gain_sweep.grids.variants = [];
 wm = @(c) mc_gain_sweep_stage_plan(c).worker_minutes;
 base_minutes = wm(c);
@@ -319,7 +378,7 @@ c.mc_gain_sweep = struct('second_axis', 'self_coupling');
 assert(throws(@() mc_gain_sweep_stage_plan(c), 'run_mc_gain_sweep:NoSecondLevels'));
 
 % A grid's model_args come after the stage's; its readout replaces the stage's.
-c = mu7chain_gainbias_config('essential');
+c = mu7chain_gainbias_config('essential', '4cond', 'all');
 c.mc_gain_sweep.model_args = {'n', 50, 'indegree', 25};
 c.mc_gain_sweep.readout_signal = 'rate';
 pl = mc_gain_sweep_stage_plan(c);
@@ -337,8 +396,10 @@ refused = { ...
         'mc_gain_sweep_stage_plan:BadConfig'; ...
     @(b) in_grid(b, 1, 'spacing', 'log'), 'mc_gain_sweep_stage_plan:BadConfig'; ...                    an unknown grid field
     @(b) in_grid(b, 2, 'tag', ''), 'mc_gain_sweep_stage_plan:BadConfig'; ...                           a grid with no tag
-    @(b) in_grid(b, 2, 'tag', 'bias'), 'mc_gain_sweep_stage_plan:BadConfig'; ...                       two grids, one folder
-    @(b) in_grid(b, 2, 'tag', 'self coupling'), 'mc_gain_sweep_folder:BadTag'; ...                     no folder name
+    @(b) in_grid(b, 3, 'tag', 'bias'), 'mc_gain_sweep_stage_plan:BadConfig'; ...                       two grids, one folder (neither runs)
+    @(b) in_grid(b, 3, 'tag', 'release noise'), 'mc_gain_sweep_folder:BadTag'; ...                     no folder name (a grid that does not run)
+    @(b) setfield(b, 'mc_gain_sweep', setfield(b.mc_gain_sweep, 'run_grids', {'self_coupling'})), ...  run_grids naming no grid
+        'mc_gain_sweep_stage_plan:BadConfig'; ...
     @(b) in_grid(b, 2, 'bias_levels', [0 1]), 'mc_gain_sweep_stage_plan:BadConfig'; ...                bias levels on another axis
     @(b) in_grid(b, 3, 'model_args', {'n'}), 'mc_gain_sweep_stage_plan:BadConfig'; ...                 a grid's model_args not in pairs
     @(b) in_grid(b, 4, 'gain_range', [0.1 4]), 'mc_gain_sweep_stage_plan:BadConfig'; ...               gain options with self-coupling first
@@ -346,6 +407,8 @@ refused = { ...
     @(b) in_variant(b, 1, 'preset', 'no_such_preset'), ''; ...                                         an unknown variant preset
     @(b) in_variant(b, 1, 'tag', 'E:I 3/2'), 'mc_gain_sweep_folder:BadTag'; ...
     @(b) in_variant(b, 2, 'tag', 'EI3to2'), 'mc_gain_sweep_stage_plan:BadConfig'};                   % two variants, one folder
+% The bundle's own config, which runs the self-coupling grid alone: grids 1
+% and 3 to 5 and the variants do not run, and are refused all the same.
 for k = 1:size(refused, 1)
     bad = mu7chain_gainbias_config('essential'); bad.run_dir = probe;
     bad = refused{k, 1}(bad);
@@ -405,7 +468,9 @@ gains = [0.8 1.6];
 tiny = struct('seeds', 3001, 'conditions', {conds3}, 'model_args', {{'n', 50, 'indegree', 25}}, ...
     'protocol', struct('T_wash_sec', 2, 'T_train_sec', 12, 'T_test_sec', 6, 'd_max_sec', 1.5), ...
     'lya_T_sec', 6, 'lya_acc_sec', 3);
-cfg = mu7chain_gainbias_config('essential', '3cond');
+% Every grid, so the run directory is laid out as one of before FD-029 and
+% every figure entry is drawn from it.
+cfg = mu7chain_gainbias_config('essential', '3cond', 'all');
 cfg.run_dir  = tmp;
 cfg.fig_root = tmpf;
 cfg.verbose  = 'near-none';
@@ -469,7 +534,7 @@ assert(~isfolder(fullfile(tmp, 'mc_example')) && ~isfolder(fullfile(tmp, 'eig_he
 t0 = tic;
 R = make_all_paper_figures(cfg);
 t_fig = toc(t0);
-assert(isequal({R.name}, entry_names) && all([R.ok]), 'figures failed: %s', strjoin({R(~[R.ok]).name}, ', '));
+assert(isequal({R.name}, entry_names_all) && all([R.ok]), 'figures failed: %s', strjoin({R(~[R.ok]).name}, ', '));
 for k = 1:numel(R)
     tag = file_tag(cfg.figures{k}.args);
     [~, saved] = cellfun(@fileparts, R(k).files, 'UniformOutput', false);

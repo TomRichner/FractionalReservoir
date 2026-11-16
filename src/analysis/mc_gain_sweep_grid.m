@@ -15,19 +15,25 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % (mc_gain_sweep_stage_plan) resolves every grid it lists through here, so
 % the sizes are written once.
 %
-% THE SIZE TABLE (Tom, 2026-11-13): levels per axis x networks, the same for
-% every grid of a mode.
-%   mode         levels    networks   one grid   the mu7chain bundle
-%   essential     3 x  3       1         9 jobs     51 jobs, about 50 min (58.9 measured)
-%   fast          7 x  7       3       147 jobs    777 jobs, about 12 h 30
-%   fastmedium    9 x  9       2       162 jobs    846 jobs, about 13 h 40
-%   medium(2)    13 x 13      10      1690 jobs   8710 jobs, about 141 h
-%   production   17 x 17      10      2890 jobs  14790 jobs, about 239 h
-% "The mu7chain bundle" is mu7chain_gainbias_config: five grids (gain x
-% bias, gain x self-coupling, and since FD-027 gain x release noise,
-% self-coupling x release noise, gain x Wiener noise) and two networks swept
-% along gain only, so (5 n^2 + 2 n) x networks jobs for n levels, of which
-% the two release-noise grids' 2 n^2 x networks. Times are for 12 pool
+% THE SIZE TABLE (Tom, 2026-11-13; fastmedium and medium resized 2026-11-16,
+% FD-029): levels per axis x networks, the same for every grid of a mode.
+%   mode         levels    networks   one grid, on 12 workers
+%   essential     3 x  3       1         9 jobs, one round, about 10 min
+%   fast          7 x  7       3       147 jobs, about 2 h 05
+%   fastmedium   11 x 11       5       605 jobs, about 8 h 36
+%   medium(2)    21 x 21       5      2205 jobs, about 31 h 20
+%   production   17 x 17      10      2890 jobs, about 41 h
+% Since FD-029 the mu7chain bundles (mu7chain_gainbias_config,
+% mu7chain_AC_config) run ONE grid, gain x self-coupling, so "one grid" is
+% the bundle's block C stage; a grid added back to them (their run_grids)
+% adds its own count, n^2 x networks, and the bias grid also its two
+% variant networks, n x networks each. FD-029 (Tom, from Brian Lundstrom's
+% feedback): at least five networks per cell at fastmedium and medium, 11
+% and 21 levels. Before it, fastmedium was 9 x 9 x 2 and medium 13 x 13 x
+% 10, and the bundle ran five grids and two variants, 846 and 8710 jobs.
+% 'production' was the lead's size above medium and is now below it in
+% levels; it is unchanged until it is decided again.
+% Times are for 12 pool
 % workers, with every job of the stage in one parfor (run_mc_gain_sweep_set),
 % at WORKER_MINUTES_PER_JOB = 10.24 worker-minutes per job of four
 % conditions (the fast run of 2026-11-13: 336 jobs without release noise in
@@ -38,10 +44,10 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % G.worker_minutes counts a job at that cost when the grid is told
 % release_noise = true (mc_gain_sweep_stage_plan decides it from the grid's
 % axes and fixed arguments); until 2026-11-14 it counted 9.5 for every job.
-% 'fastmedium' (Tom, 2026-11-14) is sized for mu7chain_AC_run to finish in
-% about 19 h: 9 levels keep the count odd (zero stays a level of the
-% symmetric axes), and 3 networks at 9 x 9 would be about 20.5 h alone.
-% Agents run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to
+% Every count is odd, so zero is a level of an axis symmetric about it. On
+% the self-coupling axis of the bundles, -4 to 6 (FD-029), zero is a level
+% only where (n - 1) is a multiple of 5: at 11 and 21 levels, not at 3, 7
+% or 17. Agents run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to
 % start. 'production' is the lead's choice of a size above medium (17
 % levels keeps the count odd, so zero stays a level of a symmetric axis).
 %
@@ -240,9 +246,9 @@ switch run_mode
     case 'fast'
         n_levels = 7;   n_seeds = 3;
     case 'fastmedium'
-        n_levels = 9;   n_seeds = 2;
+        n_levels = 11;  n_seeds = 5;
     case {'medium', 'medium2'}
-        n_levels = 13;  n_seeds = 10;
+        n_levels = 21;  n_seeds = 5;
     case 'production'
         n_levels = 17;  n_seeds = 10;
     otherwise
