@@ -1529,4 +1529,15 @@ becomes an issue with an acceptance test.
      of 1 is not a level at 11 or 21 levels; flagged for Tom.
   3. `essential` and `fast` keep their sizes (3 x 3 x 1, 7 x 7 x 3) with
      the new ranges; the feedback names fastmedium and medium only.
+- **Tom's answers (2026-11-16), which replace decisions 2 and 3:**
+  - The gain axis of this grid is **log-spaced**, 0.05 to 5; whether gain
+    1 is a level does not matter.
+  - `essential` is **7 x 7 x 2** on this grid; `fast` stays 7 x 7 x 3.
+  - **Two 1-D noise sweeps at the preset network replace the 2-D noise
+    grids** in the runs: memory capacity against sigma_u (release off)
+    and against sigma_gamma (leak 0.002, Wiener off), both through the
+    filtered readout. Lead's sizes (noise levels including zero x
+    networks): essential 5 x 2, fast 7 x 3, fastmedium 11 x 5, medium
+    21 x 5. A new figure draws both in one sheet; a preview is drawn from
+    the 2026-11-15 run's rows at gain 1.003.
 - **Result:** _(pending)_
