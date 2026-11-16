@@ -9,6 +9,12 @@
 %     three as rows) and fig_mc_robustness build, invisible and unsaved, for
 %     the paper's three conditions and for four, with the expected panels;
 %   * the maps' linear lambda_1 scale spans +-lle_clip;
+%   * the maps' style options (FD-029): by default the figure as before
+%     (box, line, markers, grey, a white-centered lambda_1 map); switched
+%     off, each mark goes with its caption sentence, and each dark-centered
+%     map of dark_center_colormaps colors the lambda_1 row with memory
+%     capacity from white to its center; the maps are darkest at the center
+%     and the sequential ones darken monotonically;
 %   * with one seed the maps drop the blank spread row and say "one seed";
 %     the lambda_1 = 0 boundary is drawn;
 %   * a result is found by run_dir in <run_dir>/mc_gain_sweep;
@@ -114,6 +120,60 @@ for sel = {three, four}
     assert(numel(ax) == 2);
     assert(numel(findall(o.figs, 'Type', 'stair')) == nc); close(o.figs);
 end
+%% The maps' style options (FD-029): defaults as before; each switch takes its mark and its caption sentence
+o = fig_mc_gain_bias_maps('data', D, 'conditions', three, 'save', false, 'visible', false);
+ax = findall(o.figs, 'Type', 'axes');
+cap = strjoin(cellstr(findall(o.figs, 'Type', 'tiledlayout', 'Parent', o.figs).Title.String), ' ');
+assert(all(strcmp({ax.Box}, 'on')) && contains(cap, 'Green dashed') && contains(cap, 'saturated') && ...
+    contains(cap, 'Grey') && ~contains(cap, 'darkest'), 'maps: the defaults draw the figure as before');
+cbs = findall(o.figs, 'Type', 'colorbar');
+l_cb = cbs(contains(arrayfun(@(b) b.Label.String, cbs, 'UniformOutput', false), 'lambda'));
+l_map = colormap(l_cb.Axes);
+assert(isequal(ax(1).Color, [0.85 0.85 0.85]) && all(l_map(128, :) > 0.95), ...
+    'maps: by default grey for missing cells and a white-centered lambda_1 map');
+close(o.figs);
+for cm = dark_center_colormaps()
+    o = fig_mc_gain_bias_maps('data', D, 'conditions', three, 'save', false, 'visible', false, ...
+        'ticks_top_right', false, 'show_zero_line', false, 'show_flags', false, 'show_iqr', false, ...
+        'lle_colormap', cm{1}, 'mc_colormap', 'lle_center', 'missing_color', [0.9 0.8 0.5]);
+    ax = findall(o.figs, 'Type', 'axes');
+    assert(numel(ax) == 2 * 3 && all(strcmp({ax.Box}, 'off')), '%s: two rows, no ticks on the top and right', cm{1});
+    assert(isempty(findall(o.figs, 'Tag', 'lle_zero')), '%s: no lambda_1 = 0 line', cm{1});
+    marks = findall(o.figs, 'Type', 'line');
+    assert(~any(ismember({marks.Marker}, {'+', 'o'})), '%s: no saturated or silent markers', cm{1});
+    [l_map, m_map, info] = dark_center_colormaps(cm{1});
+    cbs = findall(o.figs, 'Type', 'colorbar');
+    is_l = contains(arrayfun(@(b) b.Label.String, cbs, 'UniformOutput', false), 'lambda');
+    assert(isequal(colormap(cbs(is_l).Axes), l_map) && isequal(colormap(cbs(~is_l).Axes), m_map), ...
+        '%s: the rows take the named maps', cm{1});
+    assert(isequal(m_map(1, :), [1 1 1]) && max(abs(m_map(end, :) - info.center)) < 1e-6, ...
+        '%s: memory capacity from white to the lambda_1 map''s center', cm{1});
+    assert(all(arrayfun(@(a) isequal(a.Color, [0.9 0.8 0.5]), ax)), '%s: missing_color', cm{1});
+    cap = strjoin(cellstr(findall(o.figs, 'Type', 'tiledlayout', 'Parent', o.figs).Title.String), ' ');
+    assert(~contains(cap, 'Green dashed') && ~contains(cap, 'saturated') && ~contains(cap, 'Grey') && ...
+        contains(cap, 'darkest'), '%s: the caption follows the switches: %s', cm{1}, cap);
+    close(o.figs);
+end
+threw = false;
+try
+    fig_mc_gain_bias_maps('data', D, 'mc_colormap', 'lle_center', 'save', false, 'visible', false);
+catch err
+    threw = strcmp(err.identifier, 'fig_mc_gain_bias_maps:NoDarkCenter');
+end
+assert(threw, 'lle_center needs a dark-centered lambda_1 map');
+% The maps themselves: the diverging map darkest at its center, light at both
+% ends; the sequential one darkening monotonically from white (luminance,
+% Rec. 709 weights on linearized sRGB).
+lum = @(c) (c .^ 2.2) * [0.2126; 0.7152; 0.0722];
+for cm = dark_center_colormaps()
+    [l_map, m_map] = dark_center_colormaps(cm{1}, 101);
+    assert(isequal(size(l_map), [101 3]) && isequal(size(m_map), [101 3]) && all(l_map(:) >= 0 & l_map(:) <= 1));
+    [~, darkest] = min(lum(l_map));
+    assert(abs(darkest - 51) <= 2 && lum(l_map(1, :)) > 0.3 && lum(l_map(end, :)) > 0.3, ...
+        '%s: the darkest color at the center, light ends', cm{1});
+    assert(all(diff(lum(m_map)) < 0), '%s: the sequential map darkens monotonically', cm{1});
+end
+
 % One seed: the spread row would be blank, so it is dropped and the caption says so
 D_one = read_mc_gain_sweep(struct('T', T(T.seed == D.seeds(1), :), 'settings', settings));
 o = fig_mc_gain_bias_maps('data', D_one, 'conditions', three, 'save', false, 'visible', false);

@@ -66,6 +66,32 @@ function out = fig_mc_gain_bias_maps(cfg)
 % still hold a memory capacity of 5 to 9 (chained MTS at bias 0.55), so
 % half silent is not a failed network. Flags are per condition.
 %
+% STYLE OPTIONS (FD-029, from Brian Lundstrom's feedback). Their defaults
+% draw the figure as it was before them; a bundle's registry entry sets
+% them for the paper's style.
+%   ticks_top_right  (true) tick marks on the top and right edges too (the
+%                    axes box); false draws ticks on the bottom and left only
+%   show_zero_line   (true) the green dashed lambda_1 = 0 line
+%   show_flags       (true) the '+' saturated and 'o' silent markers
+%   show_iqr         (true) the spread row (above)
+%   lle_colormap     'blue_white_red' (default): blue through WHITE at zero
+%                    to red. Or a diverging map with a DARK center, so
+%                    lambda_1 = 0 is the darkest band and white is never a
+%                    value: 'guppy', 'redshift' or 'dark_magenta'
+%                    (dark_center_colormaps says what each is and where it
+%                    comes from)
+%   mc_colormap      'white_orange_red' (default), or 'lle_center': white at
+%                    zero, darkening to the center color of lle_colormap, so
+%                    the two rows share one palette (needs a dark-centered
+%                    lle_colormap)
+%   missing_color    ([0.85 0.85 0.85], grey) the color of a cell with no
+%                    successful job. With mc_colormap 'lle_center' on
+%                    'redshift' the memory-capacity map is itself a gray
+%                    scale, so give a color that is not gray there.
+% A caption sentence about something switched off is dropped with it, and
+% with a dark-centered lambda_1 map the caption says that the darkest color
+% is lambda_1 = 0.
+%
 % WHICH CONDITIONS: cfg.conditions through select_conditions (empty = all the
 % result holds, in its order); titles and colours by name (titles_by_name,
 % mc_condition_colors). Any number of columns.
@@ -95,6 +121,19 @@ arguments
     cfg.lle_clip      (1,1) double  = 10   % |lambda_1| clipped here (1/s)
     cfg.fig_tag       (1,:) char    = 'Fig_MC_gain_bias_maps'
     cfg.first_scale   (1,:) char    {mustBeMember(cfg.first_scale, {'auto', 'log', 'linear'})} = 'auto'
+    cfg.ticks_top_right (1,1) logical = true
+    cfg.show_zero_line  (1,1) logical = true
+    cfg.show_flags      (1,1) logical = true
+    cfg.lle_colormap  (1,:) char    {mustBeMember(cfg.lle_colormap, ...
+        {'blue_white_red', 'guppy', 'redshift', 'dark_magenta'})} = 'blue_white_red'
+    cfg.mc_colormap   (1,:) char    {mustBeMember(cfg.mc_colormap, {'white_orange_red', 'lle_center'})} = 'white_orange_red'
+    cfg.missing_color (1,3) double  {mustBeBetween(cfg.missing_color, 0, 1)} = [0.85 0.85 0.85]
+end
+DEFAULT_MISSING = [0.85 0.85 0.85];
+if strcmp(cfg.mc_colormap, 'lle_center') && strcmp(cfg.lle_colormap, 'blue_white_red')
+    error('fig_mc_gain_bias_maps:NoDarkCenter', ...
+        ['mc_colormap ''lle_center'' darkens to the center color of a dark-centered lambda_1 map; ' ...
+         'lle_colormap ''blue_white_red'' has a white center. Use guppy, redshift or dark_magenta.']);
 end
 
 setup_paths();
@@ -146,11 +185,12 @@ switch cfg.lle_scale
         l_cb = sprintf('\\lambda_1 (1/s), linear, clipped at \\pm%g', cfg.lle_clip);
 end
 iq_clim = [0, max([IQ(:); eps])];
+[l_cmap, m_cmap] = row_colormaps(cfg.lle_colormap, cfg.mc_colormap);
 
-rows = {struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', mc_cmap(), ...
+rows = {struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', m_cmap, ...
                'label', 'Memory capacity', 'cb', mc_cb, ...
                'ticks', mc_f(mc_ticks), 'ticklabels', {num_labels(mc_ticks)})
-        struct('V', L_col, 'clim', l_lim, 'cmap', lle_cmap(), ...
+        struct('V', L_col, 'clim', l_lim, 'cmap', l_cmap, ...
                'label', '\lambda_1, task input on', ...
                'cb', l_cb, ...
                'ticks', l_tp, 'ticklabels', {l_tl})};
@@ -205,12 +245,18 @@ for r = 1:nr
         ax_all(r, c) = ax;
         draw_cells(ax, x, y, R.V(:, :, c));
         colormap(ax, R.cmap); clim(ax, R.clim);
-        set(ax, 'Color', [0.85 0.85 0.85], 'Layer', 'top', 'TickDir', 'out', ...
+        % Box 'on' mirrors the tick marks onto the top and right edges.
+        set(ax, 'Color', cfg.missing_color, 'Layer', 'top', 'TickDir', 'out', ...
             'FontSize', st.tick_fs - 5, 'XTick', x, 'XTickLabel', xtl, ...
-            'YTick', y, 'YTickLabel', ytl, 'Box', 'on', 'XTickLabelRotation', 45);
+            'YTick', y, 'YTickLabel', ytl, 'Box', on_off(cfg.ticks_top_right), ...
+            'XTickLabelRotation', 45);
         xlim(ax, xe([1 end])); ylim(ax, ye([1 end]));
-        mark_flags(ax, x, y, PIN(:, :, c) >= cfg.flag_fraction, SIL(:, :, c) >= cfg.flag_fraction);
-        zero_boundary(ax, xe, ye, L(:, :, c), st);
+        if cfg.show_flags
+            mark_flags(ax, x, y, PIN(:, :, c) >= cfg.flag_fraction, SIL(:, :, c) >= cfg.flag_fraction);
+        end
+        if cfg.show_zero_line
+            zero_boundary(ax, xe, ye, L(:, :, c), st);
+        end
         plot(ax, x_of(D.preset_first), y_of(D.preset_second), 'p','MarkerSize', 11, ...
             'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 0.8);
         if r == 1
@@ -240,11 +286,25 @@ if n_seeds <= 1
 else
     seed_txt = sprintf('Median over up to %d seeds', n_seeds);
 end
-grey_txt = 'Grey: no successful job';
+if isequal(cfg.missing_color, DEFAULT_MISSING)
+    grey_txt = 'Grey: no successful job';
+else
+    grey_txt = 'Background color: no successful job';
+end
 if nr == 3; grey_txt = [grey_txt ' (spread row: fewer than two)']; end
-caption = {sprintf('%s. Green dashed: edge between cells with \\lambda_1 > 0 and \\lambda_1 \\leq 0.', seed_txt), ...
-    sprintf('Star: preset (%s %.3g, %s %.3g). + saturated, o silent (\\geq %.0f%% of neurons). %s.', ...
-        Q1.symbol, D.preset_first, Q2.symbol, D.preset_second, 100 * cfg.flag_fraction, grey_txt)};
+% Each sentence about a mark is there only when the mark is drawn.
+line1 = [seed_txt '.'];
+if cfg.show_zero_line
+    line1 = [line1 ' Green dashed: edge between cells with \lambda_1 > 0 and \lambda_1 \leq 0.'];
+end
+if ~strcmp(cfg.lle_colormap, 'blue_white_red')
+    line1 = [line1 ' The darkest color of the \lambda_1 row is \lambda_1 = 0.'];
+end
+line2 = sprintf('Star: preset (%s %.3g, %s %.3g).', Q1.symbol, D.preset_first, Q2.symbol, D.preset_second);
+if cfg.show_flags
+    line2 = [line2 sprintf(' + saturated, o silent (\\geq %.0f%% of neurons).', 100 * cfg.flag_fraction)];
+end
+caption = {line1, [line2 ' ' grey_txt '.']};
 if ~isempty(broken)
     caption{end+1} = sprintf(['%s: 0, then log-spaced levels; cells evenly spaced, the axis broken ' ...
         'between 0 and the lowest positive level.'], capitalized(strjoin(broken, ' and ')));
@@ -342,6 +402,25 @@ end
 
 function c = num_labels(v)
 c = arrayfun(@(x) sprintf('%g', x), v, 'UniformOutput', false);
+end
+
+function [l_cmap, m_cmap] = row_colormaps(lle_name, mc_name)
+% The lambda_1 row's and the memory-capacity row's colormaps, by name.
+if strcmp(lle_name, 'blue_white_red')
+    l_cmap = lle_cmap();
+    m_cmap = mc_cmap();      % mc_name is 'white_orange_red': checked by the caller
+    return
+end
+[l_cmap, to_center] = dark_center_colormaps(lle_name);
+if strcmp(mc_name, 'lle_center')
+    m_cmap = to_center;
+else
+    m_cmap = mc_cmap();
+end
+end
+
+function s = on_off(tf)
+if tf; s = 'on'; else; s = 'off'; end
 end
 
 function c = mc_cmap()
