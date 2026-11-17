@@ -112,13 +112,13 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 % mc_statistics_selfcoupling, fig_mc_noise_sweeps, and the two time
 % series, which read no grid); the others below come back with their grid.
 %   fig_mc_maps_bias, fig_mc_maps_selfcoupling
-%       the maps of memory capacity and lambda_1 on each grid, LINEAR color
-%       scales (memory capacity 0 to its maximum, lambda_1 clipped at +-5
-%       1/s): the paper's maps. The square-root and symmetric-log scales of
-%       fig_mc_gain_bias_maps' defaults are for reports and not drawn here.
+%       the maps of memory capacity and lambda_1 on each grid: memory
+%       capacity on a LINEAR scale (0 to its maximum), lambda_1 on the
+%       symmetric-log scale (linear within +-0.05 1/s, clipped at +-5 1/s;
+%       Tom, 2026-11-16, FD-029; linear until then). The paper's maps.
 %       Since FD-029 in Brian's style (MAP_STYLE below): ticks on the bottom
 %       and left only, no lambda_1 = 0 line, no saturated or silent marks,
-%       no spread row, lambda_1 on a dark-centered diverging map and memory
+%       no spread row, lambda_1 on CMasher's guppy (dark center) and memory
 %       capacity from white to its center color.
 %   fig_mc_gain_curves
 %       memory capacity and lambda_1 against gain at the preset's bias (0.2;
@@ -299,16 +299,22 @@ cfg.fig_root = ['figs/mu7chain_gainbias_' run_mode '_' figure_set];
 % Each entry gets run_dir, out_dir, save, visible, verbose and the set's
 % conditions from make_all_paper_figures, then its own arguments. Every
 % entry names its grid; the figure reads that grid's result and no other.
-LINEAR_SCALES = {'mc_scale', 'linear', 'lle_scale', 'linear', 'lle_clip', 5};
+% The maps' color scales: memory capacity linear from 0 to its maximum;
+% lambda_1 on the symmetric-log scale (symlog_lle: linear within +-0.05 1/s,
+% logarithmic beyond, clipped at +-5 1/s).
+MAP_SCALES = {'mc_scale', 'linear', 'lle_scale', 'symlog', 'lle_lin', 0.05, 'lle_clip', 5};
 % The maps' style (FD-029, from Brian Lundstrom's feedback): no ticks on the
 % top and right, no lambda_1 = 0 line, no saturated or silent markers, no
 % spread row; lambda_1 on a diverging map with a dark center (lambda_1 = 0
 % the darkest band) and memory capacity from white to that center color.
-% The colormap is Tom's choice among the candidates of FD-029
-% (dark_center_colormaps: guppy, redshift, dark_magenta); until he chooses,
-% the lead's worker registered PAPER_LLE_COLORMAP.
+% THE COLORMAP AND THE lambda_1 SCALE ARE TOM'S CHOICE among the FD-029
+% candidates (2026-11-16: "guppy with symlog looks best to me"): CMasher's
+% guppy (dark_center_colormaps), on the symmetric-log scale. Symlog because
+% on the linear +-5 scale the stable cells of the adapting conditions, near
+% lambda_1 = -0.1, are as dark as zero itself, so their sign cannot be seen;
+% symlog spreads the band around zero so they read blue.
 PAPER_LLE_COLORMAP = 'guppy';
-MAP_STYLE = [LINEAR_SCALES, {'ticks_top_right', false, 'show_zero_line', false, 'show_flags', false, ...
+MAP_STYLE = [MAP_SCALES, {'ticks_top_right', false, 'show_zero_line', false, 'show_flags', false, ...
     'show_iqr', false, 'lle_colormap', PAPER_LLE_COLORMAP, 'mc_colormap', 'lle_center'}];
 % The scatters' statistics boxes are placed where their panels have fewest
 % points (explore_bias_rate_lambda1, where these three were first drawn).
