@@ -268,6 +268,7 @@ M = load(fullfile(tmp, 'run_manifest.mat')); M = M.run_manifest;
 assert(strcmp(M.run_mode, 'essential') && strcmp(M.preset_name, bad.preset_name));
 assert(isequal(M.stages_run, {'dc_lle'}) && isequal(M.stages_skipped, {'sweeps', 'numerics'}));
 assert(isempty(M.sweeps_run) && isequal(M.sweeps_skipped, all_sweeps));
+assert(~isfield(M, 'conditions_run'), 'no condition selection: the manifest names none (FD-030)');
 listing = dir(tmp);
 assert(~any([listing.isdir] & ~ismember({listing.name}, {'.', '..'})), 'no sweep folder may exist');
 % A manifest field of the run's own cannot be replaced by the caller.
@@ -275,6 +276,24 @@ tmp2 = tempname; cleanup_tmp2 = onCleanup(@() rmdir_if(tmp2));
 assert_throws(@() run_all_analyses(bad.preset_name, 'essential', 'output_dir', tmp2, 'sweeps', {}, ...
     'manifest_fields', struct('run_mode', 'fast'), 'verbose', 'near-none'), ...
     'run_all_analyses:ManifestFieldClash', {'run_mode'});
+% FD-030: the conditions a run simulates. Given, the manifest records them
+% and every sweep's context holds them alone; the pre-flight of
+% run_all_paper_analyses refuses a name a stage's preset lacks, before the
+% run directory exists.
+three = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'};
+tmp3 = tempname; cleanup_tmp3 = onCleanup(@() rmdir_if(tmp3));
+run_all_analyses(bad.preset_name, 'essential', 'output_dir', tmp3, 'sweeps', {}, ...
+    'conditions', three, 'verbose', 'near-none', 'save_figs', false);
+M3 = load(fullfile(tmp3, 'run_manifest.mat'));
+assert(isequal(M3.run_manifest.conditions_run, three));
+for an = {'sensitivity', 'tau_sensitivity', 'param_space'}
+    ctx = resolve_run_context(an{1}, 'preset_name', bad.preset_name, 'run_mode', 'essential', ...
+        'conditions', three, 'verbose', 'near-none');
+    assert(isequal(cellfun(@(c) c.name, ctx.conditions, 'UniformOutput', false), three));
+end
+bad4 = bad; bad4.run_conditions = {'no_adaptation', 'sfa9_std9'};
+assert_throws(@() run_all_paper_analyses(bad4), 'preset_with_conditions:NoSuchCondition', {'sfa9_std9'});
+assert(~isfolder(probe), 'a refused condition must not create the run directory');
 
 %% mu7chain_config('essential')
 cfg = mu7chain_config('essential');
@@ -319,9 +338,12 @@ c3 = mu7chain_config('essential', '3cond');
 assert(strcmp(c3.fig_root, 'figs/mu7chain_essential_3cond') && strcmp(c3.run_dir, cfg.run_dir));
 assert(isequal(c3.stages, cfg.stages) && isequal(c3.figure_sets, {'4cond'}));
 assert(isequal(cellfun(@(f) f.name, c3.figures, 'UniformOutput', false), want_figs));
+% Essential simulates every condition of the preset (no selection, as before
+% FD-030); fast and above simulate three.
+assert(isempty(cfg.run_conditions) && isempty(c3.run_conditions));
 % Everything else is the fast config's, field for field.
 differs = {'run_mode', 'run_dir', 'fig_root', 'figures', 'stages', 'sweeps', ...
-    'eig_heatmap_examples', 'figure_sets'};
+    'eig_heatmap_examples', 'figure_sets', 'run_conditions'};
 assert(isequal(rmfield(cfg, differs), rmfield(fast, differs)), ...
     'essential differs from fast in more than: %s', strjoin(differs, ', '));
 
@@ -331,7 +353,9 @@ for md = {'fast', 'fastmedium', 'medium', 'medium2', 'production'}
         c = mu7chain_config(md{1}, st{1});
         assert(isempty(c.stages) && isempty(c.sweeps) && isempty(c.eig_heatmap_examples), ...
             '%s must select nothing', md{1});
-        assert(isequal(c.figure_sets, {'3cond', '4cond'}));
+        % FD-030: the three-condition set alone, three conditions simulated.
+        assert(isequal(c.figure_sets, {'3cond'}));
+        assert(isequal(c.run_conditions, {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}));
         pl = paper_stage_plan(c);
         assert(~pl.is_selection && isequal(pl.stages, all_stages) && isequal(pl.sweeps, all_sweeps));
         assert(numel(c.figures) == numel(fast.figures));

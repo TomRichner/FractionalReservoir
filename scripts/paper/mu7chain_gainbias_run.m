@@ -1,8 +1,8 @@
 function [run_dir, fig_results] = mu7chain_gainbias_run(run_mode)
 % MU7CHAIN_GAINBIAS_RUN Block C's bundle alone: the two memory-capacity grids, then their figure sets (FD-010, FD-024).
 %
-%   mu7chain_gainbias_run                % 'essential': about 20 minutes on 12 workers
-%   mu7chain_gainbias_run('fast')        % about 4 h 25 on 12 workers
+%   mu7chain_gainbias_run                % 'essential': about 1 h 44 on 12 workers (FD-029)
+%   mu7chain_gainbias_run('fast')        % about 2 h 06 on 12 workers (FD-030; mu7chain_gainbias_config)
 %   [run_dir, fig_results] = mu7chain_gainbias_run(run_mode)
 %
 %   setup_paths is called on the first line. Every setting comes from
@@ -15,8 +15,9 @@ function [run_dir, fig_results] = mu7chain_gainbias_run(run_mode)
 %   figures   figs/mu7chain_gainbias_<run_mode>_3cond   (the paper's three)
 %             figs/mu7chain_gainbias_<run_mode>_4cond   (with product MTS)
 %
-% The stage runs ONCE, over all four conditions; the figures are drawn once
-% per set from that one run directory (cfg.figure_sets, as in mu7chain_run).
+% The stage runs ONCE, over the mode's conditions (four at 'essential',
+% three from 'fast' upward; FD-030); the figures are drawn once per set of
+% the mode from that one run directory (cfg.figure_sets, as in mu7chain_run).
 % For block A's stages and figures in the same run, use mu7chain_AC_run.
 %
 % Agents run 'essential' and 'fast'; 'medium' and larger are Tom's to start

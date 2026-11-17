@@ -3,7 +3,7 @@ function [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %
 %   mu7chain_AC_run                 % 'essential': about 2 h 30 on 12 workers since FD-029
 %   mu7chain_AC_run('fast')
-%   mu7chain_AC_run('fastmedium')   % about 15 h 10 on 12 workers since FD-029 (mu7chain_AC_config)
+%   mu7chain_AC_run('fastmedium')   % about 11 h 15 on 12 workers since FD-030 (mu7chain_AC_config)
 %   [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %
 %   setup_paths is called on the first line. Every setting comes from
@@ -17,14 +17,18 @@ function [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %             (the grids that run since FD-029; mu7chain_gainbias_config's
 %             RUN_GRIDS), and the noise-switch rollouts' noise_switch/
 %   figures   figs/mu7chain_AC_<run_mode>_3cond   (no adaptation, 1TS, chained MTS: the paper's)
-%             figs/mu7chain_AC_<run_mode>_4cond   (the same plus product MTS: for review)
-%             'essential' draws the four-condition set alone (cfg.figure_sets)
+%             figs/mu7chain_AC_<run_mode>_4cond   (the same plus product MTS)
+%             'essential' simulates four conditions and draws the
+%             four-condition set; 'fast' and larger simulate three and draw
+%             the three-condition set (FD-030; cfg.run_conditions,
+%             cfg.figure_sets)
 %
 % EVERYTHING IS CHECKED BEFORE ANYTHING RUNS: run_all_paper_analyses
-% pre-flights the run mode, the stage selection, block C's grids and
-% variant networks, the pool allocation and the run directory, which must
-% be absent or empty. The analyses then run ONCE, over all four conditions,
-% and the figures are drawn once per set from that one run directory.
+% pre-flights the run mode, the stage selection, the conditions against
+% every preset, block C's grids and variant networks, the pool allocation
+% and the run directory, which must be absent or empty. The analyses then
+% run ONCE, over the mode's conditions, and the figures are drawn once per
+% set of the mode from that one run directory.
 %
 % Agents run 'essential' and 'fast'. 'fastmedium' and larger are Tom's to start.
 % RERUNNING REQUIRES DELETING data/mu7chain_AC_<run_mode> FIRST.

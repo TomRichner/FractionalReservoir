@@ -1,8 +1,13 @@
 function cfg = mu7chain_AC_config(run_mode, figure_set)
 % MU7CHAIN_AC_CONFIG Blocks A and C as one bundle: mu7chain_config's stages and figures, then block C's memory-capacity grids and theirs.
 %
-%   cfg = mu7chain_AC_config()                       % 'essential', figure set '4cond'
-%   cfg = mu7chain_AC_config('fast', '3cond')
+%   cfg = mu7chain_AC_config()                       % 'essential', its set '4cond'
+%   cfg = mu7chain_AC_config('fast')                 % three conditions, set '3cond' (FD-030)
+%
+% CONDITIONS (FD-030): mu7chain_config's, by mode: four at 'essential', three
+% from 'fast' upward (product MTS not simulated), with the matching figure
+% set. Every stage of both blocks and the noise switch simulates them
+% (cfg.run_conditions, carried by run_all_paper_analyses).
 %
 % ONE RUN DIRECTORY AND ONE FIGURE ROOT PER SET hold both blocks, so one
 % command per run mode (mu7chain_AC_run) produces block A's figure set and
@@ -23,8 +28,8 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %   the opt-in stage 'noise_switch'                  copies of the network
 %       that share the noise for 10 s, then run on noise seeds of their own
 %       (run_noise_switch_rollouts; Tom, 2026-11-14: "it should be added to
-%       our set of analyses and figures"), on cfg.preset_name, every
-%       condition, sized by the run mode (noise_switch_stage_plan's table:
+%       our set of analyses and figures"), on cfg.preset_name, the bundle's
+%       conditions, sized by the run mode (noise_switch_stage_plan's table:
 %       4 copies x 5 s at 'essential', 8 x 10 s at 'fast', 16 x 20 s at
 %       'medium', 32 x 20 s at 'production'), into <run_dir>/noise_switch/
 % Block C's stage and then 'noise_switch' are added to block A's stages
@@ -60,10 +65,12 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 % HOW LONG, on 12 pool workers: block A's stages (about 35 minutes at
 % 'essential'; mu7chain_config) and then block C's, since FD-029 the
 % self-coupling grid and the two 1-D noise sweeps at 10.24 worker-minutes a
-% job, 1.35 times that with the release noise on (measured on the fast run
-% of 2026-11-13; mu7chain_gainbias_config has the table): 118 jobs at
-% 'essential', about 1 h 44; 189 at 'fast', about 2 h 48; 715 at
-% 'fastmedium', about 10 h 27; 2415 at 'medium', about 34 h 52. Then the
+% job of four conditions, 1.35 times that with the release noise on
+% (measured on the fast run of 2026-11-13; mu7chain_gainbias_config has the
+% table), and three quarters of that for a job of three conditions (FD-030,
+% an estimate until measured): 118 jobs of four conditions at 'essential',
+% about 1 h 44; of three, 189 at 'fast', about 2 h 06; 715 at 'fastmedium',
+% about 7 h 50; 2415 at 'medium', about 26 h 09. Then the
 % noise switch (0.5 min at 'fast' on 4 workers, measured 2026-11-14; its
 % figure entry about 45 s at 'fast'). The figures add the two noise-level
 % time series, about a minute each. So an 'essential' run of this bundle is
@@ -72,9 +79,14 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %
 % 'fastmedium' (Tom, 2026-11-14) WAS SIZED FOR ABOUT 19 HOURS on 12
 % workers, with block C at 9 x 9 x 2 and five grids; the run of 2026-11-15
-% took 19 h 28. Since FD-029 block C is 715 jobs, about 10 h 27, so the
-% bundle is about 15 h 10 (block A 4 h 15, block C 10 h 27, figures
-% 0 h 30). The table below is the
+% took 19 h 28. Since FD-029 block C is 715 jobs, about 10 h 27 with four
+% conditions, so the bundle was about 15 h 10 (block A 4 h 15, block C
+% 10 h 27, figures 0 h 30). SINCE FD-030 every stage simulates three
+% conditions and one figure set is drawn: about 11 h 15, block A about
+% 3 h 10 (three quarters of 4 h 15, on the assumption that each stage's
+% cost is proportional to its conditions; not measured), block C about
+% 7 h 50 (the stage plan's estimate), figures about 0 h 15 (one pass).
+% The table below is the
 % sizing of 2026-11-14. Each stage's estimate is the fast run's measured time
 % (2026-11-13) scaled by the ratio of work; the sizes are in each stage's
 % table, which gives the reasoning:
@@ -95,7 +107,8 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %                                627 (715 jobs, 55 with release noise)
 %   noise_switch         3       medium's 16 copies x 20 s
 %   two figure passes   30       about 10 min each at 'fast'
-% about 18 h 25 in all: block A 4 h 15, block C 13 h 40, figures 0 h 30.
+% about 18 h 25 in all: block A 4 h 15, block C 13 h 40, figures 0 h 30
+% (every row with four conditions and two figure sets, as of then).
 % Agents run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to
 % start.
 %
@@ -104,10 +117,11 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 
 arguments
     run_mode (1,:) char = 'essential'
-    figure_set (1,:) char {mustBeMember(figure_set, {'3cond', '4cond'})} = '4cond'
+    figure_set (1,:) char = ''   % '' = the mode's own set; checked by mu7chain_config
 end
 
-A = mu7chain_config(run_mode, figure_set);            % also checks the run mode
+A = mu7chain_config(run_mode, figure_set);            % also checks the run mode and the set
+figure_set = A.figure_set;                            % resolved: the mode's own when none was named
 C = mu7chain_gainbias_config(run_mode, figure_set);
 
 cfg = A;

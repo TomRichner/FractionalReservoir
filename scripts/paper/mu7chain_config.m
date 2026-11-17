@@ -1,11 +1,20 @@
 function cfg = mu7chain_config(run_mode, figure_set)
-% MU7CHAIN_CONFIG The manuscript network with chained vesicle-pool depression: four conditions, two figure sets (2026-11-12, FD-007).
+% MU7CHAIN_CONFIG The manuscript network with chained vesicle-pool depression: four conditions at 'essential', three from 'fast' upward (2026-11-12, FD-007; FD-030).
 %
-%   cfg = mu7chain_config()                   % run_mode 'fast', figure set '4cond'
+%   cfg = mu7chain_config()                   % run_mode 'fast', its figure set '3cond'
 %   cfg = mu7chain_config('medium')           % Tom starts medium and larger himself
 %   cfg = mu7chain_config('fast', '3cond')    % the paper's figure pass
-%   cfg = mu7chain_config('fast', '4cond')    % the review pass, product MTS added
-%   cfg = mu7chain_config('essential')        % a first look: figures 2-4 and brief sweeps
+%   cfg = mu7chain_config('fast', '4cond')    % product MTS added: only for a run
+%                                             % made before FD-030, which simulated it
+%   cfg = mu7chain_config('essential')        % a first look: figures 2-4 and brief
+%                                             % sweeps; four conditions, set '4cond'
+%
+% CONDITIONS BY MODE (FD-030, Tom, 2026-11-16). Product MTS is not in the
+% paper, so from 'fast' upward the analyses simulate three conditions
+% (cfg.run_conditions) and the three-condition set is the one drawn
+% (cfg.figure_sets); 'essential' keeps all four and the four-condition set.
+% Stated once, under "Which conditions are SIMULATED" below. A figure_set
+% left empty is the mode's own.
 %
 % 'essential' (Tom, 2026-11-12, FD-023): A LOOK AT A NETWORK BEFORE COMMITTING
 % TO LONG RUNS, sized for about 35 minutes on 12 pool workers, simulation and
@@ -43,20 +52,23 @@ function cfg = mu7chain_config(run_mode, figure_set)
 %   * the presets are the mu7chain family, whose FOUR conditions are
 %       no_adaptation / sfa1_std1 (1TS) / sfa3_stdc2 (chained MTS, the
 %       paper's MTS) / sfa3_std2 (product MTS, kept for the side-by-side);
-%     every analysis runs all four;
+%     every analysis ran all four until FD-030; since then all four at
+%     'essential' and the first three from 'fast' upward;
 %   * the run mode is an ARGUMENT (default 'fast'). Agents run 'fast' only;
 %     'medium' and larger are started by Tom with this same file;
 %   * cfg.param_space_seed is fixed, so reruns of the bundle sample the same
 %     joint parameter-space points (FD-016);
-%   * there are TWO FIGURE SETS from one run directory, chosen by the second
-%     argument:
+%   * there are TWO FIGURE SETS, chosen by the second argument (since FD-030
+%     a mode draws one of them, cfg.figure_sets; a three-condition run can
+%     draw only '3cond'):
 %       '3cond'  cfg.conditions = {no_adaptation, sfa1_std1, sfa3_stdc2}
 %                fig_root figs/mu7chain_<run_mode>_3cond      (the paper's)
 %       '4cond'  cfg.conditions = all four, product MTS last
 %                fig_root figs/mu7chain_<run_mode>_4cond      (Tom's review)
-%     The analyses ignore the set: run_dir is data/mu7chain_<run_mode> for
-%     both, and run_all_paper_analyses is called once. make_all_paper_figures
-%     is called once per set (mu7chain_run).
+%     The analyses ignore the set (they simulate cfg.run_conditions): run_dir
+%     is data/mu7chain_<run_mode> for both, and run_all_paper_analyses is
+%     called once. make_all_paper_figures is called once per set of the mode
+%     (mu7chain_run).
 %
 % cfg.conditions is the option's fixed name (Plan A 4.4): a cell of condition
 % names to draw, in order; make_all_paper_figures passes it to every entry as
@@ -79,12 +91,43 @@ function cfg = mu7chain_config(run_mode, figure_set)
 
 arguments
     run_mode (1,:) char = 'fast'
-    figure_set (1,:) char {mustBeMember(figure_set, {'3cond', '4cond'})} = '4cond'
+    figure_set (1,:) char {mustBeMemberOrEmpty(figure_set)} = ''
 end
 if ~ismember(run_mode, run_mode_names())
     error('mu7chain_config:BadRunMode', 'run_mode ''%s'' is not one of: %s.', ...
         run_mode, strjoin(run_mode_names(), ', '));
 end
+
+%% Which conditions are SIMULATED, and which figure sets are drawn, by mode
+% THE ONE PLACE this bundle family states them (FD-030; Tom, 2026-11-16:
+% product MTS "will not go into the paper. We will only keep 4 conditions
+% for the essential run and for test."). mu7chain_gainbias_config and
+% mu7chain_AC_config take both from here.
+%   essential               all four (run_conditions empty = every condition
+%                           of the preset, so the run is exactly what it was
+%                           before FD-030): no_adaptation, sfa1_std1,
+%                           sfa3_stdc2, sfa3_std2; the four-condition set
+%   fast and every larger   three: no_adaptation, sfa1_std1, sfa3_stdc2;
+%                           product MTS (sfa3_std2) is not simulated; the
+%                           three-condition figure set only
+% cfg.run_conditions is read by run_all_paper_analyses, which passes it to
+% every stage (bundle_run_conditions, preset_with_conditions) and records it
+% in run_manifest (conditions_run); the preset and its four conditions are
+% unchanged. It is listed in the preset's order. A three-condition run saves
+% about a quarter of every stage's compute. The 4cond set can still be asked
+% for by name at any mode (to draw a run made before FD-030); on a
+% three-condition run make_all_paper_figures refuses it before drawing.
+% (medium2 and production follow medium: the lead's decision under FD-030.)
+THREE = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'};
+if strcmp(run_mode, 'essential')
+    run_conditions = {};
+    figure_sets = {'4cond'};
+else
+    run_conditions = THREE;
+    figure_sets = {'3cond'};
+end
+% With no figure set named, the mode's first (the one it draws).
+if isempty(figure_set); figure_set = figure_sets{1}; end
 
 cfg = struct();
 
@@ -134,13 +177,13 @@ switch figure_set
 end
 cfg.figure_set = figure_set;
 % The sets mu7chain_run draws for this mode, one make_all_paper_figures pass
-% each: both, except in 'essential', which makes the four-condition set alone
-% (Tom, 2026-11-12: "the 3 condition figures don't need to be generated").
-if strcmp(run_mode, 'essential')
-    cfg.figure_sets = {'4cond'};
-else
-    cfg.figure_sets = {'3cond', '4cond'};
-end
+% each, and the conditions the analyses simulate: stated by mode at the top
+% of this function. 'essential' makes the four-condition set alone (Tom,
+% 2026-11-12: "the 3 condition figures don't need to be generated"); every
+% larger mode the three-condition set alone (Tom, 2026-11-16, FD-030; until
+% then both sets).
+cfg.figure_sets = figure_sets;
+cfg.run_conditions = run_conditions;
 
 %% Where things land -- fixed, so this cannot touch any other run
 cfg.run_dir  = ['data/mu7chain_' run_mode];                       % analyses write, figures read
@@ -295,4 +338,11 @@ end
 %% ------------------------------------------------------------------------
 function F = add(F, name, fn, in_paper, args)
 F{end+1} = struct('name', name, 'fn', fn, 'in_paper', in_paper, 'args', {args});
+end
+
+function mustBeMemberOrEmpty(figure_set)
+% '' (the mode's own set) or one of the two sets.
+if ~isempty(figure_set)
+    mustBeMember(figure_set, {'3cond', '4cond'});
+end
 end

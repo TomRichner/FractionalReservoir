@@ -1,9 +1,9 @@
 function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 % MU7CHAIN_GAINBIAS_CONFIG Block C's bundle: memory capacity over gain against the bias, the self-coupling and two kinds of noise, on the mu7chain network (FD-010, FD-024, FD-027).
 %
-%   cfg = mu7chain_gainbias_config()                       % 'essential', figure set '4cond'
+%   cfg = mu7chain_gainbias_config()                       % 'essential', its set '4cond'
 %   cfg = mu7chain_gainbias_config('essential', '3cond')   % the paper's three conditions
-%   cfg = mu7chain_gainbias_config('fast', '4cond')        % with product MTS added
+%   cfg = mu7chain_gainbias_config('fast')                 % three conditions, set '3cond' (FD-030)
 %   cfg = mu7chain_gainbias_config('fast', '3cond', {'selfcoupling', 'bias'})
 %   cfg = mu7chain_gainbias_config('fast', '3cond', 'all') % every grid defined, as before FD-029
 %
@@ -14,7 +14,9 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 %
 % WHAT IT RUNS. One stage, the opt-in 'mc_gain_sweep' of
 % run_all_paper_analyses (paper_opt_in_stages), on the bundle's noise-free
-% memory-capacity twin, all four conditions on the same seeds. Its grids
+% memory-capacity twin, its conditions on the same seeds: all four at
+% 'essential', three from 'fast' upward, product MTS left out
+% (cfg.run_conditions, from mu7chain_config; FD-030). Its grids
 % (cfg.mc_gain_sweep.grids; mc_gain_sweep_stage_plan) are listed below,
 % each with its folder in the run directory. SINCE FD-029 (Tom,
 % 2026-11-16) THREE RUN, in every mode: the gain x self-coupling grid and
@@ -68,13 +70,18 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 %
 % HOW BIG AND HOW LONG. The sizes are mc_gain_sweep_grid's table: levels
 % per axis x networks (seeds 3001, 3002, ...); the 1-D noise sweeps take
-% the table's count of noise levels except 5 at 'essential'. Since FD-029:
-%   mode        self-coupling   each 1-D sweep   jobs (release)   on 12 workers
-%   essential    7 x  7 x 2        5 x 2          118  (10)       about 1 h 44
-%   fast         7 x  7 x 3        7 x 3          189  (21)       about 2 h 48
-%   fastmedium  11 x 11 x 5       11 x 5          715  (55)       about 10 h 27
-%   medium(2)   21 x 21 x 5       21 x 5         2415 (105)       about 34 h 52
-%   production  17 x 17 x 10      17 x 10        3230 (170)       about 46 h 47
+% the table's count of noise levels except 5 at 'essential'. Since FD-029,
+% with the conditions of FD-030 (four at 'essential', three above it):
+%   mode        self-coupling   each 1-D sweep   jobs (release)   conditions   on 12 workers
+%   essential    7 x  7 x 2        5 x 2          118  (10)          4         about 1 h 44
+%   fast         7 x  7 x 3        7 x 3          189  (21)          3         about 2 h 06
+%   fastmedium  11 x 11 x 5       11 x 5          715  (55)          3         about 7 h 50
+%   medium(2)   21 x 21 x 5       21 x 5         2415 (105)          3         about 26 h 09
+%   production  17 x 17 x 10      17 x 10        3230 (170)          3         about 35 h 05
+% (With four conditions, as before FD-030: fast 2 h 48, fastmedium 10 h 27,
+% medium 34 h 52, production 46 h 47.) A three-condition job is ESTIMATED at
+% three quarters of the four-condition job measured below, until a
+% three-condition run measures it (mc_gain_sweep_grid's n_conditions).
 % With all five 2-D grids and the two variants, as until FD-029, it was
 % (5 n^2 + 2 n) x networks jobs: 51 at essential (58.9 min measured), 777
 % at fast (about 12 h 30), and at the sizes of then 846 at fastmedium
@@ -87,13 +94,15 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 % condition-runs measured 157 s against 116 s, FD-027 N2; the calibration
 % runs of 2026-11-14 took 170 to 200 s with release noise against 124 to
 % 130 s without, the Wiener noise costing nothing). The stage's own
-% estimate (plan.worker_minutes) counts both (mc_gain_sweep_grid). Agents
+% estimate (plan.worker_minutes) counts both, and the number of conditions
+% (mc_gain_sweep_grid). Agents
 % run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to start.
 %
 % DERIVED FROM mu7chain_config, so nothing about the network is restated:
 % the preset, the memory-capacity twin (cfg.mc_preset), its integrator
-% (cfg.mc_ode_solver), the conditions drawn per set and the sets drawn per
-% mode (cfg.figure_sets) are mu7chain_config's. What differs:
+% (cfg.mc_ode_solver), the conditions simulated per mode (cfg.run_conditions),
+% the conditions drawn per set and the sets drawn per mode (cfg.figure_sets)
+% are mu7chain_config's. What differs:
 %   cfg.stages        {'mc_gain_sweep'}; cfg.sweeps and eig examples empty
 %   cfg.mc_gain_sweep the stage's settings: the seven grids, which of them
 %                     run (run_grids), the variants of
@@ -168,7 +177,7 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 
 arguments
     run_mode (1,:) char = 'essential'
-    figure_set (1,:) char {mustBeMember(figure_set, {'3cond', '4cond'})} = '4cond'
+    figure_set (1,:) char = ''   % '' = the mode's own set; checked by mu7chain_config
     run_grids = {}
 end
 if ~ismember(run_mode, run_mode_names())
@@ -177,6 +186,7 @@ if ~ismember(run_mode, run_mode_names())
 end
 
 cfg = mu7chain_config(run_mode, figure_set);
+figure_set = cfg.figure_set;   % resolved: the mode's own set when none was named
 
 %% Which stage runs: the opt-in block C stage alone
 cfg.stages = {'mc_gain_sweep'};

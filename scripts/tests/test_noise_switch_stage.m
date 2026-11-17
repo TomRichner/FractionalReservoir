@@ -36,6 +36,8 @@ for m = 1:size(sizes, 1)
     ac = mu7chain_AC_config(md);
     [~, ~, conditions] = srnn_param_preset(ac.preset_name);
     all_conds = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
+    % FD-030: every condition at essential, the bundle's three above it.
+    if ~strcmp(md, 'essential'); all_conds = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}; end
     pl = noise_switch_stage_plan(ac);
     assert(pl.n_copies == n_copies && pl.t_rollout == t_rollout && pl.t_shared == 10, ...
         '%s: %d copies x %g s rollout after 10 s shared', md, pl.n_copies, pl.t_rollout);
