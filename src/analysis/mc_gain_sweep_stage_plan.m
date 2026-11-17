@@ -67,7 +67,13 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %     lya_acc_sec, segment_len   run_mc_gain_sweep's options of those names,
 %                       the same for every run (the last five are for
 %                       tests); a grid adds its own model_args after these
-%                       and may name its own readout_signal
+%                       and may name its own readout_signal. conditions,
+%                       absent or empty, is the bundle's cfg.run_conditions
+%                       (FD-030), and when that names none every condition
+%                       of the preset; a list is checked against cfg.mc_preset
+%                       and each variant's preset here
+%   cfg.run_conditions  the bundle's simulated conditions (bundle_run_conditions),
+%                       the default of conditions above
 %   ONE UNNAMED GRID, the form from before a stage could hold several, is
 %   still read: with no grids field, the grid's own fields (first_axis,
 %   second_axis, gain_range, ..., variants, variant_seeds) are fields of
@@ -94,7 +100,9 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %               at the release-noise cost for a grid whose axis is a
 %               release-noise amplitude, release_sigma or release_sigma_all,
 %               or whose model_args set one above zero; a preset that
-%               carries release noise of its own is not looked at)
+%               carries release noise of its own is not looked at), scaled
+%               by the number of conditions a job runs (n_conditions / 4 of
+%               the four-condition measurement, FD-030)
 %
 % See also: run_mc_gain_sweep_stage, run_mc_gain_sweep_set, mc_gain_sweep_grid,
 %           mc_gain_sweep_folder, paper_opt_in_stages
@@ -185,6 +193,17 @@ shared = {'run_mode', cfg.run_mode, 'verbose', cfg.verbose};
 if isfield(cfg, 'mc_ode_solver') && ~isempty(cfg.mc_ode_solver)
     shared = [shared, {'ode_solver', cfg.mc_ode_solver}];
 end
+% The conditions every run simulates: the stage's own list, else the
+% bundle's (cfg.run_conditions, FD-030), else every condition of the preset.
+% A list is checked against the preset here, before any compute, and passed
+% to every run; with none, no 'conditions' argument is planned, as before.
+% Their number scales the estimate (mc_gain_sweep_grid's n_conditions).
+if isempty(field_or_empty(opts, 'conditions'))
+    run_conditions = bundle_run_conditions(cfg);
+    if ~isempty(run_conditions); opts.conditions = run_conditions; end
+end
+[~, ~, preset_conditions] = preset_with_conditions(cfg.mc_preset, field_or_empty(opts, 'conditions'));
+n_conditions = numel(preset_conditions);
 shared = [shared, given(opts, setdiff(RUN_OPTIONS, GRID_RUN, 'stable'))];
 stage_model_args = field_or_empty(opts, 'model_args');
 if isempty(stage_model_args); stage_model_args = {}; end
@@ -221,7 +240,8 @@ for g = 1:numel(grids)
     % The estimate only: a grid with the release noise on costs more a job.
     release_noise = has_release_noise({first_axis.property, second_axis.property}, model_args);
     shape = given(grid, GRID_SHAPE);
-    G = mc_gain_sweep_grid(cfg.run_mode, shape{:}, seeds{:}, 'release_noise', release_noise);
+    G = mc_gain_sweep_grid(cfg.run_mode, shape{:}, seeds{:}, 'release_noise', release_noise, ...
+        'n_conditions', n_conditions);
     readout = field_or_empty(grid, 'readout_signal');
     if isempty(readout); readout = stage_readout; end
     run_options = {};
@@ -249,10 +269,11 @@ for g = 1:numel(grids)
         end
         [~, own_value] = mc_gain_sweep_preset_point(v.preset, model_args, second_axis.property, ...
             first_axis.property);   % errors on an unknown preset
+        preset_with_conditions(v.preset, field_or_empty(opts, 'conditions'));   % states the conditions run
         V = mc_gain_sweep_grid(cfg.run_mode, 'first_axis', first_axis.property, ...
             'second_axis', second_axis.property, ...
             'first_levels', G.first_levels, 'second_levels', own_value, 'seeds', variant_seeds, ...
-            'release_noise', release_noise);
+            'release_noise', release_noise, 'n_conditions', n_conditions);
         runs(end+1) = new_run(grid.tag, v.tag, V, [{'preset_name', v.preset}, on_axis, ...
             {second_axis.levels_option, V.second_levels, 'seeds', V.seeds}]); %#ok<AGROW>
         run_minutes(end+1) = V.worker_minutes; %#ok<AGROW>

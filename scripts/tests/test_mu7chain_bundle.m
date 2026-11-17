@@ -3,6 +3,9 @@
 % Quick: no stage and no figure runs. Checks that
 %   * both figure sets of mu7chain_config resolve, with their own fig_root,
 %     conditions and grouped registry, and one shared run_dir;
+%   * the conditions simulated and the sets drawn per mode (FD-030): three
+%     and {'3cond'} from 'fast' upward, all four and {'4cond'} at
+%     'essential', and the three are conditions of every stage's preset;
 %   * every preset the config names exists and validates, the network is the
 %     manuscript's (mu7revisedMedium) value for value, and the twins differ
 %     from it only where they say;
@@ -34,8 +37,10 @@ name_of = @(cnd) cellfun(@(c) c.name, cnd, 'UniformOutput', false);
 cfg  = mu7chain_config();
 cfg3 = mu7chain_config('fast', '3cond');
 cfg4 = mu7chain_config('fast', '4cond');
-assert(strcmp(cfg.run_mode, 'fast') && strcmp(cfg.figure_set, '4cond'));
-assert(isequal(cfg.conditions, cfg4.conditions) && strcmp(cfg.fig_root, cfg4.fig_root));
+% No set named: the mode's own, the three-condition set from 'fast' upward
+% (FD-030; until then '4cond').
+assert(strcmp(cfg.run_mode, 'fast') && strcmp(cfg.figure_set, '3cond'));
+assert(isequal(cfg.conditions, cfg3.conditions) && strcmp(cfg.fig_root, cfg3.fig_root));
 assert(isequal(cfg3.conditions, three_names), '3cond set: %s', strjoin(cfg3.conditions, ', '));
 assert(isequal(cfg4.conditions, four_names),  '4cond set: %s', strjoin(cfg4.conditions, ', '));
 assert(strcmp(cfg3.run_dir, 'data/mu7chain_fast') && strcmp(cfg4.run_dir, cfg3.run_dir));
@@ -51,12 +56,52 @@ catch err
     threw = strcmp(err.identifier, 'mu7chain_config:BadRunMode');
 end
 assert(threw, 'an unknown run mode must be refused');
-% These modes run every stage and draw both sets; only 'essential' selects
-% (FD-023; its own checks are in test_essential_mode).
+% These modes run every stage; only 'essential' selects (FD-023; its own
+% checks are in test_essential_mode).
 for k = {cfg3, cfg4, cfg_med}
     assert(isempty(k{1}.stages) && isempty(k{1}.sweeps) && isempty(k{1}.eig_heatmap_examples));
-    assert(isequal(k{1}.figure_sets, {'3cond', '4cond'}));
 end
+% FD-030: the conditions SIMULATED and the sets DRAWN, by mode. Every mode
+% from 'fast' upward simulates the paper's three and draws the 3cond set,
+% whichever set the config was built for; 'essential' simulates all four
+% (run_conditions empty = every condition of the preset, exactly as before)
+% and draws the 4cond set.
+for m = setdiff(run_mode_names(), {'essential'}, 'stable')
+    for fs = {'', '3cond', '4cond'}
+        k = mu7chain_config(m{1}, fs{1});
+        assert(isequal(k.run_conditions, three_names), '%s: run_conditions %s', m{1}, ...
+            strjoin(k.run_conditions, ', '));
+        assert(isequal(k.figure_sets, {'3cond'}), '%s: figure_sets', m{1});
+    end
+end
+cfg_ess = mu7chain_config('essential');
+assert(isempty(cfg_ess.run_conditions) && isequal(cfg_ess.figure_sets, {'4cond'}));
+assert(strcmp(cfg_ess.figure_set, '4cond') && isequal(cfg_ess.conditions, four_names));
+assert(isempty(bundle_run_conditions(cfg_ess)));
+assert(isequal(bundle_run_conditions(cfg3), three_names));
+% The simulated conditions are conditions of every preset a stage runs on
+% (run_all_paper_analyses checks the same before any compute), in the
+% preset's order.
+for p = {cfg3.preset_name, cfg3.mc_preset, cfg3.local_lyapunov_preset}
+    [~, ~, sel] = preset_with_conditions(p{1}, cfg3.run_conditions);
+    assert(isequal(name_of(sel), three_names), 'preset %s', p{1});
+    [~, ~, all_c] = preset_with_conditions(p{1}, {});
+    assert(isequal(name_of(all_c), four_names), 'preset %s, no selection', p{1});
+end
+threw = '';
+try
+    preset_with_conditions(main_name, {'no_adaptation', 'sfa9_std9'});
+catch err
+    threw = err.identifier;
+end
+assert(strcmp(threw, 'preset_with_conditions:NoSuchCondition'), 'unknown condition: %s', threw);
+threw = '';
+try
+    bundle_run_conditions(struct('run_conditions', {{1, 2}}));
+catch err
+    threw = err.identifier;
+end
+assert(strcmp(threw, 'bundle_run_conditions:BadConfig'));
 
 % The grouped registry is rebuilt per set: each set's grouped entries read
 % their sources from that set's own fig_root (inventory R6).
@@ -226,4 +271,4 @@ for c = {{cfg3, 'c3', 3}, {cfg4, 'c4', 4}}
     assert(n_ax == 6 * n_col, '%s set: %d axes, want %d columns', k.figure_set, n_ax, n_col);
 end
 
-disp('PASS: test_mu7chain_bundle -- two figure sets, presets, conditions, name maps, chain and single-neuron runs.');
+disp('PASS: test_mu7chain_bundle -- two figure sets, conditions per mode, presets, conditions, name maps, chain and single-neuron runs.');

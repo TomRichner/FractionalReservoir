@@ -63,6 +63,9 @@ arguments
     % existing path, unchanged. With store_internal_results the internal
     % struct has the lean path's fields (no state series).
     opts.lean                   (1,1) logical = false
+    % The preset's conditions to simulate, by name (preset_with_conditions);
+    % empty = every condition the preset states, as before (FD-030).
+    opts.conditions                           = {}
 end
 
 setup_paths();
@@ -73,7 +76,7 @@ setup_paths();
 fig_guard = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 
 %% Resolve the two knobs
-[preset, model_class, conditions] = srnn_param_preset(opts.preset_name);
+[preset, model_class, conditions] = preset_with_conditions(opts.preset_name, opts.conditions);
 if ~strcmp(model_class, 'SRNNCellTypePairs')
     error('run_memory_capacity:BadModelClass', ...
         ['Preset ''%s'' is written for %s, but SRNN_ESN_reservoir now ' ...

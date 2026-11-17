@@ -36,6 +36,7 @@ arguments
     cfg.warmup_s (1,1) double = NaN % NaN preserves T/4
     cfg.simulation_start_s (1,1) double = 0
     cfg.n_override  (1,1) double = 0     % tests only
+    cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
 end
 
 setup_paths();
@@ -65,7 +66,7 @@ else
 end
 if ~isfolder(out_dir); mkdir(out_dir); end
 
-[preset_defaults, ~, conditions] = srnn_param_preset(cfg.preset_name);
+[preset_defaults, ~, conditions] = preset_with_conditions(cfg.preset_name, cfg.conditions);
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 title_map  = srnn_condition_titles();
 titles     = cellfun(@(n) title_map(n), cond_names, 'UniformOutput', false);

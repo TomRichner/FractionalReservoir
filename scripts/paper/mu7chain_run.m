@@ -15,10 +15,11 @@ function [run_dir, fig_results] = mu7chain_run(run_mode)
 %   figures   figs/mu7chain_<run_mode>_3cond   (no adaptation, 1TS, chained MTS: the paper's)
 %             figs/mu7chain_<run_mode>_4cond   (the same plus product MTS: for review)
 %
-% The analyses run ONCE, over all four conditions; the figures are drawn
-% once per set from that one run directory. Which sets is the config's
-% cfg.figure_sets: both, except 'essential', which draws the four-condition
-% set alone.
+% The analyses run ONCE, over the mode's conditions (cfg.run_conditions);
+% the figures are drawn once per set of the mode (cfg.figure_sets) from that
+% one run directory: at 'essential' four conditions and the four-condition
+% set, from 'fast' upward three conditions and the three-condition set
+% (FD-030; until then both sets above 'essential').
 %
 % WAS A SCRIPT with run_mode = 'fast' written in it (until FD-023). It is a
 % function with that as its default so that another mode is an argument and

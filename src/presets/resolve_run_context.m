@@ -54,13 +54,18 @@ function ctx = resolve_run_context(analysis, opts)
 %                   from the clock, as it always was. A nonnegative integer
 %                   makes two runs sample the same grid points; see
 %                   ParamSpaceAnalysis2.sample_seed. Used by 'param_space' only.
+%   conditions      names of the preset's conditions to run (FD-030); empty,
+%                   the default, = every condition the preset states. Resolved
+%                   by preset_with_conditions (an error on a name the preset
+%                   does not state).
 %
 % OUTPUT ctx, with the fields every caller needs:
 %   .analysis .run_mode .preset_name .verbose .save_figs .output_dir
 %   .param_space_seed  as given ([] = unset)
 %   .preset_defaults  the preset struct as srnn_param_preset returned it
 %   .model_class      'SRNNModel2' | 'SRNNCellTypePairs'
-%   .conditions       the four adaptation regimes, spelled for that class
+%   .conditions       the preset's adaptation regimes, spelled for that class
+%                     (the named ones only, when 'conditions' names some)
 %   .cfg              analysis_run_config output (empty for 'dc_lle')
 %   .model_defaults   merge_struct(preset_defaults, cfg.model) -- preset FIRST,
 %                     so run_mode keeps final say over its own knobs
@@ -84,6 +89,7 @@ arguments
     opts.save_figs   (1,1) logical = false
     opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     opts.param_space_seed          = []          % [] = unset; else ParamSpaceAnalysis2.sample_seed for the joint sample
+    opts.conditions                = {}          % the preset's conditions to run, by name; {} = all (FD-030)
 end
 
 ctx = struct();
@@ -100,9 +106,11 @@ ctx.param_space_seed = opts.param_space_seed;
 
 % The preset carries three things, not one: the overrides, the class they are
 % written for, and the conditions. Taking all three from the same call is what
-% stops a Pairs preset being swept with SRNNModel2-shaped conditions.
+% stops a Pairs preset being swept with SRNNModel2-shaped conditions. The
+% conditions may be narrowed by name ('conditions'; FD-030): a bundle that
+% simulates fewer than its preset states. Empty, the default, keeps them all.
 [ctx.preset_defaults, ctx.model_class, ctx.conditions] = ...
-    srnn_param_preset(opts.preset_name);
+    preset_with_conditions(opts.preset_name, opts.conditions);
 
 % Resolved BEFORE analysis_run_config, which needs it: a preset carrying
 % sigma_u_noise > 0 selects that mode's STOCHASTIC integrator in place of its

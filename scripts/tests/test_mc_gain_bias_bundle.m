@@ -270,7 +270,19 @@ for m = 1:size(sizes, 1)
             md, pl.runs(k).label, n_noise);
     end
     assert(isequal([pl.runs.n_jobs], [n^2, n_noise, n_noise] * n_seeds), '%s: job counts', md);
-    want_minutes = MINUTES * (n^2 + n_noise + RELEASE * n_noise) * n_seeds;
+    % FD-030: four conditions at essential (no 'conditions' argument, the
+    % preset's all), the paper's three above it, passed to every run; the
+    % estimate scales with their number.
+    if strcmp(md, 'essential')
+        assert(~any(arrayfun(@(r) any(strcmp(r.args(1:2:end), 'conditions')), pl.runs)), ...
+            '%s: no conditions argument (every condition of the preset)', md);
+        n_cond = 4;
+    else
+        assert(all(arrayfun(@(r) isequal(arg(r.args, 'conditions'), conds3), pl.runs)), ...
+            '%s: every run simulates the three conditions', md);
+        n_cond = 3;
+    end
+    want_minutes = MINUTES * (n^2 + n_noise + RELEASE * n_noise) * n_seeds * n_cond / 4;
     assert(abs(pl.worker_minutes - want_minutes) < 1e-6 * want_minutes, ...
         '%s: %g worker-minutes, expected %g', md, pl.worker_minutes, want_minutes);
     fprintf('  %-10s %3d jobs, %5.1f h on 12 workers\n', md, pl.n_jobs, pl.worker_minutes / 12 / 60);
@@ -332,15 +344,28 @@ for m = 1:size(sizes, 1)
     assert(isequal([pl.runs.n_jobs], [n^2, n, n, n^2, n^2, n^2, n^2, n_noise, n_noise] * n_seeds) && ...
         pl.n_jobs == (5 * n^2 + 2 * n + 2 * n_noise) * n_seeds, '%s: job counts', md);
     n_release = (2 * n^2 + n_noise) * n_seeds;
-    want_minutes = MINUTES * ((pl.n_jobs - n_release) + RELEASE * n_release);
+    want_minutes = MINUTES * ((pl.n_jobs - n_release) + RELEASE * n_release) * n_cond / 4;
     assert(abs(pl.worker_minutes - want_minutes) < 1e-6 * want_minutes, ...
         '%s: worker-minutes %g, expected %g', md, pl.worker_minutes, want_minutes);
 end
 % The bundle at essential: 7 x 7 x 2 and two sweeps of 5 x 2, 118 jobs; at
-% fastmedium (FD-029) 715 jobs, about 10.4 h on 12 workers.
+% fastmedium (FD-029) 715 jobs of three conditions (FD-030), about 7.8 h on
+% 12 workers (10.4 h with four).
 assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential')).n_jobs == 118);
 pl = mc_gain_sweep_stage_plan(mu7chain_gainbias_config('fastmedium'));
-assert(pl.n_jobs == 715 && abs(pl.worker_minutes / 12 / 60 - 10.443) < 0.01);
+assert(pl.n_jobs == 715 && abs(pl.worker_minutes / 12 / 60 - 0.75 * 10.443) < 0.01);
+% A count of conditions scales the job's estimate; a stage list of
+% conditions wins over the bundle's, and a name the preset lacks is refused.
+assert(abs(mc_gain_sweep_grid('fast', 'n_conditions', 3).worker_minutes - ...
+    0.75 * mc_gain_sweep_grid('fast').worker_minutes) < 1e-9);
+c = mu7chain_gainbias_config('fast');
+c.mc_gain_sweep.conditions = {'sfa3_stdc2'};
+pl = mc_gain_sweep_stage_plan(c);
+assert(isequal(arg(pl.runs(1).args, 'conditions'), {'sfa3_stdc2'}) && ...
+    abs(pl.worker_minutes - mc_gain_sweep_stage_plan(mu7chain_gainbias_config('fast')).worker_minutes / 3) < 1e-6);
+c = mu7chain_gainbias_config('fast');
+c.run_conditions = {'no_adaptation', 'sfa9_std9'};
+assert(throws(@() mc_gain_sweep_stage_plan(c), 'preset_with_conditions:NoSuchCondition'));
 % A grid's own count of levels (first_count, second_count) replaces the
 % mode's for that axis only; a count below 2 is refused (one level is given
 % as explicit levels).
@@ -485,9 +510,11 @@ for md = {'essential', 'fast'}
         assert(isequal(ns.fn, @fig_noise_switch_rollouts) && isempty(ns.args) && ~ns.in_paper, ...
             'the noise-switch entry draws through fig_noise_switch_rollouts with the bundle''s arguments only');
         ns_plan = noise_switch_stage_plan(ac);
+        if strcmp(md{1}, 'essential'); want = conds4; else; want = conds3; end   % FD-030
         assert(strcmp(ns_plan.folder, 'noise_switch') && strcmp(arg(ns_plan.args, 'preset_name'), ac.preset_name) && ...
-            isequal(ns_plan.conditions, conds4), ...
-            'the noise switch runs the bundle''s noisy preset, every condition, into noise_switch/');
+            isequal(ns_plan.conditions, want), ...
+            'the noise switch runs the bundle''s noisy preset, the bundle''s conditions, into noise_switch/');
+        assert(isequal(ac.run_conditions, A.run_conditions) && isequal(ac.figure_sets, A.figure_sets));
         grouped = ac.figures(startsWith(names, 'fig_main'));
         assert(~isempty(grouped) && all(cellfun(@(f) strcmp(arg(f.args, 'source_fig_root'), ac.fig_root), grouped)), ...
             'the grouped figures read their sources from this bundle''s figure root');
@@ -508,12 +535,15 @@ assert(throws(@() mu7chain_AC_config('fast2'), 'mu7chain_config:BadRunMode'));
 tmp = tempname; tmpf = tempname; tmp_old = tempname;
 cleanup = onCleanup(@() cellfun(@rmdir_if, {tmp, tmpf, tmp_old}));
 gains = [0.8 1.6];
-tiny = struct('seeds', 3001, 'conditions', {conds3}, 'model_args', {{'n', 50, 'indegree', 25}}, ...
+tiny = struct('seeds', 3001, 'model_args', {{'n', 50, 'indegree', 25}}, ...
     'protocol', struct('T_wash_sec', 2, 'T_train_sec', 12, 'T_test_sec', 6, 'd_max_sec', 1.5), ...
     'lya_T_sec', 6, 'lya_acc_sec', 3);
 % Every grid, so the run directory is laid out as one of before FD-029 and
-% every figure entry is drawn from it.
+% every figure entry is drawn from it. The three conditions come the way
+% they do from 'fast' upward (FD-030): the bundle's cfg.run_conditions,
+% which the stage takes as its default, and the manifest records.
 cfg = mu7chain_gainbias_config('essential', '3cond', 'all');
+cfg.run_conditions = conds3;
 cfg.run_dir  = tmp;
 cfg.fig_root = tmpf;
 cfg.verbose  = 'near-none';
@@ -540,6 +570,7 @@ t_run = toc(t0);
 assert(strcmp(run_dir, tmp));
 M = load(fullfile(tmp, 'run_manifest.mat')); M = M.run_manifest;
 assert(isequal(M.stages_run, {'mc_gain_sweep'}) && isequal(M.stages_skipped, all10));
+assert(isequal(M.conditions_run, conds3), 'the manifest records the simulated conditions (FD-030)');
 results_in = @(folder) fullfile(tmp, folder, 'mc_gain_sweep', 'mc_gain_sweep_results.mat');
 L = load(results_in('mc_gain_sweep_bias'));
 assert(height(L.T) == 2 * 2 * 3 && ~any(L.T.failed), 'bias grid: 2 x 2 x 1 seed x 3 conditions, none failed');
@@ -595,6 +626,11 @@ for k = 1:numel(R)
     [~, saved] = cellfun(@fileparts, R(k).files, 'UniformOutput', false);
     assert(all(startsWith(saved, tag)), '%s: its files are named by its tag %s', R(k).name, tag);
 end
+% The four-condition set of this three-condition run is refused before
+% anything is drawn or created (FD-030).
+cfg4 = cfg; cfg4.conditions = conds4; cfg4.fig_root = [tmpf '_4cond'];
+assert(throws(@() make_all_paper_figures(cfg4), 'make_all_paper_figures:ConditionsNotRun') && ...
+    ~isfolder(cfg4.fig_root), 'the 4cond set of a three-condition run must fail before drawing');
 stat = R(strcmp({R.name}, 'mc_statistics_selfcoupling'));
 assert(any(endsWith(stat.files, 'MC_statistics_selfcoupling_by_self_coupling.csv')) && ...
     all(cellfun(@isfile, stat.files)));
@@ -681,6 +717,7 @@ end
 old = mu7chain_gainbias_config('essential', '3cond');
 old.verbose = 'near-none';
 old.mc_gain_sweep = setfield(tiny, 'variants', variants); %#ok<SFLD>
+old.mc_gain_sweep.conditions = conds3;   % the stage's own list, as the old layout's run had
 old.mc_gain_sweep.gain_levels = gains;
 old.mc_gain_sweep.bias_levels = [0.1 0.3];
 D_old = resolve_mc_gain_sweep('run_dir', tmp_old);

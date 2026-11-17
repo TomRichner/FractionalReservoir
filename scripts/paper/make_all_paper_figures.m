@@ -66,6 +66,9 @@ function results = make_all_paper_figures(cfg)
 % built without it, drawing every condition; that is printed as one minimal
 % line after the pass and recorded per entry in the manifest
 % (results(k).conditions_applied = 'yes' | 'no' | '').
+% A run that simulated only some of its preset's conditions says so in its
+% manifest (conditions_run, FD-030); a cfg.conditions naming any other is
+% refused before anything is drawn (make_all_paper_figures:ConditionsNotRun).
 %
 % See also: paper_config, run_all_paper_analyses, resolve_run_dir, select_conditions
 
@@ -137,6 +140,13 @@ catch ME
         cfg.preset_name, ME.message);
     run_dir = '';
 end
+
+% A run that simulated fewer conditions than its preset states records them
+% (run_manifest.conditions_run, FD-030). A figure set asking for one it lacks
+% is refused HERE, before anything is created or drawn: every figure reading
+% the run would fail on it one by one (select_conditions), and the analytic
+% figures would succeed beside them, leaving a set half drawn.
+assert_run_holds_conditions(run_dir, want_conditions);
 
 %% Resolve where the output goes
 % Two modes, per cfg.fig_root (see paper_config): a configured path is STABLE
@@ -378,6 +388,28 @@ vprintf(verbose, 'minimal', '===================================================
 end
 
 %% ------------------------------------------------------------------------
+function assert_run_holds_conditions(run_dir, want_conditions)
+% Error when the run's manifest lists the conditions it simulated
+% (conditions_run) and the figure set asks for one not among them. A run
+% without the field simulated every condition of its preset, and each
+% figure checks its own data as before.
+if isempty(run_dir) || isempty(want_conditions); return; end
+manifest_file = fullfile(run_dir, 'run_manifest.mat');
+if ~isfile(manifest_file); return; end
+m = load(manifest_file, 'run_manifest');
+if ~isfield(m, 'run_manifest') || ~isfield(m.run_manifest, 'conditions_run'); return; end
+held = cellstr(m.run_manifest.conditions_run);
+missing = setdiff(want_conditions, held, 'stable');
+if ~isempty(missing)
+    error('make_all_paper_figures:ConditionsNotRun', ...
+        ['The figure set asks for condition(s) %s, which this run did not simulate.\n' ...
+         '  run directory : %s\n  simulated     : %s\n  asked for     : %s\n' ...
+         'Draw a set of the simulated conditions (for the mu7chain bundles from ''fast'' ' ...
+         'upward, the 3cond set), or make a run that simulates them.'], ...
+        strjoin(missing, ', '), run_dir, strjoin(held, ', '), strjoin(want_conditions, ', '));
+end
+end
+
 function tf = is_absolute_path(p)
 % Absolute on either platform: a leading separator, or a Windows drive letter.
 %

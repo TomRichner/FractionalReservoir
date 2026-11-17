@@ -19,8 +19,10 @@ function plan = noise_switch_stage_plan(cfg)
 %     n_copies        copies of the network
 %     t_rollout       seconds each copy runs on its own seed after the switch
 %     t_shared        seconds of identical noise before the switch
-%     conditions      names, in order; default every condition the preset
-%                     states (the figures draw the set's own selection)
+%     conditions      names, in order; default the bundle's simulated
+%                     conditions (cfg.run_conditions, FD-030), and when it
+%                     names none every condition the preset states (the
+%                     figures draw the set's own selection)
 %     model_args      name-value overrides of the preset (for tests on a
 %                     small network)
 %   A field the stage does not know is refused, so a typo cannot be ignored.
@@ -38,8 +40,9 @@ function plan = noise_switch_stage_plan(cfg)
 % integrator rate is the joint sweep's at the mode (200 Hz at fastmedium,
 % 400 at medium; analysis_run_config).
 %
-% WHICH CONDITIONS. Every one the preset states, as every analysis of the
-% bundle runs them all: one run directory serves both figure sets, each of
+% WHICH CONDITIONS. Those every analysis of the bundle runs: the bundle's
+% cfg.run_conditions, or every condition the preset states when it names
+% none. One run directory serves each figure set the bundle draws, each of
 % which draws its own selection (cfg.conditions) from it.
 %
 % THE PLAN
@@ -116,7 +119,11 @@ if ~(sigma > 0)
         cfg.preset_name, sigma);
 end
 names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
-cond_names = override(opts, 'conditions', names);
+% The stage's own list wins; then the bundle's (cfg.run_conditions, FD-030);
+% then every condition of the preset.
+run_conditions = bundle_run_conditions(cfg);
+if ~isempty(run_conditions); names_default = run_conditions; else; names_default = names; end
+cond_names = override(opts, 'conditions', names_default);
 cond_names = cellstr(cond_names);
 missing = setdiff(cond_names, names);
 if ~isempty(missing)

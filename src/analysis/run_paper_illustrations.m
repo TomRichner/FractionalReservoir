@@ -52,7 +52,13 @@ for j=1:2
             'lya_dt',settings.lya_dt,'lya_T_interval',settings.lya_T_interval, ...
             'lya_warmup',settings.lya_warmup};
     end
-    [~,~,conds]=srnn_param_preset(presets{j}); titles=srnn_condition_titles();
+    % The network's conditions are the bundle's (cfg.run_conditions, FD-030;
+    % absent or empty = all the preset states). The single neuron keeps its
+    % own preset's, all of them: its conditions are not the network's, it
+    % costs seconds, and each figure set draws its own list from them.
+    run_conditions={};
+    if j==1, run_conditions=bundle_run_conditions(cfg); end
+    [~,~,conds]=preset_with_conditions(presets{j},run_conditions); titles=srnn_condition_titles();
     results=[];
     input=struct('intrinsic_drive',0,'step_time',settings.step_time,'step_off',settings.step_off, ...
         'amplitude',settings.step_amplitude,'generator',@paper_midpoint_input);
