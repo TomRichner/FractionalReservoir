@@ -117,11 +117,11 @@ if strcmp(opts.layout,'mirror')
     hR = 0.135;
     pos.cl_trace_no = [L+0.020 0.800 0.405 0.165];
     pos.cl_trace_st = [0.555 0.800 0.405 0.165];
-    pos.cl_rate = [L 0.590 0.415 hR];
+    pos.cl_rate = [L 0.590 0.395 hR];
     pos.cl_psd  = [xC 0.590 R-xC hR];
     pos.m_tr_no = [0.130 0.290 0.390 0.205];
     pos.m_tr_st = [0.570 0.290 0.390 0.205];
-    pos.m_rate  = [L 0.060 0.415 hR];
+    pos.m_rate  = [L 0.060 0.395 hR];
     pos.m_psd   = [xC 0.060 R-xC hR];
 end
 % letter x per panel: left column at the canvas edge, others left of the y label
