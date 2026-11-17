@@ -433,7 +433,22 @@ facilitation. **Every analysis runs four conditions** (no adaptation, 1TS,
 chained MTS, product MTS); **the paper shows three**. In the figures
 chained MTS takes over product MTS's base colour and position, and a
 second version of every figure adds product MTS as a fourth column in
-green.
+green. **Since 2026-11-16 (FD-030) that holds at `essential` and in the
+tests only:** product MTS will not be in the paper, so from `fast` upward
+the mu7chain bundles simulate three conditions and draw the 3cond set
+alone. `cfg.run_conditions` (stated by mode in `mu7chain_config`, empty =
+every condition of the preset) selects them and reaches every stage by
+argument; `make_all_paper_figures` refuses a figure set naming a condition
+the run did not simulate. **Block C since FD-029 (same day):** only the
+gain by self-coupling grid runs of the 2-D grids (self-coupling -4 to 6,
+gain 0.05 to 5 log-spaced; essential 7 x 7 x 2, fast 7 x 7 x 3, fastmedium
+11 x 11 x 5, medium 21 x 21 x 5), with two 1-D noise sweeps at the preset
+(`noise1d_wiener`, `noise1d_release`; `fig_mc_noise_sweeps`); the bias
+grid, the E:I networks and the 2-D noise grids stay defined and are
+switched on by tag in `mu7chain_gainbias_config`. The maps' paper style is
+guppy on a symlog lambda_1 scale with no top or right ticks, zero line,
+flags or spread row (`dark_center_colormaps`). The sizes and grids quoted
+in the block C and release-noise paragraphs above predate both.
 
 **The code is to be general, not branched per model** (Tom, 2026-11-11;
 plan, section 2). Product depression, today's facilitation, the chain and
