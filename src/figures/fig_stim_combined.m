@@ -39,6 +39,9 @@ function out = fig_stim_combined(clinical_dir, model_fig, opts)
 %   D  model traces, no stimulation | stimulation (no lambda_1 strip; time
 %      axis replaced by a scale bar, as in A)
 %   E  model event rate                 F  model PSD
+% Its text prints at the grouped main figures' size (9 pt on a 7.0 x 7.65 in
+% canvas; fig_grouped_main's 14 pt on an 11-in PNG is 8.9 pt at 7 in), and
+% the rows are packed so the gap between the halves matches those within.
 % The model rate axes is found by a y label containing 'Events per Minute' or
 % 'Event Rate'; a legend attached to it in the source (one entry per network)
 % is carried over like the clinical one. Layout 'v1' is the nine-panel A-I
@@ -57,9 +60,13 @@ arguments
     opts.clinical_note (1,:) char = ''   % provenance line, e.g. the source repo commit
     opts.model_note (1,:) char = ''
     opts.drop_text (1,:) cell = {'SOZ Contacts$'}   % regexps of header texts to delete
-    opts.font_size (1,1) double = 7.5   % points, at the printed size
-    opts.annot_size (1,1) double = 6.5  % channel names, scale bars, legends
-    opts.size_in (1,2) double = [7.0 9.4]   % PNAS full page width
+    % NaN = the layout's default. mirror: 9 / 8 pt on 7.0 x 7.65 in, which
+    % prints the letters, labels and ticks at the size of the grouped main
+    % figures (14 pt on their 11.04-in-wide PNG = 8.9 pt at 7 in; 2026-11-17).
+    % v1: 7.5 / 6.5 pt on 7.0 x 9.4 in, as it was drawn.
+    opts.font_size (1,1) double = NaN   % points, at the printed size
+    opts.annot_size (1,1) double = NaN  % channel names, scale bars, legends
+    opts.size_in (1,2) double = [NaN NaN]   % PNAS full page width is 7 in
     opts.resolution (1,1) double = 450
     opts.save (1,1) logical = true
     opts.visible (1,1) logical = false
@@ -75,6 +82,12 @@ for fn = fieldnames(src)'
     assert(isfile(src.(fn{1})),'fig_stim_combined:MissingSource','Missing %s',src.(fn{1}));
 end
 purple = [0.494 0.247 0.596]; green = [0 0.62 0.45];
+is_mirror = strcmp(opts.layout,'mirror');
+if isnan(opts.font_size),  opts.font_size  = pick_default(is_mirror,9,7.5); end
+if isnan(opts.annot_size), opts.annot_size = pick_default(is_mirror,8,6.5); end
+if any(isnan(opts.size_in))
+    if is_mirror, opts.size_in = [7.0 7.65]; else, opts.size_in = [7.0 9.4]; end
+end
 
 % The canvas is the printed size (PNAS full page is 7 in wide), so font sizes
 % are true point sizes. It must also fit the screen: exportgraphics renders
@@ -114,15 +127,25 @@ xH = 0.770; wH = R-xH; hH = (yTop-y0-0.095)/2;
 pos.m_state = [xH y0+0.025 wH hH];
 pos.m_corr  = [xH y0+0.025+hH+0.070 wH hH];
 if strcmp(opts.layout,'mirror')
-    hR = 0.135;
-    pos.cl_trace_no = [L+0.020 0.800 0.405 0.165];
-    pos.cl_trace_st = [0.555 0.800 0.405 0.165];
-    pos.cl_rate = [L 0.590 0.395 hR];
-    pos.cl_psd  = [xC 0.590 R-xC hR];
-    pos.m_tr_no = [0.130 0.290 0.390 0.205];
-    pos.m_tr_st = [0.570 0.290 0.390 0.205];
-    pos.m_rate  = [L 0.060 0.395 hR];
-    pos.m_psd   = [xC 0.060 R-xC hR];
+    % Rows in inches from the bottom of the canvas, so each gap holds the
+    % text it has to (tick labels, x label, title, letter) and no more: the
+    % gap between the halves (C's x label, D's title) is drawn as tight as
+    % the gaps within them.
+    H = opts.size_in(2);
+    hR = 1.25/H;                       % rate and PSD rows
+    yE = 0.45/H;                       % model rate / PSD
+    yD = 2.20/H; hD = 1.30/H;          % model traces (time bar hangs below)
+    yB = 4.17/H;                       % clinical rate / PSD
+    yA = 5.90/H; hA = 1.52/H;          % clinical traces
+    L = 0.115; xC = 0.665; wR = 0.325; wT = 0.385;
+    pos.cl_trace_no = [0.125 yA wT hA];
+    pos.cl_trace_st = [0.965-wT yA wT hA];
+    pos.cl_rate = [L yB wR hR];
+    pos.cl_psd  = [xC yB R-xC hR];
+    pos.m_tr_no = [0.135 yD wT-0.010 hD];
+    pos.m_tr_st = [0.925-(wT-0.010) yD wT-0.010 hD];   % room for the amplitude bar's label
+    pos.m_rate  = [L yE wR hR];
+    pos.m_psd   = [xC yE R-xC hR];
 end
 % letter x per panel: left column at the canvas edge, others left of the y label
 xl = struct('A',0.005,'B',0.005,'C',xC-0.085,'D',0.005,'E',0.330-0.085,'F',xC-0.085, ...
@@ -263,7 +286,7 @@ if ~opts.visible, close(fig); out.fig = []; end
 % ============================================================================
     function mirror_finish()
         % house style and letters for the mirror layout
-        a_rate.YLabel.String = 'IED Rate (% of No Stim.)';
+        a_rate.YLabel.String = {'IED Rate','(% of No Stim.)'};   % two lines: one runs past the panel
         m_psd.YLabel.String = 'PSD (a.u.^2/Hz)';
         if contains(ylab(m_rate),'Events per Minute'), m_rate.YLabel.String = 'Events per Minute'; end
         axs_all = findall(fig,'Type','axes');
@@ -284,6 +307,9 @@ if ~opts.visible, close(fig); out.fig = []; end
         end
         set(findall(fig,'Type','legend'),'FontSize',opts.annot_size,'FontName','Helvetica','Box','off');
         a_psd.Title.FontSize = opts.annot_size; a_psd.YLimMode = 'auto';
+        m_psd.Title.FontSize = opts.annot_size;
+        s_rate = ylab(m_rate);   % the normalised rate label, split like the clinical one
+        if contains(s_rate,' (% of'), m_rate.YLabel.String = strsplit(strrep(s_rate,' (% of','|(% of'),'|'); end
         % model traces drawn like the clinical ones: no axis lines, row names
         % only on the left, time given by a scale bar on the stimulation side
         m_tr_no.Title.String = 'Model, No Stimulation';
@@ -308,11 +334,12 @@ if ~opts.visible, close(fig); out.fig = []; end
             aa = pairs{kk,1}; lg = pairs{kk,2};
             if isempty(lg), continue; end
             lg.Units = 'normalized'; lg.Location = 'none'; lg.NumColumns = 2;
+            lg.ItemTokenSize = [8 8];   % one marker per entry: a long token has no room
             pp = aa.Position; w = lg.Position(3); hh = lg.Position(4);
             lg.Position = [pp(1)+pp(3)+0.008 pp(2)+(pp(4)-hh)/2 w hh];
         end
-        ord = {a_no,'A',0.005; a_rate,'B',0.005; a_psd,'C',xC-0.085; ...
-            m_tr_no,'D',0.005; m_rate,'E',0.005; m_psd,'F',xC-0.085};
+        ord = {a_no,'A',0.005; a_rate,'B',0.005; a_psd,'C',xC-0.095; ...
+            m_tr_no,'D',0.005; m_rate,'E',0.005; m_psd,'F',xC-0.095};
         for kk = 1:size(ord,1), letter(fig,ord{kk,1},ord{kk,2},ord{kk,3},opts.font_size); end
     end
     function [axn,lgn] = place(axs,p,srcfig)
@@ -370,6 +397,9 @@ annotation(fig,'textbox',[x y 0.04 0.02],'String',['(' ch ')'],'FontSize',fs, ..
     'FontName','Helvetica','LineStyle','none','VerticalAlignment','bottom', ...
     'HorizontalAlignment','left','Margin',0,'Tag','letter');
 end
+function v = pick_default(tf,a,b)
+if tf, v = a; else, v = b; end
+end
 function close_if(f)
 if ~isempty(f) && isvalid(f), close(f); end
 end
@@ -408,5 +438,8 @@ if ~isempty(opts.model_note),    fprintf(fid,'- Model note: %s\n',opts.model_not
 fprintf(fid,'\n## Panel letters\n\n| New | Shows | Source panel |\n|---|---|---|\n');
 m = panel_map(opts.layout);
 for k = 1:size(m,1), fprintf(fid,'| (%s) | %s | %s |\n',m{k,:}); end
+fprintf(fid,['\n## Canvas\n\nLayout `%s`, %.2f x %.2f in (the printed size), exported at %d dpi. ' ...
+    'Panel letters, axis labels, tick labels and trace titles %g pt; channel names, scale bars, ' ...
+    'legends and the PSD notes %g pt.\n'],opts.layout,opts.size_in,opts.resolution,opts.font_size,opts.annot_size);
 fprintf(fid,'\nDropped: the clinical header text "S9, SOZ Contacts" (the caption carries it) and the sources'' own panel letters.\n');
 end
