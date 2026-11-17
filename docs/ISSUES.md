@@ -1646,8 +1646,9 @@ becomes an issue with an acceptance test.
    `run_manuscript_stim_awake` on master (dcb7e98 has the new defaults: no
    harmonic removal, every bin drawn) so `tica_awake/panels/` itself carries
    the no-removal PSD, and point item 5 at `panels/`, not `psd_2hz_check`.
-   **Blocked on Tom:** which cleaning is the paper's (`tica_awake`, v4, or
-   `tica_awake_best`, v4/v5 per subject).
+   **Cleaning decided (Tom, 2026-11-17): `tica_awake_best`** (v4awake for
+   885, 987, 877; v5 for the rest; 926 and 1533 still excluded by hand), so
+   the rerun and Fig 8's clinical panels use that run, not `tica_awake`.
 7. **Fig 3 new layout as the paper default.** When the worker on Fig 3
    reports (rows: input, expansion, eigenvalues; λ1 row removed), and Tom
    approves it, make that layout the default of the paper's group 3 (through
