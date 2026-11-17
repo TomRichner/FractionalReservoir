@@ -500,7 +500,7 @@ fprintf('\n=== 11. the stage plan ===\n');
 grid_c = struct('tag', 'selfc_noise', 'first_axis', 'self_coupling', 'first_range', [-2 2], ...
     'second_axis', 'sigma_u_noise', 'second_range', [0 0.04], 'first_count', 3, 'second_count', 3);
 cfg11 = struct('mc_preset', preset_name, 'run_mode', 'essential', 'verbose', 'near-none', ...
-    'mc_gain_sweep', struct('grids', grid_c));
+    'mc_gain_sweep', struct('grids', grid_c, 'seeds', 3001));
 pl = mc_gain_sweep_stage_plan(cfg11);
 a11 = pl.runs(1).args;
 val = @(name) a11{find(strcmp(a11(1:2:end), name)) * 2};
