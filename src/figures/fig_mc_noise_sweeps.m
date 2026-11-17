@@ -28,6 +28,8 @@ function out = fig_mc_noise_sweeps(cfg)
 % up to 1/4 of the way from the fourth to the largest), and
 % cfg.show_points = false leaves the per-network points out. The caption
 % says which band is drawn; the table keeps the smallest and largest.
+% cfg.median_markers = false draws the median as a plain line, without the
+% marker at each level (the legend entries follow the lines).
 %
 % THE NOISE AXIS is drawn as the maps draw it (mc_axis_spacing): a zero
 % level followed by a log ladder ('zero_log') at its log ladder, the zero one
@@ -71,6 +73,7 @@ arguments
     cfg.show_lle    (1,1) logical = true
     cfg.band        (1,:) char {mustBeMember(cfg.band, {'range', 'iqr'})} = 'range'   % the band over networks
     cfg.show_points (1,1) logical = true   % every network as a small point
+    cfg.median_markers (1,1) logical = true   % a marker on the median line at each level
     cfg.note        (1,:) char    = ''
     cfg.fig_tag     (1,:) char    = 'Fig_MC_noise_sweeps'
 end
@@ -150,8 +153,10 @@ for r = 1:nr
                 fill(ax, [P.x(ok), fliplr(P.x(ok))], [blo(ok), fliplr(bhi(ok))], cond_colors(c, :), ...
                     'FaceAlpha', BAND_ALPHA, 'EdgeColor', 'none', 'HandleVisibility', 'off');
             end
-            h(c) = plot(ax, P.x(ok), med(ok), '-o', 'Color', cond_colors(c, :), 'LineWidth', 2, ...
-                'MarkerSize', 4, 'MarkerFaceColor', cond_colors(c, :));
+            h(c) = plot(ax, P.x(ok), med(ok), '-', 'Color', cond_colors(c, :), 'LineWidth', 2);
+            if cfg.median_markers
+                set(h(c), 'Marker', 'o', 'MarkerSize', 4, 'MarkerFaceColor', cond_colors(c, :));
+            end
             if r == 1
                 lle = arrayfun(@(v) median(T.lle_input(T.(P.column) == v & isfinite(T.lle_input))), P.levels);
                 for k = 1:numel(P.levels)

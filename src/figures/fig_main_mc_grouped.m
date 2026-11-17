@@ -8,16 +8,17 @@ function out = fig_main_mc_grouped(cfg)
 % figures of a mu7chain_gainbias run (FD-029), each drawn from the run's
 % saved tables by its own function and its axes copied onto one canvas; no
 % simulation runs.
-%   (A) the gain x self-coupling maps as the paper draws them
+%   (A), (B) the gain x self-coupling maps as the paper draws them
 %       (fig_mc_gain_bias_maps with the registry entry
-%       'fig_mc_maps_selfcoupling' of mu7chain_gainbias_config): memory
-%       capacity (top row) and lambda_1 with the task input on (bottom row,
-%       symmetric log, guppy), one column per condition, star at the preset.
-%   (B) memory capacity against the input (Wiener) noise sigma_u at the
+%       'fig_mc_maps_selfcoupling' of mu7chain_gainbias_config): (A) memory
+%       capacity (top row) and (B) lambda_1 with the task input on (bottom
+%       row, symmetric log, guppy), one column per condition, star at the
+%       preset. Lettered per row (Tom, 2026-11-17).
+%   (C) memory capacity against the input (Wiener) noise sigma_u at the
 %       preset (fig_mc_noise_sweeps on the grid noise1d_wiener only, without
 %       its lambda_1 row; the release-noise sweep is left out): per
-%       condition the median over networks (line with a marker at each
-%       noise level) and the interquartile range over networks as the band
+%       condition the median over networks (a plain line, no markers;
+%       Tom, 2026-11-17) and the interquartile range over networks as the band
 %       (prctile(v, [25 75]); fig_mc_noise_sweeps 'band', 'iqr'), without
 %       the per-network points (Tom, 2026-11-17).
 % The source figures' header text (seeds, star, symlog and clipping, the
@@ -71,7 +72,8 @@ entry = registry_entry(bundle.figures, 'fig_mc_maps_selfcoupling');
 A = fig_mc_gain_bias_maps('run_dir', cfg.run_dir, 'conditions', names, ...
     'save', false, 'visible', false, entry.args{:});
 B = fig_mc_noise_sweeps('run_dir', cfg.run_dir, 'grids', {'noise1d_wiener'}, ...
-    'show_lle', false, 'band', 'iqr', 'show_points', false, 'conditions', names, ...
+    'show_lle', false, 'band', 'iqr', 'show_points', false, 'median_markers', false, ...
+    'conditions', names, ...
     'save', false, 'visible', false);
 src_a = A.figs; src_b = B.figs;
 cleanup = onCleanup(@() close_valid([src_a src_b]));
@@ -81,7 +83,7 @@ W = 1100; H = 640;
 fig = figure('Visible', on_off(cfg.visible), 'Color', 'w', 'Units', 'pixels', ...
     'Position', [40 40 W H]);
 drawnow;
-% (A): the six maps and their two colour bars, copied together so each
+% (A), (B): the six maps and their two colour bars, copied together so each
 % colour bar keeps its axes.
 ha = findall(src_a, '-isa', 'matlab.graphics.axis.Axes', '-or', 'Type', 'colorbar');
 maps_src = findall(src_a, 'Type', 'axes');
@@ -107,7 +109,7 @@ for r = 1:2
 end
 is_lle_cb = arrayfun(@(cb) contains(cb.Label.String, 'lambda'), cbs);
 cb_mc = cbs(~is_lle_cb); cb_l = cbs(is_lle_cb);
-% (B): the memory-capacity panel and its legend.
+% (C): the memory-capacity panel and its legend.
 hb = findall(src_b, '-isa', 'matlab.graphics.axis.Axes', '-or', 'Type', 'legend');
 copied_b = copyobj(hb, fig);
 axb = copied_b(arrayfun(@(h) isa(h, 'matlab.graphics.axis.Axes'), copied_b));
@@ -140,8 +142,9 @@ set([cb_mc cb_l], 'FontSize', 14, 'LineWidth', 1);
 titles = grouped_condition_label(names, 'two_line');
 GAIN_TICKS = [0.05 0.25 1 5];             % Tom, 2026-11-17
 gain_lbl = maps(2, 1).XLabel.String;
-s_lbl = maps(2, 1).YLabel.String;
-if iscell(s_lbl); s_lbl = s_lbl{end}; end
+% The maps' own label carries '(R_W)'; here it is the name and the symbol
+% only, set in this function and not in the shared default (Tom, 2026-11-17).
+s_lbl = 'Self-Coupling, s';
 for c = 1:nc
     col = maps(1, c).Title.Color;           % the condition colour the source used
     title(maps(1, c), titles{c}, 'FontWeight', 'normal', 'FontSize', 14, 'Color', col, ...
@@ -161,7 +164,7 @@ for c = 1:nc
         ax.YAxis.MinorTickValues = s_levels;
         if c == 1
             ax.YTickLabel = compose('%g', ax.YTick);
-            ylabel(ax, title_case(s_lbl), 'FontSize', 14);
+            ylabel(ax, s_lbl, 'FontSize', 14);
         else
             ax.YTickLabel = {};
             ax.YLabel.String = '';
@@ -174,7 +177,7 @@ end
 cb_mc.Label.String = 'Memory Capacity';
 cb_l.Label.String = 'Lyapunov Exp., \lambda_1 (s^{-1})';
 set([cb_mc.Label cb_l.Label], 'FontSize', 14, 'Interpreter', 'tex');
-% (B)
+% (C)
 noise_lbl = axb.XLabel.String;
 title(axb, '');
 xlabel(axb, title_case(noise_lbl), 'FontSize', 14);
@@ -201,10 +204,12 @@ for pass = 1:2
     lp = lgb.Position;
     lgb.Position = [W - 10 - lp(3), y_bot - 30, lp(3), lp(4)];
 end
-% Panel letters, as style_main6_grouped places them.
+% Panel letters, as style_main6_grouped places them: (A) the memory-capacity
+% row of maps, (B) the lambda_1 row, at the same offset from its row's first
+% map, (C) the noise panel (Tom, 2026-11-17).
 delete(findall(fig, 'Tag', 'main_mc_panel_letter'));
-letters = {maps(1, 1), axb};
-for k = 1:2
+letters = {maps(1, 1), maps(2, 1), axb};
+for k = 1:numel(letters)
     ax = letters{k}; p = ax.Position;
     text(ax, -95 / p(3), 1 + 55 / p(4), sprintf('(%c)', 'A' + k - 1), ...
         'Units', 'normalized', 'Clipping', 'off', 'FontSize', 14, 'FontWeight', 'normal', ...
@@ -215,8 +220,9 @@ set([maps(:); axb; cb_mc; cb_l; lgb], 'Units', 'normalized');
 %% Save
 tag = 'Fig_Main_MC_Grouped';
 out = struct('figs', fig, 'files', {{}}, 'source', {[{A.source}, B.source]}, 'layout', ...
-    struct('A', 'gain x self-coupling maps: memory capacity (top), lambda_1 (bottom)', ...
-           'B', 'memory capacity against input noise sigma_u'));
+    struct('A', 'gain x self-coupling maps: memory capacity (top row)', ...
+           'B', 'gain x self-coupling maps: lambda_1 (bottom row)', ...
+           'C', 'memory capacity against input noise sigma_u'));
 if cfg.save
     outdir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
     if ~isfolder(outdir); mkdir(outdir); end
@@ -304,14 +310,14 @@ fprintf(fid, 'Conditions: %s\n\n', strjoin(names, ', '));
 fprintf(fid, '## Sources (saved data only; no simulation)\n\n');
 for k = 1:numel(sources); fprintf(fid, '- `%s`\n', string(sources{k})); end
 fprintf(fid, ['\n## Panels\n\n' ...
-    '- (A) `fig_mc_gain_bias_maps` with the registry entry `fig_mc_maps_selfcoupling` of ' ...
-    '`mu7chain_gainbias_config(''%s'', ''%s'')`: memory capacity (median over seeds, linear, white to ' ...
-    'the guppy center colour; top row) and lambda_1 with the task input on (median over seeds, ' ...
+    '- (A), (B) `fig_mc_gain_bias_maps` with the registry entry `fig_mc_maps_selfcoupling` of ' ...
+    '`mu7chain_gainbias_config(''%s'', ''%s'')`: (A) memory capacity (median over seeds, linear, white to ' ...
+    'the guppy center colour; top row) and (B) lambda_1 with the task input on (median over seeds, ' ...
     'symmetric log, linear within +-%g 1/s, clipped at +-%g 1/s, guppy, darkest = 0; bottom row), ' ...
     'gain by self-coupling s, one column per condition. White star: the preset. Grey: no successful job.\n' ...
-    '- (B) `fig_mc_noise_sweeps` on the grid `noise1d_wiener` only, `show_lle` false: memory capacity ' ...
-    'of the preset network against the input (Wiener) noise sigma_u; line (with a marker at each ' ...
-    'noise level) median over the %d networks, band the interquartile range across the %d networks ' ...
+    '- (C) `fig_mc_noise_sweeps` on the grid `noise1d_wiener` only, `show_lle` false: memory capacity ' ...
+    'of the preset network against the input (Wiener) noise sigma_u; line (plain, no markers: ' ...
+    '`median_markers` false) median over the %d networks, band the interquartile range across the %d networks ' ...
     '(`band` = `iqr`: MATLAB `prctile(v, [25 75])`, linear interpolation between the sorted values, ' ...
     'the k-th of n at the 100 (k - 0.5) / n percentile); the per-network points are not drawn ' ...
     '(`show_points` false; Tom, 2026-11-17). Noise axis: 0, then log-spaced levels, broken ' ...
@@ -323,6 +329,7 @@ fprintf(fid, ['## Dropped from the source figures\n\n' ...
     '- The colour-bar labels'' scale wording ("symmetric log, clipped at +-5"): the bars now name ' ...
     'the quantity only; the scale is stated above.\n' ...
     '- The noise-sweep figure''s lambda_1 row and its release-noise (sigma_gamma) column.\n' ...
+    '- The `(R_W)` of the maps'' self-coupling axis label: it reads `Self-Coupling, s` (Tom, 2026-11-17).\n' ...
     '- Most tick labels: gain is labelled at 0.05, 0.25, 1 and 5 only (0.25 and 1 at their log ' ...
     'positions between grid levels; every grid level keeps a minor tick at its cell centre), ' ...
     'self-coupling every 2 (minor tick at every level), input noise sigma_u at 0 and every fourth ' ...
