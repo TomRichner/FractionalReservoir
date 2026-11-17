@@ -32,6 +32,18 @@ function out = fig_stim_combined(clinical_dir, model_fig, opts)
 %   G  model example traces, no stimulation over stimulation  | H correlation change
 %                                                              | I state change
 %
+% Layout 'mirror' (default since 2026-11-17, Tom): the model half mirrors the
+% clinical half panel for panel, and only the matching panels are kept:
+%   A  clinical traces, no stimulation | stimulation
+%   B  clinical IED rate                C  clinical SOZ PSD
+%   D  model traces, no stimulation | stimulation (no lambda_1 strip; time
+%      axis replaced by a scale bar, as in A)
+%   E  model event rate                 F  model PSD
+% The model rate axes is found by a y label containing 'Events per Minute' or
+% 'Event Rate'; a legend attached to it in the source (one entry per network)
+% is carried over like the clinical one. Layout 'v1' is the nine-panel A-I
+% figure of 2026-11-17 (figs/stim_combined_20261117).
+%
 % Output: <out_dir>/<tag>.{png,fig,svg} and <tag>_provenance.md.
 %
 % See also: fig_ied_stim, fig_grouped_main, manuscript_style
@@ -51,6 +63,8 @@ arguments
     opts.resolution (1,1) double = 450
     opts.save (1,1) logical = true
     opts.visible (1,1) logical = false
+    opts.layout (1,:) char {mustBeMember(opts.layout,{'mirror','v1'})} = 'mirror'
+    opts.time_bar (1,1) double = 5   % s, model traces scale bar (mirror layout)
 end
 assert(isfolder(clinical_dir),'fig_stim_combined:NoClinical','No folder %s',clinical_dir);
 assert(isfile(model_fig),'fig_stim_combined:NoModel','No model figure %s',model_fig);
@@ -99,6 +113,17 @@ yTop = y0+2*hLy+2*hTr+gap;
 xH = 0.770; wH = R-xH; hH = (yTop-y0-0.095)/2;
 pos.m_state = [xH y0+0.025 wH hH];
 pos.m_corr  = [xH y0+0.025+hH+0.070 wH hH];
+if strcmp(opts.layout,'mirror')
+    hR = 0.135;
+    pos.cl_trace_no = [L+0.020 0.800 0.405 0.165];
+    pos.cl_trace_st = [0.555 0.800 0.405 0.165];
+    pos.cl_rate = [L 0.590 0.415 hR];
+    pos.cl_psd  = [xC 0.590 R-xC hR];
+    pos.m_tr_no = [0.130 0.290 0.390 0.205];
+    pos.m_tr_st = [0.570 0.290 0.390 0.205];
+    pos.m_rate  = [L 0.060 0.415 hR];
+    pos.m_psd   = [xC 0.060 R-xC hR];
+end
 % letter x per panel: left column at the canvas edge, others left of the y label
 xl = struct('A',0.005,'B',0.005,'C',xC-0.085,'D',0.005,'E',0.330-0.085,'F',xC-0.085, ...
     'G',0.005,'H',xH-0.10,'I',xH-0.10);
@@ -124,6 +149,16 @@ sf = openfig(src.model,'invisible'); guard2 = onCleanup(@()close_if(sf));
 delete(findall(sf,'Type','text','Tag','letter'));
 ax = findall(sf,'Type','axes');
 ylab = @(a) strjoin(cellstr(a.YLabel.String),' ');
+title_of = @(a) strtrim(char(a.Title.String));
+lg_mrate = [];
+if strcmp(opts.layout,'mirror')
+    [m_rate,lg_mrate] = place(pick(ax,@(a)contains(ylab(a),'Events per Minute') || contains(ylab(a),'Event Rate')),pos.m_rate,sf);
+    [m_psd,lg_mpsd] = place(pick(ax,@(a)contains(ylab(a),'PSD')),pos.m_psd,sf);
+    m_tr_no = place(pick(ax,@(a)strcmp(title_of(a),'No Stimulation')),pos.m_tr_no);
+    m_tr_st = place(pick(ax,@(a)startsWith(title_of(a),'Stimulation')),pos.m_tr_st);
+    close_if(sf);
+    mirror_finish();
+else
 m_rate  = place(pick(ax,@(a)contains(ylab(a),'Events per Minute')),pos.m_rate);
 [m_psd,lg_mpsd] = place(pick(ax,@(a)contains(ylab(a),'PSD')),pos.m_psd,sf);
 m_band  = place(pick(ax,@(a)contains(ylab(a),'Power Change')),pos.m_band);
@@ -200,9 +235,10 @@ order = {a_no,'A';a_rate,'B';a_psd,'C';m_rate,'D';m_band,'E';m_psd,'F';m_tr_no,'
 for k = 1:size(order,1)
     letter(fig,order{k,1},order{k,2},xl.(order{k,2}),opts.font_size);
 end
+end   % layout v1
 drawnow;
 
-out = struct('fig',fig,'files',{{}},'sources',src,'letters',{panel_map()});
+out = struct('fig',fig,'files',{{}},'sources',src,'letters',{panel_map(opts.layout)});
 if opts.save
     outdir = opts.out_dir;
     assert(~isempty(outdir),'fig_stim_combined:NoOutDir','Give out_dir.');
@@ -225,6 +261,60 @@ if ~opts.visible && ~opts.save, return; end
 if ~opts.visible, close(fig); out.fig = []; end
 
 % ============================================================================
+    function mirror_finish()
+        % house style and letters for the mirror layout
+        a_rate.YLabel.String = 'IED Rate (% of No Stim.)';
+        m_psd.YLabel.String = 'PSD (a.u.^2/Hz)';
+        if contains(ylab(m_rate),'Events per Minute'), m_rate.YLabel.String = 'Events per Minute'; end
+        axs_all = findall(fig,'Type','axes');
+        set(axs_all,'FontName','Helvetica','FontSize',opts.font_size,'TickDir','out', ...
+            'Box','off','TitleFontSizeMultiplier',1,'LabelFontSizeMultiplier',1,'LineWidth',0.6);
+        set(findall(fig,'Type','text'),'FontName','Helvetica');
+        for hh = findall(fig,'Type','line')'
+            hh.LineWidth = max(0.5,0.6*hh.LineWidth); hh.MarkerSize = max(2.5,0.6*hh.MarkerSize);
+        end
+        for hh = findall(fig,'Type','scatter')', hh.SizeData = 0.35*hh.SizeData; end
+        for hh = findall(fig,'Type','constantline')', hh.LineWidth = max(0.5,0.6*hh.LineWidth); end
+        for aa = axs_all', aa.Title.FontWeight = 'normal'; end
+        for tt = findall(fig,'Type','text')'
+            if ~isempty(tt.String) && ~is_label_of(tt), tt.FontSize = opts.annot_size; end
+        end
+        for tt = findall([a_no a_st],'Type','text')'
+            if any(strcmp(tt.String,{'No Stimulation','Stimulation'})), tt.FontSize = opts.font_size; end
+        end
+        set(findall(fig,'Type','legend'),'FontSize',opts.annot_size,'FontName','Helvetica','Box','off');
+        a_psd.Title.FontSize = opts.annot_size; a_psd.YLimMode = 'auto';
+        % model traces drawn like the clinical ones: no axis lines, row names
+        % only on the left, time given by a scale bar on the stimulation side
+        m_tr_no.Title.String = 'Model, No Stimulation';
+        m_tr_st.Title.String = strrep(title_of(m_tr_st),'Stimulation','Model, Stimulation');
+        for aa = [m_tr_no m_tr_st]
+            aa.XAxis.Visible = 'off'; aa.YAxis.Color = 'none';
+            aa.YAxis.TickLabelColor = [0 0 0]; aa.TickLength = [0 0];
+        end
+        m_tr_st.YTickLabel = {};
+        xlm = m_tr_st.XLim; ylm = m_tr_st.YLim; x1 = xlm(2); x0 = x1-opts.time_bar;
+        yb = ylm(1)-0.04*diff(ylm);
+        line(m_tr_st,[x0 x1],[yb yb],'Color','k','LineWidth',1,'Clipping','off');
+        text(m_tr_st,(x0+x1)/2,yb,sprintf('%g s',opts.time_bar),'HorizontalAlignment','center', ...
+            'VerticalAlignment','top','FontSize',opts.annot_size,'FontName','Helvetica','Clipping','off');
+        if numel(m_rate.XTickLabel)==2 && contains(ylab(m_rate),'Events per Minute')
+            m_rate.XTickLabel = {'No Stimulation','Stimulation'};
+        end
+        if ~isempty(lg_mpsd), lg_mpsd.Location = 'southwest'; end
+        if ~isempty(lg_psd),  lg_psd.Location  = 'southwest'; end
+        pairs = {a_rate,lg_rate; m_rate,lg_mrate};
+        for kk = 1:2
+            aa = pairs{kk,1}; lg = pairs{kk,2};
+            if isempty(lg), continue; end
+            lg.Units = 'normalized'; lg.Location = 'none'; lg.NumColumns = 2;
+            pp = aa.Position; w = lg.Position(3); hh = lg.Position(4);
+            lg.Position = [pp(1)+pp(3)+0.008 pp(2)+(pp(4)-hh)/2 w hh];
+        end
+        ord = {a_no,'A',0.005; a_rate,'B',0.005; a_psd,'C',xC-0.085; ...
+            m_tr_no,'D',0.005; m_rate,'E',0.005; m_psd,'F',xC-0.085};
+        for kk = 1:size(ord,1), letter(fig,ord{kk,1},ord{kk,2},ord{kk,3},opts.font_size); end
+    end
     function [axn,lgn] = place(axs,p,srcfig)
         % copy one source axes (with its legend, if any) into fig at p;
         % freeze its limits first so the copy keeps the source's ranges
@@ -286,7 +376,16 @@ end
 function s = onoff(b)
 if b, s = 'on'; else, s = 'off'; end
 end
-function m = panel_map()
+function m = panel_map(layout)
+if nargin > 0 && strcmp(layout,'mirror')
+    m = {'A','clinical example traces (S9, SOZ), no stimulation and stimulation','clinical composite panel A (panels/Fig_Awake_Main_PanelD)'; ...
+         'B','clinical IED rate per participant, % of no stimulation','clinical composite panel B (panels/Fig_Awake_Main_PanelA_Normalized)'; ...
+         'C','clinical SOZ PSD, median and IQR, n = 12','clinical composite panel C (panels/Fig_Awake_Main_PanelB_PSD)'; ...
+         'D','model example traces, no stimulation and stimulation','model figure, traces axes (titles No Stimulation / Stimulation)'; ...
+         'E','model event rate','model figure, rate axes'; ...
+         'F','model subnet-mean PSD','model figure, PSD axes'};
+    return
+end
 m = {'A','clinical example traces (S9, SOZ), no stimulation and stimulation','clinical composite panel A (panels/Fig_Awake_Main_PanelD)'; ...
      'B','clinical IED rate per participant, % of no stimulation','clinical composite panel B (panels/Fig_Awake_Main_PanelA_Normalized)'; ...
      'C','clinical SOZ PSD, median and IQR, n = 12','clinical composite panel C (panels/Fig_Awake_Main_PanelB_PSD)'; ...
@@ -307,7 +406,7 @@ fprintf(fid,'- Clinical traces: `%s`\n- Clinical rate: `%s`\n- Clinical PSD: `%s
 if ~isempty(opts.clinical_note), fprintf(fid,'- Clinical note: %s\n',opts.clinical_note); end
 if ~isempty(opts.model_note),    fprintf(fid,'- Model note: %s\n',opts.model_note); end
 fprintf(fid,'\n## Panel letters\n\n| New | Shows | Source panel |\n|---|---|---|\n');
-m = panel_map();
+m = panel_map(opts.layout);
 for k = 1:size(m,1), fprintf(fid,'| (%s) | %s | %s |\n',m{k,:}); end
 fprintf(fid,'\nDropped: the clinical header text "S9, SOZ Contacts" (the caption carries it) and the sources'' own panel letters.\n');
 end
