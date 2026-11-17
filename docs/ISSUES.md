@@ -1540,7 +1540,23 @@ becomes an issue with an acceptance test.
     networks): essential 5 x 2, fast 7 x 3, fastmedium 11 x 5, medium
     21 x 5. A new figure draws both in one sheet; a preview is drawn from
     the 2026-11-15 run's rows at gain 1.003.
-- **Result:** _(pending)_
+- **Result (2026-11-17, done):** merged `0050ccc` and `8f01c03` (guppy on
+  the symlog lambda_1 scale, Tom's choice). The overnight run
+  `mu7chain_gainbias_run('fastmedium')` at `2cc5d3f` on 12 workers: 7.41 h
+  (2026-11-16 22:20 to 2026-11-17 05:45), 715 of 715 jobs, no failed row,
+  7 of 7 figures; data `data/mu7chain_gainbias_fastmedium`, figures
+  `figs/mu7chain_gainbias_fastmedium_3cond`. Measured cost 7.43
+  worker-minutes per three-condition job (estimate 7.89). Gain by
+  self-coupling map, median of five networks: peak memory capacity 9.5
+  (none, gain 0.32), 15.0 (1TS, gain 0.79), 14.4 (chained MTS, gain 0.79),
+  all at s = 0; share of the map at or above half the best of any
+  condition 0.02, 0.10, 0.21; measured half-maximum width along gain at
+  s = 0: 1.99, 2.07, 2.27 octaves (all three Gaussian fits rejected).
+  Noise sweeps at gain 1: memory capacity at zero noise about 10.4
+  (chained) against 3.8 (1TS), chained above 1TS at every level until
+  both reach the floor; lambda_1 does not move with either noise.
+  Cosmetic, not fixed: the scatter's marker-size legend runs to -6 though
+  the grid stops at -4.
 
 ### FD-030 Product MTS leaves the larger runs: three conditions from fast upward
 
@@ -1562,4 +1578,7 @@ becomes an issue with an acceptance test.
 - **Lead's decisions:** `medium2` and `production` follow `medium`. The
   product route model, its preset conditions and its tests stay in the
   code; only what the larger runs simulate changes.
-- **Result:** _(pending)_
+- **Result (2026-11-17, done):** merged `60a6f0b`, `3121514` (quick suite
+  90 of 90, stages tier exact on the final code). `cfg.run_conditions` by
+  mode in `mu7chain_config`; first used by the overnight block C run
+  (FD-029, result): three conditions, 7.43 worker-minutes a job.
