@@ -2,7 +2,10 @@ function style_main6_grouped(fig,tau_names)
 % STYLE_MAIN6_GROUPED Style the native plots as four row-major panel groups.
 % (A) timescale LLE, (B) leading-vector fractions, (C) the complementary
 % cumulative-capacity and reconstruction axes, (D) memory horizon. Preserve
-% all plotted data, statistics and axis limits.
+% all plotted data and statistics, with two display changes in (A) (Tom,
+% 2026-11-17): the lower y limit is -0.2 and the open-circle mean markers of
+% fig_sfa_EOC_allStd are not shown (median line, IQR band and binned counts
+% stay).
 %
 %   STYLE_MAIN6_GROUPED(fig, tau_names)
 %   STYLE_MAIN6_GROUPED(fig)        % restyle a saved FIG: names read from it
@@ -68,6 +71,9 @@ for k=1:n
         'Expected one zero-growth reference line.');
     set(zero_ref,'Color',st.zeroline_color,'LineStyle','--', ...
         'LineWidth',st.zeroline_lw);
+    % Panel (A) display (Tom, 2026-11-17): no mean markers, lower limit -0.2.
+    delete(findall(lle(k),'Type','line','Marker','o','LineStyle','none'));
+    lle(k).YLim(1)=-.2;
 end
 lle(1).YLabel.String='Lyapunov Exp., \lambda_1 (s^{-1})';
 lle(1).YLabel.Interpreter='tex';

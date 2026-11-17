@@ -97,11 +97,33 @@ p(3)=min(p(3),.88-p(1)); ax.Position=p;
 ax.Title.Position(1)=title_x/p(3);
 % Block A spans both sensitivity rows; block B is the rate row.
 delete(findall(fig,'Tag','main4_block_A')); delete(findall(fig,'Tag','main4_block_B'));
-upper=axs(arrayfun(@(ax)ax.Position(2)>.65,axs));
-[~,first]=min(arrayfun(@(ax)ax.Position(1),upper)); p=upper(first).Position;
-annotation(fig,'textbox',[p(1)-.015 p(2)+p(4)+.002 .045 .035],'String','(A)', ...
-    'LineStyle','none','FontSize',14,'Margin',0,'VerticalAlignment','bottom','Tag','main4_block_A');
-annotation(fig,'textbox',[.005 .31 .04 .035],'String','(B)', ...
+% (B) sits at a fixed place up and to the left of the first rate panel. (A)
+% takes the same offset from ITS first panel (the upper-left sensitivity
+% panel), measured from each panel's tight box (the axes plus tick labels,
+% y label and title), so the two letters stand off their panels alike.
+b_box=[.005 .31 .04 .035];
+annotation(fig,'textbox',b_box,'String','(B)', ...
     'LineStyle','none','FontSize',14,'Margin',0,'Tag','main4_block_B');
+drawnow;
+upper=axs(arrayfun(@(ax)ax.Position(2)>.65,axs));
+[~,first]=min(arrayfun(@(ax)ax.Position(1),upper));
+[~,first_rate]=min(arrayfun(@(ax)ax.Position(1),rate_axes));
+[a_left,a_top]=tight_corner(upper(first)); [b_left,b_top]=tight_corner(rate_axes(first_rate));
+a_box=[a_left-(b_left-b_box(1)), a_top+(b_box(2)-b_top), b_box(3:4)];
+annotation(fig,'textbox',a_box,'String','(A)', ...
+    'LineStyle','none','FontSize',14,'Margin',0,'Tag','main4_block_A');
 
+end
+function [left,top]=tight_corner(ax)
+% Top-left corner of the axes' tight box in normalized figure units: the
+% left edge of the y label and tick labels (TightInset), and the top of the
+% title, or of the axes when it has none. The top is not taken from
+% TightInset, which reserves a title's height (.025 here) above an untitled
+% panel and would lift (A) by that much.
+u=ax.Units; ax.Units='normalized'; p=ax.Position; t=ax.TightInset; ax.Units=u;
+left=p(1)-t(1); top=p(2)+p(4);
+if ~isempty(ax.Title.String)
+    tu=ax.Title.Units; ax.Title.Units='normalized'; e=ax.Title.Extent; ax.Title.Units=tu;
+    top=max(top,p(2)+p(4)*(e(2)+e(4)));
+end
 end

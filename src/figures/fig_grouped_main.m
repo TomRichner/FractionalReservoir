@@ -129,6 +129,7 @@ switch group
         native(a.figs(1),[0 .10 1 .31]); close(a.figs); sources{end+1}=cfg.run_dir;
         notes{end+1}='Slowest-timescale axes are both linear. LLE distribution display clipping and MC trial/statistics remain those of the source run.';
         notes{end+1}='14-point fonts and axes linewidth 1.0. Row-major groups: (A) timescale LLE, (B) leading-vector fractions, (C) cumulative memory capacity and reconstruction, (D) memory horizon. All five scientific axes are retained; B-D use sparse y ticks.';
+        notes{end+1}='Panel (A) display (Tom, 2026-11-17): the lower y limit is -0.2 (upper limit as drawn by fig_sfa_EOC_allStd) and the open-circle mean markers are removed; the median line, the IQR band and the grey binned counts are kept. Anything below -0.2 is clipped from view; the data and statistics are unchanged.';
     case 7
         external(cfg.pytorch_file,[.03 .10 .94 .80],'PyTorch replacement experiment pending');
         banner('Provisional external learning figure');
