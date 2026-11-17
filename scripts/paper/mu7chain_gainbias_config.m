@@ -1,22 +1,46 @@
-function cfg = mu7chain_gainbias_config(run_mode, figure_set)
+function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 % MU7CHAIN_GAINBIAS_CONFIG Block C's bundle: memory capacity over gain against the bias, the self-coupling and two kinds of noise, on the mu7chain network (FD-010, FD-024, FD-027).
 %
 %   cfg = mu7chain_gainbias_config()                       % 'essential', figure set '4cond'
 %   cfg = mu7chain_gainbias_config('essential', '3cond')   % the paper's three conditions
 %   cfg = mu7chain_gainbias_config('fast', '4cond')        % with product MTS added
+%   cfg = mu7chain_gainbias_config('fast', '3cond', {'selfcoupling', 'bias'})
+%   cfg = mu7chain_gainbias_config('fast', '3cond', 'all') % every grid defined, as before FD-029
+%
+% run_grids, optional: the tags of the grids that run, and whose figures
+% are registered; absent or empty = the bundle's choice, RUN_GRIDS below
+% (the self-coupling grid alone). 'all' = every grid defined (for example
+% to draw the figures of a run directory made before FD-029).
 %
 % WHAT IT RUNS. One stage, the opt-in 'mc_gain_sweep' of
 % run_all_paper_analyses (paper_opt_in_stages), on the bundle's noise-free
-% memory-capacity twin, all four conditions on the same seeds. Its runs
-% (cfg.mc_gain_sweep.grids; mc_gain_sweep_stage_plan), each into its own
-% folder of the run directory:
-%   mc_gain_sweep_bias          gain x bias (S_c): gains log-spaced 0.1 to
-%                               4, biases linear -0.6 to 0.6
+% memory-capacity twin, all four conditions on the same seeds. Its grids
+% (cfg.mc_gain_sweep.grids; mc_gain_sweep_stage_plan) are listed below,
+% each with its folder in the run directory. SINCE FD-029 (Tom,
+% 2026-11-16) THREE RUN, in every mode: the gain x self-coupling grid and
+% the two 1-D noise sweeps at the preset's gain. cfg.mc_gain_sweep.run_grids
+% names the grids that run (RUN_GRIDS below), the others stay defined and
+% selectable, and the figure registry keeps only the entries whose grids
+% run. One tag added to RUN_GRIDS brings a grid back, with its figures (the
+% bias grid with its two variants).
 %   mc_gain_sweep_selfcoupling  gain x self-coupling (self_coupling, the
 %                               diagonal of W in units of R_W; s < 0
 %                               negative, s > 0 positive feedback): gains
-%                               LINEARLY spaced 0.1 to 4, s linear -4 to 4
-%                               (an odd count of levels, so s = 0 is one)
+%                               LOG-spaced 0.05 to 5, s linear -4 to 6
+%                               (FD-029; until then gains linear 0.1 to 4
+%                               and s -4 to 4). s = 0 is a level at 11 and
+%                               21 levels (fastmedium, medium), not at 7
+%                               (essential, fast) nor 17 (production).
+%   mc_gain_sweep_noise1d_wiener   the Wiener noise sigma_u alone (0, then
+%                               log-spaced 2.5e-4 to 0.025), release off,
+%                               at the preset's gain only
+%   mc_gain_sweep_noise1d_release  the release noise sigma_gamma alone (0,
+%                               then log-spaced 1e-4 to 1e-2) at the leak
+%                               r_s = 0.002, sigma_u = 0, at the preset's
+%                               gain only
+% Defined, not run (add to RUN_GRIDS to run):
+%   mc_gain_sweep_bias          gain x bias (S_c): gains log-spaced 0.1 to
+%                               4, biases linear -0.6 to 0.6
 %   mc_gain_sweep_bias_EI3to2,  the two E:I variants of the twin (mean
 %   mc_gain_sweep_bias_EI2to3   weights 3 : 2 and 2 : 3), each along gain
 %                               only, on the bias grid's gains, at its own
@@ -31,8 +55,8 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 %   mc_gain_sweep_wienernoise   gain x the Wiener noise sigma_u
 %                               (sigma_u_noise; 0, then log-spaced to
 %                               0.025), release off
-% The three noise grids read the memory through the tau_d-filtered release
-% (readout_signal 'release_filtered'); the first four keep the synaptic
+% The noise grids, 2-D and 1-D, read the memory through the tau_d-filtered
+% release (readout_signal 'release_filtered'); the others keep the synaptic
 % readout. Their fixed arguments (model_args per grid) and the calibration
 % of the noise axes are stated where the grids are written, below.
 % The folders are 'mc_gain_sweep' followed by the grid's tag, then a
@@ -42,34 +66,37 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 % other stages as skipped. For block A's stages and these in one run, see
 % mu7chain_AC_config.
 %
-% HOW BIG AND HOW LONG. The sizes are mc_gain_sweep_grid's table, the same
-% for every grid: levels per axis x networks (seeds 3001, 3002, ...).
-%   mode         levels    jobs   of which release noise   on 12 workers
-%   essential    3 x  3 x  1    51      18                about 50 min (58.9 measured)
-%   fast         7 x  7 x  3   777     294                about 12 h 30
-%   fastmedium   9 x  9 x  2   846     324                about 13 h 40
-%   medium(2)   13 x 13 x 10  8710    3380                about 141 h
-%   production  17 x 17 x 10 14790    5780                about 239 h
-% (5 n^2 + 2 n) x networks jobs at n levels, all of the stage's jobs in one
+% HOW BIG AND HOW LONG. The sizes are mc_gain_sweep_grid's table: levels
+% per axis x networks (seeds 3001, 3002, ...); the 1-D noise sweeps take
+% the table's count of noise levels except 5 at 'essential'. Since FD-029:
+%   mode        self-coupling   each 1-D sweep   jobs (release)   on 12 workers
+%   essential    7 x  7 x 2        5 x 2          118  (10)       about 1 h 44
+%   fast         7 x  7 x 3        7 x 3          189  (21)       about 2 h 48
+%   fastmedium  11 x 11 x 5       11 x 5          715  (55)       about 10 h 27
+%   medium(2)   21 x 21 x 5       21 x 5         2415 (105)       about 34 h 52
+%   production  17 x 17 x 10      17 x 10        3230 (170)       about 46 h 47
+% With all five 2-D grids and the two variants, as until FD-029, it was
+% (5 n^2 + 2 n) x networks jobs: 51 at essential (58.9 min measured), 777
+% at fast (about 12 h 30), and at the sizes of then 846 at fastmedium
+% (9 x 9 x 2, about 13 h 40; the run of 2026-11-15 took 19 h 28 with block
+% A) and 8710 at medium (13 x 13 x 10).
+% All of the stage's jobs run in one
 % parfor. A job of four conditions is about 10.24 worker-minutes (the fast
 % run of 2026-11-13: 336 jobs without release noise in 286.7 min on 12
 % workers), and 1.35 times that with the release noise on (its
 % condition-runs measured 157 s against 116 s, FD-027 N2; the calibration
 % runs of 2026-11-14 took 170 to 200 s with release noise against 124 to
 % 130 s without, the Wiener noise costing nothing). The stage's own
-% estimate (plan.worker_minutes) counts both (mc_gain_sweep_grid). Without
-% the noise grids (the first four alone) the stage was 24 jobs, about 20
-% min, at 'essential' and 336, 4 h 47 measured, at 'fast'. 'fastmedium'
-% (Tom, 2026-11-14) is the size at which mu7chain_AC_run, blocks A and C
-% together, takes about 19 h. Agents run 'essential' and 'fast';
-% 'fastmedium' and larger are Tom's to start.
+% estimate (plan.worker_minutes) counts both (mc_gain_sweep_grid). Agents
+% run 'essential' and 'fast'; 'fastmedium' and larger are Tom's to start.
 %
 % DERIVED FROM mu7chain_config, so nothing about the network is restated:
 % the preset, the memory-capacity twin (cfg.mc_preset), its integrator
 % (cfg.mc_ode_solver), the conditions drawn per set and the sets drawn per
 % mode (cfg.figure_sets) are mu7chain_config's. What differs:
 %   cfg.stages        {'mc_gain_sweep'}; cfg.sweeps and eig examples empty
-%   cfg.mc_gain_sweep the stage's settings: the five grids, the variants of
+%   cfg.mc_gain_sweep the stage's settings: the seven grids, which of them
+%                     run (run_grids), the variants of
 %                     the bias grid (mc_gain_sweep_stage_plan lists every
 %                     field; a grid's gain_levels or second_levels, or
 %                     seeds and conditions for the stage, depart from the
@@ -79,12 +106,20 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 %   cfg.figures       the block C figures only (below)
 %
 % THE FIGURES (Tom, 2026-11-13), all drawn from the saved tables, each in
-% its own folder <fig_root>/<entry>/:
+% its own folder <fig_root>/<entry>/. Only the entries whose grids run are
+% registered (since FD-029: fig_mc_maps_selfcoupling,
+% fig_mc_robustness_selfcoupling, fig_mc_vs_lambda1,
+% mc_statistics_selfcoupling, fig_mc_noise_sweeps, and the two time
+% series, which read no grid); the others below come back with their grid.
 %   fig_mc_maps_bias, fig_mc_maps_selfcoupling
 %       the maps of memory capacity and lambda_1 on each grid, LINEAR color
 %       scales (memory capacity 0 to its maximum, lambda_1 clipped at +-5
 %       1/s): the paper's maps. The square-root and symmetric-log scales of
 %       fig_mc_gain_bias_maps' defaults are for reports and not drawn here.
+%       Since FD-029 in Brian's style (MAP_STYLE below): ticks on the bottom
+%       and left only, no lambda_1 = 0 line, no saturated or silent marks,
+%       no spread row, lambda_1 on a dark-centered diverging map and memory
+%       capacity from white to its center color.
 %   fig_mc_gain_curves
 %       memory capacity and lambda_1 against gain at the preset's bias (0.2;
 %       the nearest level of the bias grid), a row for the network and one
@@ -112,6 +147,11 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 %       ..._releasenoise_selfcoupling, ..._wienernoise_gain). Widths along
 %       the noise axis in the statistics are in sigma's own units. Not
 %       marked in_paper (Tom decides after the first maps).
+%   fig_mc_noise_sweeps
+%       the two 1-D noise sweeps at the preset's gain (FD-029): memory
+%       capacity (and lambda_1) against sigma_u and against sigma_gamma,
+%       one line per condition, with the spread over networks
+%       (fig_mc_noise_sweeps), and its table
 %   fig_noise_levels_wiener, fig_noise_levels_gamma
 %       fig_noise_levels_timeseries: the bundle's noisy network, every
 %       condition of the set, at zero, the middle and the top of each noise
@@ -129,6 +169,7 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set)
 arguments
     run_mode (1,:) char = 'essential'
     figure_set (1,:) char {mustBeMember(figure_set, {'3cond', '4cond'})} = '4cond'
+    run_grids = {}
 end
 if ~ismember(run_mode, run_mode_names())
     error('mu7chain_gainbias_config:BadRunMode', 'run_mode ''%s'' is not one of: %s.', ...
@@ -152,6 +193,16 @@ SELF = 'selfcoupling';
 GAMMA = 'releasenoise';
 SELF_GAMMA = 'selfcoupling_releasenoise';
 WIENER = 'wienernoise';
+NOISE_WIENER  = 'noise1d_wiener';    % the 1-D noise sweeps at the preset's gain (FD-029)
+NOISE_RELEASE = 'noise1d_release';
+% WHICH GRIDS RUN (FD-029, Tom, 2026-11-16: the paper shows the gain x
+% self-coupling grid, and the effect of each noise at the preset, so the
+% others are not computed). Every grid below stays defined; this list says
+% which run, and the figure registry keeps only the entries whose grids all
+% run (and those that read no grid). To bring a grid back, add its tag
+% here, e.g. {SELF, NOISE_WIENER, NOISE_RELEASE, BIAS}.
+RUN_GRIDS = {SELF, NOISE_WIENER, NOISE_RELEASE};
+if ~isempty(run_grids); RUN_GRIDS = run_grids; end
 variant_tags = {'EI3to2', 'EI2to3'};
 variants = struct('tag', variant_tags, 'preset', strcat(cfg.mc_preset, '_', variant_tags));
 % The noise grids (FD-027, step P3). Each noise axis is a zero level, then
@@ -184,21 +235,37 @@ variants = struct('tag', variant_tags, 'preset', strcat(cfg.mc_preset, '_', vari
 % spontaneous release. At 1e-2 it is 0.05, a pool of about five vesicles,
 % and memory capacity is already at its floor.
 % Levels by mode (rounded to 10 decimals by the grid table):
-%   essential  sigma_gamma 0, 1e-3, 1e-2              sigma_u 0, 2.5e-3, 0.025
-%   fast       sigma_gamma 0, 2.15e-4 ... 1e-2 (x2.15) sigma_u 0, 5.39e-4 ... 0.025 (x2.15)
-%   fastmedium sigma_gamma 0, 1.78e-4 ... 1e-2 (x1.78) sigma_u 0, 4.45e-4 ... 0.025 (x1.78)
-%   medium     sigma_gamma 0, 1.47e-4 ... 1e-2 (x1.47) sigma_u 0, 3.67e-4 ... 0.025 (x1.47)
+%   essential, 1-D sweeps (5 levels)
+%              sigma_gamma 0, 3.16e-4 ... 1e-2 (x3.16) sigma_u 0, 7.91e-4 ... 0.025 (x3.16)
+%   essential (2-D grids) and fast, 7 levels
+%              sigma_gamma 0, 2.15e-4 ... 1e-2 (x2.15) sigma_u 0, 5.39e-4 ... 0.025 (x2.15)
+%   fastmedium sigma_gamma 0, 1.58e-4 ... 1e-2 (x1.58) sigma_u 0, 3.96e-4 ... 0.025 (x1.58)
+%   medium     sigma_gamma 0, 1.26e-4 ... 1e-2 (x1.26) sigma_u 0, 3.15e-4 ... 0.025 (x1.26)
+%   (at the sizes of FD-029; the 2-D noise grids do not run unless named in
+%   RUN_GRIDS, the 1-D sweeps do)
 LEAK = 0.002;
 GAMMA_LADDER = [1e-4 1e-2];
 WIENER_LADDER = [2.5e-4 0.025];
 release_fixed = {'sigma_u_noise', 0, 'release_rate_all', LEAK};   % the gamma grids: Wiener off, the leak
 wiener_fixed  = {'release_rate_all', 0, 'release_sigma_all', 0};  % the Wiener grid: release off
 FILTERED = 'release_filtered';
+% THE 1-D NOISE SWEEPS (FD-029, Tom, 2026-11-16: "a figure at just the
+% preset but with each type of noise varied ... two 1D sweeps, which would
+% be much faster and still tell important info about the effect of noise on
+% MC"), in place of the 2-D noise grids, which stay defined but do not run.
+% Each is a grid with ONE level on its first axis, the preset's gain, and
+% the noise on its second, with the 2-D grids' ladders, fixed arguments and
+% readout: sigma_u with the release off, and sigma_gamma at the leak r_s
+% with sigma_u = 0. Noise levels (with the zero) x networks: the table's
+% n x networks (7 x 3, 11 x 5, 21 x 5) except 5 x 2 at 'essential'.
+preset_gain = mc_gain_sweep_preset_point(cfg.mc_preset);
+noise_1d_count = [];
+if strcmp(run_mode, 'essential'); noise_1d_count = 5; end
 cfg.mc_gain_sweep = struct('grids', [ ...
     grid_spec(BIAS, 'second_axis', 'S_c', 'gain_range', [0.1 4], 'gain_spacing', 'log', ...
         'second_range', [-0.6 0.6], 'variants', variants), ...
-    grid_spec(SELF, 'second_axis', 'self_coupling', 'gain_range', [0.1 4], 'gain_spacing', 'linear', ...
-        'second_range', [-4 4]), ...
+    grid_spec(SELF, 'second_axis', 'self_coupling', 'gain_range', [0.05 5], 'gain_spacing', 'log', ...
+        'second_range', [-4 6]), ...
     grid_spec(GAMMA, 'second_axis', 'release_sigma_all', 'gain_range', [0.1 4], 'gain_spacing', 'log', ...
         'second_range', GAMMA_LADDER, 'second_spacing', 'zero_log', ...
         'model_args', release_fixed, 'readout_signal', FILTERED), ...
@@ -207,11 +274,20 @@ cfg.mc_gain_sweep = struct('grids', [ ...
         'model_args', release_fixed, 'readout_signal', FILTERED), ...
     grid_spec(WIENER, 'second_axis', 'sigma_u_noise', 'gain_range', [0.1 4], 'gain_spacing', 'log', ...
         'second_range', WIENER_LADDER, 'second_spacing', 'zero_log', ...
-        'model_args', wiener_fixed, 'readout_signal', FILTERED)]);
+        'model_args', wiener_fixed, 'readout_signal', FILTERED), ...
+    grid_spec(NOISE_WIENER, 'first_levels', preset_gain, 'second_axis', 'sigma_u_noise', ...
+        'second_range', WIENER_LADDER, 'second_spacing', 'zero_log', 'second_count', noise_1d_count, ...
+        'model_args', wiener_fixed, 'readout_signal', FILTERED), ...
+    grid_spec(NOISE_RELEASE, 'first_levels', preset_gain, 'second_axis', 'release_sigma_all', ...
+        'second_range', GAMMA_LADDER, 'second_spacing', 'zero_log', 'second_count', noise_1d_count, ...
+        'model_args', release_fixed, 'readout_signal', FILTERED)]);
+if isequal(RUN_GRIDS, 'all'); RUN_GRIDS = {cfg.mc_gain_sweep.grids.tag}; end
+cfg.mc_gain_sweep.run_grids = cellstr(RUN_GRIDS);
 % The time-series figures draw zero, the middle and the top of each noise
-% axis: its 'essential' levels, from the grid table.
+% axis: a three-level zero_log ladder over its range, from the grid table.
 three = @(axis, ladder) getfield(mc_gain_sweep_grid('essential', 'second_axis', axis, ...
-    'second_range', ladder, 'second_spacing', 'zero_log', 'gain_levels', 1), 'second_levels');
+    'second_range', ladder, 'second_spacing', 'zero_log', 'second_count', 3, 'gain_levels', 1), ...
+    'second_levels');
 gamma_three  = three('release_sigma_all', GAMMA_LADDER);
 wiener_three = three('sigma_u_noise', WIENER_LADDER);
 
@@ -224,13 +300,23 @@ cfg.fig_root = ['figs/mu7chain_gainbias_' run_mode '_' figure_set];
 % conditions from make_all_paper_figures, then its own arguments. Every
 % entry names its grid; the figure reads that grid's result and no other.
 LINEAR_SCALES = {'mc_scale', 'linear', 'lle_scale', 'linear', 'lle_clip', 5};
+% The maps' style (FD-029, from Brian Lundstrom's feedback): no ticks on the
+% top and right, no lambda_1 = 0 line, no saturated or silent markers, no
+% spread row; lambda_1 on a diverging map with a dark center (lambda_1 = 0
+% the darkest band) and memory capacity from white to that center color.
+% The colormap is Tom's choice among the candidates of FD-029
+% (dark_center_colormaps: guppy, redshift, dark_magenta); until he chooses,
+% the lead's worker registered PAPER_LLE_COLORMAP.
+PAPER_LLE_COLORMAP = 'guppy';
+MAP_STYLE = [LINEAR_SCALES, {'ticks_top_right', false, 'show_zero_line', false, 'show_flags', false, ...
+    'show_iqr', false, 'lle_colormap', PAPER_LLE_COLORMAP, 'mc_colormap', 'lle_center'}];
 % The scatters' statistics boxes are placed where their panels have fewest
 % points (explore_bias_rate_lambda1, where these three were first drawn).
 cfg.figures = { ...
     grid_entry('fig_mc_maps_bias',               @fig_mc_gain_bias_maps, true,  BIAS, ...
-        [{'fig_tag', 'Fig_MC_maps_bias'}, LINEAR_SCALES]), ...
+        [{'fig_tag', 'Fig_MC_maps_bias'}, MAP_STYLE]), ...
     grid_entry('fig_mc_maps_selfcoupling',       @fig_mc_gain_bias_maps, true,  SELF, ...
-        [{'fig_tag', 'Fig_MC_maps_selfcoupling'}, LINEAR_SCALES]), ...
+        [{'fig_tag', 'Fig_MC_maps_selfcoupling'}, MAP_STYLE]), ...
     grid_entry('fig_mc_gain_curves',             @fig_mc_gain_curves,    true,  BIAS, ...
         {'fig_tag', 'Fig_MC_gain_curves', 'variants', variant_tags, 'mc_vs_lambda1', false}), ...
     grid_entry('fig_mc_robustness_bias',         @fig_mc_robustness,     true,  BIAS, ...
@@ -256,11 +342,11 @@ cfg.figures = { ...
     ...% tags name the noise first, then the first axis, so none is a
     ...% prefix of another or of the tags above.
     grid_entry('fig_mc_maps_releasenoise',               @fig_mc_gain_bias_maps, false, GAMMA, ...
-        [{'fig_tag', 'Fig_MC_maps_releasenoise_gain'}, LINEAR_SCALES]), ...
+        [{'fig_tag', 'Fig_MC_maps_releasenoise_gain'}, MAP_STYLE]), ...
     grid_entry('fig_mc_maps_selfcoupling_releasenoise',  @fig_mc_gain_bias_maps, false, SELF_GAMMA, ...
-        [{'fig_tag', 'Fig_MC_maps_releasenoise_selfcoupling'}, LINEAR_SCALES]), ...
+        [{'fig_tag', 'Fig_MC_maps_releasenoise_selfcoupling'}, MAP_STYLE]), ...
     grid_entry('fig_mc_maps_wienernoise',                @fig_mc_gain_bias_maps, false, WIENER, ...
-        [{'fig_tag', 'Fig_MC_maps_wienernoise_gain'}, LINEAR_SCALES]), ...
+        [{'fig_tag', 'Fig_MC_maps_wienernoise_gain'}, MAP_STYLE]), ...
     grid_entry('fig_mc_robustness_releasenoise',         @fig_mc_robustness,     false, GAMMA, ...
         {'fig_tag', 'Fig_MC_robustness_releasenoise_gain'}), ...
     grid_entry('fig_mc_robustness_selfcoupling_releasenoise', @fig_mc_robustness, false, SELF_GAMMA, ...
@@ -273,6 +359,9 @@ cfg.figures = { ...
         {'tag', 'MC_statistics_releasenoise_selfcoupling'}), ...
     grid_entry('mc_statistics_wienernoise',              @statistics_entry,      false, WIENER, ...
         {'tag', 'MC_statistics_wienernoise_gain'}), ...
+    ...% The two 1-D noise sweeps at the preset's gain, one figure (FD-029).
+    struct('name', 'fig_mc_noise_sweeps', 'fn', @fig_mc_noise_sweeps, 'in_paper', true, ...
+        'args', {{'grids', {NOISE_WIENER, NOISE_RELEASE}, 'fig_tag', 'Fig_MC_noise_sweeps'}}), ...
     ...% The two time-series figures: they simulate, and read no run data.
     struct('name', 'fig_noise_levels_wiener', 'fn', @fig_noise_levels_timeseries, 'in_paper', false, ...
         'args', {{'preset_name', cfg.preset_name, 'level_name', 'sigma_u_noise', ...
@@ -282,15 +371,36 @@ cfg.figures = { ...
         'args', {{'preset_name', cfg.preset_name, 'level_name', 'release_sigma_all', ...
         'levels', gamma_three, 'level_label', '\sigma_\gamma', 'model_args', release_fixed, ...
         'tag', 'Fig_noise_levels_gamma'}})};
+cfg.figures = entries_of_grids(cfg.figures, RUN_GRIDS);
+end
+
+%% ------------------------------------------------------------------------
+function figures = entries_of_grids(figures, run_grids)
+% The registry entries whose grids all run, and those that read no grid
+% (they simulate, or need no block C data): an entry of a grid that is not
+% computed would only fail on a new run directory.
+keep = cellfun(@(f) all(ismember(entry_grids(f.args), run_grids)), figures);
+figures = figures(keep);
+end
+
+function g = entry_grids(args)
+% The grids an entry reads, by its 'grid' (one) or 'grids' (several)
+% argument; empty when it names none.
+g = {};
+names = args(1:2:end);
+for key = {'grid', 'grids'}
+    k = find(strcmp(names, key{1}), 1);
+    if ~isempty(k); g = [g, cellstr(args{2 * k})]; end %#ok<AGROW>
+end
 end
 
 %% ------------------------------------------------------------------------
 function g = grid_spec(tag, varargin)
 % One grid of the stage, every field of the grid struct present (empty
 % where the grid leaves the default), so the grids form one struct array.
-g = struct('tag', tag, 'first_axis', [], 'first_range', [], 'first_spacing', [], ...
+g = struct('tag', tag, 'first_axis', [], 'first_range', [], 'first_spacing', [], 'first_levels', [], ...
     'second_axis', [], 'gain_range', [], 'gain_spacing', [], 'second_range', [], ...
-    'second_spacing', [], 'model_args', [], 'readout_signal', [], 'variants', []);
+    'second_spacing', [], 'second_count', [], 'model_args', [], 'readout_signal', [], 'variants', []);
 for k = 1:2:numel(varargin)
     g.(varargin{k}) = varargin{k + 1};
 end

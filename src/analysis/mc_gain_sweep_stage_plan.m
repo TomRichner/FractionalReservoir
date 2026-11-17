@@ -36,7 +36,10 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %                       three spacings; mc_gain_sweep_grid defines them.
 %       first_levels, second_levels   explicit levels, in place of the range
 %                       and the mode's count (gain_levels and bias_levels on
-%                       the default axes)
+%                       the default axes); one level makes a 1-D sweep
+%       first_count, second_count   a count of levels for that axis in place
+%                       of the mode's (mc_gain_sweep_grid), spaced over the
+%                       range as usual
 %       model_args      name-value overrides of the preset for THIS grid's
 %                       runs (its variants' too), applied after the stage's
 %                       model_args: the arguments the grid holds fixed (a
@@ -50,6 +53,15 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %                       grid's second axis (its bias, by default;
 %                       mc_gain_sweep_preset_point)
 %       variant_seeds   seeds of the variant runs; absent = the grid's
+%     run_grids         cell of grid tags: the grids that RUN, in the order
+%                       of grids (FD-029). Absent or empty = every grid
+%                       listed. A grid not named stays defined (a bundle's
+%                       figure entries can follow the same list, and one
+%                       tag added brings the grid back) and is validated
+%                       like any other, but its runs, its variants' too,
+%                       are left out of the plan and of its estimate. A
+%                       tag that names no grid is refused; it needs the
+%                       list form (grids).
 %     seeds             network seeds of every grid (default: the mode's)
 %     conditions, model_args, readout_signal, protocol, lya_K, lya_T_sec,
 %     lya_acc_sec, segment_len   run_mc_gain_sweep's options of those names,
@@ -95,7 +107,7 @@ RUN_OPTIONS  = {'conditions', 'model_args', 'readout_signal', 'protocol', 'lya_K
                 'lya_acc_sec', 'segment_len'};
 GRID_SHAPE   = {'first_axis', 'second_axis', 'first_range', 'first_spacing', 'first_levels', ...
                 'gain_range', 'gain_spacing', 'gain_levels', 'second_range', 'second_spacing', ...
-                'second_levels', 'bias_levels'};
+                'second_levels', 'bias_levels', 'first_count', 'second_count'};
 % A grid's own run options: added to (model_args) or replacing (readout_signal)
 % the stage's, for that grid and its variants only.
 GRID_RUN     = {'model_args', 'readout_signal'};
@@ -103,7 +115,7 @@ GRID_FIELDS  = [{'tag'}, GRID_SHAPE, GRID_RUN, {'variants', 'variant_seeds'}];
 % The options that go by a default axis's own name: refused on another axis.
 DEFAULT_NAMED = struct('first', {{'gain_range', 'gain_spacing', 'gain_levels'}}, ...
                        'second', {{'bias_levels'}});
-STAGE_FIELDS = {'grids', 'seeds'};
+STAGE_FIELDS = {'grids', 'run_grids', 'seeds'};
 
 if ~isfield(cfg, 'mc_preset') || isempty(cfg.mc_preset)
     bad_config('The mc_gain_sweep stage runs on cfg.mc_preset, which this bundle does not set.');
@@ -142,10 +154,31 @@ if isfield(opts, 'grids') && ~isempty(opts.grids)
     if any(cellfun(@isempty, {grids.tag}))
         bad_config('Every grid of cfg.mc_gain_sweep.grids needs a tag.');
     end
+    run_grids = field_or_empty(opts, 'run_grids');
+    if ~isempty(run_grids)
+        if ischar(run_grids) || isstring(run_grids); run_grids = cellstr(run_grids); end
+        if ~iscellstr(run_grids) %#ok<ISCLSTR> strings were converted on the line above
+            bad_config('cfg.mc_gain_sweep.run_grids must be a cell of grid tags.');
+        end
+        unknown = setdiff(run_grids, {grids.tag});
+        if ~isempty(unknown)
+            bad_config('cfg.mc_gain_sweep.run_grids names %s, which no grid has as its tag (the grids: %s).', ...
+                strjoin(unknown, ', '), strjoin({grids.tag}, ', '));
+        end
+    else
+        run_grids = {grids.tag};
+    end
 else
+    if ~isempty(field_or_empty(opts, 'run_grids'))
+        bad_config('cfg.mc_gain_sweep.run_grids selects among listed grids; this config lists none (no grids field).');
+    end
     grids = cell2struct([{''}; cellfun(@(f) field_or_empty(opts, f), single_grid_fields(:), ...
         'UniformOutput', false)], [{'tag'}; single_grid_fields(:)], 1);
+    run_grids = {''};
 end
+% EVERY grid is planned, so a grid that does not run is still validated (a
+% typo in it fails now, not on the day it is brought back); only the runs
+% of the grids in run_grids are kept, and only they count in the estimate.
 
 %% What every run of the stage shares
 shared = {'run_mode', cfg.run_mode, 'verbose', cfg.verbose};
@@ -160,7 +193,7 @@ seeds = given(opts, {'seeds'});
 
 %% One run per grid, then one per variant network of that grid
 runs = struct('label', {}, 'grid', {}, 'variant', {}, 'folder', {}, 'args', {}, 'n_jobs', {});
-worker_minutes = 0;
+run_minutes = zeros(1, 0);   % the estimate of each run, in the order of runs
 for g = 1:numel(grids)
     grid = grids(g);
     first_axis = mc_sweep_axis('first', field_or_empty(grid, 'first_axis'));
@@ -200,7 +233,7 @@ for g = 1:numel(grids)
         first_axis.levels_option, G.first_levels}];
     runs(end+1) = new_run(grid.tag, '', G, [{'preset_name', cfg.mc_preset}, on_axis, ...
         {second_axis.levels_option, G.second_levels, 'seeds', G.seeds}]); %#ok<AGROW>
-    worker_minutes = worker_minutes + G.worker_minutes;
+    run_minutes(end+1) = G.worker_minutes; %#ok<AGROW>
 
     variants = field_or_empty(grid, 'variants');
     if isempty(variants); variants = struct('tag', {}, 'preset', {}); end
@@ -222,14 +255,16 @@ for g = 1:numel(grids)
             'release_noise', release_noise);
         runs(end+1) = new_run(grid.tag, v.tag, V, [{'preset_name', v.preset}, on_axis, ...
             {second_axis.levels_option, V.second_levels, 'seeds', V.seeds}]); %#ok<AGROW>
-        worker_minutes = worker_minutes + V.worker_minutes;
+        run_minutes(end+1) = V.worker_minutes; %#ok<AGROW>
     end
 end
 if numel(unique({runs.folder})) < numel(runs)
     bad_config(['Two runs of the stage would write to one folder (%s): grid tags must be ' ...
         'distinct, and so must the variant tags of a grid.'], strjoin({runs.folder}, ', '));
 end
-plan = struct('runs', runs, 'n_jobs', sum([runs.n_jobs]), 'worker_minutes', worker_minutes);
+keep = ismember({runs.grid}, run_grids);
+runs = runs(keep);
+plan = struct('runs', runs, 'n_jobs', sum([runs.n_jobs]), 'worker_minutes', sum(run_minutes(keep)));
 end
 
 %% ------------------------------------------------------------------------

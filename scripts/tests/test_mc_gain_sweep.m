@@ -498,9 +498,9 @@ n_fail = n_fail + report(strcmp(id10, 'run_mc_gain_sweep:BadJobModel') && contai
 %% ---- 11. a bundle's stage plans a grid with no gain axis ----
 fprintf('\n=== 11. the stage plan ===\n');
 grid_c = struct('tag', 'selfc_noise', 'first_axis', 'self_coupling', 'first_range', [-2 2], ...
-    'second_axis', 'sigma_u_noise', 'second_range', [0 0.04]);
+    'second_axis', 'sigma_u_noise', 'second_range', [0 0.04], 'first_count', 3, 'second_count', 3);
 cfg11 = struct('mc_preset', preset_name, 'run_mode', 'essential', 'verbose', 'near-none', ...
-    'mc_gain_sweep', struct('grids', grid_c));
+    'mc_gain_sweep', struct('grids', grid_c, 'seeds', 3001));
 pl = mc_gain_sweep_stage_plan(cfg11);
 a11 = pl.runs(1).args;
 val = @(name) a11{find(strcmp(a11(1:2:end), name)) * 2};
@@ -508,7 +508,7 @@ n_fail = n_fail + report(isscalar(pl.runs) && strcmp(val('first_axis'), 'self_co
     && isequal(val('first_levels'), [-2 0 2]) && strcmp(val('second_axis'), 'sigma_u_noise') ...
     && isequal(val('second_levels'), [0 0.02 0.04]) && ~any(strcmp(a11(1:2:end), 'gain_levels')) ...
     && pl.runs(1).n_jobs == 9 && strcmp(pl.runs(1).folder, 'mc_gain_sweep_selfc_noise'), ...
-    'self_coupling x sigma_u_noise at essential: 3 x 3 linear levels, passed as first_levels / second_levels, no gain');
+    'self_coupling x sigma_u_noise, 3 x 3 linear levels by the grid''s own counts, passed as first_levels / second_levels, no gain');
 bad11 = cfg11;
 bad11.mc_gain_sweep.grids.gain_levels = [1 2];
 default11 = cfg11;
