@@ -11,6 +11,9 @@ function out = fig_stim_combined(clinical_dir, model_fig, opts)
 %                 Fig_Awake_Main_PanelA_Normalized.fig  IED rate, % of no stim
 %                 Fig_Awake_Main_PanelB_PSD.fig         SOZ PSD, median + IQR
 %               (file names overridable through opts.clinical_files).
+%               'clinical_psd_fig', f takes the PSD panel from the .fig at the
+%               full path f instead (one axes, drawn like PanelB_PSD), e.g.
+%               the no-harmonic-removal version under psd_2hz_check/.
 % model_fig     the model figure written by fig_ied_stim (its .fig): panels
 %               A event rate, B PSD, C band power, D correlation, E state
 %               change, F example traces with cumulative lambda_1. A newer
@@ -40,7 +43,8 @@ function out = fig_stim_combined(clinical_dir, model_fig, opts)
 %      axis replaced by a scale bar, as in A)
 %   E  model event rate                 F  model PSD
 % Its text prints at the grouped main figures' size (9 pt on a 7.0 x 7.65 in
-% canvas; fig_grouped_main's 14 pt on an 11-in PNG is 8.9 pt at 7 in), and
+% canvas; fig_grouped_main's 14 pt on an 11-in PNG is 8.9 pt at 7 in), with
+% the panel letters larger (12 pt, 'letter_size'; Tom, 2026-11-17), and
 % the rows are packed so the gap between the halves matches those within.
 % The model rate axes is found by a y label containing 'Events per Minute' or
 % 'Event Rate'; a legend attached to it in the source (one entry per network)
@@ -57,6 +61,7 @@ arguments
     opts.tag (1,:) char = 'Fig_Stim_Combined'
     opts.clinical_files struct = struct('traces','Fig_Awake_Main_PanelD.fig', ...
         'rate','Fig_Awake_Main_PanelA_Normalized.fig','psd','Fig_Awake_Main_PanelB_PSD.fig')
+    opts.clinical_psd_fig (1,:) char = ''   % full path of the clinical PSD panel; '' = clinical_dir/clinical_files.psd
     opts.clinical_note (1,:) char = ''   % provenance line, e.g. the source repo commit
     opts.model_note (1,:) char = ''
     opts.drop_text (1,:) cell = {'SOZ Contacts$'}   % regexps of header texts to delete
@@ -66,6 +71,7 @@ arguments
     % v1: 7.5 / 6.5 pt on 7.0 x 9.4 in, as it was drawn.
     opts.font_size (1,1) double = NaN   % points, at the printed size
     opts.annot_size (1,1) double = NaN  % channel names, scale bars, legends
+    opts.letter_size (1,1) double = NaN % panel letters; NaN = 12 pt (mirror), font_size (v1)
     opts.size_in (1,2) double = [NaN NaN]   % PNAS full page width is 7 in
     opts.resolution (1,1) double = 450
     opts.save (1,1) logical = true
@@ -78,6 +84,7 @@ assert(isfile(model_fig),'fig_stim_combined:NoModel','No model figure %s',model_
 cf = opts.clinical_files;
 src = struct('traces',fullfile(clinical_dir,cf.traces),'rate',fullfile(clinical_dir,cf.rate), ...
     'psd',fullfile(clinical_dir,cf.psd),'model',model_fig);
+if ~isempty(opts.clinical_psd_fig), src.psd = opts.clinical_psd_fig; end
 for fn = fieldnames(src)'
     assert(isfile(src.(fn{1})),'fig_stim_combined:MissingSource','Missing %s',src.(fn{1}));
 end
@@ -85,6 +92,7 @@ purple = [0.494 0.247 0.596]; green = [0 0.62 0.45];
 is_mirror = strcmp(opts.layout,'mirror');
 if isnan(opts.font_size),  opts.font_size  = pick_default(is_mirror,9,7.5); end
 if isnan(opts.annot_size), opts.annot_size = pick_default(is_mirror,8,6.5); end
+if isnan(opts.letter_size), opts.letter_size = pick_default(is_mirror,12,opts.font_size); end
 if any(isnan(opts.size_in))
     if is_mirror, opts.size_in = [7.0 7.65]; else, opts.size_in = [7.0 9.4]; end
 end
@@ -256,12 +264,12 @@ end
 % ---- letters ------------------------------------------------------------------
 order = {a_no,'A';a_rate,'B';a_psd,'C';m_rate,'D';m_band,'E';m_psd,'F';m_tr_no,'G';m_corr,'H';m_state,'I'};
 for k = 1:size(order,1)
-    letter(fig,order{k,1},order{k,2},xl.(order{k,2}),opts.font_size);
+    letter(fig,order{k,1},order{k,2},xl.(order{k,2}),opts.letter_size);
 end
 end   % layout v1
 drawnow;
 
-out = struct('fig',fig,'files',{{}},'sources',src,'letters',{panel_map(opts.layout)});
+out = struct('fig',fig,'files',{{}},'sources',src,'letters',{panel_map(opts.layout,src.psd)});
 if opts.save
     outdir = opts.out_dir;
     assert(~isempty(outdir),'fig_stim_combined:NoOutDir','Give out_dir.');
@@ -340,7 +348,7 @@ if ~opts.visible, close(fig); out.fig = []; end
         end
         ord = {a_no,'A',0.005; a_rate,'B',0.005; a_psd,'C',xC-0.095; ...
             m_tr_no,'D',0.005; m_rate,'E',0.005; m_psd,'F',xC-0.095};
-        for kk = 1:size(ord,1), letter(fig,ord{kk,1},ord{kk,2},ord{kk,3},opts.font_size); end
+        for kk = 1:size(ord,1), letter(fig,ord{kk,1},ord{kk,2},ord{kk,3},opts.letter_size); end
     end
     function [axn,lgn] = place(axs,p,srcfig)
         % copy one source axes (with its legend, if any) into fig at p;
@@ -393,7 +401,8 @@ end
 function letter(fig,ax,ch,x,fs)
 % "(A)" at the top left of the panel, just above the axes, as the grouped figures do
 ip = ax.Position; y = ip(2)+ip(4)+0.006;
-annotation(fig,'textbox',[x y 0.04 0.02],'String',['(' ch ')'],'FontSize',fs, ...
+w = 0.04*max(1,fs/7.5);   % wide enough that a larger letter does not wrap
+annotation(fig,'textbox',[x y w 0.02],'String',['(' ch ')'],'FontSize',fs, ...
     'FontName','Helvetica','LineStyle','none','VerticalAlignment','bottom', ...
     'HorizontalAlignment','left','Margin',0,'Tag','letter');
 end
@@ -406,11 +415,15 @@ end
 function s = onoff(b)
 if b, s = 'on'; else, s = 'off'; end
 end
-function m = panel_map(layout)
+function m = panel_map(layout,psd_file)
+psd_src = 'panels/Fig_Awake_Main_PanelB_PSD';
+if nargin > 1
+    [d,n] = fileparts(psd_file); [~,d] = fileparts(d); psd_src = [d '/' n];
+end
 if nargin > 0 && strcmp(layout,'mirror')
     m = {'A','clinical example traces (S9, SOZ), no stimulation and stimulation','clinical composite panel A (panels/Fig_Awake_Main_PanelD)'; ...
          'B','clinical IED rate per participant, % of no stimulation','clinical composite panel B (panels/Fig_Awake_Main_PanelA_Normalized)'; ...
-         'C','clinical SOZ PSD, median and IQR, n = 12','clinical composite panel C (panels/Fig_Awake_Main_PanelB_PSD)'; ...
+         'C','clinical SOZ PSD, median and IQR, n = 12',['clinical composite panel C (' psd_src ')']; ...
          'D','model example traces, no stimulation and stimulation','model figure, traces axes (titles No Stimulation / Stimulation)'; ...
          'E','model event rate','model figure, rate axes'; ...
          'F','model subnet-mean PSD','model figure, PSD axes'};
@@ -418,7 +431,7 @@ if nargin > 0 && strcmp(layout,'mirror')
 end
 m = {'A','clinical example traces (S9, SOZ), no stimulation and stimulation','clinical composite panel A (panels/Fig_Awake_Main_PanelD)'; ...
      'B','clinical IED rate per participant, % of no stimulation','clinical composite panel B (panels/Fig_Awake_Main_PanelA_Normalized)'; ...
-     'C','clinical SOZ PSD, median and IQR, n = 12','clinical composite panel C (panels/Fig_Awake_Main_PanelB_PSD)'; ...
+     'C','clinical SOZ PSD, median and IQR, n = 12',['clinical composite panel C (' psd_src ')']; ...
      'D','model candidate events per minute','fig_ied_stim panel A'; ...
      'E','model band-power change (dB)','fig_ied_stim panel C'; ...
      'F','model subnet-mean PSD','fig_ied_stim panel B'; ...
@@ -436,10 +449,10 @@ fprintf(fid,'- Clinical traces: `%s`\n- Clinical rate: `%s`\n- Clinical PSD: `%s
 if ~isempty(opts.clinical_note), fprintf(fid,'- Clinical note: %s\n',opts.clinical_note); end
 if ~isempty(opts.model_note),    fprintf(fid,'- Model note: %s\n',opts.model_note); end
 fprintf(fid,'\n## Panel letters\n\n| New | Shows | Source panel |\n|---|---|---|\n');
-m = panel_map(opts.layout);
+m = panel_map(opts.layout,src.psd);
 for k = 1:size(m,1), fprintf(fid,'| (%s) | %s | %s |\n',m{k,:}); end
 fprintf(fid,['\n## Canvas\n\nLayout `%s`, %.2f x %.2f in (the printed size), exported at %d dpi. ' ...
-    'Panel letters, axis labels, tick labels and trace titles %g pt; channel names, scale bars, ' ...
-    'legends and the PSD notes %g pt.\n'],opts.layout,opts.size_in,opts.resolution,opts.font_size,opts.annot_size);
+    'Panel letters %g pt; axis labels, tick labels and trace titles %g pt; channel names, scale bars, ' ...
+    'legends and the PSD notes %g pt.\n'],opts.layout,opts.size_in,opts.resolution,opts.letter_size,opts.font_size,opts.annot_size);
 fprintf(fid,'\nDropped: the clinical header text "S9, SOZ Contacts" (the caption carries it) and the sources'' own panel letters.\n');
 end
