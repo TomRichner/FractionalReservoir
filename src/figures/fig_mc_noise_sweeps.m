@@ -19,6 +19,15 @@ function out = fig_mc_noise_sweeps(cfg)
 % the smallest to the largest network (with two to five networks a range
 % says more than quartiles), and every network as a small point. Failed
 % jobs are left out and counted in the caption.
+% Two options change that for a figure that wants it (the defaults are the
+% above): cfg.band = 'iqr' draws the band from the 25th to the 75th
+% percentile over networks instead, prctile(v, [25 75]) (base MATLAB;
+% it interpolates linearly between the sorted values, the k-th of
+% n sitting at the 100 (k - 0.5) / n percentile, so with 5 networks the
+% band runs from 3/4 of the way from the smallest to the second smallest
+% up to 1/4 of the way from the fourth to the largest), and
+% cfg.show_points = false leaves the per-network points out. The caption
+% says which band is drawn; the table keeps the smallest and largest.
 %
 % THE NOISE AXIS is drawn as the maps draw it (mc_axis_spacing): a zero
 % level followed by a log ladder ('zero_log') at its log ladder, the zero one
@@ -60,6 +69,8 @@ arguments
     cfg.conditions                = {}
     cfg.first_level double        = []   % with several first-axis levels: the one drawn (nearest)
     cfg.show_lle    (1,1) logical = true
+    cfg.band        (1,:) char {mustBeMember(cfg.band, {'range', 'iqr'})} = 'range'   % the band over networks
+    cfg.show_points (1,1) logical = true   % every network as a small point
     cfg.note        (1,:) char    = ''
     cfg.fig_tag     (1,:) char    = 'Fig_MC_noise_sweeps'
 end
@@ -117,19 +128,26 @@ for r = 1:nr
             T = P.T(strcmp(P.T.condition, conds{c}), :);
             if r == 1; n_failed = n_failed + nnz(T.failed); end
             T = T(~T.failed, :);
-            [med, lo, hi, n] = deal(nan(size(P.levels)));
+            [med, lo, hi, blo, bhi, n] = deal(nan(size(P.levels)));   % lo, hi: the range; blo, bhi: the band
             for k = 1:numel(P.levels)
                 v = T.(rows{r})(T.(P.column) == P.levels(k));
                 v = v(isfinite(v));
                 n(k) = numel(v);
                 if isempty(v); continue; end
                 med(k) = median(v); lo(k) = min(v); hi(k) = max(v);
-                scatter(ax, repmat(P.x(k), size(v)), v, POINT_SIZE, cond_colors(c, :), 'filled', ...
-                    'MarkerFaceAlpha', 0.5, 'HandleVisibility', 'off');
+                if strcmp(cfg.band, 'iqr')
+                    q = prctile(v, [25 75]); blo(k) = q(1); bhi(k) = q(2);
+                else
+                    blo(k) = lo(k); bhi(k) = hi(k);
+                end
+                if cfg.show_points
+                    scatter(ax, repmat(P.x(k), size(v)), v, POINT_SIZE, cond_colors(c, :), 'filled', ...
+                        'MarkerFaceAlpha', 0.5, 'HandleVisibility', 'off');
+                end
             end
             ok = isfinite(med);
             if nnz(ok) > 1
-                fill(ax, [P.x(ok), fliplr(P.x(ok))], [lo(ok), fliplr(hi(ok))], cond_colors(c, :), ...
+                fill(ax, [P.x(ok), fliplr(P.x(ok))], [blo(ok), fliplr(bhi(ok))], cond_colors(c, :), ...
                     'FaceAlpha', BAND_ALPHA, 'EdgeColor', 'none', 'HandleVisibility', 'off');
             end
             h(c) = plot(ax, P.x(ok), med(ok), '-o', 'Color', cond_colors(c, :), 'LineWidth', 2, ...
@@ -159,8 +177,12 @@ lg.Layout.Tile = 'south';
 
 %% Caption
 n_networks = max(cellfun(@(P) numel(unique(P.T.seed)), S));
-caption = {sprintf(['Preset network at %s. Line: median over %d networks; band: smallest to largest ' ...
-    'network; points: each network.'], S{1}.at_text, n_networks)};
+band_text = 'smallest to largest network';
+if strcmp(cfg.band, 'iqr'); band_text = 'interquartile range over networks (prctile, 25 to 75)'; end
+points_text = '';
+if cfg.show_points; points_text = '; points: each network'; end
+caption = {sprintf('Preset network at %s. Line: median over %d networks; band: %s%s.', ...
+    S{1}.at_text, n_networks, band_text, points_text)};
 broken = cellfun(@(P) P.zero_log, S);
 if any(broken)
     caption{end+1} = 'Noise axes: 0, then log-spaced levels; the axis is broken between 0 and the lowest positive level.';
@@ -177,7 +199,7 @@ title(tl, caption, 'FontSize', st.tick_fs - 5);
 
 %% Save
 out = struct('figs', fig, 'files', {{}}, 'source', {cellfun(@(P) P.D.source, S, 'UniformOutput', false)}, ...
-    'table', {md'});
+    'table', {md'}, 'n_networks', n_networks);
 vprintf(cfg.verbose, 'verbose', '%s\n', md{:});
 if cfg.save
     out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
