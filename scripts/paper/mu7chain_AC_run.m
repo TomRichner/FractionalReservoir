@@ -1,9 +1,9 @@
 function [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 % MU7CHAIN_AC_RUN Blocks A and C in one command: one run, then its figure sets.
 %
-%   mu7chain_AC_run                 % 'essential': about an hour on 12 workers
+%   mu7chain_AC_run                 % 'essential': about 2 h 30 on 12 workers since FD-029
 %   mu7chain_AC_run('fast')
-%   mu7chain_AC_run('fastmedium')   % about 13 h 20 on 12 workers since FD-029 (mu7chain_AC_config)
+%   mu7chain_AC_run('fastmedium')   % about 15 h 10 on 12 workers since FD-029 (mu7chain_AC_config)
 %   [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %
 %   setup_paths is called on the first line. Every setting comes from
@@ -12,9 +12,10 @@ function [run_dir, fig_results] = mu7chain_AC_run(run_mode)
 %   first (pool_set(N)); both entry points refuse without.
 %
 %   run_dir   data/mu7chain_AC_<run_mode>: block A's stage folders, and
-%             block C's mc_gain_sweep_selfcoupling/ (the one grid that runs
-%             since FD-029; mu7chain_gainbias_config's RUN_GRIDS), and the
-%             noise-switch rollouts' noise_switch/
+%             block C's mc_gain_sweep_selfcoupling/,
+%             mc_gain_sweep_noise1d_wiener/ and mc_gain_sweep_noise1d_release/
+%             (the grids that run since FD-029; mu7chain_gainbias_config's
+%             RUN_GRIDS), and the noise-switch rollouts' noise_switch/
 %   figures   figs/mu7chain_AC_<run_mode>_3cond   (no adaptation, 1TS, chained MTS: the paper's)
 %             figs/mu7chain_AC_<run_mode>_4cond   (the same plus product MTS: for review)
 %             'essential' draws the four-condition set alone (cfg.figure_sets)

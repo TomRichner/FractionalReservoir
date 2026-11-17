@@ -36,7 +36,10 @@ function plan = mc_gain_sweep_stage_plan(cfg)
 %                       three spacings; mc_gain_sweep_grid defines them.
 %       first_levels, second_levels   explicit levels, in place of the range
 %                       and the mode's count (gain_levels and bias_levels on
-%                       the default axes)
+%                       the default axes); one level makes a 1-D sweep
+%       first_count, second_count   a count of levels for that axis in place
+%                       of the mode's (mc_gain_sweep_grid), spaced over the
+%                       range as usual
 %       model_args      name-value overrides of the preset for THIS grid's
 %                       runs (its variants' too), applied after the stage's
 %                       model_args: the arguments the grid holds fixed (a
@@ -104,7 +107,7 @@ RUN_OPTIONS  = {'conditions', 'model_args', 'readout_signal', 'protocol', 'lya_K
                 'lya_acc_sec', 'segment_len'};
 GRID_SHAPE   = {'first_axis', 'second_axis', 'first_range', 'first_spacing', 'first_levels', ...
                 'gain_range', 'gain_spacing', 'gain_levels', 'second_range', 'second_spacing', ...
-                'second_levels', 'bias_levels'};
+                'second_levels', 'bias_levels', 'first_count', 'second_count'};
 % A grid's own run options: added to (model_args) or replacing (readout_signal)
 % the stage's, for that grid and its variants only.
 GRID_RUN     = {'model_args', 'readout_signal'};
@@ -154,7 +157,7 @@ if isfield(opts, 'grids') && ~isempty(opts.grids)
     run_grids = field_or_empty(opts, 'run_grids');
     if ~isempty(run_grids)
         if ischar(run_grids) || isstring(run_grids); run_grids = cellstr(run_grids); end
-        if ~iscellstr(run_grids)
+        if ~iscellstr(run_grids) %#ok<ISCLSTR> strings were converted on the line above
             bad_config('cfg.mc_gain_sweep.run_grids must be a cell of grid tags.');
         end
         unknown = setdiff(run_grids, {grids.tag});

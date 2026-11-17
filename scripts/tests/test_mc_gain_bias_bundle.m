@@ -101,23 +101,26 @@ conds3 = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'};
 conds4 = [conds3, {'sfa3_std2'}];
 variant_tags = {'EI3to2', 'EI2to3'};
 noise_grids = {'releasenoise', 'selfcoupling_releasenoise', 'wienernoise'};
-all_grids = [{'bias', 'selfcoupling'}, noise_grids];
-% The registry with every grid running ('all', as before FD-029) ...
+noise1d = {'noise1d_wiener', 'noise1d_release'};   % the 1-D noise sweeps at the preset's gain (FD-029)
+all_grids = [{'bias', 'selfcoupling'}, noise_grids, noise1d];
+run_grids = [{'selfcoupling'}, noise1d];               % the grids the bundle runs (FD-029)
+% The registry with every grid running ('all') ... ('' where an entry
+% names no single grid: the noise sweeps' figure reads two, by 'grids')
 entry_names_all = [{'fig_mc_maps_bias', 'fig_mc_maps_selfcoupling', 'fig_mc_gain_curves', ...
     'fig_mc_robustness_bias', 'fig_mc_robustness_selfcoupling', 'fig_mc_vs_lambda1', ...
     'fig_lambda1_vs_bias', 'fig_rate_vs_lambda1', 'fig_slope_share_vs_gain', ...
     'mc_statistics_bias', 'mc_statistics_selfcoupling'}, ...
     strcat('fig_mc_maps_', noise_grids), strcat('fig_mc_robustness_', noise_grids), ...
-    strcat('mc_statistics_', noise_grids), {'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}];
+    strcat('mc_statistics_', noise_grids), {'fig_mc_noise_sweeps', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}];
 entry_grids_all = [{'bias', 'selfcoupling', 'bias', 'bias', 'selfcoupling', 'selfcoupling', ...
-    'bias', 'bias', 'bias', 'bias', 'selfcoupling'}, noise_grids, noise_grids, noise_grids, {'', ''}];
-% ... and the bundle's own (FD-029): the self-coupling grid's entries and
-% those that read no grid, in the same order.
+    'bias', 'bias', 'bias', 'bias', 'selfcoupling'}, noise_grids, noise_grids, noise_grids, {'', '', ''}];
+% ... and the bundle's own (FD-029): the self-coupling grid's entries, the
+% noise sweeps' figure and the time series, in the same order.
 registered = ismember(entry_grids_all, {'selfcoupling', ''});
 entry_names = entry_names_all(registered);
 entry_grids = entry_grids_all(registered);
 assert(isequal(entry_names, {'fig_mc_maps_selfcoupling', 'fig_mc_robustness_selfcoupling', 'fig_mc_vs_lambda1', ...
-    'mc_statistics_selfcoupling', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}));
+    'mc_statistics_selfcoupling', 'fig_mc_noise_sweeps', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}));
 % The maps' style (FD-029), on every registered map.
 MAP_STYLE = {'mc_scale', 'linear', 'lle_scale', 'linear', 'lle_clip', 5, 'ticks_top_right', false, ...
     'show_zero_line', false, 'show_flags', false, 'show_iqr', false, 'mc_colormap', 'lle_center'};
@@ -139,7 +142,11 @@ for md = {'essential', 'fast'}
         assert(isequal(names, entry_names), 'the registry is: %s', strjoin(names, ', '));
         assert(isequal(cellfun(@(f) arg_or_empty(f.args, 'grid'), c.figures, 'UniformOutput', false), entry_grids), ...
             'every entry names the grid it reads (the time series read none)');
-        assert(isequal(c.mc_gain_sweep.run_grids, {'selfcoupling'}), 'only the self-coupling grid runs (FD-029)');
+        assert(isequal(c.mc_gain_sweep.run_grids, run_grids), ...
+            'the self-coupling grid and the two 1-D noise sweeps run (FD-029)');
+        sweeps = c.figures{strcmp(names, 'fig_mc_noise_sweeps')};
+        assert(isequal(sweeps.fn, @fig_mc_noise_sweeps) && isequal(arg(sweeps.args, 'grids'), noise1d) && sweeps.in_paper, ...
+            'the noise sweeps'' figure reads the two 1-D sweeps');
         maps = c.figures(startsWith(names, 'fig_mc_maps_'));
         assert(isscalar(maps) && all(cellfun(@(f) all(arrayfun(@(k) isequal(arg(f.args, MAP_STYLE{k}), MAP_STYLE{k + 1}), ...
             1:2:numel(MAP_STYLE))) && ismember(arg(f.args, 'lle_colormap'), dark_center_colormaps()), maps)), ...
@@ -151,8 +158,9 @@ for md = {'essential', 'fast'}
             isequal(rmfield(c_all.mc_gain_sweep, 'run_grids'), rmfield(c.mc_gain_sweep, 'run_grids')));
         c_two = mu7chain_gainbias_config(md{1}, fs{1}, {'selfcoupling', 'bias'});
         two = cellfun(@(f) f.name, c_two.figures, 'UniformOutput', false);
-        assert(isequal(two, entry_names_all(ismember(entry_grids_all, {'selfcoupling', 'bias', ''}))), ...
-            'a grid brought back brings its figure entries');
+        assert(isequal(two, setdiff(entry_names_all(ismember(entry_grids_all, {'selfcoupling', 'bias', ''})), ...
+            {'fig_mc_noise_sweeps'}, 'stable')), ...
+            'a grid brought back brings its figure entries; an entry whose grids do not all run is left out');
         c = c_all;
         names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
         assert(isequal(names, entry_names_all), 'the full registry is: %s', strjoin(names, ', '));
@@ -165,12 +173,23 @@ for md = {'essential', 'fast'}
             'the self-coupling grid: gain 0.05 to 5, s -4 to 6 (FD-029)');
         assert(isequal({grids.tag}, all_grids) && ...
             isequal({grids.second_axis}, {'S_c', 'self_coupling', 'release_sigma_all', ...
-                'release_sigma_all', 'sigma_u_noise'}) && ...
-            isequal({grids.gain_spacing}, {'log', 'linear', 'log', [], 'log'}) && ...
-            isequal({grids.first_axis}, {[], [], [], 'self_coupling', []}));
+                'release_sigma_all', 'sigma_u_noise', 'sigma_u_noise', 'release_sigma_all'}) && ...
+            isequal({grids.gain_spacing}, {'log', 'log', 'log', [], 'log', [], []}) && ...
+            isequal({grids.first_axis}, {[], [], [], 'self_coupling', [], [], []}));
+        % The 1-D sweeps: one first-axis level, the preset's gain; the 2-D
+        % grids' ladders, fixed arguments and readout; 5 noise levels at
+        % essential, the table's count otherwise.
+        if strcmp(md{1}, 'essential'); want_count = 5; else; want_count = []; end
+        assert(all(cellfun(@(v) isequal(v, mc_gain_sweep_preset_point(c.mc_preset)), {grids(6:7).first_levels})) && ...
+            isequal({grids(6:7).model_args}, {wiener_fixed, release_fixed}) && ...
+            isequal({grids(6:7).second_range}, {wiener_ladder, gamma_ladder}) && ...
+            all(strcmp({grids(6:7).readout_signal}, 'release_filtered')) && ...
+            all(strcmp({grids(6:7).second_spacing}, 'zero_log')) && ...
+            all(cellfun(@(v) isequal(v, want_count), {grids(6:7).second_count})), '%s: the 1-D noise sweeps', md{1});
         assert(isequal({grids(1).variants.tag}, variant_tags) && all(cellfun(@isempty, {grids(2:end).variants})));
         assert(all(cellfun(@isempty, {grids(1:2).model_args})) && all(cellfun(@isempty, {grids(1:2).readout_signal})), ...
             'the bias and self-coupling grids keep the stage''s arguments and readout');
+        assert(isequal(c.mc_gain_sweep.run_grids, all_grids));
         assert(isequal({grids(3:5).model_args}, {release_fixed, release_fixed, wiener_fixed}) && ...
             all(strcmp({grids(3:5).readout_signal}, 'release_filtered')) && ...
             all(strcmp({grids(3:5).second_spacing}, 'zero_log')), ...
@@ -212,37 +231,54 @@ assert(throws(@() mu7chain_gainbias_config('fast2'), 'mu7chain_gainbias_config:B
 assert(strcmp(mu7chain_gainbias_config().run_mode, 'essential'), 'the default is the size agents run');
 
 %% 4. The stage's plan in every run mode: both grids, the variants, the sizes
-% FD-029: fastmedium 11 x 11 x 5 and medium 21 x 21 x 5 networks.
-sizes = {'essential', 3, 1; 'fast', 7, 3; 'fastmedium', 11, 5; 'medium', 21, 5; 'medium2', 21, 5; ...
-         'production', 17, 10};
-% The estimate: 10.24 worker-minutes a job, 1.35 times that for the two
-% release-noise grids (runs 5 and 6; mc_gain_sweep_grid), 2 n^2 x networks jobs.
+% FD-029: essential 7 x 7 x 2, fastmedium 11 x 11 x 5 and medium 21 x 21 x 5
+% networks; the 1-D noise sweeps take 5 noise levels at essential and the
+% table's count otherwise.
+sizes = {'essential', 7, 2, 5; 'fast', 7, 3, 7; 'fastmedium', 11, 5, 11; 'medium', 21, 5, 21; ...
+         'medium2', 21, 5, 21; 'production', 17, 10, 17};
+% The estimate: 10.24 worker-minutes a job, 1.35 times that for a job with
+% the release noise on (mc_gain_sweep_grid).
 MINUTES = 10.24; RELEASE = 1.35;
 assert(isequal(sizes(:, 1)', run_mode_names()), 'the size table below must cover run_mode_names');
 for m = 1:size(sizes, 1)
-    [md, n, n_seeds] = sizes{m, :};
+    [md, n, n_seeds, n_noise] = sizes{m, :};
     seeds = 3000 + (1:n_seeds);
-    self_gains = round(linspace(0.05, 5, n), 10);
+    self_gains = round(logspace(log10(0.05), log10(5), n), 10);
     self_s = round(linspace(-4, 6, n), 10);
-    % The bundle as it is: the gain x self-coupling grid alone, no variants.
-    pl = mc_gain_sweep_stage_plan(mu7chain_gainbias_config(md));
-    assert(isequal({pl.runs.label}, {'selfcoupling'}) && isequal({pl.runs.folder}, {'mc_gain_sweep_selfcoupling'}), md);
-    a = pl.runs.args;
+    zero_log = @(ladder, n) round([0, ladder(1) * (ladder(2) / ladder(1)).^((1:n-1) / (n - 1))], 10);
+    % The bundle as it is: the gain x self-coupling grid and the two 1-D
+    % noise sweeps, no variants.
+    c = mu7chain_gainbias_config(md);
+    pl = mc_gain_sweep_stage_plan(c);
+    assert(isequal({pl.runs.label}, run_grids) && isequal({pl.runs.folder}, strcat('mc_gain_sweep_', run_grids)), md);
+    a = pl.runs(1).args;
     assert(isequal(arg(a, 'gain_levels'), self_gains) && isequal(arg(a, 'second_levels'), self_s) && ...
-        isequal(arg(a, 'seeds'), seeds) && strcmp(mc_gain_axis_scale(self_gains), 'linear'), ...
-        '%s: gains linear 0.05 to 5, s linear -4 to 6, the mode''s seeds', md);
-    % s = 0 is a level where (n - 1) is a multiple of 5 (11 and 21 levels);
-    % the preset's gain 1 is a level at no mode of the table.
-    assert(nnz(self_s == 0) == (mod(n - 1, 5) == 0) && ~any(self_gains == 1), ...
-        '%s: s = 0 a level %d, gain 1 a level %d', md, any(self_s == 0), any(self_gains == 1));
-    assert(pl.n_jobs == n^2 * n_seeds && abs(pl.worker_minutes - MINUTES * n^2 * n_seeds) < 1e-6, ...
-        '%s: %d jobs, %g worker-minutes', md, pl.n_jobs, pl.worker_minutes);
-    % Every grid, as before FD-029.
+        isequal(arg(a, 'seeds'), seeds) && strcmp(mc_gain_axis_scale(self_gains), 'log'), ...
+        '%s: gains log-spaced 0.05 to 5, s linear -4 to 6, the mode''s seeds', md);
+    % s = 0 is a level where (n - 1) is a multiple of 5 (11 and 21 levels).
+    assert(nnz(self_s == 0) == (mod(n - 1, 5) == 0), '%s: s = 0 a level %d', md, any(self_s == 0));
+    preset_gain = mc_gain_sweep_preset_point(c.mc_preset);
+    for k = 2:3
+        a = pl.runs(k).args;
+        if k == 2; ladder = wiener_ladder; fixed = wiener_fixed; noise_axis = 'sigma_u_noise';
+        else;      ladder = gamma_ladder;  fixed = release_fixed; noise_axis = 'release_sigma_all'; end
+        assert(isequal(arg(a, 'gain_levels'), preset_gain) && strcmp(arg(a, 'second_axis'), noise_axis) && ...
+            max(abs(arg(a, 'second_levels') - zero_log(ladder, n_noise))) < 1e-12 && ...
+            isequal(arg(a, 'model_args'), fixed) && strcmp(arg(a, 'readout_signal'), 'release_filtered') && ...
+            isequal(arg(a, 'seeds'), seeds), '%s, %s: the preset''s gain only, %d noise levels', ...
+            md, pl.runs(k).label, n_noise);
+    end
+    assert(isequal([pl.runs.n_jobs], [n^2, n_noise, n_noise] * n_seeds), '%s: job counts', md);
+    want_minutes = MINUTES * (n^2 + n_noise + RELEASE * n_noise) * n_seeds;
+    assert(abs(pl.worker_minutes - want_minutes) < 1e-6 * want_minutes, ...
+        '%s: %g worker-minutes, expected %g', md, pl.worker_minutes, want_minutes);
+    fprintf('  %-10s %3d jobs, %5.1f h on 12 workers\n', md, pl.n_jobs, pl.worker_minutes / 12 / 60);
+    % Every grid, as before FD-029, and the two 1-D sweeps.
     c = mu7chain_gainbias_config(md, '4cond', 'all');
     pl = mc_gain_sweep_stage_plan(c);
-    assert(isequal({pl.runs.label}, [{'bias', 'bias_EI3to2', 'bias_EI2to3', 'selfcoupling'}, noise_grids]), md);
+    assert(isequal({pl.runs.label}, [{'bias', 'bias_EI3to2', 'bias_EI2to3', 'selfcoupling'}, noise_grids, noise1d]), md);
     assert(isequal({pl.runs.folder}, [{'mc_gain_sweep_bias', 'mc_gain_sweep_bias_EI3to2', ...
-        'mc_gain_sweep_bias_EI2to3', 'mc_gain_sweep_selfcoupling'}, strcat('mc_gain_sweep_', noise_grids)]), md);
+        'mc_gain_sweep_bias_EI2to3', 'mc_gain_sweep_selfcoupling'}, strcat('mc_gain_sweep_', [noise_grids, noise1d])]), md);
     for k = 1:4
         a = pl.runs(k).args;
         assert(~any(strcmp(a(1:2:end), 'model_args')) && ~any(strcmp(a(1:2:end), 'readout_signal')), ...
@@ -271,12 +307,11 @@ for m = 1:size(sizes, 1)
     assert(s_levels(1) == -4 && s_levels(end) == 6, '%s: s from -4 to 6', md);
     % The noise grids: a zero level, then the mode's log ladder without its
     % lowest rung; fixed arguments and the readout per grid.
-    zero_log = @(ladder) round([0, ladder(1) * (ladder(2) / ladder(1)).^((1:n-1) / (n - 1))], 10);
     sigma_gamma = arg(pl.runs(5).args, 'second_levels');
-    assert(max(abs(sigma_gamma - zero_log(gamma_ladder))) < 1e-12 && sigma_gamma(end) == gamma_ladder(2), ...
+    assert(max(abs(sigma_gamma - zero_log(gamma_ladder, n))) < 1e-12 && sigma_gamma(end) == gamma_ladder(2), ...
         '%s: the release-noise levels', md);
     sigma_u = arg(pl.runs(7).args, 'second_levels');
-    assert(max(abs(sigma_u - zero_log(wiener_ladder))) < 1e-12 && sigma_u(end) == wiener_ladder(2), ...
+    assert(max(abs(sigma_u - zero_log(wiener_ladder, n))) < 1e-12 && sigma_u(end) == wiener_ladder(2), ...
         '%s: the Wiener-noise levels', md);
     assert(strcmp(mc_axis_spacing(sigma_gamma), 'zero_log') && strcmp(mc_axis_spacing(sigma_u), 'zero_log'));
     a = pl.runs(5).args;
@@ -293,20 +328,27 @@ for m = 1:size(sizes, 1)
     assert(strcmp(arg(a, 'second_axis'), 'sigma_u_noise') && isequal(arg(a, 'gain_levels'), log_gains) && ...
         isequal(arg(a, 'model_args'), wiener_fixed) && strcmp(arg(a, 'readout_signal'), 'release_filtered'), ...
         '%s: gain x Wiener noise', md);
-    assert(isequal([pl.runs.n_jobs], [n^2, n, n, n^2, n^2, n^2, n^2] * n_seeds) && ...
-        pl.n_jobs == (5 * n^2 + 2 * n) * n_seeds, '%s: job counts', md);
-    n_release = 2 * n^2 * n_seeds;
+    assert(isequal([pl.runs.n_jobs], [n^2, n, n, n^2, n^2, n^2, n^2, n_noise, n_noise] * n_seeds) && ...
+        pl.n_jobs == (5 * n^2 + 2 * n + 2 * n_noise) * n_seeds, '%s: job counts', md);
+    n_release = (2 * n^2 + n_noise) * n_seeds;
     want_minutes = MINUTES * ((pl.n_jobs - n_release) + RELEASE * n_release);
     assert(abs(pl.worker_minutes - want_minutes) < 1e-6 * want_minutes, ...
         '%s: worker-minutes %g, expected %g', md, pl.worker_minutes, want_minutes);
 end
-% With every grid, the essential stage holds 51 jobs: 24 before the noise
-% grids, 27 of them. The bundle itself, the self-coupling grid alone: 9.
-assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential', '4cond', 'all')).n_jobs == 51);
-assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential')).n_jobs == 9);
-% 'fastmedium' (FD-029): 605 jobs, about 8.6 h on 12 workers.
+% The bundle at essential: 7 x 7 x 2 and two sweeps of 5 x 2, 118 jobs; at
+% fastmedium (FD-029) 715 jobs, about 10.4 h on 12 workers.
+assert(mc_gain_sweep_stage_plan(mu7chain_gainbias_config('essential')).n_jobs == 118);
 pl = mc_gain_sweep_stage_plan(mu7chain_gainbias_config('fastmedium'));
-assert(pl.n_jobs == 605 && abs(pl.worker_minutes / 12 / 60 - 8.604) < 0.01);
+assert(pl.n_jobs == 715 && abs(pl.worker_minutes / 12 / 60 - 10.443) < 0.01);
+% A grid's own count of levels (first_count, second_count) replaces the
+% mode's for that axis only; a count below 2 is refused (one level is given
+% as explicit levels).
+G = mc_gain_sweep_grid('fast', 'second_axis', 'sigma_u_noise', 'second_range', [1e-3 1e-1], ...
+    'second_spacing', 'zero_log', 'second_count', 3, 'gain_levels', 1);
+assert(max(abs(G.second_levels - [0 1e-2 1e-1])) < 1e-12 && isequal(G.first_levels, 1) && G.n_jobs == 3 * 3);
+G = mc_gain_sweep_grid('fast', 'first_count', 5);
+assert(numel(G.first_levels) == 5 && numel(G.second_levels) == 7);
+assert(throws(@() mc_gain_sweep_grid('fast', 'second_count', 1), 'mc_gain_sweep_grid:BadCount'));
 % The release-noise cost follows the grid's axes and its fixed arguments,
 % not its tag: an axis that is a release-noise amplitude, or model_args that
 % set one above zero, and a zero set there does not count.
@@ -330,7 +372,7 @@ G = mc_gain_sweep_grid('fast', 'second_axis', 'self_coupling', 'second_range', [
 assert(isequal(G.second_levels, round([0, 10.^(-2 + 2 * (1:6) / 6)], 10)), ...
     'zero, then the 7-level ladder from 0.01 to 1 without its lowest rung, rounded to 10 decimals');
 G = mc_gain_sweep_grid('essential', 'first_axis', 'sigma_u_noise', 'first_range', [1e-3 1e-1], ...
-    'first_spacing', 'zero_log', 'second_levels', 0.2);
+    'first_spacing', 'zero_log', 'first_count', 3, 'second_levels', 0.2);
 assert(max(abs(G.first_levels - [0 1e-2 1e-1])) < 1e-12, 'at three levels: zero, the middle, the top');
 assert(throws(@() mc_gain_sweep_grid('fast', 'second_axis', 'sigma_u_noise', 'second_range', [0 0.1], ...
     'second_spacing', 'zero_log'), 'mc_gain_sweep_grid:BadRange'), 'a zero_log range names the ladder, lo > 0');
@@ -482,6 +524,8 @@ grids(2).second_levels = [-1 1];
 grids(3).second_levels = [0 2e-4 2e-3];   % three levels: a zero, then a log ladder
 grids(4).second_levels = [0 2e-3];
 grids(5).second_levels = [0 1e-3 0.01];
+grids(6).second_levels = [0 1e-3 0.01];   % the 1-D sweeps keep their one level of gain, the preset's
+grids(7).second_levels = [0 2e-4 2e-3];
 cfg.mc_gain_sweep = setfield(tiny, 'grids', grids); %#ok<SFLD>
 % The time series simulate: on a tiny network, briefly.
 for k = find(startsWith(cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false), 'fig_noise_levels_'))
@@ -528,6 +572,16 @@ assert(isequal(N.wienernoise.settings.model_args, [tiny.model_args, wiener_fixed
     isequal(unique(N.wienernoise.T.sigma_u_noise)', [0 1e-3 0.01]));
 assert(~isequal(N.releasenoise.T.mc_total(N.releasenoise.T.release_sigma_all > 0), ...
     N.releasenoise.T.mc_total(N.releasenoise.T.release_sigma_all == 0)), 'the release noise changes the result');
+% The 1-D noise sweeps: one gain, the preset's; three noise levels; the
+% fixed arguments and readout of their 2-D counterparts.
+preset_gain = mc_gain_sweep_preset_point(cfg.mc_preset);
+for g = noise1d
+    N.(g{1}) = load(results_in(['mc_gain_sweep_' g{1}]));
+    assert(height(N.(g{1}).T) == 3 * 3 && ~any(N.(g{1}).T.failed) && isequal(unique(N.(g{1}).T.gain), preset_gain) && ...
+        strcmp(N.(g{1}).settings.readout_signal, 'release_filtered'), '%s: 1 gain x 3 levels x 3 conditions', g{1});
+end
+assert(isequal(N.noise1d_wiener.settings.model_args, [tiny.model_args, wiener_fixed]) && ...
+    isequal(N.noise1d_release.settings.model_args, [tiny.model_args, release_fixed]));
 assert(~isfolder(fullfile(tmp, 'mc_gain_sweep')), 'no unnamed grid: nothing is written to <run_dir>/mc_gain_sweep');
 assert(~isfolder(fullfile(tmp, 'mc_example')) && ~isfolder(fullfile(tmp, 'eig_heatmap')));
 
@@ -543,6 +597,28 @@ end
 stat = R(strcmp({R.name}, 'mc_statistics_selfcoupling'));
 assert(any(endsWith(stat.files, 'MC_statistics_selfcoupling_by_self_coupling.csv')) && ...
     all(cellfun(@isfile, stat.files)));
+
+% The noise sweeps' figure: a column per sweep, memory capacity and
+% lambda_1, a line per condition, the leak named in the caption, its table
+% beside it; lambda_1 can be left out; a 2-D grid needs first_level.
+quiet = {'conditions', conds3, 'save', false, 'visible', false};
+ns = R(strcmp({R.name}, 'fig_mc_noise_sweeps'));
+assert(any(endsWith(ns.files, 'Fig_MC_noise_sweeps_table.md')) && ...
+    all(cellfun(@(f) isfile(fullfile(tmpf, 'fig_mc_noise_sweeps', f)), ns.files)), 'the noise sweeps: figure and table');
+o = fig_mc_noise_sweeps('run_dir', tmp, quiet{:});
+ax = findobj(o.figs, 'Type', 'axes');
+cap = strjoin(cellstr(findall(o.figs, 'Type', 'tiledlayout').Title.String), ' ');
+assert(numel(ax) == 4 && contains(cap, 'leak r_s = 0.002') && contains(cap, 'broken') && ...
+    numel(findobj(o.figs, 'Type', 'legend').String) == 3 && numel(o.table) == 2 + 2 * 3 * 3, ...
+    'noise sweeps: 2 x 2 panels, the leak and the broken axis in the caption, 3 conditions, a table row per sweep, condition and level');
+close(o.figs);
+o = fig_mc_noise_sweeps('run_dir', tmp, 'show_lle', false, quiet{:});
+assert(numel(findobj(o.figs, 'Type', 'axes')) == 2); close(o.figs);
+assert(throws(@() fig_mc_noise_sweeps('run_dir', tmp, 'grids', {'wienernoise'}, quiet{:}), ...
+    'fig_mc_noise_sweeps:SeveralFirstLevels'), 'a 2-D grid is drawn only at a named first level');
+o = fig_mc_noise_sweeps('run_dir', tmp, 'grids', {'wienernoise'}, 'first_level', 1, quiet{:});
+assert(contains(strjoin(cellstr(findall(o.figs, 'Type', 'tiledlayout').Title.String), ' '), 'nearest 1'));
+close(o.figs);
 
 % The noise axis of a map is drawn as its log ladder: evenly spaced cells,
 % the zero one step below the lowest positive level, ticks labelled 0 and

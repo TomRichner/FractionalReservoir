@@ -13,12 +13,13 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %       its stages (all of them, or 'essential''s four), sweeps, presets,
 %       conditions per set and figure registry
 %   mu7chain_gainbias_config(run_mode, figure_set)   block C: the opt-in
-%       stage 'mc_gain_sweep' with its five grids defined (bias,
-%       self-coupling, and the three noise grids of FD-027, the bias grid
-%       with two variant networks; cfg.mc_gain_sweep), of which ONLY THE
-%       GAIN x SELF-COUPLING GRID RUNS since FD-029 (its run_grids), and
-%       the figure entries of that grid plus the two noise-level
-%       time-series figures
+%       stage 'mc_gain_sweep' with its seven grids defined (bias,
+%       self-coupling, the three 2-D noise grids of FD-027 and the two 1-D
+%       noise sweeps of FD-029; the bias grid with two variant networks;
+%       cfg.mc_gain_sweep), of which since FD-029 THE GAIN x SELF-COUPLING
+%       GRID AND THE TWO 1-D NOISE SWEEPS RUN (its run_grids), and the
+%       figure entries of those plus the two noise-level time-series
+%       figures
 %   the opt-in stage 'noise_switch'                  copies of the network
 %       that share the noise for 10 s, then run on noise seeds of their own
 %       (run_noise_switch_rollouts; Tom, 2026-11-14: "it should be added to
@@ -57,23 +58,23 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 % noise_switch_stage_plan). This one does not set it.
 %
 % HOW LONG, on 12 pool workers: block A's stages (about 35 minutes at
-% 'essential'; mu7chain_config) and then block C's, the self-coupling grid
-% alone since FD-029 at 10.24 worker-minutes a job (measured on the fast
-% run of 2026-11-13; mu7chain_gainbias_config has the table): 9 jobs at
-% 'essential', one round of the pool, about 10 min; 147 at 'fast', about
-% 2 h 05; 605 at 'fastmedium', about 8 h 36; 2205 at 'medium', about 31 h
-% 20. Then the noise switch (0.5 min at 'fast' on 4 workers, measured
-% 2026-11-14; its figure entry about 45 s at 'fast'). The figures add the
-% two noise-level time series, about a minute each. So an 'essential' run
-% of this bundle is about 50 min, a 'fast' run about 2 h 05 more than
-% block A's. (With all five grids, until FD-029, block C was 51 jobs,
-% about 45 to 59 min, at 'essential' and 777, about 12 h 30, at 'fast'.)
+% 'essential'; mu7chain_config) and then block C's, since FD-029 the
+% self-coupling grid and the two 1-D noise sweeps at 10.24 worker-minutes a
+% job, 1.35 times that with the release noise on (measured on the fast run
+% of 2026-11-13; mu7chain_gainbias_config has the table): 118 jobs at
+% 'essential', about 1 h 44; 189 at 'fast', about 2 h 48; 715 at
+% 'fastmedium', about 10 h 27; 2415 at 'medium', about 34 h 52. Then the
+% noise switch (0.5 min at 'fast' on 4 workers, measured 2026-11-14; its
+% figure entry about 45 s at 'fast'). The figures add the two noise-level
+% time series, about a minute each. So an 'essential' run of this bundle is
+% about 2 h 30. (Until FD-029 block C was 51 jobs, about 45 to 59 min, at
+% 'essential' and 777, about 12 h 30, at 'fast'.)
 %
 % 'fastmedium' (Tom, 2026-11-14) WAS SIZED FOR ABOUT 19 HOURS on 12
 % workers, with block C at 9 x 9 x 2 and five grids; the run of 2026-11-15
-% took 19 h 28. Since FD-029 block C is 11 x 11 x 5 on the self-coupling
-% grid alone, 605 jobs, about 8 h 36, so the bundle is about 13 h 20 (block
-% A 4 h 15, block C 8 h 36, figures 0 h 30). The table below is the
+% took 19 h 28. Since FD-029 block C is 715 jobs, about 10 h 27, so the
+% bundle is about 15 h 10 (block A 4 h 15, block C 10 h 27, figures
+% 0 h 30). The table below is the
 % sizing of 2026-11-14. Each stage's estimate is the fast run's measured time
 % (2026-11-13) scaled by the ratio of work; the sizes are in each stage's
 % table, which gives the reasoning:
@@ -91,7 +92,7 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %   paper_illustrations  3
 %   mc_gain_sweep      819       9 x 9 levels x 2 networks: 846 jobs, 324
 %                                with release noise (13 h 40); since FD-029
-%                                516 (11 x 11 x 5, one grid, 605 jobs)
+%                                627 (715 jobs, 55 with release noise)
 %   noise_switch         3       medium's 16 copies x 20 s
 %   two figure passes   30       about 10 min each at 'fast'
 % about 18 h 25 in all: block A 4 h 15, block C 13 h 40, figures 0 h 30.
