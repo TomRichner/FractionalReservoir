@@ -1541,3 +1541,25 @@ becomes an issue with an acceptance test.
     21 x 5. A new figure draws both in one sheet; a preview is drawn from
     the 2026-11-15 run's rows at gain 1.003.
 - **Result:** _(pending)_
+
+### FD-030 Product MTS leaves the larger runs: three conditions from fast upward
+
+- **Status:** in progress (Tom's decision, 2026-11-16).
+- **What:** Tom: "It would be fine if we started leaving off the prod MTS
+  ... I've decided that it will not go into the paper. We will only keep
+  4 conditions for the essential run and for test. For fast, fastmedium,
+  and medium, we will only have chained MTS, not prod MTS. And there will
+  only be 3 condition figures then." So at `fast` and above the mu7chain
+  bundles (block A, block C, A + C) simulate three conditions (no
+  adaptation, 1TS, chained MTS) and draw the three-condition figure set
+  only; `essential` and the tests keep four conditions and the
+  four-condition set. This replaces "every analysis runs four conditions"
+  (to-do list, block A, 2026-11-11) for those modes.
+- **Done means:** one place states which conditions a mode runs; every
+  stage of the bundles honors it; a three-condition run directory draws
+  its figures; `essential` and the tests are unchanged; the quick suite
+  and the stages tier pass.
+- **Lead's decisions:** `medium2` and `production` follow `medium`. The
+  product route model, its preset conditions and its tests stay in the
+  code; only what the larger runs simulate changes.
+- **Result:** _(pending)_
