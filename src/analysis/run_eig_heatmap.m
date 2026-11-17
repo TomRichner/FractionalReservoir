@@ -60,6 +60,7 @@ arguments
     cfg.examples                   = []       % struct array (label, overrides); [] -> mu_EE x 0.5 / 1 / 1.5
     cfg.n_override  (1,1) double  = 0        % 0 -> preset n (fast mode runs the NON-reference examples at 250)
     cfg.n_samples_examples (1,1) double = 0  % states per non-reference example; 0 -> per run_mode (40 / 60 / 150)
+    cfg.conditions                 = {}       % the preset's conditions to sample, by name; {} = all (FD-030)
 end
 
 setup_paths();
@@ -110,8 +111,9 @@ lya_T_interval = [T_range(2) - lle_window, T_range(2)];
 
 % The conditions come FROM THE PRESET, in its order. Hardcoding the four
 % original names here meant a 7-regime preset would have been sampled for only
-% four of them, silently, and the figure would have looked complete.
-[~, ~, conditions] = srnn_param_preset(cfg.preset_name);
+% four of them, silently, and the figure would have looked complete. A bundle
+% may narrow them by name (cfg.conditions; FD-030).
+[~, ~, conditions] = preset_with_conditions(cfg.preset_name, cfg.conditions);
 cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 titles     = cellfun(@(n) pretty(n), cond_names, 'UniformOutput', false);
 

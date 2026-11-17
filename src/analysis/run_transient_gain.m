@@ -62,6 +62,7 @@ arguments
     cfg.n_override  (1,1) double = 0     % 0 -> the preset's n (tests use a small one)
     cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.report_dt   (1,1) double = 0.02
+    cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
 end
 
 setup_paths();
@@ -116,7 +117,7 @@ else
 end
 if ~isfolder(out_dir); mkdir(out_dir); end
 
-[preset, model_class, conditions] = srnn_param_preset(cfg.preset_name);
+[preset, model_class, conditions] = preset_with_conditions(cfg.preset_name, cfg.conditions);
 if ~strcmp(model_class, 'SRNNCellTypePairs')
     error('run_transient_gain:WrongClass', ...
         'Preset ''%s'' is written for %s; this stage runs SRNNCellTypePairs only.', ...

@@ -45,6 +45,9 @@ arguments
     % computes and this stage has always discarded is not computed.
     % Default false: the existing path, unchanged.
     opts.lean        (1,1) logical = false
+    % The preset's conditions to simulate, by name (preset_with_conditions);
+    % empty = every condition the preset states, as before (FD-030).
+    opts.conditions                = {}
 end
 
 setup_paths();
@@ -54,7 +57,7 @@ setup_paths();
 % the guard goes out of scope.
 fig_guard = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 
-[preset, model_class, conditions] = srnn_param_preset(opts.preset_name);
+[preset, model_class, conditions] = preset_with_conditions(opts.preset_name, opts.conditions);
 if ~strcmp(model_class, 'SRNNCellTypePairs')
     error('run_memory_capacity_example:BadModelClass', ...
         'Preset ''%s'' is written for %s; SRNN_ESN_reservoir needs SRNNCellTypePairs.', ...

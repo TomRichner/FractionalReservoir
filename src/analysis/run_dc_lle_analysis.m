@@ -78,6 +78,9 @@ arguments
     % at sigma_u_noise = 0, stochastic above it. Same rule and same reason as
     % run_memory_capacity.
     opts.ode_solver     (1,:) char    = ''
+    % The preset's conditions to run, by name (preset_with_conditions); empty
+    % = every condition the preset states, as before (FD-030).
+    opts.conditions                   = {}
 end
 
 setup_paths();
@@ -88,7 +91,7 @@ setup_paths();
 fig_guard = with_graphics_defaults('DefaultFigureVisible', 'off'); %#ok<NASGU>
 
 %% Resolve the two knobs
-[preset, model_class, conditions] = srnn_param_preset(opts.preset_name);
+[preset, model_class, conditions] = preset_with_conditions(opts.preset_name, opts.conditions);
 if ~strcmp(model_class, 'SRNNCellTypePairs')
     error('run_dc_lle_analysis:BadModelClass', ...
         ['Preset ''%s'' is written for %s. This analysis was ported to ' ...

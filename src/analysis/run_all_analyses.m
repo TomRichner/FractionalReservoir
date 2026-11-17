@@ -47,6 +47,12 @@ function run_dir = run_all_analyses(preset_name, run_mode, opts)
 %                run_all_paper_analyses records its own stage selection this
 %                way, so the manifest says what the directory does not hold
 %                from the moment it is created.
+%   conditions   names of the preset's conditions to simulate (FD-030; a cell,
+%                default {} = every condition the preset states). Passed to
+%                each sweep's context (resolve_run_context). When given, the
+%                manifest records the selection as conditions_run, the
+%                selected names in their run order; with none given the field
+%                is absent and the manifest is what it always was.
 %
 % WAS A SCRIPT that ran three other scripts, passing settings through
 % base-workspace `master_*` variables the callees read with exist(). Everything
@@ -75,6 +81,7 @@ arguments
     opts.param_space_seed           = []          % [] = unset (clock); else the seed of the joint sample
     opts.sweeps          cell       = {'sensitivity', 'tau', 'param_space'}   % the sweeps to run, as given; {} = none
     opts.manifest_fields (1,1) struct = struct()  % extra run_manifest fields from the caller
+    opts.conditions                 = {}          % the preset's conditions to run, by name; {} = all (FD-030)
 end
 
 setup_paths();
@@ -119,7 +126,7 @@ prov = capture_git_provenance(run_dir, project_root);
 % deterministic -- srnn_param_preset is a pure lookup. Resolving here as well is
 % only so the manifest can record the class and the conditions before any
 % compute starts.
-[preset_defaults, model_class, conditions] = srnn_param_preset(preset_name);
+[preset_defaults, model_class, conditions] = preset_with_conditions(preset_name, opts.conditions);
 vprintf(opts.verbose, 'verbose', 'Parameter preset: %s (%d override(s)) on %s\n', ...
     preset_name, numel(fieldnames(preset_defaults)), model_class);
 vprintf(opts.verbose, 'verbose', 'Conditions: %s\n', ...
@@ -135,13 +142,19 @@ if ~all(run_sweep)
     vprintf(opts.verbose, 'minimal', '[sweeps] running %d of %d: %s; skipped (not selected): %s\n', ...
         n_run, numel(sweep_names), list_or_none(sweeps_run), strjoin(extra.sweeps_skipped, ', '));
 end
+% The conditions simulated, only when the caller narrowed them (FD-030): the
+% manifest of a run of every condition is unchanged. make_all_paper_figures
+% reads it to refuse a figure set that asks for a condition the run lacks.
+if ~isempty(opts.conditions)
+    extra.conditions_run = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
+end
 save_manifest(run_dir, preset_name, preset_defaults, model_class, run_mode, ...
     opts.save_figs, prov, dt_str, extra);
 
 %% Shared context arguments for every sub-analysis
 ctx_args = {'preset_name', preset_name, 'run_mode', run_mode, ...
             'output_dir', run_dir, 'save_figs', opts.save_figs, ...
-            'verbose', opts.verbose};
+            'verbose', opts.verbose, 'conditions', opts.conditions};
 
 %% 1. Sensitivity
 % The [k/n] counters number the sweeps that run; with all three selected the

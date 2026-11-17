@@ -103,12 +103,19 @@ function G = mc_gain_sweep_grid(run_mode, spec)
 % levels for the same axis take precedence over a count.
 %
 % THE COST. release_noise (default false) says the grid's runs have the
-% release noise on; it changes the estimate only.
+% release noise on; n_conditions (default 4) is the number of conditions
+% each job runs. Both change the estimate only. A job of N conditions is
+% estimated at N/4 of the measured four-condition job: the conditions of a
+% job run one after another on one worker, each about the same size. So a
+% job of three (the mu7chain bundles from 'fast' upward since FD-030,
+% product MTS left out) is estimated at 7.68 worker-minutes, three
+% quarters of 10.24, until a three-condition run measures it. The times in
+% the table above are for four conditions.
 %
 % G: first_axis, second_axis (mc_sweep_axis descriptors), first_levels,
 % second_levels, seeds (rows), n_jobs (their product), and worker_minutes,
-% the estimate n_jobs x WORKER_MINUTES_PER_JOB, times RELEASE_NOISE_COST
-% with release_noise.
+% the estimate n_jobs x WORKER_MINUTES_PER_JOB x n_conditions / 4, times
+% RELEASE_NOISE_COST with release_noise.
 %
 % Errors carry the stage's identifiers: run_mc_gain_sweep:badMode (an
 % unknown run mode), :NoFirstLevels / :NoSecondLevels (an axis with no
@@ -139,9 +146,11 @@ arguments
     spec.second_count  double {mustBeEmptyOrCount} = []
     spec.seeds         (1,:) double = []
     spec.release_noise (1,1) logical = false
+    spec.n_conditions  (1,1) double {mustBeInteger, mustBePositive} = 4
 end
 
 WORKER_MINUTES_PER_JOB = 10.24;    % one job of four conditions; see the header
+MEASURED_CONDITIONS    = 4;        % the conditions per job in that measurement
 RELEASE_NOISE_COST     = 1.35;     % a job with the release noise on, relative to one without
 DEFAULT_RANGE   = struct('first', [0.1 4], 'second', [-0.6 0.6]);   % of the default axes
 DEFAULT_SPACING = struct('first', 'log', 'second', 'linear');       % of the default axes
@@ -180,7 +189,9 @@ if isempty(G.seeds)
     G.seeds = P.seed_net_base + (1:n_seeds);
 end
 G.n_jobs = numel(G.first_levels) * numel(G.second_levels) * numel(G.seeds);
-minutes_per_job = WORKER_MINUTES_PER_JOB;
+% A job runs its conditions one after another on one worker, so its cost is
+% taken as proportional to their number (an estimate until measured).
+minutes_per_job = WORKER_MINUTES_PER_JOB * spec.n_conditions / MEASURED_CONDITIONS;
 if spec.release_noise; minutes_per_job = minutes_per_job * RELEASE_NOISE_COST; end
 G.worker_minutes = G.n_jobs * minutes_per_job;
 end
