@@ -10,6 +10,7 @@ setup_paths();
 clinical_dir = 'C:/Users/m218089/Desktop/gitlab_repos/cscs_stim_stability/results/manuscript_stim/tica_awake/panels';
 fr = 'C:/Users/m218089/Desktop/github_repos/FractionalReservoir';
 clinical_note = 'cscs_stim_stability commit f0a5bab (k = 3 SD detection, 12 awake participants; Fig_Awake_Main_Normalized)';
+clinical_psd = '';   % '' = panels/Fig_Awake_Main_PanelB_PSD.fig
 if stage == 1
     model_fig = [fr '/figs/IED_model/stim_20261005/fig_ied_stim.fig'];
     out_dir = [fr '/figs/stim_combined_v2_stage1'];
@@ -17,8 +18,12 @@ if stage == 1
 else
     model_fig = [fr '/figs/IED_model/stim_blocks_20261117/fig_ied_stim_blocks.fig'];
     out_dir = [fr '/figs/stim_combined_v2'];
+    % clinical PSD without the 2-Hz harmonic removal (Tom, 2026-11-17)
+    clinical_psd = 'C:/Users/m218089/Desktop/gitlab_repos/cscs_stim_stability/results/manuscript_stim/tica_awake/psd_2hz_check/Fig_Awake_Main_PanelB_PSD_noremoval.fig';
+    clinical_note = [clinical_note '; panel C PSD without 2-Hz harmonic removal (psd_2hz_check/Fig_Awake_Main_PanelB_PSD_noremoval)'];
     model_note = 'IED model block run stim_blocks_20261117, amplitude 0.20, 12 networks, 4 + 4 blocks each (fig_ied_stim_blocks_stats.md beside it)';
 end
 out = fig_stim_combined(clinical_dir, model_fig, 'out_dir', out_dir, 'layout', 'mirror', ...
+    'clinical_psd_fig', clinical_psd, ...
     'clinical_note', clinical_note, 'model_note', model_note);
 fprintf('Wrote %s\n', strjoin(fullfile(out_dir, out.files), ', '));
