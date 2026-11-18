@@ -36,6 +36,11 @@ arguments
     cfg.visible (1,1) logical = false
     cfg.verbose (1,:) char = 'minimal'
     cfg.conditions = {}   % names to draw, in order; empty = all the run holds (select_conditions)
+    % Group 3 only: false draws fig_main3_stability's variant without the
+    % lambda_1 row (rows input, expansion, heat map), saved as
+    % Fig_Main3_Grouped_noC (2026-11-17).
+    cfg.show_lambda_row (1,1) logical = true
+    cfg.svg (1,1) logical = false   % also save an SVG beside the PNG and .fig
 end
 setup_paths();
 root = fileparts(which('setup_paths'));
@@ -60,7 +65,7 @@ switch group
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 3
-        a=fig_main3_stability(cfg.run_dir,cfg.conditions);
+        a=fig_main3_stability(cfg.run_dir,cfg.conditions,'show_lambda_row',cfg.show_lambda_row);
         fig.Position(3)=fig.Position(3)*a.width_scale;
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
@@ -157,6 +162,7 @@ if ismember(group,[1 2 3 8])
     elseif group==3
         tt=findall(fig,'Type','axes','-regexp','Tag','^stability_r1_c\d+$');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
+        set(findall(fig,'Tag','accumulated_lambda_label'),'FontSize',12);
     end
 else
     set(findall(fig,'Type','axes'),'FontSize',10);
@@ -165,11 +171,12 @@ if group==4, style_main4_grouped(fig); end
 if group==5, style_main5_grouped(fig,margin_names,gain_names); end
 if group==6, style_main6_grouped(fig,tau_names); end
 tag=sprintf('Fig_Main%d_Grouped',group);
+if group==3 && ~cfg.show_lambda_row, tag=[tag '_noC']; end
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
     % Remove this tag's previous outputs first, as save_figure_stable does.
-    for ext={'.png','.fig'}
+    for ext={'.png','.fig','.svg'}
         old=fullfile(outdir,[tag ext{1}]);
         if isfile(old), delete(old); end
     end
@@ -193,6 +200,10 @@ if cfg.save
         end
     end
     savefig(fig,fullfile(outdir,[tag '.fig']));
+    if cfg.svg
+        exportgraphics(fig,fullfile(outdir,[tag '.svg']),'ContentType','vector',pad{:});
+        if ~isequal(fig.Position(3:4),pos(3:4)), fig.Position=pos; end
+    end
     out.files=existing_outputs(outdir,tag);
     fid=fopen(fullfile(outdir,[tag '_provenance.md']),'w'); guard=onCleanup(@()fclose(fid));
     fprintf(fid,'# Main group %d\n\nRun: `%s`\n\n',group,cfg.run_dir);
