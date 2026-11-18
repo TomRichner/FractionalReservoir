@@ -1677,3 +1677,23 @@ becomes an issue with an acceptance test.
 - **Rule for workers from now on (lead):** a figure fix is briefed as a change
   to the function *and* its registration in the run config; a redraw by hand
   is only a preview.
+
+**Work split (lead, 2026-11-17; Opus 5.5 workers only, Tom).** Four
+parallel jobs with no shared files; each in its own FractionalReservoir
+worktree from `main`, committed on its own branch, merged by the lead after
+review. Pool: 3 each (12 in all).
+
+| Job | Worker | Items | Files it owns |
+|---|---|---|---|
+| J1 Figure registration | matlab-opus-4 | 1, 2, 3, 11 | `scripts/paper/mu7chain_gainbias_config.m`, `scripts/paper/mu7chain_AC_config.m`, `scripts/paper/grouped_figure_registry.m`, `src/figures/fig_main_mc_grouped.m`, a new test |
+| J2 Block A figures | matlab-opus-5 | 7, 8, 12 | `src/figures/fig_grouped_main.m`, `src/figures/fig_main3_stability.m`, `src/figures/fig_main2_dynamics.m`, `src/analysis/run_paper_illustrations.m`, `scripts/paper/mu7chain_config.m` |
+| J3 IED stimulation run and Fig 8 | matlab-opus-6 | 4, 5 | new `scripts/paper/ied_stim_*` bundle, `scripts/explorations/IED_model/ied_stim_blocks.m` and `fig_ied_stim_blocks.m` (moved), `src/figures/fig_stim_combined.m`, `scripts/paper/make_fig_stim_combined*.m` |
+| J4 Clinical panels | matlab-opus-2 | 6 | `cscs_stim_stability` only (its own worktree; tell the CSC session first) |
+
+Item 13 is on branch `numerics-fs` (matlab-opus-1). Item 9 waits for the
+eigenvalue-by-step figure (matlab-opus-3). Item 10 is the lead's, after J1
+and J3 are merged: point `figure_sources.json` at run outputs.
+
+Each job is done when a fresh `essential` (or `fast`) run of its bundle, from
+its branch, writes the figures into the run's own figure root with the fixes,
+the guard test passes, and the quick suite passes.
