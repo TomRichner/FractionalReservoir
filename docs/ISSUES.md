@@ -1649,19 +1649,27 @@ becomes an issue with an acceptance test.
    **Cleaning decided (Tom, 2026-11-17): `tica_awake_best`** (v4awake for
    885, 987, 877; v5 for the rest; 926 and 1533 still excluded by hand), so
    the rerun and Fig 8's clinical panels use that run, not `tica_awake`.
-7. **Fig 3 new layout as the paper default.** When the worker on Fig 3
-   reports (rows: input, expansion, eigenvalues; λ1 row removed), and Tom
-   approves it, make that layout the default of the paper's group 3 (through
+7. **Fig 3 new layout as the paper default** (approved by Tom 2026-11-17;
+   option `show_lambda_row` false, 2b95c89). Make that layout the default of the paper's group 3 (through
    `grouped_figure_registry`/`fig_grouped_main` or the bundle config), not an
    option only a hand call sets.
-8. **Production top-K.** When the top-K timing reports, put the chosen K in
-   the run config of the stage that feeds Fig 3 (`local_lyapunov`) for the
-   production mode (Tom: "we will use that for the production run").
+8. **Production top-K: K = 150** (Tom, 2026-11-17; timing: about 11–12 min
+   for three conditions on an idle machine). Put it in the run config of
+   `local_lyapunov` for the production mode. The multiple-timescale
+   expansion does not converge in K; the caption calls it a lower bound.
 9. **Exploratory eigenvalue-by-step figure.** If Tom keeps it, register it
    (stage + figure) in the A + C bundle; if not, leave it in explorations.
 10. **Paper repo.** After items 1–5, point `figure_sources.json` at the run
     outputs (no hand-named folders such as `stim_combined_v2`), rerun
     `set_figs.py`, and update the Fig 8 comment in `Manuscript5.md`.
+12. **Fig 2F plots b₁** (Tom, 2026-11-17: b₁ scales 0 to 1 and is the
+    synaptic depression). Make group 2's row F plot the first depression
+    variable b₁ for every condition (state which variable in the provenance),
+    labelled synaptic depression.
+13. **Numerics acceptance** (Tom, 2026-11-17): check L uses ≤ 0.05 alone
+    (scatter clause dropped); check C top-K vs QR ≤ 0.03. Being done on
+    branch `numerics-fs`; the verdict must print that both were changed after
+    the fastmedium run. Production fs stays 400 Hz.
 11. **Guard.** A test (quick suite) that every figure the manuscript embeds
     has a registered entry in some bundle config: a list of the paper's
     figure names checked against the bundles' `cfg.figures`.
