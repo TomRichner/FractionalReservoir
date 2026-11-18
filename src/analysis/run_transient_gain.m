@@ -63,6 +63,7 @@ arguments
     cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.report_dt   (1,1) double = 0.02
     cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
+    cfg.fs                       = 0     % integration rate; 0 or [] -> 400 Hz (FD-031 item 14: the bundle's cfg.fs)
 end
 
 setup_paths();
@@ -95,7 +96,7 @@ P.lya_warmup  = 5;
 P.lya_dt      = 0.05;
 P.K           = 15;
 P.K_max       = 30;
-P.fs          = 400;
+P.fs          = stage_fs(cfg.fs, 400, 'run_transient_gain');
 P.n_override  = cfg.n_override;
 P.horizon     = horizon;
 P.report_dt   = cfg.report_dt;

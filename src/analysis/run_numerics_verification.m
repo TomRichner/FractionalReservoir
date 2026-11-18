@@ -171,6 +171,8 @@ if cfg.n_trials_lle     > 0; n_lle     = cfg.n_trials_lle;     end
 P = struct();                        % everything a worker needs, broadcast once
 P.preset_name  = cfg.preset_name;
 P.verbose      = cfg.verbose;
+% Takes no 'fs' from the bundle (FD-031 item 14, unlike the other stages):
+% this stage integrates at several rates by design, to measure the step error.
 P.fs_ladder    = [400, 800, 1600];   % the paper runs at 400; the rest test convergence
 P.fs_top       = max(P.fs_ladder);
 P.fs_noisy_ref = 8 * P.fs_top;       % 12800: the noisy reference grid

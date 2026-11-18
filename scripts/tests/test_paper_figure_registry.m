@@ -41,16 +41,17 @@ function test_paper_figure_registry()
 PAPER_FIGURES = {
     'Fig_Main1_Grouped.png',              'AC',  'fig_main1_grouped',               'Fig 1',   ''
     'Fig_Main2_Grouped.png',              'AC',  'fig_main2_grouped',               'Fig 2',   ''
-    % Fig 3: the new layout (no lambda row) becomes the entry's default
-    % output in J2 (FD-031 item 7); the entry is the same either way.
-    'Fig_Main3_Grouped_noC.png',          'AC',  'fig_main3_grouped',               'Fig 3',   ''
+    % Fig 3: the new layout (no lambda row) is the entry's default output
+    % since J2 (FD-031 item 7), fig_main3_grouped/Fig_Main3_Grouped.png. The
+    % old name Fig_Main3_Grouped_noC.png is retired (RETIRED_NAMES below).
+    'Fig_Main3_Grouped.png',              'AC',  'fig_main3_grouped',               'Fig 3',   ''
     'Fig_Main4_Grouped.png',              'AC',  'fig_main4_grouped',               'Fig 4',   ''
     'Fig_Main5_Grouped.png',              'AC',  'fig_main5_grouped',               'Fig 5',   ''
     'Fig_Main6_Grouped.png',              'AC',  'fig_main6_grouped',               'Fig 6',   ''
     'Fig_Main_MC_Grouped.png',            'C',   'fig_main_mc_grouped',             'Fig 7',   ''
     'Fig_Main_MC_Grouped.png',            'AC',  'fig_main_mc_grouped',             'Fig 7 (A + C bundle)', ''
-    'Fig_Stim_Combined.png',              'IED', 'Fig_Stim_Combined',               'Fig 8',   'J3'
-    'fig_ied_stim_blocks_supp_state.png', 'IED', 'fig_ied_stim_blocks_supp_state',  'supplement', 'J3'
+    'Fig_Stim_Combined.png',              'IED', 'Fig_Stim_Combined',               'Fig 8',   ''
+    'fig_ied_stim_blocks_supp_state.png', 'IED', 'fig_ied_stim_blocks_supp_state',  'supplement', ''
     'Fig_EI_Weights_ParamSpace_LLE.png',  'AC',  'fig_EI_weights_param_space',      'supplement', ''
     'Fig_EI_Weights_ParamSpace_mean_rate.png', 'AC', 'fig_EI_weights_param_space',  'supplement', ''
     'Fig_Eig_Heatmap_Imbalance.png',      'AC',  'fig_eig_heatmap_imbalance',       'supplement', ''
@@ -69,6 +70,14 @@ PAPER_FIGURES = {
     'Fig_single_neuron_revised.png',      'AC',  'fig_single_neuron_revised',       'supplement', ''
     'bursting_synchrony.png',             'AC',  'fig_stim_engages_adaptation',     'supplement', ''
     'bursting_timeseries.png',            'AC',  'fig_stim_engages_adaptation',     'supplement', ''
+    };
+% PNG names the paper repo may still list that a figure step no longer
+% writes, each mapped to the name that replaced it: {old, current}. The
+% cross-check reads figure_sources.json through this table, so the paper
+% repo can be updated after this repo without the test failing in between
+% (a NOTE line says the old name is still listed there).
+RETIRED_NAMES = {
+    'Fig_Main3_Grouped_noC.png',          'Fig_Main3_Grouped.png'     % Fig 3, FD-031 item 7
     };
 BUNDLE_FN = struct('AC', 'mu7chain_AC_config', 'C', 'mu7chain_gainbias_config', 'IED', 'ied_stim_config');
 MODES = {'fast', 'fastmedium'};
@@ -127,6 +136,13 @@ if isempty(src)
     fprintf('SKIP cross-check: the paper repo''s figure_sources.json was not found beside this clone\n');
 else
     listed = embedded_pngs(src);
+    [is_old, k_old] = ismember(listed, RETIRED_NAMES(:, 1));
+    for k = find(is_old(:))'
+        fprintf('NOTE %-40s is retired; figure_sources.json still lists it (read as %s)\n', ...
+            listed{k}, RETIRED_NAMES{k_old(k), 2});
+        listed{k} = RETIRED_NAMES{k_old(k), 2};
+    end
+    listed = unique(listed);
     missing = setdiff(listed, PAPER_FIGURES(:, 1));
     for k = 1:numel(missing)
         fprintf('FAIL %-40s embedded by the manuscript (%s) but has no row in PAPER_FIGURES\n', missing{k}, src);

@@ -27,6 +27,9 @@ cfg.T_wash_sec  = 10;     % washout before anything is recorded
 cfg.T_train_sec = 600;    % readout training window -> 2000 hold-samples
 cfg.T_test_sec  = 150;    % readout test window
 cfg.d_max_sec   = 15;     % longest delay scored
+% 200 Hz in every bundle, NOT the bundle's cfg.fs (FD-031 item 14): the
+% readout regresses on the stored states of a 760-s run, so memory sets this
+% rate. Shared by run_memory_capacity and block C's grids (run_mc_gain_sweep).
 cfg.fs          = 200;
 
 % sample_hold: i.i.d. values held for T_hold, so MC is measured in HOLD UNITS.

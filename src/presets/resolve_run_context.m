@@ -90,6 +90,7 @@ arguments
     opts.verbose                   = 'minimal'   % 'verbose' | 'minimal' | 'near-none' (or a logical); see verbose_level
     opts.param_space_seed          = []          % [] = unset; else ParamSpaceAnalysis2.sample_seed for the joint sample
     opts.conditions                = {}          % the preset's conditions to run, by name; {} = all (FD-030)
+    opts.fs                        = 0           % integration rate; 0 or [] = the run-mode table's (FD-031 item 14)
 end
 
 ctx = struct();
@@ -120,6 +121,13 @@ if strcmp(analysis, 'dc_lle')
     ctx.model_defaults = ctx.preset_defaults;
 else
     ctx.cfg = analysis_run_config(analysis, opts.run_mode, ctx.preset_defaults);
+    % The bundle's integration rate, when the caller passes one (FD-031 item
+    % 14: run_all_paper_analyses hands on the bundle config's cfg.fs). It
+    % replaces the mode table's fs only; the table's sizes, window and
+    % solver stand. 0 or empty keeps the table's rate. The dc_lle branch
+    % above has no table here and ignores it: run_dc_lle_analysis takes its
+    % own 'fs'.
+    ctx.cfg.model.fs = stage_fs(opts.fs, ctx.cfg.model.fs, 'resolve_run_context');
     % Preset first, run_mode timings second, so run_mode keeps final say over
     % ode_solver / fs / T_range / lya_T_interval, and so a whole-struct preset
     % assignment cannot clobber them.

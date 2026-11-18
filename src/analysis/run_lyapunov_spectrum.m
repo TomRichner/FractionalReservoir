@@ -49,6 +49,7 @@ arguments
     cfg.noise_off_too (1,1) logical = true
     cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
+    cfg.fs                       = 0     % integration rate; 0 or [] -> 400 Hz (FD-031 item 14: the bundle's cfg.fs)
 end
 
 setup_paths();
@@ -75,7 +76,7 @@ P.lya_warmup  = T / 4;
 P.lya_dt      = 0.05;
 P.K           = K;
 P.K_max       = 2 * K;
-P.fs          = 400;
+P.fs          = stage_fs(cfg.fs, 400, 'run_lyapunov_spectrum');
 P.n_override  = cfg.n_override;
 P.n_finite    = 10;                  % finite-time curves kept for the first 10 exponents
 
