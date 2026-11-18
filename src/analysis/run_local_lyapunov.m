@@ -37,6 +37,7 @@ arguments
     cfg.simulation_start_s (1,1) double = 0
     cfg.n_override  (1,1) double = 0     % tests only
     cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
+    cfg.fs                       = 0     % integration rate; 0 or [] -> 400 Hz (FD-031 item 14: the bundle's cfg.fs)
 end
 
 setup_paths();
@@ -52,6 +53,7 @@ switch cfg.run_mode
             cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
 if cfg.K > 0; K = cfg.K; end
+fs = stage_fs(cfg.fs, 400, 'run_local_lyapunov');
 T = cfg.T;
 acc_start=cfg.accumulation_start_s; if isnan(acc_start), acc_start=T/2; end
 warmup=cfg.warmup_s; if isnan(warmup), warmup=T/4; end
@@ -71,7 +73,7 @@ cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 title_map  = srnn_condition_titles();
 titles     = cellfun(@(n) title_map(n), cond_names, 'UniformOutput', false);
 seeds  = [1 2];
-common = {'rng_seeds', seeds, 'fs', 400, 'T_range', [cfg.simulation_start_s T], 'lya_T_interval', [acc_start T], ...
+common = {'rng_seeds', seeds, 'fs', fs, 'T_range', [cfg.simulation_start_s T], 'lya_T_interval', [acc_start T], ...
           'lya_warmup', warmup, 'verbose', cfg.verbose};
 if cfg.step_duration_s>0
     n_steps=round(T/cfg.step_duration_s);
@@ -111,7 +113,7 @@ for i = 1:numel(cond_names)
 end
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'seeds', seeds, ...
-    'T', T, 'K', K, 'lya_T_interval', [acc_start T], 'lya_warmup', warmup, 'fs', 400, ...
+    'T', T, 'K', K, 'lya_T_interval', [acc_start T], 'lya_warmup', warmup, 'fs', fs, ...
     'simulation_start_s', cfg.simulation_start_s, 'step_duration_s',cfg.step_duration_s, 'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
 condition_titles = titles; %#ok<NASGU>
 mat_file = fullfile(out_dir, 'local_lyapunov_data.mat');

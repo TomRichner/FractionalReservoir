@@ -87,6 +87,8 @@ switch opts.run_mode
             'Unknown run_mode ''%s'' (expected %s).', ...
             opts.run_mode, strjoin(run_mode_names(), ', '));
 end
+% 200 Hz like mc_protocol, NOT the bundle's cfg.fs (FD-031 item 14): the
+% stored states of the training run set the memory, so memory sets the rate.
 fs         = 200;
 T_wash_sec = 10;
 T_hold     = 0.3;

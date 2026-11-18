@@ -61,6 +61,7 @@ arguments
     cfg.n_override  (1,1) double  = 0        % 0 -> preset n (fast mode runs the NON-reference examples at 250)
     cfg.n_samples_examples (1,1) double = 0  % states per non-reference example; 0 -> per run_mode (40 / 60 / 150)
     cfg.conditions                 = {}       % the preset's conditions to sample, by name; {} = all (FD-030)
+    cfg.fs                         = 0        % integration rate; 0 or [] -> per run_mode (FD-031 item 14: the bundle's cfg.fs)
 end
 
 setup_paths();
@@ -105,6 +106,7 @@ switch cfg.run_mode
             cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
 if cfg.n_samples > 0; n_samples = cfg.n_samples; end
+fs = stage_fs(cfg.fs, fs, 'run_eig_heatmap');   % the bundle's rate replaces the table's
 
 lle_window     = min(30, diff(T_range) / 2);
 lya_T_interval = [T_range(2) - lle_window, T_range(2)];

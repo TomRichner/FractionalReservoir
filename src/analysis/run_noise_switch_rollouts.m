@@ -149,6 +149,8 @@ P.preset_name   = cfg.preset_name;
 P.verbose       = cfg.verbose;
 P.model_args    = cfg.model_args;
 P.rng_seeds     = cfg.rng_seeds;
+% The mode table's rate, NOT the bundle's cfg.fs (FD-031 item 14): store_fs
+% (200 Hz) is reached by whole-sample decimation, and 200 does not divide 500.
 P.fs            = run_cfg.model.fs;
 P.ode_solver    = run_cfg.model.ode_solver;
 P.T_range       = [0, T];

@@ -146,13 +146,13 @@ cfg.run_mode    = run_mode;
 % mu7chain_AC_config inherit it. Runs made before this (400 Hz at production
 % and medium, 200 Hz in several stages at fast and fastmedium) are left as
 % they are.
-% NOT YET READ BY THE STAGES (2026-11-17): each stage still takes its rate
-% from its own per-mode table or constant (analysis_run_config for the
-% sweeps; run_eig_heatmap, run_local_lyapunov, run_lyapunov_spectrum,
-% run_transient_gain, run_dc_lle_analysis, run_paper_illustrations,
-% mc_protocol / run_memory_capacity_example, run_noise_switch_rollouts,
-% run_numerics_verification). run_all_paper_analyses must pass cfg.fs to
-% them before this value takes effect; see FD-031 item 14.
+% run_all_paper_analyses hands it as 'fs' to the sweeps (replacing the
+% analysis_run_config mode table's rate), eig_heatmap, local_lyapunov,
+% lyapunov_spectrum, transient_gain, dc_lle and the paper illustrations.
+% Three stages keep their own rates by design (see run_all_paper_analyses):
+% numerics (an fs ladder), memory capacity and block C's MC grids (200 Hz,
+% for memory) and the noise-switch rollouts (store_fs 200 does not divide
+% 500).
 cfg.fs = 500;
 
 % A fixed sample seed for the joint parameter-space grid (FD-016): two runs
@@ -285,13 +285,13 @@ switch figure_set
         sn_conditions = {'no_adaptation', 'sfa1_std0', 'sfa0_std1', 'sfa0_stdc2'};
 end
 cfg.single_neuron_conditions = sn_conditions;
-F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, false, ...
+F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, true, ...
         {'conditions', sn_conditions});
 F = add(F, 'fig_adaptation_methods_stf',      @fig_adaptation_methods,          false, ...
         {'variant', 'sfa_std_stf', 'preset_name', cfg.stf_preset});
-F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            false, ...
+F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            true, ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            false, ...
+F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            true, ...
         {'preset_name', cfg.preset_name});
 % What 1TS and the chained MTS share and where they differ (FD-014): the
 % first-cycle match and the steady-state difference under a sinusoidal rate,
@@ -304,7 +304,7 @@ F = add(F, 'fig_stim_engages_adaptation',     @fig_stim_engages_adaptation,     
         {'preset_name', cfg.bursting_preset});
 F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, true, ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         false, ...
+F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_param_space_allStd',          @fig_param_space_allStd,          true, ...
         {'preset_name', cfg.preset_name});
@@ -326,11 +326,11 @@ F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    fa
 F = add(F, 'fig_transient_gain',             @fig_transient_gain,             false, {});
 F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  false, {});
 F = add(F, 'fig_local_lyapunov',             @fig_local_lyapunov,             true, {});
-F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       false, ...
+F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       true, ...
         {'variant', 'solver'});
-F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       false, ...
+F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       true, ...
         {'variant', 'lya_method'});
-F = add(F, 'fig_numerics_jacobian',          @fig_numerics_verification,       false, ...
+F = add(F, 'fig_numerics_jacobian',          @fig_numerics_verification,       true, ...
         {'variant', 'jacobian'});
 F = add(F, 'doc_tables',                      @fig_doc_tables,                  true, ...
         {'preset_name', cfg.preset_name});
