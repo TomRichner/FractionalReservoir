@@ -140,6 +140,21 @@ cfg = struct();
 cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain';
 cfg.run_mode    = run_mode;
 
+% THE INTEGRATION RATE, every run mode (Tom, 2026-11-17, FD-031 item 14): 500
+% Hz. A 400/500/800-Hz test showed second-order step error; 500 Hz halves it
+% at about 1.3x the cost. Stated once here; mu7chain_gainbias_config and
+% mu7chain_AC_config inherit it. Runs made before this (400 Hz at production
+% and medium, 200 Hz in several stages at fast and fastmedium) are left as
+% they are.
+% NOT YET READ BY THE STAGES (2026-11-17): each stage still takes its rate
+% from its own per-mode table or constant (analysis_run_config for the
+% sweeps; run_eig_heatmap, run_local_lyapunov, run_lyapunov_spectrum,
+% run_transient_gain, run_dc_lle_analysis, run_paper_illustrations,
+% mc_protocol / run_memory_capacity_example, run_noise_switch_rollouts,
+% run_numerics_verification). run_all_paper_analyses must pass cfg.fs to
+% them before this value takes effect; see FD-031 item 14.
+cfg.fs = 500;
+
 % A fixed sample seed for the joint parameter-space grid (FD-016): two runs
 % of this bundle at the same mode simulate the same 128 points. Any fixed
 % nonnegative integer would do; this one is used nowhere else.
@@ -213,7 +228,21 @@ cfg.stf_preset           = 'single_neuron_stf';
 cfg.single_neuron_preset = 'single_neuron_mu7chain';
 cfg.illustrations = true;
 cfg.illustration_step_amp = 0.25;   % TR, 2026-09-16: half the mu7revised amplitude
-cfg.local_lyapunov_K = 50; % explicit also in fast mode
+% Top-K of the local-Lyapunov stage (Figure 3's switching data and expansion
+% row). K = 50 at 'essential', 'fast' and 'fastmedium' (explicit there too,
+% overriding run_local_lyapunov's per-mode default). K = 150 at 'medium',
+% 'medium2' and 'production' (Tom, 2026-11-17, FD-031 item 8; about 11-12 min
+% for three conditions on an idle machine): the multiple-timescale expansion
+% does not converge in K, so Figure 3 calls it a lower bound, and
+% fig_main3_stability writes the K the run used into the figure's provenance.
+% medium and medium2 take production's K: for this stage run_local_lyapunov
+% already treats the three alike (K 100 each by default), and a medium run is
+% Tom's look at what production will draw.
+if ismember(run_mode, {'medium', 'medium2', 'production'})
+    cfg.local_lyapunov_K = 150;
+else
+    cfg.local_lyapunov_K = 50;
+end
 cfg.local_lyapunov_T = 40;
 cfg.local_lyapunov_step_duration_s = 5; % 8 steps over 40 s
 cfg.local_lyapunov_accumulation_start_s = 1;
