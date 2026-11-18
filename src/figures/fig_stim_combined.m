@@ -53,6 +53,12 @@ function out = fig_stim_combined(clinical_dir, model_fig, opts)
 %
 % Output: <out_dir>/<tag>.{png,fig,svg} and <tag>_provenance.md.
 %
+% The paper's Fig 8 is built by the ied_stim bundle (ied_stim_run; entry
+% Fig_Stim_Combined of ied_stim_config, through ied_stim_fig_combined),
+% which passes the run's own model figure and the clinical panels folder of
+% its one setting cfg.clinical_dir (FD-031 item 5). The former hand scripts
+% make_fig_stim_combined*.m were retired on 2026-11-17.
+%
 % See also: fig_ied_stim, fig_grouped_main, manuscript_style
 arguments
     clinical_dir (1,:) char
