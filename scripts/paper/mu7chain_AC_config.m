@@ -53,7 +53,8 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %   cfg.run_dir   data/mu7chain_AC_<run_mode>
 %   cfg.fig_root  figs/mu7chain_AC_<run_mode>_<figure_set>; the grouped
 %                 main figures read their source figures from this root
-%   cfg.figures   block A's entries, then block C's, then
+%   cfg.figures   block A's entries, then block C's (the paper's Fig 7,
+%                 fig_main_mc_grouped, among them: FD-031 item 1), then
 %                 fig_noise_switch_rollouts: one time-series figure per
 %                 condition of the set (Fig_noise_switch_timeseries_<c>_copies)
 %                 and the summary (Fig_noise_switch_divergence, with its

@@ -110,7 +110,7 @@ for c = {cfg3, cfg4}
     names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
     assert(numel(unique(names)) == numel(names), 'duplicate registry entry');
     grouped = k.figures(startsWith(names, 'fig_main') & endsWith(names, '_grouped'));
-    assert(numel(grouped) == 8);
+    assert(numel(grouped) == 6);   % groups 1-6; the 7 and 8 placeholders are out (FD-031 item 3)
     for g = 1:numel(grouped)
         a = grouped{g}.args;
         src = a{find(strcmp(a(1:2:end), 'source_fig_root')) * 2};

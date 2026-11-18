@@ -118,7 +118,8 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 % its own folder <fig_root>/<entry>/. Only the entries whose grids run are
 % registered (since FD-029: fig_mc_maps_selfcoupling,
 % fig_mc_robustness_selfcoupling, fig_mc_vs_lambda1,
-% mc_statistics_selfcoupling, fig_mc_noise_sweeps, and the two time
+% mc_statistics_selfcoupling, fig_mc_noise_sweeps, fig_main_mc_grouped
+% (paper Fig 7, FD-031), and the two time
 % series, which read no grid); the others below come back with their grid.
 %   fig_mc_maps_bias, fig_mc_maps_selfcoupling
 %       the maps of memory capacity and lambda_1 on each grid: memory
@@ -161,6 +162,12 @@ function cfg = mu7chain_gainbias_config(run_mode, figure_set, run_grids)
 %       capacity (and lambda_1) against sigma_u and against sigma_gamma,
 %       one line per condition, with the spread over networks
 %       (fig_mc_noise_sweeps), and its table
+%   fig_main_mc_grouped
+%       THE PAPER'S FIG 7 (FD-031): (A) and (B) the self-coupling maps as
+%       fig_mc_maps_selfcoupling draws them, (C) memory capacity against
+%       sigma_u; Fig_Main_MC_Grouped.png. Registered after its two sources
+%       when the self-coupling grid and the Wiener sweep both run. Also
+%       carried into mu7chain_AC_config, which appends these entries.
 %   fig_noise_levels_wiener, fig_noise_levels_gamma
 %       fig_noise_levels_timeseries: the bundle's noisy network, every
 %       condition of the set, at zero, the middle and the top of each noise
@@ -388,6 +395,20 @@ cfg.figures = { ...
         'levels', gamma_three, 'level_label', '\sigma_\gamma', 'model_args', release_fixed, ...
         'tag', 'Fig_noise_levels_gamma'}})};
 cfg.figures = entries_of_grids(cfg.figures, RUN_GRIDS);
+% THE PAPER'S MEMORY-CAPACITY FIGURE (Fig 7; FD-031 item 1): the
+% self-coupling maps and the Wiener noise sweep on one canvas
+% (fig_main_mc_grouped). It redraws both from the run's saved tables, styling
+% the maps with this registry's 'fig_mc_maps_selfcoupling' entry for the same
+% mode and set, so it is registered after its two sources and only when both
+% of their grids run. Its function takes no 'grid'/'grids' argument, hence
+% the explicit check instead of entries_of_grids.
+if all(ismember({SELF, NOISE_WIENER}, cfg.mc_gain_sweep.run_grids))
+    main_mc = struct('name', 'fig_main_mc_grouped', 'fn', @fig_main_mc_grouped, 'in_paper', true, ...
+        'args', {{'run_mode', run_mode, 'figure_set', figure_set}});
+    names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
+    after = find(ismember(names, {'fig_mc_maps_selfcoupling', 'fig_mc_noise_sweeps'}), 1, 'last');
+    cfg.figures = [cfg.figures(1:after), {main_mc}, cfg.figures(after+1:end)];
+end
 end
 
 %% ------------------------------------------------------------------------
