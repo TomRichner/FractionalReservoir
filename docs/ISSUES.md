@@ -1697,3 +1697,13 @@ and J3 are merged: point `figure_sources.json` at run outputs.
 Each job is done when a fresh `essential` (or `fast`) run of its bundle, from
 its branch, writes the figures into the run's own figure root with the fixes,
 the guard test passes, and the quick suite passes.
+
+**Addendum (Tom, 2026-11-17): fs = 500 Hz for runs from now on.** Item 14:
+make 500 Hz the integration rate of every run mode of the paper bundles
+(`mu7chain_config` and what it feeds, the block C config, the IED
+stimulation run of item 4), in one place, so the next run uses it with no
+hand step. The current 400-Hz data stay as they are; the text is written from
+them and updated after the next run. Belongs to job J2 (owns
+`mu7chain_config`); J3 sets it in the IED stimulation config. Item 9
+(eigenvalue by step) is dropped from FD-031: it is FR-002 in the manuscript
+repo, code on branch `eig-by-step-a8ca`.
