@@ -1659,9 +1659,12 @@ becomes an issue with an acceptance test.
    expansion does not converge in K; the caption calls it a lower bound.
 9. **Exploratory eigenvalue-by-step figure.** If Tom keeps it, register it
    (stage + figure) in the A + C bundle; if not, leave it in explorations.
-10. **Paper repo.** After items 1–5, point `figure_sources.json` at the run
-    outputs (no hand-named folders such as `stim_combined_v2`), rerun
-    `set_figs.py`, and update the Fig 8 comment in `Manuscript5.md`.
+10. **Paper repo.** Since 2026-11-17 the paper repo keeps committed copies
+    of every figure in `figures/` (`set_figs.py --sync`, provenance log in
+    `figures/PROVENANCE.md`). After items 1–5, point `figure_sources.json`'s
+    `figures` entries at the run outputs (no hand-named folders such as
+    `stim_combined_v2`), run `uv run set_figs.py --sync`, commit and push the
+    paper repo, and update the Fig 8 comment in `Manuscript5.md`.
 12. **Fig 2F plots b₁** (Tom, 2026-11-17: b₁ scales 0 to 1 and is the
     synaptic depression). Make group 2's row F plot the first depression
     variable b₁ for every condition (state which variable in the provenance),
