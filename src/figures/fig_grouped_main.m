@@ -36,10 +36,12 @@ arguments
     cfg.visible (1,1) logical = false
     cfg.verbose (1,:) char = 'minimal'
     cfg.conditions = {}   % names to draw, in order; empty = all the run holds (select_conditions)
-    % Group 3 only: false draws fig_main3_stability's variant without the
-    % lambda_1 row (rows input, expansion, heat map), saved as
-    % Fig_Main3_Grouped_noC (2026-11-17).
-    cfg.show_lambda_row (1,1) logical = true
+    % Group 3 only. false (the default since 2026-11-17, FD-031 item 7: the
+    % paper's layout, approved by Tom) draws fig_main3_stability's rows input,
+    % expansion, heat map, with no lambda_1 trace row, saved as
+    % Fig_Main3_Grouped. true draws the old four-row layout with the lambda_1
+    % row, saved as Fig_Main3_Grouped_withLambda so it never overwrites it.
+    cfg.show_lambda_row (1,1) logical = false
     cfg.svg (1,1) logical = false   % also save an SVG beside the PNG and .fig
 end
 setup_paths();
@@ -172,7 +174,7 @@ if group==4, style_main4_grouped(fig); end
 if group==5, style_main5_grouped(fig,margin_names,gain_names); end
 if group==6, style_main6_grouped(fig,tau_names); end
 tag=sprintf('Fig_Main%d_Grouped',group);
-if group==3 && ~cfg.show_lambda_row, tag=[tag '_noC']; end
+if group==3 && cfg.show_lambda_row, tag=[tag '_withLambda']; end
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
