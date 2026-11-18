@@ -1,6 +1,6 @@
 ---
 name: matlab-opus-6
-description: "MATLAB worker 6 of 6 on Opus 5.5 (medium effort) with its own private MATLAB session. Use for a bounded MATLAB job that should not queue behind, or disturb, the main session MATLAB. Run only ONE instance of this agent at a time (two would share one MATLAB and corrupt each other); for parallel jobs use different matlab-fable-N / matlab-opus-N agents. The brief must state pool N, the number of parallel-pool workers this job may hold (0 = none)."
+description: "MATLAB worker 6 of 8 on Opus 5.5 (medium effort) with its own private MATLAB session. Use for a bounded MATLAB job that should not queue behind, or disturb, the main session MATLAB. Run only ONE instance of this agent at a time (two would share one MATLAB and corrupt each other); for parallel jobs use different matlab-fable-N / matlab-opus-N agents. The brief must state pool N, the number of parallel-pool workers this job may hold (0 = none)."
 model: claude-opus-5-5
 effort: medium
 disallowedTools: mcp__matlab__*, Agent
