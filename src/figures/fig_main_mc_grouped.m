@@ -58,6 +58,7 @@ arguments
     cfg.save       (1,1) logical = true
     cfg.visible    (1,1) logical = false
     cfg.verbose    (1,:) char    = 'minimal' %#ok<INUSA> accepted for a uniform call
+    cfg.fig_tag    (1,:) char    = 'Fig_Main_MC_Grouped'   % file name stem (the registry names it)
 end
 setup_paths();
 root = fileparts(which('setup_paths'));
@@ -79,7 +80,7 @@ src_a = A.figs; src_b = B.figs;
 cleanup = onCleanup(@() close_valid([src_a src_b]));
 
 %% The canvas (pixels; normalized at the end)
-W = 1100; H = 640;
+W = 1100; H = 685;
 fig = figure('Visible', on_off(cfg.visible), 'Color', 'w', 'Units', 'pixels', ...
     'Position', [40 40 W H]);
 drawnow;
@@ -120,7 +121,15 @@ assert(isscalar(axb) && isscalar(lgb), 'fig_main_mc_grouped:Noise', ...
 %% Geometry (pixels)
 mw = 165; mh = 190; gap = 26;            % one map; gap between columns
 x0 = 105;                                % left edge of the first map column
-y_top = 345; y_bot = 120;                % bottom edges of the two map rows
+% The rows are 80 px apart (FD-031 item 2): (B) sits LETTER_DY above the
+% lambda_1 row's top, as (A) sits above the memory-capacity row's, and the
+% gap must hold it clear of the row above (with the former 35 px gap it fell
+% beside the bottom of the memory-capacity row). The canvas is 45 px taller
+% for it, so the top margin is unchanged.
+y_top = 390; y_bot = 120;                % bottom edges of the two map rows
+LETTER_DX = -95; LETTER_DY = 55;         % panel letter offset from its axes' top-left corner (px)
+assert(y_top - (y_bot + mh) >= LETTER_DY + 20, 'fig_main_mc_grouped:LetterGap', ...
+    'The gap between the map rows does not hold the (B) letter clear of the row above.');
 for r = 1:2
     for c = 1:nc
         set(maps(r, c), 'Units', 'pixels', 'PositionConstraint', 'innerposition', ...
@@ -205,20 +214,22 @@ for pass = 1:2
     lgb.Position = [W - 10 - lp(3), y_bot - 30, lp(3), lp(4)];
 end
 % Panel letters, as style_main6_grouped places them: (A) the memory-capacity
-% row of maps, (B) the lambda_1 row, at the same offset from its row's first
-% map, (C) the noise panel (Tom, 2026-11-17).
+% row of maps, (B) the lambda_1 row, (C) the noise panel (Tom, 2026-11-17),
+% each at the same offset (LETTER_DX, LETTER_DY) from its axes' top-left
+% corner, so (B) is at the top-left of the lambda_1 row, left of its y
+% label, and no longer beside the memory-capacity row (FD-031 item 2).
 delete(findall(fig, 'Tag', 'main_mc_panel_letter'));
 letters = {maps(1, 1), maps(2, 1), axb};
 for k = 1:numel(letters)
     ax = letters{k}; p = ax.Position;
-    text(ax, -95 / p(3), 1 + 55 / p(4), sprintf('(%c)', 'A' + k - 1), ...
+    text(ax, LETTER_DX / p(3), 1 + LETTER_DY / p(4), sprintf('(%c)', 'A' + k - 1), ...
         'Units', 'normalized', 'Clipping', 'off', 'FontSize', 14, 'FontWeight', 'normal', ...
         'Interpreter', 'none', 'Tag', 'main_mc_panel_letter');
 end
 set([maps(:); axb; cb_mc; cb_l; lgb], 'Units', 'normalized');
 
 %% Save
-tag = 'Fig_Main_MC_Grouped';
+tag = cfg.fig_tag;
 out = struct('figs', fig, 'files', {{}}, 'source', {[{A.source}, B.source]}, 'layout', ...
     struct('A', 'gain x self-coupling maps: memory capacity (top row)', ...
            'B', 'gain x self-coupling maps: lambda_1 (bottom row)', ...
@@ -336,7 +347,7 @@ fprintf(fid, ['## Dropped from the source figures\n\n' ...
     'positive level back from the last, horizontal, in scientific notation rounded to one significant figure (every level keeps ' ...
     'its tick).\n\n']);
 fprintf(fid, ['## Layout\n\n' ...
-    'Canvas 1100 x 640 px (the width of Fig 6, style_main6_grouped), all text 14 pt, panel letters ' ...
+    'Canvas 1100 x 685 px (the width of Fig 6, style_main6_grouped), all text 14 pt, panel letters ' ...
     '14 pt normal weight; PNG at 200 dpi with 20 px padding.\n']);
 end
 
