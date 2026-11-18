@@ -66,7 +66,7 @@ SIZES = {   'essential',    4,      10,       5; ...
             'medium',       16,     10,       20; ...
             'medium2',      16,     10,       20; ...
             'production',   32,     10,       20};
-ALLOWED = {'n_copies', 't_rollout', 't_shared', 'conditions', 'model_args'};
+ALLOWED = {'n_copies', 't_rollout', 't_shared', 'conditions', 'model_args', 'store_fs', 'example_fs'};
 
 if ~isfield(cfg, 'run_mode') || ~ismember(cfg.run_mode, SIZES(:, 1))
     bad_config('The noise_switch stage has no size for run mode ''%s''; it has %s.', ...
@@ -142,6 +142,22 @@ plan.conditions = cond_names;
 plan.args = {'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'conditions', cond_names, 'n_copies', n_copies, 't_shared', t_shared, ...
     't_rollout', t_rollout, 'model_args', model_args, 'verbose', verbose};
+% The bundle's integration rate and integrator (cfg.fs, cfg.ode_solver; Tom,
+% 2026-11-17: every paper simulation at SRA1 and 500 Hz), and the storage
+% rates, which must divide it (cfg.noise_switch.store_fs, example_fs). Each
+% only when the bundle states it, so a bundle that states none plans the
+% arguments it always did.
+if isfield(cfg, 'fs')
+    fs_bundle = stage_fs(cfg.fs, 0, 'noise_switch_stage_plan');
+    if fs_bundle > 0; plan.args = [plan.args, {'fs', fs_bundle}]; end
+end
+if isfield(cfg, 'ode_solver') && ~isempty(cfg.ode_solver)
+    plan.args = [plan.args, {'ode_solver', stage_solver(cfg.ode_solver, '', 'noise_switch_stage_plan')}];
+end
+for f = {'store_fs', 'example_fs'}
+    v = override(opts, f{1}, []);
+    if ~isempty(v); plan.args = [plan.args, {f{1}, v}]; end
+end
 end
 
 %% ------------------------------------------------------------------------

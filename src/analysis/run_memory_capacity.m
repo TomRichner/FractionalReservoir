@@ -66,6 +66,11 @@ arguments
     % The preset's conditions to simulate, by name (preset_with_conditions);
     % empty = every condition the preset states, as before (FD-030).
     opts.conditions                           = {}
+    % Integration rate; 0 or [] -> mc_protocol's 200 Hz (stage_fs). The
+    % paper bundles pass their cfg.fs, 500 Hz (Tom, 2026-11-17: every paper
+    % simulation at SRA1 and 500 Hz). Use 'lean' with it: the full path
+    % holds the 760-s state series, 2.5x larger at 500 Hz than at 200.
+    opts.fs                                   = 0
 end
 
 setup_paths();
@@ -84,6 +89,7 @@ if ~strcmp(model_class, 'SRNNCellTypePairs')
         opts.preset_name, model_class);
 end
 cfg = mc_run_config(opts.run_mode, preset, opts.ode_solver);
+cfg.fs = stage_fs(opts.fs, cfg.fs, 'run_memory_capacity');   % the bundle's rate replaces mc_protocol's
 
 fs = cfg.fs;
 T_wash  = round(cfg.T_wash_sec  * fs);

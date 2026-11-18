@@ -46,6 +46,7 @@ arguments
     cfg.psd_settle   (1,1) double  = 15
     cfg.psd_win_len_s (1,1) double = 10
     cfg.fs           (1,1) double  = 400
+    cfg.ode_solver   (1,:) char    = ''   % '' = build_from_preset's choice; the paper bundles pass 'sra1' (Tom, 2026-11-17)
     cfg.include_chi2 (1,1) logical = true
     cfg.save         (1,1) logical = true
     cfg.visible      (1,1) logical = true
@@ -60,6 +61,9 @@ st           = manuscript_style();
 dc_levels = cfg.dc_levels;
 nL        = numel(dc_levels);
 T_range   = [0, nL * cfg.hold_dur];
+solver_args = {};
+solver = stage_solver(cfg.ode_solver, '', 'fig_stim_engages_adaptation');
+if ~isempty(solver); solver_args = {'ode_solver', solver}; end
 
 %% Stimulus: a DC staircase plus a white-noise probe
 % The staircase sets the operating point; the noise probes how the network
@@ -86,7 +90,8 @@ model = build_from_preset(cfg.preset_name, '', ...
     'rng_seeds',        cfg.rng_seeds, ...
     'lya_method',       'none', ...
     'store_full_state', true, ...
-    'plot_deci',        1);        % full rate: the PSD needs every sample
+    'plot_deci',        1, ...     % full rate: the PSD needs every sample
+    solver_args{:});
 model.run();
 
 [fig1, ~] = model.plot();

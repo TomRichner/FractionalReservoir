@@ -165,20 +165,29 @@ if ~isempty(run_conditions); cond_args = {'conditions', run_conditions}; end
 % run_all_analyses and resolve_run_context, replacing the analysis_run_config
 % mode table's rate), eig_heatmap, lyapunov_spectrum, transient_gain,
 % local_lyapunov and dc_lle; run_paper_illustrations reads it from cfg.
-% THREE STAGES KEEP THEIR OWN RATES, by design:
+% THE INTEGRATOR likewise (Tom, 2026-11-17): cfg.ode_solver, 'sra1' in
+% mu7chain_config, so every paper simulation uses SRA1 at cfg.fs (without
+% noise SRA1 is Ralston's second-order Runge-Kutta). Absent or empty = each
+% stage keeps its own choice. Checked here (stage_solver), before compute.
+% Both go to every stage below, memory capacity, mc_example, block C's
+% grids (mc_gain_sweep_stage_plan, as protocol.fs) and the noise-switch
+% rollouts (noise_switch_stage_plan, which also takes store_fs and
+% example_fs dividing fs) included; memory capacity takes cfg.mc_ode_solver
+% before cfg.ode_solver when a bundle names both.
+% ONE STAGE KEEPS ITS OWN RATES AND SOLVERS, by design:
 %   numerics         run_numerics_verification integrates at several rates
-%                    (an fs ladder against a fine reference) to measure
-%                    the step error; one rate would defeat it.
-%   memory_capacity, mc_example and block C's grids (mc_gain_sweep)
-%                    stay at mc_protocol's 200 Hz: the readout regresses on
-%                    the stored states of a 760-s run, and memory, not
-%                    accuracy, sets that rate.
-%   noise_switch     run_noise_switch_rollouts stores at store_fs = 200 Hz
-%                    by whole-sample decimation, and 200 does not divide 500.
+%                    and with several solvers (an fs ladder against a fine
+%                    reference) to measure the step error; one rate or one
+%                    solver would defeat it.
 fs_run = 0;
 if isfield(cfg, 'fs'); fs_run = stage_fs(cfg.fs, 0, 'run_all_paper_analyses'); end
 fs_args = {};
 if fs_run > 0; fs_args = {'fs', fs_run}; end
+solver_run = '';
+if isfield(cfg, 'ode_solver'); solver_run = stage_solver(cfg.ode_solver, '', 'run_all_paper_analyses'); end
+solver_args = {};
+if ~isempty(solver_run); solver_args = {'ode_solver', solver_run}; end
+fs_args = [fs_args, solver_args];   % every stage that takes the rate takes the integrator
 
 % The opt-in stages this bundle selects (paper_opt_in_stages): each checks
 % its own part of the config here and returns the plan its run takes. One
@@ -312,8 +321,10 @@ for j=1:numel(ll_fields)
     key=['local_lyapunov_' ll_fields{j}];
     if isfield(cfg,key), ll_args=[ll_args,{ll_fields{j},cfg.(key)}]; end %#ok<AGROW>
 end
-mc_solver = '';
-if isfield(cfg, 'mc_ode_solver'); mc_solver = cfg.mc_ode_solver; end
+mc_solver = solver_run;
+if isfield(cfg, 'mc_ode_solver') && ~isempty(cfg.mc_ode_solver); mc_solver = cfg.mc_ode_solver; end
+mc_fs_args = {};
+if fs_run > 0; mc_fs_args = {'fs', fs_run}; end
 % cfg.mc_lean (absent or false = off): both memory-capacity stages take the
 % lean path, which holds no state trajectory (same numbers; see run_memory_capacity).
 mc_lean = isfield(cfg, 'mc_lean') && ~isempty(cfg.mc_lean) && logical(cfg.mc_lean);
@@ -323,11 +334,11 @@ if isfield(cfg,'transient_gain_duration_s'), gain_duration=cfg.transient_gain_du
 stages = { ...
     'memory_capacity', @() run_memory_capacity( ...
         'preset_name', cfg.mc_preset, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
-        'ode_solver', mc_solver, 'lean', mc_lean, cond_args{:}, ...
+        'ode_solver', mc_solver, 'lean', mc_lean, cond_args{:}, mc_fs_args{:}, ...
         'output_dir', run_dir); ...
     'mc_example',      @() run_memory_capacity_example( ...
         'preset_name', cfg.mc_preset, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...
-        'ode_solver', mc_solver, 'lean', mc_lean, cond_args{:}, ...
+        'ode_solver', mc_solver, 'lean', mc_lean, cond_args{:}, mc_fs_args{:}, ...
         'output_dir', fullfile(run_dir, 'mc_example')); ...
     'eig_heatmap',     @() run_eig_heatmap( ...
         'preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'verbose', cfg.verbose, ...

@@ -91,6 +91,7 @@ arguments
     opts.param_space_seed          = []          % [] = unset; else ParamSpaceAnalysis2.sample_seed for the joint sample
     opts.conditions                = {}          % the preset's conditions to run, by name; {} = all (FD-030)
     opts.fs                        = 0           % integration rate; 0 or [] = the run-mode table's (FD-031 item 14)
+    opts.ode_solver                = ''          % integrator; '' = the run-mode table's (stage_solver; Tom 2026-11-17: sra1 everywhere)
 end
 
 ctx = struct();
@@ -128,6 +129,10 @@ else
     % above has no table here and ignores it: run_dc_lle_analysis takes its
     % own 'fs'.
     ctx.cfg.model.fs = stage_fs(opts.fs, ctx.cfg.model.fs, 'resolve_run_context');
+    % The bundle's integrator likewise (cfg.ode_solver, stage_solver): it
+    % replaces the table's choice (sra1 for a noisy preset, its
+    % deterministic solver otherwise); empty keeps the table's.
+    ctx.cfg.model.ode_solver = stage_solver(opts.ode_solver, ctx.cfg.model.ode_solver, 'resolve_run_context');
     % Preset first, run_mode timings second, so run_mode keeps final say over
     % ode_solver / fs / T_range / lya_T_interval, and so a whole-struct preset
     % assignment cannot clobber them.

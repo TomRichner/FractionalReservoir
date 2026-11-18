@@ -50,6 +50,10 @@ arguments
     cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
     cfg.fs                       = 0     % integration rate; 0 or [] -> 400 Hz (FD-031 item 14: the bundle's cfg.fs)
+    % Integrator of BOTH variants; '' -> build_from_preset's choice with the
+    % noise on and rk4 with it off, as before (stage_solver: the bundle's
+    % cfg.ode_solver, 'sra1', which is Ralston's RK2 at sigma = 0).
+    cfg.ode_solver               = ''
 end
 
 setup_paths();
@@ -77,6 +81,7 @@ P.lya_dt      = 0.05;
 P.K           = K;
 P.K_max       = 2 * K;
 P.fs          = stage_fs(cfg.fs, 400, 'run_lyapunov_spectrum');
+P.ode_solver  = stage_solver(cfg.ode_solver, '', 'run_lyapunov_spectrum');   % '' = the stage's own rule
 P.n_override  = cfg.n_override;
 P.n_finite    = 10;                  % finite-time curves kept for the first 10 exponents
 
@@ -149,9 +154,12 @@ args = {'rng_seeds', seeds, 'fs', P.fs, 'T_range', P.T_range, ...
     'lya_method', 'topk', 'lya_K', P.K, 'lya_K_auto', true, 'lya_K_max', P.K_max, ...
     'lya_dt', P.lya_dt, 'lya_T_interval', P.lya_T_interval, 'lya_warmup', P.lya_warmup, ...
     'store_full_state', true};
+solver = P.ode_solver;
 if ~noise_on
-    args = [args, {'sigma_u_noise', 0, 'ode_solver', 'rk4'}];
+    if isempty(solver); solver = 'rk4'; end   % the stage's own choice with the noise off
+    args = [args, {'sigma_u_noise', 0}];
 end
+if ~isempty(solver); args = [args, {'ode_solver', solver}]; end
 if P.n_override > 0
     args = [args, {'n', P.n_override, 'indegree', max(2, round(0.2 * P.n_override)), ...
         'F_tracks_network', true}];
