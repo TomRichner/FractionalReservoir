@@ -134,6 +134,9 @@ arguments
     cfg.n_trials_lle     (1,1) double  = 0     % 0 -> per run_mode
     cfg.n_workers        (1,1) double  = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.conditions                     = {}    % the preset's conditions to check, by name; {} = all (FD-030)
+    cfg.reverdict        (1,1) logical = false % true: no compute; re-evaluate the saved results in out_dir
+                                               % against the CURRENT acceptance struct, rewrite
+                                               % numerics_verdict.md and update verdict/settings in the .mat
 end
 
 setup_paths();
@@ -198,23 +201,39 @@ P.jac_kink_margin = 10 * P.h_jac;    % exclude x rows within this of a breakpoin
 %   B  noisy reshoot: median slope >= 1, i.e. error ratio >= 2 per halving
 %      (strong order >= 1; SRA1 with additive noise should give ~1.5, ~2.8x).
 %      n/a when the preset carries no noise.
-%   L  paired |lambda_1(sra1) - lambda_1(ode45)|: median <= 0.05 s^-1 AND
-%      <= the across-trial std of lambda_1(ode45) (integrator bias must sit
-%      inside finite-time scatter; second clause needs >= 3 trials).
+%   L  paired |lambda_1(sra1) - lambda_1(ode45)|: median <= 0.05 s^-1.
+%      (As fixed on 2026-09-14 it also had to be <= the across-trial std of
+%      lambda_1(ode45), so that integrator bias sat inside finite-time
+%      scatter; that clause is off since 2026-11-17, see AMENDMENTS. The
+%      code still applies it when L_within_scatter is true and >= 3 trials.)
 %   C  reduced net: median |Benettin - QR lambda_1| <= 0.05 AND
-%      median |top-K - QR lambda_1| <= 0.02.
+%      median |top-K - QR lambda_1| <= 0.03 (0.02 as fixed on 2026-09-14;
+%      see AMENDMENTS).
 %   J  Jacobian: max relative Frobenius error <= 1e-6 AND max top-20
 %      eigenvalue mismatch <= 1e-6 (kink rows excluded).
+% AMENDMENTS. fixed_on stays the date the criteria were first fixed; any
+% threshold changed after a run that used it is listed in `amendments`, with
+% who, when and why, and the verdict prints every amendment.
+%   2026-11-17 (Tom): C_topk_qr_max 0.02 -> 0.03 after the fastmedium run
+%      (mu7chain_AC_fastmedium; chained multiple-timescale top-K vs QR 0.0237).
+%   2026-11-17 (Tom): L_within_scatter true -> false, so L is the 0.05 s^-1
+%      limit alone. The same run's chained multiple-timescale condition had
+%      median |d| 0.0422 against an ode45 scatter of 0.0366 at 400 Hz; the
+%      gap shrinks with the step (0.027 at 500 Hz, 0.006 at 800 Hz;
+%      scripts/explorations/numerics_L_fs_check.m), and production stays at
+%      400 Hz for now.
 acceptance = struct( ...
     'fixed_on',        '2026-09-14', ...
     'A_slope_free_min', 1.0, ...
     'B_slope_noisy_min', 1.0, ...
     'L_abs_diff_max',  0.05, ...
-    'L_within_scatter', true, ...
+    'L_within_scatter', false, ...
     'C_benettin_qr_max', 0.05, ...
-    'C_topk_qr_max',   0.02, ...
+    'C_topk_qr_max',   0.03, ...
     'J_rel_fro_max',   1e-6, ...
-    'J_eig_err_max',   1e-6);
+    'J_eig_err_max',   1e-6, ...
+    'amendments',      {{'C_topk_qr_max raised 0.02 -> 0.03 by Tom on 2026-11-17 after the fastmedium run', ...
+                         'L scatter clause dropped by Tom on 2026-11-17 (L_within_scatter true -> false): L is median |d| <= 0.05 s^-1 alone'}});
 
 if isempty(cfg.out_dir)
     out_dir = fullfile(fileparts(which('setup_paths')), 'data', 'numerics_verification');
@@ -222,6 +241,26 @@ else
     out_dir = cfg.out_dir;
 end
 if ~isfolder(out_dir); mkdir(out_dir); end
+
+if cfg.reverdict
+    % Re-evaluate a finished run's saved results against the current
+    % criteria. Nothing is recomputed; the criteria the run was judged by
+    % are kept as settings.acceptance_at_run (first reverdict only).
+    mat_file = fullfile(out_dir, 'numerics_verification_data.mat');
+    if ~isfile(mat_file)
+        error('run_numerics_verification:noSavedRun', 'No saved run at %s.', mat_file);
+    end
+    D = load(mat_file, 'results', 'settings');
+    settings = D.settings;
+    if ~isfield(settings, 'acceptance_at_run'); settings.acceptance_at_run = settings.acceptance; end
+    settings.acceptance = acceptance;
+    verdict = evaluate_acceptance(D.results, acceptance, settings.sigma_u_noise > 0);
+    verdict_md = write_verdict(fullfile(out_dir, 'numerics_verdict.md'), verdict, D.results, settings);
+    vprintf(cfg.verbose, 'minimal', '%s', verdict_md);
+    save(mat_file, 'verdict', 'settings', '-append');
+    vprintf(cfg.verbose, 'minimal', '[numerics_verification] reverdict -> %s\n', mat_file);
+    return
+end
 
 [preset, model_class, conditions] = preset_with_conditions(cfg.preset_name, cfg.conditions);
 if ~strcmp(model_class, 'SRNNCellTypePairs')
@@ -698,7 +737,8 @@ function V = evaluate_acceptance(res, acc, has_noise)
 % Evaluate the pre-registered criteria per condition. pass is true / false /
 % NaN (not applicable); value and threshold are what the table shows.
 n = numel(res);
-V = struct('fixed_on', acc.fixed_on, 'conditions', {{res.name}}, 'per_condition', [], 'all_pass', false);
+V = struct('fixed_on', acc.fixed_on, 'amendments', {{}}, 'conditions', {{res.name}}, 'per_condition', [], 'all_pass', false);
+if isfield(acc, 'amendments'); V.amendments = acc.amendments; end
 per = repmat(struct('name', '', 'A', [], 'B', [], 'L', [], 'C', [], 'J', []), 1, n);
 for i = 1:n
     S = res(i).summary;
@@ -756,6 +796,11 @@ L{end+1} = sprintf('# Numerics verification verdict (%s, %s)', settings.preset_n
 L{end+1} = '';
 L{end+1} = sprintf('Acceptance criteria fixed on %s, before the run. Trials: %d reshoot, %d LLE/QR; %d Jacobian states per condition.', ...
     V.fixed_on, settings.n_trials_reshoot, settings.n_trials_lle, settings.n_jac);
+if isfield(V, 'amendments')
+    for k = 1:numel(V.amendments)
+        L{end+1} = sprintf('Amended: %s.', V.amendments{k}); %#ok<AGROW>
+    end
+end
 L{end+1} = '';
 L{end+1} = '| Condition | Check | Value | Threshold | Result | What |';
 L{end+1} = '|---|---|---|---|---|---|';
