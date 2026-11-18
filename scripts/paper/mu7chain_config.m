@@ -146,14 +146,21 @@ cfg.run_mode    = run_mode;
 % mu7chain_AC_config inherit it. Runs made before this (400 Hz at production
 % and medium, 200 Hz in several stages at fast and fastmedium) are left as
 % they are.
-% run_all_paper_analyses hands it as 'fs' to the sweeps (replacing the
-% analysis_run_config mode table's rate), eig_heatmap, local_lyapunov,
-% lyapunov_spectrum, transient_gain, dc_lle and the paper illustrations.
-% Three stages keep their own rates by design (see run_all_paper_analyses):
-% numerics (an fs ladder), memory capacity and block C's MC grids (200 Hz,
-% for memory) and the noise-switch rollouts (store_fs 200 does not divide
-% 500).
+% run_all_paper_analyses hands it as 'fs' to every stage: the sweeps
+% (replacing the analysis_run_config mode table's rate), eig_heatmap,
+% local_lyapunov, lyapunov_spectrum, transient_gain, dc_lle, the paper
+% illustrations, memory capacity and mc_example, block C's grids
+% (protocol.fs) and the noise-switch rollouts. One stage keeps its own rates
+% by design: numerics (an fs ladder and a solver comparison).
 cfg.fs = 500;
+
+% THE INTEGRATOR, every stage and every run mode (Tom, 2026-11-17): SRA1,
+% Roessler's strong-order-1.5 scheme for additive noise. Without noise it is
+% Ralston's second-order Runge-Kutta, so the noise-free stages (memory
+% capacity, block C's grids, the noise-off Lyapunov spectrum, the
+% single-neuron illustration) use the same scheme and the Methods state one.
+% Handed beside cfg.fs to the same stages (stage_solver); numerics excepted.
+cfg.ode_solver = 'sra1';
 
 % A fixed sample seed for the joint parameter-space grid (FD-016): two runs
 % of this bundle at the same mode simulate the same 128 points. Any fixed
@@ -212,10 +219,14 @@ cfg.verbose = 'minimal';   % 'verbose' | 'minimal' | 'near-none' -- how much the
 %% Presets per stage and figure
 % Memory capacity on THIS network with the Wiener process OFF: the preset
 % below chains to cfg.preset_name and sets sigma_u_noise = 0. mc_run_config
-% would pick rk4 at sigma = 0, so the integrator is named explicitly: sra1,
-% the same solver as every other stage.
+% would pick rk4 at sigma = 0, so the integrator is named explicitly: the
+% bundle's cfg.ode_solver (sra1), the same solver as every other stage.
+% The lean path (no state trajectory held): at 500 Hz the full path's
+% 760-s state series is 2.5 times its 200-Hz size (about 16 GB a trial
+% then), and the lean path gives the same numbers (test_mc_lean_path).
 cfg.mc_preset            = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain';
-cfg.mc_ode_solver        = 'sra1';
+cfg.mc_ode_solver        = cfg.ode_solver;
+cfg.mc_lean              = true;
 % The local-Lyapunov stage runs on the steps5s twin: a new random step every
 % 5 s, never returning to zero. Same bundle, chained preset.
 cfg.local_lyapunov_preset = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain';
@@ -269,8 +280,11 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 % {name, handle, in_paper, extra-args}; the extra args are appended to the
 % standard fields (run_dir, out_dir, save, visible).
 F = {};
+% The two entries that simulate while drawing take the bundle's rate and
+% integrator too (Tom, 2026-11-17: every paper simulation at SRA1, 500 Hz).
+sim_args = {'fs', cfg.fs, 'ode_solver', cfg.ode_solver};
 F = add(F, 'fig_introductory_concepts',       @fig_introductory_concepts,       true, ...
-        {'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas});
+        [{'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas}, sim_args]);
 F = add(F, 'fig_FI_curve',                    @fig_FI_curve,                    true, {});
 % The single-neuron figure has its OWN condition list in each set (the
 % lead's decision, 2026-11-12): its run holds the single-neuron preset's
@@ -301,7 +315,7 @@ F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            
 F = add(F, 'fig_std_1TS_vs_MTS',              @fig_std_1TS_vs_MTS,              true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_stim_engages_adaptation',     @fig_stim_engages_adaptation,     true, ...
-        {'preset_name', cfg.bursting_preset});
+        [{'preset_name', cfg.bursting_preset}, sim_args]);
 F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         true, ...

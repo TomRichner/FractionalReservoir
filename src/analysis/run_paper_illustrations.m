@@ -42,6 +42,14 @@ end
 % before. Both illustrations (network and single neuron) run at it.
 fs=400;
 if isfield(cfg,'fs'), fs=stage_fs(cfg.fs,400,'run_paper_illustrations'); end
+% Integrator: the bundle's cfg.ode_solver (Tom, 2026-11-17: sra1 for every
+% paper simulation, the noise-free single neuron too), else
+% build_from_preset's choice (sra1 with noise, rk4 without) as before.
+solver_args={};
+if isfield(cfg,'ode_solver')
+    solver=stage_solver(cfg.ode_solver,'','run_paper_illustrations');
+    if ~isempty(solver), solver_args={'ode_solver',solver}; end
+end
 variants={'representative_dynamics','single_neuron'};
 presets={cfg.preset_name,cfg.single_neuron_preset};
 for j=1:2
@@ -75,8 +83,9 @@ for j=1:2
     for c=1:numel(conds)
         model=build_from_preset(presets{j},conds{c}.name,'T_range',settings.T_range, ...
             'input_config',input,'fs',settings.fs,'rng_seeds',settings.seeds, ...
-            'plot_deci',2,'verbose',cfg.verbose,lya_args{:});
+            'plot_deci',2,'verbose',cfg.verbose,lya_args{:},solver_args{:});
         model.run(); pd=model.plot_data; pp=model.get_params();
+        settings.ode_solver=model.ode_solver;
         assert(SRNNCellTypePairs.routes_identical(pp),'Illustration requires identical outgoing routes.');
         r=struct('name',conds{c}.name,'title',titles(conds{c}.name),'t',pd.t, ...
             'u',[],'x',[],'r',[],'syn',[],'sfa',[],'std',[],'b1',[],'std_model','none','selected',{{}},'n',model.n, ...

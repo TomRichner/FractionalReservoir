@@ -62,6 +62,7 @@ arguments
     cfg.n_samples_examples (1,1) double = 0  % states per non-reference example; 0 -> per run_mode (40 / 60 / 150)
     cfg.conditions                 = {}       % the preset's conditions to sample, by name; {} = all (FD-030)
     cfg.fs                         = 0        % integration rate; 0 or [] -> per run_mode (FD-031 item 14: the bundle's cfg.fs)
+    cfg.ode_solver                 = ''       % integrator; '' -> build_from_preset's choice (stage_solver: the bundle's cfg.ode_solver)
 end
 
 setup_paths();
@@ -107,6 +108,7 @@ switch cfg.run_mode
 end
 if cfg.n_samples > 0; n_samples = cfg.n_samples; end
 fs = stage_fs(cfg.fs, fs, 'run_eig_heatmap');   % the bundle's rate replaces the table's
+cfg.ode_solver = stage_solver(cfg.ode_solver, '', 'run_eig_heatmap');   % checked now; '' = build_from_preset's
 
 lle_window     = min(30, diff(T_range) / 2);
 lya_T_interval = [T_range(2) - lle_window, T_range(2)];
@@ -232,6 +234,7 @@ args = {'T_range', T_range, 'fs', fs, 'rng_seeds', [1 2], ...   % same W across 
 if n_override > 0
     args = [args, {'n', n_override, 'indegree', max(2, round(0.2 * n_override)), 'F_tracks_network', true}];
 end
+if ~isempty(cfg.ode_solver); args = [args, {'ode_solver', cfg.ode_solver}]; end
 args = [args, struct2namevalue(overrides)];
 model = build_from_preset(cfg.preset_name, cond_name, args{:});
 model.run();

@@ -521,11 +521,18 @@ for md = {'essential', 'fast'}
         % mc_lean: the bundle sets it so block A's two memory-capacity
         % stages take the lean path (203d4f6; the same R^2 and memory
         % capacity to the bit, test_mc_lean_path, without holding the state
-        % trajectory). mu7chain_config does not set it.
+        % trajectory). mu7chain_config sets it too since the 500-Hz decision
+        % (Tom, 2026-11-17).
         assert(isequal(ac.mc_lean, true), 'the bundle runs memory capacity on the lean path');
-        differs = {'stages', 'mc_gain_sweep', 'run_dir', 'fig_root', 'figures', 'mc_lean'};
+        % noise_switch: the storage rates of the rollouts, which must divide
+        % the bundle's cfg.fs (500 Hz): 250 and 125 Hz.
+        assert(isequal(ac.noise_switch, struct('store_fs', 250, 'example_fs', 125)) && ...
+            mod(ac.fs, ac.noise_switch.store_fs) == 0, 'the noise-switch storage rates divide cfg.fs');
+        assert(isequal(arg(ns_plan.args, 'fs'), ac.fs) && strcmp(arg(ns_plan.args, 'ode_solver'), ac.ode_solver) && ...
+            isequal(arg(ns_plan.args, 'store_fs'), 250), 'the noise switch runs at the bundle''s rate and integrator');
+        differs = {'stages', 'mc_gain_sweep', 'run_dir', 'fig_root', 'figures', 'mc_lean', 'noise_switch'};
         assert(isequal(rmfield(ac, differs), rmfield(A, intersect(differs, fieldnames(A)))), ...
-            'the bundle differs from mu7chain_config in more than its stages, directories, registry and the lean memory-capacity path');
+            'the bundle differs from mu7chain_config in more than its stages, directories, registry, the lean memory-capacity path and the noise-switch storage rates');
     end
 end
 assert(strcmp(mu7chain_AC_config().run_mode, 'essential'), 'the default is the size agents run');
