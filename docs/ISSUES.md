@@ -1710,3 +1710,17 @@ them and updated after the next run. Belongs to job J2 (owns
 `mu7chain_config`); J3 sets it in the IED stimulation config. Item 9
 (eigenvalue by step) is dropped from FD-031: it is FR-002 in the manuscript
 repo, code on branch `eig-by-step-a8ca`.
+
+**Result (2026-11-17).** Jobs merged into main: J2a 77643f7, J3 3337830,
+J2b 752eb56, J1 6ab4df6, J5 part 1 678e181 (quick suite 94/94). J5 part 2
+redrew every paper figure through its run's registered figure step on the
+existing data (A + C partial pass and block C partial pass at 678e181, clean;
+`ied_stim_figures('stim_blocks_20261117')`), and the paper repo's
+`figure_sources.json` now points at those outputs (paper repo synced and
+pushed). Items 1–8, 10–14 done; item 9 moved to FR-002. Left open, small:
+- `fig_stim_engages_adaptation` (the two bursting supplementary PNGs)
+  simulates a 50-neuron network inside its figure function, so it was not
+  redrawn in the figures-only pass; its PNGs date from the 2026-11-15 run.
+- `ied_stim_figures` writes no FractionalReservoir git-provenance file (the
+  combined figure's provenance names the cscs commit but not the FR commit).
+- Stale worktrees under `.claude/worktrees/` from this session to remove.
