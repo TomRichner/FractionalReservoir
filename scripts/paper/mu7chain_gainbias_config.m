@@ -404,7 +404,7 @@ cfg.figures = entries_of_grids(cfg.figures, RUN_GRIDS);
 % the explicit check instead of entries_of_grids.
 if all(ismember({SELF, NOISE_WIENER}, cfg.mc_gain_sweep.run_grids))
     main_mc = struct('name', 'fig_main_mc_grouped', 'fn', @fig_main_mc_grouped, 'in_paper', true, ...
-        'args', {{'run_mode', run_mode, 'figure_set', figure_set}});
+        'args', {{'run_mode', run_mode, 'figure_set', figure_set, 'fig_tag', 'Fig_Main_MC_Grouped'}});
     names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
     after = find(ismember(names, {'fig_mc_maps_selfcoupling', 'fig_mc_noise_sweeps'}), 1, 'last');
     cfg.figures = [cfg.figures(1:after), {main_mc}, cfg.figures(after+1:end)];

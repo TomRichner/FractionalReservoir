@@ -58,6 +58,7 @@ arguments
     cfg.save       (1,1) logical = true
     cfg.visible    (1,1) logical = false
     cfg.verbose    (1,:) char    = 'minimal' %#ok<INUSA> accepted for a uniform call
+    cfg.fig_tag    (1,:) char    = 'Fig_Main_MC_Grouped'   % file name stem (the registry names it)
 end
 setup_paths();
 root = fileparts(which('setup_paths'));
@@ -228,7 +229,7 @@ end
 set([maps(:); axb; cb_mc; cb_l; lgb], 'Units', 'normalized');
 
 %% Save
-tag = 'Fig_Main_MC_Grouped';
+tag = cfg.fig_tag;
 out = struct('figs', fig, 'files', {{}}, 'source', {[{A.source}, B.source]}, 'layout', ...
     struct('A', 'gain x self-coupling maps: memory capacity (top row)', ...
            'B', 'gain x self-coupling maps: lambda_1 (bottom row)', ...
