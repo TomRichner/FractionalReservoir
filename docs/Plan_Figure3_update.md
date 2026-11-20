@@ -40,8 +40,19 @@ switching run, from the same top-100 pass whose local rates panel B sums; K =
 `with_switch_spectra(cfg)`. A first version at `essential`, with the old
 timing, is in `figs/fd034_mu7chain_essential_switchK100/`.
 
-Whether this version replaces the paper's Figure 3 is not yet decided (see
-Open questions).
+**This version is the paper's Figure 3** (Tom, 2026-11-20: "we will use the
+switching version"). Making it the bundle's registered default, and the
+paper's copy from the `fastmedium` run, still wait for the go on this plan.
+
+### 2a. A fourth row: the eigenvalue histogram (Tom, 2026-11-20)
+
+"Add the eigenvalue histogram as a fourth column and then keep A, B, C as
+they currently are. Do it now." Read by the lead as a fourth row, (D), under
+row C: per condition, the Jacobian's eigenvalues projected on the real axis
+with the dotted uniform-disk reference (`fig_eig_real_histogram`, FD-033),
+from the same switching-run states as row C and on the same x limits. Being
+built now as an opt-in on the composite, with the old timing; it is not
+gated by this plan, the timing change of section 1 still is.
 
 ### 3. Drawing (Tom, 2026-11-19)
 
@@ -84,7 +95,6 @@ use the pool, and they cost about the same serially.
 
 ## Open questions (Tom to decide)
 
-- **Does the FD-034 version replace Figure 3**, or stay a variant?
 - **K.** 100 throughout (Tom, 2026-11-20) against the earlier record of
   production K = 150 for this figure (figure review, 2026-11-17); the bundle
   itself sets 50 today.
