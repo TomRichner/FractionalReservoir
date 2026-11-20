@@ -3930,6 +3930,9 @@ classdef SRNNCellTypePairs < handle
             %
             % OUTPUT struct P
             %   H            K x K x n_s (NaN where valid is false)
+            %   JQ_gram      K x K x n_s, (J Q)' (J Q): with H it gives the
+            %                Ritz residuals (ritz_diagnostics), which say
+            %                whether a Ritz value is near an eigenvalue of J
             %   valid        n_s x 1: the state lies in the propagated range
             %   sample_idx, t, K, N
             %   x_fraction   n_s x K: share of each basis vector's squared
@@ -3993,7 +3996,7 @@ classdef SRNNCellTypePairs < handle
                 end
                 block_fractions(s, :) = acc / K;
             end
-            P = struct('H', r.H_t, 'valid', r.H_valid, 'sample_idx', sample_idx, ...
+            P = struct('H', r.H_t, 'JQ_gram', r.H_gram_t, 'valid', r.H_valid, 'sample_idx', sample_idx, ...
                 't', r.H_time, 'K', K, 'N', N, 'x_fraction', x_fraction, ...
                 'block_fractions', block_fractions, 'LE_spectrum', r.LE_spectrum, ...
                 'n_positive', r.n_positive, 'cond_max', r.cond_max, 'warmup_s', warmup_s, ...

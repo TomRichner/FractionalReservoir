@@ -21,7 +21,11 @@ function out = explore_ritz_basis_seed(cfg)
 %     in the other basis's set (greedy pairing): median and max over states,
 %   * the same summary numbers the figure's table gives, for both bases
 %     (share with Re > 0, median Re, share complex), so one can see whether
-%     the picture, as opposed to single points, depends on the basis.
+%     the picture, as opposed to single points, depends on the basis,
+%   * the median Ritz residual ||J Q - Q H||_F / ||J Q||_F of each basis.
+% 'T', 100, 'window_s', 20 samples the last 20 s of a 100-s run, i.e. gives
+% the basis 80 s of alignment instead of 20 (a run of another length is
+% another noise realization, so compare distributions, not states).
 % No eigenvalues of the full Jacobian are computed, so it takes about a
 % minute per condition. Nothing is saved.
 %
@@ -35,9 +39,11 @@ arguments
     cfg.n_samples (1,1) double = 40
     cfg.T (1,1) double = 40
     cfg.fs (1,1) double = 200
+    cfg.window_s (1,1) double = 0     % length of the sampled window at the end of the run; 0 = T / 2 (the stage's)
 end
 setup_paths();
-window = [cfg.T / 2, cfg.T];
+win = cfg.window_s; if win == 0; win = cfg.T / 2; end
+window = [cfg.T - win, cfg.T];      % everything before it is alignment: a longer T with the same window is a longer warm-up
 scalings = {'raw', 'type_sd'};
 out = struct('name', cfg.conditions, 'rows', []);
 for c = 1:numel(cfg.conditions)
@@ -52,9 +58,9 @@ for c = 1:numel(cfg.conditions)
     fprintf('\n%s (state dimension %d, K = %d, %d states)\n', cfg.conditions{c}, params.state_layout.N, ...
         min(cfg.K, params.state_layout.N), numel(idx));
     rows = struct('scaling', scalings, 'angle_max_deg', [], 'n_below_1deg', [], 'moved_median', [], ...
-        'moved_max', [], 'share_pos', [], 'median_re', [], 'share_complex', [], 'seconds', []);
+        'moved_max', [], 'share_pos', [], 'median_re', [], 'share_complex', [], 'seconds', [], 'residual', []);
     for s = 1:numel(scalings)
-        Z = cell(1, 2); Qend = cell(1, 2); secs = zeros(1, 2);
+        Z = cell(1, 2); Qend = cell(1, 2); secs = zeros(1, 2); resid = zeros(1, 2);
         for b = 1:2
             % The pass, with the basis at the last sampled state kept for the angles.
             o = struct('seed', cfg.seeds(b), 'err_id_prefix', 'explore_ritz_basis_seed', ...
@@ -69,8 +75,12 @@ for c = 1:numel(cfg.conditions)
             r = lyapunov_topk(m.S_out, m.t_out, m.fs, 0.05, [m.t_out(idx(1)), m.t_out(end)], ...
                 m.t_out(idx(1)) - m.t_out(1), K, @(S, p) error('unused'), params, o);
             secs(b) = r.seconds;
-            Z{b} = complex(zeros(K, numel(idx)));
-            for k = 1:numel(idx); Z{b}(:, k) = eig(r.H_t(:, :, k)); end
+            Z{b} = complex(zeros(K, numel(idx))); res_b = zeros(1, numel(idx));
+            for k = 1:numel(idx)
+                Dg = ritz_diagnostics(r.H_t(:, :, k), r.H_gram_t(:, :, k));
+                Z{b}(:, k) = Dg.values; res_b(k) = Dg.residual;
+            end
+            resid(b) = median(res_b);
             Qend{b} = r.Q_t(:, :, end);
         end
         ang = acosd(min(1, svd(Qend{1}' * Qend{2})));           % principal angles at the last state
@@ -81,11 +91,11 @@ for c = 1:numel(cfg.conditions)
         rows(s).share_pos = [mean(real(Z{1}(:)) > 0), mean(real(Z{2}(:)) > 0)];
         rows(s).median_re = [median(real(Z{1}(:))), median(real(Z{2}(:)))];
         rows(s).share_complex = [cx(Z{1}), cx(Z{2})];
-        rows(s).seconds = secs;
+        rows(s).seconds = secs; rows(s).residual = resid;
         fprintf(['  %-7s largest principal angle %5.1f deg, %2d of %d below 1 deg | Ritz values moved: median %.3g, ' ...
-            'max %.3g 1/s | Re > 0: %.1f%% / %.1f%% | median Re %+.3f / %+.3f | complex %.0f%% / %.0f%% | %.0f + %.0f s\n'], ...
+            'max %.3g 1/s | Re > 0: %.1f%% / %.1f%% | median Re %+.3f / %+.3f | complex %.0f%% / %.0f%% | residual %.2f / %.2f | %.0f + %.0f s\n'], ...
             scalings{s}, max(ang), nnz(ang < 1), K, median(moved), max(moved), 100 * rows(s).share_pos, ...
-            rows(s).median_re, 100 * rows(s).share_complex, secs);
+            rows(s).median_re, 100 * rows(s).share_complex, resid, secs);
     end
     out(c).rows = rows;
 end

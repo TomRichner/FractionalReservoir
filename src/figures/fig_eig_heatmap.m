@@ -43,13 +43,39 @@ function out = fig_eig_heatmap(cfg)
 %   ritz_scaling   'raw' (default) or 'type_sd': which of the run's state
 %                  scalings; Ritz values depend on how x, the adaptation and
 %                  the depression variables are scaled against one another
-%   ritz_exponent_ticks  ticks along the bottom edge at the top-k Lyapunov
-%                  exponents of the same pass (default true)
-%   ritz_inset     an inset on the real axis near zero (ritz_inset_xlim,
-%                  default [-1 0.5] 1/s) with the density recomputed at that
-%                  scale: the slow band of an adapting network, near
-%                  -0.1 1/s, cannot be told from zero on a window tens of
-%                  1/s wide
+%   ritz_style     how the Ritz values are drawn. The eigenvalue density is
+%                  a (log-scaled) count, and a plain scatter is not: a pile
+%                  of a thousand points at one spot is one dot and a few
+%                  dozen stray points look like many, so a scatter
+%                  over-represents the outliers (Tom, 2026-11-19).
+%                    'density'  (default) the Ritz values as a density of
+%                               their own on the eigenvalue density's bins,
+%                               the same log transform, in the condition's
+%                               color, opacity following the count
+%                    'marginal' very small transparent points, plus a
+%                               histogram of Re along the bottom of the
+%                               panel (linear counts, so the pile reads as
+%                               a pile)
+%                    'fine'     very small transparent points only
+%                    'scatter'  the plain scatter, every point a visible dot
+%   ritz_exponent_ticks  black ticks along the bottom edge at the top-k
+%                  Lyapunov exponents of the same pass (the time averages,
+%                  over the sampled window, of the local rates whose
+%                  instantaneous values are the diagonal of H; default true)
+%   ritz_inset     an inset on the real axis with the eigenvalue density
+%                  recomputed at its scale, the Ritz values as a histogram
+%                  of Re above it and the exponent ticks: the slow band of
+%                  an adapting network, near -0.1 1/s, cannot be told from
+%                  zero on a window tens of 1/s wide. Its range is chosen
+%                  PER CONDITION from where that condition's Ritz values
+%                  and exponents are (the 5th to 95th percentile of the real
+%                  parts, the exponents and zero, padded), or is
+%                  ritz_inset_xlim when that is given
+%   NO TEXT ON THE PANELS (Tom, 2026-11-19; the repo's convention):
+%   the counts and what the ticks are go in the table beside the figure,
+%   which also carries a caption paragraph. ritz_annotate and
+%   ritz_tick_label (both default false) print them on the panels for a
+%   working copy. With the overlay the figure has ONE title line.
 % The overlay is saved under its own tag, fig_eig_heatmap_ritz (with
 % _typesd for the scaled version and _inset for the inset), with a table
 % beside it, <tag>_table.md: per condition where the points sit, how many
@@ -89,9 +115,12 @@ arguments
     cfg.ritz_overlay (1,1) logical = false   % draw the Ritz values of the leading Lyapunov subspace (FD-033)
     cfg.ritz_k       (1,1) double {mustBeInteger, mustBeNonnegative} = 0   % leading directions drawn; 0 = all the run tracked
     cfg.ritz_scaling (1,:) char {mustBeMember(cfg.ritz_scaling, {'raw', 'type_sd'})} = 'raw'
+    cfg.ritz_style   (1,:) char {mustBeMember(cfg.ritz_style, {'density', 'marginal', 'fine', 'scatter'})} = 'density'
     cfg.ritz_exponent_ticks (1,1) logical = true
+    cfg.ritz_annotate (1,1) logical = false      % print the number of points and the share right of zero on each panel
+    cfg.ritz_tick_label (1,1) logical = false    % print what the exponent ticks are on each panel
     cfg.ritz_inset   (1,1) logical = false
-    cfg.ritz_inset_xlim (1,2) double = [-1 0.5]   % real-axis range of the inset (1/s)
+    cfg.ritz_inset_xlim double = []              % real-axis range of the inset (1/s); [] = chosen per condition
 end
 
 setup_paths();
@@ -213,7 +242,7 @@ for i = 1:n_cond
         'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
 
     if cfg.ritz_overlay
-        draw_ritz(ax_panels(i), ritz{i}, ritz_color(cond_names{i}), im_lim, cfg.ritz_exponent_ticks);
+        draw_ritz(ax_panels(i), ritz{i}, ritz_color(cond_names{i}), re_edges, im_edges, scale_fn, cfg);
     end
 end
 
@@ -227,8 +256,8 @@ cb.Box = 'off';
 heading = {'Jacobian eigenvalue occupancy across adaptation regimes', ...
     sprintf('\\lambda_1 = finite-time largest Lyapunov exponent over the last %g s', lle_window)};
 if cfg.ritz_overlay
-    heading{end + 1} = sprintf(['points: eigenvalues of the Jacobian projected on the top-%d Lyapunov ' ...
-        'directions (Ritz values), %s norm'], ritz{1}.k_requested, strrep(cfg.ritz_scaling, '_', '\_'));
+    % One short line; what the points and lambda_1 are is in the table and the caption.
+    heading = 'Jacobian eigenvalues (gray) and Ritz values of the leading Lyapunov directions (color)';
 end
 title(tl, heading, 'FontWeight', 'bold');
 
@@ -236,7 +265,7 @@ if cfg.ritz_overlay && cfg.ritz_inset
     % After the layout is complete (title, colorbar), so the plot boxes are final.
     for i = 1:n_cond
         draw_ritz_inset(fig, ax_panels(i), i, evals_by_cond{i}, ritz{i}, ritz_color(cond_names{i}), ...
-            cfg.ritz_inset_xlim, scale_fn);
+            inset_range(ritz{i}, cfg.ritz_inset_xlim), scale_fn, cfg.ritz_exponent_ticks);
     end
 end
 
@@ -246,6 +275,7 @@ if ~cfg.visible; set(fig, 'Visible', 'off'); end
 fig_tag = 'fig_eig_heatmap';
 if cfg.ritz_overlay
     fig_tag = [fig_tag '_ritz'];
+    if ~strcmp(cfg.ritz_style, 'density'); fig_tag = [fig_tag '_' cfg.ritz_style]; end
     if strcmp(cfg.ritz_scaling, 'type_sd'); fig_tag = [fig_tag '_typesd']; end
     if cfg.ritz_inset; fig_tag = [fig_tag '_inset']; end
     table_text = ritz_table(D, idx, cond_names, condition_titles, ritz, cfg, re_lim, im_lim);
@@ -278,18 +308,33 @@ end
 if k == 0; k = R.K; end
 k_used = min(k, R.K);
 states = find(R.valid(:))';
-if k_used == R.K
-    z = R.values(:, states, sc);
-else
-    z = complex(zeros(k_used, numel(states)));
-    for s = 1:numel(states)
-        z(:, s) = eig(R.H(1:k_used, 1:k_used, states(s), sc));
+has_gram = isfield(R, 'JQ_gram');          % a run made before the residuals were saved has none
+z = complex(zeros(k_used, numel(states)));
+pair_res = nan(k_used, numel(states));
+names = {'residual', 'share_diag_pos', 'share_ritz_pos', 'norm_diag', 'norm_lower', 'norm_upper_T', ...
+    'coupling_TS', 'num_abscissa', 'max_re'};
+S = cell2struct(repmat({nan(1, numel(states))}, numel(names), 1), names(:), 1);
+for s = 1:numel(states)
+    Hs = R.H(:, :, states(s), sc);
+    if has_gram
+        Dg = ritz_diagnostics(Hs, R.JQ_gram(:, :, states(s), sc), k_used);
+        z(:, s) = Dg.values; pair_res(:, s) = Dg.pair_residual;
+        for n = 1:numel(names); S.(names{n})(s) = Dg.(names{n}); end
+    else
+        z(:, s) = eig(Hs(1:k_used, 1:k_used));
     end
 end
 trace_k = arrayfun(@(s) trace(R.H(1:k_used, 1:k_used, s, sc)), states);
-P = struct('z', z, 'k', k_used, 'k_requested', k, 'K', R.K, 'N', R.N, 'sc', sc, ...
+P = struct('z', z, 'pair_residual', pair_res, 'state', S, 'has_gram', has_gram, 'k', k_used, ...
+    'k_requested', k, 'K', R.K, 'N', R.N, 'sc', sc, ...
     'states', states, 'exponents', R.LE_spectrum(1:k_used, sc), 'trace_k', trace_k, ...
     'x_share', mean(R.x_fraction(states, 1:k_used, sc), 2));
+if isfield(R, 'full_num_abscissa')
+    P.full = struct('max_re', R.full_max_re(states)', 'n_positive', R.full_n_positive(states)', ...
+        'num_abscissa', R.full_num_abscissa(states, sc)');
+else
+    P.full = [];
+end
 end
 
 function col = ritz_color(cond_name)
@@ -302,58 +347,144 @@ else
 end
 end
 
-function draw_ritz(ax, P, col, im_lim, with_ticks)
-% The points, over the density and under nothing; the axes' limits are the
-% density's and stay so (points outside are clipped and counted in the table).
+function draw_ritz(ax, P, col, re_edges, im_edges, scale_fn, cfg)
+% The Ritz values over the density, in the style asked for; the axes'
+% limits are the density's and stay so (points outside are clipped and
+% counted in the table). Every object is tagged ritz_*.
 xl = xlim(ax); yl = ylim(ax);
+z = P.z(:);
+re_c = (re_edges(1:end - 1) + re_edges(2:end)) / 2;
+im_c = (im_edges(1:end - 1) + im_edges(2:end)) / 2;
 hold(ax, 'on');
-% A thin white rim keeps a dark point readable on the dark part of the density.
-scatter(ax, real(P.z(:)), imag(P.z(:)), 10, col, 'filled', 'MarkerFaceAlpha', 0.45, ...
-    'MarkerEdgeColor', 'w', 'MarkerEdgeAlpha', 0.5, 'LineWidth', 0.25, 'Tag', 'ritz_values');
-if with_ticks
+switch cfg.ritz_style
+    case 'scatter'
+        % A thin white rim keeps a dark point readable on the dark part of the density.
+        scatter(ax, real(z), imag(z), 10, col, 'filled', 'MarkerFaceAlpha', 0.45, ...
+            'MarkerEdgeColor', 'w', 'MarkerEdgeAlpha', 0.5, 'LineWidth', 0.25, 'Tag', 'ritz_values');
+    case {'fine', 'marginal'}
+        scatter(ax, real(z), imag(z), 2.5, col, 'filled', 'MarkerFaceAlpha', 0.2, ...
+            'MarkerEdgeColor', 'none', 'Tag', 'ritz_values');
+        if strcmp(cfg.ritz_style, 'marginal')
+            % Histogram of Re on the density's bins, LINEAR counts scaled to
+            % the bottom fifth of the panel: where most of the points are.
+            n = histcounts(real(z), re_edges);
+            h = yl(1) + 0.2 * diff(yl) * n / max(n);
+            xs = [re_edges(1:end - 1); re_edges(2:end)]; ys = [h; h];
+            patch(ax, [xs(1); xs(:); xs(end)], [yl(1); ys(:); yl(1)], col, 'FaceAlpha', 0.55, ...
+                'EdgeColor', col, 'LineWidth', 0.5, 'Tag', 'ritz_marginal');
+        end
+    case 'density'
+        % The same binning, smoothing and log transform as the eigenvalue
+        % density, normalized to its own maximum; a solid color whose
+        % opacity is the transformed count. Black on a gray density would
+        % not read, so a colorless condition color is drawn in dark red.
+        if max(col) - min(col) < 0.1; col = [0.75 0.10 0.15]; end
+        Dz = scale_fn(compute_eigenvalue_density(z, re_edges, im_edges, 1));
+        A = Dz' / max(Dz(:));
+        image(ax, 'XData', re_c, 'YData', im_c, 'CData', repmat(reshape(col, 1, 1, 3), numel(im_c), numel(re_c)), ...
+            'AlphaData', 0.9 * A, 'Tag', 'ritz_density');
+end
+if cfg.ritz_exponent_ticks
     % One line object with NaN breaks: the Lyapunov exponents of the same
     % pass as ticks on the bottom edge. (One object of many points, so a
     % composite that looks for the two-point Re = 0 line does not find it.)
     lam = P.exponents(:)';
-    len = 0.035 * diff(im_lim);
+    len = 0.03 * diff(yl);
     xs = [lam; lam; nan(1, numel(lam))];
     ys = repmat([yl(1); yl(1) + len; NaN], 1, numel(lam));
-    plot(ax, xs(:), ys(:), '-', 'Color', col, 'LineWidth', 0.75, 'Tag', 'ritz_exponent_ticks');
+    plot(ax, xs(:), ys(:), '-', 'Color', [0 0 0], 'LineWidth', 0.6, 'Tag', 'ritz_exponent_ticks');
+    if cfg.ritz_tick_label
+        text(ax, 0.02, 0.04, sprintf('| Lyapunov exponents (top %d)', P.k), 'Units', 'normalized', ...
+            'FontSize', 8, 'Color', [0 0 0], 'VerticalAlignment', 'bottom', 'Tag', 'ritz_tick_label');
+    end
+end
+if cfg.ritz_annotate
+    n_pos_state = sum(real(P.z) > 0, 1);
+    % Under the lambda_1 label of the stand-alone figure, top left.
+    text(ax, 0.03, 0.87, sprintf('%d Ritz values\n(%d states x %d)\nRe > 0: %.1f%%,\nin %d of %d states', ...
+        numel(z), size(P.z, 2), P.k, 100 * mean(real(z) > 0), nnz(n_pos_state > 0), size(P.z, 2)), ...
+        'Units', 'normalized', 'FontSize', 8, 'Color', col, 'HorizontalAlignment', 'left', ...
+        'VerticalAlignment', 'top', 'Tag', 'ritz_annotation');
 end
 hold(ax, 'off');
 xlim(ax, xl); ylim(ax, yl);
 end
 
-function draw_ritz_inset(fig, ax, panel, evals, P, col, re_lim_inset, scale_fn)
+function lim = inset_range(P, given)
+% The inset's real-axis range: the one given, or chosen from where this
+% condition's Ritz values and exponents are: the 5th to 95th percentile of
+% the real parts, widened to hold every exponent and zero, padded by 15%
+% and rounded outward to two significant digits.
+if ~isempty(given)
+    if numel(given) ~= 2 || given(2) <= given(1)
+        error('fig_eig_heatmap:BadInsetRange', 'ritz_inset_xlim must be [lo hi] with lo < hi, or [].');
+    end
+    lim = given(:)'; return
+end
+re = real(P.z(:));
+lo = min([quantile(re, 0.05); P.exponents(:); 0]);
+hi = max([quantile(re, 0.95); P.exponents(:); 0]);
+pad = 0.15 * max(hi - lo, 0.1);
+lo = lo - pad; hi = hi + pad;
+step = 10 ^ (floor(log10(hi - lo)) - 1);
+lim = [floor(lo / step), ceil(hi / step)] * step;
+end
+
+function draw_ritz_inset(fig, ax, panel, evals, P, col, re_lim_inset, scale_fn, with_ticks)
 % A small axes in the lower right corner of the panel's plot box, zoomed on
-% the real axis near zero: the density of the full Jacobian's eigenvalues at
-% that scale (its own gray scale, darkest = its own maximum) and the Ritz
-% values on it. Parented to the figure, tagged 'ritz_inset', with the panel
+% the real axis near zero, where the Ritz values of an adapting network
+% pile up. Lower half: the density of the full Jacobian's eigenvalues at
+% that scale (its own gray scale, darkest = its own maximum) with the Ritz
+% values as small points and the exponent ticks on the bottom edge. Upper
+% half: a histogram of the real parts of the Ritz values in that range
+% (linear counts), so the pile reads as a pile. The imaginary range is the
+% 90th percentile of the points in range, so a few far points do not
+% flatten it. Parented to the figure, tagged 'ritz_inset', with the panel
 % index and its place within the plot box in UserData so a composite can
 % put it back (fig_main3_stability).
-rel = [0.50 0.10 0.47 0.25];                  % [x y w h] as fractions of the panel's plot box
+rel = [0.50 0.13 0.47 0.30];                  % [x y w h] as fractions of the panel's plot box
 box = plot_box_position(ax);
 z = P.z(:);
 in_x = real(z) >= re_lim_inset(1) & real(z) <= re_lim_inset(2);
-im_half = max(0.5, 1.15 * max(abs(imag(z(in_x)))));
-if isempty(im_half) || ~isfinite(im_half); im_half = 0.5; end
-re_edges = linspace(re_lim_inset(1), re_lim_inset(2), 121);
-im_edges = linspace(-im_half, im_half, 41);
+im_half = 0.2;
+if any(in_x); im_half = max(0.2, 1.5 * quantile(abs(imag(z(in_x))), 0.9)); end
+re_edges = linspace(re_lim_inset(1), re_lim_inset(2), 91);
+im_edges = linspace(-im_half, im_half, 31);
 Dn = scale_fn(compute_eigenvalue_density(evals, re_edges, im_edges, 1));
 ai = axes(fig, 'Units', 'normalized', ...
     'Position', [box(1) + rel(1) * box(3), box(2) + rel(2) * box(4), rel(3) * box(3), rel(4) * box(4)]);
+% The image fills the lower half of the inset's y range; the histogram the upper half.
 imagesc(ai, (re_edges(1:end - 1) + re_edges(2:end)) / 2, (im_edges(1:end - 1) + im_edges(2:end)) / 2, Dn');
 axis(ai, 'xy'); colormap(ai, flipud(gray));
 clim(ai, [0, max(max(Dn(:)), eps)]);
 hold(ai, 'on');
 st = manuscript_style();
-plot(ai, [0 0], [-im_half im_half], '--', 'Color', st.zeroline_color, 'LineWidth', 1, 'Tag', 'ritz_inset_zero');
-scatter(ai, real(z), imag(z), 8, col, 'filled', 'MarkerFaceAlpha', 0.45, ...
-    'MarkerEdgeColor', 'w', 'MarkerEdgeAlpha', 0.5, 'LineWidth', 0.25, 'Tag', 'ritz_values_inset');
+top = 3.4 * im_half;                           % y of the top of the histogram band
+plot(ai, [0 0], [-im_half top], '--', 'Color', st.zeroline_color, 'LineWidth', 1, 'Tag', 'ritz_inset_zero');
+draw_col = col; if max(col) - min(col) < 0.1; draw_col = [0.75 0.10 0.15]; end
+scatter(ai, real(z), imag(z), 3, draw_col, 'filled', 'MarkerFaceAlpha', 0.3, ...
+    'MarkerEdgeColor', 'none', 'Tag', 'ritz_values_inset');
+n = histcounts(real(z), re_edges);
+if any(n)
+    h = 1.2 * im_half + (top - 1.3 * im_half) * n / max(n);
+    xs = [re_edges(1:end - 1); re_edges(2:end)]; ys = [h; h];
+    patch(ai, [xs(1); xs(:); xs(end)], [1.2 * im_half; ys(:); 1.2 * im_half], draw_col, 'FaceAlpha', 0.6, ...
+        'EdgeColor', draw_col, 'LineWidth', 0.5, 'Tag', 'ritz_inset_histogram');
+end
+plot(ai, re_lim_inset, [1 1] * 1.2 * im_half, '-', 'Color', [0.6 0.6 0.6], 'LineWidth', 0.5);
+if with_ticks
+    lam = P.exponents(:)';
+    xs = [lam; lam; nan(1, numel(lam))];
+    ys = repmat([-im_half; -0.7 * im_half; NaN], 1, numel(lam));
+    plot(ai, xs(:), ys(:), '-', 'Color', [0 0 0], 'LineWidth', 0.6, 'Tag', 'ritz_inset_exponent_ticks');
+end
 hold(ai, 'off');
-set(ai, 'XLim', re_lim_inset, 'YLim', [-im_half im_half], 'Box', 'on', 'FontSize', 8, ...
-    'TickDir', 'out', 'TickLength', [0.02 0.02], 'Layer', 'top', 'XTick', unique([re_lim_inset(1), 0, re_lim_inset(2)]), ...
-    'YTick', [-im_half 0 im_half], 'YTickLabel', {sprintf('%.2g', -im_half), '0', sprintf('%.2g', im_half)}, ...
+set(ai, 'XLim', re_lim_inset, 'YLim', [-im_half top], 'Box', 'on', 'FontSize', 8, ...
+    'TickDir', 'out', 'TickLength', [0.02 0.02], 'Layer', 'top', ...
+    'XTick', unique([re_lim_inset(1), 0, re_lim_inset(2)]), ...
+    'XTickLabel', arrayfun(@(v) sprintf('%g', v), unique([re_lim_inset(1), 0, re_lim_inset(2)]), 'UniformOutput', false), ...
+    'YTick', [0 im_half], 'YTickLabel', {'0', sprintf('%.2g', im_half)}, ...
+    'XTickLabelRotation', 0, ...
     'Tag', 'ritz_inset', 'UserData', struct('panel', panel, 'rel', rel));
 end
 
@@ -370,9 +501,10 @@ L{end + 1} = sprintf(['Drawn: the eigenvalues of the leading k x k block of H = 
     cfg.ritz_scaling, ritz{1}.k_requested, R1.K, R1.warmup_s, R1.interval(1), R1.interval(2), R1.lya_dt, R1.seed);
 L{end + 1} = '';
 L{end + 1} = ['| Condition | state dim. | k drawn | states | points | Re > 0 | max Re (1/s) | median Re (1/s) | ' ...
+    'Re > 0 per state: min, median, max | states with any | ' ...
     'complex | max freq. (Hz) | median freq. of complex (Hz) | outside the window | x share of the subspace | ' ...
     'lambda_1 | lambda_k | positive exponents | moved by the other scaling: median, max (1/s) |'];
-L{end + 1} = '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|';
+L{end + 1} = '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|';
 scale_lines = {};
 for i = 1:numel(cond_names)
     P = ritz{i}; R = D.ritz_by_cond{idx(i)};
@@ -387,16 +519,20 @@ for i = 1:numel(cond_names)
         dist = arrayfun(@(s) matched_distance(P.z(:, s), Po.z(:, s)), 1:size(P.z, 2));
         moved = sprintf('%.3g, %.3g', median(dist), max(dist));
     end
-    L{end + 1} = sprintf(['| %s | %d | %d | %d | %d | %d (%.1f%%) | %+.3f | %+.3f | %d (%.1f%%) | %.3g | %s | ' ...
+    per_state = sum(real(P.z) > 0, 1);
+    L{end + 1} = sprintf(['| %s | %d | %d | %d | %d | %d (%.1f%%) | %+.3f | %+.3f | %d, %g, %d | %d of %d | %d (%.1f%%) | %.3g | %s | ' ...
         '%d (%.1f%%) | %.3f | %+.4f | %+.4f | %d | %s |'], titles{i}, P.N, P.k, numel(P.states), numel(z), ...
-        nnz(real(z) > 0), 100 * mean(real(z) > 0), max(real(z)), median(real(z)), nnz(is_cx), 100 * mean(is_cx), ...
+        nnz(real(z) > 0), 100 * mean(real(z) > 0), max(real(z)), median(real(z)), ...
+        min(per_state), median(per_state), max(per_state), nnz(per_state > 0), numel(per_state), nnz(is_cx), 100 * mean(is_cx), ...
         max(f), f_med, nnz(outside), 100 * mean(outside), median(P.x_share), P.exponents(1), P.exponents(end), ...
         nnz(P.exponents > 0), moved); %#ok<AGROW>
     scale_lines{end + 1} = sprintf('- %s: %s', titles{i}, strjoin(arrayfun(@(k) sprintf('%s %.3g', ...
         R.scales.kinds{k}, R.scales.sd(k)), 1:numel(R.scales.kinds), 'UniformOutput', false), ', ')); %#ok<AGROW>
 end
 L{end + 1} = '';
-L{end + 1} = ['Columns. Re > 0, complex and outside the window: counts of points, with their share. A point is ' ...
+L{end + 1} = ['Columns. Re > 0, complex and outside the window: counts of points, with their share. Re > 0 per state: ' ...
+    'each sampled state gives k points; the smallest, median and largest number of them right of zero in one state, ' ...
+    'and in how many states at least one is. A point is ' ...
     'complex when |Im| exceeds 1e-9 of its modulus (or of 1); frequency is |Im| / 2 pi. x share: the share of the ' ...
     'drawn subspace''s squared norm in dendritic coordinates, median over states (in the drawn norm). lambda_1, ' ...
     'lambda_k: the largest and the k-th exponent of this pass over its window. Moved by the other scaling: per ' ...
@@ -406,6 +542,19 @@ L{end + 1} = '';
 L{end + 1} = '`type_sd` scales, the pooled standard deviation in time of each kind of variable over the sampled window, per condition:';
 L{end + 1} = '';
 L = [L, scale_lines];
+L{end + 1} = '';
+L = [L, ritz_diagnostics_section(D, idx, cond_names, titles, cfg)];
+L{end + 1} = '';
+L{end + 1} = '## Caption paragraph, to adapt';
+L{end + 1} = '';
+L{end + 1} = sprintf(['Gray: density of the eigenvalues of the Jacobian at %d states sampled along a baseline simulation ' ...
+    '(darker = more). Color: at the same states, the eigenvalues of the Jacobian restricted to the %d directions the ' ...
+    'Lyapunov computation tracks (Ritz values), drawn as a density on the same bins; these are instantaneous growth ' ...
+    'and rotation rates of the tracked directions, not eigenvalues of the Jacobian. Black ticks on the bottom edge: ' ...
+    'the Lyapunov exponents of those %d directions, averaged over [%g, %g] s. Inset: the real axis at the scale of ' ...
+    'the Ritz values, with a histogram of their real parts (top), the eigenvalue density and the Ritz values ' ...
+    '(bottom), the exponent ticks and zero (dashed). The share of Ritz values right of zero, and in how many states ' ...
+    'they occur, is in the first table.'], numel(ritz{1}.states), ritz{1}.k, ritz{1}.k, R1.interval(1), R1.interval(2));
 L{end + 1} = '';
 L{end + 1} = '## Reading the overlay';
 L{end + 1} = '';
@@ -417,19 +566,85 @@ L{end + 1} = ['- **In a stable adapting network the points mark the slow band.**
     'directions lie in that band (a small x share in the table), so the points gather near the slowest adaptation ' ...
     'rate (about -0.1 1/s) and say little about the network''s collective modes. No affordable k passes the band ' ...
     'at 500 neurons.'];
-L{end + 1} = ['- **A point right of zero is not an instability.** The tracked directions are coupled through the ' ...
-    'network, so H is not normal: its eigenvalues can leave the real axis and cross zero while every Lyapunov ' ...
-    'exponent is negative. Compare the "Re > 0" and "positive exponents" columns.'];
-L{end + 1} = ['- **The points need not fall on the density.** The tracked subspace is carried by the dynamics and is ' ...
-    'not an invariant subspace of the instantaneous Jacobian. The points lie within its numerical range.'];
+L{end + 1} = ['- **The points are not eigenvalues of the Jacobian, and a point right of zero is not an instability.** ' ...
+    'They would be eigenvalues only if the tracked subspace were invariant under the instantaneous Jacobian. It is ' ...
+    'carried by the dynamics instead, and the residual column of the diagnostics says how far from invariant it is ' ...
+    '(0 = invariant; on the 500-neuron networks it is 0.5 to 0.9, and single Ritz pairs are no closer). So each ' ...
+    'point is an instantaneous rate, with rotation, of the tracked directions among themselves: a point of the ' ...
+    'numerical range of the Jacobian, bounded by the numerical abscissa of H. Points right of zero say that, at that ' ...
+    'state and in that norm, some tracked directions are growing; the Lyapunov exponents (the ticks) are the time ' ...
+    'averages and can all be negative. Compare "Re > 0", "local rates > 0" and "positive exponents".'];
+L{end + 1} = ['- **Do not read the points against the density one by one.** The density is of true eigenvalues, which ' ...
+    'do not depend on the norm; the points do. In the raw norm the number of points right of zero follows, state by ' ...
+    'state, the number of eigenvalues of the full Jacobian right of zero (fig_ritz_by_state); in the type_sd norm ' ...
+    'almost none remain on the multiple-timescale network although those eigenvalues are still there.'];
 L{end + 1} = ['- **Single points do not average to single exponents.** Only sums agree: at each state the real parts of ' ...
     'the k points sum to the trace of the block, the sum of the top-k instantaneous local Lyapunov rates.'];
 L{end + 1} = ['- **The norm matters.** Ritz values depend on how x, the adaptation and the depression variables are ' ...
     'scaled against one another; the last column says by how much here. The edge of a top-k subspace inside a ' ...
     'continuous band also depends on the initial basis.'];
-L{end + 1} = ['- **Ticks on the bottom edge** are the top-k Lyapunov exponents of the same pass over its window ' ...
-    '(at this scale they overlap where the exponents are close).'];
+L{end + 1} = sprintf(['- **The black ticks on the bottom edge** are the Lyapunov exponents of the same k directions from the same ' ...
+    'pass: the averages over the sampled window, [%g, %g] s, of the local rates whose instantaneous values are the ' ...
+    'diagonal of H. They are k numbers per condition, not one set per state, and they are real. At the panel''s ' ...
+    'scale they overlap where the exponents are close; the inset separates them.'], R1.interval(1), R1.interval(2));
+L{end + 1} = ['- **How the points are drawn.** `ritz_style` = `' cfg.ritz_style '`. The eigenvalue density is a log-scaled ' ...
+    'count; a plain scatter shows every point as a dot, so a pile of a thousand points looks like one and a few dozen ' ...
+    'strays look like many. `density` draws the Ritz values as a log-scaled count on the same bins, `marginal` adds a ' ...
+    'linear histogram of the real parts. The counts in the first table are the measure.'];
 txt = strjoin(L, newline);
+end
+
+function L = ritz_diagnostics_section(D, idx, cond_names, titles, cfg)
+% What the points are: per condition and per leading block k, medians over
+% the sampled states of the residuals, of the structure of H and of the
+% comparison with the full Jacobian at the same states (ritz_diagnostics).
+L = {};
+L{end + 1} = '## What the points are: diagnostics';
+L{end + 1} = '';
+R1 = D.ritz_by_cond{idx(1)};
+if ~isfield(R1, 'JQ_gram')
+    L{end + 1} = 'This run was made before the residuals were saved (no JQ_gram); rerun the stage for the diagnostics.';
+    return
+end
+L{end + 1} = ['A Ritz value is an eigenvalue of the Jacobian only if the tracked subspace is invariant under it. ' ...
+    'Medians over the sampled states (ranges in brackets), `' cfg.ritz_scaling '` norm, for the leading k directions:'];
+L{end + 1} = '';
+L{end + 1} = ['| Condition | k | residual | pair residual | local rates > 0 | Ritz Re > 0 | max Re Ritz (1/s) | ' ...
+    'num. abscissa of H | full J: max Re | full J: eigenvalues Re > 0 | full J: num. abscissa | place | ' ...
+    'diag. norm | lower (frame turning) | upper of T (feed-forward) | coupling (1/s) |'];
+L{end + 1} = '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|';
+med = @(v) median(v, 'omitnan');
+for i = 1:numel(cond_names)
+    R = D.ritz_by_cond{idx(i)};
+    for k = unique(min([10, 25, R.K], R.K))
+        P = ritz_points(R, k, cfg.ritz_scaling, cond_names{i});
+        S = P.state; F = P.full;
+        place = (S.max_re - F.max_re) ./ (F.num_abscissa - F.max_re);
+        L{end + 1} = sprintf(['| %s | %d | %.3f [%.3f, %.3f] | %.3f | %.1f%% | %.1f%% | %+.3f [%+.3f, %+.3f] | %+.3f | ' ...
+            '%+.3f | %g [%g, %g] | %+.2f | %.3f | %.3g | %.3g | %.3g | %.3g |'], titles{i}, P.k, ...
+            med(S.residual), min(S.residual), max(S.residual), med(P.pair_residual(:)), ...
+            100 * mean(S.share_diag_pos), 100 * mean(S.share_ritz_pos), med(S.max_re), min(S.max_re), max(S.max_re), ...
+            med(S.num_abscissa), med(F.max_re), med(F.n_positive), min(F.n_positive), max(F.n_positive), ...
+            med(F.num_abscissa), med(place), med(S.norm_diag), med(S.norm_lower), med(S.norm_upper_T), ...
+            med(S.coupling_TS)); %#ok<AGROW>
+    end
+end
+L{end + 1} = '';
+L{end + 1} = ['Columns. **residual**: ||J Q - Q H||_F / ||J Q||_F, 0 for a subspace invariant under the Jacobian, near 1 ' ...
+    'when the Jacobian sends the tracked directions almost entirely out of the subspace. **pair residual**: the same for ' ...
+    'one Ritz pair, ||J Q y - theta Q y|| / ||J Q y||, median over pairs and states; small only where a point is nearly ' ...
+    'an eigenvalue of the Jacobian. **local rates > 0**: share of the diagonal entries of H (the instantaneous local ' ...
+    'Lyapunov rates of the k directions) that are positive, against **Ritz Re > 0**, the share of its eigenvalues; a ' ...
+    'gap between the two is spread made by the off-diagonal part, not local growth. **num. abscissa of H**: the largest ' ...
+    'eigenvalue of (H + H'')/2, the largest instantaneous growth rate inside the subspace; it bounds every Ritz real ' ...
+    'part. **full J**: the Jacobian at the same states: its largest eigenvalue real part, how many of its eigenvalues ' ...
+    'have positive real part, and its numerical abscissa in this norm, which bounds everything. **place**: where the ' ...
+    'largest Ritz real part sits between the full spectral abscissa (0) and the full numerical abscissa (1); below 0 it ' ...
+    'is left of the rightmost eigenvalue. **diag. norm, lower, upper of T**: H = T + S in Gram-Schmidt order, T upper ' ...
+    'triangular with the local rates on its diagonal, S skew (the turning of the frame); the 2-norm of the diagonal and ' ...
+    'the Frobenius norms of the strictly lower triangle of H (which is that of S) and of the strictly upper triangle of ' ...
+    'T. **coupling**: the largest sqrt(|T_ij S_ji|), the scale by which feed-forward weight times frame turning moves ' ...
+    'an eigenvalue of H off its diagonal.'];
 end
 
 function d = matched_distance(a, b)

@@ -27,8 +27,8 @@ function out=fig_main3_stability(run_dir,conditions,opts)
 % as a small label in the top right corner of its expansion panel.
 %
 % RITZ_OVERLAY (FD-033, default false: the figure as it was). true passes
-% fig_eig_heatmap its 'ritz_overlay' with ritz_k, ritz_scaling and
-% ritz_inset, so each heat-map panel also carries the Ritz values of the
+% fig_eig_heatmap its 'ritz_overlay' with ritz_k, ritz_scaling, ritz_style
+% and ritz_inset, so each heat-map panel also carries the Ritz values of the
 % leading Lyapunov subspace (and its inset near zero when asked); the
 % points and ticks are children of the copied axes and come with them, and
 % each inset is put back in the same place within its panel's plot box. The
@@ -41,6 +41,7 @@ arguments
     opts.ritz_k (1,1) double = 0
     opts.ritz_scaling (1,:) char = 'raw'
     opts.ritz_inset (1,1) logical = false
+    opts.ritz_style (1,:) char = 'density'
 end
 show_lambda=opts.show_lambda_row;
 % Row geometry, [y height] in normalized figure units, and the canvas height.
@@ -58,7 +59,7 @@ n_col=numel(names); width_scale=1+(n_col-3)*.30; s=1/width_scale;
 T=D.settings.T;
 ritz_args={};
 if opts.ritz_overlay
-    ritz_args={'ritz_overlay',true,'ritz_k',opts.ritz_k,'ritz_scaling',opts.ritz_scaling,'ritz_inset',opts.ritz_inset};
+    ritz_args={'ritz_overlay',true,'ritz_k',opts.ritz_k,'ritz_scaling',opts.ritz_scaling,'ritz_inset',opts.ritz_inset,'ritz_style',opts.ritz_style};
 end
 a=fig_eig_heatmap('run_dir',run_dir,'save',false,'visible',false,'density_scale','loglog', ...
     'conditions',names,ritz_args{:});
@@ -182,7 +183,7 @@ end
 uistack(sep,'bottom'); set(findall(fig,'-property','FontSize'),'FontSize',14);
 for c=1:n_col, ax=findobj(fig,'Tag',sprintf('stability_r1_c%d',c)); ax.Title.FontSize=16; end
 set(findall(fig,'Tag','accumulated_lambda_label'),'FontSize',12);
-set(findall(fig,'Tag','ritz_inset'),'FontSize',9);
+set(findall(fig,'Tag','ritz_inset'),'FontSize',9); set(findall(fig,'-regexp','Tag','^ritz_(annotation|tick_label)$'),'FontSize',9);
 if show_lambda
 notes={sprintf('Current switching data: K=%d; accumulation [%g,%g] s; saved segment-start timestamps retained. Settings are read from the completed saved analysis.',D.settings.K,D.settings.lya_T_interval), ...
     ['Input shows 24 fixed actual neurons (12 evenly spaced E and 12 I), identical indices across conditions. ' ...

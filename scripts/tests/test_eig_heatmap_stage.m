@@ -27,12 +27,18 @@
 %      J_times_by_cond, values = eig(H) with real parts summing to trace(H),
 %      block fractions summing to 1, and the scales by kind of variable
 %      (x alone without adaptation, where the scaled pass must then give the
-%      raw Ritz values). A scaling name it does not know errors
+%      raw Ritz values); and for the diagnostics JQ_gram (residuals in
+%      [0, 1]) and the full Jacobian's spectral abscissa, count of
+%      eigenvalues right of zero and numerical abscissa per state, the last
+%      bounding the projected one. A scaling name it does not know errors
 %      :badRitzScaling.
-%   5. fig_eig_heatmap with 'ritz_overlay': draws the points (one scatter
-%      tagged ritz_values per panel, and the exponent ticks), saves under
-%      the tag fig_eig_heatmap_ritz with its table, with and without the
-%      inset; without the option the figure has no such object and the tag
+%   5. fig_eig_heatmap with 'ritz_overlay', in each ritz_style: the default
+%      'density' (an image tagged ritz_density per panel), 'marginal',
+%      'fine' and 'scatter' (points tagged ritz_values), with the exponent
+%      ticks; no text on the panels and one title line unless the
+%      annotation and the tick label are asked for; saved under the tag
+%      fig_eig_heatmap_ritz (plus the style, scaling and inset) with its
+%      table, which carries the diagnostics; fig_ritz_by_state draws; without the option the figure has no such object and the tag
 %      is unchanged; on a run directory without the pass it draws as before
 %      and errors :NoRitz when the overlay is asked for.
 %   6. The composite Figure 3 (fig_main3_stability, fig_grouped_main group
@@ -119,7 +125,7 @@ all_passed = check('with the Ritz pass every legacy variable is identical to the
 all_passed = check('settings record ritz_K and the scalings; the reference example carries the same structs', ...
     DR.settings.ritz_K == 10 && isequal(DR.settings.ritz_scalings, {'raw', 'type_sd'}) && ...
     isequaln(DR.examples(1).ritz_by_cond, DR.ritz_by_cond)) && all_passed;
-shape = true; ident = true; kinds_ok = true; worst_trace = 0;
+shape = true; ident = true; kinds_ok = true; worst_trace = 0; diag_ok = true;
 for i = 1:n_cond
     R = DR.ritz_by_cond{i};
     n_s = numel(DR.J_times_by_cond{i});
@@ -132,6 +138,15 @@ for i = 1:n_cond
         end
     end
     ident = ident && max(abs(sum(R.block_fractions, 2) - 1), [], 'all') < 1e-12;
+    for sc = 1:2
+        for k = 1:n_s
+            Dg = ritz_diagnostics(R.H(:, :, k, sc), R.JQ_gram(:, :, k, sc));
+            diag_ok = diag_ok && Dg.residual >= 0 && Dg.residual <= 1 && all(Dg.pair_residual >= 0 & Dg.pair_residual <= 1 + 1e-9) && ...
+                Dg.max_re <= Dg.num_abscissa + 1e-10 && Dg.num_abscissa <= R.full_num_abscissa(k, sc) + 1e-6;
+        end
+    end
+    diag_ok = diag_ok && isequal(size(R.full_max_re), [n_s, 1]) && all(R.full_n_positive >= 0) && ...
+        max(R.full_max_re) == max(real(DR.evals_by_cond{i}));
     if strcmp(DR.cond_names{i}, 'no_adaptation')
         d_raw = sort(real(R.values(:, :, 1))); d_sc = sort(real(R.values(:, :, 2)));
         kinds_ok = kinds_ok && isequal(R.scales.kinds, {'x'}) && max(abs(d_raw - d_sc), [], 'all') < 1e-8;
@@ -145,6 +160,8 @@ end
 all_passed = check('per condition: H is K x K x states x 2, all states valid, at the sampled times', shape) && all_passed;
 all_passed = check(sprintf('real parts of the Ritz values sum to trace(H) (worst %.1e)', worst_trace), worst_trace < 1e-9) && all_passed;
 all_passed = check('block fractions sum to 1', ident) && all_passed;
+all_passed = check(['diagnostics: residuals in [0, 1]; max Re Ritz <= num. abscissa of H <= that of the full J in the same norm; ' ...
+    'the full spectral abscissa per state is that of the pooled spectra'], diag_ok) && all_passed;
 all_passed = check('scales by kind: x alone without adaptation (scaled = raw there), several kinds with it', kinds_ok) && all_passed;
 all_passed = check('an unknown scaling errors :badRitzScaling', ...
     throws_id(@() run_eig_heatmap('preset_name', P, 'run_mode', 'fast', 'ritz_K', 5, 'ritz_scalings', {'zscore'}), ...
@@ -167,25 +184,47 @@ all_passed = check('imbalance figure errors :NoExamples on a pre-examples .mat',
 n_tagged = @(fh, tag) numel(findall(fh, 'Tag', tag));
 evalc('res0 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig0''), ''visible'', false);');
 all_passed = check('without the option: no Ritz object, tag unchanged, no table', ...
-    n_tagged(res0.figs, 'ritz_values') == 0 && n_tagged(res0.figs, 'ritz_inset') == 0 && ...
+    n_tagged(res0.figs, 'ritz_values') == 0 && n_tagged(res0.figs, 'ritz_density') == 0 && n_tagged(res0.figs, 'ritz_inset') == 0 && ...
     any(strcmp(res0.files, 'fig_eig_heatmap.png')) && isempty(dir(fullfile(ritz_dir, 'fig0', '*_table.md')))) && all_passed;
 close(res0.figs);
-evalc('res3 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig3''), ''visible'', false, ''ritz_overlay'', true);');
+evalc('res3 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig3''), ''visible'', false, ''ritz_overlay'', true, ''ritz_style'', ''scatter'', ''ritz_annotate'', true, ''ritz_tick_label'', true);');
 sc3 = findall(res3.figs, 'Tag', 'ritz_values');
-all_passed = check('overlay: one scatter of K x states points and one set of exponent ticks per panel, no inset', ...
+all_passed = check('overlay, scatter style, text asked for: one scatter of K x states points, exponent ticks, their label and the annotation per panel, no inset', ...
     numel(sc3) == n_cond && n_tagged(res3.figs, 'ritz_exponent_ticks') == n_cond && n_tagged(res3.figs, 'ritz_inset') == 0 && ...
+    n_tagged(res3.figs, 'ritz_tick_label') == n_cond && n_tagged(res3.figs, 'ritz_annotation') == n_cond && ...
     sum(arrayfun(@(h) numel(h.XData), sc3)) == sum(cellfun(@(R) R.K * nnz(R.valid), DR.ritz_by_cond))) && all_passed;
-all_passed = check('overlay: saved as fig_eig_heatmap_ritz with its table', ...
-    any(strcmp(res3.files, 'fig_eig_heatmap_ritz.png')) && isfile(fullfile(ritz_dir, 'fig3', 'fig_eig_heatmap_ritz_table.md'))) && all_passed;
+all_passed = check('overlay, scatter style: saved as fig_eig_heatmap_ritz_scatter with its table', ...
+    any(strcmp(res3.files, 'fig_eig_heatmap_ritz_scatter.png')) && isfile(fullfile(ritz_dir, 'fig3', 'fig_eig_heatmap_ritz_scatter_table.md'))) && all_passed;
 close(res3.figs);
+ok5 = true;
+for sty = {'density', 'marginal'}
+    evalc(['res5 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig5'', sty{1}), ''visible'', false, ' ...
+        '''ritz_overlay'', true, ''ritz_style'', sty{1});']);
+    tl5 = findall(res5.figs, 'Type', 'tiledlayout');
+    ok5 = ok5 && n_tagged(res5.figs, ['ritz_' sty{1}]) == n_cond && n_tagged(res5.figs, 'ritz_annotation') == 0 && ...
+        n_tagged(res5.figs, 'ritz_tick_label') == 0 && isscalar(cellstr(tl5.Title.String));
+    if strcmp(sty{1}, 'density')
+        tbl = fileread(fullfile(ritz_dir, 'fig5', 'density', 'fig_eig_heatmap_ritz_table.md'));
+        ok5 = ok5 && contains(tbl, 'Caption paragraph') && any(strcmp(res5.files, 'fig_eig_heatmap_ritz.png')) && n_tagged(res5.figs, 'ritz_values') == 0 && ...
+            contains(tbl, 'What the points are: diagnostics') && contains(tbl, 'Re > 0 per state');
+    else
+        ok5 = ok5 && any(strcmp(res5.files, 'fig_eig_heatmap_ritz_marginal.png'));
+    end
+    close(res5.figs);
+end
+all_passed = check('overlay, density (the default) and marginal styles: a density image or a histogram per panel, no text on the panels, one title line; the table has the diagnostics and a caption', ok5) && all_passed;
+evalc('bs = fig_ritz_by_state(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''bs''), ''visible'', false);');
+all_passed = check('fig_ritz_by_state draws three panels per condition and saves', ...
+    numel(findall(bs.figs, 'Type', 'axes')) == 3 * n_cond && any(strcmp(bs.files, 'fig_ritz_by_state.png'))) && all_passed;
+close(bs.figs);
 evalc(['res4 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig4''), ''visible'', false, ' ...
-    '''ritz_overlay'', true, ''ritz_inset'', true, ''ritz_scaling'', ''type_sd'', ''ritz_k'', 4, ''ritz_exponent_ticks'', false);']);
+    '''ritz_overlay'', true, ''ritz_inset'', true, ''ritz_scaling'', ''type_sd'', ''ritz_k'', 4, ''ritz_exponent_ticks'', false, ''ritz_style'', ''fine'');']);
 sc4 = findall(res4.figs, 'Tag', 'ritz_values');
-all_passed = check('overlay with inset, scaled, k = 4: 4 x states points per panel, an inset per panel, no ticks, own tag', ...
+all_passed = check('overlay with inset, fine style, scaled, k = 4: 4 x states points per panel, an inset per panel, no ticks, own tag', ...
     sum(arrayfun(@(h) numel(h.XData), sc4)) == sum(cellfun(@(R) 4 * nnz(R.valid), DR.ritz_by_cond)) && ...
     n_tagged(res4.figs, 'ritz_inset') == n_cond && n_tagged(res4.figs, 'ritz_exponent_ticks') == 0 && ...
-    any(strcmp(res4.files, 'fig_eig_heatmap_ritz_typesd_inset.png')) && ...
-    isfile(fullfile(ritz_dir, 'fig4', 'fig_eig_heatmap_ritz_typesd_inset_table.md'))) && all_passed;
+    any(strcmp(res4.files, 'fig_eig_heatmap_ritz_fine_typesd_inset.png')) && ...
+    isfile(fullfile(ritz_dir, 'fig4', 'fig_eig_heatmap_ritz_fine_typesd_inset_table.md'))) && all_passed;
 close(res4.figs);
 all_passed = check('a run directory without the Ritz pass: the overlay errors :NoRitz', ...
     throws_id(@() fig_eig_heatmap('run_dir', run_dir, 'save', false, 'visible', false, 'ritz_overlay', true), ...
@@ -196,21 +235,21 @@ evalc(['run_local_lyapunov(''preset_name'', P, ''run_mode'', ''fast'', ''out_dir
     '''K'', 5, ''T'', 8, ''n_override'', 60);']);
 evalc('m3 = fig_main3_stability(ritz_dir, {}, ''ritz_overlay'', true, ''ritz_inset'', true);');
 panels = findall(m3.figs, 'Type', 'axes', '-regexp', 'Tag', '^stability_r1_c\d+$');
-in_panel = arrayfun(@(ax) numel(findall(ax, 'Tag', 'ritz_values')), panels);
+in_panel = arrayfun(@(ax) numel(findall(ax, 'Tag', 'ritz_density')), panels);
 all_passed = check('fig_main3_stability: every heat-map panel carries the points; one inset per panel', ...
     numel(panels) == n_cond && all(in_panel == 1) && n_tagged(m3.figs, 'ritz_inset') == n_cond) && all_passed;
 close(m3.figs);
 evalc('m0 = fig_main3_stability(ritz_dir, {});');
 all_passed = check('fig_main3_stability without the option: no Ritz object', ...
-    n_tagged(m0.figs, 'ritz_values') == 0 && n_tagged(m0.figs, 'ritz_inset') == 0) && all_passed;
+    n_tagged(m0.figs, 'ritz_density') == 0 && n_tagged(m0.figs, 'ritz_inset') == 0) && all_passed;
 close(m0.figs);
 evalc(['g3 = fig_grouped_main(3, ''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''g3''), ' ...
     '''ritz_overlay'', true, ''ritz_inset'', true);']);
 evalc('g0 = fig_grouped_main(3, ''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''g0''));');
 all_passed = check('fig_grouped_main group 3: Fig_Main3_Grouped_ritz_inset with the points; Fig_Main3_Grouped without', ...
-    any(strcmp(g3.files, 'Fig_Main3_Grouped_ritz_inset.png')) && n_tagged(g3.figs, 'ritz_values') == n_cond && ...
+    any(strcmp(g3.files, 'Fig_Main3_Grouped_ritz_inset.png')) && n_tagged(g3.figs, 'ritz_density') == n_cond && ...
     n_tagged(g3.figs, 'ritz_inset') == n_cond && any(strcmp(g0.files, 'Fig_Main3_Grouped.png')) && ...
-    n_tagged(g0.figs, 'ritz_values') == 0) && all_passed;
+    n_tagged(g0.figs, 'ritz_density') == 0) && all_passed;
 close([g3.figs, g0.figs]);
 
 empty_dir = fullfile(tempdir, 'eig_heatmap_stage_test_empty'); if ~exist(empty_dir, 'dir'); mkdir(empty_dir); end

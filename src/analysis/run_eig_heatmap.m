@@ -63,7 +63,16 @@ function mat_file = run_eig_heatmap(cfg)
 % struct per condition: H (K x K x states x scalings, Gram-Schmidt column
 % order, so the leading k x k block is the top-k subspace), values (its
 % eigenvalues), valid, sample_idx, t, the pass's exponents, the block
-% fractions of the subspace, the scales and the pass's settings.
+% fractions of the subspace, the scales and the pass's settings; and, to
+% say WHAT THE RITZ VALUES ARE (they are eigenvalues of the Jacobian only
+% if the tracked subspace is invariant under it, which a subspace carried
+% by the dynamics is not): JQ_gram = (J Q)' (J Q), from which the Ritz
+% residuals follow for any leading block (ritz_diagnostics); and per state,
+% from the full Jacobian, its spectral abscissa and its number of
+% eigenvalues with positive real part (full_max_re, full_n_positive; from
+% the spectra already computed) and its numerical abscissa in each norm
+% (full_num_abscissa, the largest eigenvalue of (J + J')/2 with J in that
+% norm's coordinates), which bounds the real part of every Ritz value.
 %
 % Eigenvalues are computed through the CLASS's own static compute_Jacobian_fast,
 % resolved by name, so this works for either model class.
@@ -287,7 +296,7 @@ idx = sample_indices(model.t_out, J_times);
 [evals, omega, alpha, t_used] = sample_eigenvalues(model, idx, cfg.use_parallel);
 ritz = [];
 if cfg.ritz_K > 0
-    ritz = ritz_pass(model, idx, cfg.ritz_K, ritz_scalings);   % the same states as the spectra
+    ritz = ritz_pass(model, idx, cfg.ritz_K, ritz_scalings, evals);   % the same states as the spectra
 end
 
 % Mean rate over the sampled window (the plot_data grid may be decimated).
@@ -307,10 +316,12 @@ r = struct('evals', evals, 'lle', model.lya_results.LLE, 'lya', model.lya_summar
     'mu_tilde_relative', model.mu_tilde_relative, 'n', model.n, 'model', model, 'ritz', ritz);
 end
 
-function R = ritz_pass(model, idx, K, scalings)
+function R = ritz_pass(model, idx, K, scalings, evals)
 % The Jacobian projected on the top-K Lyapunov subspace at the sampled
 % states (rows idx of the stored trajectory), once per state scaling; see
 % the header. The initial basis is seeded as the model's own top-K pass is.
+% evals: the pooled eigenvalues of the full Jacobian at the same states (N
+% per state, in the order of idx), for the per-state comparison.
 cls    = class(model);
 params = model.get_params();
 seed   = model.rng_seeds(1) + 424242;
@@ -328,9 +339,20 @@ for s = 1:numel(scalings)
             'LE_spectrum', nan(P.K, n_sc), 'n_positive', nan(1, n_sc), 'cond_max', nan(1, n_sc), ...
             'x_fraction', nan(n_s, P.K, n_sc), 'block_fractions', nan(n_s, 4, n_sc), ...
             'scales', rmfield(scales, 'd'), 'warmup_s', P.warmup_s, 'interval', P.interval, ...
-            'lya_dt', P.lya_dt, 'seed', seed, 'seconds', nan(1, n_sc));
+            'lya_dt', P.lya_dt, 'seed', seed, 'seconds', nan(1, n_sc), ...
+            'JQ_gram', nan(P.K, P.K, n_s, n_sc), 'full_num_abscissa', nan(n_s, n_sc));
+        ev = reshape(evals, P.N, n_s);
+        R.full_max_re = max(real(ev), [], 1)';
+        R.full_n_positive = sum(real(ev) > 0, 1)';
     end
     R.H(:, :, :, s) = P.H;
+    R.JQ_gram(:, :, :, s) = P.JQ_gram;
+    for k = 1:numel(idx)
+        % Numerical abscissa of the full Jacobian in this norm's coordinates.
+        J = feval([cls '.compute_Jacobian_fast'], model.S_out(idx(k), :)', params);
+        if isfield(opts, 'state_scale'); J = (1 ./ opts.state_scale) .* J .* opts.state_scale'; end
+        R.full_num_abscissa(k, s) = largest_symmetric_eigenvalue(J);
+    end
     for k = find(P.valid)'
         R.values(:, k, s) = eig(P.H(:, :, k));
     end
@@ -342,6 +364,17 @@ for s = 1:numel(scalings)
     R.block_fractions(:, :, s) = P.block_fractions;
     R.seconds(s) = P.seconds;
 end
+end
+
+function w = largest_symmetric_eigenvalue(J)
+% max eig((J + J')/2): sparse Lanczos, dense when that does not converge.
+Js = (J + J') / 2;
+w = NaN;
+if size(Js, 1) > 400
+    [~, w, flag] = eigs(sparse(Js), 1, 'largestreal', 'Tolerance', 1e-8, 'MaxIterations', 500, 'Display', false);
+    if flag ~= 0; w = NaN; end
+end
+if isnan(w); w = max(eig(full(Js))); end
 end
 
 function idx = sample_indices(t_out, J_times_sec)

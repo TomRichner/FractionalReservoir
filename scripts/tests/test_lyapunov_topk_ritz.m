@@ -46,6 +46,28 @@
 %      deviation of that kind's variables (root mean of their variances in
 %      time over the rows), written into every variable of the kind; a kind that does not fluctuate gets 1 and is
 %      named.
+%   8. RESIDUALS AND A TIME-VARYING, NON-NORMAL SYSTEM WITH A KNOWN ANSWER
+%      (ritz_diagnostics; H_gram_t). The Ritz values are eigenvalues of J
+%      only when the tracked subspace is invariant under J, and the
+%      residual ||J Q - Q H||_F / ||J Q||_F says whether it is.
+%      (a) It is 0 (to the 1e-8 floor of a difference of squares) at K = N
+%          and on the invariant subspaces of section 2.
+%      (b) A ROTATING system, J(t) = R(t) A R(t)' with R = expm(Omega t),
+%          Omega skew, A stable and non-normal. In the rotating frame the
+%          tangent dynamics are dy/dt = (A - Omega) y, constant, so the
+%          tracked subspace is R(t) V with V the leading invariant subspace
+%          of B = A - Omega, NOT of A. The answer is then known in closed
+%          form and is neither eig(A) nor eig(B): the Ritz values are
+%          eig(V' A V), with residual ||A V - V V' A V||_F / ||A V||_F > 0,
+%          and the Lyapunov exponents are the real parts of eig(B) (their
+%          sum is checked: single exponents need longer to settle). This is
+%          the case the model is in: a subspace carried by the dynamics,
+%          not invariant under the instantaneous Jacobian.
+%      (c) On the model: G = (J Q)' (J Q) against the assembled Jacobian;
+%          the residual and the pair residuals from H and G alone equal the
+%          ones computed directly from J, Q and the Ritz vectors; the
+%          projected numerical abscissa bounds every Ritz real part and is
+%          bounded by the full one.
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths has run.
 %
@@ -267,6 +289,73 @@ S_rest = SRNNCellTypePairs.state_type_scales(repmat(m.S_out(end, :), 3, 1), 1:3,
 all_passed = check('a state that does not fluctuate: every scale 1, every kind named', ...
     all(S_rest.d == 1) && isequal(S_rest.constant, Sc.kinds)) && all_passed;
 
+%% 8. Residuals, and a rotating non-normal system with a known answer
+res_full = max(arrayfun(@(s) getfield(ritz_diagnostics(r_asm.H_t(:, :, s), r_asm.H_gram_t(:, :, s)), 'residual'), 1:numel(idx))); %#ok<GFLD>
+res_inv  = max(arrayfun(@(s) getfield(ritz_diagnostics(r2.H_t(:, :, s), r2.H_gram_t(:, :, s)), 'residual'), 1:numel(idx2))); %#ok<GFLD>
+pair_inv = max(arrayfun(@(s) max(getfield(ritz_diagnostics(r2.H_t(:, :, s), r2.H_gram_t(:, :, s)), 'pair_residual')), 1:numel(idx2))); %#ok<GFLD>
+fprintf('  residual: K = N %.1e; invariant subspace (non-normal J) %.1e, worst Ritz pair %.1e\n', res_full, res_inv, pair_inv);
+all_passed = check('residual is zero at K = N and on an invariant subspace (1e-6)', ...
+    res_full < 1e-6 && res_inv < 1e-6 && pair_inv < 1e-6) && all_passed;
+
+rng_state = rng; rng(21, 'twister');
+A_rot = schur_form([-0.2, -0.5, -1, -6, -7, -8], 0.8);          % stable, non-normal
+W = randn(6); Om = 0.4 * (W - W') / norm(W - W');               % skew: the frame turns at up to 0.4 rad/s
+rng(rng_state);
+B_rot = A_rot - Om;
+[Us, Ts] = schur(B_rot, 'real');
+ev_B = ordeig(Ts);
+[~, by_re] = sort(real(ev_B), 'descend');
+sel = false(6, 1); sel(by_re(1:3)) = true;
+gap_B = min(real(ev_B(sel))) - max(real(ev_B(~sel)));
+Us = ordschur(Us, Ts, sel);
+V = Us(:, 1:3);                                                 % leading invariant subspace of B
+want_ritz = eig(V' * A_rot * V);
+want_res  = norm(A_rot * V - V * (V' * A_rot * V), 'fro') / norm(A_rot * V, 'fro');
+fs_r = 1000; t_r = (0:1 / fs_r:12)'; X_r = [t_r, zeros(numel(t_r), 5)];   % the "state" carries the time
+jac_rot = @(S, p) expm(Om * S(1)) * A_rot * expm(-Om * S(1));
+idx_r = [10003, 10511, 11250, numel(t_r)];
+o_r = struct('seed', 2, 'grid_fn', grid_fn, 'H_idx', idx_r);
+r_rot = lyapunov_topk(X_r, t_r, fs_r, 0.05, [10 12], 10, 3, jac_rot, [], o_r);
+err_ritz = 0; err_res = 0; err_eigA = Inf; err_eigB = Inf;
+top3 = @(M) maxk_real(eig(M), 3);
+for s = 1:numel(idx_r)
+    Dg = ritz_diagnostics(r_rot.H_t(:, :, s), r_rot.H_gram_t(:, :, s));
+    err_ritz = max(err_ritz, match_err(Dg.values, want_ritz));
+    err_res  = max(err_res, abs(Dg.residual - want_res));
+    err_eigA = min(err_eigA, match_err(Dg.values, top3(A_rot)));
+    err_eigB = min(err_eigB, match_err(Dg.values, top3(B_rot)));
+end
+err_le = abs(sum(r_rot.LE_spectrum) - sum(real(ev_B(sel))));   % the sum: single exponents need longer than 2 s
+fprintf(['  rotating system (gap %.2f 1/s): |Ritz - eig(V''AV)| %.1e; residual %.4f against %.4f (error %.1e);\n' ...
+    '    the Ritz values are %.2f from the leading eigenvalues of A and %.2f from those of B; sum of the exponents against that of Re eig(B) %.1e\n'], ...
+    gap_B, err_ritz, Dg.residual, want_res, err_res, err_eigA, err_eigB, err_le);
+all_passed = check('rotating non-normal system: Ritz values equal eig(V'' A V) (1e-5) and the residual its closed form (1e-5)', ...
+    gap_B > 1 && err_ritz < 1e-5 && err_res < 1e-5) && all_passed;
+all_passed = check('rotating system: a nonzero residual, and Ritz values that are eigenvalues of neither A nor B', ...
+    want_res > 0.05 && err_eigA > 1e-2 && err_eigB > 1e-2) && all_passed;
+all_passed = check('rotating system: the Lyapunov exponents sum to the real parts of the leading eig(A - Omega) (1e-4)', err_le < 1e-4) && all_passed;
+
+% (c) on the model: G and the residuals against direct computation
+err_G = 0; err_res_m = 0; err_pair_m = 0; bound_ok = true;
+for s = [1, 7, round(numel(rows) / 2), numel(rows), numel(rows) + 1]
+    Qs = rH.Q_t(:, :, s); Hs = rH.H_t(:, :, s);
+    Jd = full(jf(m.S_out(rH.H_idx(s), :)', params));
+    JQ = Jd * Qs;
+    err_G = max(err_G, max(abs(rH.H_gram_t(:, :, s) - JQ' * JQ), [], 'all') / max(abs(JQ' * JQ), [], 'all'));
+    Dg = ritz_diagnostics(Hs, rH.H_gram_t(:, :, s));
+    err_res_m = max(err_res_m, abs(Dg.residual - norm(JQ - Qs * Hs, 'fro') / norm(JQ, 'fro')));
+    [Yv, Tv] = eig(Hs);
+    direct = vecnorm(JQ * Yv - Qs * Yv * Tv) ./ vecnorm(JQ * Yv);
+    err_pair_m = max(err_pair_m, match_err(sort(Dg.pair_residual), sort(direct(:))));
+    omega_J = max(eig((Jd + Jd') / 2));
+    bound_ok = bound_ok && Dg.max_re <= Dg.num_abscissa + 1e-12 && Dg.num_abscissa <= omega_J + 1e-9 && Dg.trace_err < 1e-10;
+end
+fprintf('  model: G against (JQ)''(JQ) %.1e; residual from H and G against the direct one %.1e (last state: %.3f); pairs %.1e\n', ...
+    err_G, err_res_m, Dg.residual, err_pair_m);
+all_passed = check('model: G = (J Q)'' (J Q) (1e-12); residual and pair residuals from H and G equal the direct ones (1e-7)', ...
+    err_G < 1e-12 && err_res_m < 1e-7 && err_pair_m < 1e-7) && all_passed;
+all_passed = check('model: max Re Ritz <= projected numerical abscissa <= numerical abscissa of J; trace kept', bound_ok) && all_passed;
+
 fprintf('\n');
 if all_passed
     fprintf('=== ALL lyapunov_topk projected-Jacobian TESTS PASSED ===\n');
@@ -290,6 +379,12 @@ for k = 1:numel(ev)
         c = c + 2;
     end
 end
+end
+
+function v = maxk_real(ev, k)
+% The k eigenvalues of largest real part.
+[~, order] = sort(real(ev), 'descend');
+v = ev(order(1:k));
 end
 
 function e = match_err(a, b)

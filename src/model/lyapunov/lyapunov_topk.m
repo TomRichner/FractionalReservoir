@@ -70,6 +70,13 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
 %                            its diagonal with local_LE_spectrum_t, use
 %                            sort_idx (sorted column j is raw column
 %                            sort_idx(j)).
+%     H_gram_t               K x K x n_s, G = (J Q)' (J Q) at the same
+%                            states and in the same column order. With H
+%                            it gives the Ritz RESIDUALS, which say how far
+%                            span(Q) is from an invariant subspace of J and
+%                            so whether a Ritz value is close to an
+%                            eigenvalue of J: ||J Q y - Q H y||^2 =
+%                            y' G y - ||H y||^2 (ritz_diagnostics)
 %     H_idx, H_time          the requested rows of X and their times
 %     H_valid                n_s x 1; false (and H_t NaN) where a requested
 %                            state lies outside the propagated range
@@ -187,6 +194,7 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
     check_orth  = K <= 500;
     if want_H
         H_t     = nan(K, K, numel(H_idx));
+        G_t     = nan(K, K, numel(H_idx));
         H_valid = false(numel(H_idx), 1);
         if return_Q; Q_t = nan(N, K, numel(H_idx)); end
     end
@@ -201,7 +209,7 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
         if matrix_free
             for i = i0:i1 - 1
                 if want_H && H_slot(i) > 0 && ~H_valid(H_slot(i))
-                    [H_t(:, :, H_slot(i)), Qs] = projected_jacobian(Y, X(i, :)', apply_J, false);
+                    [H_t(:, :, H_slot(i)), G_t(:, :, H_slot(i)), Qs] = projected_jacobian(Y, X(i, :)', apply_J, false);
                     H_valid(H_slot(i)) = true;
                     if return_Q; Q_t(:, :, H_slot(i)) = Qs; end
                 end
@@ -216,7 +224,7 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
             end
             for i = i0:i1 - 1
                 if want_H && H_slot(i) > 0 && ~H_valid(H_slot(i))
-                    [H_t(:, :, H_slot(i)), Qs] = projected_jacobian(Y, X(i, :)', apply_J, false);
+                    [H_t(:, :, H_slot(i)), G_t(:, :, H_slot(i)), Qs] = projected_jacobian(Y, X(i, :)', apply_J, false);
                     H_valid(H_slot(i)) = true;
                     if return_Q; Q_t(:, :, H_slot(i)) = Qs; end
                 end
@@ -248,7 +256,7 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
         cond_t(k) = d(1) / d(end);
         if want_H && H_slot(i1) > 0
             % A requested state on the segment grid: Q is orthonormal here.
-            H_t(:, :, H_slot(i1)) = projected_jacobian(Q, X(i1, :)', apply_J, true);
+            [H_t(:, :, H_slot(i1)), G_t(:, :, H_slot(i1))] = projected_jacobian(Q, X(i1, :)', apply_J, true);
             H_valid(H_slot(i1)) = true;
             if return_Q; Q_t(:, :, H_slot(i1)) = Q; end
         end
@@ -298,6 +306,7 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
     R.lya_fs   = 1 / lya_dt;
     if want_H
         R.H_t     = H_t;                % raw (Gram-Schmidt) column order, NOT sorted
+        R.H_gram_t = G_t;               % (J Q)' (J Q), same order
         R.H_idx   = H_idx;
         R.H_time  = reshape(t(H_idx), [], 1);
         R.H_valid = H_valid;
@@ -306,9 +315,9 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
     R.seconds  = toc(t0_wall);
 end
 
-function [H, Qs] = projected_jacobian(Y, S, apply_J, is_orthonormal)
-% H = Qs' J(S) Qs for the orthonormal basis Qs of span(Y) in Y's column
-% (Gram-Schmidt) order, by one Jacobian product. Y is taken as Qs when the
+function [H, G, Qs] = projected_jacobian(Y, S, apply_J, is_orthonormal)
+% H = Qs' J(S) Qs and G = (J Qs)' (J Qs) for the orthonormal basis Qs of
+% span(Y) in Y's column (Gram-Schmidt) order, by one Jacobian product. Y is taken as Qs when the
 % caller states it is orthonormal already; otherwise a thin QR with diag(R)
 % made positive, the convention of the main loop.
     if is_orthonormal
@@ -318,7 +327,9 @@ function [H, Qs] = projected_jacobian(Y, S, apply_J, is_orthonormal)
         s = sign(diag(Rs)); s(s == 0) = 1;
         Qs = Qs .* s';
     end
-    H = Qs' * apply_J(S, Qs);
+    JQ = apply_J(S, Qs);
+    H = Qs' * JQ;
+    G = JQ' * JQ;
 end
 
 function [D, resolved] = kaplan_yorke_partial(lambda, N)
