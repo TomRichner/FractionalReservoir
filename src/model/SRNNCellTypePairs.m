@@ -4004,6 +4004,56 @@ classdef SRNNCellTypePairs < handle
                 'seconds', r.seconds);
         end
 
+        function d = frozen_gain(S, params)
+            % FROZEN_GAIN The gain each neuron's column of W carries in the dendritic block of the Jacobian.
+            %
+            %   d = SRNNCellTypePairs.frozen_gain(S, params)      n x 1
+            %
+            % With the adaptation and synaptic states held at S, the
+            % dendritic block of the Jacobian is (-I + W G) / tau_d, where
+            % column j of W is multiplied by the slope of neuron j's
+            % nonlinearity times the output factor F of its route (for a
+            % chain route the releasable pool b1; 1 without depression;
+            % facilitation included where a route has it), as
+            % compute_Jacobian_fast and jacobian_times apply it (the route
+            % model's linearize). A neuron has one route per postsynaptic
+            % type, whose factors can differ, so one number per neuron is
+            % the root mean square over its outgoing routes weighted by the
+            % share of neurons in each postsynaptic type:
+            %   d_j^2 = phi'_j^2 * sum_post (n_post / n) F_{j, pre(j) -> post}^2 ,
+            % which is the route's own factor when a type's routes are
+            % identical, and otherwise the gain that gives the same summed
+            % variance of column j. The random-matrix radius of W G is then
+            % the bulk radius of W times rms(d) (for weights of one
+            % variance; fig_eig_real_histogram).
+            %
+            % See also: jacobian_times, compute_Jacobian_fast, fig_eig_real_histogram
+            C = params.n_cellTypes;
+            layout = params.state_layout;
+            route = SRNNCellTypePairs.active_routes(params);
+            x_eff = S(layout.x);
+            for q = 1:C
+                if params.n_a(q) > 0
+                    idx = params.type_indices{q};
+                    a = reshape(S(layout.a{q}), params.n_per_type(q), params.n_a(q));
+                    x_eff(idx) = x_eff(idx) - params.c_eff(q) .* sum(a, 2);
+                end
+            end
+            rate = params.activation_function(x_eff);
+            slope = params.activation_function_derivative(x_eff);
+            d2 = zeros(params.n, 1);
+            for pre = 1:C
+                pre_idx = params.type_indices{pre};
+                npre = params.n_per_type(pre);
+                for post = 1:C
+                    R = route{pre, post};
+                    [~, ~, F] = R.model.linearize(reshape(S(R.idx), npre, R.P.ns), rate(pre_idx), R.P);
+                    d2(pre_idx) = d2(pre_idx) + (params.n_per_type(post) / params.n) .* (F(:) .* ones(npre, 1)) .^ 2;
+                end
+            end
+            d = abs(slope(:)) .* sqrt(d2);
+        end
+
         function S = state_type_scales(S_out, rows, params)
             % STATE_TYPE_SCALES One scale per KIND of state variable: its standard deviation.
             %

@@ -122,9 +122,11 @@ for c = {cfg3, cfg4}
 end
 % The same registry as the manuscript bundle's, entry for entry, plus the
 % chain's own comparison figure (FD-014), in both sets and in the paper,
-% and the ranked Lyapunov spectrum of the 80-neuron network (FD-032).
+% the ranked Lyapunov spectrum of the 80-neuron network (FD-032), and the
+% real-axis histogram of the Jacobian's eigenvalues against a uniform disk
+% (2026-11-19).
 ref_cfg = mu7revisedMedium_config();
-chain_only = {'fig_std_1TS_vs_MTS', 'fig_lyapunov_ranked_spectrum'};
+chain_only = {'fig_std_1TS_vs_MTS', 'fig_lyapunov_ranked_spectrum', 'fig_eig_real_histogram'};
 for c = {cfg3, cfg4}
     nm = cellfun(@(f) f.name, c{1}.figures, 'UniformOutput', false);
     assert(isequal(nm(~ismember(nm, chain_only)), ...

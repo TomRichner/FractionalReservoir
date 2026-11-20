@@ -74,6 +74,15 @@ function mat_file = run_eig_heatmap(cfg)
 % (full_num_abscissa, the largest eigenvalue of (J + J')/2 with J in that
 % norm's coordinates), which bounds the real part of every Ritz value.
 %
+% THE FROZEN GAINS (cfg.disk_gains, or whenever the Ritz pass is made; off by
+% default, and then nothing is saved). For the uniform-disk reference of
+% fig_eig_real_histogram: per condition, disk_by_cond{i} with the network
+% size n, tau_d, the theoretical bulk radius R of W (level_of_chaos
+% included), and per sampled state the root mean square over neurons of the
+% frozen gain d_j (the class's frozen_gain: the slope of the nonlinearity
+% times the route's output factor), so that the random-matrix radius of the
+% dendritic block (-I + W G) / tau_d is R * rms(d) / tau_d about -1/tau_d.
+%
 % Eigenvalues are computed through the CLASS's own static compute_Jacobian_fast,
 % resolved by name, so this works for either model class.
 % SRNNModel2.eigenvalue_time_series is not used: SRNNCellTypePairs has no such
@@ -95,6 +104,7 @@ arguments
     cfg.conditions                 = {}       % the preset's conditions to sample, by name; {} = all (FD-030)
     cfg.ritz_K      (1,1) double {mustBeInteger, mustBeNonnegative} = 0   % 0 = no Ritz pass (FD-033); else K of the pass
     cfg.ritz_scalings              = {'raw', 'type_sd'}   % state scalings of the Ritz pass, each a pass of its own
+    cfg.disk_gains  (1,1) logical = false    % save the frozen gains for the uniform-disk reference (always with the Ritz pass)
 end
 
 setup_paths();
@@ -204,6 +214,10 @@ ex_out = repmat(struct('label', '', 'overrides', struct(), 'mu_tilde_relative', 
 if cfg.ritz_K > 0
     [ex_out.ritz_by_cond] = deal(cell(1, n_cond));   % the field exists only when the pass is made
 end
+save_gains = cfg.disk_gains || cfg.ritz_K > 0;
+if save_gains
+    [ex_out.disk_by_cond] = deal(cell(1, n_cond));
+end
 model = [];
 for e = 1:n_ex
     is_ref = strcmp(examples(e).label, 'reference');
@@ -224,6 +238,7 @@ for e = 1:n_ex
                 examples(e).label, cond_names{i}, r.ritz.K, r.ritz.N, mat2str(round(r.ritz.seconds)), ...
                 strjoin(r.ritz.scalings, ', '), nnz(r.ritz.valid));
         end
+        if save_gains; ex_out(e).disk_by_cond{i} = r.disk; end
         ex_out(e).evals_by_cond{i}         = r.evals;
         ex_out(e).lle_by_cond(i)           = r.lle;
         ex_out(e).mean_rate_by_cond(i)     = r.mean_rate;
@@ -267,6 +282,10 @@ if cfg.ritz_K > 0
     settings.ritz_scalings = ritz_scalings;
     ritz_by_cond = ex_out(i_ref).ritz_by_cond;  %#ok<NASGU>  saved name
     saved{end + 1} = 'ritz_by_cond';
+end
+if save_gains
+    disk_by_cond = ex_out(i_ref).disk_by_cond;  %#ok<NASGU>  saved name
+    saved{end + 1} = 'disk_by_cond';
 end
 condition_titles = titles;                      %#ok<NASGU>  saved name
 examples = ex_out;                              %#ok<NASGU>  saved name
@@ -313,7 +332,17 @@ mean_rate = mean(acc(~isnan(acc)));
 r = struct('evals', evals, 'lle', model.lya_results.LLE, 'lya', model.lya_summary(), ...
     'num_abscissa', omega, 'spec_abscissa', alpha, 'J_times', t_used, ...
     'mean_rate', mean_rate, 'B_E', ei_weight_balance(model), ...
-    'mu_tilde_relative', model.mu_tilde_relative, 'n', model.n, 'model', model, 'ritz', ritz);
+    'mu_tilde_relative', model.mu_tilde_relative, 'n', model.n, 'model', model, 'ritz', ritz, 'disk', []);
+if cfg.disk_gains || cfg.ritz_K > 0
+    % The frozen gains at the sampled states, for the uniform-disk reference.
+    params = model.get_params();
+    rms_gain = zeros(numel(idx), 1);
+    for k = 1:numel(idx)
+        d = feval([class(model) '.frozen_gain'], model.S_out(idx(k), :)', params);
+        rms_gain(k) = sqrt(mean(d .^ 2));
+    end
+    r.disk = struct('n', model.n, 'tau_d', params.tau_d, 'R', model.R, 'rms_gain', rms_gain, 't', t_used);
+end
 end
 
 function R = ritz_pass(model, idx, K, scalings, evals)

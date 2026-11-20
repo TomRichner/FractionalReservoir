@@ -314,6 +314,11 @@ F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 
         {'density_scale', 'loglog'});
 F = add(F, 'fig_eig_heatmap_imbalance',       @fig_eig_heatmap_imbalance,       true, ...
         {'density_scale', 'loglog'});
+% The same eigenvalues projected on the real axis, against the projection of
+% a uniform disk (Tom, 2026-11-19; additional figure, not in the paper). From
+% the eig_heatmap stage; without the stage's saved gains it draws the
+% unit-gain disk.
+F = add(F, 'fig_eig_real_histogram',          @fig_eig_real_histogram,          false, {});
 F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
 F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
 % The ranked top-240 spectrum and its histogram on the 80-neuron network
@@ -346,6 +351,7 @@ F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
 %                                     E:I weight balance
 %   fig_lle_vs_rate                   the joint sample and the 1-D sweeps
 %   fig_eig_heatmap                   eig_heatmap, the reference example
+%   fig_eig_real_histogram            eig_heatmap, the reference example
 %   fig_main2_grouped                 representative_dynamics (paper_illustrations)
 %   fig_main3_grouped                 local_lyapunov and eig_heatmap
 %   fig_main4_grouped                 the 1-D sweeps and the joint sample
@@ -353,7 +359,7 @@ F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
 if is_essential
     keep = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', ...
             'fig_param_space_allStd', 'fig_EI_weights_param_space', 'fig_lle_vs_rate', ...
-            'fig_eig_heatmap', 'fig_lyapunov_ranked_spectrum', ...
+            'fig_eig_heatmap', 'fig_eig_real_histogram', 'fig_lyapunov_ranked_spectrum', ...
             'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped'};
     names = cellfun(@(f) f.name, F, 'UniformOutput', false);
     missing = setdiff(keep, names);
