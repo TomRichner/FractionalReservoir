@@ -3893,6 +3893,178 @@ classdef SRNNCellTypePairs < handle
             v_x = v_x / norm(v_x);
         end
 
+        function P = projected_jacobian(S_out, t_out, fs, sample_idx, K, params, opts)
+            % PROJECTED_JACOBIAN The Jacobian projected on the top-K Lyapunov subspace at stored states.
+            %
+            %   P = SRNNCellTypePairs.projected_jacobian(S_out, t_out, fs, sample_idx, K, params)
+            %   P = SRNNCellTypePairs.projected_jacobian(..., opts)
+            %
+            % A top-K Lyapunov pass (lyapunov_topk, matrix-free through
+            % jacobian_times, on this class's segment grid) over the stored
+            % trajectory, returning at each requested row of S_out the
+            % K x K matrix H = Q' J Q for the orthonormal basis Q of the
+            % tracked subspace. The diagonal of H is the instantaneous local
+            % Lyapunov rates, the trace of its leading k x k block the sum
+            % of the top-k local rates, and its eigenvalues (the Ritz values
+            % of the Jacobian on that subspace) are complex: they carry
+            % rotation as well as growth. Columns are in the Gram-Schmidt
+            % order of the basis, so H(1:k, 1:k, s) belongs to the top-k
+            % subspace for every k <= K. It is a pass of its own: nothing
+            % of the model's lya_results is read or changed.
+            %
+            % INPUTS  S_out nt x N and t_out nt x 1 on the fs grid;
+            % sample_idx, distinct rows of S_out; K (capped at N); params
+            % from get_params. opts, all optional:
+            %   warmup_s     seconds of alignment before the first sample
+            %                (default: all the trajectory before it)
+            %   lya_dt       re-orthonormalization interval (default 0.05 s)
+            %   seed         of the initial basis (default 0)
+            %   state_scale  N x 1 positive scales d of the state variables
+            %                (default [], the plain Euclidean norm). The
+            %                tangent space is then measured in units of d:
+            %                the pass runs on J_s = D^-1 J D, D = diag(d),
+            %                which has the Jacobian's eigenvalues and, in
+            %                the long run, its Lyapunov exponents, but a
+            %                different orthonormal basis and so different
+            %                Ritz values. See state_type_scales.
+            %
+            % OUTPUT struct P
+            %   H            K x K x n_s (NaN where valid is false)
+            %   valid        n_s x 1: the state lies in the propagated range
+            %   sample_idx, t, K, N
+            %   x_fraction   n_s x K: share of each basis vector's squared
+            %                norm in the dendritic coordinates (in the scaled
+            %                coordinates when state_scale is given)
+            %   block_fractions  n_s x 4: the subspace's share in x, SFA,
+            %                STD and STF coordinates (leading_vector_blocks
+            %                averaged over the K vectors); sums to 1
+            %   LE_spectrum  the pass's K exponents over [first sample, end
+            %                of the trajectory], sorted descending
+            %   n_positive, cond_max, warmup_s, interval, lya_dt, seed,
+            %   scaled (logical), seconds
+            %
+            % See also: lyapunov_topk, state_type_scales, jacobian_times,
+            %           leading_vector_blocks, run_eig_heatmap
+            if nargin < 7; opts = struct(); end
+            layout = params.state_layout;
+            N = layout.N;
+            K = min(K, N);
+            sample_idx = sample_idx(:);
+            t_first = t_out(min(sample_idx));
+            lya_dt = 0.05;
+            if isfield(opts, 'lya_dt') && ~isempty(opts.lya_dt); lya_dt = opts.lya_dt; end
+            seed = 0;
+            if isfield(opts, 'seed') && ~isempty(opts.seed); seed = opts.seed; end
+            % The window: from the first sample to the end of the trajectory
+            % (one segment earlier when the first sample is the last row).
+            interval = [min(t_first, t_out(end) - lya_dt), t_out(end)];
+            acc_start = max(0, interval(1));
+            warmup_s = acc_start - t_out(1);
+            if isfield(opts, 'warmup_s') && ~isempty(opts.warmup_s)
+                warmup_s = min(opts.warmup_s, warmup_s);
+            end
+            scaled = isfield(opts, 'state_scale') && ~isempty(opts.state_scale);
+            if scaled
+                d = opts.state_scale(:);
+                if numel(d) ~= N || any(~isfinite(d)) || any(d <= 0)
+                    error('SRNNCellTypePairs:BadStateScale', ...
+                        'opts.state_scale must hold %d finite positive scales.', N);
+                end
+                jt = @(S, Y, p) SRNNCellTypePairs.jacobian_times(S, d .* Y, p) ./ d;
+            else
+                jt = @(S, Y, p) SRNNCellTypePairs.jacobian_times(S, Y, p);
+            end
+            topk_opts = struct('seed', seed, 'err_id_prefix', 'SRNNCellTypePairs', ...
+                'grid_fn', @SRNNCellTypePairs.lyapunov_sample_grid, 'jac_times', jt, ...
+                'H_idx', sample_idx, 'H_return_Q', true);
+            r = lyapunov_topk(S_out, t_out, fs, lya_dt, interval, warmup_s, K, ...
+                @(S, p) SRNNCellTypePairs.compute_Jacobian_fast(S, p), params, topk_opts);
+
+            n_s = numel(sample_idx);
+            x_fraction = nan(n_s, K);
+            block_fractions = nan(n_s, 4);
+            for s = 1:n_s
+                if ~r.H_valid(s); continue; end
+                acc = zeros(1, 4);
+                for j = 1:K
+                    B = SRNNCellTypePairs.leading_vector_blocks(r.Q_t(:, j, s), layout);
+                    x_fraction(s, j) = B.x;
+                    acc = acc + [B.x, B.sfa, B.std, B.stf];
+                end
+                block_fractions(s, :) = acc / K;
+            end
+            P = struct('H', r.H_t, 'valid', r.H_valid, 'sample_idx', sample_idx, ...
+                't', r.H_time, 'K', K, 'N', N, 'x_fraction', x_fraction, ...
+                'block_fractions', block_fractions, 'LE_spectrum', r.LE_spectrum, ...
+                'n_positive', r.n_positive, 'cond_max', r.cond_max, 'warmup_s', warmup_s, ...
+                'interval', interval, 'lya_dt', lya_dt, 'seed', seed, 'scaled', scaled, ...
+                'seconds', r.seconds);
+        end
+
+        function S = state_type_scales(S_out, rows, params)
+            % STATE_TYPE_SCALES One scale per KIND of state variable: its standard deviation.
+            %
+            %   S = SRNNCellTypePairs.state_type_scales(S_out, rows, params)
+            %
+            % The state holds dendritic potentials, adaptation variables and
+            % synaptic variables, and the Euclidean norm treats one unit of
+            % each as the same size. This returns, for each kind, the
+            % POOLED standard deviation of its variables over the given rows
+            % of S_out: the root mean, over the variables of the kind, of
+            % each variable's variance in time. Differences between neurons'
+            % means do not count, so a unit perturbation in the scaled
+            % coordinates is one typical fluctuation in time of that kind of
+            % variable (projected_jacobian's opts.state_scale). A KIND is
+            % x; each SFA rung k (a1, a2, ...), pooled over cell types; each
+            % depression state m of a route (b1, b2, ...) and each
+            % facilitation state (g1, ...), pooled over routes. One scale
+            % per variable would fail: a silent neuron's variables do not
+            % fluctuate. A kind that does not fluctuate at all over the rows
+            % (a network at rest) gets scale 1 and is named in S.constant.
+            %
+            % OUTPUT S.d (N x 1, the scale of every state variable),
+            % S.kinds (names), S.sd (their scales, same order), S.constant
+            % (names of kinds without fluctuation).
+            %
+            % See also: projected_jacobian, make_state_layout
+            layout = params.state_layout;
+            npt = params.n_per_type;
+            C = params.n_cellTypes;
+            groups = struct('name', {'x'}, 'idx', {layout.x(:)'});
+            groups = add_blocks(groups, 'a', layout.a(:)', reshape(npt, 1, []));
+            pre_of = repmat((1:C)', 1, C);            % layout.b{pre, post}: rows are the presynaptic type
+            groups = add_blocks(groups, 'b', layout.b(:)', reshape(npt(pre_of(:)), 1, []));
+            groups = add_blocks(groups, 'g', layout.g(:)', reshape(npt(pre_of(:)), 1, []));
+            d = ones(layout.N, 1);
+            sd = zeros(1, numel(groups));
+            constant = {};
+            for k = 1:numel(groups)
+                v = S_out(rows, groups(k).idx);
+                sd(k) = sqrt(mean(var(v, 0, 1)));
+                if ~(sd(k) > 1e-12 * max(abs(v), [], 'all'))     % round-off of a constant is not a fluctuation
+                    constant{end + 1} = groups(k).name; %#ok<AGROW>
+                    sd(k) = 1;
+                end
+                d(groups(k).idx) = sd(k);
+            end
+            S = struct('d', d, 'kinds', {{groups.name}}, 'sd', sd, 'constant', {constant});
+
+            function groups = add_blocks(groups, letter, blocks, counts)
+                % Each block is count x n_states, stored column-major: state m
+                % of the block is its m-th run of `count` indices.
+                n_states = cellfun(@numel, blocks) ./ max(counts, 1);
+                for m = 1:max([n_states, 0])
+                    idx = [];
+                    for b = 1:numel(blocks)
+                        if n_states(b) >= m
+                            idx = [idx, blocks{b}((m - 1) * counts(b) + (1:counts(b)))]; %#ok<AGROW>
+                        end
+                    end
+                    groups(end + 1) = struct('name', sprintf('%s%d', letter, m), 'idx', idx); %#ok<AGROW>
+                end
+            end
+        end
+
         function E = excursion_samples(r, tl, min_pos, min_quiet)
             % EXCURSION_SAMPLES Onset and quiet times of a local Lyapunov-rate series.
             %

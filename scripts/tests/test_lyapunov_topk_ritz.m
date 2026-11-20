@@ -34,6 +34,18 @@
 %      tolerance was MEASURED before it was fixed (see the constants below).
 %   5. A requested state outside the propagated range gives H_valid false
 %      and NaN, not an error; a bad H_idx errors :InvalidHIdx.
+%   6. THE CLASS'S DOOR, SRNNCellTypePairs.projected_jacobian: it is the
+%      same pass (H identical to a direct lyapunov_topk call on the class's
+%      grid); K is capped at N; the block fractions of the subspace sum to
+%      1; at K = N the Ritz values equal the eigenvalues of the assembled
+%      Jacobian, WITH AND WITHOUT a state scaling (J_s = D^-1 J D is similar
+%      to J), while at K < N the scaling moves them; a scaling of ones is
+%      no scaling, to the bit; a bad scale errors :BadStateScale.
+%   7. SRNNCellTypePairs.state_type_scales: one scale per kind of variable
+%      (x, a1..a3, b1, b2 on this network), each the pooled standard
+%      deviation of that kind's variables (root mean of their variances in
+%      time over the rows), written into every variable of the kind; a kind that does not fluctuate gets 1 and is
+%      named.
 %
 % Prints PASS/FAIL per check and a final banner. Assumes setup_paths has run.
 %
@@ -195,6 +207,65 @@ for b = 1:numel(bad)
         'lyapunov_topk:InvalidHIdx');
 end
 all_passed = check('H_idx out of range, non-integer or repeated errors :InvalidHIdx', ok) && all_passed;
+
+%% 6. The class's door
+rows6 = [round(6 * m.fs) + 1, round(7.013 * m.fs) + 1, numel(m.t_out)];
+P1 = SRNNCellTypePairs.projected_jacobian(m.S_out, m.t_out, m.fs, rows6, K, params, struct('seed', 9));
+r_direct = lyapunov_topk(m.S_out, m.t_out, m.fs, 0.05, [m.t_out(rows6(1)), m.t_out(end)], ...
+    m.t_out(rows6(1)) - m.t_out(1), K, jf, params, ...
+    struct('seed', 9, 'grid_fn', grid_fn, 'jac_times', jt, 'H_idx', rows6));
+all_passed = check('projected_jacobian is the direct pass (H identical; all states valid)', ...
+    all(P1.valid) && isequal(P1.H, r_direct.H_t) && isequal(P1.LE_spectrum, r_direct.LE_spectrum) && ...
+    P1.warmup_s == m.t_out(rows6(1)) - m.t_out(1)) && all_passed;
+all_passed = check('block fractions sum to 1 and x fractions lie in [0, 1]', ...
+    max(abs(sum(P1.block_fractions, 2) - 1)) < 1e-12 && all(P1.x_fraction >= 0 & P1.x_fraction <= 1, 'all')) && all_passed;
+
+Nm = params.state_layout.N;
+Sc = SRNNCellTypePairs.state_type_scales(m.S_out, rows6(1):numel(m.t_out), params);
+P_full   = SRNNCellTypePairs.projected_jacobian(m.S_out, m.t_out, m.fs, rows6, 10 * Nm, params, struct('seed', 9));
+P_full_s = SRNNCellTypePairs.projected_jacobian(m.S_out, m.t_out, m.fs, rows6, Nm, params, ...
+    struct('seed', 9, 'state_scale', Sc.d));
+err_full = 0; err_full_s = 0;
+for s = 1:numel(rows6)
+    evJ = eig(full(jf(m.S_out(rows6(s), :)', params)));
+    err_full   = max(err_full,   match_err(eig(P_full.H(:, :, s)), evJ) / max(abs(evJ)));
+    err_full_s = max(err_full_s, match_err(eig(P_full_s.H(:, :, s)), evJ) / max(abs(evJ)));
+end
+fprintf('  K = N on the model: max rel |Ritz - eig(J)| raw %.2e, scaled %.2e (scales %s = %s)\n', ...
+    err_full, err_full_s, strjoin(Sc.kinds, ', '), mat2str(Sc.sd, 3));
+all_passed = check('K is capped at N', P_full.K == Nm && size(P_full.H, 1) == Nm) && all_passed;
+all_passed = check('K = N: Ritz values equal eig(J), raw and scaled (1e-8 of the largest)', ...
+    err_full < 1e-8 && err_full_s < 1e-8) && all_passed;
+P1s = SRNNCellTypePairs.projected_jacobian(m.S_out, m.t_out, m.fs, rows6, K, params, ...
+    struct('seed', 9, 'state_scale', Sc.d));
+P1o = SRNNCellTypePairs.projected_jacobian(m.S_out, m.t_out, m.fs, rows6, K, params, ...
+    struct('seed', 9, 'state_scale', ones(Nm, 1)));
+moved = max(arrayfun(@(s) match_err(eig(P1s.H(:, :, s)), eig(P1.H(:, :, s))), 1:numel(rows6)));
+fprintf('  K = %d: the scaling moves the Ritz values by up to %.3g 1/s\n', K, moved);
+all_passed = check('K < N: the scaling changes the Ritz values, and is flagged', moved > 1e-6 && P1s.scaled && ~P1.scaled) && all_passed;
+all_passed = check('a scaling of ones is no scaling, to the bit', isequal(P1o.H, P1.H)) && all_passed;
+all_passed = check('a non-positive or mis-sized scale errors :BadStateScale', ...
+    throws_id(@() SRNNCellTypePairs.projected_jacobian(m.S_out, m.t_out, m.fs, rows6, K, params, ...
+        struct('state_scale', zeros(Nm, 1))), 'SRNNCellTypePairs:BadStateScale') && ...
+    throws_id(@() SRNNCellTypePairs.projected_jacobian(m.S_out, m.t_out, m.fs, rows6, K, params, ...
+        struct('state_scale', ones(3, 1))), 'SRNNCellTypePairs:BadStateScale')) && all_passed;
+
+%% 7. Scales by kind of variable
+L = params.state_layout; win = rows6(1):numel(m.t_out);
+all_passed = check('kinds on this network: x, a1, a2, a3, b1, b2', ...
+    isequal(Sc.kinds, {'x', 'a1', 'a2', 'a3', 'b1', 'b2'}) && isempty(Sc.constant)) && all_passed;
+vx = m.S_out(win, L.x);
+a2 = [];
+for q = 1:params.n_cellTypes
+    blk = reshape(L.a{q}, params.n_per_type(q), []);
+    a2 = [a2, m.S_out(win, blk(:, 2))]; %#ok<AGROW>
+end
+all_passed = check('x and a2 scales are the pooled standard deviations, written to every variable of the kind', ...
+    abs(Sc.sd(1) - sqrt(mean(var(vx)))) < 1e-15 && abs(Sc.sd(3) - sqrt(mean(var(a2)))) < 1e-15 && ...
+    all(Sc.d(L.x) == Sc.sd(1)) && numel(Sc.d) == Nm && all(Sc.d > 0)) && all_passed;
+S_rest = SRNNCellTypePairs.state_type_scales(repmat(m.S_out(end, :), 3, 1), 1:3, params);
+all_passed = check('a state that does not fluctuate: every scale 1, every kind named', ...
+    all(S_rest.d == 1) && isequal(S_rest.constant, Sc.kinds)) && all_passed;
 
 fprintf('\n');
 if all_passed
