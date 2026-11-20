@@ -42,6 +42,29 @@ function mat_file = run_eig_heatmap(cfg)
 % `examples` (struct array) carries all of them. In fast mode the non-reference
 % examples run at n = 250 (a dense eig at N = 4000 costs ~30 s a state).
 %
+% THE RITZ PASS (FD-033, cfg.ritz_K > 0; off by default, and then nothing
+% below is computed or saved and the .mat is what it was). The eigenvalues
+% above belong to one instant and to every state direction at once; the
+% Lyapunov exponents belong to the few directions a perturbation actually
+% follows, and are real. The Jacobian projected on the top-K Lyapunov
+% subspace, H = Q' J Q, joins them: its eigenvalues (Ritz values) are
+% complex and sit in the same plane as the density. For every example and
+% condition, a top-K pass of its own (SRNNCellTypePairs.projected_jacobian;
+% K = cfg.ritz_K in every condition, capped at the state dimension; all the
+% trajectory before the first sampled state as alignment; the existing
+% Lyapunov computation and everything it saves are untouched) returns H at
+% THE SAME sampled states as the spectra. Because Ritz values depend on how
+% the state variables are scaled against one another, the pass is made once
+% per entry of cfg.ritz_scalings: 'raw' (the plain Euclidean norm) and
+% 'type_sd' (each kind of variable in units of its own pooled standard
+% deviation over the sampled window, SRNNCellTypePairs.state_type_scales;
+% per condition, since the conditions do not hold the same variables). Saved
+% as ritz_by_cond (the reference example) and examples(e).ritz_by_cond, one
+% struct per condition: H (K x K x states x scalings, Gram-Schmidt column
+% order, so the leading k x k block is the top-k subspace), values (its
+% eigenvalues), valid, sample_idx, t, the pass's exponents, the block
+% fractions of the subspace, the scales and the pass's settings.
+%
 % Eigenvalues are computed through the CLASS's own static compute_Jacobian_fast,
 % resolved by name, so this works for either model class.
 % SRNNModel2.eigenvalue_time_series is not used: SRNNCellTypePairs has no such
@@ -61,6 +84,8 @@ arguments
     cfg.n_override  (1,1) double  = 0        % 0 -> preset n (fast mode runs the NON-reference examples at 250)
     cfg.n_samples_examples (1,1) double = 0  % states per non-reference example; 0 -> per run_mode (40 / 60 / 150)
     cfg.conditions                 = {}       % the preset's conditions to sample, by name; {} = all (FD-030)
+    cfg.ritz_K      (1,1) double {mustBeInteger, mustBeNonnegative} = 0   % 0 = no Ritz pass (FD-033); else K of the pass
+    cfg.ritz_scalings              = {'raw', 'type_sd'}   % state scalings of the Ritz pass, each a pass of its own
 end
 
 setup_paths();
@@ -105,6 +130,12 @@ switch cfg.run_mode
             cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
 if cfg.n_samples > 0; n_samples = cfg.n_samples; end
+
+ritz_scalings = cellstr(cfg.ritz_scalings);
+if cfg.ritz_K > 0 && (isempty(ritz_scalings) || ~all(ismember(ritz_scalings, {'raw', 'type_sd'})))
+    error('run_eig_heatmap:badRitzScaling', ...
+        'ritz_scalings must name one or both of ''raw'' and ''type_sd''; got {%s}.', strjoin(ritz_scalings, ', '));
+end
 
 lle_window     = min(30, diff(T_range) / 2);
 lya_T_interval = [T_range(2) - lle_window, T_range(2)];
@@ -161,6 +192,9 @@ ex_out = repmat(struct('label', '', 'overrides', struct(), 'mu_tilde_relative', 
     'mean_rate_by_cond', nan(1, n_cond), 'B_E_by_cond', nan(1, n_cond), ...
     'lya_by_cond', {cell(1, n_cond)}, 'num_abscissa_by_cond', {cell(1, n_cond)}, ...
     'spec_abscissa_by_cond', {cell(1, n_cond)}, 'J_times_by_cond', {cell(1, n_cond)}), 1, n_ex);
+if cfg.ritz_K > 0
+    [ex_out.ritz_by_cond] = deal(cell(1, n_cond));   % the field exists only when the pass is made
+end
 model = [];
 for e = 1:n_ex
     is_ref = strcmp(examples(e).label, 'reference');
@@ -174,7 +208,13 @@ for e = 1:n_ex
     for i = 1:n_cond
         vprintf(cfg.verbose, 'verbose', '\n=== %s | %d/%d %s ===\n', examples(e).label, i, n_cond, titles{i});
         r = sample_condition(cfg, cond_names{i}, examples(e).overrides, n_ov, T_range, fs, ...
-            lya_T_interval, n_smp);
+            lya_T_interval, n_smp, ritz_scalings);
+        if cfg.ritz_K > 0
+            ex_out(e).ritz_by_cond{i} = r.ritz;
+            vprintf(cfg.verbose, 'minimal', '  %-20s %-14s Ritz pass K = %d of %d: %s s (%s); %d states\n', ...
+                examples(e).label, cond_names{i}, r.ritz.K, r.ritz.N, mat2str(round(r.ritz.seconds)), ...
+                strjoin(r.ritz.scalings, ', '), nnz(r.ritz.valid));
+        end
         ex_out(e).evals_by_cond{i}         = r.evals;
         ex_out(e).lle_by_cond(i)           = r.lle;
         ex_out(e).mean_rate_by_cond(i)     = r.mean_rate;
@@ -209,17 +249,25 @@ settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, ...
     'examples', {{ex_out.label}}, 'example_overrides', {{ex_out.overrides}}, ...
     'n_examples_override', n_examples_override, 'n_samples_examples', n_samples_ex);
 
+saved = {'evals_by_cond', 'condition_titles', 'cond_names', ...
+    'lle_by_cond', 'lya_by_cond', 'num_abscissa_by_cond', 'spec_abscissa_by_cond', ...
+    'J_times_by_cond', 'lle_window', 'lya_T_interval', 'settings', 'examples'};
+if cfg.ritz_K > 0
+    % Only when the pass was made, so a run without it saves what it always did.
+    settings.ritz_K = cfg.ritz_K;
+    settings.ritz_scalings = ritz_scalings;
+    ritz_by_cond = ex_out(i_ref).ritz_by_cond;  %#ok<NASGU>  saved name
+    saved{end + 1} = 'ritz_by_cond';
+end
 condition_titles = titles;                      %#ok<NASGU>  saved name
 examples = ex_out;                              %#ok<NASGU>  saved name
 mat_file = fullfile(out_dir, 'eig_heatmap_data.mat');
-save(mat_file, 'evals_by_cond', 'condition_titles', 'cond_names', ...
-    'lle_by_cond', 'lya_by_cond', 'num_abscissa_by_cond', 'spec_abscissa_by_cond', ...
-    'J_times_by_cond', 'lle_window', 'lya_T_interval', 'settings', 'examples', '-v7.3');
+save(mat_file, saved{:}, '-v7.3');
 vprintf(cfg.verbose, 'minimal', '[eig_heatmap] saved %s\n', mat_file);
 end
 
 %% ------------------------------------------------------------------------
-function r = sample_condition(cfg, cond_name, overrides, n_override, T_range, fs, lya_T_interval, n_samples)
+function r = sample_condition(cfg, cond_name, overrides, n_override, T_range, fs, lya_T_interval, n_samples, ritz_scalings)
 % One (example, condition): build on the shared seeds with the example's
 % overrides, run with the sweeps' top-K estimator, sample the Jacobian after
 % the LLE window opens, and read the mean rate and the realised E:I weight
@@ -235,7 +283,12 @@ model = build_from_preset(cfg.preset_name, cond_name, args{:});
 model.run();
 
 J_times = linspace(lya_T_interval(1), T_range(2), n_samples);
-[evals, omega, alpha, t_used] = sample_eigenvalues(model, J_times, cfg.use_parallel);
+idx = sample_indices(model.t_out, J_times);
+[evals, omega, alpha, t_used] = sample_eigenvalues(model, idx, cfg.use_parallel);
+ritz = [];
+if cfg.ritz_K > 0
+    ritz = ritz_pass(model, idx, cfg.ritz_K, ritz_scalings);   % the same states as the spectra
+end
 
 % Mean rate over the sampled window (the plot_data grid may be decimated).
 pd = model.plot_data;
@@ -251,7 +304,53 @@ mean_rate = mean(acc(~isnan(acc)));
 r = struct('evals', evals, 'lle', model.lya_results.LLE, 'lya', model.lya_summary(), ...
     'num_abscissa', omega, 'spec_abscissa', alpha, 'J_times', t_used, ...
     'mean_rate', mean_rate, 'B_E', ei_weight_balance(model), ...
-    'mu_tilde_relative', model.mu_tilde_relative, 'n', model.n, 'model', model);
+    'mu_tilde_relative', model.mu_tilde_relative, 'n', model.n, 'model', model, 'ritz', ritz);
+end
+
+function R = ritz_pass(model, idx, K, scalings)
+% The Jacobian projected on the top-K Lyapunov subspace at the sampled
+% states (rows idx of the stored trajectory), once per state scaling; see
+% the header. The initial basis is seeded as the model's own top-K pass is.
+cls    = class(model);
+params = model.get_params();
+seed   = model.rng_seeds(1) + 424242;
+rows   = min(idx):numel(model.t_out);                 % the sampled window, for the scales
+scales = feval([cls '.state_type_scales'], model.S_out, rows, params);
+for s = 1:numel(scalings)
+    opts = struct('seed', seed);
+    if strcmp(scalings{s}, 'type_sd'); opts.state_scale = scales.d; end
+    P = feval([cls '.projected_jacobian'], model.S_out, model.t_out, model.fs, idx, K, params, opts);
+    if s == 1
+        n_s = numel(idx); n_sc = numel(scalings);
+        R = struct('K', P.K, 'N', P.N, 'scalings', {scalings}, ...
+            'H', nan(P.K, P.K, n_s, n_sc), 'values', complex(nan(P.K, n_s, n_sc)), ...
+            'valid', P.valid, 'sample_idx', P.sample_idx, 't', P.t, ...
+            'LE_spectrum', nan(P.K, n_sc), 'n_positive', nan(1, n_sc), 'cond_max', nan(1, n_sc), ...
+            'x_fraction', nan(n_s, P.K, n_sc), 'block_fractions', nan(n_s, 4, n_sc), ...
+            'scales', rmfield(scales, 'd'), 'warmup_s', P.warmup_s, 'interval', P.interval, ...
+            'lya_dt', P.lya_dt, 'seed', seed, 'seconds', nan(1, n_sc));
+    end
+    R.H(:, :, :, s) = P.H;
+    for k = find(P.valid)'
+        R.values(:, k, s) = eig(P.H(:, :, k));
+    end
+    R.valid = R.valid & P.valid;
+    R.LE_spectrum(:, s) = P.LE_spectrum;
+    R.n_positive(s) = P.n_positive;
+    R.cond_max(s) = P.cond_max;
+    R.x_fraction(:, :, s) = P.x_fraction;
+    R.block_fractions(:, :, s) = P.block_fractions;
+    R.seconds(s) = P.seconds;
+end
+end
+
+function idx = sample_indices(t_out, J_times_sec)
+% Rows of the stored trajectory at the requested times: the first stored
+% time at or after each, without repeats. The spectra and the Ritz pass
+% both sample these rows.
+idx = arrayfun(@(tt) find(t_out >= tt, 1, 'first'), J_times_sec, ...
+    'UniformOutput', false);
+idx = unique([idx{~cellfun(@isempty, idx)}]);
 end
 
 function v = ei_weight_balance(m)
@@ -279,8 +378,9 @@ mu = mu(1, 1);                      % (post, pre) = (E, E); a 1 x C row broadcas
 end
 
 %% ------------------------------------------------------------------------
-function [ev_all, omega, alpha, t_used] = sample_eigenvalues(model, J_times_sec, use_parallel)
-% Pool the Jacobian eigenvalues at the requested times, and per state the
+function [ev_all, omega, alpha, t_used] = sample_eigenvalues(model, idx, use_parallel)
+% Pool the Jacobian eigenvalues at the requested rows of the stored
+% trajectory (sample_indices), and per state the
 % NUMERICAL ABSCISSA omega = max eig((J_xx + J_xx')/2) beside the SPECTRAL
 % ABSCISSA alpha = max real eig(J_xx) of the DENDRITIC BLOCK
 % J_xx = (-I + W diag(theta'(x)))/tau_d -- the rate-network Jacobian of
@@ -311,9 +411,6 @@ S_out  = model.S_out;
 t_out  = model.t_out;
 n      = model.n;
 
-idx = arrayfun(@(tt) find(t_out >= tt, 1, 'first'), J_times_sec, ...
-    'UniformOutput', false);
-idx = unique([idx{~cellfun(@isempty, idx)}]);
 t_used = t_out(idx);
 t_used = t_used(:);
 

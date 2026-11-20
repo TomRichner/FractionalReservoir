@@ -18,7 +18,19 @@
 %      without examples, and both error via resolve_data_file on a run
 %      directory without the stage.
 %
-% ~2 min. Prints PASS/FAIL per check and a final banner. Assumes setup_paths.
+%   4. THE RITZ PASS (FD-033). Off by default: the .mat holds exactly the
+%      variables it always did and `examples` has no ritz field. With
+%      'ritz_K', 10 (reference example only, same seeds and states): every
+%      legacy variable is identical to the run without it; ritz_by_cond
+%      holds, per condition, H of size K x K x states x 2 scalings with
+%      K = min(10, state dimension), every state valid and at the times of
+%      J_times_by_cond, values = eig(H) with real parts summing to trace(H),
+%      block fractions summing to 1, and the scales by kind of variable
+%      (x alone without adaptation, where the scaled pass must then give the
+%      raw Ritz values). A scaling name it does not know errors
+%      :badRitzScaling.
+%
+% ~3 min. Prints PASS/FAIL per check and a final banner. Assumes setup_paths.
 %
 % See also: run_eig_heatmap, fig_eig_heatmap, fig_eig_heatmap_imbalance
 
@@ -43,6 +55,9 @@ legacy = {'evals_by_cond', 'lle_by_cond', 'lya_by_cond', 'num_abscissa_by_cond',
     'spec_abscissa_by_cond', 'J_times_by_cond', 'lle_window', 'lya_T_interval', ...
     'settings', 'cond_names', 'condition_titles'};
 all_passed = check('legacy variables all present', all(isfield(D, legacy))) && all_passed;
+all_passed = check('no Ritz pass by default: the variables are the legacy ones and examples, no ritz field', ...
+    isequal(sort(fieldnames(D)), sort([legacy, {'examples'}]')) && ~isfield(D.examples, 'ritz_by_cond') && ...
+    ~isfield(D.settings, 'ritz_K')) && all_passed;
 all_passed = check('examples present: 3 entries, labels in order', isfield(D, 'examples') && ...
     numel(D.examples) == 3 && isequal({D.examples.label}, {'inhibition-dominant', 'reference', 'excitation-dominant'})) && all_passed;
 E = D.examples;
@@ -74,6 +89,56 @@ all_passed = check('B_E ordered inhibition < reference < excitation (every condi
 all_passed = check('settings record the example labels and the override', ...
     isequal(D.settings.examples, {E.label}) && D.settings.n_samples_examples == 5 && D.settings.n_examples_override == 60) && all_passed;
 
+%% The Ritz pass (FD-033)
+ritz_dir = fullfile(tempdir, 'eig_heatmap_stage_test_ritz');
+if exist(ritz_dir, 'dir'); rmdir(ritz_dir, 's'); end
+mkdir(ritz_dir);
+ref_only = struct('label', 'reference', 'overrides', struct()); %#ok<NASGU>  used inside evalc
+t0 = tic;
+evalc(['mat_ritz = run_eig_heatmap(''preset_name'', P, ''run_mode'', ''fast'', ' ...
+    '''out_dir'', fullfile(ritz_dir, ''eig_heatmap''), ''n_override'', 60, ''n_samples'', 5, ' ...
+    '''examples'', ref_only, ''use_parallel'', false, ''ritz_K'', 10);']);
+fprintf('  (stage with the Ritz pass, reference only, ran in %.0f s)\n', toc(t0));
+DR = load(mat_ritz);
+same = true;
+for k = 1:numel(legacy)
+    if ~ismember(legacy{k}, {'settings'}); same = same && isequaln(DR.(legacy{k}), D.(legacy{k})); end
+end
+all_passed = check('with the Ritz pass every legacy variable is identical to the run without it', same) && all_passed;
+all_passed = check('settings record ritz_K and the scalings; the reference example carries the same structs', ...
+    DR.settings.ritz_K == 10 && isequal(DR.settings.ritz_scalings, {'raw', 'type_sd'}) && ...
+    isequaln(DR.examples(1).ritz_by_cond, DR.ritz_by_cond)) && all_passed;
+shape = true; ident = true; kinds_ok = true; worst_trace = 0;
+for i = 1:n_cond
+    R = DR.ritz_by_cond{i};
+    n_s = numel(DR.J_times_by_cond{i});
+    shape = shape && R.K == min(10, R.N) && isequal(size(R.H), [R.K, R.K, n_s, 2]) && ...
+        isequal(size(R.values), [R.K, n_s, 2]) && all(R.valid) && isequal(R.t(:), DR.J_times_by_cond{i}(:)) && ...
+        all(isfinite(R.H), 'all') && all(isfinite(R.LE_spectrum), 'all');
+    for sc = 1:2
+        for k = 1:n_s
+            worst_trace = max(worst_trace, abs(sum(real(R.values(:, k, sc))) - trace(R.H(:, :, k, sc))));
+        end
+    end
+    ident = ident && max(abs(sum(R.block_fractions, 2) - 1), [], 'all') < 1e-12;
+    if strcmp(DR.cond_names{i}, 'no_adaptation')
+        d_raw = sort(real(R.values(:, :, 1))); d_sc = sort(real(R.values(:, :, 2)));
+        kinds_ok = kinds_ok && isequal(R.scales.kinds, {'x'}) && max(abs(d_raw - d_sc), [], 'all') < 1e-8;
+    else
+        kinds_ok = kinds_ok && numel(R.scales.kinds) > 1 && all(R.scales.sd > 0);
+    end
+    fprintf('  %-14s N = %3d, K = %2d: lambda_1 %+.3f (raw) %+.3f (type_sd); x share of the subspace %.2f / %.2f; kinds %s\n', ...
+        DR.cond_names{i}, R.N, R.K, R.LE_spectrum(1, 1), R.LE_spectrum(1, 2), ...
+        mean(R.block_fractions(:, 1, 1)), mean(R.block_fractions(:, 1, 2)), strjoin(R.scales.kinds, ' '));
+end
+all_passed = check('per condition: H is K x K x states x 2, all states valid, at the sampled times', shape) && all_passed;
+all_passed = check(sprintf('real parts of the Ritz values sum to trace(H) (worst %.1e)', worst_trace), worst_trace < 1e-9) && all_passed;
+all_passed = check('block fractions sum to 1', ident) && all_passed;
+all_passed = check('scales by kind: x alone without adaptation (scaled = raw there), several kinds with it', kinds_ok) && all_passed;
+all_passed = check('an unknown scaling errors :badRitzScaling', ...
+    throws_id(@() run_eig_heatmap('preset_name', P, 'run_mode', 'fast', 'ritz_K', 5, 'ritz_scalings', {'zscore'}), ...
+    'run_eig_heatmap:badRitzScaling')) && all_passed;
+
 %% Figures
 evalc('res1 = fig_eig_heatmap(''run_dir'', run_dir, ''out_dir'', fullfile(run_dir, ''fig1''), ''visible'', false);');
 all_passed = check(sprintf('fig_eig_heatmap writes files (%d)', numel(res1.files)), numel(res1.files) >= 1) && all_passed;
@@ -90,7 +155,7 @@ empty_dir = fullfile(tempdir, 'eig_heatmap_stage_test_empty'); if ~exist(empty_d
 all_passed = check('both figures error on a run directory without the stage', ...
     throws_prefix(@() fig_eig_heatmap('run_dir', empty_dir, 'save', false, 'visible', false), 'resolve_data_file:') && ...
     throws_prefix(@() fig_eig_heatmap_imbalance('run_dir', empty_dir, 'save', false, 'visible', false), 'resolve_data_file:')) && all_passed;
-rmdir(empty_dir, 's'); rmdir(old_dir, 's'); rmdir(run_dir, 's');
+rmdir(empty_dir, 's'); rmdir(old_dir, 's'); rmdir(run_dir, 's'); rmdir(ritz_dir, 's');
 
 fprintf('\n');
 if all_passed
