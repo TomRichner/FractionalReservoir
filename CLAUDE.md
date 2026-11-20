@@ -153,13 +153,16 @@ tied up both the lead and Tom's session. So:
   opened by the lead with a short call, or Tom is given the script. Up to two Fable 5.2 workers at medium
 effort take the difficult work (re-implementing classes, numerical methods,
 equations in code); up to three Opus 5.5 workers at medium effort take the
-straightforward work (configs, scripts, plots). The workers are the six
-agents in `.claude/agents/` (`matlab-fable-1..3`, `matlab-opus-1..3`), each
-with a private MATLAB session; **read
-`../StochasticPlasticDynamicalSystemPaper/docs/MATLAB_worker_agents.md`
-before delegating MATLAB work**: one instance of each agent at a time, and
-every brief states `pool: N`, with at most 12 pool workers summed over all
-MATLAB sessions on the machine. Commit at logical intervals.
+straightforward work (configs, scripts, plots). The workers are the eleven
+agents in `.claude/agents/` (`matlab-fable-1..3`, `matlab-opus-1..8`), each
+with a private MATLAB session. Since 2026-11-19 they and the pool module
+come from the shared repository `MatlabAgenticOrg` (github TomRichner, one
+clone per machine; `~/.matlab_agentic_org` holds its path on this machine);
+**read its `README.md` before delegating MATLAB work**: one instance of
+each agent at a time, and every brief states `pool: N`, within the
+machine's budget of pool workers summed over all MATLAB sessions on the
+machine, other repositories' included (12 on the workstation; `pool_status`
+prints the budget and what is available). Commit at logical intervals.
 
 **The lead carries Plan A through to completion without stopping to ask
 Tom (Tom, 2026-11-11).** A question left waiting while Tom is away or
@@ -222,7 +225,16 @@ How to use the worker agents:
 - Each is defined by one file, `.claude/agents/matlab-fable-N.md` or
   `matlab-opus-N.md`: its model and effort, its own MATLAB MCP server
   (tools `mcp__matlab_fN__*` or `mcp__matlab_oN__*`), and its standing
-  instructions. Change a worker's behaviour there, in all six files alike.
+  instructions. **The files are generated and not tracked**: on each
+  machine `uv run <MatlabAgenticOrg clone>/setup_repo.py <this repo>`
+  writes them from one template with that machine's MATLAB paths (add
+  `--force` to replace existing ones). Never edit them here; change a
+  worker's behaviour in `agents/matlab-worker.md.tmpl` of MatlabAgenticOrg
+  and rerun the script. The template names no repository, so what a worker
+  must know about this one is in this file: the path setup is
+  `setup_paths`, the stages and full regression tiers need a pool up, and
+  `run_all_paper_analyses` and `make_all_paper_figures` are whole-machine
+  entry points.
 - The lead starts one with the Agent tool, `subagent_type` set to the
   agent's name (`matlab-fable-1`), and `isolation: "worktree"` when another
   worker is running. **They are listed only in a session started with this
@@ -640,11 +652,26 @@ check with it ignored:
 
 ### Parallel pools: one module, one allocation per MATLAB session
 
-**All pool handling goes through `src/util/pool_*.m`** (FD-017). Nothing
-else in `src/` or `scripts/` calls `parpool`, and nothing opens the default
-profile, which on this workstation is `Just1` (one worker, kept on purpose
-by Tom to hold a licence seat). Automatic pool creation is off, so a
-`parfor` reached with no pool runs serially.
+**All pool handling goes through the pool module** (FD-017): `pool_set`,
+`pool_ensure`, `pool_restart`, `pool_release`, `pool_status`. **Since
+2026-11-19 the module is not in this repository.** It lives in the shared
+repository `MatlabAgenticOrg` (its `matlab/` folder; github TomRichner, one
+clone per machine), so that MATLAB sessions of every repository on a
+machine share one registry and one budget. `setup_paths` puts it on the
+path through `use_matlab_agentic_org` (repo root), which finds the clone
+from the environment variable `MATLAB_AGENTIC_ORG` or from the one-line
+file `~/.matlab_agentic_org`, and errors with the fix on a machine that has
+not been set up (`uv run <clone>/setup_repo.py <this repo>`, once per
+machine). A git worktree finds the same clone. The module's own test is
+`<clone>/tests/test_pool_module.m`; `scripts/tests/test_pool_entry_points.m`
+here checks the two entry points' refusal. `src/util/pool_log_hook.m`
+keeps the module's printed lines in the run transcript.
+
+Nothing in `src/` or `scripts/` calls `parpool`, and nothing opens the
+default profile, which on the workstation is `Just1` (one worker, kept on
+purpose by Tom to hold a licence seat). Automatic pool creation is off
+there, so a `parfor` reached with no pool runs serially (`pool_set` warns
+on a machine where it is on).
 
 - `pool_set(N)` records this session's allocation (in an environment
   variable of the MATLAB process, so it survives `clear all` and
@@ -655,14 +682,17 @@ by Tom to hold a licence seat). Automatic pool creation is off, so a
   the allocation opened now; empty at allocation 0; empty **with a loud
   warning** when no allocation is set. `pool_restart()` replaces
   `restart_parpool`. `pool_release()` closes the pool and sets the
-  allocation to 0. `pool_status()` lists every session on the machine with
-  its allocated and actually running workers.
+  allocation to 0. `pool_status()` lists every session on the machine,
+  whichever repository it was started from, with its allocated and
+  actually running workers and its working folder, and prints how many
+  workers are still available.
 - **`run_all_paper_analyses` and `make_all_paper_figures` refuse to start
   until the session has an allocation.** Run `pool_set(N)` first.
-- The budget is 12 workers summed over every MATLAB on the machine (the
-  lead's and each worker agent's). It is reported by `pool_status`, not
-  enforced. The profile name and the budget are each written once, in
-  `pool_config`.
+- The budget is per machine: 12 workers on the workstation (6 on the
+  MacBook Air), summed over every MATLAB on the machine (the lead's, each
+  worker agent's, and other repositories' sessions). It is reported by
+  `pool_status`, not enforced. The profile name is written once, in
+  `pool_config`; the budgets are in `machines.json` of MatlabAgenticOrg.
 - A stage's own `n_workers` argument no longer opens anything.
 
 ## What this project is
@@ -985,7 +1015,7 @@ named arguments), return your output directory, and read nothing from the caller
   - `helpers/` — was `_common/`: `manuscript_style` (fonts, condition palette — returns values, never sets global state), `with_manuscript_defaults`, `build_from_preset`, `resolve_run_dir`, `resolve_data_file`, `write_manuscript_tables`, `fig_doc_tables`, `write_figure_manifest`, `figure_settings`, `default_out_dir`, `existing_outputs`, `panel_letters`, `sort_axes_left_to_right`. Joined by `save_figure_stable`, `apply_percent_axis`, `preset_default_values` and `mark_default_value`, which had been stranded in the replot folder — `save_figure_stable` alone is called by 18 figures, and its own header records that it ended up there only because that is where it was extracted.
   - `replot/` — the `replot_*` regenerators, `assemble_sensitivity_figure`, `combine_runs`, `combine_two_runs`.
 - `plotting/` — colormaps, line/scatter helpers, time-series panel plots, `param_space_plots/` for post-hoc visualization, `plot_saving/save_some_figs_to_folder_2.m` (used by everything that writes figures). **Kept separate from `figures/` deliberately**: these are primitives `SRNNModel2.plot()` itself calls, so they belong to the model's surface, whereas `figures/` is manuscript composition on top. Merging them would make the model depend on the manuscript.
-- `util/` — cross-cutting helpers with no layer of their own: `merge_struct`, `struct2namevalue`, the pool module (`pool_set`, `pool_ensure`, `pool_restart`, `pool_release`, `pool_status`, with `pool_config` and `pool_registry` behind them, and `wait_for_parpool`), `capture_git_provenance`, `verify_shared_build`, `write_run_parameters_md`.
+- `util/` — cross-cutting helpers with no layer of their own: `merge_struct`, `struct2namevalue`, `pool_log_hook` (the pool module itself, `pool_set`, `pool_ensure`, `pool_restart`, `pool_release`, `pool_status` and `wait_for_parpool`, is in the shared `MatlabAgenticOrg` repository since 2026-11-19; see "Parallel pools"), `capture_git_provenance`, `verify_shared_build`, `write_run_parameters_md`.
 
 ### `scripts/` — the three things a human invokes
 

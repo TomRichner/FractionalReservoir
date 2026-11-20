@@ -7,6 +7,9 @@
 - **Status:** request, **deferred by Tom** ("sometime later"). Nothing in
   this repo was changed except adding this note. No issue entry was added
   to `docs/ISSUES.md`; give it a number when the work is taken up.
+- **Follow-up, 2026-11-19: done**, at Tom's request, as the repository
+  `MatlabAgenticOrg` (github TomRichner), which also holds the worker-agent
+  definitions as a template. See "What was done" at the end of this note.
 
 ## Why
 
@@ -178,3 +181,50 @@ Documentation that describes the module's location:
   their allocations, and the total is the sum.
 - The documents listed above name the new location, and Tom has decided
   on each of the four offered improvements (done, declined or later).
+
+## What was done (2026-11-19)
+
+Commits here: `e11aa4e` (module removed, `setup_paths` wired to the shared
+clone) and `91f7d17` (agent definitions untracked). The design and its
+reasons are in `DESIGN.md` of MatlabAgenticOrg; its `README.md` is the
+usage note.
+
+Against the request:
+
+1. The repository is `MatlabAgenticOrg`, not `matlab-pool`: it holds the
+   pool module (`matlab/`), its test, the worker-agent template and a
+   setup script (`setup_repo.py`) that installs both in a repository.
+2. Function names and behaviour are kept; no caller here was edited.
+3. The files were removed here in the commit that put the shared copy on
+   the path.
+4. Self-contained: a private `pool_printf` replaces `vprintf`. This repo
+   supplies `src/util/pool_log_hook.m` so the lines still reach `vlog`.
+5. `setup_paths` calls `use_matlab_agentic_org`, which errors with the fix
+   when the clone is not found.
+
+The points that needed care:
+
+- **Worktrees:** the clone is found from `~/.matlab_agentic_org` (or the
+  environment variable `MATLAB_AGENTIC_ORG`), outside any repository.
+- **Mixed versions:** the registry directory and JSON fields are unchanged;
+  one field, `folder`, was added.
+- **Environment variables:** renamed to `MATLAB_POOL_*`, with no fallback
+  to the old names (nothing set them from outside).
+- **`wait_for_parpool`** and `pct_licenses.ps1` moved too, still gated to
+  R5611351.
+- **Other platforms:** the module's test now passes on macOS (MacBook Air,
+  R2026a), including the count of running workers, which is taken from
+  `ps` there.
+
+The four offered improvements: (1) a repo field: done as the `folder`
+column of `pool_status`, recorded automatically. (2) counting unregistered
+pools against the budget, (3) enforcing the budget in `pool_set`, (4) a
+history log: **not done, still Tom's to decide**.
+
+"Done means", as of 2026-11-19: one copy on the path in this repo's MATLAB
+(checked on the MacBook Air; a worktree and `cscs_stim_stability` not
+checked); `test_pool_module` passes from its new home; the regression
+tiers were not run (deferred to the workstation, FD-032);
+`explore_small_network` reproduced its three lambda_1 through the shared
+module; two repositories' sessions listing each other is not yet tried;
+`cscs_stim_stability` has not been set up.
