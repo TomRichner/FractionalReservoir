@@ -40,6 +40,15 @@ arguments
     % lambda_1 row (rows input, expansion, heat map), saved as
     % Fig_Main3_Grouped_noC (2026-11-17).
     cfg.show_lambda_row (1,1) logical = true
+    % Group 3 only (FD-033): draw the Ritz values of the leading Lyapunov
+    % subspace on the eigenvalue density (fig_eig_heatmap's ritz_overlay and
+    % its ritz_k, ritz_scaling, ritz_inset). Off by default; saved under the
+    % tag with _ritz (and _typesd, _inset) appended, so the registered
+    % figure is unchanged. Needs the eig_heatmap stage's Ritz pass.
+    cfg.ritz_overlay (1,1) logical = false
+    cfg.ritz_k (1,1) double = 0
+    cfg.ritz_scaling (1,:) char = 'raw'
+    cfg.ritz_inset (1,1) logical = false
     cfg.svg (1,1) logical = false   % also save an SVG beside the PNG and .fig
 end
 setup_paths();
@@ -65,7 +74,8 @@ switch group
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 3
-        a=fig_main3_stability(cfg.run_dir,cfg.conditions,'show_lambda_row',cfg.show_lambda_row);
+        a=fig_main3_stability(cfg.run_dir,cfg.conditions,'show_lambda_row',cfg.show_lambda_row, ...
+            'ritz_overlay',cfg.ritz_overlay,'ritz_k',cfg.ritz_k,'ritz_scaling',cfg.ritz_scaling,'ritz_inset',cfg.ritz_inset);
         fig.Position(3)=fig.Position(3)*a.width_scale;
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
@@ -164,6 +174,7 @@ if ismember(group,[1 2 3 8])
         tt=findall(fig,'Type','axes','-regexp','Tag','^stability_r1_c\d+$');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
         set(findall(fig,'Tag','accumulated_lambda_label'),'FontSize',12);
+        set(findall(fig,'Tag','ritz_inset'),'FontSize',9);
     end
 else
     set(findall(fig,'Type','axes'),'FontSize',10);
@@ -173,6 +184,11 @@ if group==5, style_main5_grouped(fig,margin_names,gain_names); end
 if group==6, style_main6_grouped(fig,tau_names); end
 tag=sprintf('Fig_Main%d_Grouped',group);
 if group==3 && ~cfg.show_lambda_row, tag=[tag '_noC']; end
+if group==3 && cfg.ritz_overlay
+    tag=[tag '_ritz'];
+    if strcmp(cfg.ritz_scaling,'type_sd'), tag=[tag '_typesd']; end
+    if cfg.ritz_inset, tag=[tag '_inset']; end
+end
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end

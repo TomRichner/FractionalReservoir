@@ -29,6 +29,17 @@
 %      (x alone without adaptation, where the scaled pass must then give the
 %      raw Ritz values). A scaling name it does not know errors
 %      :badRitzScaling.
+%   5. fig_eig_heatmap with 'ritz_overlay': draws the points (one scatter
+%      tagged ritz_values per panel, and the exponent ticks), saves under
+%      the tag fig_eig_heatmap_ritz with its table, with and without the
+%      inset; without the option the figure has no such object and the tag
+%      is unchanged; on a run directory without the pass it draws as before
+%      and errors :NoRitz when the overlay is asked for.
+%   6. The composite Figure 3 (fig_main3_stability, fig_grouped_main group
+%      3) on a small local_lyapunov run beside the Ritz run: with the
+%      overlay every heat-map panel carries the points and its inset and the
+%      file is Fig_Main3_Grouped_ritz_inset; without it there are none and
+%      the tag is Fig_Main3_Grouped.
 %
 % ~3 min. Prints PASS/FAIL per check and a final banner. Assumes setup_paths.
 %
@@ -151,6 +162,57 @@ old_dir = fullfile(tempdir, 'eig_heatmap_stage_test_old'); if ~exist(old_dir, 'd
 Dold = rmfield(D, 'examples'); save(fullfile(old_dir, 'eig_heatmap', 'eig_heatmap_data.mat'), '-struct', 'Dold');
 all_passed = check('imbalance figure errors :NoExamples on a pre-examples .mat', ...
     throws_id(@() fig_eig_heatmap_imbalance('run_dir', old_dir, 'save', false, 'visible', false), 'fig_eig_heatmap_imbalance:NoExamples')) && all_passed;
+
+%% The Ritz overlay (FD-033)
+n_tagged = @(fh, tag) numel(findall(fh, 'Tag', tag));
+evalc('res0 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig0''), ''visible'', false);');
+all_passed = check('without the option: no Ritz object, tag unchanged, no table', ...
+    n_tagged(res0.figs, 'ritz_values') == 0 && n_tagged(res0.figs, 'ritz_inset') == 0 && ...
+    any(strcmp(res0.files, 'fig_eig_heatmap.png')) && isempty(dir(fullfile(ritz_dir, 'fig0', '*_table.md')))) && all_passed;
+close(res0.figs);
+evalc('res3 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig3''), ''visible'', false, ''ritz_overlay'', true);');
+sc3 = findall(res3.figs, 'Tag', 'ritz_values');
+all_passed = check('overlay: one scatter of K x states points and one set of exponent ticks per panel, no inset', ...
+    numel(sc3) == n_cond && n_tagged(res3.figs, 'ritz_exponent_ticks') == n_cond && n_tagged(res3.figs, 'ritz_inset') == 0 && ...
+    sum(arrayfun(@(h) numel(h.XData), sc3)) == sum(cellfun(@(R) R.K * nnz(R.valid), DR.ritz_by_cond))) && all_passed;
+all_passed = check('overlay: saved as fig_eig_heatmap_ritz with its table', ...
+    any(strcmp(res3.files, 'fig_eig_heatmap_ritz.png')) && isfile(fullfile(ritz_dir, 'fig3', 'fig_eig_heatmap_ritz_table.md'))) && all_passed;
+close(res3.figs);
+evalc(['res4 = fig_eig_heatmap(''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''fig4''), ''visible'', false, ' ...
+    '''ritz_overlay'', true, ''ritz_inset'', true, ''ritz_scaling'', ''type_sd'', ''ritz_k'', 4, ''ritz_exponent_ticks'', false);']);
+sc4 = findall(res4.figs, 'Tag', 'ritz_values');
+all_passed = check('overlay with inset, scaled, k = 4: 4 x states points per panel, an inset per panel, no ticks, own tag', ...
+    sum(arrayfun(@(h) numel(h.XData), sc4)) == sum(cellfun(@(R) 4 * nnz(R.valid), DR.ritz_by_cond)) && ...
+    n_tagged(res4.figs, 'ritz_inset') == n_cond && n_tagged(res4.figs, 'ritz_exponent_ticks') == 0 && ...
+    any(strcmp(res4.files, 'fig_eig_heatmap_ritz_typesd_inset.png')) && ...
+    isfile(fullfile(ritz_dir, 'fig4', 'fig_eig_heatmap_ritz_typesd_inset_table.md'))) && all_passed;
+close(res4.figs);
+all_passed = check('a run directory without the Ritz pass: the overlay errors :NoRitz', ...
+    throws_id(@() fig_eig_heatmap('run_dir', run_dir, 'save', false, 'visible', false, 'ritz_overlay', true), ...
+    'fig_eig_heatmap:NoRitz')) && all_passed;
+
+%% The composite Figure 3 with the overlay
+evalc(['run_local_lyapunov(''preset_name'', P, ''run_mode'', ''fast'', ''out_dir'', fullfile(ritz_dir, ''local_lyapunov''), ' ...
+    '''K'', 5, ''T'', 8, ''n_override'', 60);']);
+evalc('m3 = fig_main3_stability(ritz_dir, {}, ''ritz_overlay'', true, ''ritz_inset'', true);');
+panels = findall(m3.figs, 'Type', 'axes', '-regexp', 'Tag', '^stability_r1_c\d+$');
+in_panel = arrayfun(@(ax) numel(findall(ax, 'Tag', 'ritz_values')), panels);
+all_passed = check('fig_main3_stability: every heat-map panel carries the points; one inset per panel', ...
+    numel(panels) == n_cond && all(in_panel == 1) && n_tagged(m3.figs, 'ritz_inset') == n_cond) && all_passed;
+close(m3.figs);
+evalc('m0 = fig_main3_stability(ritz_dir, {});');
+all_passed = check('fig_main3_stability without the option: no Ritz object', ...
+    n_tagged(m0.figs, 'ritz_values') == 0 && n_tagged(m0.figs, 'ritz_inset') == 0) && all_passed;
+close(m0.figs);
+evalc(['g3 = fig_grouped_main(3, ''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''g3''), ' ...
+    '''ritz_overlay'', true, ''ritz_inset'', true);']);
+evalc('g0 = fig_grouped_main(3, ''run_dir'', ritz_dir, ''out_dir'', fullfile(ritz_dir, ''g0''));');
+all_passed = check('fig_grouped_main group 3: Fig_Main3_Grouped_ritz_inset with the points; Fig_Main3_Grouped without', ...
+    any(strcmp(g3.files, 'Fig_Main3_Grouped_ritz_inset.png')) && n_tagged(g3.figs, 'ritz_values') == n_cond && ...
+    n_tagged(g3.figs, 'ritz_inset') == n_cond && any(strcmp(g0.files, 'Fig_Main3_Grouped.png')) && ...
+    n_tagged(g0.figs, 'ritz_values') == 0) && all_passed;
+close([g3.figs, g0.figs]);
+
 empty_dir = fullfile(tempdir, 'eig_heatmap_stage_test_empty'); if ~exist(empty_dir, 'dir'); mkdir(empty_dir); end
 all_passed = check('both figures error on a run directory without the stage', ...
     throws_prefix(@() fig_eig_heatmap('run_dir', empty_dir, 'save', false, 'visible', false), 'resolve_data_file:') && ...

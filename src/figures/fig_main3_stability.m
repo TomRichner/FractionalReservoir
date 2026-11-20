@@ -25,10 +25,22 @@ function out=fig_main3_stability(run_dir,conditions,opts)
 % same width. Condition titles then sit over the input row, and each
 % column's accumulated lambda_1 (the value the removed row printed) is kept
 % as a small label in the top right corner of its expansion panel.
+%
+% RITZ_OVERLAY (FD-033, default false: the figure as it was). true passes
+% fig_eig_heatmap its 'ritz_overlay' with ritz_k, ritz_scaling and
+% ritz_inset, so each heat-map panel also carries the Ritz values of the
+% leading Lyapunov subspace (and its inset near zero when asked); the
+% points and ticks are children of the copied axes and come with them, and
+% each inset is put back in the same place within its panel's plot box. The
+% eig_heatmap stage must have been run with the Ritz pass.
 arguments
     run_dir char
     conditions = {}
     opts.show_lambda_row (1,1) logical = true
+    opts.ritz_overlay (1,1) logical = false
+    opts.ritz_k (1,1) double = 0
+    opts.ritz_scaling (1,:) char = 'raw'
+    opts.ritz_inset (1,1) logical = false
 end
 show_lambda=opts.show_lambda_row;
 % Row geometry, [y height] in normalized figure units, and the canvas height.
@@ -44,10 +56,16 @@ f=fullfile(run_dir,'local_lyapunov','local_lyapunov_data.mat'); D=load(f);
 D.results=D.results(cidx);
 n_col=numel(names); width_scale=1+(n_col-3)*.30; s=1/width_scale;
 T=D.settings.T;
+ritz_args={};
+if opts.ritz_overlay
+    ritz_args={'ritz_overlay',true,'ritz_k',opts.ritz_k,'ritz_scaling',opts.ritz_scaling,'ritz_inset',opts.ritz_inset};
+end
 a=fig_eig_heatmap('run_dir',run_dir,'save',false,'visible',false,'density_scale','loglog', ...
-    'conditions',names);
+    'conditions',names,ritz_args{:});
 fig=figure('Visible','off','Color','w','Position',[40 40 1450*width_scale fig_h]);
 old=findall(a.figs,'Type','axes');
+% The Ritz insets are axes of their own, not tiles; they follow their panel below.
+is_inset=strcmp(get(old,'Tag'),'ritz_inset'); insets=old(is_inset); old=old(~is_inset);
 % Tile k is the k-th selected condition (fig_eig_heatmap draws them in the
 % selection's order, row-major); findall returns the reverse creation order.
 [~,order]=sort(arrayfun(@(x)x.Layout.Tile,old)); old=old(order);
@@ -89,6 +107,12 @@ for c=1:n_col
         cb=colorbar(ax); cb.Units='normalized'; cb.Position=[(.955+(n_col-3)*.30)*s g.cbar(1) .012*s g.cbar(2)];
         cb.Label.String='log log density'; cb.Ticks=[0 .25 .5]; cb.Box='off';
         ax.Position=heat_pos;
+    end
+    for k=1:numel(insets)
+        if insets(k).UserData.panel~=c, continue; end
+        box=plot_box_position(ax); rel=insets(k).UserData.rel;
+        ins=copyobj(insets(k),fig); ins.Units='normalized';
+        ins.Position=[box(1)+rel(1)*box(3) box(2)+rel(2)*box(4) rel(3)*box(3) rel(4)*box(4)];
     end
     if show_lambda, ax=newaxis(2,c,g.input(1),g.input(2)); else, ax=newaxis(1,c,g.input(1),g.input(2)); end
     offset=0;
@@ -158,6 +182,7 @@ end
 uistack(sep,'bottom'); set(findall(fig,'-property','FontSize'),'FontSize',14);
 for c=1:n_col, ax=findobj(fig,'Tag',sprintf('stability_r1_c%d',c)); ax.Title.FontSize=16; end
 set(findall(fig,'Tag','accumulated_lambda_label'),'FontSize',12);
+set(findall(fig,'Tag','ritz_inset'),'FontSize',9);
 if show_lambda
 notes={sprintf('Current switching data: K=%d; accumulation [%g,%g] s; saved segment-start timestamps retained. Settings are read from the completed saved analysis.',D.settings.K,D.settings.lya_T_interval), ...
     ['Input shows 24 fixed actual neurons (12 evenly spaced E and 12 I), identical indices across conditions. ' ...
@@ -171,6 +196,14 @@ notes={sprintf('Variant without the lambda_1 row (show_lambda_row false). Switch
     'the small label in each (B) panel is the accumulated leading Lyapunov exponent lambda_1 at the end of the accumulation window (the value the removed row printed); ' ...
     '(C) eigenvalue density heat map. Eigenvalue and switching stages are separate examples.'], ...
     sprintf('Columns, left to right: %s (titled and coloured by condition name; heat-map tiles taken by condition).',strjoin(names,', '))};
+end
+if opts.ritz_overlay
+    notes{end+1}=sprintf(['Ritz overlay on the eigenvalue density (ritz_k %d, 0 = all the run tracked; %s norm; inset %d): points are the ' ...
+        'eigenvalues of the Jacobian projected on the leading Lyapunov directions at the same sampled states as the density, in the ' ...
+        'condition''s color; ticks on the bottom edge are that pass''s Lyapunov exponents. In a stable adapting network these directions ' ...
+        'are the band of slow single-neuron adaptation modes, not the network''s collective modes. Numbers and how to read them: the ' ...
+        'table fig_eig_heatmap writes beside its own figure (fig_eig_heatmap_ritz*_table.md).'], ...
+        opts.ritz_k,opts.ritz_scaling,opts.ritz_inset);
 end
 out=struct('figs',fig,'files',{{}},'source',{{a.source,f}},'notes',{notes},'width_scale',width_scale);
     function ax=newaxis(row,col,y,height)
