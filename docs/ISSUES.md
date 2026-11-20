@@ -1710,3 +1710,53 @@ them and updated after the next run. Belongs to job J2 (owns
 `mu7chain_config`); J3 sets it in the IED stimulation config. Item 9
 (eigenvalue by step) is dropped from FD-031: it is FR-002 in the manuscript
 repo, code on branch `eig-by-step-a8ca`.
+
+### FD-032 A ranked Lyapunov spectrum and its histogram on an 80-neuron network, made by every run
+
+- **Status:** in progress (Tom's request, 2026-11-19).
+- **What:** Tom: "I think we could probably have a ranked Lyapunov plot and
+  histogram in the supplement of the paper ... it should get made when we
+  do a run. It should use the 80 neuron network and use topk = 240." At 500
+  neurons the leading exponents of a stable adapting network are a band of
+  slow single-neuron adaptation variables that top-K never gets past; at
+  80 neurons 240 exponents reach well into the spectrum
+  (`scripts/explorations/small_network/`, commits `cce0fd9`, `2d5664b`,
+  `4bf32d4`).
+- **Done means:** an 80-neuron preset in the mu7chain bundle (the mu7chain
+  network with only its size changed: n 80, indegree 16, F_ref 80 / 16); a
+  stage of the mu7chain bundles that computes the top 240 exponents
+  (capped at the state dimension) per condition on it, in every run mode;
+  a figure with the sorted exponents against rank and their histogram per
+  condition, registered so `make_all_paper_figures` draws it from the run
+  directory; a fast test of the stage and figure in the quick suite; the
+  existing `lyapunov_spectrum` stage unchanged to the bit (ultrarapid and
+  stages tiers pass).
+- **Lead's decisions:** the settled window Tom chose from the exploration
+  (60 s of settling, 20 s warm-up, exponents accumulated over 80 to 140 s;
+  a 10 s window from a cold start put the top band 0.04 1/s too low);
+  preset noise on only; the per-neuron spreads as the preset has them; the
+  existing `run_lyapunov_spectrum` is reused with new optional arguments,
+  not copied; the same network, K and window in every run mode, with more
+  seeds in the larger modes.
+- **Result (2026-11-19, built, not closed):** preset `..._mu7chain_n80`;
+  opt-in stage `lyapunov_spectrum_n80` (`lyapunov_spectrum_n80_stage_plan`,
+  `run_lyapunov_spectrum_n80_stage`), named in `cfg.stages` of
+  `mu7chain_config` in every mode; `run_lyapunov_spectrum` gains optional
+  `T`, `lya_T_interval`, `lya_warmup`, `fs`, `K_max` and caps K at the
+  state dimension; `fig_lyapunov_ranked_spectrum` registered in both
+  figure sets; `test_lyapunov_spectrum_n80_stage` (27 s). Ran at
+  `essential` through `run_all_paper_analyses` with only this stage
+  selected (3.9 min on the laptop) and drew through
+  `make_all_paper_figures`. **Two things keep it open.** (1) Built on the
+  MacBook, where the exact tiers (`test_regression_rapid`,
+  `test_regression_stages`) fail by round-off against the workstation's
+  references whatever the code; the edited `run_lyapunov_spectrum` was
+  shown bit-identical to HEAD's on the stages tier's own call on the same
+  machine, and the tolerance tier passes. Both exact tiers are to be run
+  on the workstation. (2) On the stage's seed [1 2] the 80-neuron network
+  without adaptation is pinned (lambda_1 -6.0, 72 of 80 exponents at
+  -1/tau_d) and 1TS has lambda_1 +0.0025; on seed [7 8] (the exploration)
+  no adaptation oscillates with lambda_1 +0.17 and 1TS is stable at
+  -0.41. The regime at 80 neurons depends on the seed and is not the
+  500-neuron network's; whether that is acceptable for a supplementary
+  figure is Tom's to decide.

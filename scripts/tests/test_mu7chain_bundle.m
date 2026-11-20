@@ -57,9 +57,11 @@ catch err
 end
 assert(threw, 'an unknown run mode must be refused');
 % These modes run every stage; only 'essential' selects (FD-023; its own
-% checks are in test_essential_mode).
+% checks are in test_essential_mode). Every stage is written out, followed
+% by the opt-in lyapunov_spectrum_n80 that every mode runs (FD-032).
 for k = {cfg3, cfg4, cfg_med}
-    assert(isempty(k{1}.stages) && isempty(k{1}.sweeps) && isempty(k{1}.eig_heatmap_examples));
+    assert(isequal(k{1}.stages, [paper_stage_names(), {'lyapunov_spectrum_n80'}]) && ...
+        isempty(k{1}.sweeps) && isempty(k{1}.eig_heatmap_examples));
 end
 % FD-030: the conditions SIMULATED and the sets DRAWN, by mode. Every mode
 % from 'fast' upward simulates the paper's three and draws the 3cond set,
@@ -119,9 +121,10 @@ for c = {cfg3, cfg4}
     end
 end
 % The same registry as the manuscript bundle's, entry for entry, plus the
-% chain's own comparison figure (FD-014), in both sets and in the paper.
+% chain's own comparison figure (FD-014), in both sets and in the paper,
+% and the ranked Lyapunov spectrum of the 80-neuron network (FD-032).
 ref_cfg = mu7revisedMedium_config();
-chain_only = {'fig_std_1TS_vs_MTS'};
+chain_only = {'fig_std_1TS_vs_MTS', 'fig_lyapunov_ranked_spectrum'};
 for c = {cfg3, cfg4}
     nm = cellfun(@(f) f.name, c{1}.figures, 'UniformOutput', false);
     assert(isequal(nm(~ismember(nm, chain_only)), ...
@@ -141,11 +144,21 @@ assert(ismember(cfg.run_mode, run_mode_names()));
 
 %% Every preset the config names exists and validates
 stage_presets = {cfg.preset_name, cfg.mc_preset, cfg.local_lyapunov_preset, ...
-                 cfg.single_neuron_preset};
+                 cfg.single_neuron_preset, cfg.lyapunov_spectrum_n80_preset};
 assert(strcmp(cfg.preset_name, main_name));
 for k = 1:numel(stage_presets)
     srnn_param_preset(stage_presets{k});   % validates its conditions, or throws
 end
+
+% The 80-neuron twin (FD-032): the network with only its size changed, and
+% the same four conditions exactly.
+[d80, cls80, cnd80] = srnn_param_preset(cfg.lyapunov_spectrum_n80_preset);
+[d500, ~, cnd500] = srnn_param_preset(main_name);
+size_fields = {'n', 'indegree', 'F_ref_n', 'F_ref_indegree'};
+assert(strcmp(cls80, 'SRNNCellTypePairs') && isequal(cnd80, cnd500));
+assert(isequal(cellfun(@(f) d80.(f), size_fields), [80 16 80 16]));
+assert(isequal(rmfield(d80, size_fields), rmfield(d500, size_fields)), ...
+    'the 80-neuron preset differs from the mu7chain network in more than its size');
 
 [d, cls, cnd] = srnn_param_preset(main_name);
 assert(strcmp(cls, 'SRNNCellTypePairs'));

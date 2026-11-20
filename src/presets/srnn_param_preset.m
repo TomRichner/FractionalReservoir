@@ -1390,6 +1390,29 @@ switch name
         d.input_config = struct('n_steps', 8, 'step_density', struct(), 'amp', 0.5, ...
             'no_stim_pattern', false(1, 8), 'intrinsic_drive', 0, 'positive_only', false);
 
+    case 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain_n80'
+        % The mu7chain network at 80 neurons, for the ranked Lyapunov spectrum
+        % and its histogram (FD-032; the opt-in stage lyapunov_spectrum_n80).
+        % Same bundle (mu7chain_config), chained from the noisy mu7chain preset
+        % under the within-bundle rule. ONLY THE SIZE differs, by the rule of
+        % the 100-neuron regression preset and of
+        % scripts/explorations/small_network/small_network_model:
+        %   n                500 -> 80
+        %   indegree         100 -> 16   (connection probability stays 0.2)
+        %   F_ref_n          500 -> 80   (F_tracks_network stays false, so the
+        %   F_ref_indegree   100 -> 16    weight unit is the small network's own)
+        % The bulk radius R is then the parent's; the mean (rank-one) part of
+        % W is smaller in norm. At 500 neurons top-K never gets past the band
+        % of slow single-neuron adaptation exponents; at 80, 240 exponents
+        % reach well into the spectrum. Conditions, noise, spreads and
+        % everything else are the parent's.
+        [d, model_class, conditions] = srnn_param_preset( ...
+            'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain');
+        d.n = 80;
+        d.indegree = 16;
+        d.F_ref_n = 80;
+        d.F_ref_indegree = 16;
+
     case 'single_neuron_mu7chain'
         % Within the mu7chain bundle: one reference E neuron without recurrence,
         % noise or heterogeneity, isolating one mechanism per condition. The
@@ -2138,7 +2161,8 @@ names = {'default', 'overconnected', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain_EI3to2', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain_EI2to3', ...
     'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain', ...
-    'single_neuron_mu7chain'};
+    'single_neuron_mu7chain', ...
+    'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain_n80'};
 end
 
 function ic = pairs_input_config(intrinsic_drive)

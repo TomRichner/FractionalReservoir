@@ -22,7 +22,8 @@
 %   * mu7chain_config('essential') has the run directory, figure root,
 %     stages, sweeps, eig-heatmap example, figure-set default and registry
 %     specified, and every registry entry is the fast registry's own;
-%   * mu7chain_config('fast') and ('medium') select nothing.
+%   * mu7chain_config('fast') and larger skip nothing: every stage, then the
+%     opt-in lyapunov_spectrum_n80 (FD-032).
 %
 % Asserts; silent until it throws, then prints one PASS line.
 % Assumes setup_paths has run.
@@ -229,7 +230,8 @@ assert(isequal(table_names, all_stages(2:end)), 'run_all_paper_analyses'' stage 
 % function that exist.
 [~, ~, opt_in] = paper_stage_names();
 registry = paper_opt_in_stages();
-assert(isequal(opt_in, {registry.name}) && isequal(opt_in, {'mc_gain_sweep', 'noise_switch'}));
+assert(isequal(opt_in, {registry.name}) && ...
+    isequal(opt_in, {'lyapunov_spectrum_n80', 'mc_gain_sweep', 'noise_switch'}));
 assert(isempty(intersect(opt_in, all_stages)), 'an opt-in stage must not also be in the first list');
 for k = 1:numel(registry)
     assert(exist(func2str(registry(k).plan), 'file') == 2 && exist(func2str(registry(k).run), 'file') == 2, ...
@@ -302,7 +304,8 @@ assert(strcmp(cfg.run_dir, 'data/mu7chain_essential'));
 assert(strcmp(cfg.fig_root, 'figs/mu7chain_essential_4cond'));
 assert(isequal(cfg.figure_sets, {'4cond'}), 'essential draws the four-condition set only');
 assert(isequal(cfg.conditions, {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2', 'sfa3_std2'}));
-assert(isequal(cfg.stages, {'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations'}));
+assert(isequal(cfg.stages, {'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations', ...
+    'lyapunov_spectrum_n80'}));   % the last is opt-in and run in every mode (FD-032)
 assert(isequal(cfg.sweeps, {'sensitivity', 'param_space'}));
 ex = cfg.eig_heatmap_examples;
 assert(isstruct(ex) && isscalar(ex) && strcmp(ex.label, 'reference') && ...
@@ -314,7 +317,7 @@ assert(isequal(pl.stages, cfg.stages) && isequal(pl.sweeps, cfg.sweeps) && ...
 % The registry, exactly, in order.
 want_figs = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', 'fig_param_space_allStd', ...
     'fig_EI_weights_param_space', 'fig_lle_vs_rate', 'fig_eig_heatmap', ...
-    'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped'};
+    'fig_lyapunov_ranked_spectrum', 'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped'};
 names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
 assert(isequal(names, want_figs), 'the essential registry is: %s', strjoin(names, ', '));
 % Each entry is the fast registry's own, except that a grouped entry reads
@@ -347,17 +350,20 @@ differs = {'run_mode', 'run_dir', 'fig_root', 'figures', 'stages', 'sweeps', ...
 assert(isequal(rmfield(cfg, differs), rmfield(fast, differs)), ...
     'essential differs from fast in more than: %s', strjoin(differs, ', '));
 
-%% The other modes select nothing
+%% The other modes skip nothing
+% Every stage of the first list, written out, then the opt-in
+% lyapunov_spectrum_n80 that every mode runs (FD-032).
 for md = {'fast', 'fastmedium', 'medium', 'medium2', 'production'}
     for st = {'3cond', '4cond'}
         c = mu7chain_config(md{1}, st{1});
-        assert(isempty(c.stages) && isempty(c.sweeps) && isempty(c.eig_heatmap_examples), ...
-            '%s must select nothing', md{1});
+        assert(isequal(c.stages, [all_stages, {'lyapunov_spectrum_n80'}]) && isempty(c.sweeps) && ...
+            isempty(c.eig_heatmap_examples), '%s must skip nothing', md{1});
         % FD-030: the three-condition set alone, three conditions simulated.
         assert(isequal(c.figure_sets, {'3cond'}));
         assert(isequal(c.run_conditions, {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}));
         pl = paper_stage_plan(c);
-        assert(~pl.is_selection && isequal(pl.stages, all_stages) && isequal(pl.sweeps, all_sweeps));
+        assert(~pl.is_selection && isequal(pl.stages, [all_stages, {'lyapunov_spectrum_n80'}]) && ...
+            isequal(pl.sweeps, all_sweeps));
         assert(numel(c.figures) == numel(fast.figures));
     end
 end

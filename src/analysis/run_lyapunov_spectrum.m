@@ -29,7 +29,25 @@ function mat_file = run_lyapunov_spectrum(cfg)
 %   medium(2)    T = 40 s, 3 seeds, K = 200
 %   production   T = 100 s, 5 seeds, K = 300
 % Accumulation over the second half of T after a warm-up of T/4;
-% re-orthonormalisation every 0.05 s; lya_K_max = 2K.
+% re-orthonormalisation every 0.05 s; lya_K_max = 2K; fs 400 Hz.
+%
+% THE WINDOW AND RATE AS ARGUMENTS (FD-032). Each of these, left at its
+% default, takes the value above, so a call that names none of them is the
+% call it always was:
+%   T               simulated interval [0, T] in s (0 -> the run mode's T)
+%   lya_T_interval  accumulation window [t1, t2] in s ([] -> [T/2, T])
+%   lya_warmup      seconds of iteration before t1 ([] -> T/4)
+%   fs              integration rate in Hz (0 -> 400)
+%   K_max           cap of the retry doubling (0 -> 2K); K_max = K takes
+%                   exactly K exponents, never more
+% K CAPPED AT THE STATE DIMENSION: a run whose N_sys_eqs is below K takes all
+% N exponents (top-K cannot take more than N). A K at or below N, every call
+% before FD-032, is unaffected. settings.K is the K asked for; each run's
+% K_used and N say what it got.
+%
+% The opt-in stage lyapunov_spectrum_n80 (FD-032) calls this on the
+% 80-neuron preset with its own window; the stage 'lyapunov_spectrum' names
+% none of these arguments.
 %
 % Builds happen INSIDE the parfor, so the generator is pinned to 'twister'
 % first (workers default to 'threefry'; UserNotes.md) -- a seed then means
@@ -49,6 +67,11 @@ arguments
     cfg.noise_off_too (1,1) logical = true
     cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
+    cfg.T           (1,1) double {mustBeNonnegative} = 0   % 0 -> per run_mode (FD-032)
+    cfg.lya_T_interval (1,:) double = []                    % [] -> [T/2, T]
+    cfg.lya_warmup  (1,:) double = []                       % [] -> T/4
+    cfg.fs          (1,1) double {mustBeNonnegative} = 0   % 0 -> 400 Hz
+    cfg.K_max       (1,1) double {mustBeNonnegative} = 0   % 0 -> 2K
 end
 
 setup_paths();
@@ -65,17 +88,38 @@ switch cfg.run_mode
 end
 if cfg.n_seeds > 0; n_seeds = cfg.n_seeds; end
 if cfg.K > 0;       K = cfg.K; end
+if cfg.T > 0;       T = cfg.T; end
+lya_T_interval = [T / 2, T];
+if ~isempty(cfg.lya_T_interval); lya_T_interval = cfg.lya_T_interval; end
+lya_warmup = T / 4;
+if ~isempty(cfg.lya_warmup); lya_warmup = cfg.lya_warmup; end
+fs = 400;
+if cfg.fs > 0;      fs = cfg.fs; end
+K_max = 2 * K;
+if cfg.K_max > 0;   K_max = cfg.K_max; end
+if ~(numel(lya_T_interval) == 2 && lya_T_interval(1) < lya_T_interval(2) && ...
+        lya_T_interval(1) >= 0 && lya_T_interval(2) <= T)
+    error('run_lyapunov_spectrum:BadWindow', ...
+        'lya_T_interval must be [t1, t2] with 0 <= t1 < t2 <= T = %g s.', T);
+end
+if ~(isscalar(lya_warmup) && lya_warmup >= 0 && lya_warmup <= lya_T_interval(1))
+    error('run_lyapunov_spectrum:BadWindow', ...
+        'lya_warmup must be a scalar in [0, t1] = [0, %g] s.', lya_T_interval(1));
+end
+if K_max < K
+    error('run_lyapunov_spectrum:BadKMax', 'K_max (%d) must be at least K (%d).', K_max, K);
+end
 
 P = struct();
 P.preset_name = cfg.preset_name;
 P.verbose     = cfg.verbose;
 P.T_range     = [0, T];
-P.lya_T_interval = [T / 2, T];
-P.lya_warmup  = T / 4;
+P.lya_T_interval = lya_T_interval;
+P.lya_warmup  = lya_warmup;
 P.lya_dt      = 0.05;
 P.K           = K;
-P.K_max       = 2 * K;
-P.fs          = 400;
+P.K_max       = K_max;
+P.fs          = fs;
 P.n_override  = cfg.n_override;
 P.n_finite    = 10;                  % finite-time curves kept for the first 10 exponents
 
@@ -157,6 +201,13 @@ if P.n_override > 0
 end
 t0 = tic;
 m = build_from_preset(P.preset_name, cname, 'verbose', P.verbose, args{:});
+% K capped at the state dimension (FD-032): top-K cannot take more than N
+% exponents. Only a K above N is touched, which no call made before FD-032
+% could have had (lyapunov_topk refuses it), so those calls are unchanged.
+if P.K > m.N_sys_eqs
+    m.lya_K = m.N_sys_eqs;
+    m.lya_K_max = m.N_sys_eqs;
+end
 m.run();
 S = m.lya_summary();
 lr = m.lya_results;

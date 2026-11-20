@@ -23,7 +23,8 @@ function cfg = mu7chain_config(run_mode, figure_set)
 % bundle that does not run every stage or draw every figure:
 %   runs     sweeps (the seven 1-D sensitivity sweeps and the joint
 %            parameter-space sample), eig_heatmap (the reference example
-%            only), local_lyapunov, paper_illustrations
+%            only), local_lyapunov, paper_illustrations, and the opt-in
+%            lyapunov_spectrum_n80 that every mode runs (FD-032)
 %   skips    the tau sweep, memory_capacity, mc_example, numerics,
 %            lyapunov_spectrum, transient_gain, dc_lle (the data of main
 %            figures 5 and 6 and of the supplementary checks)
@@ -44,7 +45,15 @@ function cfg = mu7chain_config(run_mode, figure_set)
 %            paper.
 % The selection is three config fields read by run_all_paper_analyses
 % (paper_stage_plan): cfg.stages, cfg.sweeps, cfg.eig_heatmap_examples. In
-% every other mode they are empty, which means everything, as before.
+% every other mode the last two are empty, which means everything, and
+% cfg.stages names every stage plus the opt-in lyapunov_spectrum_n80
+% (FD-032), so nothing is skipped.
+%
+% THE RANKED LYAPUNOV SPECTRUM (FD-032), every mode: the stage
+% lyapunov_spectrum_n80 (top 240 exponents per condition on the 80-neuron
+% preset cfg.lyapunov_spectrum_n80_preset, into
+% <run_dir>/lyapunov_spectrum_n80/) and the supplementary figure entry
+% fig_lyapunov_ranked_spectrum, in both figure sets and at 'essential'.
 %
 % WHAT CHANGED FROM mu7revisedMedium_config. The network is the manuscript's
 % baseline, value for value (see the preset's case block), and every stage
@@ -152,12 +161,23 @@ cfg.param_space_seed = 7202;
 %   figure 2   representative_dynamics, saved by paper_illustrations
 %   figure 3   local_lyapunov, and the reference example of eig_heatmap
 %   figure 4   the 1-D sensitivity sweeps and the joint sample
+%
+% PLUS, IN EVERY MODE, the opt-in stage 'lyapunov_spectrum_n80' (FD-032; Tom,
+% 2026-11-19: "it should get made when we do a run"): the top 240 Lyapunov
+% exponents per condition on the 80-neuron version of this network
+% (cfg.lyapunov_spectrum_n80_preset), for the supplementary ranked spectrum
+% and histogram. An opt-in stage runs only when cfg.stages names it, so
+% from 'fast' upward cfg.stages is every stage of the first list written
+% out (paper_stage_names), then this one; nothing is skipped, as before.
+% Its settings (seeds by mode; K, window and rate fixed) are in
+% lyapunov_spectrum_n80_stage_plan.
 is_essential = strcmp(run_mode, 'essential');
-cfg.stages = {};
+cfg.stages = [paper_stage_names(), {'lyapunov_spectrum_n80'}];
 cfg.sweeps = {};
 cfg.eig_heatmap_examples = [];
 if is_essential
-    cfg.stages = {'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations'};
+    cfg.stages = {'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations', ...
+        'lyapunov_spectrum_n80'};
     cfg.sweeps = {'sensitivity', 'param_space'};
     % The reference network alone: fig_eig_heatmap (and figure 3 through it)
     % reads the reference; the two E:I-imbalanced examples feed only
@@ -204,6 +224,9 @@ cfg.mc_ode_solver        = 'sra1';
 % The local-Lyapunov stage runs on the steps5s twin: a new random step every
 % 5 s, never returning to zero. Same bundle, chained preset.
 cfg.local_lyapunov_preset = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain';
+% The ranked Lyapunov spectrum (stage lyapunov_spectrum_n80, FD-032) runs on
+% the 80-neuron twin: this network with only its size changed. Same bundle.
+cfg.lyapunov_spectrum_n80_preset = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain_n80';
 cfg.bursting_preset      = 'bursting_pairs';
 cfg.sompolinsky_preset   = 'sompolinsky_pairs';
 cfg.stf_preset           = 'single_neuron_stf';
@@ -293,6 +316,10 @@ F = add(F, 'fig_eig_heatmap_imbalance',       @fig_eig_heatmap_imbalance,       
         {'density_scale', 'loglog'});
 F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
 F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
+% The ranked top-240 spectrum and its histogram on the 80-neuron network
+% (FD-032, supplementary), from the stage lyapunov_spectrum_n80, which this
+% bundle runs in every mode.
+F = add(F, 'fig_lyapunov_ranked_spectrum',   @fig_lyapunov_ranked_spectrum,   false, {});
 F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    false, {});
 F = add(F, 'fig_transient_gain',             @fig_transient_gain,             false, {});
 F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  false, {});
@@ -322,10 +349,12 @@ F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
 %   fig_main2_grouped                 representative_dynamics (paper_illustrations)
 %   fig_main3_grouped                 local_lyapunov and eig_heatmap
 %   fig_main4_grouped                 the 1-D sweeps and the joint sample
+%   fig_lyapunov_ranked_spectrum      lyapunov_spectrum_n80 (FD-032)
 if is_essential
     keep = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', ...
             'fig_param_space_allStd', 'fig_EI_weights_param_space', 'fig_lle_vs_rate', ...
-            'fig_eig_heatmap', 'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped'};
+            'fig_eig_heatmap', 'fig_lyapunov_ranked_spectrum', ...
+            'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped'};
     names = cellfun(@(f) f.name, F, 'UniformOutput', false);
     missing = setdiff(keep, names);
     assert(isempty(missing), 'mu7chain_config:EssentialRegistry', ...

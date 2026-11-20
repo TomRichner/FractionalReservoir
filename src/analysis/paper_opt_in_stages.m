@@ -24,11 +24,15 @@ function registry = paper_opt_in_stages()
 %
 % See also: paper_stage_names, paper_stage_plan, run_all_paper_analyses
 
+% lyapunov_spectrum_n80  the top-240 Lyapunov spectrum of the 80-neuron
+%                network per condition (FD-032; Tom, 2026-11-19). First,
+%                so in a bundle that also runs block C it follows block A's
+%                stages rather than hours of gain sweeps.
 % mc_gain_sweep  block C: memory capacity over gain and a second axis
 % noise_switch   copies of one network that share the noise, then stop
 %                sharing it (run_noise_switch_rollouts; Tom, 2026-11-14)
 registry = struct( ...
-    'name', {'mc_gain_sweep',            'noise_switch'}, ...
-    'plan', {@mc_gain_sweep_stage_plan,  @noise_switch_stage_plan}, ...
-    'run',  {@run_mc_gain_sweep_stage,   @run_noise_switch_stage});
+    'name', {'lyapunov_spectrum_n80',            'mc_gain_sweep',            'noise_switch'}, ...
+    'plan', {@lyapunov_spectrum_n80_stage_plan,  @mc_gain_sweep_stage_plan,  @noise_switch_stage_plan}, ...
+    'run',  {@run_lyapunov_spectrum_n80_stage,   @run_mc_gain_sweep_stage,   @run_noise_switch_stage});
 end
