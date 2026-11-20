@@ -1873,3 +1873,6 @@ machine needs that repo cloned and `setup_repo.py` run once.
   full-Jacobian eigenvalues Re > 0 per state, median 8 / 4 / 0; x share
   1.00 / 0.149 / 0.032. Stage 13.7 min on 4 workers; only the dense eig
   step uses the pool. Whether this replaces Figure 3 is Tom's call.
+- **Plan for the next version (2026-11-20):** `docs/Plan_Figure3_update.md`
+  (new timing: alignment -10 to 0 s, accumulation 0 to 40 s; open
+  questions). Not to be executed until Tom says go.
