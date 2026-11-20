@@ -1822,3 +1822,29 @@ machine needs that repo cloned and `setup_repo.py` run once.
   states of the stable chained MTS network (rightmost +0.4 median, +1.3
   max). Tom's choices: density drawing of the Ritz values, raw norm, no
   text on the panels, one title. Whether it goes into Figure 3 is open.
+
+### FD-034 Figure 3 with panels B and C on one trajectory, 100 directions throughout
+
+- **Status:** in progress (Tom's request, 2026-11-20: "make a new version
+  of Figure 3 that is computed from the switching run itself so that B and
+  C share the trajectory ... with top 100 Lyapunov exponents, not 50").
+- **Why:** Tom's reading of the FD-033 overlay: the Ritz values show where
+  in the spectrum the directions sit whose expansion panel B plots. That
+  link is exact only if both come from one pass: the diagonal of
+  H = Q' J Q holds the local rates B sums, so the real parts of the Ritz
+  values at a state add up to the sum of those rates. Today C (density
+  and Ritz values) is a separate baseline run with no input steps and a
+  top-K pass of its own.
+- **Done means:** opt-in, nothing registered changes with it off; at 40
+  states evenly over 1 to 40 s of the switching run (5 per input step),
+  the full-Jacobian spectra and H from the same top-100 pass whose local
+  rates B plots; K = 100 in B, in the Ritz values and in the exponent
+  ticks; raw norm, density drawing, inset, no text on panels; the
+  composite and the stand-alone C panel at `essential` under
+  `figs/fd034_mu7chain_essential_switchK100/`; checks that H's diagonal
+  matches the pass's local rates, that early states are aligned, and that
+  the option-off output equals HEAD's on the same machine. Exact tiers
+  deferred to the workstation with FD-032's and FD-033's.
+- **If adopted:** the Figure 3 caption's "In separate baseline
+  simulations" and "50 tracked QR directions ($q_{50}$)" change, and the
+  quoted growth rates must come from the run that makes the figure.
