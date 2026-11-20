@@ -13,8 +13,9 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 %                 run_eig_heatmap and the manuscript's imbalance figure):
 %                 a real positive structural outlier, about +26 in units of
 %                 W against a bulk radius of 5.6
-%   'EEx0p5'      E-to-E mean times 0.5: a complex pair with negative real
-%                 part (not near the abscissa; here for completeness)
+%   'EEx<a>p<b>'  any other multiple a.b of the E-to-E mean ('EEx1p25' is
+%                 times 1.25). Times 0.5 gives a complex pair with negative
+%                 real part (not near the abscissa)
 %   'EI3to2'      block means [8.4 -5.6; 8.4 -5.6] on the NOISY parent (the
 %                 preset of that name is the noise-free twin; overriding
 %                 the means on the parent keeps the noise)
@@ -33,6 +34,10 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 %               full_budget_s of wall time is used: the rightmost
 %               eigenvalues of the FULL Jacobian (outlier_full_spectrum),
 %               and at n_kin of those states the kinetic edge
+%   dense pass  at the same n_cal states: the WHOLE spectrum of the full
+%               Jacobian and the continuation of the frozen-gain outlier
+%               in it (outlier_dense_spectrum; about 15 s a state at 4000
+%               states, in the client)
 %   lambda_1    the top-K Lyapunov exponents over the same window (lya_K;
 %               0 skips it)
 %
@@ -48,8 +53,8 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 %
 % Name-value options (defaults)
 %   T_settle 60, T_measure 20, fs 500, dt_sample 0.01, n 500,
-%   n_top 3, n_keep 30, n_cal 8, n_null 40, n_shuffle 20,
-%   dt_full 0.05, k_full 8, full_budget_s 240, n_kin 2, lya_K 3,
+%   n_top 3, n_keep 30, n_cal 12, n_null 40, n_shuffle 20,
+%   dt_full 0.1, k_full 8, full_budget_s 200, dense true, n_kin 2, lya_K 3,
 %   out_dir '' (data/explorations/outliers under the repository root),
 %   tag '' (appended to the file name), verbose true
 %
@@ -59,7 +64,7 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 % See also: explore_outliers, outlier_measures, fig_outliers
 
 arguments
-    network   (1,:) char {mustBeMember(network, {'reference', 'EEx1p5', 'EEx0p5', 'EI3to2'})}
+    network   (1,:) char
     condition (1,:) char {mustBeMember(condition, {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'})}
     seed      (1,2) double = [7 8]
     opts.T_settle  (1,1) double = 60
@@ -69,12 +74,13 @@ arguments
     opts.n         (1,1) double = 500
     opts.n_top     (1,1) double = 3
     opts.n_keep    (1,1) double = 30
-    opts.n_cal     (1,1) double = 8
+    opts.n_cal     (1,1) double = 12
     opts.n_null    (1,1) double = 40
     opts.n_shuffle (1,1) double = 20
-    opts.dt_full   (1,1) double = 0.05
+    opts.dt_full   (1,1) double = 0.1
     opts.k_full    (1,1) double = 8
-    opts.full_budget_s (1,1) double = 240
+    opts.full_budget_s (1,1) double = 200
+    opts.dense     (1,1) logical = true
     opts.n_kin     (1,1) double = 2
     opts.lya_K     (1,1) double = 3
     opts.out_dir   (1,:) char = ''
@@ -87,11 +93,15 @@ preset = ['celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_' ...
     'stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain'];
 T_end = opts.T_settle + opts.T_measure;
 
-switch network
-    case 'reference', net_args = {};
-    case 'EEx1p5',    net_args = {'mu_EE_relative', 1.5 * 7};
-    case 'EEx0p5',    net_args = {'mu_EE_relative', 0.5 * 7};
-    case 'EI3to2',    net_args = {'mu_tilde_relative', [8.4 -5.6; 8.4 -5.6]};
+tok = regexp(network, '^EEx(\d+)p(\d+)$', 'tokens', 'once');
+if strcmp(network, 'reference')
+    net_args = {};
+elseif strcmp(network, 'EI3to2')
+    net_args = {'mu_tilde_relative', [8.4 -5.6; 8.4 -5.6]};
+elseif ~isempty(tok)
+    net_args = {'mu_EE_relative', str2double([tok{1} '.' tok{2}]) * 7};
+else
+    error('outlier_run:Network', 'Unknown network ''%s'' (reference, EEx<a>p<b>, EI3to2).', network);
 end
 size_args = {};
 if opts.n ~= 500
@@ -196,6 +206,20 @@ t_full = toc(t0);
 say(opts, '  full pass: %.0f s, %d of %d states done, kinetic edge %s\n', ...
     t_full, n_done, numel(full_idx), mat2str(kin.edge, 3));
 
+%% Dense pass: the whole full-Jacobian spectrum at the calibration states, in the client
+t0 = tic;
+dense = [];
+if opts.dense
+    dense = cell(1, numel(cal_idx));
+    for k = 1:numel(cal_idx)
+        dense{k} = outlier_dense_spectrum(S_cal(:, k), params, ws);
+    end
+    dense = [dense{:}];
+    say(opts, '  dense pass: %.0f s at %d states; continuation of the outlier (median) %s 1/s, unstable eigenvalues (median) %g\n', ...
+        toc(t0), numel(cal_idx), num2str(median([dense.cont]), '%.3g'), median([dense.n_pos]));
+end
+t_dense = toc(t0);
+
 %% Assemble
 R = struct();
 R.network = network; R.condition = condition; R.seed = seed;
@@ -225,7 +249,8 @@ R.full = struct('t', t(full_idx(1:n_done)), 'dt', step_full * step / opts.fs, ..
     'coh', cat(2, full.coh), 'n_converged', [full.n_converged], ...
     'seconds', [full.seconds], 'n_requested', numel(full_idx));
 R.kin = kin;
-R.seconds = struct('sim', t_sim, 'fast', t_fast, 'null', t_null, 'full', t_full, 'all', toc(t_all));
+R.dense = dense;                                           % struct array at R.cal_t, see outlier_dense_spectrum
+R.seconds = struct('sim', t_sim, 'fast', t_fast, 'null', t_null, 'full', t_full, 'dense', t_dense, 'all', toc(t_all));
 
 out_dir = opts.out_dir;
 if isempty(out_dir)

@@ -52,6 +52,22 @@ function m = outlier_measures(R, opts)
 %                 Compared with Re lambda_1 where K1 > edge (an outlier is
 %                 predicted), and the fraction of states where one is
 %                 predicted is given beside the fraction where one is seen.
+%   detachment    rho(t) = Re lambda_1 / edge (the table's `ratio`): 1 at
+%                 the edge of the bulk. rho_uniform is the same at the
+%                 calibration states with every gain set to the rms gain
+%                 (the structure's own detachment), and
+%                 reined = 1 - (rho - 1)/(rho_uniform - 1) the fraction of
+%                 it the gains removed. frac_on_E, frac_on_I (fraction of
+%                 neurons off the floor and ceiling) say whether that was
+%                 done with the population still responsive or by pinning
+%                 it. THIS, read beside X_full, replaced exposure as the
+%                 summary after the first runs (see fig_outliers).
+%   continuation  at the dense states, the eigenvalue of the FULL Jacobian
+%                 whose dendritic pattern matches the rightmost eigenvector
+%                 of M (outlier_dense_spectrum): cont_re, cont_im (1/s).
+%   X_full        time average of max(0, rightmost real part of the full
+%                 Jacobian): the instability that is left when the slow
+%                 variables are allowed to respond (1/s).
 %   full Jacobian the rightmost eigenvalues with the slow variables free.
 %                 An eigenvalue to the right of the kinetic edge is a
 %                 network eigenvalue (outlier_full_spectrum). abscissa_full
@@ -154,6 +170,32 @@ end
 rate_top_at_full = interp1(R.t, rate_top, F.t, 'nearest', 'extrap');
 full_minus_fast = absc_full - rate_top_at_full;
 
+%% Detachment against what the structure alone would give, and collapse
+% rho(t) = Re lambda_1 / edge is the detachment (1 at the edge of the
+% bulk). rho_uniform is the same ratio at the calibration states with every
+% gain replaced by the rms gain: the bulk the same size, the E-I difference
+% of the gains removed, so the mean structure is back at its structural
+% ratio to the bulk. reined is the fraction of that structural detachment
+% the actual gains have removed (1: back at the edge; more than 1: pushed
+% inside the bulk; NaN where the structure has no outlier to rein in).
+q95 = [R.cal.q95_re];
+rho_cal     = [R.cal.obs_re] ./ q95;
+rho_uniform = [R.cal.uniform_re] ./ q95;
+rho_uniform_med = median(rho_uniform(ok));
+if rho_uniform_med > 1.05
+    reined = 1 - (median(ratio, 'omitnan') - 1) / (rho_uniform_med - 1);
+else
+    reined = NaN;
+end
+x_full = mean(max(0, absc_full), 'omitnan');           % instability exposure of the FULL Jacobian (1/s)
+
+%% The dense pass: what became of the rightmost frozen-gain mode
+dn = struct('cont', NaN, 'cont_ov', NaN, 'n_pos', NaN, 'abscissa', NaN, 'rate1_M', NaN, 't', []);
+if isfield(R, 'dense') && ~isempty(R.dense)
+    dn = struct('cont', [R.dense.cont], 'cont_ov', [R.dense.cont_ov], 'n_pos', [R.dense.n_pos], ...
+        'abscissa', [R.dense.abscissa], 'rate1_M', [R.dense.rate1_M], 't', R.cal_t);
+end
+
 %% Collect
 m = struct();
 m.network = R.network; m.condition = R.condition; m.seed = R.seed;
@@ -175,7 +217,10 @@ m.full = struct('t', F.t, 'abscissa', absc_full, 'n_net', n_net_full, 'kin_edge'
 m.shuffle_pct = [R.cal.obs_pct_in_shuffle];
 m.cal = struct('obs_re', [R.cal.obs_re], 'typemean_re', [R.cal.typemean_re], ...
     'uniform_re', [R.cal.uniform_re], 'shuffle_med', arrayfun(@(c) median(c.shuf_re), R.cal), ...
-    'R_eff', calR);
+    'R_eff', calR, 'q95_re', q95, 'rho', rho_cal, 'rho_uniform', rho_uniform);
+m.dense = dn;
+m.frac_on = R.frac_on;
+m.structural_ratio = max(real(R.structural.K_eig_realized)) / R.structural.R_realized;
 
 lle = NaN;
 if isfield(R.lya, 'LLE'); lle = R.lya.LLE; end
@@ -209,7 +254,18 @@ m.row = struct( ...
     'full_minus_fast_med', median(full_minus_fast, 'omitnan'), ...
     'full_states', numel(F.t), ...
     'shuffle_pct_med', median(m.shuffle_pct), ...
-    'uniform_minus_obs', median(m.cal.uniform_re - m.cal.obs_re));
+    'uniform_minus_obs', median(m.cal.uniform_re - m.cal.obs_re), ...
+    'ratio_p05', pct(ratio, 0.05), 'ratio_p95', pct(ratio, 0.95), ...
+    'rho_uniform', rho_uniform_med, 'reined', reined, ...
+    'structural_ratio', m.structural_ratio, ...
+    'agree_re', agree_re, ...
+    'frac_on_E', median(R.frac_on(E, :)), 'frac_on_I', median(R.frac_on(I, :)), ...
+    'gain_ratio_EI', median(squeeze(R.dbar(E, E, :)) ./ squeeze(R.dbar(E, I, :)), 'omitnan'), ...
+    'X_full', x_full, 'full_abscissa_p05', pct(absc_full, 0.05), 'full_abscissa_p95', pct(absc_full, 0.95), ...
+    'full_dwell_zero_max', max([dw_full 0]), 'full_n_exc_zero', numel(dw_full), ...
+    'cont_re_med', median(real(dn.cont), 'omitnan'), 'cont_im_med', median(imag(dn.cont), 'omitnan'), ...
+    'cont_ov_med', median(dn.cont_ov, 'omitnan'), 'dense_n_pos_med', median(dn.n_pos, 'omitnan'), ...
+    'dense_frac_unstable', mean(dn.n_pos > 0));
 end
 
 %% ------------------------------------------------------------------------

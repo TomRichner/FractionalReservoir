@@ -26,9 +26,10 @@
 %
 % WHAT IS RUN. Each of `networks` under each of `conditions` on each of
 % `seeds`, by outlier_run: 60 s to settle, then 20 s measured, the
-% frozen-gain spectrum every 10 ms, null draws for the bulk edge at 8
-% states, the rightmost eigenvalues of the full Jacobian every 50 ms for
-% as long as its time budget lasts, and the top 3 Lyapunov exponents over
+% frozen-gain spectrum every 10 ms, null draws for the bulk edge at 12
+% states and the whole full-Jacobian spectrum at the same states, the
+% rightmost eigenvalues of the full Jacobian every 100 ms for as long as
+% its time budget lasts, and the top 3 Lyapunov exponents over
 % the same 20 s. One file per run under data/explorations/outliers/.
 %
 % HOW TO RUN IT. A run takes minutes, so the script does as many missing
@@ -41,6 +42,12 @@
 % POOL. The script opens nothing. With a pool up (pool_set in this
 % session) the fast pass and the null use it; without one they run in the
 % client.
+%
+% THE DOSE RUNS (added after the first results; not looped here). E-to-E
+% times 1.1, 1.25 and 1.75 on seed [7 8], lighter sampling, into
+% data/explorations/outliers_dose/, which fig_outliers reads when present:
+%   outlier_run('EEx1p25', cond, [7 8], 'dt_sample', 0.05, 'n_cal', 8, ...
+%       'dense', false, 'dt_full', 20, 'out_dir', dose_dir)
 %
 % THEN: outlier_table (the measures, one row per run) and fig_outliers
 % (the figures and their sidecars).

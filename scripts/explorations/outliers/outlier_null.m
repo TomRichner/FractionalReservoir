@@ -21,8 +21,9 @@ function c = outlier_null(S, params, ws, n_null, n_shuffle)
 %             and the spread of the gains by type, breaks which neuron has
 %             which gain)
 %   typemean  every neuron given its type's mean gain (no spread)
-%   uniform   every neuron given the grand mean gain (no E-I difference:
-%             the mean structure back at its structural ratio to the bulk)
+%   uniform   every neuron given the rms of all gains (no E-I difference,
+%             same bulk size: the mean structure back at its structural
+%             ratio to the bulk). uniform_mean_re uses the grand mean.
 %
 % Fields
 %   R_eff            predicted radius at this state
@@ -33,7 +34,12 @@ function c = outlier_null(S, params, ws, n_null, n_shuffle)
 %   obs_pct_in_shuffle   fraction of shuffles whose rightmost is BELOW the
 %                    observed one (near 0: the actual assignment of gains
 %                    to neurons keeps the edge further in than chance)
-%   typemean_re, uniform_re   rightmost real part under those controls
+%   typemean_re, uniform_re, uniform_mean_re   rightmost real part under
+%                    those controls
+%   ev_M             n x 1: the whole spectrum of the actual M (for the
+%                    complex-plane figure)
+%   ev_null          n x 3: the whole spectrum of the first three null draws
+%   ev_uniform       n x 1: the whole spectrum under the uniform control
 %
 % See also: outlier_effective_matrix, outlier_measures
 
@@ -60,6 +66,8 @@ for a = 1:C
 end
 
 null_re = zeros(n_null, 1); null_abs = zeros(n_null, 1);
+n_ev_null = min(3, n_null);
+ev_null = complex(zeros(n, n_ev_null));
 for k = 1:n_null
     Wn = Wc;
     for a = 1:C
@@ -70,11 +78,13 @@ for k = 1:n_null
         end
     end
     ev = eig(Wn .* Dmat);
+    if k <= n_ev_null; ev_null(:, k) = ev; end
     null_re(k)  = max(real(ev));
     null_abs(k) = max(abs(ev));
 end
 
-obs_re = max(real(eig(Mf)));
+ev_M = eig(Mf);
+obs_re = max(real(ev_M));
 
 shuf_re = zeros(n_shuffle, 1);
 for k = 1:n_shuffle
@@ -93,14 +103,20 @@ for a = 1:C
     end
 end
 typemean_re = max(real(eig(ws.Wf .* Dtm)));
-uniform_re  = max(real(eig(ws.Wf .* mean(d(:)))));
+% Uniform gain at the rms of the observed gains, so the bulk keeps its size
+% and only the E-I difference of the gains is removed (the grand MEAN gain
+% is kept as uniform_mean_re: it shrinks the bulk as well).
+ev_uniform = eig(ws.Wf .* sqrt(mean(d(:).^2)));
+uniform_re = max(real(ev_uniform));
+uniform_mean_re = max(real(eig(ws.Wf .* mean(d(:)))));
 
 c = struct('R_eff', pred.R_eff, 'null_re', null_re, 'null_abs', null_abs, ...
     'q95_re', quantile_(null_re, 0.95), 'q95_abs', quantile_(null_abs, 0.95), ...
     'med_re', median(null_re), 'med_abs', median(null_abs), ...
     'obs_re', obs_re, 'shuf_re', shuf_re, ...
     'obs_pct_in_shuffle', mean(shuf_re < obs_re), ...
-    'typemean_re', typemean_re, 'uniform_re', uniform_re);
+    'typemean_re', typemean_re, 'uniform_re', uniform_re, 'uniform_mean_re', uniform_mean_re, ...
+    'ev_M', ev_M, 'ev_null', ev_null, 'ev_uniform', ev_uniform);
 end
 
 function q = quantile_(x, p)
