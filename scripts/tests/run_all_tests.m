@@ -129,8 +129,9 @@ function names = slow_test_names()
 % results equal pool results only to round-off (the client is multithreaded,
 % pool workers are not), so the byte-exact test_regression_stages and
 % test_regression_bundle NEED A POOL UP, of any size; test_regression_rapid
-% passes either way. test_pool_module is the exception to all this: it
-% restarts the session's pool several times and puts it back as it found it.
+% passes either way. The pool module's own test left this repository with
+% the module (2026-11-19): run('<MatlabAgenticOrg>/tests/test_pool_module.m').
+% What stays here, in the quick list, is test_pool_entry_points (no pool).
     names = {
         'test_regression_bundle'            % ~50 min  the FULL regression: every stage and figure (32 + 18 min)
         'test_numerics_verification_stage'  % 737 s  the numerics stage at 'fast', five checks x 3 conditions
@@ -138,7 +139,6 @@ function names = slow_test_names()
         'test_lyapunov_topk'                % 165 s  top-K against the ode45 full-spectrum QR reference
         'test_sensitivity_refactor'         %  61 s  two sensitivity sweeps on a parallel pool
         'test_benettin_vs_qr'               %  50 s  SRNNModel2, n = 300, both methods
-        'test_pool_module'                  %  47 s  the pool module: opens, restarts and resizes the session's pool
         'test_select_conditions_figure'     % 120 s  cfg.conditions end to end on fig_lle_vs_rate; reads data/regression_fast/reference_post_refactor (SKIPs without it)
         'test_sweep_figures_conditions'     %  66 s  the sweep figures with a selection of conditions; needs the same regression run
         'test_RMTBlocks_predictions'        %  37 s  eigenvalue statistics over many draws

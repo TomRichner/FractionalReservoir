@@ -8,6 +8,13 @@ function projectRoot = setup_paths()
 % Optionally returns the project root, which is also recoverable elsewhere as
 %   project_root = fileparts(which('setup_paths'));
 %
+% Also puts the shared parallel-pool module on the path (pool_set,
+% pool_ensure, pool_restart, pool_release, pool_status). Since 2026-11-19
+% that module lives in the MatlabAgenticOrg repository, one clone per
+% machine, used by every MATLAB repository on it; use_matlab_agentic_org
+% (beside this file) finds the clone and errors with the fix when this
+% machine has not been set up.
+%
 % Deliberately does NOT genpath the project root: data/, figs/ and docs/ must
 % stay off the path (data/param_space/run_all_*/ holds copies of the launcher
 % scripts, which would otherwise shadow the originals in scripts/).
@@ -26,4 +33,5 @@ addpath(genpath(srcPath));
 if isfolder(scriptsPath)
     addpath(genpath(scriptsPath));
 end
+use_matlab_agentic_org();
 end
