@@ -47,6 +47,8 @@ function run_dir = run_all_paper_analyses(cfg)
 %                'param_space'); absent or empty = all three.
 %   cfg.eig_heatmap_examples   the eig-heatmap stage's examples; absent or
 %                empty = its default three.
+%   cfg.eig_heatmap_ritz_K     K of the eig-heatmap stage's Ritz pass (FD-033);
+%                absent or 0 = no pass. Set by with_ritz_overlay.
 % OPT-IN STAGES run only when cfg.stages names them, after the stages above;
 % "every stage" does not include them. paper_opt_in_stages lists them, and
 % each one's plan function documents the config fields it reads and checks
@@ -133,6 +135,13 @@ if isfield(cfg, 'eig_heatmap_examples') && ~isempty(cfg.eig_heatmap_examples)
             'cfg.eig_heatmap_examples must be a struct array with fields label and overrides (see run_eig_heatmap).');
     end
     eig_args = {'examples', ex};
+end
+% cfg.eig_heatmap_ritz_K (optional, FD-033; absent or 0 = no Ritz pass, the
+% stage as it always was) goes to run_eig_heatmap as its 'ritz_K': the
+% Jacobian projected on the top-K Lyapunov subspace at the sampled states.
+% No bundle sets it by default; with_ritz_overlay does, with the figures.
+if isfield(cfg, 'eig_heatmap_ritz_K') && ~isempty(cfg.eig_heatmap_ritz_K) && cfg.eig_heatmap_ritz_K > 0
+    eig_args = [eig_args, {'ritz_K', cfg.eig_heatmap_ritz_K}];
 end
 
 % WHICH CONDITIONS ARE SIMULATED (FD-030): cfg.run_conditions, a cell of
