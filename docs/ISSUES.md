@@ -1760,3 +1760,10 @@ repo, code on branch `eig-by-step-a8ca`.
   -0.41. The regime at 80 neurons depends on the seed and is not the
   500-neuron network's; whether that is acceptable for a supplementary
   figure is Tom's to decide.
+- **To check later (Tom, 2026-11-19):** "you can skip the regression tests
+  for now since we aren't on the pc. we can make a note in issues to check
+  it later." So on the workstation, before the next real run: 
+  `run_all_tests('test_regression_rapid')` and
+  `run_all_tests('test_regression_stages')` on commit `d227e95` or later.
+  If either fails there, the change to look at first is
+  `run_lyapunov_spectrum` (the stages tier calls it with its defaults).
