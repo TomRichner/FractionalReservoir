@@ -33,7 +33,12 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
 %                 [idx_all, t_lya, acc_start]; the class's lyapunov_sample_grid),
 %                 .jac_times (optional, @(S, Y, params) -> J(S) * Y without
 %                 assembling J; when given, jac_fn is never called),
-%                 .verbose (logical, default false)
+%                 .verbose (logical, default false),
+%                 .H_idx (optional; row indices into X at which to return
+%                 the PROJECTED JACOBIAN H = Q' J Q, see below; absent or
+%                 empty computes nothing and adds no field),
+%                 .H_return_Q (logical, default false: also return the
+%                 basis at those states)
 %
 %   OUTPUT struct R
 %     LE_spectrum            K x 1, sorted descending
@@ -56,6 +61,36 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
 %                            (computed when K <= 500)
 %     Q_final                N x K basis at the end (a warm start)
 %     lya_dt, lya_fs, seconds
+%   and, only when opts.H_idx is given:
+%     H_t                    K x K x n_s, the projected Jacobian at each
+%                            requested state, columns in the UNSORTED
+%                            (Gram-Schmidt) order of the basis: column j is
+%                            the j-th basis vector, so the leading k x k
+%                            block belongs to the top-k subspace. To compare
+%                            its diagonal with local_LE_spectrum_t, use
+%                            sort_idx (sorted column j is raw column
+%                            sort_idx(j)).
+%     H_idx, H_time          the requested rows of X and their times
+%     H_valid                n_s x 1; false (and H_t NaN) where a requested
+%                            state lies outside the propagated range
+%     Q_t                    N x K x n_s, the orthonormal basis at those
+%                            states (only with opts.H_return_Q)
+%
+%   THE PROJECTED JACOBIAN. Writing the tangent propagator as Phi = Q R,
+%   H = Q' J Q = (dR/dt) R^-1 + Q' dQ/dt: its diagonal is the instantaneous
+%   local Lyapunov rates, the trace of its leading k x k block is the sum of
+%   the top-k local rates, and its eigenvalues (the Ritz values of J on the
+%   tracked subspace) are complex, so they carry rotation as well as growth.
+%   They depend only on span(Q), not on the basis chosen within it. At a
+%   requested state INSIDE a segment the propagated Y is not orthonormal, so
+%   a thin QR of a copy of it (signs fixed as below) gives the basis a
+%   re-orthonormalisation at that instant would give: same span, same
+%   Gram-Schmidt order. H is then ONE Jacobian product at that state, exact
+%   for the propagated subspace and instantaneous. It is not the
+%   finite-interval form log(Q_k' Q_{k+1} R_k) / lya_dt, which averages over
+%   a segment and aliases rotation faster than pi / lya_dt. The propagated Y
+%   is never modified, so every other output is bit-identical with the option
+%   on or off (test_lyapunov_topk_ritz).
 %
 %   PROPAGATION. Heun (RK2) on the fiducial grid with the Jacobian taken at
 %   the STORED states at t_i and t_{i+1}: no interpolants, no adaptive
@@ -98,6 +133,25 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
 
     N  = size(X, 2);
     nt = size(X, 1);
+
+    % The projected Jacobian at requested states (opts.H_idx); off by default.
+    want_H = isfield(opts, 'H_idx') && ~isempty(opts.H_idx);
+    if want_H
+        H_idx = opts.H_idx(:);
+        if ~isnumeric(H_idx) || any(H_idx ~= round(H_idx)) || any(H_idx < 1) || any(H_idx > nt) ...
+                || numel(unique(H_idx)) ~= numel(H_idx)
+            error([pfx ':InvalidHIdx'], ...
+                'opts.H_idx must hold distinct integer row indices of X in [1, %d].', nt);
+        end
+        return_Q = isfield(opts, 'H_return_Q') && ~isempty(opts.H_return_Q) && opts.H_return_Q;
+        H_slot = zeros(nt, 1);                 % row of X -> slice of H_t (0 = not requested)
+        H_slot(H_idx) = 1:numel(H_idx);
+        if matrix_free
+            apply_J = @(S, Yk) jac_times(S, Yk, params);
+        else
+            apply_J = @(S, Yk) jac_fn(S, params) * Yk;
+        end
+    end
     if ~isscalar(K) || ~isnumeric(K) || ~isfinite(K) || K ~= round(K) || K < 1 || K > N
         error([pfx ':InvalidLyapunovK'], ...
             'lya_K must be an integer in [1, %d] (0 selects N); got %s.', N, mat2str(K));
@@ -131,6 +185,11 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
     elapsed     = 0;
     orth_defect_max = 0;
     check_orth  = K <= 500;
+    if want_H
+        H_t     = nan(K, K, numel(H_idx));
+        H_valid = false(numel(H_idx), 1);
+        if return_Q; Q_t = nan(N, K, numel(H_idx)); end
+    end
 
     J1 = [];                     % Jacobian at the segment's first grid point
     i_prev_end = -1;
@@ -141,6 +200,11 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
         Y = Q;
         if matrix_free
             for i = i0:i1 - 1
+                if want_H && H_slot(i) > 0 && ~H_valid(H_slot(i))
+                    [H_t(:, :, H_slot(i)), Qs] = projected_jacobian(Y, X(i, :)', apply_J, false);
+                    H_valid(H_slot(i)) = true;
+                    if return_Q; Q_t(:, :, H_slot(i)) = Qs; end
+                end
                 h  = t(i + 1) - t(i);
                 F0 = jac_times(X(i, :)', Y, params);
                 Yp = Y + h * F0;
@@ -151,6 +215,11 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
                 J1 = jac_fn(X(i0, :)', params);
             end
             for i = i0:i1 - 1
+                if want_H && H_slot(i) > 0 && ~H_valid(H_slot(i))
+                    [H_t(:, :, H_slot(i)), Qs] = projected_jacobian(Y, X(i, :)', apply_J, false);
+                    H_valid(H_slot(i)) = true;
+                    if return_Q; Q_t(:, :, H_slot(i)) = Qs; end
+                end
                 J0 = J1;
                 J1 = jac_fn(X(i + 1, :)', params);
                 h  = t(i + 1) - t(i);
@@ -177,6 +246,12 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
             orth_defect_max = max(orth_defect_max, norm(Q' * Q - eye(K)));
         end
         cond_t(k) = d(1) / d(end);
+        if want_H && H_slot(i1) > 0
+            % A requested state on the segment grid: Q is orthonormal here.
+            H_t(:, :, H_slot(i1)) = projected_jacobian(Q, X(i1, :)', apply_J, true);
+            H_valid(H_slot(i1)) = true;
+            if return_Q; Q_t(:, :, H_slot(i1)) = Q; end
+        end
 
         seg = t(i1) - t(i0);
         log_d = log(d);
@@ -221,7 +296,29 @@ function R = lyapunov_topk(X, t, fs, lya_dt, interval, lya_warmup, K, jac_fn, pa
     R.Q_final  = Q(:, order);
     R.lya_dt   = lya_dt;
     R.lya_fs   = 1 / lya_dt;
+    if want_H
+        R.H_t     = H_t;                % raw (Gram-Schmidt) column order, NOT sorted
+        R.H_idx   = H_idx;
+        R.H_time  = reshape(t(H_idx), [], 1);
+        R.H_valid = H_valid;
+        if return_Q; R.Q_t = Q_t; end
+    end
     R.seconds  = toc(t0_wall);
+end
+
+function [H, Qs] = projected_jacobian(Y, S, apply_J, is_orthonormal)
+% H = Qs' J(S) Qs for the orthonormal basis Qs of span(Y) in Y's column
+% (Gram-Schmidt) order, by one Jacobian product. Y is taken as Qs when the
+% caller states it is orthonormal already; otherwise a thin QR with diag(R)
+% made positive, the convention of the main loop.
+    if is_orthonormal
+        Qs = Y;
+    else
+        [Qs, Rs] = qr(Y, 0);
+        s = sign(diag(Rs)); s(s == 0) = 1;
+        Qs = Qs .* s';
+    end
+    H = Qs' * apply_J(S, Qs);
 end
 
 function [D, resolved] = kaplan_yorke_partial(lambda, N)
