@@ -49,6 +49,10 @@ function run_dir = run_all_paper_analyses(cfg)
 %                empty = its default three.
 %   cfg.eig_heatmap_ritz_K     K of the eig-heatmap stage's Ritz pass (FD-033);
 %                absent or 0 = no pass. Set by with_ritz_overlay.
+%   cfg.local_lyapunov_spectra_n_samples   states of the local-Lyapunov
+%                stage's own run at which to save the Jacobian's spectra and
+%                the projected Jacobian of its top-K pass (FD-034); absent or
+%                0 = none. Set by with_switch_spectra.
 % OPT-IN STAGES run only when cfg.stages names them, after the stages above;
 % "every stage" does not include them. paper_opt_in_stages lists them, and
 % each one's plan function documents the config fields it reads and checks
@@ -294,7 +298,10 @@ end
 % ll_preset, resolved in the pre-flight above). Every stage takes the
 % bundle's simulated conditions, cond_args (empty when it names none).
 ll_args={};
-ll_fields={'K','T','step_duration_s','accumulation_start_s','warmup_s','simulation_start_s'};
+% cfg.local_lyapunov_spectra_n_samples (optional, FD-034; absent or 0 = the
+% stage as it always was) is run_local_lyapunov's 'spectra_n_samples'. No
+% bundle sets it by default; with_switch_spectra does, with the figures.
+ll_fields={'K','T','step_duration_s','accumulation_start_s','warmup_s','simulation_start_s','spectra_n_samples'};
 for j=1:numel(ll_fields)
     key=['local_lyapunov_' ll_fields{j}];
     if isfield(cfg,key), ll_args=[ll_args,{ll_fields{j},cfg.(key)}]; end %#ok<AGROW>

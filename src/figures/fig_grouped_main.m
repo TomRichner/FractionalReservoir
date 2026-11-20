@@ -50,6 +50,10 @@ arguments
     cfg.ritz_scaling (1,:) char = 'raw'
     cfg.ritz_inset (1,1) logical = false
     cfg.ritz_style (1,:) char = 'density'
+    % Group 3 only (FD-034): 'local_lyapunov' takes the heat map and its
+    % Ritz values from the switching run of the local_lyapunov stage
+    % (run_local_lyapunov's spectra_n_samples); saved with _switch in the tag.
+    cfg.spectra_source (1,:) char {mustBeMember(cfg.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'
     cfg.svg (1,1) logical = false   % also save an SVG beside the PNG and .fig
 end
 setup_paths();
@@ -76,7 +80,8 @@ switch group
         sources=a.source; notes=a.notes;
     case 3
         a=fig_main3_stability(cfg.run_dir,cfg.conditions,'show_lambda_row',cfg.show_lambda_row, ...
-            'ritz_overlay',cfg.ritz_overlay,'ritz_k',cfg.ritz_k,'ritz_scaling',cfg.ritz_scaling,'ritz_inset',cfg.ritz_inset,'ritz_style',cfg.ritz_style);
+            'ritz_overlay',cfg.ritz_overlay,'ritz_k',cfg.ritz_k,'ritz_scaling',cfg.ritz_scaling,'ritz_inset',cfg.ritz_inset,'ritz_style',cfg.ritz_style, ...
+            'spectra_source',cfg.spectra_source);
         fig.Position(3)=fig.Position(3)*a.width_scale;
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
@@ -185,6 +190,7 @@ if group==5, style_main5_grouped(fig,margin_names,gain_names); end
 if group==6, style_main6_grouped(fig,tau_names); end
 tag=sprintf('Fig_Main%d_Grouped',group);
 if group==3 && ~cfg.show_lambda_row, tag=[tag '_noC']; end
+if group==3 && strcmp(cfg.spectra_source,'local_lyapunov'), tag=[tag '_switch']; end
 if group==3 && cfg.ritz_overlay
     tag=[tag '_ritz'];
     if ~strcmp(cfg.ritz_style,'density'), tag=[tag '_' cfg.ritz_style]; end

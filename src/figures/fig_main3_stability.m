@@ -33,6 +33,14 @@ function out=fig_main3_stability(run_dir,conditions,opts)
 % points and ticks are children of the copied axes and come with them, and
 % each inset is put back in the same place within its panel's plot box. The
 % eig_heatmap stage must have been run with the Ritz pass.
+%
+% SPECTRA_SOURCE (FD-034, default 'eig_heatmap': the figure as it was).
+% 'local_lyapunov' takes the heat map, and its Ritz overlay, from the states
+% run_local_lyapunov sampled along the switching run itself
+% ('spectra_n_samples'; fig_eig_heatmap's option of the same name), so the
+% expansion row and the heat-map row are one trajectory and one top-K pass:
+% the Ritz values are the instantaneous rates, with rotation, of the
+% directions whose positive local rates the expansion row sums.
 arguments
     run_dir char
     conditions = {}
@@ -42,6 +50,7 @@ arguments
     opts.ritz_scaling (1,:) char = 'raw'
     opts.ritz_inset (1,1) logical = false
     opts.ritz_style (1,:) char = 'density'
+    opts.spectra_source (1,:) char {mustBeMember(opts.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'
 end
 show_lambda=opts.show_lambda_row;
 % Row geometry, [y height] in normalized figure units, and the canvas height.
@@ -62,7 +71,7 @@ if opts.ritz_overlay
     ritz_args={'ritz_overlay',true,'ritz_k',opts.ritz_k,'ritz_scaling',opts.ritz_scaling,'ritz_inset',opts.ritz_inset,'ritz_style',opts.ritz_style};
 end
 a=fig_eig_heatmap('run_dir',run_dir,'save',false,'visible',false,'density_scale','loglog', ...
-    'conditions',names,ritz_args{:});
+    'conditions',names,ritz_args{:},'spectra_source',opts.spectra_source);
 fig=figure('Visible','off','Color','w','Position',[40 40 1450*width_scale fig_h]);
 old=findall(a.figs,'Type','axes');
 % The Ritz insets are axes of their own, not tiles; they follow their panel below.
@@ -205,6 +214,12 @@ if opts.ritz_overlay
         'are the band of slow single-neuron adaptation modes, not the network''s collective modes. Numbers and how to read them: the ' ...
         'table fig_eig_heatmap writes beside its own figure (fig_eig_heatmap_ritz*_table.md).'], ...
         opts.ritz_k,opts.ritz_scaling,opts.ritz_inset);
+end
+if strcmp(opts.spectra_source,'local_lyapunov')
+    % Said last, because it replaces the "separate examples" statement above.
+    notes{end+1}=sprintf(['spectra_source local_lyapunov (FD-034): the heat map and its Ritz values are NOT a separate example. ' ...
+        'They are taken at states of the switching run of the expansion row, and the Ritz values come from the top-%d pass ' ...
+        'whose positive local rates that row sums.'],D.settings.K);
 end
 out=struct('figs',fig,'files',{{}},'source',{{a.source,f}},'notes',{notes},'width_scale',width_scale);
     function ax=newaxis(row,col,y,height)

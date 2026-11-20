@@ -97,6 +97,18 @@ function out = fig_eig_heatmap(cfg)
 % multiple-timescale network the raw points spread over several 1/s where
 % the type_sd points sit within a few tenths of -0.1 1/s (2026-11-19).
 %
+% SPECTRA_SOURCE (FD-034; 'eig_heatmap' by default, the figure as it was).
+% 'local_lyapunov' draws the same figure from the states run_local_lyapunov
+% sampled along its switching-input run ('spectra_n_samples';
+% <run_dir>/local_lyapunov/local_lyapunov_spectra.mat): the density is of
+% the Jacobian at states of that run, and the Ritz values are those of the
+% top-K pass whose local rates the composite Figure 3 plots in its expansion
+% row, so the diagonal of each H is the instantaneous value of those rates.
+% Saved under fig_eig_heatmap_switch (with the overlay's suffixes), and the
+% table gains a section on the shared pass: how the diagonal of H compares
+% with the pass's interval rates, the first against the second half of the
+% window, and the numbers by input step.
+%
 % PLOTTING HALF ONLY. run_eig_heatmap does the sampling and writes
 % eig_heatmap_data.mat, so the look can be iterated without re-simulating.
 %
@@ -121,6 +133,7 @@ arguments
     cfg.ritz_tick_label (1,1) logical = false    % print what the exponent ticks are on each panel
     cfg.ritz_inset   (1,1) logical = false
     cfg.ritz_inset_xlim double = []              % real-axis range of the inset (1/s); [] = chosen per condition
+    cfg.spectra_source (1,:) char {mustBeMember(cfg.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'   % which stage sampled the states (FD-034)
 end
 
 setup_paths();
@@ -133,10 +146,18 @@ st           = manuscript_style(); %#ok<NASGU>
 % so. The fix added the run directory but KEPT a data/eig_heatmap fallback, which
 % is the same failure one step further out; that tier is now gone. Pass the
 % standalone location AS run_dir, or pass data_file directly.
-data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
-    {fullfile(cfg.run_dir, 'eig_heatmap')}, ...
-    'eig_heatmap_data.mat', ...
-    'Run run_eig_heatmap first');
+switch cfg.spectra_source
+    case 'eig_heatmap'
+        data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
+            {fullfile(cfg.run_dir, 'eig_heatmap')}, ...
+            'eig_heatmap_data.mat', ...
+            'Run run_eig_heatmap first');
+    case 'local_lyapunov'
+        data_file = resolve_data_file(cfg.data_file, cfg.run_dir, ...
+            {fullfile(cfg.run_dir, 'local_lyapunov')}, ...
+            'local_lyapunov_spectra.mat', ...
+            'Run run_local_lyapunov with ''spectra_n_samples'' > 0 first');
+end
 D = load(data_file);
 if isfield(D, 'cond_names')
     held = D.cond_names;
@@ -273,6 +294,7 @@ if ~cfg.visible; set(fig, 'Visible', 'off'); end
 
 %% --- Save -------------------------------------------------------------------
 fig_tag = 'fig_eig_heatmap';
+if strcmp(cfg.spectra_source, 'local_lyapunov'); fig_tag = [fig_tag '_switch']; end
 if cfg.ritz_overlay
     fig_tag = [fig_tag '_ritz'];
     if ~strcmp(cfg.ritz_style, 'density'); fig_tag = [fig_tag '_' cfg.ritz_style]; end
@@ -545,9 +567,15 @@ L = [L, scale_lines];
 L{end + 1} = '';
 L = [L, ritz_diagnostics_section(D, idx, cond_names, titles, cfg)];
 L{end + 1} = '';
+if isfield(D, 'state_step') && isfield(R1, 'local_rates_before')
+    L = [L, shared_pass_section(D, idx, titles, ritz)];
+    L{end + 1} = '';
+end
 L{end + 1} = '## Caption paragraph, to adapt';
 L{end + 1} = '';
-L{end + 1} = sprintf(['Gray: density of the eigenvalues of the Jacobian at %d states sampled along a baseline simulation ' ...
+trajectory = 'a baseline simulation';
+if isfield(D, 'settings') && isfield(D.settings, 'trajectory'); trajectory = D.settings.trajectory; end
+L{end + 1} = sprintf(['Gray: density of the eigenvalues of the Jacobian at %d states sampled along ' trajectory ' ' ...
     '(darker = more). Color: at the same states, the eigenvalues of the Jacobian restricted to the %d directions the ' ...
     'Lyapunov computation tracks (Ritz values), drawn as a density on the same bins; these are instantaneous growth ' ...
     'and rotation rates of the tracked directions, not eigenvalues of the Jacobian. Black ticks on the bottom edge: ' ...
@@ -645,6 +673,95 @@ L{end + 1} = ['Columns. **residual**: ||J Q - Q H||_F / ||J Q||_F, 0 for a subsp
     'the Frobenius norms of the strictly lower triangle of H (which is that of S) and of the strictly upper triangle of ' ...
     'T. **coupling**: the largest sqrt(|T_ij S_ji|), the scale by which feed-forward weight times frame turning moves ' ...
     'an eigenvalue of H off its diagonal.'];
+end
+
+function L = shared_pass_section(D, idx, titles, ritz)
+% FD-034: the states were sampled along the local_lyapunov stage's own run
+% and H comes from the pass whose local rates Figure 3 plots. Three tables:
+% the diagonal of H against the pass's interval rates, the first against the
+% second half of the window, and the numbers by input step.
+L = {};
+L{end + 1} = '## The shared pass: states of the switching run, H from the pass whose local rates are plotted';
+L{end + 1} = '';
+L{end + 1} = sprintf(['The %d states are evenly spaced over [%g, %g] s of %s, and H = Q''JQ comes from the top-%d pass ' ...
+    'whose local rates the expansion row of Figure 3 sums (the same exponents bit for bit; run_local_lyapunov). ' ...
+    'The diagonal of H is therefore the instantaneous value of those rates, and at each state the real parts of ' ...
+    'the Ritz values sum to its trace.'], numel(D.state_times), D.state_times(1), D.state_times(end), ...
+    D.settings.trajectory, D.ritz_by_cond{idx(1)}.K);
+L{end + 1} = '';
+L{end + 1} = ['| Condition | sum Re(Ritz) - trace(H): max abs (1/s) | diag(H) vs interval rate: correlation | median abs diff (1/s) | ' ...
+    '95th pct. abs diff (1/s) | interval rates before vs after: median abs diff (1/s) | ' ...
+    'expansion (bits/s), instantaneous vs interval: correlation | median instantaneous | median interval | median abs diff |'];
+L{end + 1} = '|---|---|---|---|---|---|---|---|---|---|';
+S = cell(1, numel(idx));
+for i = 1:numel(idx)
+    R = D.ritz_by_cond{idx(i)}; P = ritz{i};
+    st = P.states;
+    dg = cell2mat(arrayfun(@(s) diag(R.H(:, :, s, P.sc))', st(:), 'UniformOutput', false));   % states x K
+    bef = R.local_rates_before(st, :); aft = R.local_rates_after(st, :);
+    avg = mean(cat(3, bef, aft), 3, 'omitnan');             % the interval rate around the state
+    ok = isfinite(avg);
+    ad = abs(dg(ok) - avg(ok));
+    both = isfinite(bef) & isfinite(aft);
+    exp_inst = sum(max(dg, 0), 2) / log(2);
+    exp_int  = mean([sum(max(bef, 0), 2), sum(max(aft, 0), 2)], 2, 'omitnan') / log(2);   % NaN rows sum to 0: mask below
+    exp_int(~any(isfinite(aft), 2)) = sum(max(bef(~any(isfinite(aft), 2), :), 0), 2) / log(2);
+    exp_int(~any(isfinite(bef), 2)) = sum(max(aft(~any(isfinite(bef), 2), :), 0), 2) / log(2);
+    tr_err = max(abs(sum(real(P.z), 1) - P.trace_k));
+    L{end + 1} = sprintf('| %s | %.2g | %.3f | %.3g | %.3g | %.3g | %.3f | %.3g | %.3g | %.3g |', titles{i}, tr_err, ...
+        corr_of(dg(ok), avg(ok)), median(ad), quantile(ad, 0.95), median(abs(bef(both) - aft(both))), ...
+        corr_of(exp_inst, exp_int), median(exp_inst), median(exp_int), median(abs(exp_inst - exp_int))); %#ok<AGROW>
+    S{i} = struct('dg', dg, 'exp_inst', exp_inst, 'exp_int', exp_int, 't', R.t(st), 'step', D.state_step(st));
+end
+L{end + 1} = '';
+L{end + 1} = ['Columns. **diag(H) vs interval rate**: every tracked direction at every state; the interval rate is the ' ...
+    'pass''s local rate averaged over the two re-orthonormalization intervals that end and start at the state (one where ' ...
+    'the run has only one). They are not the same quantity (an instant against an average over the interval), and ' ...
+    '**before vs after** gives the scale: how much the interval rate itself changes from one interval to the next. ' ...
+    '**expansion**: the sum of the positive rates over the tracked directions divided by log 2, what the expansion row ' ...
+    'plots, from the diagonal of H (instantaneous) and as plotted for the intervals ending and starting at the state (their mean).'];
+L{end + 1} = '';
+L{end + 1} = 'First against second half of the window (the basis is aligned before the window; an unconverged basis would show as a drift):';
+L{end + 1} = '';
+L{end + 1} = '| Condition | half | states | median Re(Ritz) (1/s) | Ritz Re > 0 | local rates > 0 | residual, median | full J: eigenvalues Re > 0, median | x share, median |';
+L{end + 1} = '|---|---|---|---|---|---|---|---|---|';
+for i = 1:numel(idx)
+    P = ritz{i}; t = S{i}.t; mid = (D.state_times(1) + D.state_times(end)) / 2;
+    halves = {t <= mid, t > mid}; label = {'first', 'second'};
+    for h = 1:2
+        L{end + 1} = group_row(sprintf('| %s | %s', titles{i}, label{h}), P, S{i}, halves{h}); %#ok<AGROW>
+    end
+end
+L{end + 1} = '';
+L{end + 1} = sprintf('By input step (a new input every %g s; a state at a switch instant is counted with the step that ends there):', ...
+    D.settings.step_duration_s);
+L{end + 1} = '';
+L{end + 1} = ['| Condition | step | states | median Re(Ritz) (1/s) | Ritz Re > 0 | local rates > 0 | residual, median | ' ...
+    'full J: eigenvalues Re > 0, median | x share, median | expansion, instantaneous: median (bits/s) |'];
+L{end + 1} = '|---|---|---|---|---|---|---|---|---|---|';
+for i = 1:numel(idx)
+    for q = unique(S{i}.step(:))'
+        in = S{i}.step(:) == q;
+        L{end + 1} = [group_row(sprintf('| %s | %d', titles{i}, q), ritz{i}, S{i}, in), ...
+            sprintf(' %.3g |', median(S{i}.exp_inst(in)))]; %#ok<AGROW>
+    end
+end
+end
+
+function row = group_row(lead, P, S, in)
+% One row of the shared-pass tables: the states selected by `in`.
+in = in(:)';
+z = P.z(:, in); dg = S.dg(in, :);
+res = NaN; if P.has_gram; res = median(P.state.residual(in), 'omitnan'); end
+n_pos = NaN; if ~isempty(P.full); n_pos = median(P.full.n_positive(in)); end
+row = sprintf('%s | %d | %+.3f | %.1f%% | %.1f%% | %.3f | %g | %.3f |', lead, nnz(in), median(real(z(:))), ...
+    100 * mean(real(z(:)) > 0), 100 * mean(dg(:) > 0), res, n_pos, median(P.x_share(in)));
+end
+
+function c = corr_of(a, b)
+% Pearson correlation of two samples (no toolbox).
+a = a(:) - mean(a(:)); b = b(:) - mean(b(:));
+c = (a' * b) / sqrt((a' * a) * (b' * b));
 end
 
 function d = matched_distance(a, b)
