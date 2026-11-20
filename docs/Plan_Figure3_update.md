@@ -11,6 +11,11 @@ history is `ISSUES.md` FD-033 and FD-034.
 
 ### 1. Timing of the switching run (Tom, 2026-11-20)
 
+**Released the same day** ("apply the new timing. I want that done now"):
+being applied in `mu7chain_config.m` and run at `essential` into
+`figs/fd034_mu7chain_essential_switchK100_t0/`. The rest of this plan (the
+bundle default, the `fastmedium` run, the caption) still waits for Tom's go.
+
 | Interval | What happens |
 |---|---|
 | −15 to −10 s | The network runs with no stimulus; nothing is tracked. |
