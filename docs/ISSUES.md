@@ -1848,3 +1848,28 @@ machine needs that repo cloned and `setup_repo.py` run once.
 - **If adopted:** the Figure 3 caption's "In separate baseline
   simulations" and "50 tracked QR directions ($q_{50}$)" change, and the
   quoted growth rates must come from the run that makes the figure.
+- **FD-034 result (2026-11-20, built; opt-in, not in any bundle run):**
+  commits `b90990f` (the eig-heatmap stage's spectra sampling and Ritz
+  pass become shared functions, `jacobian_spectra_at_states`,
+  `ritz_pass_at_states`) and `3eb72b6` (`run_local_lyapunov`
+  `'spectra_n_samples'`, `'spectra_source'` in `fig_eig_heatmap`,
+  `fig_main3_stability`, `fig_grouped_main`, `with_switch_spectra`,
+  `test_local_lyapunov_spectra`). States at t = 1, 2, ..., 40 s. The class
+  cannot return H from its own pass and `SRNNCellTypePairs.m` was off
+  limits (another session's uncommitted edits), so the stage repeats the
+  top-100 pass through `projected_jacobian` and errors unless the two
+  passes' exponents are bit-identical (they were); folding `H_idx` into
+  `compute_lyapunov` would remove the repeat. Gates on the MacBook:
+  option off equals HEAD at `essential` (`isequaln`), covering tests
+  pass; exact tiers deferred to the workstation; `with_switch_spectra`
+  through the two bundle entry points not run end to end. Checks: the
+  Ritz real parts sum to trace(H) to 1e-13; H's diagonal against the
+  pass's 50-ms rates correlates 0.986 to 0.992; sum of positive diagonal
+  entries against panel B's plotted value 0.951 / 0.995 / 0.980 (none /
+  1TS / chained MTS); first and second half of the window agree, so 15 s
+  of alignment is enough for the distribution (not for rank order inside
+  the chained band, -0.080 to -0.111 1/s). At K = 100: median Ritz real
+  part -8.95 / -0.456 / -0.097 1/s; Ritz Re > 0 12.9 / 7.8 / 7.2 %;
+  full-Jacobian eigenvalues Re > 0 per state, median 8 / 4 / 0; x share
+  1.00 / 0.149 / 0.032. Stage 13.7 min on 4 workers; only the dense eig
+  step uses the pool. Whether this replaces Figure 3 is Tom's call.
