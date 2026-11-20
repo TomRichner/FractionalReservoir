@@ -1802,3 +1802,23 @@ repo for the shared `MatlabAgenticOrg` repository (commits `e11aa4e`,
 `91f7d17`, `4c75bdb`; Tom's request). FD-017's text above still describes
 it under `src/util/`; `CLAUDE.md` has the current arrangement. Each
 machine needs that repo cloned and `setup_repo.py` run once.
+- **FD-033 result (2026-11-19, built; opt-in, not in any bundle run):**
+  commits `1ea6379`, `2f90ec5`, `b22c491`, `d996819`, `8708aec`,
+  `0f3c049`, `53640a1`; the real-axis histogram Tom asked for alongside
+  it, `e3f833d` (`fig_eig_real_histogram`). Gates on the MacBook: HEAD
+  copies of `lyapunov_topk` and of the default `run_eig_heatmap` call
+  identical to the edited ones, tolerance tier and the covering tests
+  pass, new tests `test_lyapunov_topk_ritz` and `test_ritz_overlay_bundle`
+  pass; the exact tiers are deferred to the workstation with FD-032's.
+  **What the overlay turned out to be:** the tracked subspace is far from
+  invariant under the instantaneous Jacobian (median residual 0.56 / 0.75
+  / 0.88 for no adaptation / 1TS / chained MTS), so the Ritz values are
+  instantaneous rates of the tracked directions, not approximations of
+  eigenvalues. Their median sits on the slow band in the adapting
+  networks (-0.098 1/s for chained MTS) and the tracked subspace holds
+  little x (0.057), in either norm; how many lie right of zero depends on
+  the norm (11.5 % raw, 0.4 % scaled by variable type, chained MTS). The
+  full Jacobian itself has eigenvalues right of zero at 27 of 40 sampled
+  states of the stable chained MTS network (rightmost +0.4 median, +1.3
+  max). Tom's choices: density drawing of the Ritz values, raw norm, no
+  text on the panels, one title. Whether it goes into Figure 3 is open.
