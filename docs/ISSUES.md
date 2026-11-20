@@ -1767,3 +1767,38 @@ repo, code on branch `eig-by-step-a8ca`.
   `run_all_tests('test_regression_stages')` on commit `d227e95` or later.
   If either fails there, the change to look at first is
   `run_lyapunov_spectrum` (the stages tier calls it with its defaults).
+
+### FD-033 Ritz overlay for Figure 3: the Jacobian projected on the leading Lyapunov directions
+
+- **Status:** in progress (Tom's request, 2026-11-19: "build the Ritz
+  overlay for figure 3").
+- **What:** the top-K Lyapunov computation carries an orthonormal basis Q;
+  H = Q' J Q at a sampled state has the local Lyapunov rates on its
+  diagonal and complex eigenvalues (Ritz values) that carry rotation as
+  well as growth. Drawn over the eigenvalue density of Figure 3 at the
+  same sampled states, they show where the directions the exponents
+  measure sit in the complex plane. Specification:
+  `../StochasticPlasticDynamicalSystemPaper/docs/future_directions/adaptation_reins_in_outlier_eigenvalues/Complex_spectrum_from_the_Lyapunov_computation.md`.
+- **Done means:** `lyapunov_topk` returns H at chosen stored states as an
+  option, every existing output bit-identical with it on or off;
+  `run_eig_heatmap` makes the Ritz pass when asked (off by default, an old
+  run directory still draws); `fig_eig_heatmap` and the composite Figure 3
+  draw the overlay as an option under a separate file tag; tests on a
+  linear system with known complex eigenvalues, the trace identity on the
+  model, and the figure with and without the overlay; one essential-size
+  run of the stage with both versions drawn.
+- **Lead's decisions:** exact H from one Jacobian product at the sampled
+  state (not the interval average from the QR factors, which aliases above
+  10 Hz); a second top-K pass with K = 50 in every condition, the existing
+  pass untouched; raw and scaled-by-variable-type versions both computed,
+  scales per condition; opt-in and a separate `_ritz` file until Tom has
+  seen it; condition colors; an optional inset on the real axis near zero.
+  Expected at 500 neurons, and to be stated with the figure: in the
+  adapting conditions all 50 directions are slow single-neuron adaptation
+  modes, so their Ritz values sit on the real axis near -0.1 1/s.
+
+**Note, 2026-11-19 (not an issue):** the pool module of FD-017 left this
+repo for the shared `MatlabAgenticOrg` repository (commits `e11aa4e`,
+`91f7d17`, `4c75bdb`; Tom's request). FD-017's text above still describes
+it under `src/util/`; `CLAUDE.md` has the current arrangement. Each
+machine needs that repo cloned and `setup_repo.py` run once.
