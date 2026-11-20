@@ -312,10 +312,10 @@ model.run();
 
 J_times = linspace(lya_T_interval(1), T_range(2), n_samples);
 idx = sample_indices(model.t_out, J_times);
-[evals, omega, alpha, t_used] = sample_eigenvalues(model, idx, cfg.use_parallel);
+[evals, omega, alpha, t_used] = jacobian_spectra_at_states(model, idx, cfg.use_parallel);
 ritz = [];
 if cfg.ritz_K > 0
-    ritz = ritz_pass(model, idx, cfg.ritz_K, ritz_scalings, evals);   % the same states as the spectra
+    ritz = ritz_pass_at_states(model, idx, cfg.ritz_K, ritz_scalings, evals);   % the same states as the spectra
 end
 
 % Mean rate over the sampled window (the plot_data grid may be decimated).
@@ -343,67 +343,6 @@ if cfg.disk_gains || cfg.ritz_K > 0
     end
     r.disk = struct('n', model.n, 'tau_d', params.tau_d, 'R', model.R, 'rms_gain', rms_gain, 't', t_used);
 end
-end
-
-function R = ritz_pass(model, idx, K, scalings, evals)
-% The Jacobian projected on the top-K Lyapunov subspace at the sampled
-% states (rows idx of the stored trajectory), once per state scaling; see
-% the header. The initial basis is seeded as the model's own top-K pass is.
-% evals: the pooled eigenvalues of the full Jacobian at the same states (N
-% per state, in the order of idx), for the per-state comparison.
-cls    = class(model);
-params = model.get_params();
-seed   = model.rng_seeds(1) + 424242;
-rows   = min(idx):numel(model.t_out);                 % the sampled window, for the scales
-scales = feval([cls '.state_type_scales'], model.S_out, rows, params);
-for s = 1:numel(scalings)
-    opts = struct('seed', seed);
-    if strcmp(scalings{s}, 'type_sd'); opts.state_scale = scales.d; end
-    P = feval([cls '.projected_jacobian'], model.S_out, model.t_out, model.fs, idx, K, params, opts);
-    if s == 1
-        n_s = numel(idx); n_sc = numel(scalings);
-        R = struct('K', P.K, 'N', P.N, 'scalings', {scalings}, ...
-            'H', nan(P.K, P.K, n_s, n_sc), 'values', complex(nan(P.K, n_s, n_sc)), ...
-            'valid', P.valid, 'sample_idx', P.sample_idx, 't', P.t, ...
-            'LE_spectrum', nan(P.K, n_sc), 'n_positive', nan(1, n_sc), 'cond_max', nan(1, n_sc), ...
-            'x_fraction', nan(n_s, P.K, n_sc), 'block_fractions', nan(n_s, 4, n_sc), ...
-            'scales', rmfield(scales, 'd'), 'warmup_s', P.warmup_s, 'interval', P.interval, ...
-            'lya_dt', P.lya_dt, 'seed', seed, 'seconds', nan(1, n_sc), ...
-            'JQ_gram', nan(P.K, P.K, n_s, n_sc), 'full_num_abscissa', nan(n_s, n_sc));
-        ev = reshape(evals, P.N, n_s);
-        R.full_max_re = max(real(ev), [], 1)';
-        R.full_n_positive = sum(real(ev) > 0, 1)';
-    end
-    R.H(:, :, :, s) = P.H;
-    R.JQ_gram(:, :, :, s) = P.JQ_gram;
-    for k = 1:numel(idx)
-        % Numerical abscissa of the full Jacobian in this norm's coordinates.
-        J = feval([cls '.compute_Jacobian_fast'], model.S_out(idx(k), :)', params);
-        if isfield(opts, 'state_scale'); J = (1 ./ opts.state_scale) .* J .* opts.state_scale'; end
-        R.full_num_abscissa(k, s) = largest_symmetric_eigenvalue(J);
-    end
-    for k = find(P.valid)'
-        R.values(:, k, s) = eig(P.H(:, :, k));
-    end
-    R.valid = R.valid & P.valid;
-    R.LE_spectrum(:, s) = P.LE_spectrum;
-    R.n_positive(s) = P.n_positive;
-    R.cond_max(s) = P.cond_max;
-    R.x_fraction(:, :, s) = P.x_fraction;
-    R.block_fractions(:, :, s) = P.block_fractions;
-    R.seconds(s) = P.seconds;
-end
-end
-
-function w = largest_symmetric_eigenvalue(J)
-% max eig((J + J')/2): sparse Lanczos, dense when that does not converge.
-Js = (J + J') / 2;
-w = NaN;
-if size(Js, 1) > 400
-    [~, w, flag] = eigs(sparse(Js), 1, 'largestreal', 'Tolerance', 1e-8, 'MaxIterations', 500, 'Display', false);
-    if flag ~= 0; w = NaN; end
-end
-if isnan(w); w = max(eig(full(Js))); end
 end
 
 function idx = sample_indices(t_out, J_times_sec)
@@ -437,67 +376,6 @@ function mu = preset_mu_EE(preset_name)
 d = srnn_param_preset(preset_name);
 mu = d.mu_tilde_relative;
 mu = mu(1, 1);                      % (post, pre) = (E, E); a 1 x C row broadcasts, so (1) is E too
-end
-
-%% ------------------------------------------------------------------------
-function [ev_all, omega, alpha, t_used] = sample_eigenvalues(model, idx, use_parallel)
-% Pool the Jacobian eigenvalues at the requested rows of the stored
-% trajectory (sample_indices), and per state the
-% NUMERICAL ABSCISSA omega = max eig((J_xx + J_xx')/2) beside the SPECTRAL
-% ABSCISSA alpha = max real eig(J_xx) of the DENDRITIC BLOCK
-% J_xx = (-I + W diag(theta'(x)))/tau_d -- the rate-network Jacobian of
-% Hennequin et al., with the adaptation and depression states held fixed.
-% omega bounds the instantaneous growth rate of a perturbation of x
-% (d/dt ||dx|| <= omega ||dx||), so omega > alpha is the margin by which the
-% non-normal recurrent coupling can amplify transiently even when every
-% eigenvalue decays (Trefethen & Embree). omega >= alpha always.
-%
-% WHY THE x BLOCK ONLY (measured 2026-09-12): on the FULL Jacobian the
-% numerical abscissa is 50-180 /s against a spectral abscissa of 0-10, and it
-% ranks the regimes by how their state coordinates are scaled rather than by
-% dynamics -- the symmetric part mixes rows in units of 1/tau_d = 10 (x) with
-% rows in units of 1/tau_a and 1/tau_rel (a, b), and the (x,a) vs (a,x)
-% blocks differ by a factor W/(c tau_d) against 1/tau_a. The numerical
-% abscissa is not invariant to a diagonal rescaling of the state, so it is
-% only meaningful on a block with one unit. The full-J eigenvalues are still
-% pooled for the heatmap as before.
-%
-% Resolves compute_Jacobian_fast BY CLASS NAME, so one implementation serves
-% both model classes. They do not share a state layout -- SRNNCellTypePairs
-% carries b-states per ROUTE where SRNNModel2 carries them per population -- so
-% indexing S_out by hand would be class-specific and fragile; the x rows are
-% the LAST n of the state on both classes.
-cls    = class(model);
-params = model.get_params();
-S_out  = model.S_out;
-t_out  = model.t_out;
-n      = model.n;
-
-t_used = t_out(idx);
-t_used = t_used(:);
-
-n_idx = numel(idx);
-ev = cell(1, n_idx);
-omega = zeros(n_idx, 1);
-alpha = zeros(n_idx, 1);
-if use_parallel
-    parfor k = 1:n_idx
-        J = full(feval([cls '.compute_Jacobian_fast'], S_out(idx(k), :)', params));
-        ev{k} = eig(J);
-        Jxx = J(end - n + 1:end, end - n + 1:end);
-        alpha(k) = max(real(eig(Jxx)));
-        omega(k) = max(eig((Jxx + Jxx') / 2));
-    end
-else
-    for k = 1:n_idx
-        J = full(feval([cls '.compute_Jacobian_fast'], S_out(idx(k), :)', params));
-        ev{k} = eig(J);
-        Jxx = J(end - n + 1:end, end - n + 1:end);
-        alpha(k) = max(real(eig(Jxx)));
-        omega(k) = max(eig((Jxx + Jxx') / 2));
-    end
-end
-ev_all = vertcat(ev{:});
 end
 
 function s = pretty(name)
