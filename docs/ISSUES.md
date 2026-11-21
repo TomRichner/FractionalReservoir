@@ -2095,3 +2095,28 @@ machine needs that repo cloned and `setup_repo.py` run once.
   imported panels, do not follow the map and need a decision or a change
   by hand. Before and after PNGs:
   `../FractionalReservoir_wt_fd044/figs/fd044_before_after/`.
+- **Wave 1 merged (2026-11-21):** FD-040 (`62643f2`, `112320c`), FD-041
+  (`051dc34`, `e1505a1`, `0ec1d90`), FD-042 (`f23d8b6`, `9b92d7c`), each
+  new files only, tests passing at 60 to 80 neurons, nothing at 500
+  neurons beyond FD-040's one reproduction simulation (frozen-gain
+  spectra of E-to-E x 1.5, `sfa3_stdc2`, seed [7 8] against the
+  exploration's file: 1.7e-14; lambda_1 identical). Not wired yet.
+  **Lead's decisions:** FD-040's proposed sizes stand (`essential` 2
+  seeds, 20 s windows; `fastmedium` and above 10 seeds, 200 s at 50 ms
+  for reference and E-to-E x 1.5, full-Jacobian series every 0.1 s);
+  estimated cost at `fastmedium` on 13 workers 2 to 2.5 h and 35 to 50 GB
+  at the start (3.5 to 4 GB per worker on the long multiple-timescale
+  runs), to be measured on the PC, knobs `cfg.outlier_spectra_*`.
+  FD-040's contract differs from the plan's sketch (`R.cal` a scalar
+  struct, the null outputs in `R.null`, the kinetic edge in `R.full` and
+  `R.dense`); its header in `ospec_load_run.m` is the statement of it,
+  and FD-046 aligns the two readers. FD-040 found that in a stable
+  network the rightmost NETWORK mode is not among the eight rightmost
+  eigenvalues (number 679 from the right at E-to-E x 1.5 with multiple
+  timescales), so the full-Jacobian series gives it only as an upper
+  bound there; excursions beyond zero are unaffected. FD-041 drew its
+  complex-plane figure through `complex_plane_axes` and the leftover mode
+  as a filled dot; Tom had liked the earlier look, so that is flagged to
+  him. **Wave 2:** FD-043 (`matlab-opus-2`), FD-045 (`matlab-fable-2`),
+  FD-046 first part: readers aligned, the three stages and the
+  switching Figure 3 wired (`matlab-opus-1`); three MATLAB processes.
