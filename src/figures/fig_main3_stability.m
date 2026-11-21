@@ -53,12 +53,35 @@ function out=fig_main3_stability(run_dir,conditions,opts)
 % map: fig_eig_real_histogram for the same conditions and spectra_source
 % (the eigenvalues of row (C) projected on the real axis, log counts per
 % state, with the dotted projection of a uniform disk), each panel under
-% the plot box of the heat map above it and on its x limits. Rows (A)-(C)
-% keep their size and their distance from the top of the canvas, which
-% grows downwards by out.height_scale. No text on the panels: the numbers
+% the plot box of the heat map above it and on its x limits. THE CANVAS DOES
+% NOT GROW (2026-11-21): the four rows share the canvas of the three-row
+% layout (900 px here, 950 in fig_grouped_main), with the input and
+% expansion rows shorter, and out.height_scale is 1. Until then the canvas
+% grew downwards by the new row, to 1152 px (1216 in fig_grouped_main),
+% which is taller than the workstation's screen: MATLAB then shrank the
+% window, at creation or at export and not every time, so the rows were
+% squeezed by an amount that depended on the screen and on the session
+% (seen at 950, 1058 and 1088 px for the same call). The numbers
 % and a caption sentence are in out.table_text (fig_grouped_main saves it
 % as <tag>_table.md). The dotted reference needs the frozen gains in the
 % stage's file (disk_by_cond); without them it is the unit-gain disk.
+%
+% HISTOGRAM_LABELS (Tom, 2026-11-21; default true; only with
+% real_histogram_row). The named exception to "no text on panels": row (D)
+% carries fig_eig_real_histogram's 'labels' ("neurons at floor or ceiling"
+% at the spike at -1/tau_d, "adaptive states" at the pile near zero,
+% "network modes" at the plateau, and the dotted curve named as a uniform
+% disk of the same radius), each once, where it is clearest. false draws
+% the row without them.
+%
+% THE PAPER'S FIGURE 3 (figure plan of 2026-11-21) is spectra_source
+% 'local_lyapunov', real_histogram_row true, ritz_overlay false: the heat
+% map of the switching run without the Ritz points, their exponent ticks or
+% the inset. The overlay stays an option (ritz_overlay, ritz_inset) for the
+% appendix version. The lambda_1 label above row (B) is at the figure's
+% text size (it was 12 pt beside 14 pt axis text); its tag is
+% 'accumulated_lambda_value'. Rows (C) and (D) are labeled as rates, in
+% s^-1, with ticks every 10 s^-1 on the real axis of both.
 arguments
     run_dir char
     conditions = {}
@@ -70,6 +93,7 @@ arguments
     opts.ritz_style (1,:) char = 'density'
     opts.spectra_source (1,:) char {mustBeMember(opts.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'
     opts.real_histogram_row (1,1) logical = false
+    opts.histogram_labels (1,1) logical = true
 end
 show_lambda=opts.show_lambda_row;
 assert(~(opts.real_histogram_row && show_lambda),'fig_main3_stability:HistogramRow', ...
@@ -84,18 +108,10 @@ else
 end
 height_scale=1;
 if opts.real_histogram_row
-    % The canvas grows downwards by the new row: every existing row keeps
-    % its size and its distance from the top edge in pixels.
-    % In units of the three-row canvas height; their sum, .28, is a whole
-    % number of pixels on this canvas (900) and on fig_grouped_main's (950),
-    % so the rows above do not move by a fraction of a pixel.
-    hist_row=[.065 .19]; hist_gap=.09;
-    height_scale=1+hist_row(2)+hist_gap; shift=height_scale-1;
-    for fn={'input','exp','heat','cbar'}
-        g.(fn{1})=[g.(fn{1})(1)+shift g.(fn{1})(2)]/height_scale;
-    end
-    g.div=[g.div(1) g.div(2)+shift]/height_scale;
-    g.hist=hist_row/height_scale; fig_h=fig_h*height_scale;
+    % Four rows on the canvas of three (see REAL_HISTOGRAM_ROW in the header):
+    % input and expansion shorter, the heat map nearly its three-row size.
+    g.input=[.835 .09]; g.exp=[.63 .125]; g.heat=[.30 .23]; g.hist=[.065 .155];
+    g.cbar=[.31 .20]; g.div=[.03 .975];
 end
 f=fullfile(run_dir,'local_lyapunov','local_lyapunov_data.mat'); D=load(f);
 [names,cidx]=select_conditions({D.results.name},conditions);
@@ -122,7 +138,7 @@ heat_titles=titles_by_name(names);
 if opts.real_histogram_row
     % Row (D): fig_eig_real_histogram for the same selection and source.
     hh=fig_eig_real_histogram('run_dir',run_dir,'save',false,'visible',false,'verbose','near-none', ...
-        'conditions',names,'spectra_source',opts.spectra_source);
+        'conditions',names,'spectra_source',opts.spectra_source,'labels',opts.histogram_labels);
     hist_old=findall(hh.figs,'Type','axes');
     [~,order]=sort(arrayfun(@(x)x.Layout.Tile,hist_old)); hist_old=hist_old(order);
     assert(numel(hist_old)==n_col,'fig_main3_stability:Tiles', ...
@@ -147,6 +163,11 @@ for c=1:n_col
                 'LineWidth',st.zeroline_lw,'Tag','zero_eigenvalue_reference');
         end
     end
+    % Rates, in s^-1; ticks every 10 on the real axis, fixed so that a later
+    % re-layout (fig_grouped_main) cannot change them or rotate their labels.
+    xt=10*(ceil(ax.XLim(1)/10):floor(ax.XLim(2)/10));
+    if numel(xt)>=2, ax.XTick=xt; end
+    ax.XTickLabelRotation=0; xlabel(ax,'Re(\lambda) (s^{-1})'); ylabel(ax,'Im(\lambda) (s^{-1})');
     texts=findall(ax,'Type','text');
     for k=1:numel(texts)
         if startsWith(string(texts(k).String),'\lambda_1 ='), delete(texts(k)); end
@@ -173,20 +194,20 @@ for c=1:n_col
         % Under the heat map's plot box, on its x limits: the density above,
         % projected on the real axis. (fig_grouped_main puts it under the
         % plot box again on its own canvas, where that box is another width.)
-        assert(strcmp(char(strjoin(cellstr(hist_old(c).Title.String),' ')),heat_titles{c}), ...
-            'fig_main3_stability:TileMismatch','Histogram tile %d is not ''%s''.',c,heat_titles{c});
+        assert(strcmp(char(strjoin(cellstr(hist_old(c).Title.String),' ')),titles{c}), ...
+            'fig_main3_stability:TileMismatch','Histogram tile %d is not ''%s''.',c,titles{c});
         assert(max(abs(hh.edges([1 end])-ax.XLim))<=1e-9*diff(ax.XLim),'fig_main3_stability:HistogramWindow', ...
             'The histogram''s bins do not span the heat map''s x limits.');
         box=plot_box_position(ax);
         hx=copyobj(hist_old(c),fig); hx.Units='normalized'; hx.Position=[box(1) g.hist(1) box(3) g.hist(2)];
-        hx.Tag=sprintf('stability_r4_c%d',c); hx.LineWidth=1; hx.XLim=ax.XLim; hx.XTick=ax.XTick;
-        title(hx,''); xlabel(hx,'Re(\lambda)');
+        hx.Tag=sprintf('stability_r4_c%d',c); hx.LineWidth=1; hx.XLim=ax.XLim; hx.XTick=ax.XTick; hx.XTickLabelRotation=0;
+        title(hx,''); xlabel(hx,'Re(\lambda) (s^{-1})');
         if strcmp(hx.YScale,'log')
             % Decades, labeled plainly: the default leaves one label on this short axis.
             dec=ceil(log10(hx.YLim(1))):floor(log10(hx.YLim(2)));
             hx.YTick=10.^dec; hx.YTickLabel=arrayfun(@(v)sprintf('%g',v),10.^dec,'UniformOutput',false);
         end
-        if c==1, ylabel(hx,'Eigenvalues per state'); else, ylabel(hx,''); end
+        if c==1, ylabel(hx,{'Eigenvalues','per state'}); else, ylabel(hx,''); end
     end
     if show_lambda, ax=newaxis(2,c,g.input(1),g.input(2)); else, ax=newaxis(1,c,g.input(1),g.input(2)); end
     offset=0;
@@ -236,8 +257,8 @@ for c=1:n_col
         % The accumulated lambda_1 the removed row printed, kept unobtrusively.
         % Just above the panel's top right corner, clear of the trace.
         text(ax,1,1.02,sprintf('\\lambda_1 = %+.3f s^{-1}',value),'Units','normalized', ...
-            'HorizontalAlignment','right','VerticalAlignment','bottom','FontSize',12,'Clipping','off', ...
-            'Color',col,'Tag','accumulated_lambda_label');
+            'HorizontalAlignment','right','VerticalAlignment','bottom','FontSize',14,'Clipping','off', ...
+            'Color',col,'Tag','accumulated_lambda_value');
     end
 end
 close(a.figs);
@@ -257,7 +278,6 @@ if ~show_lambda
 end
 uistack(sep,'bottom'); set(findall(fig,'-property','FontSize'),'FontSize',14);
 for c=1:n_col, ax=findobj(fig,'Tag',sprintf('stability_r1_c%d',c)); ax.Title.FontSize=16; end
-set(findall(fig,'Tag','accumulated_lambda_label'),'FontSize',12);
 set(findall(fig,'Tag','ritz_inset'),'FontSize',9); set(findall(fig,'-regexp','Tag','^ritz_(annotation|tick_label)$'),'FontSize',9);
 if show_lambda
 notes={sprintf('Current switching data: K=%d; accumulation [%g,%g] s; saved segment-start timestamps retained. Settings are read from the completed saved analysis.',D.settings.K,D.settings.lya_T_interval), ...
@@ -298,6 +318,9 @@ if opts.real_histogram_row
         strjoin(arrayfun(@(k)sprintf('%s %.2f against %.2f',names{k},hh.reference(k).pos_per_state,hh.reference(k).pos_expected),1:n_col, ...
         'UniformOutput',false),'; ') ' (the table''s last column; its other columns give the disk and the rest).'];
     out.notes{end+1}=row_d;
+    if opts.histogram_labels
+        out.notes{end+1}='Labels on row (D), each once (the named exception to no text on panels): "neurons at floor or ceiling" at the spike at -1/tau_d in the first column; "network modes" above the plateau with the dotted curve named under it in the second; "adaptive states" at the pile near zero in the last column that has adaptive variables.';
+    end
     out.height_scale=height_scale;
     out.table_text=sprintf('%s\n\n## Row (D) of the composite\n\n%s\n',hh.table_text,row_d);
 end

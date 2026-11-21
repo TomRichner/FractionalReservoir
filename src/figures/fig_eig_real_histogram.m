@@ -52,6 +52,26 @@ function out = fig_eig_real_histogram(cfg)
 % which holds the same disk_by_cond), saved with _switch in the tag; it is
 % row (D) of fig_main3_stability's 'real_histogram_row'.
 %
+% LABELS (Tom, 2026-11-21; default false: no text on the panels). true writes
+% the labels of the paper's Figure 3, row (D), one group per panel, where
+% each is clearest and has room (a panel of the composite is about 30
+% characters of 14-point text wide, so they are broken over short lines):
+% in the first panel "neurons at floor or ceiling" beside the spike at
+% -1/tau_d (neurons whose slope is zero leave their eigenvalue at the leak
+% rate); in the second panel (the first when there is one) "network modes"
+% above the plateau, and under it a row of dots and "uniform disk, same
+% radius", which names the dotted curve (only "uniform disk" when the
+% radius drawn is not the rms-gain one); in the last panel that has
+% adaptive variables (N > n) "adaptive states" beside the pile near zero.
+% They are text objects tagged 'histogram_label' in data coordinates, so
+% they travel with a copied axes and keep their place on any canvas. The
+% count axis gets headroom for them (its top is 8 instead of 1.5 times the
+% tallest bar). Needs count_scale 'log'. It is the named exception to the
+% rule of no text on panels. Tried and dropped: all labels in one panel
+% (they overlap at 14 points), "network modes" and "adaptive states" in one
+% panel (read as "network states"), a drawn line sample (its height
+% depends on the canvas).
+%
 % x limits are fig_eig_heatmap's window (the same quantile rule over the
 % drawn conditions), so the two figures read together. No text on the
 % panels: the numbers are in <tag>_table.md, with a caption paragraph.
@@ -71,6 +91,7 @@ arguments
     cfg.count_scale (1,:) char {mustBeMember(cfg.count_scale, {'log', 'clipped'})} = 'log'
     cfg.n_bins      (1,1) double {mustBeInteger, mustBePositive} = 200
     cfg.spectra_source (1,:) char {mustBeMember(cfg.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'   % which stage sampled the states (FD-034)
+    cfg.labels      (1,1) logical = false   % the four labels of Figure 3, row (D)
 end
 setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
@@ -86,7 +107,7 @@ end
 D = load(data_file);
 if isfield(D, 'cond_names'); held = D.cond_names; else; held = D.condition_titles; end
 [cond_names, idx] = select_conditions(held, cfg.conditions);
-titles = titles_by_name(cond_names, D.condition_titles(idx));
+titles = grouped_condition_label(cond_names, 'sentence');   % by NAME, sentence case
 evals = D.evals_by_cond(idx);
 n_cond = numel(cond_names);
 radius_is_name = ischar(cfg.disk_radius) || isstring(cfg.disk_radius);
@@ -155,7 +176,12 @@ fig = figure('Color', 'w', 'Position', [150, 150, 430 * n_cond, 330]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 tl = tiledlayout(fig, 1, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
 floor_count = 0.5 / max([ref.n_states]);            % half an eigenvalue in one state: the log axis's floor
-top_log = 1.5 * max(arrayfun(@(r) max(r.counts), ref));
+headroom = 1.5;
+if cfg.labels
+    assert(strcmp(cfg.count_scale, 'log'), 'fig_eig_real_histogram:Labels', 'labels are placed on the logarithmic count axis: count_scale ''log''.');
+    headroom = 8;
+end
+top_log = headroom * max(arrayfun(@(r) max(r.counts), ref));
 ax = gobjects(1, n_cond);
 for i = 1:n_cond
     ax(i) = nexttile(tl); hold(ax(i), 'on');
@@ -186,9 +212,30 @@ for i = 1:n_cond
     plot(ax(i), [0 0], ylim(ax(i)), '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw, ...
         'Tag', 'zero_eigenvalue_reference');
     xlim(ax(i), re_lim); box(ax(i), 'off'); set(ax(i), 'TickDir', 'out');
-    title(ax(i), titles{i}, 'FontWeight', 'normal', 'FontSize', 14);
-    xlabel(ax(i), 'Re(\lambda) (1/s)');
-    if i == 1; ylabel(ax(i), 'eigenvalues per state'); end
+    title(ax(i), titles{i}, 'FontWeight', 'normal', 'FontSize', 14, 'Color', col);
+    xlabel(ax(i), 'Re(ambda) (s^{-1})');
+    if i == 1; ylabel(ax(i), 'Eigenvalues per state'); end
+end
+
+if cfg.labels
+    % Each label once, where it is clearest (see the header).
+    lab = {'Color', [0.15 0.15 0.15], 'FontSize', st.tick_fs, 'Tag', 'histogram_label', 'Clipping', 'off'};
+    span = diff(re_lim);
+    adapting = find(arrayfun(@(r) r.N > r.n, ref));
+    i_mid = min(2, n_cond);
+    if strcmp(ref(i_mid).mode, 'gain')
+        net_words = {'network modes', '{\bf\cdot\cdot\cdot} uniform disk,', 'same radius'};
+    else
+        net_words = {'network modes', '{\bf\cdot\cdot\cdot} uniform disk'};
+    end
+    text(ax(1), ref(1).c - 0.02 * span, top_log, {'neurons', 'at floor', 'or ceiling'}, ...
+        'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', lab{:});
+    text(ax(i_mid), re_lim(1) + 0.01 * span, top_log, net_words, ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'Interpreter', 'tex', lab{:});
+    if ~isempty(adapting)
+        text(ax(adapting(end)), -0.05 * span, top_log, {'adaptive', 'states'}, ...
+            'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', lab{:});
+    end
 end
 
 %% Table
