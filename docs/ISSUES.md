@@ -2078,3 +2078,20 @@ machine needs that repo cloned and `setup_repo.py` run once.
   (`../FractionalReservoir_wt_fd04N`); the worktree and branch for FD-043
   exist and wait. The ten-seed dose run (FD-037, `matlab-fable-1`, pool 3)
   continues in the main checkout.
+- **FD-044 done on the MacBook (2026-11-20):** commit `350b285`, merged.
+  `manuscript_style` gives `no_adaptation` (and its display key
+  `Baseline`) the dark red `[0.75 0.10 0.15]`; the now-dead substitution
+  in `fig_eig_heatmap`'s Ritz drawing is removed, and that figure redraws
+  pixel-identical. No test pinned the old black; the six covering tests
+  pass. Lead's review: the diff is the two files and does what was asked.
+  **Left for Tom (reported, not changed):** red sits beside green on the
+  same panel in `fig_sensitivity_medians`, `fig_eig_real_histogram`, the
+  Ritz inset, `fig_main3_stability`, `fig_lyapunov_ranked_spectrum` and
+  every multi-condition overlay of the four-condition set (green product
+  MTS); the red column heading sits above E-neuron traces of nearly the
+  same red in `fig_main2_dynamics`, `fig_main3_stability`,
+  `fig_example_timeseries` and `fig_local_lyapunov`; figures that draw
+  every condition's traces in black, and the schematic, clinical and
+  imported panels, do not follow the map and need a decision or a change
+  by hand. Before and after PNGs:
+  `../FractionalReservoir_wt_fd044/figs/fd044_before_after/`.
