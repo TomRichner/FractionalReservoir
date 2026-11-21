@@ -244,7 +244,8 @@ end
 
 function c = undo_switch(c)
 % A mu7chain config as it was before with_switch_spectra became its default:
-% without the switching entries, fig_main3_grouped the baseline composite,
+% without the switching entries (fig_main3_grouped_ritz, the overlay version of
+% 2026-11-21, among them), fig_main3_grouped the baseline composite,
 % and no spectra settings (K stays the bundle's, 150 since 2026-11-21).
 names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
 base = c.figures{strcmp(names, 'fig_main3_grouped_baseline')};
@@ -255,7 +256,7 @@ base.group = 'main';
 assert(isequal(base.args(end - 1:end), {'fig_tag', 'Fig_Main3_Grouped_baseline'}));
 base.args = base.args(1:end - 2);
 c.figures{strcmp(names, 'fig_main3_grouped')} = base;
-c.figures = c.figures(~ismember(names, {'fig_main3_grouped_baseline', 'fig_eig_heatmap_switch', ...
+c.figures = c.figures(~ismember(names, {'fig_main3_grouped_baseline', 'fig_main3_grouped_ritz', 'fig_eig_heatmap_switch', ...
     'fig_eig_real_histogram_switch'}));
 c = rmfield(c, {'local_lyapunov_spectra_n_samples', 'local_lyapunov_spectra_start_s'});
 end

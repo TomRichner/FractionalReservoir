@@ -92,7 +92,7 @@ end
 
 %% 2. The opt-in stage runs only when named
 [st, ~, opt_in] = paper_stage_names();
-assert(isequal(st, all10) && isequal(opt_in, {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', ...
+assert(isequal(st, all10) && isequal(opt_in, {'lyapunov_spectrum_n80', 'concept_examples', 'uncoupled_reference', 'outlier_spectra', 'frequency_response', ...
     'eigenvalue_density', 'outlier_structures', 'mc_gain_sweep', 'noise_switch'}));
 pl = paper_stage_plan(struct('illustrations', true, 'stages', {{'mc_gain_sweep', 'dc_lle'}}));
 assert(isequal(pl.stages, {'dc_lle', 'mc_gain_sweep'}), 'opt-in stages run after the first list');

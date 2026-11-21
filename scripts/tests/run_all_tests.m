@@ -148,8 +148,8 @@ function names = slow_test_names()
         'test_leading_direction'            % 142 s  Figure 4C: joint sample and uncoupled reference at tiny size
         'test_composite_spectral_figures'   % 110-240 s  Figures 5, 6 and S6 to S8 from the spectral stages at tiny size
         'test_memory_supplement_composites' %  91 s  Figure 7, S1, S2, S4, S5, S9 from small runs
-        'test_burst_mode_stage'             % TIMING  the burst_mode stage and Figure 8 A to C, S10
-        'test_ied_network_mode_stage'       % TIMING  the modular network's network-mode stage and its figure
+        'test_burst_mode_stage'             %  41 s  the burst_mode stage and Figure 8 A to C, S10 (4 workers)
+        'test_concept_examples_stage'       %  37 s  the concept_examples stage, Figure 1 and S3 at 80 neurons
         };
 end
 
