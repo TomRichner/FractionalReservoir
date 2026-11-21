@@ -51,11 +51,13 @@ function cfg = mu7chain_config(run_mode, figure_set)
 %
 % THE SPECTRAL SUPPLEMENT (FD-040 to FD-046; Tom, 2026-11-20: "integrate
 % these figures into the full run"), every mode: the opt-in stages
-% outlier_spectra, frequency_response and eigenvalue_density and their
-% figure entries (none in_paper), added at the end by
-% with_spectral_supplement. Sizes by run mode are the stages' own
-% (outlier_spectra_stage_plan: 2 seeds and 20 s windows at 'essential' and
-% 'fast', 10 seeds and 200 s for reference and E-to-E x 1.5 above).
+% outlier_spectra, frequency_response, eigenvalue_density and
+% outlier_structures and their figure entries (none in_paper), added at
+% the end by with_spectral_supplement. Sizes by run mode are the stages'
+% own (outlier_spectra_stage_plan: 2 seeds and 20 s windows at 'essential'
+% and 'fast', 10 seeds and 200 s for reference and E-to-E x 1.5 above;
+% outlier_structures_stage_plan: fifteen networks, 1 seed at 'essential'
+% and 'fast', 5 above).
 %
 % FIGURE 3 IS THE SWITCHING VERSION (Tom, 2026-11-20: "we will use the
 % switching version"; docs/Plan_Figure3_update.md, step 6), every mode:

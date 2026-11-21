@@ -23,7 +23,7 @@
 %     stages, sweeps, eig-heatmap example, figure-set default and registry
 %     specified, and every registry entry is the fast registry's own;
 %   * mu7chain_config('fast') and larger skip nothing: every stage, then the
-%     opt-in lyapunov_spectrum_n80 (FD-032) and the three spectral stages
+%     opt-in lyapunov_spectrum_n80 (FD-032) and the four spectral stages
 %     (FD-046).
 %
 % Asserts; silent until it throws, then prints one PASS line.
@@ -233,7 +233,7 @@ assert(isequal(table_names, all_stages(2:end)), 'run_all_paper_analyses'' stage 
 registry = paper_opt_in_stages();
 assert(isequal(opt_in, {registry.name}) && ...
     isequal(opt_in, {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', 'eigenvalue_density', ...
-    'mc_gain_sweep', 'noise_switch'}));
+    'outlier_structures', 'mc_gain_sweep', 'noise_switch'}));
 assert(isempty(intersect(opt_in, all_stages)), 'an opt-in stage must not also be in the first list');
 for k = 1:numel(registry)
     assert(exist(func2str(registry(k).plan), 'file') == 2 && exist(func2str(registry(k).run), 'file') == 2, ...
@@ -307,8 +307,8 @@ assert(strcmp(cfg.fig_root, 'figs/mu7chain_essential_4cond'));
 assert(isequal(cfg.figure_sets, {'4cond'}), 'essential draws the four-condition set only');
 assert(isequal(cfg.conditions, {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2', 'sfa3_std2'}));
 assert(isequal(cfg.stages, {'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations', ...
-    'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', 'eigenvalue_density'}));
-% the last four are opt-in and run in every mode (FD-032; FD-046, with_spectral_supplement)
+    'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', 'eigenvalue_density', 'outlier_structures'}));
+% the last five are opt-in and run in every mode (FD-032; FD-046, with_spectral_supplement)
 assert(isequal(cfg.sweeps, {'sensitivity', 'param_space'}));
 ex = cfg.eig_heatmap_examples;
 assert(isstruct(ex) && isscalar(ex) && strcmp(ex.label, 'reference') && ...
@@ -325,10 +325,13 @@ want_figs = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', 'fig_
     'fig_EI_weights_param_space', 'fig_lle_vs_rate', 'fig_eig_heatmap', 'fig_eig_heatmap_switch', ...
     'fig_eig_real_histogram', 'fig_eig_real_histogram_switch', ...
     'fig_lyapunov_ranked_spectrum', 'fig_main2_grouped', 'fig_main3_grouped', 'fig_main3_grouped_baseline', ...
-    'fig_main4_grouped', 'fig_freqresp_network', 'fig_freqresp_plane', 'fig_freqresp_phase', ...
+    'fig_main4_grouped', 'fig_outlier_plane', 'fig_outlier_dose', 'fig_outlier_slow_variables', ...
+    'fig_outlier_dwell', 'fig_freqresp_network', 'fig_freqresp_plane', 'fig_freqresp_phase', ...
     'fig_freqresp_single_neuron', 'fig_eigdens_radial', 'fig_eigdens_radial_EEx1p5', 'fig_eigdens_gains', ...
     'fig_eigdens_gains_EEx1p5', 'fig_eigdens_measures', 'fig_eigdens_measures_EEx1p5', 'fig_eigdens_plane', ...
-    'fig_eigdens_plane_EEx1p5', 'fig_eigdens_theory_check'};
+    'fig_eigdens_plane_EEx1p5', 'fig_eigdens_theory_check', 'fig_ostruct_summary', ...
+    'fig_ostruct_plane_rotation', 'fig_ostruct_plane_local', 'fig_ostruct_plane_blockmean', ...
+    'fig_ostruct_rotation', 'fig_ostruct_h1'};
 names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
 assert(isequal(names, want_figs), 'the essential registry is: %s', strjoin(names, ', '));
 % Each entry is the fast registry's own, except that a grouped entry reads
@@ -363,9 +366,9 @@ assert(isequal(rmfield(cfg, differs), rmfield(fast, differs)), ...
 
 %% The other modes skip nothing
 % Every stage of the first list, written out, then the opt-in
-% lyapunov_spectrum_n80 (FD-032) and the three spectral stages (FD-046)
+% lyapunov_spectrum_n80 (FD-032) and the four spectral stages (FD-046)
 % that every mode runs.
-opt_in_all = {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', 'eigenvalue_density'};
+opt_in_all = {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', 'eigenvalue_density', 'outlier_structures'};
 for md = {'fast', 'fastmedium', 'medium', 'medium2', 'production'}
     for st = {'3cond', '4cond'}
         c = mu7chain_config(md{1}, st{1});

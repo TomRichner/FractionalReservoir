@@ -23,11 +23,14 @@
 %     make_all_paper_figures uses) it draws three columns in the 3cond set
 %     and four in the 4cond set;
 %   * run_all_paper_analyses' run-mode pre-flight accepts the config's mode;
-%   * the bundle's defaults of FD-046, in every mode: the three spectral
-%     stages (outlier_spectra, frequency_response, eigenvalue_density)
-%     after lyapunov_spectrum_n80, their plans accept the bundle, their
-%     figure entries are appended (none in_paper; the density figures also
-%     for EEx1p5; the conditions outlier_spectra simulates), and Figure 3 is
+%   * the bundle's defaults of FD-046, in every mode: the four spectral
+%     stages (outlier_spectra, frequency_response, eigenvalue_density,
+%     outlier_structures) after lyapunov_spectrum_n80, their plans accept
+%     the bundle, their figure entries are appended (none in_paper; the
+%     density figures also for EEx1p5; fig_ostruct_plane once per group;
+%     the conditions the entry's stage simulates), outlier_spectra gives
+%     'reference' and 'EEx1p5' the dense pass that three of its figures
+%     need, and Figure 3 is
 %     the switching version: fig_main3_grouped (in_paper) is the four-row
 %     switching composite, the baseline composite is
 %     fig_main3_grouped_baseline (not in_paper), K = 100 and 40 states from
@@ -69,8 +72,9 @@ assert(threw, 'an unknown run mode must be refused');
 % These modes run every stage; only 'essential' selects (FD-023; its own
 % checks are in test_essential_mode). Every stage is written out, followed
 % by the opt-in lyapunov_spectrum_n80 that every mode runs (FD-032) and the
-% three spectral stages (FD-046, with_spectral_supplement).
-spectral = {'outlier_spectra', 'frequency_response', 'eigenvalue_density'};
+% four spectral stages (FD-046, with_spectral_supplement).
+spectral = {'outlier_spectra', 'frequency_response', 'eigenvalue_density', 'outlier_structures'};
+n_spec = numel(spectral);
 for k = {cfg3, cfg4, cfg_med}
     assert(isequal(k{1}.stages, [paper_stage_names(), {'lyapunov_spectrum_n80'}, spectral]) && ...
         isempty(k{1}.sweeps) && isempty(k{1}.eig_heatmap_examples));
@@ -171,11 +175,19 @@ for m = run_mode_names()
             % plans accept the bundle (the reading stages refuse a bundle
             % without outlier_spectra).
             i80 = find(strcmp(k.stages, 'lyapunov_spectrum_n80'));
-            assert(isscalar(i80) && isequal(k.stages(i80 + 1:i80 + 3), spectral), '%s: the stages', tag);
-            assert(isequal(paper_stage_plan(k).stages(end - 2 - 2 * ac:end - 2 * ac), spectral), '%s: run order', tag);
+            assert(isscalar(i80) && isequal(k.stages(i80 + 1:i80 + n_spec), spectral), '%s: the stages', tag);
+            assert(isequal(paper_stage_plan(k).stages(end - (n_spec - 1) - 2 * ac:end - 2 * ac), spectral), '%s: run order', tag);
             pl = outlier_spectra_stage_plan(k);
             frequency_response_stage_plan(k); eigenvalue_density_stage_plan(k);
-            assert(isequal(pl.conditions, three_spec), '%s: outlier_spectra conditions', tag);
+            ps = outlier_structures_stage_plan(k);
+            assert(isequal(pl.conditions, three_spec) && isequal(ps.conditions, three_spec), '%s: the stages'' conditions', tag);
+            % fig_outlier_plane, _slow_variables and _dwell draw 'reference'
+            % and 'EEx1p5' and need their dense pass and full-Jacobian
+            % series: the stage's default full_networks, every run of them.
+            dense_nets = {'reference', 'EEx1p5'};
+            assert(isequal(pl.full_networks, dense_nets) && all(ismember(dense_nets, pl.networks)) && ...
+                all([pl.runs(ismember({pl.runs.network}, dense_nets)).full]) && ...
+                ~any([pl.runs(~ismember({pl.runs.network}, dense_nets)).full]), '%s: the dense pass of reference and EEx1p5', tag);
             % The entries, none in the paper, each with the conditions it can draw.
             names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
             want = spectral_entry_names();
@@ -191,7 +203,11 @@ for m = run_mode_names()
                     c = a{find(strcmp(a(1:2:end), 'conditions')) * 2};
                     assert(isequal(c, intersect(k.conditions, three_spec, 'stable')), '%s: %s conditions', tag, f.name);
                     assert(endsWith(f.name, '_EEx1p5') == any(strcmp(a(1:2:end), 'network')), '%s: %s network', tag, f.name);
-                    if endsWith(f.name, '_EEx1p5')
+                    assert(startsWith(f.name, 'fig_ostruct_plane_') == any(strcmp(a(1:2:end), 'group')), '%s: %s group', tag, f.name);
+                    if startsWith(f.name, 'fig_ostruct_plane_')
+                        assert(strcmp(a{find(strcmp(a(1:2:end), 'group')) * 2}, extractAfter(f.name, 'fig_ostruct_plane_')) && ...
+                            strcmp(func2str(f.fn), 'fig_ostruct_plane'), '%s: %s', tag, f.name);
+                    elseif endsWith(f.name, '_EEx1p5')
                         assert(strcmp(a{find(strcmp(a(1:2:end), 'network')) * 2}, 'EEx1p5') && ...
                             strcmp(func2str(f.fn), extractBefore(f.name, '_EEx1p5')), '%s: %s', tag, f.name);
                     else
@@ -371,11 +387,13 @@ disp('PASS: test_mu7chain_bundle -- two figure sets, conditions per mode, preset
 
 function names = spectral_entry_names()
 % The entries with_spectral_supplement appends, in order.
-names = {'fig_freqresp_network', 'fig_freqresp_plane', 'fig_freqresp_phase', 'fig_freqresp_single_neuron'};
+names = {'fig_outlier_plane', 'fig_outlier_dose', 'fig_outlier_slow_variables', 'fig_outlier_dwell', ...
+    'fig_freqresp_network', 'fig_freqresp_plane', 'fig_freqresp_phase', 'fig_freqresp_single_neuron'};
 for d = {'radial', 'gains', 'measures', 'plane'}
     names = [names, {['fig_eigdens_' d{1}], ['fig_eigdens_' d{1} '_EEx1p5']}]; %#ok<AGROW>
 end
-names = [names, {'fig_eigdens_theory_check'}];
+names = [names, {'fig_eigdens_theory_check', 'fig_ostruct_summary', 'fig_ostruct_plane_rotation', ...
+    'fig_ostruct_plane_local', 'fig_ostruct_plane_blockmean', 'fig_ostruct_rotation', 'fig_ostruct_h1'}];
 end
 
 function ok = throws_id(fn, id)

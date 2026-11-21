@@ -21,14 +21,30 @@ function cfg = with_spectral_supplement(cfg)
 %                            bundle's network and four E-to-E doses, per
 %                            condition and seed (FD-040; sizes by run mode
 %                            in outlier_spectra_stage_plan,
-%                            knobs cfg.outlier_spectra_*)
+%                            knobs cfg.outlier_spectra_*). Its own four
+%                            figures (FD-045): fig_outlier_plane, _dose,
+%                            _slow_variables, _dwell. The plane, the
+%                            slow-variables and the dwell figure draw the
+%                            networks 'reference' and 'EEx1p5' and need
+%                            their dense pass and full-Jacobian series,
+%                            which the stage's default full_networks gives
+%                            (a bundle that changes that knob loses them)
 %       frequency_response   at outlier_spectra's calibration states (FD-041;
 %                            cfg.frequency_response)
 %       eigenvalue_density   at the same states (FD-042; cfg.eigenvalue_density)
+%       outlier_structures   fifteen networks with an intended eigenvalue
+%                            outside the bulk, the mode followed (FD-043;
+%                            sizes in outlier_structures_stage_plan, knobs
+%                            cfg.outlier_structures_*). Reads nothing of
+%                            outlier_spectra's output. Six figures:
+%                            fig_ostruct_summary, fig_ostruct_plane once
+%                            per group (rotation, local, blockmean; the
+%                            entry's name carries the group),
+%                            fig_ostruct_rotation, fig_ostruct_h1
 %     An empty cfg.stages (every stage) is written out first
 %     (paper_stage_names), since an empty selection never runs an opt-in
 %     stage. The two reading stages' plans refuse a bundle that names them
-%     without outlier_spectra, so the three are added together.
+%     without outlier_spectra, so the stages are added together.
 %   * appends the figure entries of PARTS to cfg.figures, none in_paper
 %     (Tom has not chosen among them; the plan's section 2: supplementary
 %     candidates). The density figures are made for two networks: the
@@ -41,11 +57,10 @@ function cfg = with_spectral_supplement(cfg)
 %     which that stage does not run, and an entry's own args override the
 %     bundle-wide list (as the single-neuron entry's do).
 %
-% TO ADD A STAGE OR FIGURES (FD-043 outlier_structures; FD-045's four
-% fig_outlier_* on FD-040's output): a row of PARTS. A new stage is a row
-% with its name and its entries (the stage must also be a row of
-% paper_opt_in_stages); figures of an existing stage are entries in that
-% stage's row (FD-045's go in outlier_spectra's).
+% TO ADD A STAGE OR FIGURES: a row of PARTS. A new stage is a row with its
+% name, its entries and the plan that says which conditions it simulates
+% (the stage must also be a row of paper_opt_in_stages); figures of an
+% existing stage are entries in that stage's row.
 %
 % Errors :AlreadyAdded when cfg.stages already names one of the stages or
 % cfg.figures already holds one of the entries, :NoFigures when cfg has
@@ -53,6 +68,7 @@ function cfg = with_spectral_supplement(cfg)
 %
 % See also: mu7chain_config, paper_opt_in_stages, outlier_spectra_stage_plan,
 %           frequency_response_stage_plan, eigenvalue_density_stage_plan,
+%           outlier_structures_stage_plan,
 %           with_switch_spectra, with_ritz_overlay
 arguments
     cfg (1,1) struct
@@ -61,9 +77,11 @@ if ~isfield(cfg, 'figures') || ~iscell(cfg.figures)
     error('with_spectral_supplement:NoFigures', 'The config has no figure registry (cfg.figures).');
 end
 
-%% What it adds: one row per stage, {stage, its figure entries}
+%% What it adds: one row per stage, {stage, its figure entries, conditions plan}
 % Entries are {name, function, extra args, draws_conditions}. The second
-% network of the density figures is named as outlier_spectra's index names it.
+% network of the density figures is named as outlier_spectra's index names
+% it. The third column is the plan whose conditions the row's entries can
+% draw (the two reading stages draw outlier_spectra's runs).
 EE = 'EEx1p5';
 dens = {@fig_eigdens_radial, @fig_eigdens_gains, @fig_eigdens_measures, @fig_eigdens_plane};
 dens_entries = cell(0, 4);
@@ -72,15 +90,29 @@ for k = 1:numel(dens)
     dens_entries(end + 1, :) = {name, dens{k}, {}, true}; %#ok<AGROW>
     dens_entries(end + 1, :) = {[name '_' EE], dens{k}, {'network', EE}, true}; %#ok<AGROW>
 end
+groups = {'rotation', 'local', 'blockmean'};
+plane_entries = cell(numel(groups), 4);
+for k = 1:numel(groups)
+    plane_entries(k, :) = {['fig_ostruct_plane_' groups{k}], @fig_ostruct_plane, {'group', groups{k}}, true};
+end
 PARTS = { ...
-    'outlier_spectra',    cell(0, 4); ...
+    'outlier_spectra',    { ...
+        'fig_outlier_plane',          @fig_outlier_plane,          {}, true; ...
+        'fig_outlier_dose',           @fig_outlier_dose,           {}, true; ...
+        'fig_outlier_slow_variables', @fig_outlier_slow_variables, {}, true; ...
+        'fig_outlier_dwell',          @fig_outlier_dwell,          {}, true}, @outlier_spectra_stage_plan; ...
     'frequency_response', { ...
         'fig_freqresp_network',       @fig_freqresp_network,       {}, true; ...
         'fig_freqresp_plane',         @fig_freqresp_plane,         {}, true; ...
         'fig_freqresp_phase',         @fig_freqresp_phase,         {}, true; ...
-        'fig_freqresp_single_neuron', @fig_freqresp_single_neuron, {}, true}; ...
+        'fig_freqresp_single_neuron', @fig_freqresp_single_neuron, {}, true}, @outlier_spectra_stage_plan; ...
     'eigenvalue_density', [dens_entries; ...
-        {'fig_eigdens_theory_check',  @fig_eigdens_theory_check,   {}, false}]};
+        {'fig_eigdens_theory_check',  @fig_eigdens_theory_check,   {}, false}], @outlier_spectra_stage_plan; ...
+    'outlier_structures', [ ...
+        {'fig_ostruct_summary',       @fig_ostruct_summary,        {}, true}; ...
+        plane_entries; ...
+        {'fig_ostruct_rotation',      @fig_ostruct_rotation,       {}, true; ...
+         'fig_ostruct_h1',            @fig_ostruct_h1,             {}, true}], @outlier_structures_stage_plan};
 
 %% Stages
 stages = {};
@@ -100,16 +132,20 @@ already = intersect(entries(:, 1), names);
 if ~isempty(already)
     error('with_spectral_supplement:AlreadyAdded', 'cfg.figures already holds %s.', strjoin(already, ', '));
 end
-% The conditions the figures can draw: the bundle's, as far as
-% outlier_spectra simulates them (its plan; no compute).
-draws = {};
-if isfield(cfg, 'conditions') && ~isempty(cfg.conditions)
-    plan = outlier_spectra_stage_plan(cfg);
-    draws = intersect(cfg.conditions, plan.conditions, 'stable');
-end
-for k = 1:size(entries, 1)
-    args = entries{k, 3};
-    if entries{k, 4} && ~isempty(draws); args = [args, {'conditions', draws}]; end %#ok<AGROW>
-    cfg.figures{end + 1} = struct('name', entries{k, 1}, 'fn', entries{k, 2}, 'in_paper', false, 'args', {args});
+% The conditions an entry can draw: the bundle's, as far as its stage
+% simulates them (the stage's plan; no compute).
+has_conditions = isfield(cfg, 'conditions') && ~isempty(cfg.conditions);
+for p = 1:size(PARTS, 1)
+    entries = PARTS{p, 2};
+    draws = {};
+    if has_conditions && any([entries{:, 4}])
+        plan = PARTS{p, 3}(cfg);
+        draws = intersect(cfg.conditions, plan.conditions, 'stable');
+    end
+    for k = 1:size(entries, 1)
+        args = entries{k, 3};
+        if entries{k, 4} && ~isempty(draws); args = [args, {'conditions', draws}]; end %#ok<AGROW>
+        cfg.figures{end + 1} = struct('name', entries{k, 1}, 'fn', entries{k, 2}, 'in_paper', false, 'args', {args});
+    end
 end
 end
