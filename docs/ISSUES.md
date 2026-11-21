@@ -1876,3 +1876,25 @@ machine needs that repo cloned and `setup_repo.py` run once.
 - **Plan for the next version (2026-11-20):** `docs/Plan_Figure3_update.md`
   (new timing: alignment -10 to 0 s, accumulation 0 to 40 s; open
   questions). Not to be executed until Tom says go.
+- **FD-034, later the same day (2026-11-20):** Tom chose the switching-run
+  version as the paper's Figure 3, asked for a fourth row and released the
+  new timing. Commits `99c3466` (the switching-run spectra save the frozen
+  gains; `spectra_start_s`, so the first sampled state may come after the
+  accumulation start), `08decab` (row D, `'real_histogram_row'`: the
+  eigenvalues projected on the real axis against the uniform disk, under
+  row C on the same x limits; `fig_eig_real_histogram` takes the switching
+  source), `49960a1` (`mu7chain_config`: accumulation from 0 s, alignment
+  10 s, simulation from -15 s). No regression reference depends on the
+  mu7chain timing (`regression_fast_config` keeps the old one). Run at
+  `essential`, serial, 13.3 min, 3.05 GB peak, into
+  `figs/fd034_mu7chain_essential_switchK100_t0/`. New against old timing:
+  lambda_1 +3.3210 (+3.3288), -0.0036 (+0.0060), -0.0869 (-0.0795); positive
+  exponents of 100: 7, 0 (was 1), 0. **The single-timescale lambda_1
+  changes sign**; its Benettin value in the same run is -0.0254. The
+  trajectory, eigenvalues and gains are bit-identical to the old-timing
+  run; only H, the Ritz values, the exponents and panel B moved. Row D,
+  eigenvalues right of zero per state against the uniform disk: 8.72 vs
+  68.67, 5.00 vs 52.66, 2.00 vs 18.76. Open: the stand-alone C panel still
+  has a title line plus an on-panel lambda_1 label; the figure entries
+  were called directly with the 3cond set, `make_all_paper_figures` was
+  not run; `with_switch_spectra` is not yet the bundle's default.
