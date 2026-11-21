@@ -12,6 +12,18 @@ into registered opt-in stages and figure functions of the `mu7chain` bundles,
 with the changes Tom asked for, built and tested on the MacBook at tiny and
 `essential` size only. The full run is Tom's, on the workstation.
 
+**Limits set by Tom after the launch (2026-11-20):** "we don't have very much
+ram on the computer. limit to a total of 4 matlab processes. we will do the
+main computation on my PC. can hold off on regression tests too. Just want
+you to build." So on the MacBook: at most four MATLAB processes in total
+(four workers with no pool, or fewer workers with a pool); tests at tiny
+network size only; no 500-neuron timing runs, costs are estimates to be
+measured on the PC; no regression tiers; FD-046 ends with the wiring and a
+tiny-size smoke of the bundle's new stages, not an `essential` run. The
+ten-seed dose run (FD-037) was stopped at 46 of 150 runs (kept in
+`data/explorations/outliers_dose_seeds/`); the ten seeds come from the
+stage on the PC.
+
 The lead decides what the plan leaves open and writes the decision under the
 issue (FD-040 to FD-046) or in the worklog; Tom can reverse it afterwards.
 
@@ -76,7 +88,7 @@ standard signature `out = fig_x(cfg)`, reads one run directory or errors
 | FD-043 | `outlier_structures`: the fifteen networks, the intended mode followed | `fig_ostruct_summary`, `_plane`, `_rotation`, `_h1` | `matlab-opus-2` |
 | FD-044 | (none) no adaptation in dark red in `manuscript_style` | every registered figure | `matlab-opus-3` |
 | FD-045 | (reads FD-040) | `fig_outlier_plane` (FD-036), `fig_outlier_dose` (FD-037), `fig_outlier_slow_variables` (FD-038), `fig_outlier_dwell` (FD-039) | after FD-040 merges |
-| FD-046 | wiring: the four stages and all figures into the `mu7chain` bundles; the switching Figure 3 as the bundle default (Plan_Figure3_update, step 6); one `essential` run end to end, serial; cost table for Tom's full run | | after the rest |
+| FD-046 | wiring: the four stages and all figures into the `mu7chain` bundles; the switching Figure 3 as the bundle default (Plan_Figure3_update, step 6); a tiny-size smoke of the new stages through the bundle entry points; estimated cost table for Tom's full run | | after the rest |
 
 Names: exploration code stays where it is until FD-046 (a job is still
 running from it); stage code is COPIED into `src/analysis/` and
@@ -131,8 +143,8 @@ existing tests named in its brief; no change to any existing saved output
 with the stage off. The exact regression tiers are owed on the workstation
 (with FD-032 to FD-034). The lead reviews each diff before merging.
 
-Pool on the MacBook (budget 6): the ten-seed dose run holds 3; FD-040 may
-hold 2; the others 0.
+Pool on the MacBook: none. Four MATLAB processes in total is the limit, so
+every worker runs with `pool: 0` and no more than four workers run at once.
 
 ## 7. What Tom runs afterwards, on the workstation
 
