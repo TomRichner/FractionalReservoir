@@ -41,6 +41,18 @@ function out=fig_main3_stability(run_dir,conditions,opts)
 % expansion row and the heat-map row are one trajectory and one top-K pass:
 % the Ritz values are the instantaneous rates, with rotation, of the
 % directions whose positive local rates the expansion row sums.
+%
+% REAL_HISTOGRAM_ROW (Tom, 2026-11-20; default false: the figure as it was;
+% needs show_lambda_row false). true adds a fourth row, (D), under the heat
+% map: fig_eig_real_histogram for the same conditions and spectra_source
+% (the eigenvalues of row (C) projected on the real axis, log counts per
+% state, with the dotted projection of a uniform disk), each panel under
+% the plot box of the heat map above it and on its x limits. Rows (A)-(C)
+% keep their size and their distance from the top of the canvas, which
+% grows downwards by out.height_scale. No text on the panels: the numbers
+% and a caption sentence are in out.table_text (fig_grouped_main saves it
+% as <tag>_table.md). The dotted reference needs the frozen gains in the
+% stage's file (disk_by_cond); without them it is the unit-gain disk.
 arguments
     run_dir char
     conditions = {}
@@ -51,8 +63,11 @@ arguments
     opts.ritz_inset (1,1) logical = false
     opts.ritz_style (1,:) char = 'density'
     opts.spectra_source (1,:) char {mustBeMember(opts.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'
+    opts.real_histogram_row (1,1) logical = false
 end
 show_lambda=opts.show_lambda_row;
+assert(~(opts.real_histogram_row && show_lambda),'fig_main3_stability:HistogramRow', ...
+    'real_histogram_row is a row under the heat map of the layout without the lambda_1 row: set show_lambda_row false.');
 % Row geometry, [y height] in normalized figure units, and the canvas height.
 if show_lambda
     fig_h=1150; g.heat=[.745 .18]; g.input=[.535 .125]; g.lambda=[.315 .14]; g.exp=[.105 .135];
@@ -60,6 +75,21 @@ if show_lambda
 else
     fig_h=900; g.input=[.755 .155]; g.exp=[.45 .2]; g.heat=[.065 .25];
     g.cbar=[.08 .22]; g.div=[.04 .965];
+end
+height_scale=1;
+if opts.real_histogram_row
+    % The canvas grows downwards by the new row: every existing row keeps
+    % its size and its distance from the top edge in pixels.
+    % In units of the three-row canvas height; their sum, .28, is a whole
+    % number of pixels on this canvas (900) and on fig_grouped_main's (950),
+    % so the rows above do not move by a fraction of a pixel.
+    hist_row=[.065 .19]; hist_gap=.09;
+    height_scale=1+hist_row(2)+hist_gap; shift=height_scale-1;
+    for fn={'input','exp','heat','cbar'}
+        g.(fn{1})=[g.(fn{1})(1)+shift g.(fn{1})(2)]/height_scale;
+    end
+    g.div=[g.div(1) g.div(2)+shift]/height_scale;
+    g.hist=hist_row/height_scale; fig_h=fig_h*height_scale;
 end
 f=fullfile(run_dir,'local_lyapunov','local_lyapunov_data.mat'); D=load(f);
 [names,cidx]=select_conditions({D.results.name},conditions);
@@ -83,6 +113,15 @@ assert(numel(old)==n_col,'fig_main3_stability:Tiles', ...
     'fig_eig_heatmap drew %d tiles for %d conditions.',numel(old),n_col);
 st=manuscript_style(); titles=grouped_condition_label(names,'sentence');
 heat_titles=titles_by_name(names);
+if opts.real_histogram_row
+    % Row (D): fig_eig_real_histogram for the same selection and source.
+    hh=fig_eig_real_histogram('run_dir',run_dir,'save',false,'visible',false,'verbose','near-none', ...
+        'conditions',names,'spectra_source',opts.spectra_source);
+    hist_old=findall(hh.figs,'Type','axes');
+    [~,order]=sort(arrayfun(@(x)x.Layout.Tile,hist_old)); hist_old=hist_old(order);
+    assert(numel(hist_old)==n_col,'fig_main3_stability:Tiles', ...
+        'fig_eig_real_histogram drew %d tiles for %d conditions.',numel(hist_old),n_col);
+end
 selected=cellfun(@(v)v(round(linspace(1,numel(v),min(12,numel(v))))), ...
     D.results(1).type_indices,'UniformOutput',false);
 for c=1:n_col
@@ -123,6 +162,25 @@ for c=1:n_col
         box=plot_box_position(ax); rel=insets(k).UserData.rel;
         ins=copyobj(insets(k),fig); ins.Units='normalized';
         ins.Position=[box(1)+rel(1)*box(3) box(2)+rel(2)*box(4) rel(3)*box(3) rel(4)*box(4)];
+    end
+    if opts.real_histogram_row
+        % Under the heat map's plot box, on its x limits: the density above,
+        % projected on the real axis. (fig_grouped_main puts it under the
+        % plot box again on its own canvas, where that box is another width.)
+        assert(strcmp(char(strjoin(cellstr(hist_old(c).Title.String),' ')),heat_titles{c}), ...
+            'fig_main3_stability:TileMismatch','Histogram tile %d is not ''%s''.',c,heat_titles{c});
+        assert(max(abs(hh.edges([1 end])-ax.XLim))<=1e-9*diff(ax.XLim),'fig_main3_stability:HistogramWindow', ...
+            'The histogram''s bins do not span the heat map''s x limits.');
+        box=plot_box_position(ax);
+        hx=copyobj(hist_old(c),fig); hx.Units='normalized'; hx.Position=[box(1) g.hist(1) box(3) g.hist(2)];
+        hx.Tag=sprintf('stability_r4_c%d',c); hx.LineWidth=1; hx.XLim=ax.XLim; hx.XTick=ax.XTick;
+        title(hx,''); xlabel(hx,'Re(\lambda)');
+        if strcmp(hx.YScale,'log')
+            % Decades, labeled plainly: the default leaves one label on this short axis.
+            dec=ceil(log10(hx.YLim(1))):floor(log10(hx.YLim(2)));
+            hx.YTick=10.^dec; hx.YTickLabel=arrayfun(@(v)sprintf('%g',v),10.^dec,'UniformOutput',false);
+        end
+        if c==1, ylabel(hx,'Eigenvalues per state'); else, ylabel(hx,''); end
     end
     if show_lambda, ax=newaxis(2,c,g.input(1),g.input(2)); else, ax=newaxis(1,c,g.input(1),g.input(2)); end
     offset=0;
@@ -177,12 +235,14 @@ for c=1:n_col
     end
 end
 close(a.figs);
+if opts.real_histogram_row, close(hh.figs); end
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
 for xpos=(.3775+(0:n_col-2)*.30)*s, plot(sep,[xpos xpos],g.div,'Color',[.88 .88 .88],'LineWidth',2.5); end
 if ~show_lambda
     % Row letters in figure coordinates, one column, where letter() puts them
     % on a full-width axis (the heat map's plot box is narrower than its axis).
     rows={'A',g.input;'B',g.exp;'C',g.heat};
+    if opts.real_histogram_row, rows(end+1,:)={'D',g.hist}; end
     for k=1:size(rows,1)
         y=rows{k,2}(1)+1.05*rows{k,2}(2);
         text(sep,(.105-.42*.235)*s,y,['(' rows{k,1} ')'],'FontSize',14,'VerticalAlignment','top', ...
@@ -219,9 +279,22 @@ if strcmp(opts.spectra_source,'local_lyapunov')
     % Said last, because it replaces the "separate examples" statement above.
     notes{end+1}=sprintf(['spectra_source local_lyapunov (FD-034): the heat map and its Ritz values are NOT a separate example. ' ...
         'They are taken at states of the switching run of the expansion row, and the Ritz values come from the top-%d pass ' ...
-        'whose positive local rates that row sums.'],D.settings.K);
+        'whose positive local rates that row sums. That pass: alignment over [%g, %g] s, accumulation over [%g, %g] s.'], ...
+        D.settings.K,D.settings.lya_T_interval(1)-D.settings.lya_warmup,D.settings.lya_T_interval(1),D.settings.lya_T_interval);
 end
 out=struct('figs',fig,'files',{{}},'source',{{a.source,f}},'notes',{notes},'width_scale',width_scale);
+if opts.real_histogram_row
+    row_d=['Row (D): for each condition, the real parts of the eigenvalues of the Jacobian at the sampled states of row (C), ' ...
+        'as a histogram on (C)''s real axis (bars: eigenvalues per state in each bin, logarithmic count axis). Dotted: the ' ...
+        'projection of a uniform disk holding the network''s n eigenvalues, centered at -1/tau_d, its radius the ' ...
+        'random-matrix radius of the connectivity times the root-mean-square frozen gain at those states (a semicircle). ' ...
+        'Dashed: zero. Eigenvalues right of zero per state against the uniform disk''s expectation: ' ...
+        strjoin(arrayfun(@(k)sprintf('%s %.2f against %.2f',names{k},hh.reference(k).pos_per_state,hh.reference(k).pos_expected),1:n_col, ...
+        'UniformOutput',false),'; ') ' (the table''s last column; its other columns give the disk and the rest).'];
+    out.notes{end+1}=row_d;
+    out.height_scale=height_scale;
+    out.table_text=sprintf('%s\n\n## Row (D) of the composite\n\n%s\n',hh.table_text,row_d);
+end
     function ax=newaxis(row,col,y,height)
         ax=axes(fig,'Position',[(.105+(col-1)*.30)*s y .235*s height], ...
             'Tag',sprintf('stability_r%d_c%d',row,col),'FontSize',14,'LineWidth',1,'Box','off');

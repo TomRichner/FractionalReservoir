@@ -46,6 +46,12 @@ function out = fig_eig_real_histogram(cfg)
 % 'clipped': linear, cut at 1.5 times the reference curve's peak; bars that
 % exceed it are drawn to the top and marked with a small triangle.
 %
+% SPECTRA_SOURCE (FD-034, default 'eig_heatmap': the figure as it was).
+% 'local_lyapunov' draws it from the states run_local_lyapunov sampled along
+% the switching run (<run_dir>/local_lyapunov/local_lyapunov_spectra.mat,
+% which holds the same disk_by_cond), saved with _switch in the tag; it is
+% row (D) of fig_main3_stability's 'real_histogram_row'.
+%
 % x limits are fig_eig_heatmap's window (the same quantile rule over the
 % drawn conditions), so the two figures read together. No text on the
 % panels: the numbers are in <tag>_table.md, with a caption paragraph.
@@ -64,12 +70,19 @@ arguments
     cfg.disk_radius               = 'gain'   % 'gain' | 'unit' | a positive number (1/s)
     cfg.count_scale (1,:) char {mustBeMember(cfg.count_scale, {'log', 'clipped'})} = 'log'
     cfg.n_bins      (1,1) double {mustBeInteger, mustBePositive} = 200
+    cfg.spectra_source (1,:) char {mustBeMember(cfg.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'   % which stage sampled the states (FD-034)
 end
 setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 st = manuscript_style();
-data_file = resolve_data_file(cfg.data_file, cfg.run_dir, {fullfile(cfg.run_dir, 'eig_heatmap')}, ...
-    'eig_heatmap_data.mat', 'Run run_eig_heatmap first');
+switch cfg.spectra_source
+    case 'eig_heatmap'
+        data_file = resolve_data_file(cfg.data_file, cfg.run_dir, {fullfile(cfg.run_dir, 'eig_heatmap')}, ...
+            'eig_heatmap_data.mat', 'Run run_eig_heatmap first');
+    case 'local_lyapunov'
+        data_file = resolve_data_file(cfg.data_file, cfg.run_dir, {fullfile(cfg.run_dir, 'local_lyapunov')}, ...
+            'local_lyapunov_spectra.mat', 'Run run_local_lyapunov with ''spectra_n_samples'' > 0 first');
+end
 D = load(data_file);
 if isfield(D, 'cond_names'); held = D.cond_names; else; held = D.condition_titles; end
 [cond_names, idx] = select_conditions(held, cfg.conditions);
@@ -107,7 +120,7 @@ if strcmp(mode, 'gain') && ~have_gains
     mode = 'unit';
 end
 ref = struct('n', cell(1, n_cond), 'N', [], 'n_states', [], 'c', [], 'rho', [], 'rho_unit', [], ...
-    'rho_gain', [], 'rms_gain', [], 'expected', [], 'counts', [], 'mode', []);
+    'rho_gain', [], 'rms_gain', [], 'expected', [], 'counts', [], 'mode', [], 'pos_per_state', [], 'pos_expected', []);
 for i = 1:n_cond
     if have_gains
         G = D.disk_by_cond{idx(i)};
@@ -117,7 +130,8 @@ for i = 1:n_cond
     else
         % The preset alone: R does not depend on the network size.
         m = build_from_preset(D.settings.preset_name, cond_names{i}, 'verbose', 'near-none');
-        n = D.settings.n; tau_d = m.tau_d; R = m.R;
+        if isfield(D.settings, 'n'); n = D.settings.n; else; n = m.n; end
+        tau_d = m.tau_d; R = m.R;
         ref(i).rms_gain = NaN; ref(i).rho_gain = NaN;
     end
     ref(i).n = n; ref(i).c = -1 / tau_d; ref(i).rho_unit = R / tau_d;
@@ -131,6 +145,9 @@ for i = 1:n_cond
     ref(i).N = numel(evals{i}) / ref(i).n_states;
     ref(i).expected = n * diff(semicircle_cdf((edges - ref(i).c) / ref(i).rho));
     ref(i).counts = histcounts(real(evals{i}), edges) / ref(i).n_states;
+    % Right of zero, per state: the eigenvalues, and the uniform disk's share of its n.
+    ref(i).pos_per_state = sum(real(evals{i}) > 0) / ref(i).n_states;
+    ref(i).pos_expected = n * (1 - semicircle_cdf((0 - ref(i).c) / ref(i).rho));
 end
 
 %% Draw
@@ -176,10 +193,20 @@ end
 
 %% Table
 fig_tag = 'fig_eig_real_histogram';
+if strcmp(cfg.spectra_source, 'local_lyapunov'); fig_tag = [fig_tag '_switch']; end
 if strcmp(cfg.count_scale, 'clipped'); fig_tag = [fig_tag '_clipped']; end
 L = {};
 L{end + 1} = '# Jacobian eigenvalues projected on the real axis, against a uniform disk';
 L{end + 1} = '';
+if strcmp(cfg.spectra_source, 'local_lyapunov')
+    % Read from the file, so the window stated is the run's own.
+    L{end + 1} = sprintf(['States: %d per condition along %s, at t = %g to %g s (run_local_lyapunov; the states of the ' ...
+        'eigenvalue density drawn from the same file). That run accumulates over [%g, %g] s after %g s of alignment ' ...
+        'over [%g, %g] s.'], numel(D.state_times), D.settings.trajectory, D.state_times(1), D.state_times(end), ...
+        D.lya_T_interval(1), D.lya_T_interval(2), D.settings.lya_warmup, D.lya_T_interval(1) - D.settings.lya_warmup, ...
+        D.lya_T_interval(1));
+    L{end + 1} = '';
+end
 L{end + 1} = sprintf(['Histogram: Re(lambda) of the eigenvalues of the full Jacobian at the sampled states, counts per state, ' ...
     '%d bins of width %.4g 1/s over [%.4g, %.4g] 1/s (the density figure''s window). Dotted curve: the projection of a ' ...
     'uniform disk holding n eigenvalues, radius drawn: `%s`. Count axis: `%s`.'], cfg.n_bins, width, re_lim(1), re_lim(2), ...
@@ -220,7 +247,8 @@ L{end + 1} = ['Histograms: real parts of the eigenvalues of the Jacobian at the 
 table_text = strjoin(L, newline);
 vprintf(cfg.verbose, 'verbose', '%s\n', table_text);
 
-out = struct('figs', fig, 'files', {{}}, 'source', data_file, 'reference', ref, 'edges', edges);
+out = struct('figs', fig, 'files', {{}}, 'source', data_file, 'reference', ref, 'edges', edges, ...
+    'table_text', table_text);
 if cfg.save
     save_figure_stable(out_dir, fig_tag, fig);
     out.files = existing_outputs(out_dir, fig_tag);

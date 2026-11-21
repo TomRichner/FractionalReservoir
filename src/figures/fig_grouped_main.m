@@ -54,7 +54,13 @@ arguments
     % Ritz values from the switching run of the local_lyapunov stage
     % (run_local_lyapunov's spectra_n_samples); saved with _switch in the tag.
     cfg.spectra_source (1,:) char {mustBeMember(cfg.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'
-    cfg.svg (1,1) logical = false   % also save an SVG beside the PNG and .fig
+    % Group 3 only (Tom, 2026-11-20): a fourth row, (D), under the heat map:
+    % the eigenvalues projected on the real axis against a uniform disk
+    % (fig_main3_stability's real_histogram_row; needs show_lambda_row
+    % false). Saved with _realhist appended to the tag, on a taller canvas,
+    % with the numbers in <tag>_table.md.
+    cfg.real_histogram_row (1,1) logical = false
+    cfg.svg (1,1) logical = false  % also save an SVG beside the PNG and .fig
 end
 setup_paths();
 root = fileparts(which('setup_paths'));
@@ -81,8 +87,9 @@ switch group
     case 3
         a=fig_main3_stability(cfg.run_dir,cfg.conditions,'show_lambda_row',cfg.show_lambda_row, ...
             'ritz_overlay',cfg.ritz_overlay,'ritz_k',cfg.ritz_k,'ritz_scaling',cfg.ritz_scaling,'ritz_inset',cfg.ritz_inset,'ritz_style',cfg.ritz_style, ...
-            'spectra_source',cfg.spectra_source);
+            'spectra_source',cfg.spectra_source,'real_histogram_row',cfg.real_histogram_row);
         fig.Position(3)=fig.Position(3)*a.width_scale;
+        if cfg.real_histogram_row, fig.Position(4)=fig.Position(4)*a.height_scale; table_text=a.table_text; end
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 4
@@ -181,6 +188,15 @@ if ismember(group,[1 2 3 8])
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
         set(findall(fig,'Tag','accumulated_lambda_label'),'FontSize',12);
         set(findall(fig,'Tag','ritz_inset'),'FontSize',9); set(findall(fig,'-regexp','Tag','^ritz_(annotation|tick_label)$'),'FontSize',9);
+        if cfg.real_histogram_row
+            % Each histogram under the plot box of the heat map above it, as
+            % that box is on THIS canvas (fig_main3_stability's is another shape).
+            hx=findall(fig,'Type','axes','-regexp','Tag','^stability_r4_c\d+$');
+            for k=1:numel(hx)
+                heat=findall(fig,'Type','axes','Tag',strrep(hx(k).Tag,'_r4_','_r3_'));
+                pb=plot_box_position(heat); hx(k).Position([1 3])=pb([1 3]);
+            end
+        end
     end
 else
     set(findall(fig,'Type','axes'),'FontSize',10);
@@ -197,6 +213,7 @@ if group==3 && cfg.ritz_overlay
     if strcmp(cfg.ritz_scaling,'type_sd'), tag=[tag '_typesd']; end
     if cfg.ritz_inset, tag=[tag '_inset']; end
 end
+if group==3 && cfg.real_histogram_row, tag=[tag '_realhist']; end
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
@@ -234,6 +251,11 @@ if cfg.save
     fprintf(fid,'# Main group %d\n\nRun: `%s`\n\n',group,cfg.run_dir);
     for j=1:numel(sources), fprintf(fid,'- Source: `%s`\n',string(sources{j})); end
     fprintf(fid,'\n'); for j=1:numel(notes), fprintf(fid,'%s\n\n',notes{j}); end
+    if group==3 && cfg.real_histogram_row
+        % The numbers of row (D) and its caption sentence.
+        tid=fopen(fullfile(outdir,[tag '_table.md']),'w'); tguard=onCleanup(@()fclose(tid));
+        fprintf(tid,'%s\n',table_text);
+    end
 end
     function pan=panel(pos)
         pan=uipanel(fig,'Units','normalized','Position',pos,'BorderType','none','BackgroundColor','w');

@@ -1,8 +1,9 @@
-function cfg = with_switch_spectra(cfg, K, n_samples)
+function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s)
 % WITH_SWITCH_SPECTRA Figure 3 with its heat map on the switching run, one top-K pass throughout (FD-034).
 %
 %   cfg = WITH_SWITCH_SPECTRA(cfg)                 K = 100, 40 states
 %   cfg = WITH_SWITCH_SPECTRA(cfg, K, n_samples)
+%   cfg = WITH_SWITCH_SPECTRA(cfg, K, n_samples, first_state_s)
 %
 % OPT-IN, like with_ritz_overlay: no bundle sets it, so no registered run,
 % stage output or figure changes. In the registered Figure 3 the expansion
@@ -26,12 +27,26 @@ function cfg = with_switch_spectra(cfg, K, n_samples)
 %     'spectra_n_samples' (the Jacobian's spectra and H = Q'JQ of the
 %     stage's own top-K pass at that many states of its run; see
 %     run_local_lyapunov).
-%   * two registry entries, each after the entry it is a version of, in a
-%     directory of its own, neither in_paper:
+%   * cfg.local_lyapunov_spectra_start_s = first_state_s (default 1 s;
+%     run_local_lyapunov's 'spectra_start_s'), only when the config's
+%     accumulation window opens before that time. The states are evenly
+%     spaced from there to the end of the run, so 40 of them are t = 1, 2,
+%     ..., 40 s whether the window is [1, 40] s (the first version, where
+%     the field is not set and nothing changes) or [0, 40] s (the timing of
+%     docs/Plan_Figure3_update.md; Tom has not decided on moving the
+%     states, 2026-11-20).
+%   * registry entries, each after the entry it is a version of, in a
+%     directory of its own, none in_paper:
 %       fig_eig_heatmap_switch     the density of the switching run with the
 %                                  Ritz overlay and its inset
 %       fig_main3_grouped_switch   the composite: input, expansion, heat map
 %                                  (no lambda_1 row), same overlay and inset
+%       fig_main3_grouped_switch_hist  that composite with a fourth row, (D):
+%                                  the eigenvalues projected on the real axis
+%                                  against a uniform disk (Tom, 2026-11-20)
+%       fig_eig_real_histogram_switch  the stand-alone histogram of the
+%                                  switching run (only when the config
+%                                  registers fig_eig_real_histogram)
 %     The entries they are versions of are untouched.
 %
 % The config must register fig_eig_heatmap and fig_main3_grouped and name a
@@ -46,6 +61,7 @@ arguments
     cfg (1,1) struct
     K (1,1) double {mustBeInteger, mustBePositive} = 100
     n_samples (1,1) double {mustBeInteger, mustBeGreaterThanOrEqual(n_samples, 2)} = 40
+    first_state_s (1,1) double = 1
 end
 names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
 need = {'fig_eig_heatmap', 'fig_main3_grouped'};
@@ -60,6 +76,11 @@ if any(ismember(added, names))
 end
 cfg.local_lyapunov_K = K;
 cfg.local_lyapunov_spectra_n_samples = n_samples;
+if isfield(cfg, 'local_lyapunov_accumulation_start_s') && cfg.local_lyapunov_accumulation_start_s < first_state_s
+    % Only when the window opens before it: otherwise the stage's default
+    % (the first state at the accumulation start) is that state already.
+    cfg.local_lyapunov_spectra_start_s = first_state_s;
+end
 
 heat = cfg.figures{strcmp(names, 'fig_eig_heatmap')};
 main3 = cfg.figures{strcmp(names, 'fig_main3_grouped')};
@@ -67,12 +88,21 @@ overlay = {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset
 added_heat = struct('name', added{1}, 'fn', heat.fn, 'in_paper', false, 'args', {[heat.args, overlay]});
 added_main3 = struct('name', added{2}, 'fn', main3.fn, 'in_paper', false, ...
     'args', {[main3.args, overlay, {'show_lambda_row', false}]});
+added_main3_hist = struct('name', [added{2} '_hist'], 'fn', main3.fn, 'in_paper', false, ...
+    'args', {[main3.args, overlay, {'show_lambda_row', false, 'real_histogram_row', true}]});
+has_hist = ismember('fig_eig_real_histogram', names);
+if has_hist
+    hist0 = cfg.figures{strcmp(names, 'fig_eig_real_histogram')};
+    added_hist = struct('name', 'fig_eig_real_histogram_switch', 'fn', hist0.fn, 'in_paper', false, ...
+        'args', {[hist0.args, {'spectra_source', 'local_lyapunov'}]});
+end
 
 F = {};
 for k = 1:numel(cfg.figures)
     F{end + 1} = cfg.figures{k}; %#ok<AGROW>
     if strcmp(names{k}, 'fig_eig_heatmap');   F{end + 1} = added_heat;  end %#ok<AGROW>
-    if strcmp(names{k}, 'fig_main3_grouped'); F{end + 1} = added_main3; end %#ok<AGROW>
+    if strcmp(names{k}, 'fig_main3_grouped'); F{end + 1} = added_main3; F{end + 1} = added_main3_hist; end %#ok<AGROW>
+    if has_hist && strcmp(names{k}, 'fig_eig_real_histogram'); F{end + 1} = added_hist; end %#ok<AGROW>
 end
 cfg.figures = F;
 end
