@@ -64,7 +64,7 @@ T.file = {runs.file}'; T.ok = ok'; T.message = message';
 settings = rmfield(plan, 'runs');
 settings.n_workers = n_workers;
 settings.minutes = toc(t_stage) / 60;
-runs = T; %#ok<NASGU>
+runs = T;
 save(index_file, 'runs', 'settings');
 if ~all(ok)
     bad = find(~ok);
@@ -87,6 +87,6 @@ catch err
 end
 end
 
-function save_one(file, N) %#ok<INUSD>
+function save_one(file, N)
 save(file, 'N', '-v7.3');
 end

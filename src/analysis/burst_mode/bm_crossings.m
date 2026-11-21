@@ -32,7 +32,8 @@ function M = bm_crossings(t, z, bursts, windows, tol_pre, tol_post)
 t = t(:); re = real(z(:));
 above = re > 0;
 d = diff([false; above; false]);
-c_on = t(find(d == 1)); c_off = t(find(d == -1) - 1);
+% d has one more element than t: an onset at k is d(k) = 1, an offset at k is d(k + 1) = -1
+c_on = t(d(1:end - 1) == 1); c_off = t(d(2:end) == -1);
 b_on = bursts.t_on(:); b_off = bursts.t_off(:);
 names = fieldnames(windows);
 M = struct('cross_on', c_on', 'cross_off', c_off');

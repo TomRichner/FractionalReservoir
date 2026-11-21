@@ -78,7 +78,7 @@ runs_table.message = message';
 settings = rmfield(plan, 'runs');
 settings.n_workers = n_workers;
 settings.minutes = toc(t_stage) / 60;
-runs = runs_table; %#ok<NASGU>
+runs = runs_table;
 save(index_file, 'runs', 'settings');
 
 if ~all(ok)
@@ -104,6 +104,6 @@ catch err
 end
 end
 
-function save_run(file, R) %#ok<INUSD>
+function save_run(file, R)
 save(file, 'R', '-v7.3');
 end
