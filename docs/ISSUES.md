@@ -1987,3 +1987,29 @@ machine needs that repo cloned and `setup_repo.py` run once.
   the per-seed values; no text on the panels; and, for the paper, a
   registered stage and figure function in place of the exploration
   scripts (as FD-036).
+
+### FD-038 The slow-variables figure of the outlier exploration, for the supplement
+
+- **Status:** wanted (Tom, 2026-11-20: "7 should go in the supplement",
+  figure 7 of the November 20 figure report,
+  `figs/explorations/outliers/outliers_slow_variables.png`). Not started.
+- **What it is today:** `fig_outliers.m`, section 4: two networks
+  (reference, E-to-E x 1.5) by three conditions, a close-up
+  ([-14, 10] x [-9, 9] 1/s) of the dense full-Jacobian spectrum at the 12
+  calibration states of one seed; open markers the rightmost frozen-gain
+  eigenvalue, filled markers its continuation in the full Jacobian (the
+  eigenvalue whose dendritic pattern overlaps it most), each with its
+  conjugate; no adaptation in dark red. Box axes; the open markers are
+  hidden under the filled ones where there are no slow variables.
+- **To make it a supplementary figure:** Tom's complex-plane style
+  (`complex_plane_axes`: axes through the origin, 1:1, one scale, ticks
+  outside the bulk; survey in FD-035 calls this figure easy to move);
+  more than one seed, or a stated choice of seed; the continuation's
+  identification stated with its overlap (0.97 to 0.98 for the E-to-E
+  outlier with multiple timescales, 0.42 to 0.93 for bulk-edge modes),
+  and the 10 % dendritic-fraction rule varied once; a caption and a
+  `_table.md` sidecar; a registered stage and figure function, as for
+  FD-036 and FD-037. The frequency-response exploration explains the
+  figure (the full spectrum solves z = (lambda(M(z)) - 1)/tau_d, and the
+  continuation pairs sit in the band between the adaptation filter and
+  the dendritic low-pass, near 0.6 to 0.9 Hz): the caption can say so.
