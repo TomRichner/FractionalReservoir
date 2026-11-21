@@ -39,6 +39,7 @@ arguments
     cfg.T_range     (1,2) double  = [0, 60]
     cfg.lya_interval (1,2) double = [30, 60]
     cfg.fs          (1,1) double  = 200
+    cfg.ode_solver  (1,:) char    = ''   % '' = build_from_preset's choice; the paper bundles pass 'sra1' (Tom, 2026-11-17)
     cfg.net_seed    (1,1) double  = 0
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
@@ -53,6 +54,9 @@ gammas   = cfg.gammas;
 n_traces = cfg.n_traces;
 T_plot   = cfg.T_range;
 n_cases  = numel(gammas);
+solver_args = {};
+solver = stage_solver(cfg.ode_solver, '', 'fig_introductory_concepts');
+if ~isempty(solver); solver_args = {'ode_solver', solver}; end
 results  = struct('gamma', {}, 't', {}, 'x', {}, 'LLE', {}, 'R', {}, 'W', {});
 
 %% Simulate the three networks
@@ -75,7 +79,7 @@ for k = 1:n_cases
         'store_full_state',     false, ...
         'store_decimated_state', true, ...
         'plot_freq',            cfg.fs, ...
-        'u_ex_scale',           0);
+        'u_ex_scale',           0, solver_args{:});
     model.run();
 
     LLE = model.lya_results.LLE;

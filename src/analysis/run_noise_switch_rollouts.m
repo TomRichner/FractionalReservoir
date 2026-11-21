@@ -115,6 +115,12 @@ arguments
     cfg.out_dir       (1,:) char   = ''
     cfg.verbose                    = 'minimal'
     cfg.model_args    (1,:) cell   = {}
+    % Integration rate and integrator; 0 / '' = the run-mode table's
+    % (analysis_run_config 'param_space': its fs, sra1 for the noisy preset).
+    % The paper bundles pass cfg.fs = 500 and cfg.ode_solver = 'sra1' (Tom,
+    % 2026-11-17), with store_fs 250 and example_fs 125, which divide it.
+    cfg.fs                         = 0
+    cfg.ode_solver                 = ''
 end
 
 setup_paths();
@@ -149,8 +155,12 @@ P.preset_name   = cfg.preset_name;
 P.verbose       = cfg.verbose;
 P.model_args    = cfg.model_args;
 P.rng_seeds     = cfg.rng_seeds;
-P.fs            = run_cfg.model.fs;
-P.ode_solver    = run_cfg.model.ode_solver;
+% The mode table's rate and integrator unless the caller names its own (the
+% bundle's cfg.fs and cfg.ode_solver, through noise_switch_stage_plan).
+% store_fs is reached by whole-sample decimation, so it must divide fs
+% (whole_ratio below refuses one that does not: 200 does not divide 500).
+P.fs            = stage_fs(cfg.fs, run_cfg.model.fs, 'run_noise_switch_rollouts');
+P.ode_solver    = stage_solver(cfg.ode_solver, run_cfg.model.ode_solver, 'run_noise_switch_rollouts');
 P.T_range       = [0, T];
 P.t_shared      = cfg.t_shared;
 P.noise_seed    = cfg.noise_seed;

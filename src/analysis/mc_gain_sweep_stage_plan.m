@@ -190,8 +190,27 @@ end
 
 %% What every run of the stage shares
 shared = {'run_mode', cfg.run_mode, 'verbose', cfg.verbose};
-if isfield(cfg, 'mc_ode_solver') && ~isempty(cfg.mc_ode_solver)
-    shared = [shared, {'ode_solver', cfg.mc_ode_solver}];
+% The integrator: cfg.mc_ode_solver, else the bundle's cfg.ode_solver (Tom,
+% 2026-11-17: every paper simulation at SRA1), else run_mc_gain_sweep's own.
+mc_solver = '';
+if isfield(cfg, 'ode_solver'); mc_solver = stage_solver(cfg.ode_solver, '', 'mc_gain_sweep_stage_plan'); end
+if isfield(cfg, 'mc_ode_solver') && ~isempty(cfg.mc_ode_solver); mc_solver = cfg.mc_ode_solver; end
+if ~isempty(mc_solver)
+    shared = [shared, {'ode_solver', mc_solver}];
+end
+% The integration rate: the bundle's cfg.fs replaces mc_protocol's 200 Hz,
+% as protocol.fs (500 Hz in the paper bundles; Tom, 2026-11-17). A
+% cfg.mc_gain_sweep.protocol that names its own fs keeps it. The protocol
+% is part of every job's signature, so a 500-Hz grid never resumes into a
+% folder of 200-Hz jobs.
+if isfield(cfg, 'fs')
+    fs_bundle = stage_fs(cfg.fs, 0, 'mc_gain_sweep_stage_plan');
+    if fs_bundle > 0
+        protocol = field_or_empty(opts, 'protocol');
+        if isempty(protocol); protocol = struct(); end
+        if ~isfield(protocol, 'fs'); protocol.fs = fs_bundle; end
+        opts.protocol = protocol;
+    end
 end
 % The conditions every run simulates: the stage's own list, else the
 % bundle's (cfg.run_conditions, FD-030), else every condition of the preset.

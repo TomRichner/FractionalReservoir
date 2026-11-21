@@ -128,7 +128,7 @@ for c = {cfg3, cfg4}
     names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
     assert(numel(unique(names)) == numel(names), 'duplicate registry entry');
     grouped = k.figures(startsWith(names, 'fig_main') & endsWith(names, '_grouped'));
-    assert(numel(grouped) == 8);
+    assert(numel(grouped) == 6);   % groups 1-6; the 7 and 8 placeholders are out (FD-031 item 3)
     for g = 1:numel(grouped)
         a = grouped{g}.args;
         src = a{find(strcmp(a(1:2:end), 'source_fig_root')) * 2};
@@ -221,8 +221,14 @@ for m = run_mode_names()
             b3 = k.figures{strcmp(names, 'fig_main3_grouped_baseline')};
             assert(m3.in_paper && ~b3.in_paper && isequal(m3.fn, b3.fn) && ...
                 find(strcmp(names, 'fig_main3_grouped_baseline')) == find(strcmp(names, 'fig_main3_grouped')) + 1, '%s: Figure 3 entries', tag);
-            assert(isequal(m3.args, [b3.args, {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset', true, ...
-                'show_lambda_row', false, 'real_histogram_row', true}]), '%s: the four-row switching composite', tag);
+            % The registry names both files (fig_tag): the paper's composite
+            % is Fig_Main3_Grouped.png, the name FD-031 gave Figure 3 and the
+            % manuscript's figure_sources.json points at; the baseline
+            % (FD-031's layout on the eig_heatmap run) has a name of its own.
+            assert(isequal(b3.args(end - 1:end), {'fig_tag', 'Fig_Main3_Grouped_baseline'}) && ...
+                isequal(m3.args, [b3.args(1:end - 2), {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset', true, ...
+                'show_lambda_row', false, 'real_histogram_row', true, 'fig_tag', 'Fig_Main3_Grouped'}]), ...
+                '%s: the four-row switching composite', tag);
             assert(~any(ismember({'fig_main3_grouped_switch', 'fig_main3_grouped_switch_hist'}, names)) && ...
                 all(ismember({'fig_eig_heatmap_switch', 'fig_eig_real_histogram_switch'}, names)), '%s: switching versions', tag);
             assert(k.local_lyapunov_K == 100 && k.local_lyapunov_spectra_n_samples == 40 && ...

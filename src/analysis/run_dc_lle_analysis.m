@@ -81,6 +81,9 @@ arguments
     % The preset's conditions to run, by name (preset_with_conditions); empty
     % = every condition the preset states, as before (FD-030).
     opts.conditions                   = {}
+    % Integration rate; 0 or [] = this stage's own 400 Hz. FD-031 item 14:
+    % run_all_paper_analyses passes the bundle's cfg.fs.
+    opts.fs                           = 0
 end
 
 setup_paths();
@@ -99,6 +102,7 @@ if ~strcmp(model_class, 'SRNNCellTypePairs')
          'that class''s vocabulary.'], opts.preset_name, model_class);
 end
 cfg = dc_lle_run_config(opts.run_mode, preset, opts.ode_solver);
+cfg.fs = stage_fs(opts.fs, cfg.fs, 'run_dc_lle_analysis');
 
 condition_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 n_cond = numel(condition_names);

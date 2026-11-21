@@ -63,6 +63,8 @@ arguments
     cfg.n_workers   (1,1) double = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.report_dt   (1,1) double = 0.02
     cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
+    cfg.fs                       = 0     % integration rate; 0 or [] -> 400 Hz (FD-031 item 14: the bundle's cfg.fs)
+    cfg.ode_solver               = ''    % integrator; '' -> build_from_preset's choice (stage_solver: the bundle's cfg.ode_solver)
 end
 
 setup_paths();
@@ -95,7 +97,8 @@ P.lya_warmup  = 5;
 P.lya_dt      = 0.05;
 P.K           = 15;
 P.K_max       = 30;
-P.fs          = 400;
+P.fs          = stage_fs(cfg.fs, 400, 'run_transient_gain');
+P.ode_solver  = stage_solver(cfg.ode_solver, '', 'run_transient_gain');   % '' = build_from_preset's
 P.n_override  = cfg.n_override;
 P.horizon     = horizon;
 P.report_dt   = cfg.report_dt;
@@ -191,6 +194,7 @@ args = {'rng_seeds', seeds, 'fs', P.fs, 'T_range', P.T_range, ...
     'lya_method', 'topk', 'lya_K', P.K, 'lya_K_auto', true, 'lya_K_max', P.K_max, ...
     'lya_dt', P.lya_dt, 'lya_T_interval', P.lya_T_interval, 'lya_warmup', P.lya_warmup, ...
     'store_full_state', true};
+if ~isempty(P.ode_solver); args = [args, {'ode_solver', P.ode_solver}]; end
 if P.n_override > 0
     args = [args, {'n', P.n_override, 'indegree', max(2, round(0.2 * P.n_override)), ...
         'F_tracks_network', true}];

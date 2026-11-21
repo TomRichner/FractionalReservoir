@@ -36,10 +36,12 @@ arguments
     cfg.visible (1,1) logical = false
     cfg.verbose (1,:) char = 'minimal'
     cfg.conditions = {}   % names to draw, in order; empty = all the run holds (select_conditions)
-    % Group 3 only: false draws fig_main3_stability's variant without the
-    % lambda_1 row (rows input, expansion, heat map), saved as
-    % Fig_Main3_Grouped_noC (2026-11-17).
-    cfg.show_lambda_row (1,1) logical = true
+    % Group 3 only. false (the default since 2026-11-17, FD-031 item 7: the
+    % paper's layout, approved by Tom) draws fig_main3_stability's rows input,
+    % expansion, heat map, with no lambda_1 trace row, saved as
+    % Fig_Main3_Grouped. true draws the old four-row layout with the lambda_1
+    % row, saved as Fig_Main3_Grouped_withLambda so it never overwrites it.
+    cfg.show_lambda_row (1,1) logical = false
     % Group 3 only (FD-033): draw the Ritz values of the leading Lyapunov
     % subspace on the eigenvalue density (fig_eig_heatmap's ritz_overlay and
     % its ritz_k, ritz_scaling, ritz_style, ritz_inset). Off by default; saved under the
@@ -60,7 +62,17 @@ arguments
     % false). Saved with _realhist appended to the tag, on a taller canvas,
     % with the numbers in <tag>_table.md.
     cfg.real_histogram_row (1,1) logical = false
-    cfg.svg (1,1) logical = false  % also save an SVG beside the PNG and .fig
+    % The file name stem, when the registry names it (as fig_main_mc_grouped's
+    % fig_tag, FD-031). '' (the default) names the file by its options:
+    % Fig_Main<k>_Grouped, and for group 3 _withLambda, _switch, _ritz
+    % (_<style>, _typesd, _inset) and _realhist appended, so a variant drawn
+    % by hand never overwrites another. The mu7chain bundles' in-paper Figure
+    % 3 is the switching four-row composite (FD-046) and passes
+    % 'Fig_Main3_Grouped', the name the manuscript's figure_sources.json
+    % points at; the baseline composite beside it passes
+    % 'Fig_Main3_Grouped_baseline' (with_switch_spectra).
+    cfg.fig_tag (1,:) char = ''
+    cfg.svg (1,1) logical = false   % also save an SVG beside the PNG and .fig
 end
 setup_paths();
 root = fileparts(which('setup_paths'));
@@ -205,7 +217,7 @@ if group==4, style_main4_grouped(fig); end
 if group==5, style_main5_grouped(fig,margin_names,gain_names); end
 if group==6, style_main6_grouped(fig,tau_names); end
 tag=sprintf('Fig_Main%d_Grouped',group);
-if group==3 && ~cfg.show_lambda_row, tag=[tag '_noC']; end
+if group==3 && cfg.show_lambda_row, tag=[tag '_withLambda']; end
 if group==3 && strcmp(cfg.spectra_source,'local_lyapunov'), tag=[tag '_switch']; end
 if group==3 && cfg.ritz_overlay
     tag=[tag '_ritz'];
@@ -214,6 +226,7 @@ if group==3 && cfg.ritz_overlay
     if cfg.ritz_inset, tag=[tag '_inset']; end
 end
 if group==3 && cfg.real_histogram_row, tag=[tag '_realhist']; end
+if ~isempty(cfg.fig_tag), tag=cfg.fig_tag; end   % the registry's name wins over the name by options
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end

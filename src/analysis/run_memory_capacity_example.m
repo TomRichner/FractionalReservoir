@@ -48,6 +48,9 @@ arguments
     % The preset's conditions to simulate, by name (preset_with_conditions);
     % empty = every condition the preset states, as before (FD-030).
     opts.conditions                = {}
+    % Integration rate; 0 or [] -> 200 Hz, mc_protocol's (stage_fs). The
+    % paper bundles pass their cfg.fs, 500 Hz (Tom, 2026-11-17).
+    opts.fs                        = 0
 end
 
 setup_paths();
@@ -87,7 +90,10 @@ switch opts.run_mode
             'Unknown run_mode ''%s'' (expected %s).', ...
             opts.run_mode, strjoin(run_mode_names(), ', '));
 end
-fs         = 200;
+% 200 Hz like mc_protocol by default; a bundle hands its cfg.fs ('fs', 500
+% for the paper: Tom, 2026-11-17, every paper simulation at SRA1 and 500 Hz).
+% T_hold * fs must be whole samples (0.3 s x 500 Hz = 150).
+fs         = stage_fs(opts.fs, mc_protocol().fs, 'run_memory_capacity_example');
 T_wash_sec = 10;
 T_hold     = 0.3;
 input_type = 'sample_hold';

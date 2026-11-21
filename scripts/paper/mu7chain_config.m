@@ -62,13 +62,17 @@ function cfg = mu7chain_config(run_mode, figure_set)
 % FIGURE 3 IS THE SWITCHING VERSION (Tom, 2026-11-20: "we will use the
 % switching version"; docs/Plan_Figure3_update.md, step 6), every mode:
 % with_switch_spectra(cfg, 100, 40, 1, 'as_default', true) at the end.
-% So the local-Lyapunov stage tracks K = 100 directions (cfg.local_lyapunov_K;
-% 50 until then) and saves the Jacobian's spectra and H at 40 states of its own
-% switching run, at 1, 2, ..., 40 s; the registered fig_main3_grouped is
-% the four-row composite (input, expansion, heat map with the Ritz overlay,
-% the real-axis histogram), and the baseline composite stays as
-% fig_main3_grouped_baseline, not in_paper. K = 100 also changes
-% fig_local_lyapunov, which reads the same stage.
+% So the local-Lyapunov stage tracks K = 100 directions (cfg.local_lyapunov_K,
+% in every mode; see the note where it is set) and saves the Jacobian's
+% spectra and H at 40 states of its own switching run, at 1, 2, ..., 40 s;
+% the registered fig_main3_grouped is the four-row composite (input,
+% expansion, heat map with the Ritz overlay, the real-axis histogram),
+% saved as fig_main3_grouped/Fig_Main3_Grouped.png (the name FD-031 gave
+% the paper's Figure 3), and the baseline composite (FD-031's three-row
+% paper layout on the separate eig_heatmap run) stays as
+% fig_main3_grouped_baseline (Fig_Main3_Grouped_baseline.png), not
+% in_paper. K = 100 also changes fig_local_lyapunov, which reads the same
+% stage.
 %
 % THE RANKED LYAPUNOV SPECTRUM (FD-032), every mode: the stage
 % lyapunov_spectrum_n80 (top 240 exponents per condition on the 80-neuron
@@ -170,6 +174,31 @@ cfg = struct();
 cfg.preset_name = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain';
 cfg.run_mode    = run_mode;
 
+% THE INTEGRATION RATE, every run mode (Tom, 2026-11-17, FD-031 item 14): 500
+% Hz. A 400/500/800-Hz test showed second-order step error; 500 Hz halves it
+% at about 1.3x the cost. Stated once here; mu7chain_gainbias_config and
+% mu7chain_AC_config inherit it. Runs made before this (400 Hz at production
+% and medium, 200 Hz in several stages at fast and fastmedium) are left as
+% they are.
+% run_all_paper_analyses hands it as 'fs' to every stage: the sweeps
+% (replacing the analysis_run_config mode table's rate), eig_heatmap,
+% local_lyapunov, lyapunov_spectrum, transient_gain, dc_lle, the paper
+% illustrations, memory capacity and mc_example, block C's grids
+% (protocol.fs) and the noise-switch rollouts. The opt-in stages built since
+% (lyapunov_spectrum_n80, outlier_spectra, outlier_structures) read it and
+% cfg.ode_solver in their plans; frequency_response and eigenvalue_density
+% simulate nothing. One stage keeps its own rates by design: numerics (an fs
+% ladder and a solver comparison).
+cfg.fs = 500;
+
+% THE INTEGRATOR, every stage and every run mode (Tom, 2026-11-17): SRA1,
+% Roessler's strong-order-1.5 scheme for additive noise. Without noise it is
+% Ralston's second-order Runge-Kutta, so the noise-free stages (memory
+% capacity, block C's grids, the noise-off Lyapunov spectrum, the
+% single-neuron illustration) use the same scheme and the Methods state one.
+% Handed beside cfg.fs to the same stages (stage_solver); numerics excepted.
+cfg.ode_solver = 'sra1';
+
 % A fixed sample seed for the joint parameter-space grid (FD-016): two runs
 % of this bundle at the same mode simulate the same 128 points. Any fixed
 % nonnegative integer would do; this one is used nowhere else.
@@ -238,10 +267,14 @@ cfg.verbose = 'minimal';   % 'verbose' | 'minimal' | 'near-none' -- how much the
 %% Presets per stage and figure
 % Memory capacity on THIS network with the Wiener process OFF: the preset
 % below chains to cfg.preset_name and sets sigma_u_noise = 0. mc_run_config
-% would pick rk4 at sigma = 0, so the integrator is named explicitly: sra1,
-% the same solver as every other stage.
+% would pick rk4 at sigma = 0, so the integrator is named explicitly: the
+% bundle's cfg.ode_solver (sra1), the same solver as every other stage.
+% The lean path (no state trajectory held): at 500 Hz the full path's
+% 760-s state series is 2.5 times its 200-Hz size (about 16 GB a trial
+% then), and the lean path gives the same numbers (test_mc_lean_path).
 cfg.mc_preset            = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_noStim_noise0_chainStd_4cond_mu7chain';
-cfg.mc_ode_solver        = 'sra1';
+cfg.mc_ode_solver        = cfg.ode_solver;
+cfg.mc_lean              = true;
 % The local-Lyapunov stage runs on the steps5s twin: a new random step every
 % 5 s, never returning to zero. Same bundle, chained preset.
 cfg.local_lyapunov_preset = 'celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_stdSpread0p25_steps5s_noise0p025_chainStd_4cond_mu7chain';
@@ -257,10 +290,20 @@ cfg.stf_preset           = 'single_neuron_stf';
 cfg.single_neuron_preset = 'single_neuron_mu7chain';
 cfg.illustrations = true;
 cfg.illustration_step_amp = 0.25;   % TR, 2026-09-16: half the mu7revised amplitude
-% K = 100 throughout Figure 3 (Tom, 2026-11-20): the expansion row, the Ritz
-% values and the exponent ticks; passed to with_switch_spectra at the end.
-% (50 until FD-046.)
-cfg.local_lyapunov_K = 100; % explicit also in fast mode
+% Top-K of the local-Lyapunov stage (Figure 3's switching data: the
+% expansion row, the Ritz values and the exponent ticks): K = 100 IN EVERY
+% RUN MODE (Tom, 2026-11-20: 100 tracked directions throughout Figure 3;
+% explicit in fast mode too, overriding run_local_lyapunov's per-mode
+% default; passed to with_switch_spectra at the end).
+% History, both decisions recorded because they were made on two machines
+% two days apart: on 2026-11-17 (FD-031 item 8, the PC) K was 50 at
+% 'essential', 'fast' and 'fastmedium' and 150 at 'medium', 'medium2' and
+% 'production' (about 11-12 min for three conditions on an idle machine);
+% the 2026-11-20 decision replaces both values. What FD-031 found still
+% holds at K = 100: the multiple-timescale expansion does not converge in
+% K, so Figure 3 calls it a lower bound, and fig_main3_stability writes the
+% K the run used into the figure's provenance.
+cfg.local_lyapunov_K = 100;
 cfg.local_lyapunov_T = 40;
 cfg.local_lyapunov_step_duration_s = 5; % 8 steps over 40 s
 % Timing of the switching run (Tom, 2026-11-20; docs/Plan_Figure3_update.md):
@@ -291,8 +334,11 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 % {name, handle, in_paper, extra-args}; the extra args are appended to the
 % standard fields (run_dir, out_dir, save, visible).
 F = {};
+% The two entries that simulate while drawing take the bundle's rate and
+% integrator too (Tom, 2026-11-17: every paper simulation at SRA1, 500 Hz).
+sim_args = {'fs', cfg.fs, 'ode_solver', cfg.ode_solver};
 F = add(F, 'fig_introductory_concepts',       @fig_introductory_concepts,       true, ...
-        {'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas});
+        [{'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas}, sim_args]);
 F = add(F, 'fig_FI_curve',                    @fig_FI_curve,                    true, {});
 % The single-neuron figure has its OWN condition list in each set (the
 % lead's decision, 2026-11-12): its run holds the single-neuron preset's
@@ -307,13 +353,13 @@ switch figure_set
         sn_conditions = {'no_adaptation', 'sfa1_std0', 'sfa0_std1', 'sfa0_stdc2'};
 end
 cfg.single_neuron_conditions = sn_conditions;
-F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, false, ...
+F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, true, ...
         {'conditions', sn_conditions});
 F = add(F, 'fig_adaptation_methods_stf',      @fig_adaptation_methods,          false, ...
         {'variant', 'sfa_std_stf', 'preset_name', cfg.stf_preset});
-F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            false, ...
+F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            true, ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            false, ...
+F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            true, ...
         {'preset_name', cfg.preset_name});
 % What 1TS and the chained MTS share and where they differ (FD-014): the
 % first-cycle match and the steady-state difference under a sinusoidal rate,
@@ -323,10 +369,10 @@ F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            
 F = add(F, 'fig_std_1TS_vs_MTS',              @fig_std_1TS_vs_MTS,              true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_stim_engages_adaptation',     @fig_stim_engages_adaptation,     true, ...
-        {'preset_name', cfg.bursting_preset});
+        [{'preset_name', cfg.bursting_preset}, sim_args]);
 F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, true, ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         false, ...
+F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         true, ...
         {'preset_name', cfg.preset_name});
 F = add(F, 'fig_param_space_allStd',          @fig_param_space_allStd,          true, ...
         {'preset_name', cfg.preset_name});
@@ -357,11 +403,11 @@ F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    fa
 F = add(F, 'fig_transient_gain',             @fig_transient_gain,             false, {});
 F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  false, {});
 F = add(F, 'fig_local_lyapunov',             @fig_local_lyapunov,             true, {});
-F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       false, ...
+F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       true, ...
         {'variant', 'solver'});
-F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       false, ...
+F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       true, ...
         {'variant', 'lya_method'});
-F = add(F, 'fig_numerics_jacobian',          @fig_numerics_verification,       false, ...
+F = add(F, 'fig_numerics_jacobian',          @fig_numerics_verification,       true, ...
         {'variant', 'jacobian'});
 F = add(F, 'doc_tables',                      @fig_doc_tables,                  true, ...
         {'preset_name', cfg.preset_name});

@@ -105,6 +105,8 @@ arguments
     cfg.ritz_K      (1,1) double {mustBeInteger, mustBeNonnegative} = 0   % 0 = no Ritz pass (FD-033); else K of the pass
     cfg.ritz_scalings              = {'raw', 'type_sd'}   % state scalings of the Ritz pass, each a pass of its own
     cfg.disk_gains  (1,1) logical = false    % save the frozen gains for the uniform-disk reference (always with the Ritz pass)
+    cfg.fs                         = 0        % integration rate; 0 or [] -> per run_mode (FD-031 item 14: the bundle's cfg.fs)
+    cfg.ode_solver                 = ''       % integrator; '' -> build_from_preset's choice (stage_solver: the bundle's cfg.ode_solver)
 end
 
 setup_paths();
@@ -149,6 +151,8 @@ switch cfg.run_mode
             cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
 if cfg.n_samples > 0; n_samples = cfg.n_samples; end
+fs = stage_fs(cfg.fs, fs, 'run_eig_heatmap');   % the bundle's rate replaces the table's
+cfg.ode_solver = stage_solver(cfg.ode_solver, '', 'run_eig_heatmap');   % checked now; '' = build_from_preset's
 
 ritz_scalings = cellstr(cfg.ritz_scalings);
 if cfg.ritz_K > 0 && (isempty(ritz_scalings) || ~all(ismember(ritz_scalings, {'raw', 'type_sd'})))
@@ -306,6 +310,7 @@ args = {'T_range', T_range, 'fs', fs, 'rng_seeds', [1 2], ...   % same W across 
 if n_override > 0
     args = [args, {'n', n_override, 'indegree', max(2, round(0.2 * n_override)), 'F_tracks_network', true}];
 end
+if ~isempty(cfg.ode_solver); args = [args, {'ode_solver', cfg.ode_solver}]; end
 args = [args, struct2namevalue(overrides)];
 model = build_from_preset(cfg.preset_name, cond_name, args{:});
 model.run();

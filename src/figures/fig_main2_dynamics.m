@@ -65,10 +65,16 @@ fig=figure('Visible','off','Color','w','Position',[40 40 1450*width_scale 1200])
 % by a 2-Hz low-pass, half of the saved neurons in the model's E/I colours
 % (excitatory_colormap / inhibitory_colormap in src/plotting, the palettes SRNNModel2.plot uses; TR, 2026-09-16).
 ax_all=gobjects(7,n_col);
-rows={'u','x','r','syn','sfa','std','lambda'};
+% Row (F) is b1, the FIRST depression variable (available resources, 0 to 1)
+% of every condition, as run_paper_illustrations saves it (FD-031 item 12;
+% Tom, 2026-11-17: b1 is the synaptic depression). Not the route's depression
+% factor `std` (prod(b) on a product route), which the stage also saves.
+rows={'u','x','r','syn','sfa','b1','lambda'};
 labels={'Input, $u_i$',{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
     {'Synaptic','output, $\theta_i$'},{'Spike-Frequency','Adaptation'}, ...
     {'Synaptic','Depression'},{'Lyapunov Exp.,','$\lambda_1$'}};
+% (The label stays "Synaptic Depression": with ", $b_1$" its long second line
+% runs into the labels of rows E and G. The provenance names b1.)
 titles=grouped_condition_label(names,'sentence');
 st=manuscript_style();
 for c=1:n_col
@@ -92,7 +98,10 @@ for c=1:n_col
             case 2, ylim(ax,[-6 6]); yticks(ax,[-5 0 5]);
             case {3,4}, ylim(ax,[0 1]); yticks(ax,[0 .5 1]);
             case 5, ylim(ax,[0 .6]); yticks(ax,[0 .5]);
-            case 6, ylim(ax,[0 1.02]); yticks(ax,[0 .5 1]);
+            case 6
+                % b1 lies in [0,1]; the archived raster keeps its calibrated [0,1.02].
+                if numeric, ylim(ax,[0 1]); else, ylim(ax,[0 1.02]); end
+                yticks(ax,[0 .5 1]);
             case 7, ylim(ax,[-5 5]); yticks(ax,[-5 0 5]);
         end
         if j==7
@@ -123,12 +132,18 @@ for xpos=(.3775+(0:n_col-2)*.30)*s
     plot(sep,[xpos xpos],[.07 .945],'Color',[.88 .88 .88],'LineWidth',2.5);
 end
 uistack(sep,'bottom');
-notes{end+1}=['Numeric rendering draws the first half of the saved neurons of each type (25 saved -> 12 displayed), ' ...
+notes{end+1}=['Numeric rendering draws the first half of the saved neurons of each type (round(25/2): 25 saved -> 13 displayed), ' ...
     'the same indices in every state row, in the model''s own E/I palettes (excitatory_colormap / inhibitory_colormap, ' ...
     'the colours SRNNModel2.plot uses). Row (A) is the uniform input step. Row (G): the local rate is low-pass filtered at 2 Hz ' ...
     '(2nd-order Butterworth, zero phase) for display only; the finite-time lambda_1 is unfiltered. ' ...
     'The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.'];
 notes{end+1}=sprintf('Columns, left to right: %s (titled and coloured by condition name).',strjoin(names,', '));
+if numeric
+    notes{end+1}=['Row (F), Synaptic Depression: b1, the first depression variable (available resources, 0 to 1) ' ...
+        'of each neuron''s first outgoing route, field `b1` of the saved results, for every condition: the only b ' ...
+        'of a one-variable route, the releasable pool of a chained route, the first factor of a product route. ' ...
+        'Not the route''s depression factor `std`. Blank where the condition has no depression.'];
+end
 out=struct('figs',fig,'files',{{}},'source',{{source}},'notes',{notes},'width_scale',width_scale);
 end
 function draw_numeric(ax,r,field)
@@ -145,8 +160,15 @@ if strcmp(field,'u')
     % Every neuron receives the same step; one black trace.
     plot(ax,r.t,r.u(1,:),'k','LineWidth',1.25); return
 end
-if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std'})
+if strcmp(r.name,'no_adaptation') && ismember(field,{'sfa','std','b1'})
     return
+end
+if strcmp(field,'b1')
+    % A condition without depression (SFA only) leaves the row blank.
+    if isfield(r,'std_model') && strcmp(r.std_model,'none'), return; end
+    assert(isfield(r,'b1') && ~isempty(r.b1),'fig_main2_dynamics:NoB1', ...
+        ['The saved representative_dynamics results have no b1 (the first depression variable). ' ...
+        'They predate FD-031 item 12: rerun the paper_illustrations stage for this run.']);
 end
 Y=r.(field); counts=cellfun(@numel,r.selected); offsets=[0 cumsum(counts)];
 for q=numel(counts):-1:1

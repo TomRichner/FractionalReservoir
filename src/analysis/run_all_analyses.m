@@ -82,6 +82,8 @@ arguments
     opts.sweeps          cell       = {'sensitivity', 'tau', 'param_space'}   % the sweeps to run, as given; {} = none
     opts.manifest_fields (1,1) struct = struct()  % extra run_manifest fields from the caller
     opts.conditions                 = {}          % the preset's conditions to run, by name; {} = all (FD-030)
+    opts.fs                         = 0           % integration rate for every sweep; 0 or [] = each mode table's (FD-031 item 14)
+    opts.ode_solver                 = ''          % integrator for every sweep; '' = each mode table's (stage_solver)
 end
 
 setup_paths();
@@ -148,13 +150,25 @@ end
 if ~isempty(opts.conditions)
     extra.conditions_run = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 end
+% The integration rate, only when the caller set one (FD-031 item 14): the
+% sweeps then ran at it, not at their mode table's rate. A run that set none
+% keeps the manifest it always had.
+fs_given = stage_fs(opts.fs, 0, 'run_all_analyses');
+if fs_given > 0
+    extra.fs = fs_given;
+end
+% The integrator likewise, only when the caller named one (stage_solver).
+if ~isempty(opts.ode_solver)
+    extra.ode_solver = stage_solver(opts.ode_solver, '', 'run_all_analyses');
+end
 save_manifest(run_dir, preset_name, preset_defaults, model_class, run_mode, ...
     opts.save_figs, prov, dt_str, extra);
 
 %% Shared context arguments for every sub-analysis
 ctx_args = {'preset_name', preset_name, 'run_mode', run_mode, ...
             'output_dir', run_dir, 'save_figs', opts.save_figs, ...
-            'verbose', opts.verbose, 'conditions', opts.conditions};
+            'verbose', opts.verbose, 'conditions', opts.conditions, 'fs', opts.fs, ...
+            'ode_solver', opts.ode_solver};
 
 %% 1. Sensitivity
 % The [k/n] counters number the sweeps that run; with all three selected the

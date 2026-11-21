@@ -262,12 +262,20 @@ all_passed = check('with the gains saved, the stage records n, tau_d, R and one 
 %% The composite Figure 3 with the overlay
 evalc(['run_local_lyapunov(''preset_name'', P, ''run_mode'', ''fast'', ''out_dir'', fullfile(ritz_dir, ''local_lyapunov''), ' ...
     '''K'', 5, ''T'', 8, ''n_override'', 60);']);
-evalc('m3 = fig_main3_stability(ritz_dir, {}, ''ritz_overlay'', true, ''ritz_inset'', true);');
-panels = findall(m3.figs, 'Type', 'axes', '-regexp', 'Tag', '^stability_r1_c\d+$');
-in_panel = arrayfun(@(ax) numel(findall(ax, 'Tag', 'ritz_density')), panels);
-all_passed = check('fig_main3_stability: every heat-map panel carries the points; one inset per panel', ...
-    numel(panels) == n_cond && all(in_panel == 1) && n_tagged(m3.figs, 'ritz_inset') == n_cond) && all_passed;
-close(m3.figs);
+% The heat map is row 3 of the default layout (no lambda_1 row; the default
+% since the merge with FD-031, 2026-11-21) and row 1 of the old layout with
+% the lambda_1 row, which stays reachable ('show_lambda_row', true).
+layouts = {{}, '^stability_r3_c\d+$'; {'show_lambda_row', true}, '^stability_r1_c\d+$'};
+ok = true;
+for q = 1:size(layouts, 1)
+    evalc('m3 = fig_main3_stability(ritz_dir, {}, ''ritz_overlay'', true, ''ritz_inset'', true, layouts{q, 1}{:});');
+    panels = findall(m3.figs, 'Type', 'axes', '-regexp', 'Tag', layouts{q, 2});
+    in_panel = arrayfun(@(ax) numel(findall(ax, 'Tag', 'ritz_density')), panels);
+    ok = ok && numel(panels) == n_cond && all(in_panel == 1) && n_tagged(m3.figs, 'ritz_inset') == n_cond;
+    close(m3.figs);
+end
+all_passed = check('fig_main3_stability, the paper layout and the old one with the lambda_1 row: every heat-map panel carries the points; one inset per panel', ...
+    ok) && all_passed;
 evalc('m0 = fig_main3_stability(ritz_dir, {});');
 all_passed = check('fig_main3_stability without the option: no Ritz object', ...
     n_tagged(m0.figs, 'ritz_density') == 0 && n_tagged(m0.figs, 'ritz_inset') == 0) && all_passed;

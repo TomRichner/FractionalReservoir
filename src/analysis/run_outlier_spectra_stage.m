@@ -65,6 +65,10 @@ for k = 1:n_runs
         'x_thr', plan.x_thr, 'lya_K', plan.lya_K, 'lya_window', plan.lya_window_s, ...
         'chunk_s', plan.chunk_s, 'out_dir', out_dir, ...
         'verbose', verbose_level(verbose) >= verbose_level('verbose')};
+    % The bundle's integrator (plan.ode_solver; '' or absent = ospec_build_model's rule).
+    if isfield(plan, 'ode_solver') && ~isempty(plan.ode_solver)
+        a = [a, {'ode_solver', plan.ode_solver}]; %#ok<AGROW>
+    end
     if r.full
         a = [a, {'dt_full', plan.dt_full, 'dense', true}]; %#ok<AGROW>
     else

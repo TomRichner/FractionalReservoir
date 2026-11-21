@@ -15,6 +15,10 @@ function model = ospec_build_model(B)
 %   rng_seeds        1 x 2
 %   T_range, fs      the run's time grid
 %   lya_args         name-value Lyapunov settings
+%   ode_solver       optional: the integrator (the bundle's cfg.ode_solver,
+%                    through the stage's plan). Absent or empty: the rule
+%                    below. A file saved before the field existed has none
+%                    and rebuilds as it was built.
 %
 % build_from_preset's rule (preset, then condition, then the caller's
 % pairs; sra1 for a noisy preset, rk4 otherwise), on OspecNet so that
@@ -45,6 +49,7 @@ end
 cond = rmfield(conditions{ci}, 'name');
 solver = 'rk4';
 if isfield(p, 'sigma_u_noise') && any(p.sigma_u_noise(:) > 0); solver = 'sra1'; end
+if isfield(B, 'ode_solver') && ~isempty(B.ode_solver); solver = B.ode_solver; end
 
 rng(0, 'twister');
 args = [struct2namevalue(p), struct2namevalue(cond), {'ode_solver', solver}, ...

@@ -49,8 +49,14 @@ function plan = lyapunov_spectrum_n80_stage_plan(cfg)
 %                    the adapting conditions are stable (lambda_1 < 0, D_KY
 %                    resolved at 0). A doubling to 480 would also double the
 %                    cost of exactly the runs that are already the slowest.
-%   fs               500 Hz; the integrator is the one the preset selects
-%                    (sra1: the preset is stochastic; build_from_preset)
+%   fs               the bundle's cfg.fs (stage_fs; 500 Hz in the mu7chain
+%                    bundles), else 500 Hz
+%   integrator       the bundle's cfg.ode_solver (stage_solver; 'sra1' in
+%                    the mu7chain bundles), else the one the preset selects
+%                    (sra1: the preset is stochastic; build_from_preset).
+%                    Both since the merge with the solver plumbing
+%                    (2026-11-21); in the mu7chain bundles the values are
+%                    the ones the stage always used.
 %   lya_dt           0.05 s (run_lyapunov_spectrum's)
 %   noise            the preset's only; no noise-off variant
 % EVERY RUN USES THE ONE T_range. Runs of different length on one seed are
@@ -68,7 +74,8 @@ function plan = lyapunov_spectrum_n80_stage_plan(cfg)
 %   plan.args     name-value arguments for run_lyapunov_spectrum, all but
 %                 out_dir
 %   plan.n_seeds, plan.K, plan.T, plan.lya_T_interval, plan.lya_warmup,
-%   plan.fs, plan.conditions, plan.preset_name
+%   plan.fs, plan.ode_solver ('' = the preset's), plan.conditions,
+%   plan.preset_name
 %                 what the run will do, for the stage's one-line report
 %
 % See also: run_lyapunov_spectrum_n80_stage, run_lyapunov_spectrum,
@@ -159,12 +166,18 @@ plan.K              = K;
 plan.T              = T;
 plan.lya_T_interval = window;
 plan.lya_warmup     = warmup;
-plan.fs             = FS;
+% The bundle's rate and integrator (cfg.fs, cfg.ode_solver; Tom, 2026-11-17:
+% every paper simulation at SRA1 and 500 Hz), else the stage's own.
+fs = stage_fs(field_or_empty(cfg, 'fs'), FS, 'lyapunov_spectrum_n80_stage_plan');
+solver = stage_solver(field_or_empty(cfg, 'ode_solver'), '', 'lyapunov_spectrum_n80_stage_plan');
+plan.fs             = fs;
+plan.ode_solver     = solver;
 plan.conditions     = cond_names;
 plan.args = {'preset_name', preset_name, 'run_mode', cfg.run_mode, 'verbose', verbose, ...
     'conditions', cond_names, 'n_seeds', n_seeds, 'K', K, 'K_max', K, ...
-    'T', T, 'lya_T_interval', window, 'lya_warmup', warmup, 'fs', FS, ...
+    'T', T, 'lya_T_interval', window, 'lya_warmup', warmup, 'fs', fs, ...
     'noise_off_too', false};
+if ~isempty(solver); plan.args = [plan.args, {'ode_solver', solver}]; end
 end
 
 %% ------------------------------------------------------------------------

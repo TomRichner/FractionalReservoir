@@ -115,16 +115,16 @@ entry_names_all = [{'fig_mc_maps_bias', 'fig_mc_maps_selfcoupling', 'fig_mc_gain
     'fig_lambda1_vs_bias', 'fig_rate_vs_lambda1', 'fig_slope_share_vs_gain', ...
     'mc_statistics_bias', 'mc_statistics_selfcoupling'}, ...
     strcat('fig_mc_maps_', noise_grids), strcat('fig_mc_robustness_', noise_grids), ...
-    strcat('mc_statistics_', noise_grids), {'fig_mc_noise_sweeps', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}];
+    strcat('mc_statistics_', noise_grids), {'fig_mc_noise_sweeps', 'fig_main_mc_grouped', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}];
 entry_grids_all = [{'bias', 'selfcoupling', 'bias', 'bias', 'selfcoupling', 'selfcoupling', ...
-    'bias', 'bias', 'bias', 'bias', 'selfcoupling'}, noise_grids, noise_grids, noise_grids, {'', '', ''}];
+    'bias', 'bias', 'bias', 'bias', 'selfcoupling'}, noise_grids, noise_grids, noise_grids, {'', '', '', ''}];
 % ... and the bundle's own (FD-029): the self-coupling grid's entries, the
 % noise sweeps' figure and the time series, in the same order.
 registered = ismember(entry_grids_all, {'selfcoupling', ''});
 entry_names = entry_names_all(registered);
 entry_grids = entry_grids_all(registered);
 assert(isequal(entry_names, {'fig_mc_maps_selfcoupling', 'fig_mc_robustness_selfcoupling', 'fig_mc_vs_lambda1', ...
-    'mc_statistics_selfcoupling', 'fig_mc_noise_sweeps', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}));
+    'mc_statistics_selfcoupling', 'fig_mc_noise_sweeps', 'fig_main_mc_grouped', 'fig_noise_levels_wiener', 'fig_noise_levels_gamma'}));
 % The maps' style (FD-029; guppy on symlog is Tom's choice), on every registered map.
 MAP_STYLE = {'mc_scale', 'linear', 'lle_scale', 'symlog', 'lle_lin', 0.05, 'lle_clip', 5, ...
     'ticks_top_right', false, 'show_zero_line', false, 'show_flags', false, 'show_iqr', false, ...
@@ -164,7 +164,7 @@ for md = {'essential', 'fast'}
         c_two = mu7chain_gainbias_config(md{1}, fs{1}, {'selfcoupling', 'bias'});
         two = cellfun(@(f) f.name, c_two.figures, 'UniformOutput', false);
         assert(isequal(two, setdiff(entry_names_all(ismember(entry_grids_all, {'selfcoupling', 'bias', ''})), ...
-            {'fig_mc_noise_sweeps'}, 'stable')), ...
+            {'fig_mc_noise_sweeps', 'fig_main_mc_grouped'}, 'stable')), ...
             'a grid brought back brings its figure entries; an entry whose grids do not all run is left out');
         c = c_all;
         names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
@@ -523,17 +523,24 @@ for md = {'essential', 'fast'}
             isequal(ns_plan.conditions, want), ...
             'the noise switch runs the bundle''s noisy preset, the bundle''s conditions, into noise_switch/');
         assert(isequal(ac.run_conditions, A.run_conditions) && isequal(ac.figure_sets, A.figure_sets));
-        grouped = ac.figures(startsWith(names, 'fig_main'));
+        grouped = ac.figures(startsWith(names, 'fig_main') & ~strcmp(names, 'fig_main_mc_grouped'));   % Fig 7 is block C's, with no source root
         assert(~isempty(grouped) && all(cellfun(@(f) strcmp(arg(f.args, 'source_fig_root'), ac.fig_root), grouped)), ...
             'the grouped figures read their sources from this bundle''s figure root');
         % mc_lean: the bundle sets it so block A's two memory-capacity
         % stages take the lean path (203d4f6; the same R^2 and memory
         % capacity to the bit, test_mc_lean_path, without holding the state
-        % trajectory). mu7chain_config does not set it.
+        % trajectory). mu7chain_config sets it too since the 500-Hz decision
+        % (Tom, 2026-11-17).
         assert(isequal(ac.mc_lean, true), 'the bundle runs memory capacity on the lean path');
-        differs = {'stages', 'mc_gain_sweep', 'run_dir', 'fig_root', 'figures', 'mc_lean'};
+        % noise_switch: the storage rates of the rollouts, which must divide
+        % the bundle's cfg.fs (500 Hz): 250 and 125 Hz.
+        assert(isequal(ac.noise_switch, struct('store_fs', 250, 'example_fs', 125)) && ...
+            mod(ac.fs, ac.noise_switch.store_fs) == 0, 'the noise-switch storage rates divide cfg.fs');
+        assert(isequal(arg(ns_plan.args, 'fs'), ac.fs) && strcmp(arg(ns_plan.args, 'ode_solver'), ac.ode_solver) && ...
+            isequal(arg(ns_plan.args, 'store_fs'), 250), 'the noise switch runs at the bundle''s rate and integrator');
+        differs = {'stages', 'mc_gain_sweep', 'run_dir', 'fig_root', 'figures', 'mc_lean', 'noise_switch'};
         assert(isequal(rmfield(ac, differs), rmfield(A, intersect(differs, fieldnames(A)))), ...
-            'the bundle differs from mu7chain_config in more than its stages, directories, registry and the lean memory-capacity path');
+            'the bundle differs from mu7chain_config in more than its stages, directories, registry, the lean memory-capacity path and the noise-switch storage rates');
     end
 end
 assert(strcmp(mu7chain_AC_config().run_mode, 'essential'), 'the default is the size agents run');

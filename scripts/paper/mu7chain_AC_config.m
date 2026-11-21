@@ -53,7 +53,8 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %   cfg.run_dir   data/mu7chain_AC_<run_mode>
 %   cfg.fig_root  figs/mu7chain_AC_<run_mode>_<figure_set>; the grouped
 %                 main figures read their source figures from this root
-%   cfg.figures   block A's entries, then block C's, then
+%   cfg.figures   block A's entries, then block C's (the paper's Fig 7,
+%                 fig_main_mc_grouped, among them: FD-031 item 1), then
 %                 fig_noise_switch_rollouts: one time-series figure per
 %                 condition of the set (Fig_noise_switch_timeseries_<c>_copies)
 %                 and the summary (Fig_noise_switch_divergence, with its
@@ -140,6 +141,11 @@ cfg.mc_gain_sweep = C.mc_gain_sweep;
 % on the same 12 workers, and the full-trajectory path would not fit in
 % memory. mu7chain_config on its own is unchanged (lead, FD-025).
 cfg.mc_lean = true;
+% The noise-switch rollouts store by whole-sample decimation of the
+% integration rate, so the storage rates must divide cfg.fs = 500 (Tom,
+% 2026-11-17): every other sample (250 Hz), and every fourth for the
+% example series (125 Hz). The old 200 and 100 Hz do not divide 500.
+cfg.noise_switch = struct('store_fs', 250, 'example_fs', 125);
 
 %% Where things land -- apart from either part's own directories
 cfg.run_dir  = ['data/mu7chain_AC_' run_mode];

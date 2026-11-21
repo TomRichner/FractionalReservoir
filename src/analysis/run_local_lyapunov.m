@@ -85,6 +85,8 @@ arguments
     cfg.spectra_n_samples (1,1) double {mustBeInteger, mustBeNonnegative} = 0   % 0 = off; else states at which to save the spectra and H (FD-034)
     cfg.spectra_start_s (1,1) double = NaN   % time of the first sampled state; NaN = the accumulation start (spectra_n_samples > 0 only)
     cfg.use_parallel (1,1) logical = true   % the spectra's eigenvalue problems in a parfor (spectra_n_samples > 0 only)
+    cfg.fs                       = 0     % integration rate; 0 or [] -> 400 Hz (FD-031 item 14: the bundle's cfg.fs)
+    cfg.ode_solver               = ''    % integrator; '' -> build_from_preset's choice (stage_solver: the bundle's cfg.ode_solver)
 end
 
 setup_paths();
@@ -100,6 +102,8 @@ switch cfg.run_mode
             cfg.run_mode, strjoin(run_mode_names(), ', '));
 end
 if cfg.K > 0; K = cfg.K; end
+fs = stage_fs(cfg.fs, 400, 'run_local_lyapunov');
+solver = stage_solver(cfg.ode_solver, '', 'run_local_lyapunov');   % '' = build_from_preset's
 T = cfg.T;
 acc_start=cfg.accumulation_start_s; if isnan(acc_start), acc_start=T/2; end
 warmup=cfg.warmup_s; if isnan(warmup), warmup=T/4; end
@@ -119,8 +123,9 @@ cond_names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
 title_map  = srnn_condition_titles();
 titles     = cellfun(@(n) title_map(n), cond_names, 'UniformOutput', false);
 seeds  = [1 2];
-common = {'rng_seeds', seeds, 'fs', 400, 'T_range', [cfg.simulation_start_s T], 'lya_T_interval', [acc_start T], ...
+common = {'rng_seeds', seeds, 'fs', fs, 'T_range', [cfg.simulation_start_s T], 'lya_T_interval', [acc_start T], ...
           'lya_warmup', warmup, 'verbose', cfg.verbose};
+if ~isempty(solver); common = [common, {'ode_solver', solver}]; end
 if cfg.step_duration_s>0
     n_steps=round(T/cfg.step_duration_s);
     assert(n_steps>=1 && abs(n_steps*cfg.step_duration_s-T)<1e-9, ...
@@ -181,7 +186,8 @@ for i = 1:numel(cond_names)
 end
 
 settings = struct('preset_name', cfg.preset_name, 'run_mode', cfg.run_mode, 'seeds', seeds, ...
-    'T', T, 'K', K, 'lya_T_interval', [acc_start T], 'lya_warmup', warmup, 'fs', 400, ...
+    'T', T, 'K', K, 'lya_T_interval', [acc_start T], 'lya_warmup', warmup, 'fs', fs, ...
+    'ode_solver', m.ode_solver, ...
     'simulation_start_s', cfg.simulation_start_s, 'step_duration_s',cfg.step_duration_s, 'n_override', cfg.n_override, 'minutes', toc(t_stage) / 60);
 condition_titles = titles; %#ok<NASGU>
 mat_file = fullfile(out_dir, 'local_lyapunov_data.mat');

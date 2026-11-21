@@ -21,17 +21,29 @@ function out = fig_ied_stim_blocks(opts)
 % fig_ied_stim_blocks_supp_state (supplement: % change under stimulation of
 % mean rate, SFA feedback and depression 1 - b_1, one point per network from
 % its block means, median line), plus _stats.{md,mat}.
+%
+%   out = fig_ied_stim_blocks('data_dir', run_dir, 'out_dir', d)          % all three
+%   out = fig_ied_stim_blocks(..., 'which', 'main' | 'rate' | 'supp_state')
+%
+% A figure of the ied_stim bundle (ied_stim_config registers one entry per
+% 'which', each into its own folder; FD-031 item 4); moved from
+% scripts/explorations/IED_model on 2026-11-17. The stats files are written
+% with 'main' (and 'all'). example_seed defaults to the run's first network,
+% example_blocks to its first no-stimulation and first stimulation block.
 arguments
-    opts.data_dir (1,:) char = 'C:/Users/m218089/Desktop/github_repos/FractionalReservoir/data/IED_model/stim_blocks_20261117'
-    opts.out_dir (1,:) char = 'C:/Users/m218089/Desktop/github_repos/FractionalReservoir/figs/IED_model/stim_blocks_20261117'
-    opts.example_seed (1,1) double = 42
-    opts.example_blocks (1,2) double = [1 5]
+    opts.data_dir (1,:) char {mustBeNonempty}
+    opts.out_dir (1,:) char {mustBeNonempty}
+    opts.which (1,:) char {mustBeMember(opts.which,{'all','main','rate','supp_state'})} = 'all'
+    opts.example_seed (1,1) double = NaN
+    opts.example_blocks (1,2) double = [NaN NaN]
     opts.floor_pct (1,1) double = 0.5     % where a zero-event block is drawn
     opts.visible (1,1) logical = false
 end
-setup_paths();
 if ~isfolder(opts.out_dir), mkdir(opts.out_dir); end
 L=load(fullfile(opts.data_dir,'summary.mat')); S=L.rows; run_opts=L.opts;
+if isnan(opts.example_seed), opts.example_seed=S.seed(1); end
+if any(isnan(opts.example_blocks)), opts.example_blocks=[1 run_opts.n_no+1]; end
+want=@(w) any(strcmp(opts.which,{'all',w}));
 seeds=unique(S.seed,'stable')'; nS=numel(seeds);
 purple=[0.494 0.247 0.596]; green=[0 0.62 0.45]; red=[0.85 0.2 0.1];
 cols=net_colors(nS); fs=14;
@@ -52,7 +64,10 @@ for i=1:nS
 end
 ratio=pooled(:,2)./pooled(:,1);
 f=S.psd_f{1};
+pct=100*(state(:,:,2)./state(:,:,1)-1);
+fig=[]; ex_info={'',''};
 
+if want('main')
 fig=figure('Color','w','Visible',onoff(opts.visible),'Units','inches','Position',[0 0 16 10]);
 tl=tiledlayout(fig,2,2,'TileSpacing','loose','Padding','compact');
 
@@ -101,14 +116,17 @@ title(ax,sprintf('Median, IQR Over Networks (n = %d)',nS),'FontWeight','normal')
 legend(ax,hs,{'No Stim.','Stim.'},'Location','southwest','Box','off');
 style(ax,fs);
 save_fig(fig,opts.out_dir,'fig_ied_stim_blocks');
+end
 
 % ---- standalone rate figure --------------------------------------------------
+if want('rate')
 f2=figure('Color','w','Visible','off','Units','inches','Position',[0 0 7 4.5]);
 rate_axes(axes(f2),norm_blk,pooled,cols,seeds,opts.floor_pct,fs);
 save_fig(f2,opts.out_dir,'fig_ied_stim_blocks_rate'); close(f2);
+end
 
 % ---- supplement: state change -------------------------------------------------
-pct=100*(state(:,:,2)./state(:,:,1)-1);
+if want('supp_state')
 f3=figure('Color','w','Visible','off','Units','inches','Position',[0 0 4.5 4]);
 ax=axes(f3); hold(ax,'on'); rng(7,'twister');
 for c=1:3
@@ -120,14 +138,17 @@ yline(ax,0,'-','Color',[.5 .5 .5],'LineWidth',1);
 xlim(ax,[0.4 3.6]); xticks(ax,1:3); xticklabels(ax,{'Rate','SFA','Depression'});
 ylabel(ax,'Change with Stimulation (%)'); style(ax,fs);
 save_fig(f3,opts.out_dir,'fig_ied_stim_blocks_supp_state'); close(f3);
+end
 
 % ---- stats -------------------------------------------------------------------
 stats=struct('seeds',seeds,'pooled_epm',pooled,'ratio',ratio,'norm_blocks',{norm_blk}, ...
     'state_means',state,'state_pct',pct,'example',{ex_info},'run_opts',run_opts);
-save(fullfile(opts.out_dir,'fig_ied_stim_blocks_stats.mat'),'stats');
-write_stats(fullfile(opts.out_dir,'fig_ied_stim_blocks_stats.md'),stats,S);
+if want('main')
+    save(fullfile(opts.out_dir,'fig_ied_stim_blocks_stats.mat'),'stats');
+    write_stats(fullfile(opts.out_dir,'fig_ied_stim_blocks_stats.md'),stats,S);
+end
 out=struct('fig',fig,'stats',stats,'out_dir',opts.out_dir);
-if ~opts.visible, close(fig); out.fig=[]; end
+if ~opts.visible && ~isempty(fig), close(fig); out.fig=[]; end
 end
 
 % ------------------------------------------------------------------------------
@@ -176,6 +197,8 @@ fid=fopen(file,'w'); g=onCleanup(@()fclose(fid));
 o=st.run_opts; nS=numel(st.seeds);
 fprintf(fid,'# fig_ied_stim_blocks statistics\n\nRun: ied_stim_blocks, amplitude %.2g, %d networks (seeds %s), %d no-stimulation + %d stimulation blocks per network, %g s analysed per block after %g s settle (plus the model warmup); noise seed per block base.noise_seed + (seed - 42) + 1000*block.\n\n', ...
     o.amplitude,nS,mat2str(st.seeds),o.n_no,o.n_stim,o.block_len,o.settle);
+if isfield(o,'fs'), fprintf(fid,'Integration rate fs = %g Hz.\n\n',o.fs);
+else, fprintf(fid,'Integration rate fs = 400 Hz (ied_base_config; run made before fs was a run setting).\n\n'); end
 fprintf(fid,'Example traces: no stimulation %s; stimulation %s.\n\n',st.example{1},st.example{2});
 fprintf(fid,'## Candidate events per minute, pooled per condition, and normalised block rates\n\n| Network | Seed | No stim (ev/min) | Stim (ev/min) | Stim / no stim | No-stim blocks (%% of pooled) | Stim blocks (%% of pooled no stim) |\n|---|---|---|---|---|---|---|\n');
 for i=1:nS

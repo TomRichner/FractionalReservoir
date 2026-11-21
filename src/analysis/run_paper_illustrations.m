@@ -12,6 +12,12 @@ function out_dir = run_paper_illustrations(cfg,run_dir)
 % the releasable pool b1 on a chained route (FD-006). `std_model` says which
 % ('product', 'chain', or 'none' where no route is depressed), so a figure can
 % label the row correctly.
+% The saved `b1` is each neuron's FIRST DEPRESSION VARIABLE on the same route,
+% b(:,1,:) as the model holds it: the available resources, 0 to 1, for every
+% route model (the only b of a one-variable route, the releasable pool of a
+% chain, the first factor of a product). Main Fig 2 row (F) plots it (FD-031
+% item 12; Tom, 2026-11-17: b1 scales from 0 to 1 and is the synaptic
+% depression). Ones where the route has no depression, like `std`.
 arguments
     cfg struct
     run_dir char
@@ -32,13 +38,25 @@ n_per_type=4;
 if isfield(cfg,'illustration_neurons_per_type') && ~isempty(cfg.illustration_neurons_per_type)
     n_per_type=cfg.illustration_neurons_per_type;
 end
+% Integration rate: the bundle's cfg.fs (FD-031 item 14), else 400 Hz as
+% before. Both illustrations (network and single neuron) run at it.
+fs=400;
+if isfield(cfg,'fs'), fs=stage_fs(cfg.fs,400,'run_paper_illustrations'); end
+% Integrator: the bundle's cfg.ode_solver (Tom, 2026-11-17: sra1 for every
+% paper simulation, the noise-free single neuron too), else
+% build_from_preset's choice (sra1 with noise, rk4 without) as before.
+solver_args={};
+if isfield(cfg,'ode_solver')
+    solver=stage_solver(cfg.ode_solver,'','run_paper_illustrations');
+    if ~isempty(solver), solver_args={'ode_solver',solver}; end
+end
 variants={'representative_dynamics','single_neuron'};
 presets={cfg.preset_name,cfg.single_neuron_preset};
 for j=1:2
     settings=struct('preset_name',presets{j},'display_window',cfg.illustration_display_window, ...
         'step_time',step_window(1),'step_off',step_window(2),'step_amplitude',cfg.illustration_step_amp, ...
         'neurons_per_type',n_per_type, ...
-        'T_range',[-15 cfg.illustration_display_window(2)],'fs',400,'seeds',[1 2], ...
+        'T_range',[-15 cfg.illustration_display_window(2)],'fs',fs,'seeds',[1 2], ...
         'protocol',sprintf('Uniform positive input step of %g to all neurons over [%g, %g] s; the first %d neurons of each type saved.', ...
             cfg.illustration_step_amp,step_window(1),step_window(2),n_per_type));
     lya_args={'lya_method','none'};
@@ -65,11 +83,12 @@ for j=1:2
     for c=1:numel(conds)
         model=build_from_preset(presets{j},conds{c}.name,'T_range',settings.T_range, ...
             'input_config',input,'fs',settings.fs,'rng_seeds',settings.seeds, ...
-            'plot_deci',2,'verbose',cfg.verbose,lya_args{:});
+            'plot_deci',2,'verbose',cfg.verbose,lya_args{:},solver_args{:});
         model.run(); pd=model.plot_data; pp=model.get_params();
+        settings.ode_solver=model.ode_solver;
         assert(SRNNCellTypePairs.routes_identical(pp),'Illustration requires identical outgoing routes.');
         r=struct('name',conds{c}.name,'title',titles(conds{c}.name),'t',pd.t, ...
-            'u',[],'x',[],'r',[],'syn',[],'sfa',[],'std',[],'std_model','none','selected',{{}},'n',model.n, ...
+            'u',[],'x',[],'r',[],'syn',[],'sfa',[],'std',[],'b1',[],'std_model','none','selected',{{}},'n',model.n, ...
             'cell_type_names',{model.cell_type_names},'t_lya',[],'local_lambda',[], ...
             'finite_lambda',[],'LLE',NaN);
         if j==1
@@ -90,7 +109,7 @@ for j=1:2
             post=fieldnames(pd.synaptic_output.(name));
             r.syn=[r.syn; pd.synaptic_output.(name).(post{1})(ix,:)];
             A=pd.a.(name); B=pd.b.(name).(post{1});
-            sa=zeros(numel(ix),numel(pd.t)); sb=ones(numel(ix),numel(pd.t));
+            sa=zeros(numel(ix),numel(pd.t)); sb=ones(numel(ix),numel(pd.t)); s1=sb;
             if ~isempty(A), sa=pp.c_eff(q)*reshape(sum(A(ix,:,:),2),numel(ix),[]); end
             if ~isempty(B)
                 % The route's depression factor from the model (FD-006): the
@@ -101,9 +120,10 @@ for j=1:2
                 post_q=find(strcmp(model.cell_type_names,post{1}),1);
                 Dq=SRNNCellTypePairs.std_route_factor(B,pp,q,post_q);
                 sb=reshape(Dq(ix,:,:),numel(ix),[]);
+                s1=reshape(B(ix,1,:),numel(ix),[]);   % b1, the first depression variable
                 if pp.std_chain(q,post_q), r.std_model='chain'; elseif ~strcmp(r.std_model,'chain'), r.std_model='product'; end
             end
-            r.sfa=[r.sfa;sa]; r.std=[r.std;sb];
+            r.sfa=[r.sfa;sa]; r.std=[r.std;sb]; r.b1=[r.b1;s1];
         end
         if c==1, results=r; else, results(c)=r; end   % struct([]) has no fields and cannot be indexed into
     end

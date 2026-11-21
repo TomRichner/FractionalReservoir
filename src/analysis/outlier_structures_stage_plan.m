@@ -102,8 +102,13 @@ function plan = outlier_structures_stage_plan(cfg)
 %   T_settle 60, window_s 20, dt_sample 0.05, n_cal 8, n_null 40,
 %   n_shuffle 20, n_top 3, n_keep 30, dt_vectors 0.1, dt_mode 0.1 (must be
 %   above 0: the stage is about the followed mode), k_full 8, x_thr 0.1,
-%   lya_K 3, lya_window_s 20, fs 500, chunk_s 10, n_override 0 (tests:
-%   40 to 80)
+%   lya_K 3, lya_window_s 20, chunk_s 10, n_override 0 (tests: 40 to 80)
+%   fs            the bundle's cfg.fs (stage_fs; 500 Hz in the mu7chain
+%                 bundles), else 500 Hz; cfg.outlier_structures_fs, when
+%                 set, overrides it for this stage. The integrator is not a
+%                 knob: the bundle's cfg.ode_solver (plan.ode_solver), else
+%                 ospec_build_model's rule, exactly as in
+%                 outlier_spectra_stage_plan (the runs are that stage's).
 %   dt_full       window_s: the full-Jacobian series of ospec_run at the
 %                 start and the end of the window only (the exploration's
 %                 dt_full of 20 s). The stage wants the dense pass, which
@@ -199,7 +204,7 @@ P.k_full       = knob('k_full', 8);
 P.x_thr        = knob('x_thr', 0.1);
 P.lya_K        = knob('lya_K', 3);
 P.lya_window_s = knob('lya_window_s', 20);
-P.fs           = knob('fs', 500);
+P.fs           = knob('fs', stage_fs(field_or_empty(cfg, 'fs'), 500, 'outlier_structures_stage_plan'));   % the bundle's rate, else 500 Hz
 P.chunk_s      = knob('chunk_s', 10);
 P.n_override   = knob('n_override', 0);
 P.check_tol    = knob('check_tol', 0.15);
@@ -349,7 +354,10 @@ assert(numel(unique({runs.file})) == numel(runs), 'outlier_structures_stage_plan
 
 verbose = 'minimal';
 if isfield(cfg, 'verbose') && ~isempty(cfg.verbose); verbose = cfg.verbose; end
+[ode_solver, problem] = ospec_bundle_solver(cfg, 'outlier_structures_stage_plan');
+if ~isempty(problem); bad_config('%s', problem); end
 plan = P;
+plan.ode_solver    = ode_solver;
 plan.folder        = 'outlier_structures';
 plan.preset_name   = preset_name;
 plan.run_mode      = cfg.run_mode;

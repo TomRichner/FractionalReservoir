@@ -61,10 +61,19 @@ function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s, opts)
 %     eig_heatmap stage). fig_main3_grouped_switch and _switch_hist are not
 %     added (the first is not chosen, the second would be fig_main3_grouped
 %     itself); fig_eig_heatmap_switch and fig_eig_real_histogram_switch are
-%     added as above. The composite saves under the tag
-%     Fig_Main3_Grouped_noC_switch_ritz_inset_realhist (fig_grouped_main
-%     names it by its options) in <fig_root>/fig_main3_grouped/; the
-%     baseline under Fig_Main3_Grouped in <fig_root>/fig_main3_grouped_baseline/.
+%     added as above. THE FILE NAMES (the merge of FD-031 and FD-046,
+%     2026-11-21): the registry names both through fig_grouped_main's
+%     'fig_tag'. The paper's composite is
+%     <fig_root>/fig_main3_grouped/Fig_Main3_Grouped.png, the name FD-031
+%     gave the paper's Figure 3 and the manuscript's figure_sources.json
+%     points at, so nothing is repointed (by its options it would be
+%     Fig_Main3_Grouped_switch_ritz_inset_realhist). The baseline is
+%     <fig_root>/fig_main3_grouped_baseline/Fig_Main3_Grouped_baseline.png:
+%     FD-031's paper layout (input, expansion, heat map of the separate
+%     eig_heatmap run; no lambda_1 row), named apart so that two different
+%     figures are never both called Fig_Main3_Grouped.png. The old layout
+%     with the lambda_1 row is not registered; it is fig_grouped_main(3,
+%     ..., 'show_lambda_row', true), saved as Fig_Main3_Grouped_withLambda.
 %
 % The config must register fig_eig_heatmap and fig_main3_grouped and name a
 % local-Lyapunov stage with input steps (the mu7chain bundles do).
@@ -121,9 +130,11 @@ if opts.as_default
     paper_main3 = added_main3_hist;
     paper_main3.name = main3.name;
     paper_main3.in_paper = main3.in_paper;
+    paper_main3.args = [paper_main3.args, {'fig_tag', 'Fig_Main3_Grouped'}];
     baseline = main3;
     baseline.name = 'fig_main3_grouped_baseline';
     baseline.in_paper = false;
+    baseline.args = [baseline.args, {'fig_tag', 'Fig_Main3_Grouped_baseline'}];
     main3_entries = {paper_main3, baseline};
 else
     main3_entries = {main3, added_main3, added_main3_hist};

@@ -79,6 +79,8 @@ function [file, R] = ospec_run(network, condition, seed, opts)
 %
 % Name-value options (defaults)
 %   preset_name (the mu7chain preset), T_settle 60, T_measure 20, fs 500,
+%   ode_solver '' (ospec_build_model's rule: sra1 for a noisy preset; the
+%   stage hands the bundle's cfg.ode_solver),
 %   dt_sample 0.01, n 0 (the preset's; another value builds a smaller
 %   network by the rule of small_network_model: indegree 0.2 n and the
 %   weight unit the smaller network's own), n_top 3, n_keep 30, n_cal 12,
@@ -100,6 +102,7 @@ arguments
     opts.T_settle  (1,1) double = 60
     opts.T_measure (1,1) double = 20
     opts.fs        (1,1) double = 500
+    opts.ode_solver (1,:) char  = ''     % '' = ospec_build_model's rule (sra1 for a noisy preset); else the bundle's integrator
     opts.dt_sample (1,1) double = 0.01
     opts.n         (1,1) double = 0
     opts.n_top     (1,1) double = 3
@@ -146,6 +149,9 @@ end
 build = struct('preset_name', opts.preset_name, 'condition', condition, ...
     'net_args', {net.net_args}, 'size_args', {size_args}, 'added_structure', net.added_structure, ...
     'rng_seeds', seed, 'T_range', [0 T_end], 'fs', opts.fs, 'lya_args', {lya_args});
+% Only when an integrator is named, so a run that names none saves the
+% build record it always did.
+if ~isempty(opts.ode_solver); build.ode_solver = opts.ode_solver; end
 model = ospec_build_model(build);
 say(opts, '[ospec_run] %s | %s | seed [%d %d] | n = %d, %d states, %.0f s at %g Hz\n', ...
     network, condition, seed(1), seed(2), model.n, model.N_sys_eqs, T_end, opts.fs);

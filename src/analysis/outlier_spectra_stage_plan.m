@@ -78,10 +78,19 @@ function plan = outlier_spectra_stage_plan(cfg)
 %                   makes it a network mode (ospec_full_spectrum)
 %   lya_K           3 Lyapunov exponents (0: none), over the first
 %   lya_window_s    20 s of the window
-%   fs              500 Hz
+%   fs              the bundle's cfg.fs (stage_fs; 500 Hz in the mu7chain
+%                   bundles), else 500 Hz. cfg.outlier_spectra_fs, when
+%                   set, overrides the bundle's rate for this stage.
 %   chunk_s         10 s integrated per piece (memory only; the trajectory
 %                   does not depend on it)
 %   n_override      0: the preset's size. Tests use 40 to 80.
+%
+% THE INTEGRATOR is not a knob: the bundle's cfg.ode_solver (plan.ode_solver;
+% 'sra1' in the mu7chain bundles; it must be fixed-step, ospec_bundle_solver),
+% else ospec_build_model's rule (sra1: the preset is noisy). Rate and
+% integrator follow the bundle since the merge with the solver plumbing
+% (2026-11-21; Tom, 2026-11-17: every paper simulation at SRA1 and 500 Hz);
+% in the mu7chain bundles both are the values the stage always used.
 %
 % EVERY RUN OF ONE NETWORK GROUP USES ONE LENGTH. Runs of different length
 % on one seed are different noise realizations, so a full_networks run at
@@ -94,6 +103,7 @@ function plan = outlier_spectra_stage_plan(cfg)
 %                  dt_sample, full (logical), file (the run's .mat name)
 %   plan.<knob>    every knob above, as resolved; plan.preset_name,
 %                  plan.run_mode, plan.seeds (the rows used), plan.verbose
+%   plan.ode_solver   the bundle's integrator, or '' (ospec_build_model's rule)
 %
 % See also: run_outlier_spectra_stage, ospec_run, ospec_load_run,
 %           ospec_network, paper_opt_in_stages
@@ -172,7 +182,7 @@ P.k_full         = knob('k_full', 8);
 P.x_thr          = knob('x_thr', 0.1);
 P.lya_K          = knob('lya_K', 3);
 P.lya_window_s   = knob('lya_window_s', 20);
-P.fs             = knob('fs', 500);
+P.fs             = knob('fs', stage_fs(field_or_empty(cfg, 'fs'), 500, 'outlier_spectra_stage_plan'));   % the bundle's rate, else 500 Hz
 P.chunk_s        = knob('chunk_s', 10);
 P.n_override     = knob('n_override', 0);
 
@@ -283,7 +293,10 @@ end
 
 verbose = 'minimal';
 if isfield(cfg, 'verbose') && ~isempty(cfg.verbose); verbose = cfg.verbose; end
+[ode_solver, problem] = ospec_bundle_solver(cfg, 'outlier_spectra_stage_plan');
+if ~isempty(problem); bad_config('%s', problem); end
 plan = P;
+plan.ode_solver  = ode_solver;
 plan.folder      = 'outlier_spectra';
 plan.preset_name = preset_name;
 plan.run_mode    = cfg.run_mode;

@@ -18,13 +18,19 @@ function out=fig_main3_stability(run_dir,conditions,opts)
 % it otherwise (by value; for the manuscript's three columns that is the
 % placement they had).
 %
-% SHOW_LAMBDA_ROW (default true, the layout above). false draws the variant
-% Tom asked for on 2026-11-17: row (C), the lambda_1 traces, removed and the
-% remaining rows reordered top to bottom as (A) switching input, (B)
-% expansion, (C) eigenvalue density heat map, on a shorter canvas of the
-% same width. Condition titles then sit over the input row, and each
-% column's accumulated lambda_1 (the value the removed row printed) is kept
-% as a small label in the top right corner of its expansion panel.
+% SHOW_LAMBDA_ROW (default false since 2026-11-17, FD-031 item 7: the paper's
+% layout, approved by Tom). false removes row (C) of the layout above, the
+% lambda_1 traces, and reorders the remaining rows top to bottom as (A)
+% switching input, (B) expansion, (C) eigenvalue density heat map, on a
+% shorter canvas of the same width. Condition titles then sit over the input
+% row, and each column's accumulated lambda_1 (the value the removed row
+% printed) is kept as a small label in the top right corner of its expansion
+% panel. true draws the old four-row layout described above, kept reachable.
+%
+% K, the number of QR directions the local_lyapunov stage tracked (top-K), is
+% read from the saved settings and written into the notes (provenance): the
+% expansion row sums the positive local rates of those K directions only, so
+% when more than K directions expand it is a lower bound.
 %
 % RITZ_OVERLAY (FD-033, default false: the figure as it was). true passes
 % fig_eig_heatmap its 'ritz_overlay' with ritz_k, ritz_scaling, ritz_style
@@ -56,7 +62,7 @@ function out=fig_main3_stability(run_dir,conditions,opts)
 arguments
     run_dir char
     conditions = {}
-    opts.show_lambda_row (1,1) logical = true
+    opts.show_lambda_row (1,1) logical = false
     opts.ritz_overlay (1,1) logical = false
     opts.ritz_k (1,1) double = 0
     opts.ritz_scaling (1,:) char = 'raw'
@@ -260,9 +266,9 @@ notes={sprintf('Current switching data: K=%d; accumulation [%g,%g] s; saved segm
     'Row D shows expansive transients: sum(max(saved local QR rates,0),2)/log(2), the positive local growth summed over the tracked QR directions. Division by log(2) expresses this growth in bits/s; it is not a measurement of KS entropy or information transmission. Eigenvalue and switching stages are separate examples.'], ...
     sprintf('Columns, left to right: %s (titled and coloured by condition name; heat-map tiles taken by condition).',strjoin(names,', '))};
 else
-notes={sprintf('Variant without the lambda_1 row (show_lambda_row false). Switching data: K=%d; accumulation [%g,%g] s; saved segment-start timestamps retained. Settings are read from the completed saved analysis.',D.settings.K,D.settings.lya_T_interval), ...
+notes={sprintf('Paper layout, without the lambda_1 row (show_lambda_row false, the default since FD-031). Switching data: top-K QR, K=%d tracked directions; accumulation [%g,%g] s; saved segment-start timestamps retained. Settings are read from the completed saved analysis.',D.settings.K,D.settings.lya_T_interval), ...
     ['Rows, top to bottom: (A) input, 24 fixed actual neurons (12 evenly spaced E and 12 I), identical indices across conditions; ' ...
-    '(B) expansive transients: sum(max(saved local QR rates,0),2)/log(2), the positive local growth summed over the tracked QR directions, in bits/s; it is not a measurement of KS entropy or information transmission; ' ...
+    sprintf('(B) expansive transients: sum(max(saved local QR rates,0),2)/log(2), the positive local growth summed over the K = %d tracked QR directions, in bits/s; a lower bound when more than K directions expand; it is not a measurement of KS entropy or information transmission; ',D.settings.K) ...
     'the small label in each (B) panel is the accumulated leading Lyapunov exponent lambda_1 at the end of the accumulation window (the value the removed row printed); ' ...
     '(C) eigenvalue density heat map. Eigenvalue and switching stages are separate examples.'], ...
     sprintf('Columns, left to right: %s (titled and coloured by condition name; heat-map tiles taken by condition).',strjoin(names,', '))};

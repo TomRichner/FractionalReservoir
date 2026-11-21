@@ -18,7 +18,7 @@
 %   4. fig_eig_heatmap with 'spectra_source', 'local_lyapunov' and the
 %      overlay: saved as fig_eig_heatmap_switch_ritz_inset with a table that
 %      carries the shared-pass section; fig_grouped_main group 3 saves
-%      Fig_Main3_Grouped_noC_switch_ritz_inset with one density image and one
+%      Fig_Main3_Grouped_switch_ritz_inset with one density image and one
 %      inset per panel. On a run without the spectra both error through
 %      resolve_data_file, and the default source is untouched by the option.
 %      The fourth row ('real_histogram_row'): one histogram and one dotted
@@ -108,7 +108,7 @@ end
 close(h.figs);
 evalc(['g = fig_grouped_main(3, ''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''g3''), ''show_lambda_row'', false, ' ...
     '''spectra_source'', ''local_lyapunov'', ''ritz_overlay'', true, ''ritz_inset'', true);']);
-ok = ok && any(strcmp(g.files, 'Fig_Main3_Grouped_noC_switch_ritz_inset.png')) && ...
+ok = ok && any(strcmp(g.files, 'Fig_Main3_Grouped_switch_ritz_inset.png')) && ...
     n_tagged(g.figs, 'ritz_density') == numel(C) && n_tagged(g.figs, 'ritz_inset') == numel(C);
 g_pos = g.figs.Position;
 close(g.figs);
@@ -117,7 +117,7 @@ all_passed = check('figures from the switching run: tags with _switch, the overl
 % The fourth row (the real-axis histogram) and the stand-alone histogram.
 evalc(['g4 = fig_grouped_main(3, ''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''g4''), ''show_lambda_row'', false, ' ...
     '''spectra_source'', ''local_lyapunov'', ''ritz_overlay'', true, ''ritz_inset'', true, ''real_histogram_row'', true);']);
-tag4 = 'Fig_Main3_Grouped_noC_switch_ritz_inset_realhist';
+tag4 = 'Fig_Main3_Grouped_switch_ritz_inset_realhist';   % no _noC since the merge with FD-031: no lambda_1 row is the default
 ok = any(strcmp(g4.files, [tag4 '.png'])) && isfile(fullfile(on_dir, 'g4', [tag4 '_table.md'])) && ...
     n_tagged(g4.figs, 'eig_real_histogram') == numel(C) && n_tagged(g4.figs, 'uniform_disk_reference') == numel(C) && ...
     g4.figs.Position(3) == g_pos(3) && g4.figs.Position(4) > g_pos(4) && numel(findall(g4.figs, 'Tag', 'row_letter')) == 4;
@@ -145,7 +145,8 @@ ok = ok && numel(D.disk_by_cond) == numel(C) && G.n == 40 && numel(G.rms_gain) =
     all(G.rms_gain > 0 & G.rms_gain < 1) && max(abs(G.t(:)' - (1:10))) < 1e-9;
 all_passed = check('the histogram row: (D) under each heat map''s plot box on its x limits, no text on it, table written; the stand-alone histogram; the saved gains', ok) && all_passed;
 all_passed = check('the histogram row needs the layout without the lambda_1 row', ...
-    throws_prefix(@() fig_main3_stability(on_dir, {}, 'real_histogram_row', true), 'fig_main3_stability:HistogramRow')) && all_passed;
+    throws_prefix(@() fig_main3_stability(on_dir, {}, 'real_histogram_row', true, 'show_lambda_row', true), ...
+    'fig_main3_stability:HistogramRow')) && all_passed;   % named: no lambda_1 row is the default since the merge with FD-031
 
 % A first state after the accumulation start: the same pass, the same H.
 late_dir = fullfile(base, 'late');
@@ -233,6 +234,9 @@ names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
 base = c.figures{strcmp(names, 'fig_main3_grouped_baseline')};
 base.name = 'fig_main3_grouped';
 base.in_paper = true;
+% as_default names the baseline's file (fig_tag, last in its args); before it, the entry had none.
+assert(isequal(base.args(end - 1:end), {'fig_tag', 'Fig_Main3_Grouped_baseline'}));
+base.args = base.args(1:end - 2);
 c.figures{strcmp(names, 'fig_main3_grouped')} = base;
 c.figures = c.figures(~ismember(names, {'fig_main3_grouped_baseline', 'fig_eig_heatmap_switch', ...
     'fig_eig_real_histogram_switch'}));
