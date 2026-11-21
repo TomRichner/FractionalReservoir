@@ -71,6 +71,8 @@ for i=fig_vec
         end
         fh = fh(1);
         set(fh,'PaperPositionMode','auto')
+        size_before = fh.Position;      % the size the figure was laid out for
+        oversize = larger_than_screen(fh);
         if any(strcmpi(fig_type,'fig'))
             % A figure saved while invisible reopens invisible (openfig keeps the
             % stored Visible), and every pipeline figure is drawn invisible. The
@@ -80,9 +82,12 @@ for i=fig_vec
         end
         if any(strcmpi(fig_type,'png'))
             png_file = fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']);
-            size_before = fh.Position;
-            exportgraphics(fh, png_file, 'Resolution', png_resolution(fh))
-            if was_resized(fh, size_before)
+            if ~oversize
+                exportgraphics(fh, png_file, 'Resolution', png_resolution(fh))
+                drawnow;                % a resize can arrive after the export returns
+                oversize = was_resized(fh, size_before);
+            end
+            if oversize
                 print_whole(fh, size_before, png_file, '-dpng');
             end
         end
@@ -93,9 +98,12 @@ for i=fig_vec
             % the raise gone that accident goes too, so the target is now named.
             set(fh, 'Renderer', 'painters');
             svg_file = fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']);
-            size_before = fh.Position;
-            exportgraphics(fh, svg_file, 'BackgroundColor', 'none', 'ContentType', 'vector');
-            if was_resized(fh, size_before)
+            if ~oversize
+                exportgraphics(fh, svg_file, 'BackgroundColor', 'none', 'ContentType', 'vector');
+                drawnow;
+                oversize = was_resized(fh, size_before);
+            end
+            if oversize
                 print_whole(fh, size_before, svg_file, '-dsvg');
             end
         end
@@ -117,30 +125,59 @@ if ~isempty(failed)
 end
 end
 
-function tf = was_resized(fh, size_before)
-% True when an export changed the figure's size.
+function tf = larger_than_screen(fh)
+% True for a figure that does not fit the screen with a tenth to spare.
 %
-% WHY (2026-11-21, Plan 2 package D). exportgraphics shrinks a figure that
+% WHY (2026-11-21, Plan 2 package D). MATLAB shrinks a figure window that
 % is larger than the screen to the screen (on the 1710 x 1073 workstation a
-% 12 x 15.8 in figure came back 10.97 in tall), and from then on every
-% export of it is wrong: rows of panels laid out in inches are cut off at
-% the top, or drawn at the old pitch on the shrunken canvas. The first
-% export of a fresh figure is usually whole and the later ones (the .svg,
-% a second save) are not, so the damage depended on the order of saving.
-% This is what cut the column titles and first row off
-% Fig_Ostruct_Plane_rotation and _blockmean, and it is the resize
-% fig_grouped_main works around ("every other export"). Figures that fit
-% the screen are not resized and take the path they always took.
+% 12 x 15.8 in figure came back 10.97 in tall), also an invisible one, and
+% it does so at a moment of its choosing: usually during an export. What
+% was measured on a figure 8 x 16 in with marks at its top, middle and
+% bottom:
+%   exportgraphics  NEVER gave the whole figure. The PNG had either the
+%                   bottom 10.97 in only, or all three marks squeezed onto
+%                   a canvas 10.97 in tall; the SVG was always 10.97 in.
+%                   Whether the window was resized during the call did not
+%                   tell the two apart.
+%   print           with the paper set to the figure's size gave the whole
+%                   figure EXACTLY WHEN the window had its full size before
+%                   the call and still had it after; a print during which
+%                   the window was shrunk had the top cut off. Setting
+%                   Position back takes on one attempt and not on the next.
+% On a figure with many small axes laid out in inches the first
+% exportgraphics of a session can come out whole, which is why the damage
+% looked random: Fig_Ostruct_Plane_rotation and _blockmean (5 to 7 rows)
+% lost their column titles and first row on 2026-11-21 while the 3-row
+% local group, which fits the screen, was intact. It is also the "resized
+% on every other export" that fig_grouped_main works around.
+%
+% So a figure that does not fit goes to print_whole from the start, and a
+% figure that fits takes the path it always took (exportgraphics, cropped
+% to its content). The tenth to spare covers the window's title bar and
+% the task bar; a figure in that margin is printed uncropped, which is
+% harmless.
+tf = false;
+try
+    px  = getpixelposition(fh);
+    scr = get(groot, 'ScreenSize');
+    tf  = px(3) > 0.9 * scr(3) || px(4) > 0.9 * scr(4);
+catch
+    % no screen to compare with: keep the usual path
+end
+end
+
+function tf = was_resized(fh, size_before)
+% True when the figure no longer has the size it was laid out for.
 tf = any(abs(fh.Position(3:4) - size_before(3:4)) > 1e-6 * max(size_before(3:4)));
 end
 
 function print_whole(fh, size_before, file, device)
-% Export a figure larger than the screen at its own size. print renders
-% from the paper size, not from the window, so with the size restored and
-% the paper set to it the whole canvas comes out (uncropped, unlike
-% exportgraphics). The size is restored again afterwards: print shrinks
-% the window too, and the caller's figure should keep the size it was
-% laid out for.
+% Export a figure larger than the screen at its own size (see
+% larger_than_screen): print with the paper set to the figure's size,
+% repeated until one print has run with the window at its full size before
+% AND after. The canvas is not cropped to the content. The size is put
+% back at the end as well as it can be: the caller's figure should keep
+% the size it was laid out for, but MATLAB may shrink the window again.
 units = fh.Units;
 fh.Position = size_before;
 fh.Units = 'inches';
@@ -148,13 +185,28 @@ sz = fh.Position(3:4);
 fh.Units = units;
 set(fh, 'PaperUnits', 'inches', 'PaperPositionMode', 'manual', 'PaperSize', sz, ...
     'PaperPosition', [0 0 sz], 'InvertHardcopy', 'off');
-fh.Position = size_before;
-if strcmp(device, '-dpng')
-    print(fh, file, device, sprintf('-r%d', png_resolution(fh)));
-else
-    print(fh, file, device, '-vector');
+whole = false;
+for attempt = 1:10
+    fh.Position = size_before;
+    drawnow;
+    if was_resized(fh, size_before); continue; end      % the size did not take: set it again
+    if strcmp(device, '-dpng')
+        print(fh, file, device, sprintf('-r%d', png_resolution(fh)));
+    else
+        print(fh, file, device, '-vector');
+    end
+    if ~was_resized(fh, size_before); whole = true; break; end
 end
-fh.Position = size_before;
+if ~whole
+    warning('save_some_figs_to_folder_2:NotWhole', ...
+        ['%s: the figure is larger than the screen and no print ran with its window at full size ' ...
+         '(10 attempts); the file is probably cut off at the top.'], file);
+end
+for attempt = 1:3                                       % leave the figure at its own size
+    if ~was_resized(fh, size_before); break; end
+    fh.Position = size_before;
+    drawnow;
+end
 end
 
 function res = png_resolution(fh)

@@ -107,10 +107,10 @@ for w = 1:n_net
         col = st.condition_color(conditions{c});
         ax = nexttile(tl, (w - 1) * n_cond + c);
         ax.Tag = sprintf('freqresp_plane_%s_c%d', networks{w}, c);
-        % The axis names once: Re under the bottom row, Im on the first column.
+        % The axis names once: Re in the last panel, Im in the first.
         re_label = ''; im_label = '';
-        if w == n_net; re_label = 'Re (s^{-1})'; end
-        if c == 1; im_label = 'Im (rad/s)'; end
+        if w == n_net && c == n_cond; re_label = 'Re (s^{-1})'; end   % once: in the first columns it sat on the edge curves
+        if c == 1 && w == 1; im_label = 'Im (rad/s)'; end
         cp = complex_plane_axes(ax, axes_args{:}, 're_label', re_label, 'im_label', im_label);
 
         lam = double(p.lam);
