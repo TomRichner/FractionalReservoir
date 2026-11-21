@@ -239,9 +239,13 @@ cfg.illustration_step_amp = 0.25;   % TR, 2026-09-16: half the mu7revised amplit
 cfg.local_lyapunov_K = 50; % explicit also in fast mode
 cfg.local_lyapunov_T = 40;
 cfg.local_lyapunov_step_duration_s = 5; % 8 steps over 40 s
-cfg.local_lyapunov_accumulation_start_s = 1;
-cfg.local_lyapunov_warmup_s = 15;
-cfg.local_lyapunov_simulation_start_s = -15; % full alignment [-14,1]
+% Timing of the switching run (Tom, 2026-11-20; docs/Plan_Figure3_update.md):
+% [-15,-10] s the network runs with no stimulus and nothing is tracked,
+% [-10,0] s the tracked directions align (no stimulus), [0,40] s accumulation
+% with the stimulus on. Before: accumulation from 1 s, alignment [-14,1] s.
+cfg.local_lyapunov_accumulation_start_s = 0;
+cfg.local_lyapunov_warmup_s = 10;
+cfg.local_lyapunov_simulation_start_s = -15; % alignment [-10,0]
 cfg.illustration_lya_start_s = 0; % first finite estimate after the [0,0.05] s segment
 cfg.illustration_lya_warmup_s = 10; % alignment over [-10,0] s; simulation starts -15
 cfg.illustration_display_window = [0 30];
