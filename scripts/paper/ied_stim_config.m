@@ -55,8 +55,22 @@ function cfg = ied_stim_config(run_mode, overrides)
 % figure holds clinical recordings: it is written under figs/ (gitignored)
 % and must never be force-added to git.
 %
+% FIGURE 8 IN THE NEW ORDER (Plan 2, package E; Tom, 2026-11-21): entry
+% Fig_Main8_Stim draws A to C the bursting network from the opt-in paper
+% stage burst_mode, D to F the clinical panels, G to I this bundle's
+% model. cfg.burst_mode_dir is the paper run directory holding
+% burst_mode/ (override 'burst_mode_dir'); by default the mu7chain_AC run
+% of the same mode (fastmedium for the 2026-11-17 data). Fig_Stim_Combined
+% (the present order) is kept as it was.
+%
+% THE NETWORK-MODE STAGE (appendix, kept separate): run_ied_network_mode_stage(cfg)
+% writes <run_dir>/network_mode (ied_network_mode_stage_plan has the sizes
+% by mode); entry fig_ied_network_mode draws it. cfg.network_mode holds its
+% knobs (empty: the mode's sizes).
+%
 % See also: ied_stim_run, ied_stim_blocks, ied_stim_figures,
-%           fig_ied_stim_blocks, ied_stim_fig_combined, fig_stim_combined
+%           fig_ied_stim_blocks, ied_stim_fig_combined, fig_stim_combined,
+%           ied_network_mode_stage_plan, fig_ied_network_mode
 arguments
     run_mode (1,:) char {mustBeMember(run_mode, ...
         {'essential','fast','production','stim_blocks_20261117'})} = 'essential'
@@ -65,6 +79,7 @@ arguments
     overrides.clinical_dir (1,:) char = ''
     overrides.clinical_psd_fig (1,:) char = ''
     overrides.visible_figures (1,1) logical = false
+    overrides.burst_mode_dir (1,:) char = ''
 end
 root = fileparts(which('setup_paths'));
 cfg = struct();
@@ -107,6 +122,14 @@ cfg.clinical_files = struct('traces', 'Fig_Awake_Main_PanelD.fig', ...
 % no-harmonic-removal default).
 cfg.clinical_psd_fig = overrides.clinical_psd_fig;
 
+%% Figure 8 A to C and the network-mode stage
+% The paper run whose burst_mode stage Figure 8 A to C is drawn from: the
+% mu7chain_AC run of the same mode (the 2026-11-17 data go with fastmedium).
+paper_mode = run_mode;
+if strcmp(run_mode, 'stim_blocks_20261117'); paper_mode = 'fastmedium'; end
+cfg.burst_mode_dir = pick(overrides.burst_mode_dir, fullfile(root, 'data', ['mu7chain_AC_' paper_mode]));
+cfg.network_mode = struct();    % knobs of ied_network_mode_stage_plan; empty: the mode's sizes
+
 %% The figure registry
 % {name, handle, in_paper, extra-args}; ied_stim_figures calls
 % fn('data_dir', cfg.run_dir, 'out_dir', <fig_root>/<name>, 'visible', ...,
@@ -124,6 +147,15 @@ F = add(F, 'Fig_Stim_Combined',              @ied_stim_fig_combined, true, ...
         {'model_fig', fullfile(cfg.fig_root, 'fig_ied_stim_blocks', 'fig_ied_stim_blocks.fig'), ...
          'clinical_dir', cfg.clinical_dir, 'clinical_files', cfg.clinical_files, ...
          'clinical_psd_fig', cfg.clinical_psd_fig, 'run_name', cfg.run_name, 'sim', cfg.sim});
+% Fig 8 in the new order: the bursting network A-C (burst_mode stage of the
+% paper run in cfg.burst_mode_dir), clinical D-F, this model G-I.
+F = add(F, 'Fig_Main8_Stim',                 @ied_stim_fig_combined, true, ...
+        {'model_fig', fullfile(cfg.fig_root, 'fig_ied_stim_blocks', 'fig_ied_stim_blocks.fig'), ...
+         'clinical_dir', cfg.clinical_dir, 'clinical_files', cfg.clinical_files, ...
+         'clinical_psd_fig', cfg.clinical_psd_fig, 'run_name', cfg.run_name, 'sim', cfg.sim, ...
+         'burst_mode_dir', cfg.burst_mode_dir, 'tag', 'Fig_Main8_Stim'});
+% Appendix: the full Jacobian's network mode (the network_mode stage).
+F = add(F, 'fig_ied_network_mode',           @fig_ied_network_mode, false, {});
 cfg.figures = F;
 end
 
