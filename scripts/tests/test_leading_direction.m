@@ -23,8 +23,8 @@
 %      layout. A run without the joint sample errors through
 %      resolve_data_file.
 %   4. fig_main4_connectivity: the grouped Figure 4's panels and the three
-%      of (C) on a canvas of the same height, letters (A), (B), (C), PNG
-%      at the canvas size (200 dpi), .fig and _table.md written.
+%      of (C) on a canvas of the same height that fits the screen (built
+%      with composite_figure), letters (A), (B), (C), files and _table.md.
 %
 % About 2 to 3 minutes (the grouped Figure 4 rebuilds its networks).
 
@@ -148,18 +148,20 @@ n_fail = n_fail + check(strcmp(error_of(@() fig_leading_direction(base{:}, 'save
 evalc('g = fig_grouped_main(4, ''run_dir'', run_dir, ''preset_name'', preset, ''save'', false);');
 n_ab = numel(findall(g.figs, 'Type', 'axes')); ab_size = g.figs.Position(3:4); close(g.figs);
 evalc('m = fig_main4_connectivity(base{:}, ''preset_name'', preset, ''out_dir'', fullfile(tmp, ''m4''));');
+m_px = getpixelposition(m.figs);
 ok = numel(findall(m.figs, 'Type', 'axes')) == n_ab + 3 && n_tagged(m.figs, 'uncoupled_reference') == 3 && ...
-    abs(m.figs.Position(4) - ab_size(2)) < 1 && m.figs.Position(3) > ab_size(1) && ...
+    abs(m_px(4) - ab_size(2)) < 1.5 && m_px(3) > ab_size(1) && m_px(4) < 0.9 * 1073 && ...   % fits the workstation's screen
     all(arrayfun(@(t) isscalar(findall(m.figs, 'Tag', ['main4_block_' t])), 'ABC')) && ...
     all(ismember({'Fig_Main4_Connectivity.png', 'Fig_Main4_Connectivity.fig'}, m.files)) && ...
     isfile(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md'));
 if ok
-    info = imfinfo(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity.png'));
-    want_px = m.figs.Position(3:4) * 200 / 96;
-    ok = abs(info.Width - want_px(1)) <= 2 && abs(info.Height - want_px(2)) <= 2 && ...
+    % (C)'s column ends level with (B)'s panels and starts no higher than (A)'s letter.
+    cx = findall(m.figs, '-regexp', 'Tag', '^leading_direction_c\d+$'); la = findall(m.figs, 'Tag', 'main4_block_A');
+    tops = arrayfun(@(a) sum(getpixelposition(a) * [0; 1; 0; 1]), cx);
+    ok = max(tops) <= (la.Position(2) + la.Position(4)) * m_px(4) && ...
         contains(fileread(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md')), 'Panel (C)');
 end
-n_fail = n_fail + check(ok, 'composite: the grouped Figure 4''s panels and three of (C), same height, letters, PNG at the canvas size, table');
+n_fail = n_fail + check(ok, 'composite: the grouped Figure 4''s panels and three of (C), same height, letters, (C) below the top of (A)''s letter, table');
 close(m.figs);
 evalc('m = fig_main4_connectivity(base{:}, ''preset_name'', preset, ''out_dir'', fullfile(tmp, ''m4''), ''fig_tag'', ''Fig_Main4_Grouped'', ''conditions'', sel);');
 n_fail = n_fail + check(any(strcmp(m.files, 'Fig_Main4_Grouped.png')) && n_tagged(m.figs, 'leading_direction_points') == 2, ...
