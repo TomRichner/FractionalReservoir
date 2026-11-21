@@ -302,9 +302,13 @@ end
 ll_args={};
 % cfg.local_lyapunov_spectra_n_samples (optional, FD-034; absent or 0 = the
 % stage as it always was) is run_local_lyapunov's 'spectra_n_samples', and
-% cfg.local_lyapunov_spectra_start_s (optional) its 'spectra_start_s'. No
-% bundle sets it by default; with_switch_spectra does, with the figures.
-ll_fields={'K','T','step_duration_s','accumulation_start_s','warmup_s','simulation_start_s','spectra_n_samples','spectra_start_s'};
+% cfg.local_lyapunov_spectra_start_s (optional) its 'spectra_start_s'. Set
+% by with_switch_spectra, with the figures; the mu7chain bundles call it
+% (their default since FD-046), the others do not.
+% cfg.local_lyapunov_n_override (optional, tests only; absent = the preset's
+% size) is its 'n_override', so a smoke of the entry point can run this stage
+% on a tiny network (FD-046); no bundle sets it.
+ll_fields={'K','T','step_duration_s','accumulation_start_s','warmup_s','simulation_start_s','spectra_n_samples','spectra_start_s','n_override'};
 for j=1:numel(ll_fields)
     key=['local_lyapunov_' ll_fields{j}];
     if isfield(cfg,key), ll_args=[ll_args,{ll_fields{j},cfg.(key)}]; end %#ok<AGROW>

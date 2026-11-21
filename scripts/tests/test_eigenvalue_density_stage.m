@@ -15,14 +15,18 @@
 %   2. THE PLAN: a bundle naming the stage and outlier_spectra is planned
 %      (folder, input folder, file, grids); refused (BadConfig) without
 %      outlier_spectra, with an unknown option, or with an unknown run mode.
-%   3. THE STAGE on contract-conformant files (make_synthetic_outlier_spectra:
-%      an 80-neuron mu7chain network, reference and E-to-E x 1.5, three
-%      conditions, two seeds, three states each, the two layouts of R.cal):
+%   3. THE STAGE on the output of the REAL outlier_spectra stage, run here
+%      at tiny size (tiny_ospec below: 80 neurons, reference and E-to-E x
+%      1.5 both with the dense passes, three conditions, two seeds, three
+%      calibration states each), so the two stages are tested as a chain:
 %      every index row becomes a run, in order, with the shapes the figures
 %      read; the theoretical radius from the saved gains equals the one the
-%      fixture computed (R_eff, 1e-9); the frozen-gain eigenvalue counts are
-%      the spectrum's own; the loader refuses a missing input and a
-%      mismatched network (errors, no fallback).
+%      outlier_spectra stage saved (R_eff, 1e-9); the frozen-gain eigenvalue
+%      counts are the spectrum's own; the leading Lyapunov exponent is read;
+%      a run without the dense passes is read with X.dense empty; the
+%      loader refuses a missing input and a mismatched network (errors, no
+%      fallback). (Until FD-046 a fixture, make_synthetic_outlier_spectra,
+%      wrote files in a sketch of the contract's layout instead.)
 %   4. THEORY WITH THE SAVED GAINS against the measured cumulative radial
 %      distribution, at the test size: the largest gap inside the bulk at a
 %      single state is below 0.15 (one 80-eigenvalue spectrum: a
@@ -38,7 +42,7 @@
 % and a pool allocation is set (pool_set(0) will do).
 %
 % See also: eigenvalue_density_stage_plan, run_eigenvalue_density_stage,
-%           eigdens_load_runs, make_synthetic_outlier_spectra
+%           eigdens_load_runs, run_outlier_spectra_stage
 
 t_all = tic;
 
@@ -73,11 +77,14 @@ for k = 1:numel(refused)
     assert(throws(@() eigenvalue_density_stage_plan(refused{k}), 'eigenvalue_density_stage_plan:BadConfig'), 'refusal %d', k);
 end
 
-%% 3. The stage on contract-conformant files
-run_dir = tempname; empty_run = tempname; fig_dir = tempname;
-cleanup = onCleanup(@() cellfun(@rmdir_if, {run_dir, empty_run, fig_dir}));
+%% 3. The stage on the outlier_spectra stage's output
+run_dir = tempname; empty_run = tempname; fig_dir = tempname; nodense = tempname;
+cleanup = onCleanup(@() cellfun(@rmdir_if, {run_dir, empty_run, fig_dir, nodense}));
 mkdir(run_dir); mkdir(empty_run);
-make_synthetic_outlier_spectra(run_dir);
+t0 = tic;
+tiny_ospec(run_dir, {'reference', 'EEx1p5'}, {'reference', 'EEx1p5'}, ...
+    {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}, [1 2; 2 3], 80, 3);
+t_ospec = toc(t0);
 index = eigdens_load_runs(run_dir);
 assert(height(index) == 12);
 t0 = tic;
@@ -97,6 +104,7 @@ for k = 1:numel(D.runs)
     assert(max(abs(r.R_eff - r.R_eff_saved)) < 1e-9 * max(r.R_eff), 'run %d: R_eff from the saved gains', k);
     assert(all(isfinite(r.full.n_band_x)), 'run %d: the dense pass was read', k);
     X = eigdens_load_runs(run_dir, index, k);
+    assert(isfinite(X.lambda_1) && X.lambda_1 == r.lambda_1, 'run %d: the leading Lyapunov exponent', k);
     for s = 1:K                                   % the counts are the spectrum's own
         ev = X.ev_M(:, s);
         assert(r.m_M(4, s) == nnz(real(ev) > 1) && r.m_M(3, s) == nnz(real(ev) > 0.8 & real(ev) <= 1));
@@ -108,11 +116,16 @@ assert(throws(@() eigdens_load_runs(empty_run), 'eigdens_load_runs:NoInput'));
 assert(throws(@() eigdens_load_runs(fullfile(empty_run, 'nope')), 'eigdens_load_runs:NoInput'));
 assert(throws(@() run_eigenvalue_density_stage(cfg, empty_run, pl), 'eigdens_load_runs:NoInput'));
 f1 = fullfile(run_dir, 'outlier_spectra', index.file{1});
-L = load(f1, 'R'); R = L.R; R.rng_seeds = [5 6];           % another draw of W than the saved one
+L = load(f1, 'R'); R = L.R; R.build.rng_seeds = [5 6];     % another draw of W than the one the run saved
 bad_dir = fullfile(empty_run, 'bad'); mkdir(fullfile(bad_dir, 'outlier_spectra'));
 save(fullfile(bad_dir, 'outlier_spectra', index.file{1}), 'R');
-runs = index(1, :); save(fullfile(bad_dir, 'outlier_spectra', 'ospec_index.mat'), 'runs');
+runs = index(1, :); settings = struct();
+save(fullfile(bad_dir, 'outlier_spectra', 'ospec_index.mat'), 'runs', 'settings');
 assert(throws(@() eigdens_load_runs(bad_dir, eigdens_load_runs(bad_dir), 1), 'eigdens_load_runs:WrongNetwork'));
+% A run of a network outside full_networks has no dense passes: read, X.dense empty.
+tiny_ospec(nodense, {'reference'}, {}, {'sfa1_std1'}, [1 2], 80, 0);
+X = eigdens_load_runs(nodense, eigdens_load_runs(nodense), 1);
+assert(isempty(X.dense) && isnan(X.lambda_1) && isequal(size(X.ev_null), [80 3 3]), 'a run without the dense passes');
 
 %% 4. Theory with the saved gains reproduces the measured distribution
 inside = pl.grids.u <= 1;
@@ -155,11 +168,35 @@ close(out.figs);
 assert(isfile(fullfile(o, 'Fig_Eigdens_Theory_Check.png')) && isfile(fullfile(o, 'Fig_Eigdens_Theory_Check_table.md')));
 t_fig = toc(t0);
 
-fprintf(['PASS: test_eigenvalue_density_stage -- theory vs sampled matrices, the plan, the stage on 12 runs (%.1f s), ' ...
-    'theory with the saved gains (worst state %.3f, worst mean %.3f), the figures (%.0f s); %.0f s in all.\n'], ...
-    t_stage, worst_state, worst_mean, t_fig, toc(t_all));
+fprintf(['PASS: test_eigenvalue_density_stage -- theory vs sampled matrices, the plan, the stage on 12 runs of the ' ...
+    'outlier_spectra stage (that stage %.0f s, this one %.1f s), theory with the saved gains (worst state %.3f, ' ...
+    'worst mean %.3f), the figures (%.0f s); %.0f s in all.\n'], ...
+    t_ospec, t_stage, worst_state, worst_mean, t_fig, toc(t_all));
 
 %% ------------------------------------------------------------------------
+function tiny_ospec(run_dir, networks, full_networks, conditions, seeds, n, lya_K)
+% The REAL outlier_spectra stage at tiny size into run_dir: the bundle's
+% essential config, the stage's knobs shrunk to seconds.
+c = mu7chain_config('essential');
+c.verbose = 'near-none';
+c.outlier_spectra_n_override = n;
+c.outlier_spectra_networks = networks;
+c.outlier_spectra_full_networks = full_networks;
+c.outlier_spectra_conditions = conditions;
+c.outlier_spectra_seeds = seeds;
+c.outlier_spectra_n_seeds = size(seeds, 1);
+c.outlier_spectra_T_settle = 2;
+c.outlier_spectra_window_s = 2;
+c.outlier_spectra_full_window_s = 2;
+c.outlier_spectra_n_cal = 3;
+c.outlier_spectra_n_null = 4;
+c.outlier_spectra_n_shuffle = 3;
+c.outlier_spectra_lya_K = lya_K;
+c.outlier_spectra_lya_window_s = 1.5;
+c.outlier_spectra_chunk_s = 1;
+run_outlier_spectra_stage(c, run_dir, outlier_spectra_stage_plan(c));
+end
+
 function tf = throws(fn, id)
 try
     fn();

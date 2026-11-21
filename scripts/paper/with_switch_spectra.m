@@ -1,12 +1,16 @@
-function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s)
+function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s, opts)
 % WITH_SWITCH_SPECTRA Figure 3 with its heat map on the switching run, one top-K pass throughout (FD-034).
 %
 %   cfg = WITH_SWITCH_SPECTRA(cfg)                 K = 100, 40 states
 %   cfg = WITH_SWITCH_SPECTRA(cfg, K, n_samples)
 %   cfg = WITH_SWITCH_SPECTRA(cfg, K, n_samples, first_state_s)
+%   cfg = WITH_SWITCH_SPECTRA(..., 'as_default', true)   the paper's Figure 3 (below)
 %
-% OPT-IN, like with_ritz_overlay: no bundle sets it, so no registered run,
-% stage output or figure changes. In the registered Figure 3 the expansion
+% THE mu7chain BUNDLES' DEFAULT since FD-046 (Tom, 2026-11-20: "we will use
+% the switching version"; docs/Plan_Figure3_update.md, step 6):
+% mu7chain_config ends with with_switch_spectra(cfg, 100, 40, 1,
+% 'as_default', true). Without 'as_default' it is the opt-in it was
+% (FD-034), adding versions beside the registered entries. In the registered Figure 3 the expansion
 % row comes from the local-Lyapunov stage (a switching-input run) and the
 % eigenvalue density, with its optional Ritz overlay, from the eig-heatmap
 % stage (a separate baseline run with a top-K pass of its own). This turns
@@ -48,6 +52,19 @@ function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s)
 %                                  switching run (only when the config
 %                                  registers fig_eig_real_histogram)
 %     The entries they are versions of are untouched.
+%   * WITH 'as_default', true, the paper's Figure 3 is the switching one:
+%     the entry fig_main3_grouped (its name, its in_paper) draws the
+%     four-row composite (input, expansion, heat map with the Ritz overlay
+%     and inset, and row (D), the real-axis histogram), and the baseline
+%     composite it drew until then is kept, right after it, as
+%     fig_main3_grouped_baseline, not in_paper (it still reads the
+%     eig_heatmap stage). fig_main3_grouped_switch and _switch_hist are not
+%     added (the first is not chosen, the second would be fig_main3_grouped
+%     itself); fig_eig_heatmap_switch and fig_eig_real_histogram_switch are
+%     added as above. The composite saves under the tag
+%     Fig_Main3_Grouped_noC_switch_ritz_inset_realhist (fig_grouped_main
+%     names it by its options) in <fig_root>/fig_main3_grouped/; the
+%     baseline under Fig_Main3_Grouped in <fig_root>/fig_main3_grouped_baseline/.
 %
 % The config must register fig_eig_heatmap and fig_main3_grouped and name a
 % local-Lyapunov stage with input steps (the mu7chain bundles do).
@@ -62,6 +79,7 @@ arguments
     K (1,1) double {mustBeInteger, mustBePositive} = 100
     n_samples (1,1) double {mustBeInteger, mustBeGreaterThanOrEqual(n_samples, 2)} = 40
     first_state_s (1,1) double = 1
+    opts.as_default (1,1) logical = false
 end
 names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
 need = {'fig_eig_heatmap', 'fig_main3_grouped'};
@@ -71,7 +89,7 @@ if ~isempty(missing)
         'The config''s registry lacks %s, which the added entries are versions of.', strjoin(missing, ', '));
 end
 added = {'fig_eig_heatmap_switch', 'fig_main3_grouped_switch'};
-if any(ismember(added, names))
+if any(ismember([added, {'fig_main3_grouped_baseline'}], names))
     error('with_switch_spectra:AlreadyAdded', 'This config already carries the switching-run entries.');
 end
 cfg.local_lyapunov_K = K;
@@ -97,11 +115,27 @@ if has_hist
         'args', {[hist0.args, {'spectra_source', 'local_lyapunov'}]});
 end
 
+if opts.as_default
+    % The paper's name and flag on the four-row switching composite; the
+    % baseline composite kept beside it under a name of its own.
+    paper_main3 = added_main3_hist;
+    paper_main3.name = main3.name;
+    paper_main3.in_paper = main3.in_paper;
+    baseline = main3;
+    baseline.name = 'fig_main3_grouped_baseline';
+    baseline.in_paper = false;
+    main3_entries = {paper_main3, baseline};
+else
+    main3_entries = {main3, added_main3, added_main3_hist};
+end
 F = {};
 for k = 1:numel(cfg.figures)
+    if strcmp(names{k}, 'fig_main3_grouped')
+        F = [F, main3_entries]; %#ok<AGROW>
+        continue;
+    end
     F{end + 1} = cfg.figures{k}; %#ok<AGROW>
     if strcmp(names{k}, 'fig_eig_heatmap');   F{end + 1} = added_heat;  end %#ok<AGROW>
-    if strcmp(names{k}, 'fig_main3_grouped'); F{end + 1} = added_main3; F{end + 1} = added_main3_hist; end %#ok<AGROW>
     if has_hist && strcmp(names{k}, 'fig_eig_real_histogram'); F{end + 1} = added_hist; end %#ok<AGROW>
 end
 cfg.figures = F;

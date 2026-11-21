@@ -22,7 +22,17 @@
 %     each set, and with the entry's args after the bundle's (the order
 %     make_all_paper_figures uses) it draws three columns in the 3cond set
 %     and four in the 4cond set;
-%   * run_all_paper_analyses' run-mode pre-flight accepts the config's mode.
+%   * run_all_paper_analyses' run-mode pre-flight accepts the config's mode;
+%   * the bundle's defaults of FD-046, in every mode: the three spectral
+%     stages (outlier_spectra, frequency_response, eigenvalue_density)
+%     after lyapunov_spectrum_n80, their plans accept the bundle, their
+%     figure entries are appended (none in_paper; the density figures also
+%     for EEx1p5; the conditions outlier_spectra simulates), and Figure 3 is
+%     the switching version: fig_main3_grouped (in_paper) is the four-row
+%     switching composite, the baseline composite is
+%     fig_main3_grouped_baseline (not in_paper), K = 100 and 40 states from
+%     1 s; the A + C bundle inherits all of it; the regression bundle gets
+%     none of it.
 %
 % Asserts; silent until it throws, then prints one PASS line.
 % See also: mu7chain_config, mu7chain_run, test_preset_conditions
@@ -58,9 +68,11 @@ end
 assert(threw, 'an unknown run mode must be refused');
 % These modes run every stage; only 'essential' selects (FD-023; its own
 % checks are in test_essential_mode). Every stage is written out, followed
-% by the opt-in lyapunov_spectrum_n80 that every mode runs (FD-032).
+% by the opt-in lyapunov_spectrum_n80 that every mode runs (FD-032) and the
+% three spectral stages (FD-046, with_spectral_supplement).
+spectral = {'outlier_spectra', 'frequency_response', 'eigenvalue_density'};
 for k = {cfg3, cfg4, cfg_med}
-    assert(isequal(k{1}.stages, [paper_stage_names(), {'lyapunov_spectrum_n80'}]) && ...
+    assert(isequal(k{1}.stages, [paper_stage_names(), {'lyapunov_spectrum_n80'}, spectral]) && ...
         isempty(k{1}.sweeps) && isempty(k{1}.eig_heatmap_examples));
 end
 % FD-030: the conditions SIMULATED and the sets DRAWN, by mode. Every mode
@@ -126,7 +138,11 @@ end
 % real-axis histogram of the Jacobian's eigenvalues against a uniform disk
 % (2026-11-19).
 ref_cfg = mu7revisedMedium_config();
-chain_only = {'fig_std_1TS_vs_MTS', 'fig_lyapunov_ranked_spectrum', 'fig_eig_real_histogram'};
+% (FD-046) Also the spectral supplement's entries, the switching Figure 3's
+% stand-alone versions and the baseline composite kept beside it.
+chain_only = {'fig_std_1TS_vs_MTS', 'fig_lyapunov_ranked_spectrum', 'fig_eig_real_histogram', ...
+    'fig_eig_heatmap_switch', 'fig_eig_real_histogram_switch', 'fig_main3_grouped_baseline'};
+chain_only = [chain_only, spectral_entry_names()];
 for c = {cfg3, cfg4}
     nm = cellfun(@(f) f.name, c{1}.figures, 'UniformOutput', false);
     assert(isequal(nm(~ismember(nm, chain_only)), ...
@@ -143,6 +159,71 @@ assert(isequal(cfg3.param_space_seed, cfg4.param_space_seed, s));
 % run_all_paper_analyses' pre-flight is ismember(cfg.run_mode, run_mode_names())
 % (it is inline in the entry point, which is not run here).
 assert(ismember(cfg.run_mode, run_mode_names()));
+
+%% FD-046: the spectral supplement and the switching Figure 3 are the default
+three_spec = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'};
+for m = run_mode_names()
+    for fs = {'3cond', '4cond'}
+        for ac = [false true]
+            if ac; k = mu7chain_AC_config(m{1}, fs{1}); else; k = mu7chain_config(m{1}, fs{1}); end
+            tag = sprintf('%s %s%s', m{1}, fs{1}, repmat(' (A + C)', 1, ac));
+            % The stages: after lyapunov_spectrum_n80, before block C's; the
+            % plans accept the bundle (the reading stages refuse a bundle
+            % without outlier_spectra).
+            i80 = find(strcmp(k.stages, 'lyapunov_spectrum_n80'));
+            assert(isscalar(i80) && isequal(k.stages(i80 + 1:i80 + 3), spectral), '%s: the stages', tag);
+            assert(isequal(paper_stage_plan(k).stages(end - 2 - 2 * ac:end - 2 * ac), spectral), '%s: run order', tag);
+            pl = outlier_spectra_stage_plan(k);
+            frequency_response_stage_plan(k); eigenvalue_density_stage_plan(k);
+            assert(isequal(pl.conditions, three_spec), '%s: outlier_spectra conditions', tag);
+            % The entries, none in the paper, each with the conditions it can draw.
+            names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
+            want = spectral_entry_names();
+            [present, at] = ismember(want, names);
+            assert(all(present) && all(diff(at) == 1), '%s: the spectral entries, in order', tag);
+            for e = k.figures(at)
+                f = e{1};
+                assert(~f.in_paper && isa(f.fn, 'function_handle'), '%s: %s', tag, f.name);
+                a = f.args;
+                if strcmp(f.name, 'fig_eigdens_theory_check')
+                    assert(isempty(a), '%s: %s args', tag, f.name);
+                else
+                    c = a{find(strcmp(a(1:2:end), 'conditions')) * 2};
+                    assert(isequal(c, intersect(k.conditions, three_spec, 'stable')), '%s: %s conditions', tag, f.name);
+                    assert(endsWith(f.name, '_EEx1p5') == any(strcmp(a(1:2:end), 'network')), '%s: %s network', tag, f.name);
+                    if endsWith(f.name, '_EEx1p5')
+                        assert(strcmp(a{find(strcmp(a(1:2:end), 'network')) * 2}, 'EEx1p5') && ...
+                            strcmp(func2str(f.fn), extractBefore(f.name, '_EEx1p5')), '%s: %s', tag, f.name);
+                    else
+                        assert(strcmp(func2str(f.fn), f.name), '%s: %s', tag, f.name);
+                    end
+                end
+            end
+            % Figure 3: the switching composite under the paper's name; the
+            % baseline beside it; K = 100 and 40 states at 1, 2, ..., 40 s.
+            m3 = k.figures{strcmp(names, 'fig_main3_grouped')};
+            b3 = k.figures{strcmp(names, 'fig_main3_grouped_baseline')};
+            assert(m3.in_paper && ~b3.in_paper && isequal(m3.fn, b3.fn) && ...
+                find(strcmp(names, 'fig_main3_grouped_baseline')) == find(strcmp(names, 'fig_main3_grouped')) + 1, '%s: Figure 3 entries', tag);
+            assert(isequal(m3.args, [b3.args, {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset', true, ...
+                'show_lambda_row', false, 'real_histogram_row', true}]), '%s: the four-row switching composite', tag);
+            assert(~any(ismember({'fig_main3_grouped_switch', 'fig_main3_grouped_switch_hist'}, names)) && ...
+                all(ismember({'fig_eig_heatmap_switch', 'fig_eig_real_histogram_switch'}, names)), '%s: switching versions', tag);
+            assert(k.local_lyapunov_K == 100 && k.local_lyapunov_spectra_n_samples == 40 && ...
+                k.local_lyapunov_spectra_start_s == 1 && k.local_lyapunov_accumulation_start_s == 0 && ...
+                k.local_lyapunov_warmup_s == 10 && k.local_lyapunov_simulation_start_s == -15, '%s: the timing', tag);
+        end
+    end
+end
+% The regression bundle gets none of it.
+rg = regression_fast_config();
+rgn = cellfun(@(f) f.name, rg.figures, 'UniformOutput', false);
+assert(~any(ismember(spectral, paper_stage_plan(rg).stages)) && ~any(ismember(spectral_entry_names(), rgn)) && ...
+    ~isfield(rg, 'local_lyapunov_spectra_n_samples') && ~ismember('fig_main3_grouped_baseline', rgn), ...
+    'the regression bundle has no spectral stage, entry or switching Figure 3');
+% Applying either helper again is refused.
+assert(throws_id(@() with_spectral_supplement(cfg3), 'with_spectral_supplement:AlreadyAdded'));
+assert(throws_id(@() with_switch_spectra(cfg3), 'with_switch_spectra:AlreadyAdded'));
 
 %% Every preset the config names exists and validates
 stage_presets = {cfg.preset_name, cfg.mc_preset, cfg.local_lyapunov_preset, ...
@@ -286,4 +367,22 @@ for c = {{cfg3, 'c3', 3}, {cfg4, 'c4', 4}}
     assert(n_ax == 6 * n_col, '%s set: %d axes, want %d columns', k.figure_set, n_ax, n_col);
 end
 
-disp('PASS: test_mu7chain_bundle -- two figure sets, conditions per mode, presets, conditions, name maps, chain and single-neuron runs.');
+disp('PASS: test_mu7chain_bundle -- two figure sets, conditions per mode, presets, conditions, name maps, chain and single-neuron runs, the spectral and Figure 3 defaults (FD-046).');
+
+function names = spectral_entry_names()
+% The entries with_spectral_supplement appends, in order.
+names = {'fig_freqresp_network', 'fig_freqresp_plane', 'fig_freqresp_phase', 'fig_freqresp_single_neuron'};
+for d = {'radial', 'gains', 'measures', 'plane'}
+    names = [names, {['fig_eigdens_' d{1}], ['fig_eigdens_' d{1} '_EEx1p5']}]; %#ok<AGROW>
+end
+names = [names, {'fig_eigdens_theory_check'}];
+end
+
+function ok = throws_id(fn, id)
+ok = false;
+try
+    fn();
+catch ME
+    ok = strcmp(ME.identifier, id);
+end
+end

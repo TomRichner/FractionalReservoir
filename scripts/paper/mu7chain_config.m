@@ -49,6 +49,25 @@ function cfg = mu7chain_config(run_mode, figure_set)
 % cfg.stages names every stage plus the opt-in lyapunov_spectrum_n80
 % (FD-032), so nothing is skipped.
 %
+% THE SPECTRAL SUPPLEMENT (FD-040 to FD-046; Tom, 2026-11-20: "integrate
+% these figures into the full run"), every mode: the opt-in stages
+% outlier_spectra, frequency_response and eigenvalue_density and their
+% figure entries (none in_paper), added at the end by
+% with_spectral_supplement. Sizes by run mode are the stages' own
+% (outlier_spectra_stage_plan: 2 seeds and 20 s windows at 'essential' and
+% 'fast', 10 seeds and 200 s for reference and E-to-E x 1.5 above).
+%
+% FIGURE 3 IS THE SWITCHING VERSION (Tom, 2026-11-20: "we will use the
+% switching version"; docs/Plan_Figure3_update.md, step 6), every mode:
+% with_switch_spectra(cfg, 100, 40, 1, 'as_default', true) at the end.
+% So the local-Lyapunov stage tracks K = 100 directions (cfg.local_lyapunov_K;
+% 50 until then) and saves the Jacobian's spectra and H at 40 states of its own
+% switching run, at 1, 2, ..., 40 s; the registered fig_main3_grouped is
+% the four-row composite (input, expansion, heat map with the Ritz overlay,
+% the real-axis histogram), and the baseline composite stays as
+% fig_main3_grouped_baseline, not in_paper. K = 100 also changes
+% fig_local_lyapunov, which reads the same stage.
+%
 % THE RANKED LYAPUNOV SPECTRUM (FD-032), every mode: the stage
 % lyapunov_spectrum_n80 (top 240 exponents per condition on the 80-neuron
 % preset cfg.lyapunov_spectrum_n80_preset, into
@@ -236,7 +255,10 @@ cfg.stf_preset           = 'single_neuron_stf';
 cfg.single_neuron_preset = 'single_neuron_mu7chain';
 cfg.illustrations = true;
 cfg.illustration_step_amp = 0.25;   % TR, 2026-09-16: half the mu7revised amplitude
-cfg.local_lyapunov_K = 50; % explicit also in fast mode
+% K = 100 throughout Figure 3 (Tom, 2026-11-20): the expansion row, the Ritz
+% values and the exponent ticks; passed to with_switch_spectra at the end.
+% (50 until FD-046.)
+cfg.local_lyapunov_K = 100; % explicit also in fast mode
 cfg.local_lyapunov_T = 40;
 cfg.local_lyapunov_step_duration_s = 5; % 8 steps over 40 s
 % Timing of the switching run (Tom, 2026-11-20; docs/Plan_Figure3_update.md):
@@ -372,6 +394,12 @@ if is_essential
     F = F(ismember(names, keep));
 end
 cfg.figures = F;
+
+%% The spectral supplement and the switching Figure 3: this bundle's defaults
+% (see the header). Last, so that both see the registry above, the
+% essential selection included.
+cfg = with_spectral_supplement(cfg);
+cfg = with_switch_spectra(cfg, cfg.local_lyapunov_K, 40, 1, 'as_default', true);
 end
 
 %% ------------------------------------------------------------------------
