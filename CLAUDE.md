@@ -18,6 +18,19 @@ dead end.
 
 ## Current work (as of 2026-11-12)
 
+**Since 2026-11-21 the work in hand is Plan 2, the figures of the new figure
+plan** (Tom, 2026-11-21). The plan and its status are in the manuscript
+repository:
+`../StochasticPlasticDynamicalSystemPaper/docs/Advancing_the_narrative/Plan2.md`.
+The specification of every figure (main, supplement, appendix; panel by
+panel; the style rules) is `figures_main_supp_appen.md` beside it. Read both
+before touching a figure, a figure registry or a bundle config. Plan 2's
+rules in short: each work package in its own worktree and branch
+(`../FractionalReservoir_wt_p2<x>`, `p2-<x>`); new files where possible; only
+the package that owns a shared file edits it, the others hand their registry
+rows and config lines to package A as text; no simulation inside a figure
+function; the gates of "Regression tests" below; nothing pushed.
+
 We are bringing the manuscript to a final draft from Brian Lundstrom's
 feedback.
 
