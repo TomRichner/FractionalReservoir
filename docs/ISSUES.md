@@ -2069,3 +2069,12 @@ machine needs that repo cloned and `setup_repo.py` run once.
   the full run. Last.
 - **Done means, for all:** section 6 of the plan; the full run and the
   exact regression tiers are Tom's, on the workstation.
+- **Lead's decision at launch (2026-11-20):** FD-043 moves to the second
+  wave. Its runs go through the same run code FD-040 is porting
+  (`outlier_run` and its helpers), so building both at once would port
+  those functions twice. Wave 1 is FD-040 (`matlab-fable-2`, pool 2),
+  FD-041 (`matlab-fable-3`), FD-042 (`matlab-opus-1`) and FD-044
+  (`matlab-opus-3`), each in its own worktree
+  (`../FractionalReservoir_wt_fd04N`); the worktree and branch for FD-043
+  exist and wait. The ten-seed dose run (FD-037, `matlab-fable-1`, pool 3)
+  continues in the main checkout.
