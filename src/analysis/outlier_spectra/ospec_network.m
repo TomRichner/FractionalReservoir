@@ -30,6 +30,14 @@ function net = ospec_network(network, mu_base)
 %                    imaginary part is 0, a rank-two conjugate pair
 %                    otherwise. Dense, on random patterns of neurons,
 %                    ignores Dale's law.
+%   noise<k>         the Wiener noise drawn from noise_seed k instead of the
+%                    class's default (rng_seeds(1) + 224737); the weights,
+%                    setpoints, time constants and initial state, all drawn
+%                    from rng_seeds(1), are unchanged. A second noise
+%                    realization of a network whose weight seed is part of
+%                    its definition (outlier_structures_stage_plan, FD-043).
+%                    Adds nothing to the label and does not change the
+%                    intended mode.
 %
 % THE INTENDED MODE (net.target), the eigenvalue of the structural W that
 % the measures follow by its eigenvector (ospec_mode_reference):
@@ -68,6 +76,7 @@ for k = 1:numel(tokens)
     route = regexp(tk, '^(EE|EI|IE|II)x(\d+)p(\d+)$', 'tokens', 'once');
     ind   = regexp(tk, '^ind(\d+)$', 'tokens', 'once');
     lr    = regexp(tk, '^lrA(\d+)p(\d+)W(\d+)p(\d+)$', 'tokens', 'once');
+    nz    = regexp(tk, '^noise(\d+)$', 'tokens', 'once');
     if strcmp(tk, 'reference')
         labels{end + 1} = 'reference'; %#ok<AGROW>
     elseif strcmp(tk, 'EI3to2')
@@ -89,9 +98,11 @@ for k = 1:numel(tokens)
         else
             labels{end + 1} = sprintf('rank two, (%g \\pm %gi) R', added.a, added.w); %#ok<AGROW>
         end
+    elseif ~isempty(nz)
+        net_args = [net_args, {'noise_seed', str2double(nz{1})}]; %#ok<AGROW>
     else
         error('ospec_network:Name', ['Unknown token ''%s'' in network ''%s'' (reference, EI3to2, ' ...
-            '<EE|EI|IE|II>x<a>p<b>, ind<k>, lrA<a>p<b>W<c>p<d>, joined by ''-'').'], tk, network);
+            '<EE|EI|IE|II>x<a>p<b>, ind<k>, lrA<a>p<b>W<c>p<d>, noise<k>, joined by ''-'').'], tk, network);
     end
 end
 
@@ -107,6 +118,9 @@ else
 end
 if numel(labels) > 1
     labels = labels(~strcmp(labels, 'reference'));
+end
+if isempty(labels)                          % a name of noise tokens alone is the reference network
+    labels = {'reference'};
 end
 net = struct('name', network, 'net_args', {net_args}, 'added_structure', added, ...
     'target', target, 'label', strjoin(labels, ', '));
