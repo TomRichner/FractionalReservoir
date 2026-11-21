@@ -57,6 +57,11 @@
 %     EIx0p9      I-to-E times 0.9:  +1.78 R (and -1.75 R)
 %     IIx1p25     I-to-I times 1.25: +2.00 R (and -3.22 R): more
 %                 inhibition of inhibition is a RIGHT-side outlier
+%   Added after the first results (the 1.4 R modes come back to the edge
+%   through the spread of the gains alone, so they could not tell whether
+%   a non-population mode is reined in when that is not enough):
+%     lrA2p5W0p0    rank one, real:      2.45 R
+%     lrA2p5W1p0    rank two: (2.48 + 0.99i) R
 %   Yesterday's two, rerun so that they carry the mode measures.
 %     EEx1p5, reference (seed [7 8])
 %
@@ -85,7 +90,8 @@ if ~exist('networks', 'var')
         'EEx1p6-EIx1p33-IEx1p33', [7 8]; ...
         'EEx1p5',      [7 8]; 'reference',   [7 8]; ...
         'EIx0p9',      [7 8]; 'IIx1p25',     [7 8]; ...
-        'EEx1p6-EIx1p31-IEx1p31', [7 8]};
+        'EEx1p6-EIx1p31-IEx1p31', [7 8]; ...
+        'lrA2p5W0p0',  [7 8]; 'lrA2p5W1p0',  [7 8]};
 end
 if ~exist('conditions', 'var'); conditions = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}; end
 

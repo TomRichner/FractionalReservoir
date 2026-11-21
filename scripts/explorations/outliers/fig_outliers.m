@@ -55,7 +55,7 @@ function files = fig_outliers(data_dir, fig_dir, opts)
 % summary uses every seed. Figures are left OPEN (Tom looks at them in
 % MATLAB), tagged 'fig_outliers'; a new call deletes only figures with that
 % tag. Names are manuscript_style's, and so are the colors except that no
-% adaptation is drawn in dark red (FR-004; see cond_color below).
+% adaptation is drawn in dark red (FR-004; see outlier_cond_color).
 %
 % See also: explore_outliers, outlier_table, outlier_measures
 
@@ -118,7 +118,7 @@ for w = 1:n_net
         R = Rs{w, c};
         if ~isempty(R)
             m = M{pick(nets{w}, conds{c}, seed1)};
-            col = cond_color(st, conds{c});
+            col = outlier_cond_color(st, conds{c});
             tau = R.tau_d;
             ev = ([R.cal.ev_M] - 1) ./ tau;                    % n x n_cal, rates
             th = linspace(0, 2 * pi, 200);
@@ -129,7 +129,7 @@ for w = 1:n_net
             for q = 1:size(ev, 2)
                 [~, i1] = max(real(ev(:, q))); top(q) = ev(i1, q);
             end
-            topc = with_conjugates(top);                       % a complex rightmost eigenvalue is one of a pair
+            topc = outlier_with_conjugates(top);                       % a complex rightmost eigenvalue is one of a pair
             plot(ax, real(topc), imag(topc), 'o', 'MarkerSize', 6, 'MarkerFaceColor', col, 'MarkerEdgeColor', 'k', 'LineWidth', 0.75);
             u = (median([R.cal.uniform_re]) - 1) / tau;
             plot(ax, u, 0, 'd', 'MarkerSize', 9, 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 1.25);
@@ -173,7 +173,7 @@ for row = 1:2
         ax = nexttile(tl); hold(ax, 'on');
         for c = 1:n_cond
             sel = find(strcmp(T.network, nets{w}) & strcmp(T.condition, conds{c}));
-            col = cond_color(st, conds{c});
+            col = outlier_cond_color(st, conds{c});
             off = linspace(-0.12, 0.12, numel(sel)) .* (numel(sel) > 1);
             for q = 1:numel(sel)
                 k = sel(q); x = c + off(q);
@@ -231,7 +231,7 @@ for w = 1:n_net
         k = pick(nets{w}, conds{c}, seed1);
         if ~isempty(k)
             m = M{k};
-            col = cond_color(st, conds{c});
+            col = outlier_cond_color(st, conds{c});
             plot(ax, m.t, m.rate_edge, '-', 'Color', gray, 'LineWidth', 1.5);
             plot(ax, m.t, m.rate_top, '-', 'Color', col, 'LineWidth', 1.0);
             plot(ax, m.full.t, m.full.abscissa, '-', 'Color', 'k', 'LineWidth', 1.25);
@@ -271,14 +271,14 @@ for w = 1:n_net
         ax = nexttile(tl); hold(ax, 'on');
         R = Rs{w, c};
         if ~isempty(R) && ~isempty(R.dense)
-            col = cond_color(st, conds{c});
+            col = outlier_cond_color(st, conds{c});
             D = R.dense;
             lam = double([D.lam]); xf = double([D.xfrac]);
             net = lam(xf >= 0.1);
             scatter(ax, real(net), imag(net), 5, col, 'filled', 'MarkerFaceAlpha', 0.2, 'MarkerEdgeColor', 'none');
             xline(ax, 0, '--', 'Color', 'k', 'LineWidth', 1.0);
             fr = ([D.lam1_M] - 1) ./ R.tau_d;
-            frc = with_conjugates(fr);                         % both members of a complex pair
+            frc = outlier_with_conjugates(fr);                         % both members of a complex pair
             plot(ax, real(frc), imag(frc), 'o', 'MarkerSize', 7, 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 1.25);
             ct = [D.cont];
             plot(ax, [real(ct) real(ct)], [imag(ct) -imag(ct)], 'o', 'MarkerSize', 7, 'MarkerFaceColor', col, 'MarkerEdgeColor', 'k', 'LineWidth', 0.75);
@@ -314,7 +314,7 @@ for w = 1:n_net
     for c = 1:n_cond
         for k = find(strcmp(T.network, nets{w}) & strcmp(T.condition, conds{c}))'
             m = M{k};
-            col = cond_color(st, conds{c});
+            col = outlier_cond_color(st, conds{c});
             survival(ax, m.dwell.zero, m.dt, '--', col, 1.25);
             survival(ax, m.dwell.full_zero, 0.1, '-', col, 2.25);
         end
@@ -358,8 +358,8 @@ if isfolder(opts.dose_dir) && ~isempty(dir(fullfile(opts.dose_dir, 'run_*.mat'))
         end
         for c = 1:n_cond
             u = Ta(strcmp(Ta.condition, conds{c}), :);
-            plot(ax, u.structural_ratio, u.(ycol{p}), '-o', 'Color', cond_color(st, conds{c}), 'LineWidth', 2.0, ...
-                'MarkerSize', 8, 'MarkerFaceColor', cond_color(st, conds{c}), 'MarkerEdgeColor', 'w');
+            plot(ax, u.structural_ratio, u.(ycol{p}), '-o', 'Color', outlier_cond_color(st, conds{c}), 'LineWidth', 2.0, ...
+                'MarkerSize', 8, 'MarkerFaceColor', outlier_cond_color(st, conds{c}), 'MarkerEdgeColor', 'w');
         end
         if p == 1; set(ax, 'YScale', 'log', 'YLim', [0.4 8], 'YTick', [0.5 1 2 4 8]); else; ylim(ax, [0 1.1]); end
         set(ax, 'FontSize', fs_t, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
@@ -391,22 +391,6 @@ function fig = new_fig(pos)
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', pos, 'Tag', 'fig_outliers');
 end
 
-function col = cond_color(st, name)
-% The color every figure here draws a condition in. FR-004 (Tom,
-% 2026-11-20): no adaptation is the dark red of the Figure 3 Ritz overlay
-% (the value fig_eig_heatmap's draw_ritz substitutes for a colorless
-% condition color), not manuscript_style's black, so that it cannot be
-% confused with the marks that are black for another reason (the full
-% Jacobian, the uniform-gain diamonds, zero lines). The shared map in
-% manuscript_style is deliberately not changed here: the paper's figures
-% change together on the next full figures run, and this helper goes then.
-if strcmp(name, 'no_adaptation')
-    col = [0.75 0.10 0.15];
-else
-    col = st.condition_color(name);
-end
-end
-
 function name = net_name(net)
 tok = regexp(net, '^EEx(\d+)p(\d+)$', 'tokens', 'once');
 if ~isempty(tok)
@@ -416,16 +400,6 @@ elseif strcmp(net, 'EI3to2')
 else
     name = net;
 end
-end
-
-function z = with_conjugates(z)
-% The eigenvalues z with the conjugate of each complex one appended, so that
-% both members of a pair are marked. A real one (|Im| below 1e-9 of the
-% larger of its modulus and 1) is kept once, on the real axis.
-z = z(:).';
-is_real = abs(imag(z)) <= 1e-9 * max(abs(z), 1);
-z(is_real) = real(z(is_real));
-z = [z, conj(z(~is_real))];
 end
 
 function survival(ax, dwell, dt, style, col, lw)
