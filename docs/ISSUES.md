@@ -2120,3 +2120,16 @@ machine needs that repo cloned and `setup_repo.py` run once.
   him. **Wave 2:** FD-043 (`matlab-opus-2`), FD-045 (`matlab-fable-2`),
   FD-046 first part: readers aligned, the three stages and the
   switching Figure 3 wired (`matlab-opus-1`); three MATLAB processes.
+- **FD-045 merged (2026-11-21):** commit `7c25053`: `fig_outlier_plane`,
+  `fig_outlier_dose`, `fig_outlier_slow_variables`, `fig_outlier_dwell`,
+  one reader (`outlier_fig_data`) and `censored_survival`; test passes at
+  60 neurons on the real stage. Not registered yet (FD-046). Worker's
+  choices the lead accepts: dose spread as thin per-seed lines (band an
+  option); dwell as a Kaplan-Meier estimate per seed with cut-off
+  excursions censored, median across seeds, a triangle where a curve
+  ends above zero, a dashed level line for a condition beyond zero for
+  the whole window; outliers marked against each state's own radius
+  while the drawn circle is the median one. To check on 500-neuron data:
+  the fitted windows of the plane and slow-variables figures against the
+  exploration's (options pin them), the break, marker and inset sizes at
+  14 pt. Covers FD-036 to FD-039 as far as the MacBook can.
