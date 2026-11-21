@@ -1898,3 +1898,34 @@ machine needs that repo cloned and `setup_repo.py` run once.
   has a title line plus an on-panel lambda_1 label; the figure entries
   were called directly with the 3cond set, `make_all_paper_figures` was
   not run; `with_switch_spectra` is not yet the bundle's default.
+
+### FD-035 Complex-plane eigenvalue plots in Tom's style, and which figures could move to it
+
+- **Status:** function built; the paper's figures not changed (Tom,
+  2026-11-20: see it on the outlier comparison first, "then we'd probably
+  want to see if there's other figures, like maybe figure 3 or others,
+  where this type of style could be implemented").
+- **What Tom asked for:** axes through the origin, 1:1 aspect, one scale
+  across compared panels, a break in the real axis for a far eigenvalue,
+  ticks only outside the bulk (recorded in `Figure_style_guide.md`).
+- **Built:** `src/plotting/complex_plane_axes.m` with
+  `scripts/tests/test_complex_plane_axes.m` (commit `75c5ebd`), and the
+  outlier comparison redrawn with it,
+  `scripts/explorations/outliers/plane_fig_outliers.m` (`91ec441`),
+  output `figs/explorations/outliers/outliers_complex_plane_v2.png`.
+  Existing through-origin code it follows: `src/plotting/plot_eigenvalues.m`
+  and the Figure 1 discs (no ticks, no break).
+- **Known limits:** a right-hand break only; the origin must lie inside
+  the window; a line drawn across the gap is not detected. With E-to-E
+  x 1.5 and adaptation, one real eigenvalue per state lies far left of
+  the window (Re -59 to -42 1/s): a left-hand break would be needed to
+  show it.
+- **Survey (worker, nothing edited):** `outliers_slow_variables` and the
+  eigenvalue panel of `fig_example_timeseries` are easy; the Figure 1
+  discs already have the look and could call the function with no ticks;
+  Figure 3 panel C (`fig_eig_heatmap` through `fig_main3_stability`) is
+  the hard one: the density image can sit under hand-drawn axes, but the
+  Ritz inset is a boxed axes placed relative to the panel, the composite
+  re-places panels and restyles ticks, and tick clearing needs a bulk
+  radius the heat map does not have (the disc of `fig_eig_real_histogram`
+  could supply it). `fig_eig_heatmap_imbalance` follows Figure 3.
