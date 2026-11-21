@@ -2042,3 +2042,30 @@ machine needs that repo cloned and `setup_repo.py` run once.
   irrelevant beyond zero but matters if the threshold is ever moved); no
   text on panels; a `_table.md` sidecar with medians and quartiles of the
   dwell times and the fraction of time beyond zero per condition.
+
+### FD-040 to FD-046 The spectral figures of 2026-11-20 as stages of the full run
+
+- **Status:** in progress (Tom, 2026-11-20: "make the changes (e.g. with
+  more seeds) discussed so far, and integrate these figures into the full
+  run. Use fable 5.2 medium agents and opus 5.5 medium agents"; and no full
+  run on the MacBook). The plan, the decisions the lead made where Tom
+  left it open, the data contract, the sizes by run level and the order
+  are in `docs/Plan_spectral_supplement.md`.
+- **FD-040** stage `outlier_spectra` (data for FD-036 to FD-039, FD-041,
+  FD-042). `matlab-fable-2`, branch `fd040-outlier-spectra`.
+- **FD-041** stage `frequency_response` and its four figures.
+  `matlab-fable-3`, branch `fd041-frequency-response`.
+- **FD-042** stage `eigenvalue_density` and its five figures.
+  `matlab-opus-1`, branch `fd042-eigenvalue-density`.
+- **FD-043** stage `outlier_structures` and its four figures.
+  `matlab-opus-2`, branch `fd043-outlier-structures`.
+- **FD-044** no adaptation in dark red in `manuscript_style` (manuscript
+  FR-004). `matlab-opus-3`, branch `fd044-no-adaptation-red`.
+- **FD-045** the four outlier figures on FD-040's output (closes FD-036 to
+  FD-039 as far as the MacBook can). After FD-040 and FD-037's ten-seed
+  run.
+- **FD-046** wiring into the `mu7chain` bundles, the switching Figure 3 as
+  the bundle default, one `essential` run end to end, the cost table for
+  the full run. Last.
+- **Done means, for all:** section 6 of the plan; the full run and the
+  exact regression tiers are Tom's, on the workstation.
