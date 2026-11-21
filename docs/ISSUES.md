@@ -1965,3 +1965,25 @@ machine needs that repo cloned and `setup_repo.py` run once.
   which needs a left-hand break or a sentence in the caption; larger break
   marks; a caption and a `_table.md` sidecar; and the choice between a
   figure of its own and the responsiveness panel of the closing figure.
+
+### FD-037 The outlier dose figure for the supplement, with more seeds
+
+- **Status:** wanted (Tom, 2026-11-20, on
+  `figs/explorations/outliers/outliers_dose.png`: "a good figure that
+  should go into the supplement. We will need it with more seeds
+  though"). Recorded in the manuscript's `docs/final_draft_to_do.md`.
+- **What it is today:** `fig_outliers.m`, dose section: E-to-E mean at 1,
+  1.1, 1.25, 1.5 and 1.75 times the reference, placed by the structural
+  outlier over the structural bulk radius; three panels (detachment of
+  the rightmost frozen-gain eigenvalue with the uniform-gain diamonds,
+  responsive fraction of E neurons, E over I mean gain); three
+  conditions; ONE seed ([7 8]); light sampling (401 states, 8 calibration
+  states, no full-Jacobian pass); runs in `data/explorations/outliers_dose/`.
+  Its detachment is being moved to the theoretical radius the same day.
+- **Done means:** the same figure over several seeds (lead's proposal:
+  ten), drawn as the median across seeds with the spread, detachment
+  against the theoretical radius; the structural outlier of each seed on
+  the horizontal axis or its median, stated; a `_table.md` sidecar with
+  the per-seed values; no text on the panels; and, for the paper, a
+  registered stage and figure function in place of the exploration
+  scripts (as FD-036).
