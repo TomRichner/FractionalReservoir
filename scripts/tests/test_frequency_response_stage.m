@@ -5,10 +5,12 @@
 % and its four figures, on 60-neuron networks.
 %
 % The stage reads the calibration states of the stage outlier_spectra
-% (FD-040). That stage was built in parallel, so the input here is made by
-% the fixture fresp_test_make_ospec: files in the contract's layout from
-% tiny networks (two networks x three conditions x two seeds, three states
-% each).
+% (FD-040), so the input here is made by THAT STAGE, run for real at tiny
+% size (tiny_ospec below: 60 neurons, two networks, both with the dense
+% passes, x three conditions x two seeds, 2 s of settling, a 2 s window,
+% three calibration states each), and the two stages are tested as a
+% chain. (Until FD-046 a fixture, fresp_test_make_ospec, wrote files in a
+% sketch of the contract's layout instead.)
 %
 % Checks:
 %   1. The plan in EVERY run mode: the folder, file and input, the two
@@ -16,7 +18,7 @@
 %      are taken. An unknown field, a bad grid, a bad rate, a missing run
 %      mode, and a bundle whose cfg.stages lacks outlier_spectra are
 %      refused (and that last one accepted with input_exists).
-%   2. The stage on the fixture's files: one entry per (network, condition,
+%   2. The stage on the outlier_spectra stage's output: one entry per (network, condition,
 %      seed) of the index, the curves of the right size and finite, the
 %      matched operating point per adapting condition and seed. A condition
 %      without slow variables does not depend on frequency and has no
@@ -35,15 +37,16 @@
 %      matrix I + tau_d J_xx.
 %   5. The loader: the stage errors on a run directory without the
 %      outlier_spectra index and on a network the index lacks; a run file
-%      that lacks a contract field is refused by name.
+%      that lacks a contract field is refused by name, and a run without
+%      the dense passes (a network not among the full_networks) is refused.
 %   6. The four figures draw from the stage's output (PNG and _table.md
 %      each), take 'conditions', and error on an empty run directory.
 %
-% Asserts; prints one PASS line. About a minute, serial. Assumes
+% Asserts; prints one PASS line. About two minutes, serial. Assumes
 % setup_paths has run and a pool allocation is set (pool_set(0) will do).
 %
 % See also: frequency_response_stage_plan, run_frequency_response_stage,
-%           fresp_run_one, fresp_load_states, fresp_test_make_ospec
+%           fresp_run_one, fresp_load_states, run_outlier_spectra_stage
 
 %% 1. The plan in every run mode
 modes = run_mode_names();
@@ -80,14 +83,14 @@ frequency_response_stage_plan(struct('run_mode', 'fast', 'stages', {{'outlier_sp
 frequency_response_stage_plan(struct('run_mode', 'fast', 'stages', {{'frequency_response'}}, ...
     'frequency_response', struct('input_exists', true)));
 
-%% 2. The stage on contract-conformant files
+%% 2. The stage on the outlier_spectra stage's output
 tmp = tempname; tmpf = tempname; empty_run = tempname; broken = tempname;
 cleanup = onCleanup(@() cellfun(@rmdir_if, {tmp, tmpf, empty_run, broken}));
 networks = {'reference', 'EEx1p5'};
 conditions = {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'};
 seeds = [1 2; 2 3];
 t0 = tic;
-fresp_test_make_ospec(tmp, 'networks', networks, 'conditions', conditions, 'seeds', seeds, 'n', 60, 'n_cal', 3);
+tiny_ospec(tmp, networks, networks, conditions, seeds, 60);
 t_fix = toc(t0);
 
 cfg = struct('run_mode', 'essential', 'verbose', 'near-none');
@@ -199,6 +202,11 @@ R = rmfield(L.R, 'cal');
 save(fullfile(broken, 'outlier_spectra', T.file{1}), 'R');
 assert(throws(@() fresp_load_states(broken, T(1, :)), 'fresp_load_states:Contract'), ...
     'a run file without the calibration states is refused');
+nodense = tempname; cleanup2 = onCleanup(@() rmdir_if(nodense));
+tiny_ospec(nodense, {'reference'}, {}, {'sfa1_std1'}, [1 2], 60);
+Tn = fresp_load_states(nodense);
+assert(~Tn.has_dense(1) && throws(@() fresp_load_states(nodense, Tn(1, :)), 'fresp_load_states:NoDense'), ...
+    'a run without the dense passes is refused');
 
 %% 6. The figures
 t0 = tic;
@@ -233,10 +241,32 @@ t_fig = toc(t0);
 
 fprintf(['PASS: test_frequency_response_stage -- the plan in every mode, refusals, the stage on contract files, ' ...
     'closed form against the Jacobian %.1e (off-diagonal %.1e, single neuron %.1e), exactness %.1e, frozen limit %.1e, ' ...
-    'the loader, four figures (fixture %.0f s, stage %.0f s, figures %.0f s).\n'], ...
+    'the loader, four figures (outlier_spectra %.0f s, stage %.0f s, figures %.0f s).\n'], ...
     worst.closed, worst.offdiag, worst.single, worst.sigma, worst.frozen, t_fix, t_run, t_fig);
 
 %% ------------------------------------------------------------------------
+function tiny_ospec(run_dir, networks, full_networks, conditions, seeds, n)
+% The REAL outlier_spectra stage at tiny size into run_dir: the bundle's
+% essential config, the stage's knobs shrunk to seconds.
+c = mu7chain_config('essential');
+c.verbose = 'near-none';
+c.outlier_spectra_n_override = n;
+c.outlier_spectra_networks = networks;
+c.outlier_spectra_full_networks = full_networks;
+c.outlier_spectra_conditions = conditions;
+c.outlier_spectra_seeds = seeds;
+c.outlier_spectra_n_seeds = size(seeds, 1);
+c.outlier_spectra_T_settle = 2;
+c.outlier_spectra_window_s = 2;
+c.outlier_spectra_full_window_s = 2;
+c.outlier_spectra_n_cal = 3;
+c.outlier_spectra_n_null = 4;
+c.outlier_spectra_n_shuffle = 3;
+c.outlier_spectra_lya_K = 0;
+c.outlier_spectra_chunk_s = 1;
+run_outlier_spectra_stage(c, run_dir, outlier_spectra_stage_plan(c));
+end
+
 function tf = throws(fn, id)
 try
     fn();
