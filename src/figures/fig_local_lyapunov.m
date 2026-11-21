@@ -64,8 +64,9 @@ titles = grouped_condition_label(names, 'sentence');
 window_recorded = isfield(D.settings, 'lya_T_interval') && numel(D.settings.lya_T_interval) == 2;
 if window_recorded; win = D.settings.lya_T_interval(:)'; else; win = [T/2, T]; end
 
-% 1150 px tall: a figure taller than the screen can be cut at export.
-fig = figure('Color', 'w', 'Position', [40 40 560 * n_cond + 120, 1150]);
+% 1000 px tall: a figure taller than the screen (1073 px on the workstation,
+% 2026-11-21) is shrunk by MATLAB at creation or at export.
+fig = figure('Color', 'w', 'Position', [40 40 560 * n_cond + 120, 1000]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 tl = tiledlayout(fig, 6, n_cond, 'TileSpacing', 'compact', 'Padding', 'loose');
 tl.TileIndexing = 'columnmajor';
