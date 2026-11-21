@@ -79,8 +79,12 @@ for i=fig_vec
             saveas(fh, fullfile(save_folder, [save_name '_f_' num2str(i)]), 'fig');
         end
         if any(strcmpi(fig_type,'png'))
-            exportgraphics(fh, fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']), ...
-                'Resolution', png_resolution(fh))
+            png_file = fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']);
+            size_before = fh.Position;
+            exportgraphics(fh, png_file, 'Resolution', png_resolution(fh))
+            if was_resized(fh, size_before)
+                print_whole(fh, size_before, png_file, '-dpng');
+            end
         end
         if any(strcmpi(fig_type,'svg'))
             % Was set(gcf, ...), which targeted whatever figure happened to be
@@ -88,7 +92,12 @@ for i=fig_vec
             % above had just raised fh with figure(i), making it current. With
             % the raise gone that accident goes too, so the target is now named.
             set(fh, 'Renderer', 'painters');
-            exportgraphics(fh, fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']), 'BackgroundColor', 'none', 'ContentType', 'vector');
+            svg_file = fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']);
+            size_before = fh.Position;
+            exportgraphics(fh, svg_file, 'BackgroundColor', 'none', 'ContentType', 'vector');
+            if was_resized(fh, size_before)
+                print_whole(fh, size_before, svg_file, '-dsvg');
+            end
         end
         if any(strcmpi(fig_type, 'pdf'))
             % Append to PDF report
@@ -106,6 +115,46 @@ if ~isempty(failed)
         '%d of %d figures did not save for ''%s'': %s', ...
         numel(failed), numel(fig_vec), save_name, strjoin(failed, ', '));
 end
+end
+
+function tf = was_resized(fh, size_before)
+% True when an export changed the figure's size.
+%
+% WHY (2026-11-21, Plan 2 package D). exportgraphics shrinks a figure that
+% is larger than the screen to the screen (on the 1710 x 1073 workstation a
+% 12 x 15.8 in figure came back 10.97 in tall), and from then on every
+% export of it is wrong: rows of panels laid out in inches are cut off at
+% the top, or drawn at the old pitch on the shrunken canvas. The first
+% export of a fresh figure is usually whole and the later ones (the .svg,
+% a second save) are not, so the damage depended on the order of saving.
+% This is what cut the column titles and first row off
+% Fig_Ostruct_Plane_rotation and _blockmean, and it is the resize
+% fig_grouped_main works around ("every other export"). Figures that fit
+% the screen are not resized and take the path they always took.
+tf = any(abs(fh.Position(3:4) - size_before(3:4)) > 1e-6 * max(size_before(3:4)));
+end
+
+function print_whole(fh, size_before, file, device)
+% Export a figure larger than the screen at its own size. print renders
+% from the paper size, not from the window, so with the size restored and
+% the paper set to it the whole canvas comes out (uncropped, unlike
+% exportgraphics). The size is restored again afterwards: print shrinks
+% the window too, and the caller's figure should keep the size it was
+% laid out for.
+units = fh.Units;
+fh.Position = size_before;
+fh.Units = 'inches';
+sz = fh.Position(3:4);
+fh.Units = units;
+set(fh, 'PaperUnits', 'inches', 'PaperPositionMode', 'manual', 'PaperSize', sz, ...
+    'PaperPosition', [0 0 sz], 'InvertHardcopy', 'off');
+fh.Position = size_before;
+if strcmp(device, '-dpng')
+    print(fh, file, device, sprintf('-r%d', png_resolution(fh)));
+else
+    print(fh, file, device, '-vector');
+end
+fh.Position = size_before;
 end
 
 function res = png_resolution(fh)
