@@ -53,31 +53,45 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the networks are recorded in the .mat
     cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
+    cfg.networks                  = {}    % networks (rows) to draw, in order; empty = all the stage ran
+    cfg.panels      (1,:) double {mustBeMember(cfg.panels, [1 2 3])} = [1 2 3]   % columns: 1 bulk radius, 2 rightmost real part, 3 loop gain
 end
 
 setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 st      = manuscript_style();
 [D, data_file] = fresp_fig_load(cfg.data_file, cfg.run_dir);
-networks = D.settings.networks;
+networks = fresp_pick_networks(D.settings.networks, cfg.networks);
 conditions = select_conditions(D.settings.conditions, cfg.conditions);
 n_net = numel(networks); n_cond = numel(conditions);
 gray = [0.6 0.6 0.6];
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
-fig = figure('Color', 'w', 'Position', [80 80 1250, 350 * n_net], 'Visible', vis);
-tl = tiledlayout(fig, n_net, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+panels = unique(cfg.panels, 'stable'); n_p = numel(panels);
+fig = figure('Color', 'w', 'Position', [80 80 round(1250 * n_p / 3), 350 * n_net], 'Visible', vis);
+% A column that is not asked for is drawn on a scrap figure and thrown
+% away: the table needs all three, and the drawing code stays one piece.
+scrap = figure('Visible', 'off'); scrap_closer = onCleanup(@() close(scrap));
+tl = tiledlayout(fig, n_net, n_p, 'TileSpacing', 'compact', 'Padding', 'compact');
 ax = gobjects(n_net, 3);
 rows = {};
 y_hi = [2.2 2.2 1.6]; y_lo = [0 0 0];        % the ranges at 500 neurons; widened below when the data need it
 marks = cell(n_net, n_cond);
 for w = 1:n_net
     for c = 1:3
-        ax(w, c) = nexttile(tl, (w - 1) * 3 + c); hold(ax(w, c), 'on');
+        k = find(panels == c);
+        if isempty(k)
+            ax(w, c) = axes(scrap);
+        else
+            ax(w, c) = nexttile(tl, (w - 1) * n_p + k);
+        end
+        hold(ax(w, c), 'on');
+        ax(w, c).Tag = sprintf('freqresp_network_%s_c%d', networks{w}, c);
     end
     for c = 1:n_cond
         runs = D.runs(strcmp({D.runs.network}, networks{w}) & strcmp({D.runs.condition}, conditions{c}));
@@ -156,6 +170,7 @@ for w = 1:n_net
     ylabel(ax(w, 3), 'Loop gain', 'FontSize', st.label_fs);
 end
 
+clear scrap_closer
 r1 = D.runs(1);
 head = {'network', 'condition', 'seeds', 'states pooled', 'R frozen', 'R(0) both', 'R(0) adaptation alone', ...
     'R(0) depression alone', 'f where R reaches 90% of frozen (Hz)', 'peak loop gain', 'at Hz', ...

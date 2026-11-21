@@ -39,7 +39,7 @@ function out = fig_freqresp_plane(cfg)
 %
 % Options beyond the standard ones
 %   seed      [] (the first seed of the stage) or a 1 x 2 seed pair
-%   re_lim, im_lim   the window, [-12 8] 1/s and [0 20] rad/s (the stage's
+%   re_lim, im_lim   the window, [-12 8] 1/s and [0 22] rad/s (the stage's
 %             complex grid must cover it for the edge to be drawn across it)
 %   tick_step 4
 %
@@ -51,13 +51,15 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the networks are recorded in the .mat
     cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
+    cfg.networks                  = {}    % networks (rows) to draw, in order; empty = all the stage ran
     cfg.seed        double        = []
     cfg.re_lim      (1,2) double  = [-12 8]
-    cfg.im_lim      (1,2) double  = [0 20]
+    cfg.im_lim      (1,2) double  = [0 22]    % the top tick (20) sits below the top end, clear of the column title
     cfg.tick_step   (1,1) double  = 4
 end
 
@@ -65,9 +67,9 @@ setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
 st      = manuscript_style();
 [D, data_file] = fresp_fig_load(cfg.data_file, cfg.run_dir);
-networks = D.settings.networks;
+networks = fresp_pick_networks(D.settings.networks, cfg.networks);
 conditions = select_conditions(D.settings.conditions, cfg.conditions);
-titles = titles_by_name(conditions);
+titles = grouped_condition_label(conditions, 'sentence');
 n_net = numel(networks); n_cond = numel(conditions);
 seed = cfg.seed;
 if isempty(seed); seed = D.settings.seeds(1, :); end
@@ -104,6 +106,7 @@ for w = 1:n_net
         a = A{w, c}; p = P{w, c};
         col = st.condition_color(conditions{c});
         ax = nexttile(tl, (w - 1) * n_cond + c);
+        ax.Tag = sprintf('freqresp_plane_%s_c%d', networks{w}, c);
         % The axis names once: Re under the bottom row, Im on the first column.
         re_label = ''; im_label = '';
         if w == n_net; re_label = 'Re (s^{-1})'; end
