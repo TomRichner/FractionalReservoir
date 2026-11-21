@@ -361,6 +361,11 @@ end
 
 function col = ritz_color(cond_name)
 % The condition's color (manuscript_style), as every other figure uses it.
+% No adaptation was black there until FR-004 (2026-11-20), and black does
+% not read on the gray density, so draw_ritz and draw_ritz_inset drew a
+% colorless condition color in dark red [0.75 0.10 0.15]. The map now holds
+% that red itself and no condition in it is colorless, so the substitution
+% was removed; the overlay's color is unchanged.
 st = manuscript_style();
 if st.condition_color.isKey(cond_name)
     col = st.condition_color(cond_name);
@@ -398,9 +403,8 @@ switch cfg.ritz_style
     case 'density'
         % The same binning, smoothing and log transform as the eigenvalue
         % density, normalized to its own maximum; a solid color whose
-        % opacity is the transformed count. Black on a gray density would
-        % not read, so a colorless condition color is drawn in dark red.
-        if max(col) - min(col) < 0.1; col = [0.75 0.10 0.15]; end
+        % opacity is the transformed count (no adaptation in its dark red,
+        % see ritz_color).
         Dz = scale_fn(compute_eigenvalue_density(z, re_edges, im_edges, 1));
         A = Dz' / max(Dz(:));
         image(ax, 'XData', re_c, 'YData', im_c, 'CData', repmat(reshape(col, 1, 1, 3), numel(im_c), numel(re_c)), ...
@@ -483,15 +487,14 @@ hold(ai, 'on');
 st = manuscript_style();
 top = 3.4 * im_half;                           % y of the top of the histogram band
 plot(ai, [0 0], [-im_half top], '--', 'Color', st.zeroline_color, 'LineWidth', 1, 'Tag', 'ritz_inset_zero');
-draw_col = col; if max(col) - min(col) < 0.1; draw_col = [0.75 0.10 0.15]; end
-scatter(ai, real(z), imag(z), 3, draw_col, 'filled', 'MarkerFaceAlpha', 0.3, ...
+scatter(ai, real(z), imag(z), 3, col, 'filled', 'MarkerFaceAlpha', 0.3, ...
     'MarkerEdgeColor', 'none', 'Tag', 'ritz_values_inset');
 n = histcounts(real(z), re_edges);
 if any(n)
     h = 1.2 * im_half + (top - 1.3 * im_half) * n / max(n);
     xs = [re_edges(1:end - 1); re_edges(2:end)]; ys = [h; h];
-    patch(ai, [xs(1); xs(:); xs(end)], [1.2 * im_half; ys(:); 1.2 * im_half], draw_col, 'FaceAlpha', 0.6, ...
-        'EdgeColor', draw_col, 'LineWidth', 0.5, 'Tag', 'ritz_inset_histogram');
+    patch(ai, [xs(1); xs(:); xs(end)], [1.2 * im_half; ys(:); 1.2 * im_half], col, 'FaceAlpha', 0.6, ...
+        'EdgeColor', col, 'LineWidth', 0.5, 'Tag', 'ritz_inset_histogram');
 end
 plot(ai, re_lim_inset, [1 1] * 1.2 * im_half, '-', 'Color', [0.6 0.6 0.6], 'LineWidth', 0.5);
 if with_ticks
