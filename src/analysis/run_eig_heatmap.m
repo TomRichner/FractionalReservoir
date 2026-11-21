@@ -334,14 +334,9 @@ r = struct('evals', evals, 'lle', model.lya_results.LLE, 'lya', model.lya_summar
     'mean_rate', mean_rate, 'B_E', ei_weight_balance(model), ...
     'mu_tilde_relative', model.mu_tilde_relative, 'n', model.n, 'model', model, 'ritz', ritz, 'disk', []);
 if cfg.disk_gains || cfg.ritz_K > 0
-    % The frozen gains at the sampled states, for the uniform-disk reference.
-    params = model.get_params();
-    rms_gain = zeros(numel(idx), 1);
-    for k = 1:numel(idx)
-        d = feval([class(model) '.frozen_gain'], model.S_out(idx(k), :)', params);
-        rms_gain(k) = sqrt(mean(d .^ 2));
-    end
-    r.disk = struct('n', model.n, 'tau_d', params.tau_d, 'R', model.R, 'rms_gain', rms_gain, 't', t_used);
+    % The frozen gains at the sampled states, for the uniform-disk reference
+    % (shared with run_local_lyapunov's spectra, which saves the same struct).
+    r.disk = frozen_gain_disk_at_states(model, idx);
 end
 end
 

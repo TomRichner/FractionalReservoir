@@ -31,7 +31,12 @@ function mat_file = run_local_lyapunov(cfg)
 % whose local rates the figure plots:
 %   * spectra_n_samples states evenly spaced over the accumulation window
 %     [accumulation start, T], both ends included (40 over [1, 40] s: one
-%     per second, 5 per 5-s input step);
+%     per second, 5 per 5-s input step). cfg.spectra_start_s (default NaN:
+%     the accumulation start) names another first state inside the window:
+%     the states are then evenly spaced over [spectra_start_s, T] (with
+%     accumulation over [0, 40] s, spectra_start_s = 1 keeps the 40 states
+%     at 1, 2, ..., 40 s). The pass below still accumulates over the whole
+%     window (ritz_pass_at_states, 'window_start_idx');
 %   * the eigenvalues of the full Jacobian at those states
 %     (jacobian_spectra_at_states);
 %   * H = Q' J Q at those states (ritz_pass_at_states, raw norm) from a
@@ -53,7 +58,10 @@ function mat_file = run_local_lyapunov(cfg)
 % ends there), and in each ritz_by_cond{i} the pass's sort_idx and its local
 % rates over the QR intervals ending and starting at each state
 % (local_rates_before, local_rates_after; states x K, Gram-Schmidt order;
-% NaN where the run has no such interval). The trajectory is held in full
+% NaN where the run has no such interval). Also disk_by_cond, the frozen
+% gains at the same states, exactly as run_eig_heatmap saves them
+% (frozen_gain_disk_at_states), for the uniform-disk reference of
+% fig_eig_real_histogram and of Figure 3's histogram row. The trajectory is held in full
 % while a condition is processed (store_full_state: steps x state dimension
 % doubles), one condition at a time. local_lyapunov_data.mat is unchanged
 % but for settings.spectra_n_samples.
@@ -75,7 +83,8 @@ arguments
     cfg.n_override  (1,1) double = 0     % tests only
     cfg.conditions               = {}    % the preset's conditions to run, by name; {} = all (FD-030)
     cfg.spectra_n_samples (1,1) double {mustBeInteger, mustBeNonnegative} = 0   % 0 = off; else states at which to save the spectra and H (FD-034)
-    cfg.use_parallel (1,1) logical = true    % the spectra's eigenvalue problems in a parfor (spectra_n_samples > 0 only)
+    cfg.spectra_start_s (1,1) double = NaN   % time of the first sampled state; NaN = the accumulation start (spectra_n_samples > 0 only)
+    cfg.use_parallel (1,1) logical = true   % the spectra's eigenvalue problems in a parfor (spectra_n_samples > 0 only)
 end
 
 setup_paths();
@@ -132,10 +141,14 @@ topk_extra = {};
 if with_spectra
     assert(cfg.spectra_n_samples >= 2, 'run_local_lyapunov:SpectraSamples', ...
         'spectra_n_samples must be 0 (off) or at least 2.');
+    if isnan(cfg.spectra_start_s); cfg.spectra_start_s = acc_start; end
+    assert(cfg.spectra_start_s >= acc_start && cfg.spectra_start_s < T, 'run_local_lyapunov:SpectraSamples', ...
+        'spectra_start_s must lie in the accumulation window, [%g, %g) s.', acc_start, T);
     topk_extra = {'store_full_state', true};     % the trajectory is needed after the run
     spectra = struct('evals', {cell(1, numel(cond_names))}, 'ritz', {cell(1, numel(cond_names))}, ...
         'num_abscissa', {cell(1, numel(cond_names))}, 'spec_abscissa', {cell(1, numel(cond_names))}, ...
-        'times', {cell(1, numel(cond_names))}, 'seconds', nan(2, numel(cond_names)));
+        'times', {cell(1, numel(cond_names))}, 'seconds', nan(2, numel(cond_names)), ...
+        'disk', {cell(1, numel(cond_names))});
 end
 
 t_stage = tic;
@@ -152,7 +165,7 @@ for i = 1:numel(cond_names)
     results(i).type_indices = m.type_indices; results(i).cell_type_names = m.cell_type_names;
     if with_spectra
         [spectra.evals{i}, spectra.num_abscissa{i}, spectra.spec_abscissa{i}, spectra.times{i}, ...
-            spectra.ritz{i}, spectra.seconds(:, i)] = spectra_along_run(m, cfg, acc_start, T, warmup);
+            spectra.ritz{i}, spectra.seconds(:, i), spectra.disk{i}] = spectra_along_run(m, cfg, acc_start, T, warmup);
         vprintf(cfg.verbose, 'minimal', '  %-14s spectra at %d states: eigenvalues %.0f s, H from the top-%d pass %.0f s\n', ...
             cond_names{i}, numel(spectra.times{i}), spectra.seconds(1, i), spectra.ritz{i}.K, spectra.seconds(2, i));
     end
@@ -182,21 +195,25 @@ vprintf(cfg.verbose, 'minimal', '[local_lyapunov] %.1f min -> %s\n', settings.mi
 end
 
 %% ------------------------------------------------------------------------
-function [evals, omega, alpha, t_used, R, seconds] = spectra_along_run(m, cfg, acc_start, T, warmup)
+function [evals, omega, alpha, t_used, R, seconds, disk] = spectra_along_run(m, cfg, acc_start, T, warmup)
 % The full-Jacobian spectra and H = Q'JQ at states evenly spaced over the
 % accumulation window of the run just made (FD-034; see the header). m holds
-% its trajectory (store_full_state) and its own top-K result.
-t_req = linspace(acc_start, T, cfg.spectra_n_samples);
+% its trajectory (store_full_state) and its own top-K result. disk: the
+% frozen gains at the same states (frozen_gain_disk_at_states).
+t_req = linspace(cfg.spectra_start_s, T, cfg.spectra_n_samples);
 half_step = 0.5 / m.fs;
 idx = arrayfun(@(tt) find(m.t_out >= tt - half_step, 1, 'first'), t_req);   % the stored row at each time
 assert(numel(unique(idx)) == numel(idx), 'run_local_lyapunov:SpectraSamples', ...
-    'spectra_n_samples = %d asks for more states than the run stores in [%g, %g] s.', cfg.spectra_n_samples, acc_start, T);
+    'spectra_n_samples = %d asks for more states than the run stores in [%g, %g] s.', cfg.spectra_n_samples, cfg.spectra_start_s, T);
+idx_acc = find(m.t_out >= acc_start - half_step, 1, 'first');               % where the pass's window starts
 t0 = tic;
 [evals, omega, alpha, t_used] = jacobian_spectra_at_states(m, idx, cfg.use_parallel);
 seconds = [toc(t0); NaN];
+disk = frozen_gain_disk_at_states(m, idx);
 t0 = tic;
 tk = m.lya_results;
-R = ritz_pass_at_states(m, idx, tk.K, {'raw'}, evals, struct('warmup_s', warmup, 'lya_dt', tk.lya_dt));
+R = ritz_pass_at_states(m, idx, tk.K, {'raw'}, evals, ...
+    struct('warmup_s', warmup, 'lya_dt', tk.lya_dt, 'window_start_idx', idx_acc));
 seconds(2) = toc(t0);
 % The same pass as the model's: same function and arguments, so the same bits.
 if ~isequal(R.LE_spectrum(:, 1), tk.LE_spectrum)
@@ -235,7 +252,8 @@ ritz_by_cond          = spectra.ritz;
 num_abscissa_by_cond  = spectra.num_abscissa;
 spec_abscissa_by_cond = spectra.spec_abscissa;
 J_times_by_cond       = spectra.times;
-lle_by_cond    = arrayfun(@(r) r.topk.LLE, results);
+disk_by_cond          = spectra.disk;   % the frozen gains, as run_eig_heatmap saves them
+lle_by_cond   = arrayfun(@(r) r.topk.LLE, results);
 lya_T_interval = settings.lya_T_interval;
 lle_window     = diff(lya_T_interval);
 state_times    = spectra.times{1};
@@ -250,7 +268,10 @@ settings.spectra_seconds = spectra.seconds;
 settings.ritz_K = settings.K;
 settings.ritz_scalings = {'raw'};
 settings.n_samples = cfg.spectra_n_samples;
+if cfg.spectra_start_s ~= settings.lya_T_interval(1)
+    settings.spectra_start_s = cfg.spectra_start_s;   % only when it is not the accumulation start
+end
 save(fullfile(out_dir, 'local_lyapunov_spectra.mat'), 'evals_by_cond', 'ritz_by_cond', 'cond_names', ...
     'condition_titles', 'lle_by_cond', 'lle_window', 'lya_T_interval', 'num_abscissa_by_cond', ...
-    'spec_abscissa_by_cond', 'J_times_by_cond', 'state_times', 'state_step', 'settings', '-v7.3');
+    'spec_abscissa_by_cond', 'J_times_by_cond', 'disk_by_cond', 'state_times', 'state_step', 'settings', '-v7.3');
 end

@@ -19,6 +19,13 @@ function R = ritz_pass_at_states(model, idx, K, scalings, evals, pass_opts)
 % is all the trajectory before the first sampled state. run_local_lyapunov
 % names its own warm-up here so that the pass is, argument for argument,
 % the model's own top-K pass (FD-034).
+%   'window_start_idx' (read here, not handed on): the row of S_out where
+%   the pass's window starts, when that is before the first sampled state.
+%   projected_jacobian starts its window at the first row it is asked for,
+%   so that row is asked for too and its outputs dropped: H and the rest
+%   are returned at idx only, from a pass that accumulated over
+%   [t_out(window_start_idx), end]. Absent, empty or not before min(idx):
+%   the window starts at the first sampled state, as it always did.
 %
 % See also: run_eig_heatmap, run_local_lyapunov, ritz_diagnostics,
 %           SRNNCellTypePairs.projected_jacobian, jacobian_spectra_at_states
@@ -28,11 +35,26 @@ params = model.get_params();
 seed   = model.rng_seeds(1) + 424242;
 rows   = min(idx):numel(model.t_out);                 % the sampled window, for the scales
 scales = feval([cls '.state_type_scales'], model.S_out, rows, params);
+idx_pass = idx(:);
+lead_in = isfield(pass_opts, 'window_start_idx') && ~isempty(pass_opts.window_start_idx) && ...
+    pass_opts.window_start_idx < min(idx);
+if lead_in; idx_pass = [pass_opts.window_start_idx; idx(:)]; end
+if isfield(pass_opts, 'window_start_idx'); pass_opts = rmfield(pass_opts, 'window_start_idx'); end
 for s = 1:numel(scalings)
     opts = pass_opts;
     opts.seed = seed;
     if strcmp(scalings{s}, 'type_sd'); opts.state_scale = scales.d; end
-    P = feval([cls '.projected_jacobian'], model.S_out, model.t_out, model.fs, idx, K, params, opts);
+    if lead_in
+        P = feval([cls '.projected_jacobian'], model.S_out, model.t_out, model.fs, idx_pass, K, params, opts);
+        % Drop the row that only opened the window.
+        assert(P.sample_idx(1) == idx_pass(1), 'ritz_pass_at_states:Order', ...
+            'projected_jacobian did not return the states in the order asked for.');
+        P.H = P.H(:, :, 2:end); P.JQ_gram = P.JQ_gram(:, :, 2:end);
+        P.valid = P.valid(2:end); P.sample_idx = P.sample_idx(2:end); P.t = P.t(2:end);
+        P.x_fraction = P.x_fraction(2:end, :); P.block_fractions = P.block_fractions(2:end, :);
+    else
+        P = feval([cls '.projected_jacobian'], model.S_out, model.t_out, model.fs, idx, K, params, opts);
+    end
     if s == 1
         n_s = numel(idx); n_sc = numel(scalings);
         R = struct('K', P.K, 'N', P.N, 'scalings', {scalings}, ...
