@@ -131,19 +131,23 @@ cfg.burst_mode_dir = pick(overrides.burst_mode_dir, fullfile(root, 'data', ['mu7
 cfg.network_mode = struct();    % knobs of ied_network_mode_stage_plan; empty: the mode's sizes
 
 %% The figure registry
-% {name, handle, in_paper, extra-args}; ied_stim_figures calls
-% fn('data_dir', cfg.run_dir, 'out_dir', <fig_root>/<name>, 'visible', ...,
-% args{:}) in this order. The combined figure reads the first entry's .fig,
-% so it comes last.
+% add(F, name, handle, group, extra-args), built by paper_figure_entry;
+% ied_stim_figures calls fn('data_dir', cfg.run_dir, 'out_dir',
+% <fig_root>/<name>, 'visible', ..., args{:}) in this order. The combined
+% figure reads the first entry's .fig, so it comes last. GROUPS (Plan 2,
+% package A, 2026-11-21; paper_figure_groups): Fig 8 (Fig_Stim_Combined) is
+% 'main'; the other three are 'appendix' (the supplementary state-change
+% figure becomes a panel of S10, built by package E; until 2026-11-21 it was
+% in_paper true). in_paper follows the group.
 F = {};
 % Model traces / normalised rate / PSD: the source of Fig 8's panels D-F.
-F = add(F, 'fig_ied_stim_blocks',            @fig_ied_stim_blocks, false, {'which', 'main'});
-F = add(F, 'fig_ied_stim_blocks_rate',       @fig_ied_stim_blocks, false, {'which', 'rate'});
+F = add(F, 'fig_ied_stim_blocks',            @fig_ied_stim_blocks, 'appendix', {'which', 'main'});
+F = add(F, 'fig_ied_stim_blocks_rate',       @fig_ied_stim_blocks, 'appendix', {'which', 'rate'});
 % Supplement: change with stimulation of the mean rate, SFA feedback and
 % the increase in depression (1 - b_1), one point per network.
-F = add(F, 'fig_ied_stim_blocks_supp_state', @fig_ied_stim_blocks, true,  {'which', 'supp_state'});
+F = add(F, 'fig_ied_stim_blocks_supp_state', @fig_ied_stim_blocks, 'appendix',  {'which', 'supp_state'});
 % Fig 8: clinical A-C over model D-F, mirror layout.
-F = add(F, 'Fig_Stim_Combined',              @ied_stim_fig_combined, true, ...
+F = add(F, 'Fig_Stim_Combined',              @ied_stim_fig_combined, 'main', ...
         {'model_fig', fullfile(cfg.fig_root, 'fig_ied_stim_blocks', 'fig_ied_stim_blocks.fig'), ...
          'clinical_dir', cfg.clinical_dir, 'clinical_files', cfg.clinical_files, ...
          'clinical_psd_fig', cfg.clinical_psd_fig, 'run_name', cfg.run_name, 'sim', cfg.sim});
@@ -160,8 +164,8 @@ cfg.figures = F;
 end
 
 %% ------------------------------------------------------------------------
-function F = add(F, name, fn, in_paper, args)
-F{end+1} = struct('name', name, 'fn', fn, 'in_paper', in_paper, 'args', {args});
+function F = add(F, name, fn, group, args)
+F{end+1} = paper_figure_entry(name, fn, group, args);
 end
 function v = pick(v, default)
 if isempty(v), v = default; end

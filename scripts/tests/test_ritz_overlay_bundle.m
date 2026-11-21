@@ -8,7 +8,7 @@
 %      whose name contains 'ritz'.
 %   2. with_ritz_overlay(cfg) sets cfg.eig_heatmap_ritz_K = 50 (or the K
 %      given) and adds exactly three entries, each right after the entry it
-%      is a version of, none in_paper: fig_eig_heatmap_ritz and
+%      is a version of, all 'appendix' (none in_paper): fig_eig_heatmap_ritz and
 %      fig_eig_heatmap_ritz_inset (fig_eig_heatmap's function and args plus
 %      the overlay's) and fig_main3_grouped_ritz (the baseline composite's:
 %      fig_main3_grouped_baseline in the mu7chain bundles since FD-046, whose

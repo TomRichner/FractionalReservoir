@@ -45,8 +45,10 @@ function cfg = with_spectral_supplement(cfg)
 %     (paper_stage_names), since an empty selection never runs an opt-in
 %     stage. The two reading stages' plans refuse a bundle that names them
 %     without outlier_spectra, so the stages are added together.
-%   * appends the figure entries of PARTS to cfg.figures, none in_paper
-%     (Tom has not chosen among them; the plan's section 2: supplementary
+%   * appends the figure entries of PARTS to cfg.figures, all 'appendix'
+%     (until the supplementary composites of Plan 2 are wired in, which
+%     reuse them as panels; earlier: none in_paper, the plan's section 2:
+%     supplementary
 %     candidates). The density figures are made for two networks: the
 %     reference under the function's own name, and E-to-E x 1.5 (the
 %     network outlier_spectra's index calls 'EEx1p5') under that name with
@@ -145,7 +147,7 @@ for p = 1:size(PARTS, 1)
     for k = 1:size(entries, 1)
         args = entries{k, 3};
         if entries{k, 4} && ~isempty(draws); args = [args, {'conditions', draws}]; end %#ok<AGROW>
-        cfg.figures{end + 1} = struct('name', entries{k, 1}, 'fn', entries{k, 2}, 'in_paper', false, 'args', {args});
+        cfg.figures{end + 1} = paper_figure_entry(entries{k, 1}, entries{k, 2}, 'appendix', args);
     end
 end
 end

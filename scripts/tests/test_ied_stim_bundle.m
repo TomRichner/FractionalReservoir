@@ -15,7 +15,8 @@ for mode = {'essential', 'fast', 'production', 'stim_blocks_20261117'}
     cfg = ied_stim_config(mode{1});
     F = [cfg.figures{:}]; names = {F.name};
     assert(isequal(names, want), 'registry of %s: %s', mode{1}, strjoin(names, ', '));
-    assert(F(3).in_paper && F(4).in_paper, 'supplement and Fig 8 must be in_paper');
+    assert(strcmp(F(3).group, 'appendix') && ~F(3).in_paper && strcmp(F(4).group, 'main') && F(4).in_paper, ...
+        'Fig 8 is main; the state-change figure is appendix (a panel of S10, Plan 2)');
     a = struct(F(4).args{:});
     assert(strcmp(a.model_fig, fullfile(cfg.fig_root, 'fig_ied_stim_blocks', 'fig_ied_stim_blocks.fig')), ...
         'Fig 8 must read the run''s own model figure');

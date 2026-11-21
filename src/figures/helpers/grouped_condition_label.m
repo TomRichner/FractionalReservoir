@@ -7,7 +7,7 @@ function out = grouped_condition_label(x, kind)
 %   names   cell of condition names (snake_case keys), or one char name.
 %   kind    which wording the grouped figures paint:
 %     'title'     srnn_condition_titles, as every other figure titles a
-%                 condition: 'Multiple-Timescale Adaptation'.
+%                 condition: 'Multiple-timescale adaptation'.
 %     'sentence'  the same words in sentence case (the column headings of
 %                 groups 2 and 3): 'Multiple-timescale adaptation'. Only a
 %                 capital followed by lower-case letters, after a space or a
@@ -15,11 +15,11 @@ function out = grouped_condition_label(x, kind)
 %     'tick'      sentence case without the trailing word 'adaptation'
 %                 except in 'No adaptation' (group 5's margin ticks):
 %                 'Single-timescale', 'Multiple-timescale (product)'.
-%     'two_line'  the title split before ' Adaptation' (group 5's gain
-%                 titles): {'Multiple-Timescale', 'Adaptation (product)'};
-%                 'No Adaptation' and titles without the word stay one line.
+%     'two_line'  the title split before ' adaptation' (group 5's gain
+%                 titles): {'Multiple-timescale', 'adaptation (product)'};
+%                 'No adaptation' and titles without the word stay one line.
 %                 Returns a cell whose entries are char or 1x2 cellstr.
-%     'abbrev'    the memory-horizon ticks of group 6: 'No Adaptation', '1TS',
+%     'abbrev'    the memory-horizon ticks of group 6: 'No adaptation', '1TS',
 %                 'MTS' (the chain), 'prodMTS' (the product MTS); any other
 %                 name falls back to manuscript_style's condition_short, then
 %                 to the name itself.
@@ -85,8 +85,10 @@ end
 end
 
 function s = two_line(t)
-k = strfind(t, ' Adaptation');
-if isempty(k) || strcmp(t, 'No Adaptation')
+% Case-insensitive, so a title in either case splits (srnn_condition_titles
+% is in sentence case since 2026-11-21); 'No adaptation' stays one line.
+k = regexpi(t, ' adaptation');
+if isempty(k) || startsWith(t, 'No ', 'IgnoreCase', true)
     s = t;
 else
     s = {t(1:k(1)-1), t(k(1)+1:end)};
@@ -94,7 +96,7 @@ end
 end
 
 function s = abbrev(name)
-known = {'no_adaptation', 'No Adaptation'; ...
+known = {'no_adaptation', 'No adaptation'; ...
          'sfa1_std1',     '1TS'; ...
          'sfa3_stdc2',    'MTS'; ...
          'sfa3_std2',     'prodMTS'};

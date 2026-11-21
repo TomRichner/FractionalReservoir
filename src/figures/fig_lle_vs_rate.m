@@ -29,7 +29,7 @@ function out = fig_lle_vs_rate(cfg)
 % Every network is one plain filled circle on the blue-grey-red weight-balance
 % map (blue_gray_red_colormap); the y window is the data's within +/-5 1/s and
 % points beyond it simply fall outside the axes (no clamping, no triangles;
-% TR, 2026-09-15). The grey line under the points is the median per rate bin.
+% TR, 2026-09-15). The line under the points, in the condition's colour, is the median per rate bin.
 %
 % WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006; the pattern every figure
 % follows). A cell of condition names, drawn as one panel each, LEFT TO RIGHT
@@ -175,7 +175,9 @@ for i = 1:n_cond
         if b == numel(bm); in = in | x == 1; end
         if nnz(in) >= 3; bm(b) = median(y(in)); bx(b) = median(x(in)); end
     end
-    plot(ax, bx(~isnan(bm)), bm(~isnan(bm)), '-', 'Color', [0.8 0.8 0.8], 'LineWidth', 2.2);
+    % In the condition's colour (Plan 2, package A, 2026-11-21: no condition
+    % in gray); it was light gray until then.
+    plot(ax, bx(~isnan(bm)), bm(~isnan(bm)), '-', 'Color', st.condition_color(name), 'LineWidth', 2.2);
     yline(ax, 0, '--', 'Color', [0 0.6 0], 'LineWidth', 1.4);
     % every network: a plain filled circle, no edge; out-of-window points fall off the axes
     scatter(ax, x, y, sz, c, 'filled');
@@ -194,7 +196,7 @@ cb = colorbar(axs(end));
 cb.Ticks = cb_ticks; cb.TickLabels = cb_labels;
 cb.Label.String = 'E:I weight ratio'; cb.Label.FontSize = st.label_fs;
 cb.Layout.Tile = 'east';
-title(tl, sprintf('\\lambda_1 vs mean population rate%s; grey line: median per rate bin', ...
+title(tl, sprintf('\\lambda_1 vs mean population rate%s; line: median per rate bin', ...
     tern(cfg.include_sweeps, ', joint sample + 1-D sweeps (small)', ', joint sample')), ...
     'FontWeight', 'normal', 'FontSize', 9);
 

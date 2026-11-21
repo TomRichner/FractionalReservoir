@@ -206,7 +206,9 @@ colors = zeros(n_cond, 3); short = cell(1, n_cond);
 for i = 1:n_cond
     colors(i, :) = [0.5 0.5 0.5]; short{i} = titles{i};
     if isKey(st.condition_color, R(i).name), colors(i, :) = st.condition_color(R(i).name); end
-    if isKey(st.condition_short, R(i).name), short{i} = st.condition_short(R(i).name); end
+    % The legend names a condition by its title (titles{i}, from
+    % srnn_condition_titles; Plan 2, package A, 2026-11-21). Until then it
+    % used the short codes 'Baseline', 'SFA-1+STD-1', 'SFA+STD'.
 end
 
 n_col = max(n_blk, 3);

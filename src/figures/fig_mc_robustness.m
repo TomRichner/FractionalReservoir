@@ -117,7 +117,9 @@ end
 function t = tick_label(t)
 % A condition's title broken over lines, so the tick labels of four
 % conditions fit side by side.
-t = regexprep(t, '-Timescale ', '-Timescale\\newline');
+% Case-insensitive: the titles are in sentence case since 2026-11-21
+% ('Single-timescale adaptation').
+t = regexprep(t, '-(timescale) ', '-$1\\newline', 'ignorecase');
 t = regexprep(t, '\s+(\(.*\))$', '\\newline$1');
-t = strrep(t, 'No Adaptation', 'No\newlineAdaptation');
+t = regexprep(t, '^(No) (adaptation)', '$1\\newline$2', 'ignorecase');
 end

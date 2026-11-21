@@ -32,9 +32,11 @@ for k=1:numel(axs)
         ax.Title.String=char(strrep(strjoin(string(ax.Title.String),' '),newline,' '));
         % The plain line is the saved rate-bin median; ConstantLine objects
         % are the separate zero references and retain their original styling.
-        set(findall(ax,'Type','line'),'Color',[.5 .5 .5],'LineWidth',2.5);
         % The panel's condition, from its title (fig_lle_vs_rate titles by name).
         name=grouped_condition_label(ax.Title.String,'name_of_title');
+        % The median in the condition's colour (Plan 2, package A, 2026-11-21:
+        % no condition in gray; it was gray [.5 .5 .5] until then).
+        set(findall(ax,'Type','line'),'Color',st.condition_color(name{1}),'LineWidth',2.5);
         ax.Title.Color=st.condition_color(name{1});
         % Long titles collide over narrow panels (four conditions, or the
         % product's '(product)' title): those go on two lines. The paper's
