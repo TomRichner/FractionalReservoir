@@ -166,9 +166,8 @@ end
 % of the set and the summary, from <run_dir>/noise_switch/ (an error when
 % the run does not hold it). Its tags, Fig_noise_switch_timeseries_<c>_copies
 % and Fig_noise_switch_divergence, are prefixes of no other tag, and it has
-% its own folder. Not in the manuscript (a possible supplemental figure).
-noise_switch = struct('name', 'fig_noise_switch_rollouts', 'fn', @fig_noise_switch_rollouts, ...
-    'in_paper', false, 'args', {{}});
+% its own folder. In the appendix (the figure plan of 2026-11-21).
+noise_switch = paper_figure_entry('fig_noise_switch_rollouts', @fig_noise_switch_rollouts, 'appendix');
 cfg.figures = [figures_A, C.figures, {noise_switch}];
 names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
 [~, first] = unique(names, 'stable');

@@ -26,14 +26,14 @@
 %   * the bundle's defaults of FD-046, in every mode: the four spectral
 %     stages (outlier_spectra, frequency_response, eigenvalue_density,
 %     outlier_structures) after lyapunov_spectrum_n80, their plans accept
-%     the bundle, their figure entries are appended (none in_paper; the
+%     the bundle, their figure entries are appended (all 'appendix'; the
 %     density figures also for EEx1p5; fig_ostruct_plane once per group;
 %     the conditions the entry's stage simulates), outlier_spectra gives
 %     'reference' and 'EEx1p5' the dense pass that three of its figures
 %     need, and Figure 3 is
 %     the switching version: fig_main3_grouped (in_paper) is the four-row
 %     switching composite, the baseline composite is
-%     fig_main3_grouped_baseline (not in_paper), K = 100 and 40 states from
+%     fig_main3_grouped_baseline ('appendix'), K = 150 and 40 states from
 %     1 s; the A + C bundle inherits all of it; the regression bundle gets
 %     none of it.
 %
@@ -152,7 +152,7 @@ for c = {cfg3, cfg4}
     assert(isequal(nm(~ismember(nm, chain_only)), ...
                    cellfun(@(f) f.name, ref_cfg.figures, 'UniformOutput', false)));
     e = c{1}.figures{strcmp(nm, 'fig_std_1TS_vs_MTS')};
-    assert(e.in_paper && isequal(e.args, {'preset_name', main_name}));
+    assert(strcmp(e.group, 'appendix') && ~e.in_paper && isequal(e.args, {'preset_name', main_name}));   % a panel of S1 (Plan 2)
 end
 
 % FD-016: a fixed sample seed, valid for run_all_paper_analyses.
@@ -195,7 +195,7 @@ for m = run_mode_names()
             assert(all(present) && all(diff(at) == 1), '%s: the spectral entries, in order', tag);
             for e = k.figures(at)
                 f = e{1};
-                assert(~f.in_paper && isa(f.fn, 'function_handle'), '%s: %s', tag, f.name);
+                assert(~f.in_paper && strcmp(f.group, 'appendix') && isa(f.fn, 'function_handle'), '%s: %s', tag, f.name);
                 a = f.args;
                 if strcmp(f.name, 'fig_eigdens_theory_check')
                     assert(isempty(a), '%s: %s args', tag, f.name);
@@ -216,10 +216,10 @@ for m = run_mode_names()
                 end
             end
             % Figure 3: the switching composite under the paper's name; the
-            % baseline beside it; K = 100 and 40 states at 1, 2, ..., 40 s.
+            % baseline beside it; K = 150 and 40 states at 1, 2, ..., 40 s.
             m3 = k.figures{strcmp(names, 'fig_main3_grouped')};
             b3 = k.figures{strcmp(names, 'fig_main3_grouped_baseline')};
-            assert(m3.in_paper && ~b3.in_paper && isequal(m3.fn, b3.fn) && ...
+            assert(m3.in_paper && strcmp(m3.group, 'main') && ~b3.in_paper && strcmp(b3.group, 'appendix') && isequal(m3.fn, b3.fn) && ...
                 find(strcmp(names, 'fig_main3_grouped_baseline')) == find(strcmp(names, 'fig_main3_grouped')) + 1, '%s: Figure 3 entries', tag);
             % The registry names both files (fig_tag): the paper's composite
             % is Fig_Main3_Grouped.png, the name FD-031 gave Figure 3 and the
@@ -231,7 +231,7 @@ for m = run_mode_names()
                 '%s: the four-row switching composite', tag);
             assert(~any(ismember({'fig_main3_grouped_switch', 'fig_main3_grouped_switch_hist'}, names)) && ...
                 all(ismember({'fig_eig_heatmap_switch', 'fig_eig_real_histogram_switch'}, names)), '%s: switching versions', tag);
-            assert(k.local_lyapunov_K == 100 && k.local_lyapunov_spectra_n_samples == 40 && ...
+            assert(k.local_lyapunov_K == 150 && k.local_lyapunov_spectra_n_samples == 40 && ...
                 k.local_lyapunov_spectra_start_s == 1 && k.local_lyapunov_accumulation_start_s == 0 && ...
                 k.local_lyapunov_warmup_s == 10 && k.local_lyapunov_simulation_start_s == -15, '%s: the timing', tag);
         end
@@ -332,7 +332,7 @@ assert(isequal(st.condition_color('sfa3_std2'), [0 0.7 0]));
 assert(isequal(st.condition_color('sfa3_stdc2'), [0.000 0.447 0.698]));
 assert(strcmp(st.condition_short('sfa3_stdc2'), 'SFA+STD'));
 assert(strcmp(st.condition_short('sfa3_std2'), 'SFA+prodSTD'));
-assert(strcmp(st.condition_title('sfa3_stdc2'), 'Multiple-Timescale Adaptation'));
+assert(strcmp(st.condition_title('sfa3_stdc2'), 'Multiple-timescale adaptation'));
 % The four drawn colours are distinct, and so are the titles.
 cols = cell2mat(cellfun(@(n) st.condition_color(n), four_names, 'UniformOutput', false)');
 assert(size(unique(cols, 'rows'), 1) == 4);

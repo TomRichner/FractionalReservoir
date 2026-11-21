@@ -52,7 +52,7 @@ function cfg = mu7chain_config(run_mode, figure_set)
 % THE SPECTRAL SUPPLEMENT (FD-040 to FD-046; Tom, 2026-11-20: "integrate
 % these figures into the full run"), every mode: the opt-in stages
 % outlier_spectra, frequency_response, eigenvalue_density and
-% outlier_structures and their figure entries (none in_paper), added at
+% outlier_structures and their figure entries (all 'appendix'), added at
 % the end by with_spectral_supplement. Sizes by run mode are the stages'
 % own (outlier_spectra_stage_plan: 2 seeds and 20 s windows at 'essential'
 % and 'fast', 10 seeds and 200 s for reference and E-to-E x 1.5 above;
@@ -61,18 +61,18 @@ function cfg = mu7chain_config(run_mode, figure_set)
 %
 % FIGURE 3 IS THE SWITCHING VERSION (Tom, 2026-11-20: "we will use the
 % switching version"; docs/Plan_Figure3_update.md, step 6), every mode:
-% with_switch_spectra(cfg, 100, 40, 1, 'as_default', true) at the end.
-% So the local-Lyapunov stage tracks K = 100 directions (cfg.local_lyapunov_K,
-% in every mode; see the note where it is set) and saves the Jacobian's
+% with_switch_spectra(cfg, cfg.local_lyapunov_K, 40, 1, 'as_default', true)
+% at the end. So the local-Lyapunov stage tracks K = 150 directions
+% (cfg.local_lyapunov_K, in every mode since 2026-11-21; 100 from
+% 2026-11-20; see the note where it is set) and saves the Jacobian's
 % spectra and H at 40 states of its own switching run, at 1, 2, ..., 40 s;
 % the registered fig_main3_grouped is the four-row composite (input,
 % expansion, heat map with the Ritz overlay, the real-axis histogram),
 % saved as fig_main3_grouped/Fig_Main3_Grouped.png (the name FD-031 gave
 % the paper's Figure 3), and the baseline composite (FD-031's three-row
 % paper layout on the separate eig_heatmap run) stays as
-% fig_main3_grouped_baseline (Fig_Main3_Grouped_baseline.png), not
-% in_paper. K = 100 also changes fig_local_lyapunov, which reads the same
-% stage.
+% fig_main3_grouped_baseline (Fig_Main3_Grouped_baseline.png), in the
+% appendix. K also changes fig_local_lyapunov, which reads the same stage.
 %
 % THE RANKED LYAPUNOV SPECTRUM (FD-032), every mode: the stage
 % lyapunov_spectrum_n80 (top 240 exponents per condition on the 80-neuron
@@ -291,19 +291,23 @@ cfg.single_neuron_preset = 'single_neuron_mu7chain';
 cfg.illustrations = true;
 cfg.illustration_step_amp = 0.25;   % TR, 2026-09-16: half the mu7revised amplitude
 % Top-K of the local-Lyapunov stage (Figure 3's switching data: the
-% expansion row, the Ritz values and the exponent ticks): K = 100 IN EVERY
-% RUN MODE (Tom, 2026-11-20: 100 tracked directions throughout Figure 3;
-% explicit in fast mode too, overriding run_local_lyapunov's per-mode
-% default; passed to with_switch_spectra at the end).
-% History, both decisions recorded because they were made on two machines
-% two days apart: on 2026-11-17 (FD-031 item 8, the PC) K was 50 at
-% 'essential', 'fast' and 'fastmedium' and 150 at 'medium', 'medium2' and
-% 'production' (about 11-12 min for three conditions on an idle machine);
-% the 2026-11-20 decision replaces both values. What FD-031 found still
-% holds at K = 100: the multiple-timescale expansion does not converge in
-% K, so Figure 3 calls it a lower bound, and fig_main3_stability writes the
-% K the run used into the figure's provenance.
-cfg.local_lyapunov_K = 100;
+% expansion row, the Ritz values and the exponent ticks): K = 150 IN EVERY
+% RUN MODE (Tom, 2026-11-21: "go with 150"; Plan 2, package A). Explicit in
+% every mode, overriding run_local_lyapunov's per-mode default, and passed
+% to with_switch_spectra at the end, so the stage, the switching spectra
+% and the registered Figure 3 all use it.
+% History, recorded because the decisions were made on two machines over
+% four days: on 2026-11-17 (FD-031 item 8, the PC) K was 50 at 'essential',
+% 'fast' and 'fastmedium' and 150 at 'medium', 'medium2' and 'production'
+% (about 11-12 min for three conditions on an idle machine); on 2026-11-20
+% (the MacBook) K = 100 in every mode replaced both; on 2026-11-21 K = 150
+% in every mode replaced that. What FD-031 found still holds: the
+% multiple-timescale expansion does not converge in K, so Figure 3 calls it
+% a lower bound, and fig_main3_stability writes the K the run used into the
+% figure's provenance. The cost grows about linearly in K over 100 (the
+% top-K pass is matrix-free, N x K per step), so the stage is about 1.5
+% times its K = 100 time; not measured when this was written.
+cfg.local_lyapunov_K = 150;
 cfg.local_lyapunov_T = 40;
 cfg.local_lyapunov_step_duration_s = 5; % 8 steps over 40 s
 % Timing of the switching run (Tom, 2026-11-20; docs/Plan_Figure3_update.md):
@@ -329,17 +333,27 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 
 %% The figure registry
 % mu7revisedMedium_config's registry, entry for entry. Order is the order
-% make_all_paper_figures runs them. in_paper marks the ones in the manuscript;
-% the rest are kept working and regenerated. Each entry is
-% {name, handle, in_paper, extra-args}; the extra args are appended to the
-% standard fields (run_dir, out_dir, save, visible).
+% make_all_paper_figures runs them. Each entry is
+% add(F, name, handle, group, extra-args), built by paper_figure_entry; the
+% extra args are appended to the standard fields (run_dir, out_dir, save,
+% visible).
+%
+% THE GROUPS (Plan 2, package A, 2026-11-21; paper_figure_groups and the
+% manuscript repository's figures_main_supp_appen.md): every entry is
+% 'main', 'supplement' or 'appendix', and in_paper is derived from it (main
+% and supplement). The main figures here are the grouped composites
+% (grouped_figure_registry). Every single figure below is 'appendix': it is
+% either in the plan's appendix or only a panel of a future supplementary
+% composite (fig_supp<k>_grouped), which other Plan 2 packages build and the
+% wiring job registers as 'supplement'. Until 2026-11-21 several of them
+% were in_paper true, as panels of the old supplement.
 F = {};
 % The two entries that simulate while drawing take the bundle's rate and
 % integrator too (Tom, 2026-11-17: every paper simulation at SRA1, 500 Hz).
 sim_args = {'fs', cfg.fs, 'ode_solver', cfg.ode_solver};
-F = add(F, 'fig_introductory_concepts',       @fig_introductory_concepts,       true, ...
+F = add(F, 'fig_introductory_concepts',       @fig_introductory_concepts,       'appendix', ...
         [{'preset_name', cfg.sompolinsky_preset, 'gammas', cfg.panelA_gammas}, sim_args]);
-F = add(F, 'fig_FI_curve',                    @fig_FI_curve,                    true, {});
+F = add(F, 'fig_FI_curve',                    @fig_FI_curve,                    'appendix', {});
 % The single-neuron figure has its OWN condition list in each set (the
 % lead's decision, 2026-11-12): its run holds the single-neuron preset's
 % conditions, not the network's. The paper's version keeps its three columns
@@ -353,63 +367,63 @@ switch figure_set
         sn_conditions = {'no_adaptation', 'sfa1_std0', 'sfa0_std1', 'sfa0_stdc2'};
 end
 cfg.single_neuron_conditions = sn_conditions;
-F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, true, ...
+F = add(F, 'fig_single_neuron_revised', @fig_single_neuron_revised, 'appendix', ...
         {'conditions', sn_conditions});
-F = add(F, 'fig_adaptation_methods_stf',      @fig_adaptation_methods,          false, ...
+F = add(F, 'fig_adaptation_methods_stf',      @fig_adaptation_methods,          'appendix', ...
         {'variant', 'sfa_std_stf', 'preset_name', cfg.stf_preset});
-F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            true, ...
+F = add(F, 'fig_SFA_steady_state',            @fig_SFA_steady_state,            'appendix', ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            true, ...
+F = add(F, 'fig_STD_steady_state',            @fig_STD_steady_state,            'appendix', ...
         {'preset_name', cfg.preset_name});
 % What 1TS and the chained MTS share and where they differ (FD-014): the
 % first-cycle match and the steady-state difference under a sinusoidal rate,
 % rate steps, and the steady state against rate. Not in mu7revisedMedium's
 % registry, which has no chain. Built from the preset's route models, no
 % run directory; the 4cond set adds the product in green.
-F = add(F, 'fig_std_1TS_vs_MTS',              @fig_std_1TS_vs_MTS,              true, ...
+F = add(F, 'fig_std_1TS_vs_MTS',              @fig_std_1TS_vs_MTS,              'appendix', ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_stim_engages_adaptation',     @fig_stim_engages_adaptation,     true, ...
+F = add(F, 'fig_stim_engages_adaptation',     @fig_stim_engages_adaptation,     'appendix', ...
         [{'preset_name', cfg.bursting_preset}, sim_args]);
-F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, true, ...
+F = add(F, 'fig_sensitivity_analysis_allStd', @fig_sensitivity_analysis_allStd, 'appendix', ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         true, ...
+F = add(F, 'fig_sensitivity_medians',         @fig_sensitivity_medians,         'appendix', ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_param_space_allStd',          @fig_param_space_allStd,          true, ...
+F = add(F, 'fig_param_space_allStd',          @fig_param_space_allStd,          'appendix', ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_EI_weights_param_space',      @fig_EI_weights_param_space,      true, ...
+F = add(F, 'fig_EI_weights_param_space',      @fig_EI_weights_param_space,      'appendix', ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_lle_vs_rate',                @fig_lle_vs_rate,                true, {});
-F = add(F, 'fig_local_vs_finite_lle',        @fig_local_vs_finite_lle,        true, {});
-F = add(F, 'fig_sfa_EOC_allStd',              @fig_sfa_EOC_allStd,              true, ...
+F = add(F, 'fig_lle_vs_rate',                @fig_lle_vs_rate,                'appendix', {});
+F = add(F, 'fig_local_vs_finite_lle',        @fig_local_vs_finite_lle,        'appendix', {});
+F = add(F, 'fig_sfa_EOC_allStd',              @fig_sfa_EOC_allStd,              'appendix', ...
         {'preset_name', cfg.preset_name});
-F = add(F, 'fig_memory_capacity',             @fig_memory_capacity,             true, {});
-F = add(F, 'fig_memory_capacity_example',     @fig_memory_capacity_example,     true, {});
-F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 false, ...
+F = add(F, 'fig_memory_capacity',             @fig_memory_capacity,             'appendix', {});
+F = add(F, 'fig_memory_capacity_example',     @fig_memory_capacity_example,     'appendix', {});
+F = add(F, 'fig_eig_heatmap',                 @fig_eig_heatmap,                 'appendix', ...
         {'density_scale', 'loglog'});
-F = add(F, 'fig_eig_heatmap_imbalance',       @fig_eig_heatmap_imbalance,       true, ...
+F = add(F, 'fig_eig_heatmap_imbalance',       @fig_eig_heatmap_imbalance,       'appendix', ...
         {'density_scale', 'loglog'});
 % The same eigenvalues projected on the real axis, against the projection of
 % a uniform disk (Tom, 2026-11-19; additional figure, not in the paper). From
 % the eig_heatmap stage; without the stage's saved gains it draws the
 % unit-gain disk.
-F = add(F, 'fig_eig_real_histogram',          @fig_eig_real_histogram,          false, {});
-F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      false, {});
-F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          false, {});
+F = add(F, 'fig_eig_real_histogram',          @fig_eig_real_histogram,          'appendix', {});
+F = add(F, 'fig_dc_lle',                      @fig_dc_lle,                      'appendix', {});
+F = add(F, 'fig_lyapunov_spectrum',          @fig_lyapunov_spectrum,          'appendix', {});
 % The ranked top-240 spectrum and its histogram on the 80-neuron network
 % (FD-032, supplementary), from the stage lyapunov_spectrum_n80, which this
 % bundle runs in every mode.
-F = add(F, 'fig_lyapunov_ranked_spectrum',   @fig_lyapunov_ranked_spectrum,   false, {});
-F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    false, {});
-F = add(F, 'fig_transient_gain',             @fig_transient_gain,             false, {});
-F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  false, {});
-F = add(F, 'fig_local_lyapunov',             @fig_local_lyapunov,             true, {});
-F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       true, ...
+F = add(F, 'fig_lyapunov_ranked_spectrum',   @fig_lyapunov_ranked_spectrum,   'appendix', {});
+F = add(F, 'fig_transient_amplification',    @fig_transient_amplification,    'appendix', {});
+F = add(F, 'fig_transient_gain',             @fig_transient_gain,             'appendix', {});
+F = add(F, 'fig_transient_gain_excursions',  @fig_transient_gain_excursions,  'appendix', {});
+F = add(F, 'fig_local_lyapunov',             @fig_local_lyapunov,             'appendix', {});
+F = add(F, 'fig_numerics_solver',             @fig_numerics_verification,       'appendix', ...
         {'variant', 'solver'});
-F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       true, ...
+F = add(F, 'fig_numerics_lya_method',         @fig_numerics_verification,       'appendix', ...
         {'variant', 'lya_method'});
-F = add(F, 'fig_numerics_jacobian',          @fig_numerics_verification,       true, ...
+F = add(F, 'fig_numerics_jacobian',          @fig_numerics_verification,       'appendix', ...
         {'variant', 'jacobian'});
-F = add(F, 'doc_tables',                      @fig_doc_tables,                  true, ...
+F = add(F, 'doc_tables',                      @fig_doc_tables,                  'appendix', ...
         {'preset_name', cfg.preset_name});
 % Built for THIS set's fig_root (see "why the registry is built per set").
 F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
@@ -451,8 +465,8 @@ cfg = with_switch_spectra(cfg, cfg.local_lyapunov_K, 40, 1, 'as_default', true);
 end
 
 %% ------------------------------------------------------------------------
-function F = add(F, name, fn, in_paper, args)
-F{end+1} = struct('name', name, 'fn', fn, 'in_paper', in_paper, 'args', {args});
+function F = add(F, name, fn, group, args)
+F{end+1} = paper_figure_entry(name, fn, group, args);
 end
 
 function mustBeMemberOrEmpty(figure_set)

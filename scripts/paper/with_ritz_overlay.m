@@ -25,7 +25,7 @@ function cfg = with_ritz_overlay(cfg, K)
 %       fig_eig_heatmap_ritz         the density with the points
 %       fig_eig_heatmap_ritz_inset   the same with the inset near zero
 %       fig_main3_grouped_ritz       the composite Figure 3 with both
-%     None is marked in_paper. The composite is a version of the BASELINE
+%     All are in the group 'appendix' (none in_paper). The composite is a version of the BASELINE
 %     composite, the one that reads the eig_heatmap stage: in the mu7chain
 %     bundles since FD-046 that is fig_main3_grouped_baseline (the paper's
 %     fig_main3_grouped draws the switching run, with_switch_spectra), and
@@ -62,11 +62,11 @@ if ismember('fig_main3_grouped_baseline', names); base3 = 'fig_main3_grouped_bas
 main3 = cfg.figures{strcmp(names, base3)};
 overlay = {'ritz_overlay', true};
 added_heat = { ...
-    struct('name', 'fig_eig_heatmap_ritz', 'fn', heat.fn, 'in_paper', false, 'args', {[heat.args, overlay]}), ...
-    struct('name', 'fig_eig_heatmap_ritz_inset', 'fn', heat.fn, 'in_paper', false, ...
-        'args', {[heat.args, overlay, {'ritz_inset', true}]})};
-added_main3 = {struct('name', 'fig_main3_grouped_ritz', 'fn', main3.fn, 'in_paper', false, ...
-    'args', {[main3.args, overlay, {'ritz_inset', true}]})};
+    paper_figure_entry('fig_eig_heatmap_ritz', heat.fn, 'appendix', [heat.args, overlay]), ...
+    paper_figure_entry('fig_eig_heatmap_ritz_inset', heat.fn, 'appendix', ...
+        [heat.args, overlay, {'ritz_inset', true}])};
+added_main3 = {paper_figure_entry('fig_main3_grouped_ritz', main3.fn, 'appendix', ...
+    [main3.args, overlay, {'ritz_inset', true}])};
 
 F = {};
 for k = 1:numel(cfg.figures)

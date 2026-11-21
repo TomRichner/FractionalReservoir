@@ -45,7 +45,7 @@ for s = 1:2
     cleanup = onCleanup(@() rmdir(tmp, 's'));
     names = cellfun(@(f) f.name, k_cfg.figures, 'UniformOutput', false);
     e = k_cfg.figures{strcmp(names, 'fig_std_1TS_vs_MTS')};
-    assert(e.in_paper, 'fig_std_1TS_vs_MTS must be in_paper in the %s set', k_cfg.figure_set);
+    assert(strcmp(e.group, 'appendix') && ~e.in_paper, 'fig_std_1TS_vs_MTS is an appendix entry (a panel of S1, Plan 2) in the %s set', k_cfg.figure_set);
     % The call make_all_paper_figures makes: standard fields, the bundle's
     % conditions, then the entry's args. The robustness grid is cut to two
     % frequencies at one amplitude (it is most of the figure's run time, and
