@@ -86,7 +86,7 @@ for w = 1:n_net
     for c = 1:3
         k = find(panels == c);
         if isempty(k)
-            ax(w, c) = axes(scrap);
+            ax(w, c) = axes(scrap); %#ok<LAXES> creates one, does not raise one
         else
             ax(w, c) = nexttile(tl, (w - 1) * n_p + k);
         end

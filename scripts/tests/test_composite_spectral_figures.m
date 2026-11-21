@@ -70,6 +70,11 @@ for pass = 1:2
     svg = fileread(fullfile(big_dir, 'Tall.svg'));
     hgt = regexp(svg, 'height="([\d.]+)mm"', 'tokens', 'once');
     assert(~isempty(hgt) && abs(str2double(hgt{1}) / 25.4 - tall(2)) < 0.05, 'pass %d: the SVG is the figure''s height', pass);
+    assert(numel(strfind(svg, '<polyline')) == 2, 'pass %d: the SVG has the top mark and the bottom mark', pass);
+    assert(~contains(svg, '#010203') && ~contains(svg, '#030201') && isempty(findall(fig, 'Tag', 'print_whole_check')) && ...
+        isscalar(findall(fig, 'Type', 'axes')), 'pass %d: the check squares are gone from the file and from the figure', pass);
+    corner = A(1:20, 1:20, :);
+    assert(all(corner(:) == 255), 'pass %d: the check square is painted out of the PNG', pass);
 end
 assert(isequal(sizes(1, :), sizes(2, :)), 'the second save is the size of the first');
 close(fig);
