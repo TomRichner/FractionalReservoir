@@ -65,6 +65,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -136,14 +137,14 @@ for w = 1:n_net
     set(ax, 'XScale', 'log', 'XLim', x_lim, 'YLim', [0 1.04], 'YTick', 0:0.5:1, 'XTick', 10 .^ (-3:3), ...
         'XMinorTick', 'off', 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
     title(ax, F.net_labels{w}, 'FontSize', st.title_fs, 'FontWeight', 'normal');
-    xlabel(ax, 'time beyond zero (s)', 'FontSize', st.label_fs);
-    if w == 1; ylabel(ax, 'fraction of excursions longer', 'FontSize', st.label_fs); end
+    xlabel(ax, 'Time beyond zero (s)', 'FontSize', st.label_fs);
+    if w == 1; ylabel(ax, 'Fraction of excursions longer', 'FontSize', st.label_fs); end
 end
 
 fig_tag = 'Fig_Outlier_Dwell';
 out = struct('figs', fig, 'files', {{}}, 'source', F.file, 'curves', {C});
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');

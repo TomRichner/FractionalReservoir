@@ -33,6 +33,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -72,14 +73,14 @@ for p = 1:2
     end
     axis(ax, 'equal'); xlim(ax, lim); ylim(ax, lim);
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
-    xlabel(ax, sprintf('predicted shift, %s', plab{p}), 'FontSize', st.label_fs - 2);
-    ylabel(ax, sprintf('observed shift, %s', plab{p}), 'FontSize', st.label_fs - 2);
+    xlabel(ax, sprintf('Predicted shift, %s', plab{p}), 'FontSize', st.label_fs - 2);
+    ylabel(ax, sprintf('Observed shift, %s', plab{p}), 'FontSize', st.label_fs - 2);
 end
 
 fig_tag = 'Fig_Ostruct_H1';
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     sel = ismember(T.condition, F.cond_names);
     r_re = corr_(T.shift_pred_re(sel), T.shift_obs_re(sel));

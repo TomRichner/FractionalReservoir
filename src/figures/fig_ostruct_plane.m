@@ -56,6 +56,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -103,7 +104,9 @@ z_all = [vertcat(PP.z); z_marks];
 im_lim = [-1 1] * max(MARGIN * rad_max, 1.08 * max(abs(imag(z_marks(real(z_marks) >= re_lim(1))))));
 % Ticks come only outside the bulk: widen the window to the left and in
 % height so that at least one multiple of the step lies outside it.
-tick_step = nice_step(rad_max / 2);
+% A step near two thirds of the bulk radius: with half of it (5 1/s at 500
+% neurons) the labels 10, 15, 20, 25 ran together and under the diamonds.
+tick_step = nice_step(rad_max / 1.5);
 im_lim = [-1 1] * max(im_lim(2), (floor(rad_max / tick_step) + 1) * tick_step * 1.02);
 re_lim(1) = min(re_lim(1), floor((c0 - rad_max) / tick_step) * tick_step - 0.02 * tick_step);
 pad = 0.08 * rad_max;
@@ -180,7 +183,7 @@ end
 fig_tag = ['Fig_Ostruct_Plane_' cfg.group];
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     group_text = struct( ...
         'rotation', ['Low-rank structure ADDED to the weights on random patterns of neurons (dense, ignoring Dale''s ' ...

@@ -42,6 +42,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -78,6 +79,11 @@ z_all = vertcat(P.z);
 %% One window for every panel
 MARGIN = 1.35;                          % the window around the largest bulk, in radii
 re_lim = [c0 - MARGIN * rad_max, max(c0 + MARGIN * rad_max, 0.15 * rad_max)];
+% Room for the name of the real axis right of the largest bulk: the name sits
+% under the right end of the axis, and with the window ending 0.35 radii
+% past the bulk it was drawn on the bulk's edge (seen 2026-11-21). A quarter
+% of the window's width is kept clear of the largest circle.
+re_lim(2) = max(re_lim(2), (c0 + 1.05 * rad_max - 0.25 * re_lim(1)) / 0.75);
 im_lim = [-MARGIN, MARGIN] * rad_max;
 tick_step = nice_step(rad_max / 3);     % so a tick or two falls between the bulk and the window's edge
 far_lim = [];
@@ -141,7 +147,7 @@ for c = 1:n_c
 end
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');
