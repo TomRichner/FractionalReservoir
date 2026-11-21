@@ -62,6 +62,27 @@ function m = outlier_measures(R, opts)
 %                 done with the population still responsive or by pinning
 %                 it. THIS, read beside X_full, replaced exposure as the
 %                 summary after the first runs (see fig_outliers).
+%   detachment against the THEORETICAL radius (Tom, 2026-11-20: the bulk is
+%                 the unscaled predicted radius; enlarging it by kappa turns
+%                 close outliers into non-outliers)
+%                 ratio_theory(t) = Re lambda_1(t) / R_eff(t): 1 at the
+%                 predicted radius, with no finite-size correction. Because
+%                 kappa is one number per run, ratio_theory = kappa ratio
+%                 state by state, so its median and percentiles are kappa
+%                 times those of `ratio` (to round-off); it is computed
+%                 from the per-state values all the same.
+%                 rho_uniform_theory is the uniform-gain rightmost real part
+%                 over R_eff at each calibration state (median over them).
+%                 That one is NOT kappa rho_uniform: rho_uniform divides by
+%                 each state's own null percentile, and the median of those
+%                 percentiles over R_eff is what kappa is.
+%                 reined_theory is `reined` from these two. It is given for
+%                 the same runs as `reined` (whether the structure has an
+%                 outlier is decided against the null, rho_uniform > 1.05,
+%                 since a bulk of finite size reaches past R_eff with no
+%                 structure at all: agree_re is how far).
+%                 The fields with `ratio`, `rho` and `reined` and no
+%                 `_theory` keep their meaning: against the calibrated edge.
 %   continuation  at the dense states, the eigenvalue of the FULL Jacobian
 %                 whose dendritic pattern matches the rightmost eigenvector
 %                 of M (outlier_dense_spectrum): cont_re, cont_im (1/s).
@@ -110,6 +131,8 @@ x        = max(0, lam1 - max(edge, 1)) ./ tau_d;
 ratio    = nan(1, n_s);
 okr = R.R_eff > 1e-6;
 ratio(okr) = lam1(okr) ./ edge(okr);
+ratio_theory = nan(1, n_s);                            % against the theoretical radius, state by state
+ratio_theory(okr) = lam1(okr) ./ R.R_eff(okr);
 
 %% How many
 n_out     = sum(R.re_keep  > edge, 1);
@@ -187,6 +210,19 @@ if rho_uniform_med > 1.05
 else
     reined = NaN;
 end
+% The same against the theoretical radius: each calibration state's own
+% R_eff in place of its null percentile. The gate is the calibrated one, so
+% reined and reined_theory are given for the same runs.
+rho_cal_theory     = nan(size(calR));
+rho_uniform_theory = nan(size(calR));
+rho_cal_theory(ok)     = [R.cal(ok).obs_re]     ./ calR(ok);
+rho_uniform_theory(ok) = [R.cal(ok).uniform_re] ./ calR(ok);
+rho_uniform_theory_med = median(rho_uniform_theory(ok));
+if rho_uniform_med > 1.05
+    reined_theory = 1 - (median(ratio_theory, 'omitnan') - 1) / (rho_uniform_theory_med - 1);
+else
+    reined_theory = NaN;
+end
 x_full = mean(max(0, absc_full), 'omitnan');           % instability exposure of the FULL Jacobian (1/s)
 
 %% The dense pass: what became of the rightmost frozen-gain mode
@@ -202,7 +238,7 @@ m.network = R.network; m.condition = R.condition; m.seed = R.seed;
 m.t = R.t; m.dt = dt; m.tau_d = tau_d;
 m.kappa = kappa; m.kappa_abs = kappa_abs; m.agree_abs = agree_abs; m.agree_re = agree_re;
 m.edge = edge; m.lam1 = lam1; m.rate_top = rate_top; m.rate_edge = rate_edge;
-m.excess = excess; m.x = x; m.ratio = ratio;
+m.excess = excess; m.x = x; m.ratio = ratio; m.ratio_theory = ratio_theory;
 m.n_out = n_out; m.n_out_abs = n_out_abs;
 m.dwell = struct('bulk', dw_bulk, 'bulk_censored', cz_bulk, 'zero', dw_zero, ...
     'zero_censored', cz_zero, 'x', dw_x, 'x_censored', cz_x, ...
@@ -217,7 +253,8 @@ m.full = struct('t', F.t, 'abscissa', absc_full, 'n_net', n_net_full, 'kin_edge'
 m.shuffle_pct = [R.cal.obs_pct_in_shuffle];
 m.cal = struct('obs_re', [R.cal.obs_re], 'typemean_re', [R.cal.typemean_re], ...
     'uniform_re', [R.cal.uniform_re], 'shuffle_med', arrayfun(@(c) median(c.shuf_re), R.cal), ...
-    'R_eff', calR, 'q95_re', q95, 'rho', rho_cal, 'rho_uniform', rho_uniform);
+    'R_eff', calR, 'q95_re', q95, 'rho', rho_cal, 'rho_uniform', rho_uniform, ...
+    'rho_theory', rho_cal_theory, 'rho_uniform_theory', rho_uniform_theory);
 m.dense = dn;
 m.frac_on = R.frac_on;
 m.structural_ratio = max(real(R.structural.K_eig_realized)) / R.structural.R_realized;
@@ -265,7 +302,10 @@ m.row = struct( ...
     'full_dwell_zero_max', max([dw_full 0]), 'full_n_exc_zero', numel(dw_full), ...
     'cont_re_med', median(real(dn.cont), 'omitnan'), 'cont_im_med', median(imag(dn.cont), 'omitnan'), ...
     'cont_ov_med', median(dn.cont_ov, 'omitnan'), 'dense_n_pos_med', median(dn.n_pos, 'omitnan'), ...
-    'dense_frac_unstable', mean(dn.n_pos > 0));
+    'dense_frac_unstable', mean(dn.n_pos > 0), ...
+    'ratio_theory_med', median(ratio_theory, 'omitnan'), ...
+    'ratio_theory_p05', pct(ratio_theory, 0.05), 'ratio_theory_p95', pct(ratio_theory, 0.95), ...
+    'rho_uniform_theory', rho_uniform_theory_med, 'reined_theory', reined_theory);
 end
 
 %% ------------------------------------------------------------------------
