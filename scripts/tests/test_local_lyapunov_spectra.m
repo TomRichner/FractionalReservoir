@@ -23,7 +23,7 @@
 %      resolve_data_file, and the default source is untouched by the option.
 %      The fourth row ('real_histogram_row'): one histogram and one dotted
 %      reference per column, under the plot box of the heat map above it and
-%      on its x limits, no text on it, a taller canvas of the same width, a
+%      on its x limits, only the named labels on it, the same canvas, a
 %      _table.md with the row's caption sentence; fig_eig_real_histogram
 %      with 'spectra_source', 'local_lyapunov'; the gains the stage saves
 %      (disk_by_cond). With the lambda_1 row it errors :HistogramRow.
@@ -120,30 +120,46 @@ evalc(['g4 = fig_grouped_main(3, ''run_dir'', on_dir, ''out_dir'', fullfile(on_d
 tag4 = 'Fig_Main3_Grouped_switch_ritz_inset_realhist';   % no _noC since the merge with FD-031: no lambda_1 row is the default
 ok = any(strcmp(g4.files, [tag4 '.png'])) && isfile(fullfile(on_dir, 'g4', [tag4 '_table.md'])) && ...
     n_tagged(g4.figs, 'eig_real_histogram') == numel(C) && n_tagged(g4.figs, 'uniform_disk_reference') == numel(C) && ...
-    g4.figs.Position(3) == g_pos(3) && g4.figs.Position(4) > g_pos(4) && numel(findall(g4.figs, 'Tag', 'row_letter')) == 4;
+    g4.figs.Position(3) == g_pos(3) && g4.figs.Position(4) == g_pos(4) && numel(findall(g4.figs, 'Tag', 'row_letter')) == 4;
 for c = 1:numel(C)
     heat = findall(g4.figs, 'Tag', sprintf('stability_r3_c%d', c)); hx = findall(g4.figs, 'Tag', sprintf('stability_r4_c%d', c));
     ok = ok && isscalar(heat) && isscalar(hx);
     if ok
         pb = plot_box_position(heat);
         ok = isequal(hx.XLim, heat.XLim) && max(abs(hx.Position([1 3]) - pb([1 3]))) < 1e-6 && ...
-            hx.Position(2) + hx.Position(4) < pb(2) && isempty(findobj(hx, 'Type', 'text'));
+            hx.Position(2) + hx.Position(4) < pb(2) && ...
+            isempty(findobj(hx, 'Type', 'text', '-not', 'Tag', 'histogram_label'));   % only the named labels
     end
 end
 if ok
     tbl = fileread(fullfile(on_dir, 'g4', [tag4 '_table.md']));
     ok = contains(tbl, 'Row (D)') && contains(tbl, 'radius drawn: `gain`') && contains(tbl, 'switching-input run');
 end
+% The three labels of row (D), once each, at the figure's text size; the lambda_1
+% label above row (B) at that size too (Plan 2, package C).
+labs = findall(g4.figs, 'Tag', 'histogram_label'); lam = findall(g4.figs, 'Tag', 'accumulated_lambda_value');
+ok = ok && numel(labs) == 3 && all([labs.FontSize] == 14) && numel(lam) == numel(C) && all([lam.FontSize] == 14);
 close(g4.figs);
+evalc('m4 = fig_main3_stability(on_dir, {}, ''spectra_source'', ''local_lyapunov'', ''real_histogram_row'', true, ''histogram_labels'', false);');
+ok = ok && n_tagged(m4.figs, 'histogram_label') == 0 && n_tagged(m4.figs, 'ritz_density') == 0 && n_tagged(m4.figs, 'ritz_inset') == 0;
+close(m4.figs);
 evalc(['rh = fig_eig_real_histogram(''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''rh''), ''visible'', false, ' ...
     '''spectra_source'', ''local_lyapunov'');']);
 ok = ok && any(strcmp(rh.files, 'fig_eig_real_histogram_switch.png')) && strcmp(rh.reference(1).mode, 'gain') && ...
-    isfile(fullfile(on_dir, 'rh', 'fig_eig_real_histogram_switch_table.md'));
+    isfile(fullfile(on_dir, 'rh', 'fig_eig_real_histogram_switch_table.md')) && n_tagged(rh.figs, 'histogram_label') == 0;
 close(rh.figs);
 G = D.disk_by_cond{end};
 ok = ok && numel(D.disk_by_cond) == numel(C) && G.n == 40 && numel(G.rms_gain) == n_s && ...
     all(G.rms_gain > 0 & G.rms_gain < 1) && max(abs(G.t(:)' - (1:10))) < 1e-9;
-all_passed = check('the histogram row: (D) under each heat map''s plot box on its x limits, no text on it, table written; the stand-alone histogram; the saved gains', ok) && all_passed;
+all_passed = check('the histogram row: (D) under each heat map''s plot box on its x limits, no text on it but the three named labels (none when switched off, none on the stand-alone figure), table written; the stand-alone histogram; the saved gains', ok) && all_passed;
+% fig_local_lyapunov: the stage's accumulation window and K, read from the run (Plan 2, package C).
+evalc('ll = fig_local_lyapunov(''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''ll''), ''visible'', false);');
+ok = isequal(ll.window, B.settings.lya_T_interval) && isequal(ll.window, [1 10]) && ll.K == K && ...
+    contains(ll.table_text, sprintf('K = %d tracked', K)) && contains(ll.table_text, '[1, 10] s, the stage''s accumulation window') && ...
+    isempty(findobj(ll.figs, 'Type', 'text')) && isfile(fullfile(on_dir, 'll', 'Fig_Local_Lyapunov_table.md')) && ...
+    ll.figs.Position(4) <= 1000;
+close(ll.figs);
+all_passed = check('fig_local_lyapunov: the run''s accumulation window and K, no text on the panels, the table, a canvas that fits the screen', ok) && all_passed;
 all_passed = check('the histogram row needs the layout without the lambda_1 row', ...
     throws_prefix(@() fig_main3_stability(on_dir, {}, 'real_histogram_row', true, 'show_lambda_row', true), ...
     'fig_main3_stability:HistogramRow')) && all_passed;   % named: no lambda_1 row is the default since the merge with FD-031
