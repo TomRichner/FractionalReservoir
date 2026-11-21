@@ -54,7 +54,8 @@ function files = fig_outliers(data_dir, fig_dir, opts)
 % The single-seed figures use opts.seed (the first on disk by default); the
 % summary uses every seed. Figures are left OPEN (Tom looks at them in
 % MATLAB), tagged 'fig_outliers'; a new call deletes only figures with that
-% tag. Colors and names are manuscript_style's.
+% tag. Names are manuscript_style's, and so are the colors except that no
+% adaptation is drawn in dark red (FR-004; see cond_color below).
 %
 % See also: explore_outliers, outlier_table, outlier_measures
 
@@ -117,7 +118,7 @@ for w = 1:n_net
         R = Rs{w, c};
         if ~isempty(R)
             m = M{pick(nets{w}, conds{c}, seed1)};
-            col = st.condition_color(conds{c});
+            col = cond_color(st, conds{c});
             tau = R.tau_d;
             ev = ([R.cal.ev_M] - 1) ./ tau;                    % n x n_cal, rates
             th = linspace(0, 2 * pi, 200);
@@ -172,7 +173,7 @@ for row = 1:2
         ax = nexttile(tl); hold(ax, 'on');
         for c = 1:n_cond
             sel = find(strcmp(T.network, nets{w}) & strcmp(T.condition, conds{c}));
-            col = st.condition_color(conds{c});
+            col = cond_color(st, conds{c});
             off = linspace(-0.12, 0.12, numel(sel)) .* (numel(sel) > 1);
             for q = 1:numel(sel)
                 k = sel(q); x = c + off(q);
@@ -230,7 +231,7 @@ for w = 1:n_net
         k = pick(nets{w}, conds{c}, seed1);
         if ~isempty(k)
             m = M{k};
-            col = st.condition_color(conds{c});
+            col = cond_color(st, conds{c});
             plot(ax, m.t, m.rate_edge, '-', 'Color', gray, 'LineWidth', 1.5);
             plot(ax, m.t, m.rate_top, '-', 'Color', col, 'LineWidth', 1.0);
             plot(ax, m.full.t, m.full.abscissa, '-', 'Color', 'k', 'LineWidth', 1.25);
@@ -270,7 +271,7 @@ for w = 1:n_net
         ax = nexttile(tl); hold(ax, 'on');
         R = Rs{w, c};
         if ~isempty(R) && ~isempty(R.dense)
-            col = st.condition_color(conds{c});
+            col = cond_color(st, conds{c});
             D = R.dense;
             lam = double([D.lam]); xf = double([D.xfrac]);
             net = lam(xf >= 0.1);
@@ -313,7 +314,7 @@ for w = 1:n_net
     for c = 1:n_cond
         for k = find(strcmp(T.network, nets{w}) & strcmp(T.condition, conds{c}))'
             m = M{k};
-            col = st.condition_color(conds{c});
+            col = cond_color(st, conds{c});
             survival(ax, m.dwell.zero, m.dt, '--', col, 1.25);
             survival(ax, m.dwell.full_zero, 0.1, '-', col, 2.25);
         end
@@ -357,8 +358,8 @@ if isfolder(opts.dose_dir) && ~isempty(dir(fullfile(opts.dose_dir, 'run_*.mat'))
         end
         for c = 1:n_cond
             u = Ta(strcmp(Ta.condition, conds{c}), :);
-            plot(ax, u.structural_ratio, u.(ycol{p}), '-o', 'Color', st.condition_color(conds{c}), 'LineWidth', 2.0, ...
-                'MarkerSize', 8, 'MarkerFaceColor', st.condition_color(conds{c}), 'MarkerEdgeColor', 'w');
+            plot(ax, u.structural_ratio, u.(ycol{p}), '-o', 'Color', cond_color(st, conds{c}), 'LineWidth', 2.0, ...
+                'MarkerSize', 8, 'MarkerFaceColor', cond_color(st, conds{c}), 'MarkerEdgeColor', 'w');
         end
         if p == 1; set(ax, 'YScale', 'log', 'YLim', [0.4 8], 'YTick', [0.5 1 2 4 8]); else; ylim(ax, [0 1.1]); end
         set(ax, 'FontSize', fs_t, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
@@ -388,6 +389,22 @@ end
 %% ------------------------------------------------------------------------
 function fig = new_fig(pos)
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', pos, 'Tag', 'fig_outliers');
+end
+
+function col = cond_color(st, name)
+% The color every figure here draws a condition in. FR-004 (Tom,
+% 2026-11-20): no adaptation is the dark red of the Figure 3 Ritz overlay
+% (the value fig_eig_heatmap's draw_ritz substitutes for a colorless
+% condition color), not manuscript_style's black, so that it cannot be
+% confused with the marks that are black for another reason (the full
+% Jacobian, the uniform-gain diamonds, zero lines). The shared map in
+% manuscript_style is deliberately not changed here: the paper's figures
+% change together on the next full figures run, and this helper goes then.
+if strcmp(name, 'no_adaptation')
+    col = [0.75 0.10 0.15];
+else
+    col = st.condition_color(name);
+end
 end
 
 function name = net_name(net)
