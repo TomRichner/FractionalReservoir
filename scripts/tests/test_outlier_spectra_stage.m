@@ -133,7 +133,12 @@ assert(isequal(runs.network', {'reference', 'reference', 'EEx1p5', 'EEx1p5'}) &&
     isequal(runs.condition', {'no_adaptation', 'sfa3_stdc2', 'no_adaptation', 'sfa3_stdc2'}) && ...
     all(runs.seed1 == 7) && all(runs.seed2 == 8) && isequal(runs.has_full_series', [false false true true]) && ...
     all(runs.window_s == 2));
-assert(settings.n_override == 60 && settings.n_workers == 0 && ~isfield(settings, 'runs'));
+% The stage records the workers of the session's pool: 0 with pool_set(0),
+% the pool's size with one up. (The assert was == 0 and failed whenever a
+% pool was up, as on the workstation's baseline of 2026-11-21.)
+pool_now = gcp('nocreate'); n_workers_now = 0;
+if ~isempty(pool_now); n_workers_now = pool_now.NumWorkers; end
+assert(settings.n_override == 60 && settings.n_workers == n_workers_now && ~isfield(settings, 'runs'));
 [runs2, ~, folder2] = ospec_read_index(folder);          % the stage's folder itself is accepted
 assert(isequal(runs2, runs) && strcmp(folder2, folder));
 assert(throws(@() ospec_read_index(tempname), 'ospec_read_index:NoIndex'));

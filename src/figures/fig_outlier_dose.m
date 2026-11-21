@@ -60,6 +60,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -100,7 +101,7 @@ diamond = median(reshape(V.rho_uniform_theory, n_net, []), 2, 'omitnan');   % ov
 
 %% Draw
 ykey = {'ratio_theory_med', 'frac_on_E', 'gain_ratio_EI'};
-ylab = {'detachment  Re \lambda_1 / bulk radius', 'responsive fraction of E neurons', 'mean gain, E / I'};
+ylab = {'Detachment, Re \lambda_1 / bulk radius', 'Responsive fraction of E neurons', 'Mean gain, E / I'};
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 14 4.6], 'Visible', vis);
 tl = tiledlayout(fig, 1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -155,14 +156,14 @@ for p = 1:3
     end
     xlim(ax, x_lim);
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
-    xlabel(ax, 'structural outlier / bulk radius', 'FontSize', st.label_fs);
+    xlabel(ax, 'Structural outlier / bulk radius', 'FontSize', st.label_fs);
     ylabel(ax, ylab{p}, 'FontSize', st.label_fs);
 end
 
 fig_tag = 'Fig_Outlier_Dose';
 out = struct('figs', fig, 'files', {{}}, 'source', F.file, 'x', x_med, 'networks', {nets}, 'values', V, 'diamond', diamond);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');

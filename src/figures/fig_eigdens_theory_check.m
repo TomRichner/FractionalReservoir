@@ -35,6 +35,7 @@ arguments
     cfg.verbose     (1,:) char    = 'minimal'
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''    % accepted, unused: the data are sampled here
     cfg.preset_name (1,:) char    = ''    % unused
@@ -60,7 +61,7 @@ for c = 1:numel(C)
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out', ...
         'XLim', [0 1], 'YLim', [0 1], 'XTick', 0:0.5:1, 'YTick', 0:0.5:1);
     title(ax, C(c).name, 'FontSize', st.title_fs, 'FontWeight', 'normal');
-    if c == 1; ylabel(ax, 'fraction within r', 'FontSize', st.label_fs); end
+    if c == 1; ylabel(ax, 'Fraction within r', 'FontSize', st.label_fs); end
     xlabel(ax, 'r / R', 'FontSize', st.label_fs);
 end
 
@@ -70,7 +71,7 @@ rows = arrayfun(@(k) sprintf('| %s | %.4g | %.4f | %.4f | %.1e | %.1e | %.3f |',
     'UniformOutput', false);
 out = struct('figs', fig, 'files', {{}}, 'source', 'sampled (eigdens_check_theory)', 'check', C);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');

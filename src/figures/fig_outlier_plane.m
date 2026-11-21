@@ -57,7 +57,8 @@ function out = fig_outlier_plane(cfg)
 % in the established E and I colors (excitatory_colormap(1),
 % inhibitory_colormap(1)). Neurons beyond |u| = inset_u_lim are drawn in a
 % short strip past a gap in the floor or ceiling line: "further out", not
-% how far. No text on it.
+% how far. The only text on it: the letters E and I (inset_marks), each in
+% its cell-type color on its side of the curve.
 %
 % Text on the figure: the condition names above the columns, in their
 % colors, the network names beside the rows, the axis names and ticks.
@@ -76,6 +77,7 @@ arguments
     cfg.data_file   (1,:) char    = ''    % the stage's ospec_index.mat, instead of run_dir
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the preset is recorded in the stage's files
@@ -98,6 +100,8 @@ arguments
     cfg.inset_alpha (1,1) double  = 0.2
     cfg.inset_seed (1,1) double   = 1
     cfg.inset_height (1,1) double {mustBePositive} = 0.62   % in largest dashed radii
+    cfg.inset_marks (1,1) logical = true    % the letters E and I on the inset
+    cfg.inset_mark_fs (1,1) double = 11
 end
 
 setup_paths();
@@ -194,9 +198,9 @@ for w = 1:n_net
 end
 
 fig_tag = 'Fig_Outlier_Plane';
-out = struct('figs', fig, 'files', {{}}, 'source', F.file, 'window', g, 'numbers', {S});
+out = struct('figs', fig, 'files', {{}}, 'source', F.file, 'window', g, 'numbers', {S}, 'seed', F.seeds(F.i_seed, :));
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');
@@ -300,6 +304,16 @@ uu = linspace(-L, L, 400);
 plot(ax, uu, SRNNCellTypePairs.piecewiseSigmoid(uu, d.S_a, 0), 'k-', 'LineWidth', 0.75 * lw);
 plot(ax, [-L - gap - strip, -L - gap], [0 0], 'k-', 'LineWidth', 0.75 * lw);   % the floor, beyond the gap
 plot(ax, [L + gap, L + gap + strip], [1 1], 'k-', 'LineWidth', 0.75 * lw);     % the ceiling, beyond the gap
+if cfg.inset_marks
+    % Which row of dots is which (Tom, 2026-11-21: the one text allowed on
+    % the inset). "E" on the side of the curve its dots are jittered to
+    % (above), "I" below, each in its cell-type color, in the two empty
+    % corners of the inset.
+    mark = {'FontSize', cfg.inset_mark_fs, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+        'Tag', 'fig_outlier_plane_inset_mark'};
+    text(ax, -0.7 * L, 0.5 + 2 * jit, 'E', 'Color', ei_col(1, :), mark{:});
+    text(ax,  0.7 * L, 0.5 - 2 * jit, 'I', 'Color', ei_col(2, :), mark{:});
+end
 end
 
 function s = panel_numbers(runs, f, re_left, u_lim)
@@ -390,7 +404,7 @@ fprintf(fid, ['AXES: through the origin (`complex_plane_axes`), one unit of Re a
     'circle (radius %.3g 1/s). %s %s\n\n'], g.re_lim, g.y_lim, rad_max, break_txt, left_txt);
 if cfg.inset
     a = first.S_a / 2;
-    fprintf(fid, ['INSET (lower right of each panel; no text on it). The black curve is the firing-rate nonlinearity, ' ...
+    fprintf(fid, ['INSET (lower right of each panel; the letters E and I mark the two cell types). The black curve is the firing-rate nonlinearity, ' ...
         'the piecewise sigmoid (S_a = %g): rate 0 (floor) below u = %g, quadratic up to %g, slope 1 up to %g, quadratic ' ...
         'up to %g, rate 1 (ceiling) above. Each dot is one neuron at one of the drawn states, at its operating point; ' ...
         'excitatory neurons in magenta ABOVE the curve, inhibitory ones in teal BELOW it (the cell-type colors of ' ...

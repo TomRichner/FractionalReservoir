@@ -15,11 +15,15 @@ function out = fig_ostruct_summary(cfg)
 % (no bar with one seed).
 %   top     the detachment of the intended mode: the real part of its
 %           eigenvalue in the frozen-gain connectivity over the theoretical
-%           bulk radius (median over the window), on a log axis; the gray
-%           line is the radius; the open black diamonds the same with every
+%           bulk radius (median over the window), on a LINEAR axis that
+%           holds every value; the shaded band from -1 to 1 is the bulk
+%           (the eigenvalues are centered on 0 in these units), the gray
+%           line at 1 its right edge; the open black diamonds the same with every
 %           gain made equal (the uniform-gain value: what the weights alone
-%           give). Values below the axis's floor are drawn at the floor
-%           (the sidecar counts them).
+%           give). A mode left of the band (below -1) has been pushed out
+%           of the bulk on the far side: its carriers are pinned. (Until
+%           2026-11-21 the axis was logarithmic and every value below 0.2,
+%           the negative ones included, was drawn at the floor.)
 %   middle  the responsive fraction of the E neurons (filled) and of the
 %           I neurons (open), side by side: detachment at or below 1 with a low
 %           responsive fraction is a pinned network, not a controlled one.
@@ -41,13 +45,13 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
     cfg.conditions                = {}
 end
 
-RHO_FLOOR = 0.2; RHO_CEIL = 8;
 SUB = 0.06;                              % offset of the two quantities within a condition's slot
 setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
@@ -61,9 +65,16 @@ if n_c == 1; off = 0; end
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 max(9, 1.15 * n_net + 2) 10], 'Visible', vis);
 tl = tiledlayout(fig, 3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-n_floor = 0;
+rho_all = [F.lo.mode_rho(:); F.hi.mode_rho(:); F.lo.mode_rho_uniform(:); F.hi.mode_rho_uniform(:)];
+rho_all = rho_all(isfinite(rho_all));
+rho_lim = [min([rho_all; -1]), max([rho_all; 1])];
+rho_lim = rho_lim + [-1 1] * 0.06 * diff(rho_lim);
 for p = 1:3
     ax = nexttile(tl); hold(ax, 'on');
+    if p == 1                                 % under the markers: the bulk, -1 to 1
+        patch(ax, [0.4, n_net + 0.6, n_net + 0.6, 0.4], [-1 -1 1 1], [0.93 0.93 0.93], 'EdgeColor', 'none');
+        yline(ax, 1, '-', 'Color', gray, 'LineWidth', 1.5);
+    end
     for w = 1:n_net
         for c = 1:n_c
             if F.n_seed(w, c) == 0; continue; end
@@ -71,13 +82,11 @@ for p = 1:3
             xa = x - SUB; xb = x + SUB;                       % the two quantities of a slot side by side
             switch p
                 case 1
-                    clampv = @(v) min(max(v, RHO_FLOOR), RHO_CEIL);
                     md = F.med.mode_rho(w, c);
-                    n_floor = n_floor + (md < RHO_FLOOR);
-                    range_bar(ax, xa, clampv(F.lo.mode_rho(w, c)), clampv(F.hi.mode_rho(w, c)), col);
-                    plot(ax, xa, clampv(md), 'o', 'MarkerSize', 8, 'MarkerFaceColor', col, 'MarkerEdgeColor', 'w', 'LineWidth', 1.0);
-                    range_bar(ax, xb, clampv(F.lo.mode_rho_uniform(w, c)), clampv(F.hi.mode_rho_uniform(w, c)), [0 0 0]);
-                    plot(ax, xb, clampv(F.med.mode_rho_uniform(w, c)), 'd', 'MarkerSize', 7, 'MarkerFaceColor', 'w', ...
+                    range_bar(ax, xa, F.lo.mode_rho(w, c), F.hi.mode_rho(w, c), col);
+                    plot(ax, xa, md, 'o', 'MarkerSize', 8, 'MarkerFaceColor', col, 'MarkerEdgeColor', 'w', 'LineWidth', 1.0);
+                    range_bar(ax, xb, F.lo.mode_rho_uniform(w, c), F.hi.mode_rho_uniform(w, c), [0 0 0]);
+                    plot(ax, xb, F.med.mode_rho_uniform(w, c), 'd', 'MarkerSize', 7, 'MarkerFaceColor', 'w', ...
                         'MarkerEdgeColor', 'k', 'LineWidth', 1.25);
                 case 2
                     range_bar(ax, xa, F.lo.frac_on_E(w, c), F.hi.frac_on_E(w, c), col);
@@ -96,15 +105,14 @@ for p = 1:3
     seps = find(diff(F.group) ~= 0) + 0.5;
     if ~isempty(seps); xline(ax, seps, ':', 'Color', gray, 'LineWidth', 1.0); end
     if p == 1
-        yline(ax, 1, '-', 'Color', gray, 'LineWidth', 1.5);
-        set(ax, 'YScale', 'log', 'YLim', [RHO_FLOOR * 0.95, RHO_CEIL], 'YTick', [0.25 0.5 1 2 4 8]);
+        set(ax, 'YLim', rho_lim, 'Layer', 'top');
         ylabel(ax, 'Re \lambda_{mode} / bulk radius', 'FontSize', st.label_fs);
     elseif p == 2
         ylim(ax, [0 1.05]);
-        ylabel(ax, 'responsive fraction', 'FontSize', st.label_fs);
+        ylabel(ax, 'Responsive fraction', 'FontSize', st.label_fs);
     else
         yline(ax, 0, '--', 'Color', 'k', 'LineWidth', 1.0);
-        ylabel(ax, 'rate of the mode (s^{-1})', 'FontSize', st.label_fs);
+        ylabel(ax, 'Rate of the mode (s^{-1})', 'FontSize', st.label_fs);
     end
     set(ax, 'XTick', 1:n_net, 'XTickLabel', {}, 'XLim', [0.4, n_net + 0.6], 'FontSize', st.tick_fs, ...
         'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
@@ -114,7 +122,7 @@ end
 fig_tag = 'Fig_Ostruct_Summary';
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     caption = sprintf(['Is adaptation''s reining in of outliers limited to outliers made by a mismatch of the E and I ' ...
         'block means? Every network of the outlier_structures stage, in three groups separated by dotted lines: ' ...
@@ -124,12 +132,15 @@ if cfg.save
         'routes changed; the E-I loop strengthened with E-to-E). Within a network the conditions in their colors. Each ' ...
         'marker is the median over %s of the run''s value, the bar the range over seeds. TOP: detachment of the ' ...
         'INTENDED mode (the eigenvalue of the frozen-gain effective connectivity that carries the structural mode''s ' ...
-        'eigenvector), its real part over the theoretical bulk radius of each state, median over the window; log axis, ' ...
-        'values below %.2g drawn at %.2g (%d network-condition medians). Gray line: the radius. Open diamonds: the same ' ...
+        'eigenvector), its real part over the theoretical bulk radius of each state, median over the window; LINEAR axis, ' ...
+        'every value at its place (drawn range %.3g to %.3g; %d network-condition medians are below -1). Shaded band: ' ...
+        'the bulk, from -1 to 1 in these units (the eigenvalues are centered on 0); gray line: its right edge. A mode ' ...
+        'below -1 has left the bulk on the far side, which happens when the neurons that carry it are pinned at the ' ...
+        'floor or ceiling. Open diamonds: the same ' ...
         'with every gain set to the rms gain, what the weights alone give. MIDDLE: the fraction of E (filled) and I ' ...
         '(open) neurons off the floor and the ceiling of the nonlinearity. BOTTOM: the real part of the mode as a ' ...
         'rate, slow variables frozen (open) and free (filled, the continuation in the full Jacobian, median over the ' ...
-        'calibration states); dashed: zero.'], F.seeds_text, RHO_FLOOR, RHO_FLOOR, n_floor);
+        'calibration states); dashed: zero.'], F.seeds_text, rho_lim, nnz(F.med.mode_rho < -1));
     cols = {'lam0_re_R', 'lam0_im_R', 'lambda_1', 'mode_rho', 'mode_rho_p05', 'mode_rho_p95', 'mode_rho_uniform', ...
         'mode_reined', 'mode_ov', 'mode_frac_rightmost', 'rate_struct', 'rate_frozen', 'rate_full', 'frac_on_E', ...
         'frac_on_I', 'on_top', 'on_rest', 'right_rho', 'right_rho_uniform', 'full_abscissa', 'full_frac_unstable'};
