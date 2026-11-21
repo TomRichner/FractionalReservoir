@@ -81,8 +81,13 @@ label_fs = st.label_fs;
 title_fs = 16;    % panel titles
 lw       = st.line_lw;
 
-three_color = [0.85 0.325 0.098];   % warm, matching the E colour used elsewhere
-one_color   = [0.5 0.5 0.5];
+% The two ladders in the colours of the conditions that carry them, as
+% fig_STD_steady_state colours its one pool and its chain (Plan 2, package A,
+% 2026-11-21: no condition in gray): three timescales the multiple-timescale
+% blue, one the single-timescale colour. Until then three were warm orange
+% [0.85 0.325 0.098] (the E colour) and one gray.
+three_color = st.condition_color('sfa3_stdc2');
+one_color   = st.condition_color('sfa1_std1');
 
 %% ---- Figure ---------------------------------------------------------------
 % Position computed rather than hardcoded: Fig_FI_curve's [4429 ...] is a

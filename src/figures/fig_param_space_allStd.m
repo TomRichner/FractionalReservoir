@@ -97,6 +97,13 @@ for mi = 1:numel(specs)
         xlabel(ax, spec.label, 'Interpreter', 'tex', 'FontSize', label_fs);
         set(ax.Title, 'FontWeight', 'normal', 'FontSize', title_fs);
     end
+    % Each column's bars in its condition's colour (Plan 2, package A,
+    % 2026-11-21: no condition in gray); the column's title names it.
+    cond_rgb = condition_rgb_by_column(cax, reshape([cax.Position], 4, [])', [0.6 0.6 0.6], st);
+    for c = 1:nCols
+        set(findobj(cax(c), 'Type', 'histogram'), 'FaceColor', cond_rgb(c, :));
+        set(findobj(cax(c), 'Type', 'bar'), 'FaceColor', cond_rgb(c, :));
+    end
     linkaxes(cax, 'y');
     % The 300-px canvas leaves no room for the 20-pt x label, which printed cut
     % in half (on product runs too); extend the canvas downward by what it

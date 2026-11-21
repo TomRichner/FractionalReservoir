@@ -74,12 +74,17 @@ style_cleanup = with_manuscript_defaults(); %#ok<NASGU>
 % manuscript figure, so a regime is one colour everywhere.
 colors = mc_condition_colors(condition_names);
 
-% Short legend labels by name, with the raw key as the fallback a saved run
-% directory can always need.
+% Legend labels by name, from the condition titles (srnn_condition_titles,
+% the one place for them; Plan 2, package A, 2026-11-21): their tick form
+% (grouped_condition_label 'tick': 'No adaptation', 'Single-timescale',
+% 'Multiple-timescale'), which fits the narrow panel; until then the short
+% codes 'Baseline', 'SFA-1+STD-1', 'SFA+STD'. A name no title carries keeps
+% the raw key, the fallback a saved run directory can always need.
 display_names = condition_names;
+titles_map = srnn_condition_titles();
 for i = 1:n_cond
-    if isKey(st.condition_short, condition_names{i})
-        display_names{i} = st.condition_short(condition_names{i});
+    if isKey(titles_map, condition_names{i})
+        display_names(i) = grouped_condition_label(condition_names(i), 'tick');
     end
 end
 

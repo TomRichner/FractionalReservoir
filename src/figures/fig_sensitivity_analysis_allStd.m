@@ -153,7 +153,10 @@ dark_cmap = repmat(linspace(1, cmap_darkest, 256)', 1, 3);
 % matters most exactly where the distribution is densest and the line is
 % therefore least separable from it. Chosen deliberately (TR, 2026-08-26); the
 % dark-grey colormap ceiling above is what keeps a 50%-alpha line legible at all.
-median_color = [0.10 0.50 1.00 0.50];   % bright blue, 50% alpha
+% SINCE 2026-11-21 (Plan 2, package A) the line takes its column's CONDITION
+% colour (manuscript_style) at this alpha; the blue below is only the
+% fallback for a column whose title names no known condition.
+median_color = [0.10 0.50 1.00 0.50];   % bright blue, 50% alpha (fallback hue)
 median_lw    = 3;      % blue median line width, 25% thinner (plot_sensitivity uses 4)
 zeroline_lw  = 2;      % green dashed zero line width (plot_sensitivity uses 4)
 
@@ -240,6 +243,14 @@ for si = 1:numel(sheets)
     rank_of_row(top_down) = 1:numel(top_down);
     row_idx = rank_of_row(row_of);
 
+    % --- Each axis's CONDITION, for the median line's colour --------------
+    % Columns are conditions; the column's title is its condition title
+    % (srnn_condition_titles), inverted to the name. The median line is drawn
+    % in that condition's manuscript_style colour (Plan 2, package A: no
+    % condition in a shared colour); a column whose title names no known
+    % condition keeps the old blue.
+    median_rgb = condition_rgb_by_column(ax_all, ax_pos, median_color(1:3), st);
+
     % --- Clean up axis labels + fonts -------------------------------------
     for a = 1:numel(ax_all)
         ax = ax_all(a);
@@ -259,7 +270,7 @@ for si = 1:numel(sheets)
         % Color would drop it back to opaque. (imagesc is Type 'image', the zero
         % line is 'constantline', so 'line' is the median.)
         ml = findobj(ax, 'Type', 'line');
-        set(ml, 'Color', median_color, 'LineWidth', median_lw);
+        set(ml, 'Color', [median_rgb(a, :), median_color(4)], 'LineWidth', median_lw);
         % Green dashed zero line: thinner for LLE, dropped for mean_rate.
         zl = findobj(ax, 'Type', 'constantline');
         if spec.zero_line
