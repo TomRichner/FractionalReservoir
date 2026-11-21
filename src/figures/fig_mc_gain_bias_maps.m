@@ -29,6 +29,15 @@ function out = fig_mc_gain_bias_maps(cfg)
 %      only when cfg.show_iqr (default true) AND some cell has more than one
 %      successful seed; with one seed the row would be blank, so it is
 %      dropped and the caption says "one seed".
+%   4. (only when asked for, cfg.rows) the RESPONSIVE SHARE of neurons,
+%      median over seeds of 1 - frac_pinned - frac_silent (the quantity
+%      'frac_on_slope' of mc_sweep_quantity: the share of neurons whose
+%      time-mean rate is neither above 0.9 nor below 0.01), from 0 (white)
+%      to 1 (dark green), one scale for every condition.
+% WHICH ROWS: cfg.rows, a cell of 'mc', 'lle', 'iqr', 'responsive' in the
+% order they are drawn; empty (the default) is rows 1 to 3 as described
+% (the spread row under cfg.show_iqr). A named 'iqr' row is drawn only when
+% some cell has more than one successful seed, as the default one.
 % x is the result's first axis (D.first_axis): the gain (level_of_chaos),
 % or whatever property the sweep ran there, for example the self-coupling
 % s; on a log axis for a log-spaced grid of positive levels and a linear
@@ -128,6 +137,7 @@ arguments
         {'blue_white_red', 'guppy', 'redshift', 'dark_magenta'})} = 'blue_white_red'
     cfg.mc_colormap   (1,:) char    {mustBeMember(cfg.mc_colormap, {'white_orange_red', 'lle_center'})} = 'white_orange_red'
     cfg.missing_color (1,3) double  {mustBeBetween(cfg.missing_color, 0, 1)} = [0.85 0.85 0.85]
+    cfg.rows          (1,:) cell    {mustBeMember(cfg.rows, {'mc', 'lle', 'iqr', 'responsive'})} = {}
 end
 DEFAULT_MISSING = [0.85 0.85 0.85];
 if strcmp(cfg.mc_colormap, 'lle_center') && strcmp(cfg.lle_colormap, 'blue_white_red')
@@ -149,8 +159,14 @@ cond_colors = mc_condition_colors(conds);
 Q1 = mc_sweep_quantity(D.first_axis.column, D);    % the first axis (x): label and wording
 Q2 = mc_sweep_quantity(D.second_axis.column, D);   % the second axis (y)
 nb = numel(D.second_levels); ng = numel(D.first_levels);
-MC = nan(nb, ng, nc); L = MC; IQ = MC; PIN = MC; SIL = MC; NOK = MC;
+MC = nan(nb, ng, nc); L = MC; IQ = MC; PIN = MC; SIL = MC; NOK = MC; RESP = MC;
+% The responsive share is derived per run (mc_sweep_quantity), then its
+% median over seeds is taken per cell like every other row's.
+D_resp = D;
+Q_resp = mc_sweep_quantity('frac_on_slope', D);
+D_resp.T.frac_on_slope = Q_resp.values;
 for c = 1:nc
+    RESP(:, :, c) = mc_gain_grid(D_resp, conds{c}, 'frac_on_slope');
     [MC(:, :, c), NOK(:, :, c)] = mc_gain_grid(D, conds{c}, 'mc_total');
     L(:, :, c)   = mc_gain_grid(D, conds{c}, 'lle_input');
     IQ(:, :, c)  = mc_gain_grid(D, conds{c}, 'mc_total', 'iqr');
@@ -187,18 +203,31 @@ end
 iq_clim = [0, max([IQ(:); eps])];
 [l_cmap, m_cmap] = row_colormaps(cfg.lle_colormap, cfg.mc_colormap);
 
-rows = {struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', m_cmap, ...
+row_of = struct( ...
+    'mc', struct('V', mc_f(MC), 'clim', mc_f([0 mc_max]), 'cmap', m_cmap, ...
                'label', 'Memory capacity', 'cb', mc_cb, ...
-               'ticks', mc_f(mc_ticks), 'ticklabels', {num_labels(mc_ticks)})
-        struct('V', L_col, 'clim', l_lim, 'cmap', l_cmap, ...
+               'ticks', mc_f(mc_ticks), 'ticklabels', {num_labels(mc_ticks)}), ...
+    'lle', struct('V', L_col, 'clim', l_lim, 'cmap', l_cmap, ...
                'label', '\lambda_1, task input on', ...
                'cb', l_cb, ...
-               'ticks', l_tp, 'ticklabels', {l_tl})};
-if cfg.show_iqr && n_seeds > 1
-    rows{end+1} = struct('V', IQ, 'clim', iq_clim, 'cmap', spread_cmap(), ...
-                         'label', 'Spread over seeds', 'cb', 'MC IQR over seeds', ...
-                         'ticks', [], 'ticklabels', {{}});
+               'ticks', l_tp, 'ticklabels', {l_tl}), ...
+    'iqr', struct('V', IQ, 'clim', iq_clim, 'cmap', spread_cmap(), ...
+               'label', 'Spread over seeds', 'cb', 'MC IQR over seeds', ...
+               'ticks', [], 'ticklabels', {{}}), ...
+    'responsive', struct('V', RESP, 'clim', [0 1], 'cmap', responsive_cmap(), ...
+               'label', 'Responsive share', 'cb', 'Responsive share of neurons', ...
+               'ticks', 0:0.25:1, 'ticklabels', {num_labels(0:0.25:1)}));
+row_names = cfg.rows;
+if isempty(row_names)
+    row_names = {'mc', 'lle'};
+    if cfg.show_iqr; row_names{end+1} = 'iqr'; end
 end
+if n_seeds <= 1; row_names = row_names(~strcmp(row_names, 'iqr')); end   % one seed: no spread to show
+if isempty(row_names)
+    error('fig_mc_gain_bias_maps:NoRows', ...
+        'No row to draw: the spread row needs more than one successful seed in some cell.');
+end
+rows = cellfun(@(n) row_of.(n), row_names, 'UniformOutput', false);
 nr = numel(rows);
 
 %% Draw
@@ -291,13 +320,13 @@ if isequal(cfg.missing_color, DEFAULT_MISSING)
 else
     grey_txt = 'Background color: no successful job';
 end
-if nr == 3; grey_txt = [grey_txt ' (spread row: fewer than two)']; end
+if any(strcmp(row_names, 'iqr')); grey_txt = [grey_txt ' (spread row: fewer than two)']; end
 % Each sentence about a mark is there only when the mark is drawn.
 line1 = [seed_txt '.'];
 if cfg.show_zero_line
     line1 = [line1 ' Green dashed: edge between cells with \lambda_1 > 0 and \lambda_1 \leq 0.'];
 end
-if ~strcmp(cfg.lle_colormap, 'blue_white_red')
+if ~strcmp(cfg.lle_colormap, 'blue_white_red') && any(strcmp(row_names, 'lle'))
     line1 = [line1 ' The darkest color of the \lambda_1 row is \lambda_1 = 0.'];
 end
 line2 = sprintf('Star: preset (%s %.3g, %s %.3g).', Q1.symbol, D.preset_first, Q2.symbol, D.preset_second);
@@ -312,7 +341,9 @@ end
 title(outer, caption, 'FontSize', st.tick_fs - 5);
 
 %% Save
-out = struct('figs', fig, 'files', {{}}, 'source', D.source);
+out = struct('figs', fig, 'files', {{}}, 'source', D.source, 'rows', {row_names}, ...
+    'responsive_share', struct('conditions', {conds}, 'first_levels', D.first_levels, ...
+        'second_levels', D.second_levels, 'median', RESP));
 if cfg.save
     out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
     save_figure_stable(out_dir, cfg.fig_tag, fig);
@@ -437,6 +468,11 @@ function c = spread_cmap()
 % Spread over seeds: white to dark purple. Not a grey scale: grey is the
 % colour of a cell with no data (the axes colour).
 c = interpolated_cmap([1 1 1; 0.80 0.76 0.89; 0.55 0.45 0.72; 0.25 0.10 0.40]);
+end
+
+function c = responsive_cmap()
+% Responsive share: white (no neuron on the slope) to dark green (all of them).
+c = interpolated_cmap([1 1 1; 0.62 0.83 0.71; 0.04 0.42 0.23]);
 end
 
 function c = interpolated_cmap(anchors)
