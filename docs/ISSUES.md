@@ -2013,3 +2013,32 @@ machine needs that repo cloned and `setup_repo.py` run once.
   figure (the full spectrum solves z = (lambda(M(z)) - 1)/tau_d, and the
   continuation pairs sit in the band between the adaptation filter and
   the dendritic low-pass, near 0.6 to 0.9 Hz): the caption can say so.
+
+### FD-039 The dwell-time figure of the outlier exploration: more seeds, a much longer run, medians
+
+- **Status:** wanted (Tom, 2026-11-20, on figure 9 of the November 20
+  figure report, `figs/explorations/outliers/outliers_dwell.png`: "could
+  become a good figure. It would need more seeds and then we could plot
+  the median for each. And we would need to run it for much longer").
+  Queued behind the ten-seed dose run (FD-037), which holds the pool.
+- **What it is today:** `fig_outliers.m`, dwell section: survival curves
+  of the durations of excursions of the rightmost eigenvalue beyond zero,
+  frozen gains (dashed, every 10 ms) and full Jacobian (solid, every
+  100 ms), two networks, three conditions, two seeds drawn as separate
+  curves, a 20 s window. Its weaknesses: excursions that run into the end
+  of the window are drawn as if they ended there (single-timescale frozen
+  gains in the reference network: one excursion of the whole 20 s per
+  seed, a vertical line at the right edge); few excursions per curve; the
+  full-Jacobian pass ran out of its time budget in two runs.
+- **Done means:** a window long enough that the excursions seen so far
+  are resolved many times over (lead's proposal: 200 s after settling),
+  about ten seeds, one curve per condition as the median across seeds
+  with the spread; excursions cut off by the end of the window marked or
+  handled as censored, not counted as complete; the full-Jacobian pass
+  completed in every run (cost to be timed first: it is the expensive
+  part, and the run may belong on the workstation); the rightmost NETWORK
+  mode used throughout (in stable networks the full Jacobian's rightmost
+  eigenvalue is a single-neuron slow variable at a fixed rate, which is
+  irrelevant beyond zero but matters if the threshold is ever moved); no
+  text on panels; a `_table.md` sidecar with medians and quartiles of the
+  dwell times and the fraction of time beyond zero per condition.
