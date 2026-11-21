@@ -95,6 +95,36 @@ function file = plane_fig_outliers(data_dir, fig_dir, opts)
 % the sidecar's fractions are always over all neurons and all 12 states,
 % and it says what is drawn.
 %
+% THE RIBBON ('inset_style', 'ribbon'; Tom, 2026-11-20: "a version of the
+% sigmoid without dots ... like a confplot but where the color depends on
+% the E/I ratio and the width is the percent of neurons at that part of the
+% sigmoid"; the default name is then outliers_complex_plane_v4). No dots:
+% the curve carries a band, symmetric about it and measured PERPENDICULAR
+% to it on the page (the inset is not 1:1, and the sloped part is steep
+% there, so a vertical band would look thinner on the slope than on the
+% flats for the same share).
+%   bins        ribbon_bin (0.1) in u across the window: the curve's own
+%               break points (-0.6, -0.4, 0.4, 0.6 for S_a = 0.8) fall on
+%               bin edges, each quadratic knee is two bins, and a bin is
+%               about 2 pt long on the page, so finer bins could not be
+%               seen and would only be noisier. Each strip beyond the
+%               window is ONE bin, drawn along the whole strip.
+%   width       the band's full thickness is the share of the panel's
+%               neuron-states (E and I together, all drawn states) in the
+%               bin: ribbon_pt points at 100 %, linear in the share
+%               ('ribbon_scale', 'linear': 25 pt at 100 %, 0.25 pt per
+%               percent; 40 pt made the 86 % strip of E-to-E times 1.5
+%               without adaptation run into the Re label above it) or in its square root ('sqrt': 14 pt at 100 %, so
+%               1 % is 1.4 pt and thin parts stay visible beside a pile).
+%               The same scale in every panel.
+%   color       by the fraction of excitatory neurons among the bin's
+%               neuron-states: the I color at 0, the E color at 1, blended
+%               linearly in RGB ('ribbon_blend', 'direct'), or through a
+%               neutral gray at one half ('neutral'). An empty bin draws
+%               nothing but the thin black curve.
+% 'inset_style' is 'dots' by default; 'split' is the same as
+% 'inset_split', true.
+%
 % See also: complex_plane_axes, fig_outliers, outlier_measures, plane_states
 
 arguments
@@ -118,6 +148,12 @@ arguments
     opts.inset_u_lim (1,1) double = 1.5
     opts.inset_jitter (1,1) double = 0.12
     opts.inset_split (1,1) logical = false
+    opts.inset_style (1,:) char {mustBeMember(opts.inset_style, {'dots', 'split', 'ribbon'})} = 'dots'
+    opts.ribbon_bin (1,1) double {mustBePositive} = 0.1
+    opts.ribbon_scale (1,:) char {mustBeMember(opts.ribbon_scale, {'linear', 'sqrt'})} = 'linear'
+    opts.ribbon_pt double = []                           % full thickness in points at 100 %; [] is 25 (linear) or 14 (sqrt)
+    opts.ribbon_blend (1,:) char {mustBeMember(opts.ribbon_blend, {'direct', 'neutral'})} = 'direct'
+    opts.ribbon_neutral (1,3) double = [0.62 0.62 0.62]
     opts.inset_seed (1,1) double = 1
     opts.inset_snapshots double = []
     opts.inset_n_neurons (1,1) double = Inf
@@ -126,8 +162,15 @@ arguments
     opts.inset_re_left (1,1) double = 8.5
     opts.inset_im (1,2) double = [-22 -10.5]
 end
+if opts.inset_split; opts.inset_style = 'split'; end     % the older spelling of the split style
+opts.inset_split = strcmp(opts.inset_style, 'split');
+if isempty(opts.ribbon_pt)
+    if strcmp(opts.ribbon_scale, 'linear'); opts.ribbon_pt = 25; else; opts.ribbon_pt = 14; end
+end
 if isempty(opts.name)
-    if opts.ring_rightmost && ~opts.inset && ~opts.theory_circle && ~opts.mark_outliers
+    if opts.inset && strcmp(opts.inset_style, 'ribbon')
+        opts.name = 'outliers_complex_plane_v4';
+    elseif opts.ring_rightmost && ~opts.inset && ~opts.theory_circle && ~opts.mark_outliers
         opts.name = 'outliers_complex_plane_v2';
     else
         opts.name = 'outliers_complex_plane_v3';
@@ -507,6 +550,12 @@ end
 u = q.u(keep, cols); r = q.r(keep, cols);
 ty = repmat(q.type(keep), 1, numel(cols));
 u = u(:); r = r(:); ty = ty(:);
+ax = axes(fig, 'Units', 'inches', 'Position', rect, 'Visible', 'off', 'Tag', 'plane_fig_outliers_inset');
+hold(ax, 'on');
+set(ax, 'XLim', [-1 1] * (L + gap + strip + 0.05), 'YLim', [-jit - 0.06, 1 + jit + 0.06], 'Clipping', 'off');
+if strcmp(opts.inset_style, 'ribbon')
+    draw_ribbon(ax, rect, ribbon_bins(u, ty, opts), q.S_a, ei_col, opts, gap, strip);
+else
 x = u;
 lo = u < -L; hi = u > L;
 x(lo) = -L - gap - strip * rs.rand(nnz(lo), 1);
@@ -517,15 +566,149 @@ else
     y = r + jit * (2 * rs.rand(numel(r), 1) - 1);
 end
 order = rs.randperm(numel(x));                          % neither type is drawn on top of the other
-ax = axes(fig, 'Units', 'inches', 'Position', rect, 'Visible', 'off', 'Tag', 'plane_fig_outliers_inset');
-hold(ax, 'on');
 scatter(ax, x(order), y(order), opts.inset_size, ei_col(ty(order), :), 'filled', ...
     'MarkerFaceAlpha', opts.inset_alpha, 'MarkerEdgeColor', 'none');
+end
 uu = linspace(-L, L, 400);
 plot(ax, uu, SRNNCellTypePairs.piecewiseSigmoid(uu, q.S_a, 0), 'k-', 'LineWidth', 0.75 * lw);
 plot(ax, [-L - gap - strip, -L - gap], [0 0], 'k-', 'LineWidth', 0.75 * lw);   % the floor, beyond the gap
 plot(ax, [L + gap, L + gap + strip], [1 1], 'k-', 'LineWidth', 0.75 * lw);     % the ceiling, beyond the gap
-set(ax, 'XLim', [-1 1] * (L + gap + strip + 0.05), 'YLim', [-jit - 0.06, 1 + jit + 0.06], 'Clipping', 'off');
+end
+
+function B = ribbon_bins(u, ty, opts)
+% The share of the neuron-states (percent, both types together) in each bin
+% of u across the window and in the two groups beyond it, and the fraction
+% of excitatory ones in each (NaN where the bin is empty). Type 1 is E.
+L = opts.inset_u_lim;
+nb = round(2 * L / opts.ribbon_bin);
+B.edges = linspace(-L, L, nb + 1);
+in = u >= -L & u <= L;
+n_all = histcounts(u(in), B.edges);
+n_E = histcounts(u(in & ty == 1), B.edges);
+B.pct = 100 * n_all / numel(u);
+B.frac_E = n_E ./ n_all;                                % 0/0 is NaN: an empty bin
+lo = u < -L; hi = u > L;
+B.pct_lo = 100 * mean(lo); B.frac_E_lo = mean(ty(lo) == 1);
+B.pct_hi = 100 * mean(hi); B.frac_E_hi = mean(ty(hi) == 1);
+if abs(sum(B.pct) + B.pct_lo + B.pct_hi - 100) > 1e-9
+    error('plane_fig_outliers:RibbonBins', 'The bins and the two strips do not hold every neuron-state.');
+end
+end
+
+function t = ribbon_thickness(pct, opts)
+% Full thickness of the band in points for a share in percent.
+if strcmp(opts.ribbon_scale, 'sqrt')
+    t = opts.ribbon_pt * sqrt(pct / 100);
+else
+    t = opts.ribbon_pt * pct / 100;
+end
+end
+
+function col = ribbon_color(frac_E, ei_col, opts)
+% The I color at 0, the E color at 1; between them a straight blend in RGB,
+% or one that passes through the neutral gray at one half.
+if strcmp(opts.ribbon_blend, 'neutral')
+    if frac_E < 0.5
+        col = ei_col(2, :) + 2 * frac_E * (opts.ribbon_neutral - ei_col(2, :));
+    else
+        col = opts.ribbon_neutral + (2 * frac_E - 1) * (ei_col(1, :) - opts.ribbon_neutral);
+    end
+else
+    col = (1 - frac_E) * ei_col(2, :) + frac_E * ei_col(1, :);
+end
+end
+
+function draw_ribbon(ax, rect, B, S_a, ei_col, opts, gap, strip)
+% The band around the curve, one filled piece per occupied bin. The offset
+% is along the curve's normal ON THE PAGE (inches), half the thickness to
+% each side, so the pieces of neighboring bins meet on a common cut.
+L = opts.inset_u_lim;
+per = [rect(3) / diff(ax.XLim), rect(4) / diff(ax.YLim)];   % inches per unit of u and of rate
+phi = @(v) SRNNCellTypePairs.piecewiseSigmoid(v, S_a, 0);
+for b = find(B.pct > 0)
+    uu = linspace(B.edges(b), B.edges(b + 1), 9);
+    rr = phi(uu);
+    d = (phi(uu + 1e-6) - phi(uu - 1e-6)) / 2e-6;       % slope in data units
+    tx = per(1); ty = per(2) * d;                       % the tangent in inches
+    len = hypot(tx, ty);
+    h = 0.5 * ribbon_thickness(B.pct(b), opts) / 72;    % half thickness in inches
+    du = -ty ./ len * h / per(1); dr = tx ./ len * h / per(2);
+    patch(ax, [uu + du, fliplr(uu - du)], [rr + dr, fliplr(rr - dr)], ribbon_color(B.frac_E(b), ei_col, opts), ...
+        'EdgeColor', 'none');
+end
+pct = [B.pct_lo, B.pct_hi]; fe = [B.frac_E_lo, B.frac_E_hi];
+x0 = [-L - gap - strip, L + gap]; y0 = [0 1];
+for k = find(pct > 0)
+    h = 0.5 * ribbon_thickness(pct(k), opts) / 72 / per(2);
+    patch(ax, x0(k) + [0 strip strip 0], y0(k) + [-h -h h h], ribbon_color(fe(k), ei_col, opts), 'EdgeColor', 'none');
+end
+end
+
+function write_ribbon_text(fid, P, nets, conds, opts, who, when, cols)
+drawn = P(~cellfun(@isempty, P));
+q1 = drawn{1}.inset;
+a = q1.S_a / 2;
+ei_col = [excitatory_colormap(1); inhibitory_colormap(1)];
+if strcmp(opts.ribbon_scale, 'sqrt')
+    scale = sprintf(['proportional to the SQUARE ROOT of that share: %g pt at 100 %%, so 1 %% is %.3g pt, 10 %% is ' ...
+        '%.3g pt and 50 %% is %.3g pt (a band four times as thick holds sixteen times the share)'], opts.ribbon_pt, ...
+        ribbon_thickness(1, opts), ribbon_thickness(10, opts), ribbon_thickness(50, opts));
+else
+    scale = sprintf('proportional to that share: %g pt at 100 %%, that is %.3g pt of thickness per percent (%.3g %% per point)', ...
+        opts.ribbon_pt, opts.ribbon_pt / 100, 100 / opts.ribbon_pt);
+end
+mid = ribbon_color(0.5, ei_col, opts);
+if strcmp(opts.ribbon_blend, 'neutral')
+    blend = sprintf(['through a neutral gray (RGB %s) at one half, so that an even mix reads as neither type: teal to ' ...
+        'gray from 0 to 0.5, gray to magenta from 0.5 to 1'], list(opts.ribbon_neutral));
+else
+    blend = sprintf('linearly in RGB, so that an even mix is the slate purple RGB %s', list(mid));
+end
+fprintf(fid, ['INSET (lower right of each panel; no text on it). The thin black curve is the model''s firing-rate ' ...
+    'nonlinearity, the piecewise sigmoid (`SRNNCellTypePairs.piecewiseSigmoid`, S_a = %g): rate exactly 0 (floor, ' ...
+    'slope 0) below u = %g, quadratic up to %g, slope 1 up to %g, quadratic up to %g, rate exactly 1 (ceiling, slope 0) ' ...
+    'above. Horizontal: u = x - (c/K) sum_k a_k - S_c, the argument the nonlinearity receives (dendritic state x minus ' ...
+    'the neuron''s adaptation current) relative to the neuron''s own setpoint S_c, so that every neuron lies on the one ' ...
+    'curve centered on u = 0. Vertical: the rate, 0 to 1. The inset shows u from %g to %g, the same in all panels.\n\n'], ...
+    q1.S_a, a - 1, -a, a, 1 - a, -opts.inset_u_lim, opts.inset_u_lim);
+fprintf(fid, ['THE RIBBON (Tom, 2026-11-20; instead of one dot per neuron). The colored band around the curve says how ' ...
+    'many neurons sit at each part of the curve and of which type. It is built from %s, at %s, E and I together ' ...
+    '(the "neuron-states" of the panel). The window is cut into bins of %g in u (%d bins; the curve''s break points ' ...
+    'fall on bin edges). WIDTH: at each bin the band''s full thickness, measured perpendicular to the curve on the page ' ...
+    'and laid half to each side of it, is set by the share of the panel''s neuron-states in that bin, %s. The scale ' ...
+    'is the same in all six panels. The thickness says nothing about the rate: the neurons are ON the curve. COLOR: ' ...
+    'the fraction of excitatory neurons among the neuron-states of the bin: teal (RGB %s) where all are inhibitory, ' ...
+    'magenta (RGB %s) where all are excitatory, blended %s. (The two types are equal in number here, so one half is the ' ...
+    'network''s own mix. These are the CELL TYPE colors and have nothing to do with the condition colors of the ' ...
+    'eigenvalue dots.) A bin with no neuron draws nothing but the black curve. THE STRIPS: neurons beyond the window ' ...
+    'are gathered into ONE bin on each side, drawn as a band of constant thickness along the short piece of floor ' ...
+    'line past the gap (left, u < %g) or of ceiling line (right, u > %g), on the same width scale and color rule: a ' ...
+    'strip says "further out", not how far, and because it gathers an unbounded range of u it can be much thicker ' ...
+    'than any bin of the window.\n\n'], who, when, opts.ribbon_bin, round(2 * opts.inset_u_lim / opts.ribbon_bin), scale, ...
+    list(ei_col(2, :)), list(ei_col(1, :)), blend, -opts.inset_u_lim, opts.inset_u_lim);
+fprintf(fid, ['What the ribbon draws, per panel (over all neurons at the drawn states): the share in each strip with its excitatory fraction, and the fullest ' ...
+    'bin of the window with its place, share, excitatory fraction and drawn thickness.\n\n']);
+fprintf(fid, ['| network | condition | left strip %% | E fraction | thickness (pt) | right strip %% | E fraction | thickness (pt) | ' ...
+    'fullest bin, u | %% | E fraction | thickness (pt) | occupied bins |\n']);
+fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|---|---|\n');
+for w = 1:size(P, 1)
+    for c = 1:size(P, 2)
+        if isempty(P{w, c}); continue; end
+        q = P{w, c}.inset;
+        u = q.u(:, cols); ty = repmat(q.type, 1, numel(cols));
+        B = ribbon_bins(u(:), ty(:), opts);
+        [pm, bm] = max(B.pct);
+        fprintf(fid, '| %s | %s | %.1f | %s | %.2f | %.1f | %s | %.2f | %.2f to %.2f | %.1f | %.2f | %.2f | %d of %d |\n', ...
+            nets{w}, conds{c}, B.pct_lo, frac_txt(B.frac_E_lo), ribbon_thickness(B.pct_lo, opts), ...
+            B.pct_hi, frac_txt(B.frac_E_hi), ribbon_thickness(B.pct_hi, opts), ...
+            B.edges(bm), B.edges(bm + 1), pm, B.frac_E(bm), ribbon_thickness(pm, opts), nnz(B.pct > 0), numel(B.pct));
+    end
+end
+fprintf(fid, '\n');
+end
+
+function s = frac_txt(f)
+if isnan(f); s = '-'; else; s = sprintf('%.2f', f); end
 end
 
 function write_inset_text(fid, P, nets, conds, opts)
@@ -546,6 +729,9 @@ else
     when = sprintf('state %s of the %d whose spectra the panel overlays', list(cols), n_cal);
 end
 a = q1.S_a / 2;
+if strcmp(opts.inset_style, 'ribbon')
+    write_ribbon_text(fid, P, nets, conds, opts, who, when, cols);
+else
 if opts.inset_split
     how = sprintf(['a uniform random offset by cell type, excitatory neurons UPWARD by 0 to %g and inhibitory neurons ' ...
         'DOWNWARD by 0 to %g (in units of the rate; fixed seed %d), so that the two types lie on either side of the ' ...
@@ -569,6 +755,7 @@ fprintf(fid, ['INSET (lower right of each panel; no text on it). The black curve
     'the two types drawn in random order.\n\n'], ...
     q1.S_a, a - 1, -a, a, 1 - a, who, when, how, ...
     -opts.inset_u_lim, opts.inset_u_lim, -opts.inset_u_lim, opts.inset_u_lim, opts.inset_size, opts.inset_alpha);
+end
 fprintf(fid, ['The states are a re-simulation of each saved run (`plane_states`; the runs save no states), ' ...
     'checked against it at the 12 states: the mean and rms gains by route, the rates and the fractions with nonzero ' ...
     'slope are identical (largest difference %.3g), and all 500 eigenvalues of the effective connectivity agree to ' ...
