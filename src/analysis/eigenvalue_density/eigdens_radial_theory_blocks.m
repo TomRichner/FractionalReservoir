@@ -46,7 +46,7 @@ function T = eigdens_radial_theory_blocks(s2, type_of, d, r)
 % See also: eigdens_radial_theory, eigdens_check_theory
 
 d = double(d(:)); type_of = type_of(:);
-n = numel(d); C = size(s2, 1);
+C = size(s2, 1);
 d2 = d.^2;
 onehot = double(type_of == 1:C);                 % n x C
 V = s2 .* (onehot' * d2)';                       % V(a, b) = s2(a, b) sum_{j in b} d_j^2

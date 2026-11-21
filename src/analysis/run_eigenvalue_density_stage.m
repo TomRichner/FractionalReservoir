@@ -32,9 +32,14 @@ function detail = run_eigenvalue_density_stage(cfg, run_dir, plan)
 % does not do (it reads them). What remains per run: loading the run file,
 % redrawing W (no integration), and per state the block theory (a
 % fixed-point iteration over 101 radii) and the radial curves and measures
-% of 1 + q + 1 spectra; see the timing in FD-042's report. Memory: one
-% run's spectra at a time per worker (the run file's other fields are
-% loaded with it; tens of MB at 500 neurons).
+% of 1 + q + 1 spectra. Measured 2026-11-20 on a MacBook Air M3, serial, on
+% synthetic 500-neuron files of the contract's size (12 states, 3 null
+% draws, a 4000-eigenvalue dense spectrum per state, the outlier_run
+% ballast): 0.1 s to load and redraw, 1.9 s to measure, so about 2 s per
+% run; 5 networks x 3 conditions x 10 seeds = 150 runs take about 5 min
+% serially, under a minute on 12 workers. Memory: one run file at a time
+% per worker (tens of MB at 500 neurons); the output is about 0.1 MB per
+% run (15 MB for 150 runs).
 %
 % See also: eigenvalue_density_stage_plan, eigdens_load_runs,
 %           eigdens_run_measures, fig_eigdens_radial

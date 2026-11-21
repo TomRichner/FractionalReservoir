@@ -28,7 +28,7 @@ function plan = eigenvalue_density_stage_plan(cfg)
 % missing input fails in the pre-flight and not after hours of compute;
 % the registry of opt-in stages runs outlier_spectra first). The stage has
 % no size of its own: the networks, seeds and states are outlier_spectra's
-% (its table by run mode), and the cost scales with them (about 1 s per
+% (its table by run mode), and the cost scales with them (about 2 s per
 % run at 500 neurons and 12 states; see run_eigenvalue_density_stage).
 %
 % THE CONFIG
