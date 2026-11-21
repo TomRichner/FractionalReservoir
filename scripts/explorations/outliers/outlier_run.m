@@ -5,7 +5,8 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 %   [file, R] = outlier_run(network, condition, seed, Name, Value, ...)
 %
 % The network is the paper's (mu7chain preset, 500 neurons, noise 0.025,
-% sra1 at 500 Hz) with at most one thing changed:
+% sra1 at 500 Hz) with what its name changes (outlier_network has the
+% whole grammar; tokens are joined by '-'):
 %   'reference'   as the preset: block means [7 -7; 7 -7], structurally
 %                 balanced, NO structural outlier (the mean matrix is
 %                 nilpotent)
@@ -13,12 +14,16 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 %                 run_eig_heatmap and the manuscript's imbalance figure):
 %                 a real positive structural outlier, about +26 in units of
 %                 W against a bulk radius of 5.6
-%   'EEx<a>p<b>'  any other multiple a.b of the E-to-E mean ('EEx1p25' is
-%                 times 1.25). Times 0.5 gives a complex pair with negative
-%                 real part (not near the abscissa)
+%   '<XY>x<a>p<b>'  the block mean mu_XY times a.b; XY is (post, pre), so
+%                 EI is the I-to-E mean. E-to-E times 0.5 gives a complex
+%                 pair with negative real part (not near the abscissa)
 %   'EI3to2'      block means [8.4 -5.6; 8.4 -5.6] on the NOISY parent (the
 %                 preset of that name is the noise-free twin; overriding
 %                 the means on the parent keeps the noise)
+%   'ind<k>'      indegree k instead of 100
+%   'lrA<a>p<b>W<c>p<d>'  low-rank structure added to W: an eigenvalue at
+%                 R (a.b + i c.d) carried by random patterns of neurons
+%                 (OutlierNet; dense, ignores Dale's law)
 % condition is one of the preset's: 'no_adaptation', 'sfa1_std1' (one
 % timescale), 'sfa3_stdc2' (chained multiple timescales).
 %
@@ -38,6 +43,15 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 %               Jacobian and the continuation of the frozen-gain outlier
 %               in it (outlier_dense_spectrum; about 15 s a state at 4000
 %               states, in the client)
+%   mode pass   every dt_mode seconds: the INTENDED mode of the network
+%               (outlier_mode_reference: the added structure's eigenvalue,
+%               the block-mean outlier, or the rightmost structural
+%               eigenvalue), followed by its eigenvector whether or not it
+%               is the rightmost, with the first-order prediction from the
+%               gains of the neurons that carry it (outlier_mode_snapshot).
+%               The dense pass follows the same mode into the full
+%               Jacobian. (Added 2026-11-20; runs saved before have no
+%               R.mode and no R.ref.)
 %   lambda_1    the top-K Lyapunov exponents over the same window (lya_K;
 %               0 skips it)
 %
@@ -49,12 +63,14 @@ function [file, R] = outlier_run(network, condition, seed, opts)
 % 500 Hz and 4000 states (multiple timescales, 500 neurons) 1.3 GB. Only
 % the sampled rows are kept afterwards. The fast pass and the null use the
 % session's pool when one is up (parfor; n x n matrices only); the full
-% pass runs in the client, one state at a time.
+% pass runs in the client, one state at a time; the dense pass uses the
+% pool (one 4000 x 4000 eigenvector matrix per worker, about 1 GB each
+% while eig runs).
 %
 % Name-value options (defaults)
 %   T_settle 60, T_measure 20, fs 500, dt_sample 0.01, n 500,
 %   n_top 3, n_keep 30, n_cal 12, n_null 40, n_shuffle 20,
-%   dt_full 0.1, k_full 8, full_budget_s 200, dense true, n_kin 2, lya_K 3,
+%   dt_mode 0.1, dt_full 0.1, k_full 8, full_budget_s 200, dense true, n_kin 2, lya_K 3,
 %   out_dir '' (data/explorations/outliers under the repository root),
 %   tag '' (appended to the file name), verbose true
 %
@@ -77,6 +93,7 @@ arguments
     opts.n_cal     (1,1) double = 12
     opts.n_null    (1,1) double = 40
     opts.n_shuffle (1,1) double = 20
+    opts.dt_mode   (1,1) double = 0.1
     opts.dt_full   (1,1) double = 0.1
     opts.k_full    (1,1) double = 8
     opts.full_budget_s (1,1) double = 200
@@ -93,16 +110,8 @@ preset = ['celltype_pairs_sfaEI_Sc0p2sig0p1_tauSpread0p25_' ...
     'stdSpread0p25_noStim_noise0p025_chainStd_4cond_mu7chain'];
 T_end = opts.T_settle + opts.T_measure;
 
-tok = regexp(network, '^EEx(\d+)p(\d+)$', 'tokens', 'once');
-if strcmp(network, 'reference')
-    net_args = {};
-elseif strcmp(network, 'EI3to2')
-    net_args = {'mu_tilde_relative', [8.4 -5.6; 8.4 -5.6]};
-elseif ~isempty(tok)
-    net_args = {'mu_EE_relative', str2double([tok{1} '.' tok{2}]) * 7};
-else
-    error('outlier_run:Network', 'Unknown network ''%s'' (reference, EEx<a>p<b>, EI3to2).', network);
-end
+net = outlier_network(network);
+net_args = net.net_args;
 size_args = {};
 if opts.n ~= 500
     % The size rule of small_network_model: alpha stays 0.2 and the weight
@@ -117,7 +126,7 @@ if opts.lya_K > 0
         'lya_warmup', min(5, opts.T_settle)};
 end
 
-model = build_from_preset(preset, condition, net_args{:}, size_args{:}, ...
+model = build_model(preset, condition, net.added_structure, net_args{:}, size_args{:}, ...
     'rng_seeds', seed, 'T_range', [0 T_end], 'fs', opts.fs, ...
     'store_full_state', true, 'verbose', 'near-none', lya_args{:});
 say(opts, '[outlier_run] %s | %s | seed [%d %d] | n = %d, %d states, %.0f s at %g Hz (trajectory about %.2f GB)\n', ...
@@ -130,6 +139,11 @@ t_sim = toc(t0);
 params = model.get_params();
 ws = outlier_weight_stats(params);
 tau_d = params.tau_d;
+target_value = [];
+if ~isempty(model.added); target_value = model.added.target; end
+ref = outlier_mode_reference(ws, net.target, target_value);
+say(opts, '  intended mode (%s): %s in units of W, %.2f bulk radii from the center (real part %.2f), rightmost: %d\n', ...
+    net.target, num2str(ref.lam0, '%.3g'), ref.bulk_ratio, ref.re_ratio, ref.is_rightmost);
 
 % The sampled rows, then let go of the trajectory.
 step = max(1, round(opts.dt_sample * opts.fs));
@@ -164,6 +178,20 @@ end
 snap = [snap{:}];
 t_fast = toc(t0);
 say(opts, '  fast pass: %.0f s (%d workers)\n', t_fast, n_workers);
+
+%% Mode pass: the intended mode, followed by its eigenvector
+t0 = tic;
+step_mode = max(1, round(opts.dt_mode / (step / opts.fs)));
+mode_idx = 1:step_mode:n_s;
+S_mode = S_sel(:, mode_idx);
+mode = cell(1, numel(mode_idx));
+parfor (k = 1:numel(mode_idx), n_workers)
+    mode{k} = outlier_mode_snapshot(S_mode(:, k), params, ws, ref);
+end
+mode = [mode{:}];
+t_mode = toc(t0);
+say(opts, '  mode pass: %.0f s at %d states; overlap with the structural eigenvector (median) %.2f, rightmost at %.0f%% of states\n', ...
+    t_mode, numel(mode_idx), median([mode.ov]), 100 * mean([mode.is_rightmost]));
 
 %% Null draws and gain controls at n_cal states
 t0 = tic;
@@ -206,17 +234,17 @@ t_full = toc(t0);
 say(opts, '  full pass: %.0f s, %d of %d states done, kinetic edge %s\n', ...
     t_full, n_done, numel(full_idx), mat2str(kin.edge, 3));
 
-%% Dense pass: the whole full-Jacobian spectrum at the calibration states, in the client
+%% Dense pass: the whole full-Jacobian spectrum at the calibration states
 t0 = tic;
 dense = [];
 if opts.dense
     dense = cell(1, numel(cal_idx));
-    for k = 1:numel(cal_idx)
-        dense{k} = outlier_dense_spectrum(S_cal(:, k), params, ws);
+    parfor (k = 1:numel(cal_idx), n_workers)
+        dense{k} = outlier_dense_spectrum(S_cal(:, k), params, ws, ref);
     end
     dense = [dense{:}];
-    say(opts, '  dense pass: %.0f s at %d states; continuation of the outlier (median) %s 1/s, unstable eigenvalues (median) %g\n', ...
-        toc(t0), numel(cal_idx), num2str(median([dense.cont]), '%.3g'), median([dense.n_pos]));
+    say(opts, '  dense pass: %.0f s at %d states; continuation of the rightmost (median) %s 1/s, of the intended mode %s 1/s, unstable eigenvalues (median) %g\n', ...
+        toc(t0), numel(cal_idx), num2str(median([dense.cont]), '%.3g'), num2str(median([dense.mode_cont]), '%.3g'), median([dense.n_pos]));
 end
 t_dense = toc(t0);
 
@@ -249,8 +277,11 @@ R.full = struct('t', t(full_idx(1:n_done)), 'dt', step_full * step / opts.fs, ..
     'coh', cat(2, full.coh), 'n_converged', [full.n_converged], ...
     'seconds', [full.seconds], 'n_requested', numel(full_idx));
 R.kin = kin;
+R.net = net;                                               % outlier_network(network)
+R.ref = ref;                                               % the intended mode, see outlier_mode_reference
+R.mode = mode;  R.mode_t = t(mode_idx);                    % struct array, see outlier_mode_snapshot
 R.dense = dense;                                           % struct array at R.cal_t, see outlier_dense_spectrum
-R.seconds = struct('sim', t_sim, 'fast', t_fast, 'null', t_null, 'full', t_full, 'dense', t_dense, 'all', toc(t_all));
+R.seconds = struct('sim', t_sim, 'fast', t_fast, 'null', t_null, 'mode', t_mode, 'full', t_full, 'dense', t_dense, 'all', toc(t_all));
 
 out_dir = opts.out_dir;
 if isempty(out_dir)
@@ -260,6 +291,25 @@ if ~isfolder(out_dir); mkdir(out_dir); end
 file = fullfile(out_dir, outlier_run_name(network, condition, seed, opts.tag));
 save(file, 'R', '-v7.3');
 say(opts, '  saved %s (%.0f s in all)\n', file, toc(t_all));
+end
+
+function model = build_model(preset, condition, added_structure, varargin)
+% build_from_preset's rule (preset, then condition, then the caller's
+% pairs; sra1 for a noisy preset), on OutlierNet so that structure can be
+% added to the drawn W. With added_structure empty the model is the
+% parent class's, weights and all.
+[p, model_class, conditions] = srnn_param_preset(preset);
+if ~strcmp(model_class, 'SRNNCellTypePairs')
+    error('outlier_run:Class', 'Preset %s builds a %s, not an SRNNCellTypePairs.', preset, model_class);
+end
+names = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
+cond = rmfield(conditions{strcmp(names, condition)}, 'name');
+solver = 'rk4';
+if isfield(p, 'sigma_u_noise') && any(p.sigma_u_noise(:) > 0); solver = 'sra1'; end
+args = [struct2namevalue(p), struct2namevalue(cond), {'ode_solver', solver}, varargin, ...
+    {'added_structure', added_structure}];
+model = OutlierNet(args{:});
+model.build();
 end
 
 function say(opts, varargin)

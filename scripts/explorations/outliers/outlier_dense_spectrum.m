@@ -1,7 +1,8 @@
-function f = outlier_dense_spectrum(S, params, ws)
+function f = outlier_dense_spectrum(S, params, ws, ref)
 %OUTLIER_DENSE_SPECTRUM The WHOLE spectrum of the full Jacobian at one state, and where the frozen-gain outlier went in it.
 %
 %   f = outlier_dense_spectrum(S, params, ws)
+%   f = outlier_dense_spectrum(S, params, ws, ref)    also follows the INTENDED mode
 %
 % WHY (found on the first real run, 2026-11-19). The rightmost eigenvalues
 % of the full Jacobian (outlier_full_spectrum) are, with adaptation, the
@@ -33,6 +34,15 @@ function f = outlier_dense_spectrum(S, params, ws)
 %   lam1_M    the rightmost eigenvalue of M at this state (units of W)
 %   rate1_M   its rate (lam1_M - 1)/tau_d
 %   seconds
+% With ref (outlier_mode_reference; added 2026-11-20), the same for the
+% INTENDED mode, which need not be the rightmost: the eigenvector of M
+% that overlaps most with the structural right eigenvector ref.r0
+% (outlier_mode_snapshot's rule), and its continuation in the full
+% Jacobian by the rule above:
+%   mode_lam_M   its eigenvalue in M (units of W, Im >= 0), mode_ov_M its
+%                overlap with ref.r0, mode_is_rightmost
+%   mode_cont    the continuation (1/s, Im >= 0), mode_cont_ov,
+%                mode_cont_xfrac
 %
 % See also: outlier_full_spectrum, outlier_effective_matrix, outlier_run
 
@@ -61,6 +71,20 @@ cont = complex(real(lam(q)), abs(imag(lam(q))));
 f = struct('lam', single(lam), 'ov', single(ov(:)), 'xfrac', single(xn2(:)), ...
     'n_pos', sum(real(lam) > 0), 'abscissa', real(lam(1)), ...
     'cont', cont, 'cont_ov', ov(q), 'cont_xfrac', xn2(q), ...
-    'lam1_M', lm(i1), 'rate1_M', (real(lm(i1)) - 1) / params.tau_d, ...
-    'seconds', toc(t0));
+    'lam1_M', lm(i1), 'rate1_M', (real(lm(i1)) - 1) / params.tau_d);
+
+if nargin >= 4 && ~isempty(ref)
+    [ov_M, im] = max(abs(ref.r0' * Vm));       % eig returns unit columns
+    vm = Vm(:, im);
+    ov_mode = abs(vm' * Vx) ./ sqrt(max(xn2, realmin));
+    [~, qm] = max(ov_mode(cand));
+    qm = cand(qm);
+    f.mode_lam_M = complex(real(lm(im)), abs(imag(lm(im))));
+    f.mode_ov_M = ov_M;
+    f.mode_is_rightmost = abs(real(lm(im)) - real(lm(i1))) < 1e-9 * max(1, abs(lm(i1)));
+    f.mode_cont = complex(real(lam(qm)), abs(imag(lam(qm))));
+    f.mode_cont_ov = ov_mode(qm);
+    f.mode_cont_xfrac = xn2(qm);
+end
+f.seconds = toc(t0);
 end
