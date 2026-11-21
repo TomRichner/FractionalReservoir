@@ -43,10 +43,12 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the networks are in the data
     cfg.network     (1,:) char    = 'reference'
+    cfg.panels      (1,:) cell    = {'cumulative', 'density'}   % which of the two panels, left to right
     cfg.conditions                = {}
 end
 
@@ -61,10 +63,15 @@ ax_style = {'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'Tick
 stack = @(rs, f) cat(1, rs.(f));               % seeds x states, as rows
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
-fig = figure('Visible', vis, 'Color', 'w', 'Units', 'centimeters', 'Position', [2 2 26 11]);
-tl = tiledlayout(fig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+panels = cfg.panels(ismember(cfg.panels, {'cumulative', 'density'}));
+if isempty(panels) || numel(panels) ~= numel(cfg.panels)
+    error('fig_eigdens_radial:Panels', 'panels holds ''cumulative'' and/or ''density''.');
+end
+fig = figure('Visible', vis, 'Color', 'w', 'Units', 'centimeters', 'Position', [2 2 13 * numel(panels) 11]);
+tl = tiledlayout(fig, 1, numel(panels), 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % Left: cumulative fraction within r.
+if ismember('cumulative', panels)
 ax = nexttile(tl); hold(ax, 'on');
 plot(ax, u, min(u.^2, 1), ':', 'Color', gray, 'LineWidth', 1.8);
 for c = 1:n_c
@@ -77,11 +84,13 @@ for c = 1:n_c
 end
 set(ax, ax_style{:}, 'XLim', [0 1.2], 'YLim', [0 1], 'XTick', 0:0.2:1.2, 'YTick', 0:0.2:1);
 xlabel(ax, 'r / R_{eff}', 'FontSize', st.label_fs);
-ylabel(ax, 'fraction of eigenvalues within r', 'FontSize', st.label_fs);
+ylabel(ax, 'Fraction of eigenvalues within r', 'FontSize', st.label_fs);
+end
 
 % Right: density relative to a uniform disk.
-ax = nexttile(tl); hold(ax, 'on');
 y_floor = 0.03;
+if ismember('density', panels)
+ax = nexttile(tl); hold(ax, 'on');
 plot(ax, [0 1.44], [1 1], ':', 'Color', gray, 'LineWidth', 1.8);
 inside = u2c < 1;
 for c = 1:n_c
@@ -98,7 +107,8 @@ end
 set(ax, ax_style{:}, 'XLim', [0 1.2], 'YScale', 'log', 'YLim', [y_floor 5], 'XTick', 0:0.2:1.2, ...
     'YTick', [0.03 0.1 0.3 1 3], 'YTickLabel', {'0.03', '0.1', '0.3', '1', '3'});
 xlabel(ax, '(r / R_{eff})^2', 'FontSize', st.label_fs);
-ylabel(ax, 'density / uniform disk', 'FontSize', st.label_fs);
+ylabel(ax, 'Density / uniform disk', 'FontSize', st.label_fs);
+end
 
 fig_tag = ['Fig_Eigdens_Radial' F.suffix];
 rows = cell(1, n_c);
@@ -113,7 +123,7 @@ for c = 1:n_c
 end
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');

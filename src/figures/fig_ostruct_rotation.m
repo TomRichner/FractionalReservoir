@@ -43,6 +43,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -69,8 +70,8 @@ vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 16 4.4], 'Visible', vis);
 tl = tiledlayout(fig, 1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
 panels = {'reined_none', 'reined_adapted', 'rate', 'rot'};
-ylab = {'fraction of detachment removed', 'fraction of detachment removed', 'real part of the mode (s^{-1})', ...
-    'rotation rate, full Jacobian (rad s^{-1})'};
+ylab = {'Fraction of detachment removed', 'Fraction of detachment removed', 'Real part of the mode (s^{-1})', ...
+    'Rotation rate, full Jacobian (rad s^{-1})'};
 axs = gobjects(1, 4);
 for p = 1:4
     ax = nexttile(tl); hold(ax, 'on');
@@ -114,12 +115,12 @@ set(axs, 'XLim', [0, x_hi]);                            % one horizontal range i
 y4 = ylim(axs(4)); hi4 = max(y4(2), x_hi);
 plot(axs(4), [0 hi4], [0 hi4], '-', 'Color', gray, 'LineWidth', 1.5);   % equality
 set(axs(4), 'YLim', [min(0, y4(1)), hi4]);
-xlabel(tl, 'rotation rate of the mode, uniform gain (rad s^{-1})', 'FontSize', st.label_fs - 2);
+xlabel(tl, 'Rotation rate of the mode, uniform gain (rad s^{-1})', 'FontSize', st.label_fs - 2);
 
 fig_tag = 'Fig_Ostruct_Rotation';
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     caption = sprintf(['The rotation sweep: low-rank structure added to the weights with a real part of about 1.4 ' ...
         'structural bulk radii and an imaginary part from 0 to about one bulk radius (circles; the rank-one, real case ' ...

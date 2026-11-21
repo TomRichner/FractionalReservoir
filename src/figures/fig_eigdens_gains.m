@@ -32,6 +32,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -58,8 +59,8 @@ for c = 1:n_c
     stairs(ax, [0; g; g_max], [0; (1:numel(g))' / numel(g); 1], '-', 'Color', F.colors{c}, 'LineWidth', 2.5);
 end
 set(ax, ax_style{:}, 'XLim', [0 g_max], 'YLim', [0 1], 'YTick', 0:0.2:1);
-xlabel(ax, 'gain d', 'FontSize', st.label_fs);
-ylabel(ax, 'fraction of neurons with gain \leq d', 'FontSize', st.label_fs);
+xlabel(ax, 'Gain d', 'FontSize', st.label_fs);
+ylabel(ax, 'Fraction of neurons with gain \leq d', 'FontSize', st.label_fs);
 
 ax = nexttile(tl); hold(ax, 'on');
 plot(ax, [0 1], [0 1], ':', 'Color', gray, 'LineWidth', 1.8);
@@ -68,7 +69,7 @@ for c = 1:n_c
     plot(ax, 1 - [rs.p0], [rs.pr], '.', 'Color', F.colors{c}, 'MarkerSize', 12);
 end
 set(ax, ax_style{:}, 'XLim', [0 1], 'YLim', [0 1], 'XTick', 0:0.2:1, 'YTick', 0:0.2:1);
-xlabel(ax, 'fraction of neurons with nonzero gain', 'FontSize', st.label_fs);
+xlabel(ax, 'Fraction of neurons with nonzero gain', 'FontSize', st.label_fs);
 ylabel(ax, '\langle d^2 \rangle^2 / \langle d^4 \rangle', 'FontSize', st.label_fs);
 
 fig_tag = ['Fig_Eigdens_Gains' F.suffix];
@@ -83,7 +84,7 @@ for c = 1:n_c
 end
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');

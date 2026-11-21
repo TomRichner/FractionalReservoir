@@ -54,53 +54,12 @@ for k=1:3
 end
 clear guard
 % Source illustration values are untouched: only copied graphics are styled.
-% STD endpoint from the actual reference MTS route at raw rate r_ref=0.25.
-[~,~,conditions]=srnn_param_preset(preset_name);
-full=full_adaptation_condition(conditions);
-cond=conditions{find(cellfun(@(c)strcmp(c.name,full),conditions),1)};
-std=cond.synapse_config.E.E.std;
-r_ref=.25;
-% The depression factor at r_ref is the ROUTE MODEL's: its steady_state and
-% depression handles, through the class's own route compiler. A product
-% route gives prod_m 1/(1+r_ref*tau_rec_m/tau_rel_m) as before; a chain
-% route gives b1 of (C4), the releasable pool (NOT a product of two pools:
-% its single tau_rel would broadcast over both tau_rec).
-stf=[]; if isfield(cond.synapse_config.E.E,'stf'), stf=cond.synapse_config.E.E.stf; end
-route=SRNNCellTypePairs.compile_route(struct('std',std,'stf',stf), ...
-    struct('npre',1,'label','E->E','err_id_prefix','fig_main1_concepts'));
-ss=route.model.steady_state(r_ref,route.P);
-b_each=ss.s(:,1:route.P.n_b);   % per-variable steady state: pools (product) or [b1 b2] (chain)
-b_min=route.model.depression(b_each,route.P);
-is_chain=strcmp(route.P.model,'pool');
-assert(b_min>0 && b_min<1);
-a_levels=linspace(0,1,5);
-b_levels=linspace(1,b_min,5); % intermediate frozen total factors, not trajectories
-sfa_colors=a_levels(:)*[.95 .40 .04];
-% Paired black -> dark blue -> teal, with the tallest/largest level black.
-std_colors=[0 0 0;.04 .22 .65;.08 .40 .85;0 .55 .70;0 .65 .55];
-x=linspace(-.6,1.8,450);
-phi=@(z)SRNNCellTypePairs.logisticSigmoid(z,.4);
-ax1=axes(fig,'Position',[.065 .10 .18 .235],'Tag','sfa_sigmoid'); hold(ax1,'on');
-ax2=axes(fig,'Position',[.295 .10 .19 .235],'Tag','sfa_discs'); hold(ax2,'on');
-ax3=axes(fig,'Position',[.555 .10 .18 .235],'Tag','std_sigmoid'); hold(ax3,'on');
-ax4=axes(fig,'Position',[.77 .10 .18 .235],'Tag','std_discs'); hold(ax4,'on');
-theta=linspace(0,2*pi,400);
-for k=1:5
-    plot(ax1,x,phi(x-.6*a_levels(k)),'Color',sfa_colors(k,:),'LineWidth',2,'Tag',sprintf('level_%d',k));
-    center=-.25-1.2*a_levels(k);
-    plot(ax2,center+.8*cos(theta),.8*sin(theta),'Color',sfa_colors(k,:),'LineWidth',2,'Tag',sprintf('level_%d',k));
-    plot(ax3,x,b_levels(k)*phi(x),'Color',std_colors(k,:),'LineWidth',2,'Tag',sprintf('level_%d',k));
-    radius=1.6*b_levels(k);
-    plot(ax4,-1+radius*cos(theta),radius*sin(theta),'Color',std_colors(k,:),'LineWidth',2,'Tag',sprintf('level_%d',k));
-end
-for ax=[ax1 ax3]
-    set(ax,'XLim',[x(1) x(end)],'YLim',[0 1.02],'XTick',[0 1],'YTick',[0 1], ...
-        'LineWidth',1.0,'FontSize',14,'Box','off');
-    ax.XAxis.LineWidth=1.0; ax.YAxis.LineWidth=1.0;
-    xlabel(ax,'Dendritic Potential','FontSize',14); ylabel(ax,'Synaptic Output','FontSize',14);
-end
-concept_axes(ax2,[-2.5 1],[-1.25 1.25]);
-concept_axes(ax4,[-2.9 1],[-1.9 1.9]);
+% The bottom row (SFA and STD sigmoids and discs, the STD endpoint from the
+% route model of the fully adapted condition at raw rate r_ref = 0.25) is
+% drawn by draw_adaptation_concepts, shared with fig_main1_concept_networks.
+A=draw_adaptation_concepts(fig,preset_name);
+sfa_colors=A.sfa_colors; std_colors=A.std_colors; b_levels=A.b_levels;
+std_note=A.std_note; frozen_note=A.frozen_note;
 row_labels=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1], ...
     'Visible','off','Tag','intro_row_labels');
 for j=1:3
@@ -109,25 +68,6 @@ for j=1:3
         'FontSize',14,'VerticalAlignment','top','Tag',sprintf('row_label_%d',j));
 end
 set(findall(fig,'-property','FontSize'),'FontSize',14);
-if is_chain
-    std_note=sprintf(['STD endpoint (%s, chained vesicle pools): tau_rec=%s s (releasable-pool refill, ' ...
-        'reserve refill), tau_rel=%s s, n2=%g, raw reference rate r_ref=%.2f. ' ...
-        'Steady state (C4) of route_pool: releasable pool b1=%.9g, reserve b2=%.9g; the depression ' ...
-        'factor is b1 alone, B_min=%.9g. ' ...
-        'Five displayed frozen factors=%s. Intermediate factors are illustrative, not simulated steady-state points.'], ...
-        full,mat2str(std.tau_rec),mat2str(std.tau_rel),std.n2,r_ref,b_each(1),b_each(2),b_min,mat2str(b_levels));
-    frozen_note=['not fits to the reference piecewise activation. STD uses a frozen factor B (the releasable ' ...
-        'pool b1) multiplying the entire curve, not the self-consistent rate-dependent steady-state ' ...
-        'input-output relation. The reserve b2 acts on the output only through b1.'];
-else
-    std_note=sprintf(['STD endpoint: tau_rec=%s s, tau_rel=%s s, raw reference rate r_ref=%.2f. ' ...
-        'Each b_m,ss=1/(1+r_ref*tau_rec,m/tau_rel,m)=%s; total product B_min=%.9g. ' ...
-        'Five displayed frozen total factors=%s. Intermediate factors are illustrative, not simulated steady-state points.'], ...
-        mat2str(std.tau_rec),mat2str(std.tau_rel),r_ref,mat2str(b_each),b_min,mat2str(b_levels));
-    frozen_note=['not fits to the reference piecewise activation. STD uses a frozen product B multiplying the entire curve, ' ...
-        'not the self-consistent rate-dependent steady-state input-output relation. ' ...
-        'The two-timescale product must not be identified with a single depression variable.'];
-end
 notes={['For the current mu7 figure-only configuration, the native introductory source is explicitly ' ...
     'figs/sfaEI_fast/fig_introductory_concepts (clean source commit4406b56). It uses the same ' ...
     'sompolinsky_pairs preset, gammas[0.9,1.6,2.5], seed0, 15 traces and [0,60]s as the mu7 intro. ' ...
@@ -145,13 +85,4 @@ out=struct('figs',fig,'files',{{}},'source',{sources},'notes',{notes}, ...
 end
 function aa=left_to_right(aa)
 pos=vertcat(aa.Position); [~,ix]=sort(pos(:,1)); aa=aa(ix);
-end
-function concept_axes(ax,xr,yr)
-axis(ax,'off'); axis(ax,'equal');
-hx=plot(ax,[xr(1) xr(2)-.15],[0 0],'k','LineWidth',1);
-hy=plot(ax,[0 0],[yr(1)*.85 yr(2)*.85],'k','LineWidth',1);
-uistack([hx hy],'bottom');
-text(ax,xr(2)-.10,0,'Re','FontSize',14,'VerticalAlignment','middle');
-text(ax,0,yr(2)*.85,'Im','FontSize',14,'HorizontalAlignment','center','VerticalAlignment','bottom');
-xlim(ax,xr); ylim(ax,yr);
 end
