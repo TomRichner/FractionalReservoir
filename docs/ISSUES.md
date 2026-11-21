@@ -2133,3 +2133,20 @@ machine needs that repo cloned and `setup_repo.py` run once.
   the fitted windows of the plane and slow-variables figures against the
   exploration's (options pin them), the break, marker and inset sizes at
   14 pt. Covers FD-036 to FD-039 as far as the MacBook can.
+- **FD-043 merged (2026-11-21):** commits `f703c25` (a `noise<k>` token
+  in `ospec_network`, the one additive change in FD-040's code, its test
+  rerun), `c394a56` (stage), `f5a8688` (figures, test). The runs go
+  through `run_outlier_spectra_stage` itself. Before any run the stage
+  checks each weight draw's structural spectrum for the intended
+  eigenvalue (15 % tolerance, at least 1.05 R on the right) and skips and
+  records a draw that fails. Seeds: new weights, patterns and noise per
+  seed, except the two local-outlier networks, whose weight seed is part
+  of the definition, so their further seeds are noise realizations on the
+  same weights. `essential` 45 runs, `fastmedium` 225 runs; estimated 35
+  to 65 min on 13 workers at `fastmedium`, about 2 GB per worker.
+  Detachment is against the theoretical radius. Lead accepts the worker's
+  choices (other outliers drawn only slightly less faint than the bulk;
+  the no-adaptation reined fraction in a panel of its own). To look at on
+  500-neuron data: the rotation plane figure is 7 rows (about 26 in tall)
+  and may want splitting; the test needs 80 neurons because at 60 most
+  networks fail the structural check, as they should. Not registered yet.
