@@ -25,7 +25,12 @@ function cfg = with_ritz_overlay(cfg, K)
 %       fig_eig_heatmap_ritz         the density with the points
 %       fig_eig_heatmap_ritz_inset   the same with the inset near zero
 %       fig_main3_grouped_ritz       the composite Figure 3 with both
-%     None is marked in_paper. The entries they are versions of are
+%     None is marked in_paper. The composite is a version of the BASELINE
+%     composite, the one that reads the eig_heatmap stage: in the mu7chain
+%     bundles since FD-046 that is fig_main3_grouped_baseline (the paper's
+%     fig_main3_grouped draws the switching run, with_switch_spectra), and
+%     the added entry follows it; in a config without that entry it is
+%     fig_main3_grouped. The entries they are versions of are
 %     untouched, so the registered figures are what they were.
 %
 % The config must register fig_eig_heatmap and fig_main3_grouped (the
@@ -52,7 +57,9 @@ end
 cfg.eig_heatmap_ritz_K = K;
 
 heat = cfg.figures{strcmp(names, 'fig_eig_heatmap')};
-main3 = cfg.figures{strcmp(names, 'fig_main3_grouped')};
+base3 = 'fig_main3_grouped';
+if ismember('fig_main3_grouped_baseline', names); base3 = 'fig_main3_grouped_baseline'; end
+main3 = cfg.figures{strcmp(names, base3)};
 overlay = {'ritz_overlay', true};
 added_heat = { ...
     struct('name', 'fig_eig_heatmap_ritz', 'fn', heat.fn, 'in_paper', false, 'args', {[heat.args, overlay]}), ...
@@ -65,7 +72,7 @@ F = {};
 for k = 1:numel(cfg.figures)
     F{end + 1} = cfg.figures{k}; %#ok<AGROW>
     if strcmp(names{k}, 'fig_eig_heatmap');   F = [F, added_heat];  end %#ok<AGROW>
-    if strcmp(names{k}, 'fig_main3_grouped'); F = [F, added_main3]; end %#ok<AGROW>
+    if strcmp(names{k}, base3); F = [F, added_main3]; end %#ok<AGROW>
 end
 cfg.figures = F;
 end

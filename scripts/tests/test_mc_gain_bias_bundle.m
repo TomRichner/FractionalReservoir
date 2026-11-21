@@ -77,7 +77,8 @@ ess  = plan_literal(ess_stages, ...
     {'memory_capacity', 'mc_example', 'numerics', 'lyapunov_spectrum', 'transient_gain', 'dc_lle'}, ...
     {'sensitivity', 'param_space'}, {'tau'}, true, all10);
 % mu7chain_config adds, in every mode, the opt-in lyapunov_spectrum_n80
-% (FD-032) after the literal's stages; nothing else of its plans moved.
+% (FD-032) and the three spectral stages (FD-046) after the literal's
+% stages; nothing else of its plans moved.
 bundles = {'mu7chain_config(''essential'')', mu7chain_config('essential'), with_n80(ess); ...
            'mu7chain_config(''fast'')',      mu7chain_config('fast'),      with_n80(full); ...
            'mu7revisedMedium_config',        mu7revisedMedium_config(),    full; ...
@@ -91,7 +92,8 @@ end
 
 %% 2. The opt-in stage runs only when named
 [st, ~, opt_in] = paper_stage_names();
-assert(isequal(st, all10) && isequal(opt_in, {'lyapunov_spectrum_n80', 'mc_gain_sweep', 'noise_switch'}));
+assert(isequal(st, all10) && isequal(opt_in, {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', ...
+    'eigenvalue_density', 'mc_gain_sweep', 'noise_switch'}));
 pl = paper_stage_plan(struct('illustrations', true, 'stages', {{'mc_gain_sweep', 'dc_lle'}}));
 assert(isequal(pl.stages, {'dc_lle', 'mc_gain_sweep'}), 'opt-in stages run after the first list');
 assert(isequal(pl.stages_skipped, setdiff(all10, {'dc_lle'}, 'stable')) && pl.runs.mc_gain_sweep);
@@ -494,9 +496,11 @@ for md = {'essential', 'fast'}
         C = mu7chain_gainbias_config(md{1}, fs{1});
         pl = paper_stage_plan(ac);
         if strcmp(md{1}, 'essential'); stages_A = ess_stages; else; stages_A = all10; end
-        % Block A's stages include the opt-in lyapunov_spectrum_n80 (FD-032),
-        % which runs first of the opt-in stages.
-        assert(isequal(pl.stages, [stages_A, {'lyapunov_spectrum_n80', 'mc_gain_sweep', 'noise_switch'}]), ...
+        % Block A's stages include the opt-in lyapunov_spectrum_n80 (FD-032)
+        % and the three spectral stages (FD-046), which run first of the
+        % opt-in stages.
+        assert(isequal(pl.stages, [stages_A, {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', ...
+            'eigenvalue_density', 'mc_gain_sweep', 'noise_switch'}]), ...
             '%s: block A''s stages, then block C''s, then the noise switch', md{1});
         assert(pl.runs.noise_switch && ~ismember('noise_switch', [paper_stage_plan(A).stages, ...
             paper_stage_plan(C).stages]), 'only the A + C bundle runs the noise switch');
@@ -752,9 +756,11 @@ for k = 1:numel(all_stages); p.runs.(all_stages{k}) = ismember(all_stages{k}, st
 end
 
 function p = with_n80(p)
-% The plan with the opt-in lyapunov_spectrum_n80 run after its stages (FD-032).
-p.stages = [p.stages, {'lyapunov_spectrum_n80'}];
-p.runs.lyapunov_spectrum_n80 = true;
+% The plan with the opt-in lyapunov_spectrum_n80 (FD-032) and the three
+% spectral stages (FD-046) run after its stages: mu7chain_config's.
+added = {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', 'eigenvalue_density'};
+p.stages = [p.stages, added];
+for k = 1:numel(added); p.runs.(added{k}) = true; end
 end
 
 function v = arg(args, name)

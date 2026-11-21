@@ -58,10 +58,12 @@ for m = 1:size(seeds, 1)
         arg(pl.args, 'noise_off_too') == false && isequal(arg(pl.args, 'conditions'), want_conds), ...
         '%s: the arguments', md);
 end
-% The A + C bundle runs it too, after block A's stages and before block C's.
+% The A + C bundle runs it too, after block A's stages and before block C's
+% (the three spectral stages of FD-046 sit between it and block C's sweep).
 ac = paper_stage_plan(mu7chain_AC_config('fast'));
 k = find(strcmp(ac.stages, 'lyapunov_spectrum_n80'));
-assert(isscalar(k) && strcmp(ac.stages{k + 1}, 'mc_gain_sweep'));
+assert(isscalar(k) && strcmp(ac.stages{k - 1}, 'paper_illustrations') && ...
+    find(strcmp(ac.stages, 'mc_gain_sweep')) > k);
 
 c = mu7chain_config('essential');
 c.lyapunov_spectrum_n80 = struct('n_seeds', 2, 'K', 30, 'T', 6, 'lya_T_interval', [3 6], 'lya_warmup', 2);

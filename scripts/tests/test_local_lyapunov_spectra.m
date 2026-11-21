@@ -29,12 +29,17 @@
 %      (disk_by_cond). With the lambda_1 row it errors :HistogramRow.
 %      'spectra_start_s': a later first state gives the same H, exponents
 %      and gains at the shared states, bit for bit.
-%   5. with_switch_spectra: no bundle carries it by default; it sets K = 100
-%      and 40 states (or those given) and adds exactly four entries, each
-%      after the entry it is a version of, none in_paper, every other
-%      entry unchanged; it names the first state only when the accumulation
-%      window opens before it; twice errors :AlreadyAdded, a config without
-%      the entries :MissingEntry.
+%   5. with_switch_spectra: the mu7chain bundles carry it by default since
+%      FD-046 ('essential' and 'fast' are exactly the config without it, put
+%      back by undo_switch below, with with_switch_spectra(cfg, 100, 40, 1,
+%      'as_default', true) applied: fig_main3_grouped the four-row
+%      switching composite, the baseline composite beside it). As the
+%      opt-in (on the config without it): it sets K = 100 and 40 states (or
+%      those given) and adds exactly four entries, each after the entry it
+%      is a version of, none in_paper, every other entry unchanged; it
+%      names the first state only when the accumulation window opens
+%      before it; twice errors :AlreadyAdded, a config without the entries
+%      :MissingEntry.
 %
 % ~1.5 min. Prints PASS/FAIL per check and a final banner. Assumes setup_paths.
 %
@@ -160,15 +165,15 @@ all_passed = check('a run without the spectra errors through resolve_data_file',
     'resolve_data_file:')) && all_passed;
 rmdir(base, 's');
 
-%% The opt-in config switch
+%% The config switch: the bundles' default (FD-046), and the opt-in
 ok = true;
 for mode = {'essential', 'fast'}
     c = mu7chain_config(mode{1});
-    n = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
-    ok = ok && ~isfield(c, 'local_lyapunov_spectra_n_samples') && ~any(contains(n, 'switch')) && c.local_lyapunov_K == 50;
+    ok = ok && isequal(with_switch_spectra(undo_switch(c), 100, 40, 1, 'as_default', true), c) && ...
+        c.local_lyapunov_K == 100 && c.local_lyapunov_spectra_n_samples == 40 && c.local_lyapunov_spectra_start_s == 1;
 end
-all_passed = check('mu7chain_config carries no switching-run spectra and K = 50 by default', ok) && all_passed;
-base_cfg = mu7chain_config('essential');
+all_passed = check('mu7chain_config carries the switching Figure 3 by default (K = 100, 40 states from 1 s)', ok) && all_passed;
+base_cfg = undo_switch(mu7chain_config('essential'));
 cfg = with_switch_spectra(base_cfg);
 names0 = cellfun(@(f) f.name, base_cfg.figures, 'UniformOutput', false);
 names  = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
@@ -193,6 +198,8 @@ all_passed = check('four entries added after the entries they are versions of, n
     ~any(cellfun(@(f) f.in_paper, cfg.figures(ismember(names, added)))) && ...
     isequal(rmfield(drop_start(cfg), {'figures', 'local_lyapunov_K', 'local_lyapunov_spectra_n_samples'}), ...
             rmfield(base_cfg, {'figures', 'local_lyapunov_K'}))) && all_passed;
+all_passed = check('as_default: the paper''s name on the four-row composite, the baseline beside it', ...
+    isequal(with_switch_spectra(base_cfg, 100, 40, 1, 'as_default', true), mu7chain_config('essential'))) && all_passed;
 % The first state: left to the stage when the window opens at or after it, named when it opens before.
 % (Whatever the bundle's own accumulation start is.)
 early = base_cfg; early.local_lyapunov_accumulation_start_s = 0;
@@ -216,6 +223,20 @@ end
 %% ------------------------------------------------------------------------
 function b = drop_seconds(b)
 if isfield(b, 'seconds'); b = rmfield(b, 'seconds'); end
+end
+
+function c = undo_switch(c)
+% A mu7chain config as it was before with_switch_spectra became its default:
+% without the switching entries, fig_main3_grouped the baseline composite,
+% and no spectra settings (K stays the bundle's 100).
+names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
+base = c.figures{strcmp(names, 'fig_main3_grouped_baseline')};
+base.name = 'fig_main3_grouped';
+base.in_paper = true;
+c.figures{strcmp(names, 'fig_main3_grouped')} = base;
+c.figures = c.figures(~ismember(names, {'fig_main3_grouped_baseline', 'fig_eig_heatmap_switch', ...
+    'fig_eig_real_histogram_switch'}));
+c = rmfield(c, {'local_lyapunov_spectra_n_samples', 'local_lyapunov_spectra_start_s'});
 end
 
 function c = drop_start(c)
