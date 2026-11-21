@@ -12,7 +12,8 @@ function files = fig_outliers(data_dir, fig_dir, opts)
 %                         frozen-gain spectrum at the calibration states in
 %                         the plane of rates, the null-calibrated edge of
 %                         the bulk (gray circle), the rightmost eigenvalue
-%                         of each state (ringed), where the structure alone
+%                         of each state (ringed; with its conjugate when it
+%                         is complex), where the structure alone
 %                         would put it (open diamond: uniform gains), zero
 %                         (dashed). The point: is there an eigenvalue
 %                         outside the bulk, and where is it relative to
@@ -30,7 +31,8 @@ function files = fig_outliers(data_dir, fig_dir, opts)
 %   outliers_slow_variables   what the slow variables do to the rightmost
 %                         frozen-gain mode: the full Jacobian's network
 %                         eigenvalues at the dense states (dots), the
-%                         frozen rightmost eigenvalue (open) and the full-
+%                         frozen rightmost eigenvalue (open, with its
+%                         conjugate when it is complex) and the full-
 %                         Jacobian eigenvalue that carries its pattern
 %                         (filled, with its conjugate).
 %   outliers_dwell        survival curves of the time spent beyond zero:
@@ -126,7 +128,8 @@ for w = 1:n_net
             for q = 1:size(ev, 2)
                 [~, i1] = max(real(ev(:, q))); top(q) = ev(i1, q);
             end
-            plot(ax, real(top), abs(imag(top)), 'o', 'MarkerSize', 6, 'MarkerFaceColor', col, 'MarkerEdgeColor', 'k', 'LineWidth', 0.75);
+            topc = with_conjugates(top);                       % a complex rightmost eigenvalue is one of a pair
+            plot(ax, real(topc), imag(topc), 'o', 'MarkerSize', 6, 'MarkerFaceColor', col, 'MarkerEdgeColor', 'k', 'LineWidth', 0.75);
             u = (median([R.cal.uniform_re]) - 1) / tau;
             plot(ax, u, 0, 'd', 'MarkerSize', 9, 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 1.25);
             xline(ax, 0, '--', 'Color', 'k', 'LineWidth', 1.0);
@@ -151,7 +154,8 @@ write_sidecar(fig_dir, 'outliers_complex_plane', ...
     '(lambda - 1)/tau_d, at 12 states spread over 20 s after 60 s of settling, overlaid. Gray circle: the edge of the ' ...
     'bulk, centered on -1/tau_d = -10 1/s: the radius predicted from the gains (median over the window) times the ' ...
     'null-calibrated factor kappa (95th percentile of the rightmost real part of null matrices that have the same ' ...
-    'entries and gains and no mean structure). Ringed dots: the rightmost eigenvalue of each state. Open diamond: where ' ...
+    'entries and gains and no mean structure). Ringed dots: the rightmost eigenvalue of each state; when it is ' ...
+    'complex it is one of a conjugate pair and both members are ringed. Open diamond: where ' ...
     'the rightmost eigenvalue would be if every neuron had the same gain (the rms of the observed gains, so the bulk ' ...
     'keeps its size): the outlier the weights alone make. Dashed: zero. The pile at -10 is the silent and saturated ' ...
     'neurons (zero gain). In the reference network the diamond is inside the circle (balanced means, no outlier) and ' ...
@@ -273,7 +277,8 @@ for w = 1:n_net
             scatter(ax, real(net), imag(net), 5, col, 'filled', 'MarkerFaceAlpha', 0.2, 'MarkerEdgeColor', 'none');
             xline(ax, 0, '--', 'Color', 'k', 'LineWidth', 1.0);
             fr = ([D.lam1_M] - 1) ./ R.tau_d;
-            plot(ax, real(fr), abs(imag(fr)), 'o', 'MarkerSize', 7, 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 1.25);
+            frc = with_conjugates(fr);                         % both members of a complex pair
+            plot(ax, real(frc), imag(frc), 'o', 'MarkerSize', 7, 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'k', 'LineWidth', 1.25);
             ct = [D.cont];
             plot(ax, [real(ct) real(ct)], [imag(ct) -imag(ct)], 'o', 'MarkerSize', 7, 'MarkerFaceColor', col, 'MarkerEdgeColor', 'k', 'LineWidth', 0.75);
         end
@@ -293,7 +298,7 @@ write_sidecar(fig_dir, 'outliers_slow_variables', ...
     'the same 12 states as the complex-plane figure, overlaid. Dots: eigenvalues whose eigenvector has at least 10% ' ...
     'of its squared norm in the dendritic variables (network modes; the thousands of single-neuron slow modes on the ' ...
     'negative real axis are left out). Open circles: the rightmost eigenvalue of the frozen-gain matrix at each state ' ...
-    '(what the other figures follow). Filled ringed circles: the eigenvalue of the full Jacobian whose dendritic ' ...
+    '(what the other figures follow), with its conjugate when it is complex. Filled ringed circles: the eigenvalue of the full Jacobian whose dendritic ' ...
     'pattern overlaps most with that frozen mode (cont_ov_med), with its conjugate. Dashed: zero. Without adaptation ' ...
     'there are no slow variables and the two coincide. With adaptation the frozen mode, real or nearly so and right ' ...
     'of zero, becomes a complex pair: the slow variables turn growth into a slow oscillation (Im of 4 to 6 1/s is ' ...
@@ -394,6 +399,16 @@ elseif strcmp(net, 'EI3to2')
 else
     name = net;
 end
+end
+
+function z = with_conjugates(z)
+% The eigenvalues z with the conjugate of each complex one appended, so that
+% both members of a pair are marked. A real one (|Im| below 1e-9 of the
+% larger of its modulus and 1) is kept once, on the real axis.
+z = z(:).';
+is_real = abs(imag(z)) <= 1e-9 * max(abs(z), 1);
+z(is_real) = real(z(is_real));
+z = [z, conj(z(~is_real))];
 end
 
 function survival(ax, dwell, dt, style, col, lw)
