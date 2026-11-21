@@ -2212,3 +2212,93 @@ machine needs that repo cloned and `setup_repo.py` run once.
   every mode. Sixteen tests pass at tiny size; the smoke wrote 26 of 26
   entries. What remains is Tom's: push, the full run and the regression
   tiers on the PC, and section 8 of the plan.
+
+### FD-047 to FD-052 Plan 2: the figures of the new figure plan
+
+The plan, its phases and status are in the manuscript repository,
+`docs/Advancing_the_narrative/Plan2.md`; the specification of every figure
+(main, supplement, appendix, panel by panel, and the style rules) is
+`figures_main_supp_appen.md` beside it. One issue per work package, each in
+its own worktree and branch (`../FractionalReservoir_wt_p2<x>`, `p2-<x>`).
+Shared files (bundle configs, registry, `make_all_paper_figures`,
+`manuscript_style`, the registry tests, this file) belong to package A; the
+other packages hand their registry rows to it as text.
+
+**Baseline on `main` (8afd32d), phase 0, 2026-11-21:** the rapid exact tier
+passes bit for bit. The stages exact tier differs from its reference
+(made 2026-11-13) by one structural leaf, the extra
+`transient_gain/transient_gain_trials.mat::P.ode_solver` (a field added
+2026-11-17), and no value, in the lead's session; that counts as clean, and
+the reference is re-captured at integration. The quick suite: 103 of 105
+pass; `test_outlier_spectra_stage` fails only when a pool is up (it asserts
+`n_workers == 0`), `test_local_lyapunov_spectra` fails one layout check
+(row D of the histogram against the heat map's plot box, off by 0.0235;
+probably a tall figure clamped to the 1710 x 1073 screen). The quick suite
+takes about 35 minutes; run it in pieces.
+
+### FD-047 Plan 2, package A: the three groups, condition colors, 150 directions
+
+- **Status:** in progress (branch `p2-a`).
+- **What:** every entry of the paper bundles (`mu7chain_config`,
+  `mu7chain_AC_config`, `mu7chain_gainbias_config`, `ied_stim_config`) in
+  a group, `main`, `supplement` or `appendix` (`paper_figure_groups`,
+  `paper_figure_entry`; `in_paper` derived from it); `make_all_paper_figures`
+  writes `figure_groups.md` and counts by group; the guard test
+  `test_paper_figure_groups` (at most 8 main and 10 supplementary figures
+  across the bundles that make the paper, every entry grouped, names
+  unique); every condition in its `manuscript_style` color and titled in
+  sentence case (`srnn_condition_titles`), in every registered figure that
+  no other package owns; Figure 3 with 150 tracked directions in every run
+  mode (Tom, 2026-11-21: "go with 150"). Then, last, the wiring of the
+  other packages' registry rows.
+- **Done means:** the guard and registry tests pass; the covering tests,
+  the rapid and stages tiers as at the baseline (title text apart); the
+  other packages' rows wired, and `figure_groups.md` of a tiny-size pass
+  lists eight main figures.
+
+### FD-048 Plan 2, package B: Figure 1 and S3
+
+- **Status:** open.
+- **What:** the `concept_examples` stage (four example structures at 500
+  neurons, their equal-gain spectra and unadapted activity), the
+  representative 30 by 30 weight image, the new Figure 1 with the kept
+  sigmoid and circle diagrams, and the connectivity gallery S3.
+- **Done means:** stage and figures built and tested at tiny size, PNGs
+  looked at, registry rows handed to package A.
+
+### FD-049 Plan 2, package C: Figures 3 and 4
+
+- **Status:** open.
+- **What:** Figure 3 without the Ritz overlay in the composite and with the
+  three labels on row D; `fig_local_lyapunov` on the stage's window;
+  Figure 4 panel C (dendritic share of the leading perturbation against
+  lambda_1, with the uncoupled reference).
+- **Done means:** as FD-048.
+
+### FD-050 Plan 2, package D: Figures 5 and 6, S6 to S8
+
+- **Status:** open.
+- **What:** Figure 5 from `fig_outlier_plane` and `fig_outlier_dose` (E and
+  I marks on the insets); Figure 6 from the transient-gain and
+  frequency-response panels; the supplementary composites S6, S7, S8; the
+  layout defects of the spectral figures of 2026-11-21, tall figures cut at
+  export among them.
+- **Done means:** as FD-048.
+
+### FD-051 Plan 2, package E: Figure 8, S10
+
+- **Status:** open.
+- **What:** the `burst_mode` stage (the bursting network before and during
+  sustained input, several seeds, the frozen-adaptation arm, the network
+  mode with gains frozen and in the full Jacobian), its panels A to C as
+  rates, the combined Figure 8 in the new order, S10, and the network mode
+  in the modular network as an appendix figure.
+- **Done means:** as FD-048.
+
+### FD-052 Plan 2, package F: Figure 7, S1, S2, S4, S5, S9
+
+- **Status:** open.
+- **What:** the merged memory figure; the supplementary composites of
+  existing figures (single neuron and depression models; numerics;
+  sensitivity; joint sample; memory with the new responsive-share maps).
+- **Done means:** as FD-048.
