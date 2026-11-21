@@ -2199,3 +2199,16 @@ machine needs that repo cloned and `setup_repo.py` run once.
   Lead's decision: merge `origin/main` into `main` here, with the
   conflicts resolved by a worker and the new stages made to take the
   bundle's `fs` and solver, before Tom pulls on the PC.
+- **FD-046 done on the MacBook (2026-11-21):** second part `5a56182`
+  (`outlier_structures` registered; ten more figure entries, 23 in all)
+  and `2c651de`, the merge of `origin/main` (`2dd8f0a`), fast-forwarded
+  into `main` after the lead's review (the bundle config holds `cfg.fs`
+  500, `cfg.ode_solver` sra1, K 100, the new timing and both helpers; no
+  protected file touched). The worker's decisions, which the lead
+  accepts and Tom can reverse: the baseline composite is written as
+  `Fig_Main3_Grouped_baseline.png`; the old with-lambda layout is
+  reachable by option only; `outlier_structures` has its own `fs` knob;
+  an adaptive solver is refused by the two outlier plans; K = 100 in
+  every mode. Sixteen tests pass at tiny size; the smoke wrote 26 of 26
+  entries. What remains is Tom's: push, the full run and the regression
+  tiers on the PC, and section 8 of the plan.
