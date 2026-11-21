@@ -1929,3 +1929,39 @@ machine needs that repo cloned and `setup_repo.py` run once.
   re-places panels and restyles ticks, and tick clearing needs a bulk
   radius the heat map does not have (the disc of `fig_eig_real_histogram`
   could supply it). `fig_eig_heatmap_imbalance` follows Figure 3.
+
+### FD-036 The outlier complex-plane figure with neurons on the response curve, as a paper figure
+
+- **Status:** wanted for the paper or its supplement (Tom, 2026-11-20, on
+  `figs/explorations/outliers/outliers_complex_plane_v3_alt.png`: "looks
+  awesome. That, or something like it should go in the paper, or at least
+  the supplement"). Not started; placement open (manuscript
+  `docs/final_draft_to_do.md`, entry of 2026-11-20).
+- **What it is today:** `scripts/explorations/outliers/plane_fig_outliers.m`
+  with `'inset', true, 'theory_circle', true, 'mark_outliers', true,
+  'inset_split', true`: two networks (reference, E-to-E x 1.5) by three
+  conditions; the frozen-gain spectrum at 12 states on shared axes through
+  the origin (`complex_plane_axes`), the theoretical bulk radius solid and
+  the null-calibrated edge dashed, eigenvalues beyond 1.03 times the
+  theoretical radius marked, the uniform-gain diamond beyond a break, and
+  at lower right the nonlinearity with one dot per neuron per state,
+  E above the curve and I below. Per-neuron states come from re-simulated
+  runs (`plane_states.m`), verified against the saved spectra.
+- **Tom's choices so far:** axes through the origin, 1:1, one scale, a
+  break for the far diamond, ticks outside the bulk only; no ringed
+  rightmost markers; outliers marked against the unscaled radius at 103 %;
+  no adaptation in dark red; E and I in the established colors; the split
+  dots preferred to the mixed dots and to the ribbon variants (`_v4`,
+  `_v4_alt`), which he has seen. Other figure details he set aside for
+  now.
+- **To make it a paper figure:** a registered stage and figure function
+  in place of the exploration scripts (saving the per-neuron states and
+  gains at the sampled states, so nothing is re-simulated or recovered);
+  more seeds, and a decision on which seed is drawn; the run level the
+  paper uses, not 500-neuron `essential`; the marking judged against each
+  state's own radius or the drawn one (they differ for single-timescale
+  in the reference network, 5.8 against 15.7 per state); the one real
+  eigenvalue per state far to the left (-59 to -42 1/s) with E-to-E x 1.5,
+  which needs a left-hand break or a sentence in the caption; larger break
+  marks; a caption and a `_table.md` sidecar; and the choice between a
+  figure of its own and the responsiveness panel of the closing figure.
