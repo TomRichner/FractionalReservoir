@@ -67,6 +67,9 @@ for k = 1:n_chk
     end
 end
 checks = struct2table([rows{:}], 'AsArray', true);
+for c = {'key', 'network', 'target', 'group', 'reason'}
+    if ~iscell(checks.(c{1})); checks.(c{1}) = cellstr(checks.(c{1})); end   % one draw gives char columns
+end
 vprintf(verbose, 'minimal', '  outlier_structures: structural check of %d weight draw(s) in %.0f s, %d passed\n', ...
     n_chk, toc(t0), nnz(checks.pass));
 

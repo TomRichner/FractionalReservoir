@@ -32,6 +32,7 @@ function S = ostruct_load(run_dir, opts)
 %   MM         cell, the series of each row of T (ostruct_mode_measures' mm)
 %   M          cell, ospec_measures of each row of T
 %   Rs         cell, the runs (only when keep_runs)
+%   idx        the rows of S.runs behind T, MM, M and Rs, in their order
 %
 % Errors (ostruct_load:NoStage) when the folder holds no ostruct_index.mat.
 % The run files themselves are read through ospec_read_index and
@@ -71,7 +72,7 @@ if isfile(fullfile(folder, 'ospec_index.mat'))
     runs.message(found) = ospec.message(at(found));
 end
 S = struct('folder', folder, 'runs', runs, 'checks', L.checks, 'settings', L.settings, ...
-    'networks', L.networks, 'T', table(), 'MM', {{}}, 'M', {{}}, 'Rs', {{}});
+    'networks', L.networks, 'T', table(), 'MM', {{}}, 'M', {{}}, 'Rs', {{}}, 'idx', zeros(0, 1));
 
 pick = runs.ok;
 if ~isempty(opts.keys)
@@ -86,9 +87,9 @@ end
 if ~isempty(opts.realization)
     pick = pick & ismember(runs.realization, opts.realization);
 end
-if ~opts.measures && ~opts.keep_runs; return; end
-
 idx = find(pick);
+S.idx = idx;
+if ~opts.measures && ~opts.keep_runs; return; end
 rows = cell(1, numel(idx)); MM = cell(1, numel(idx)); M = cell(1, numel(idx)); Rs = cell(1, numel(idx));
 for q = 1:numel(idx)
     k = idx(q);
