@@ -2150,3 +2150,38 @@ machine needs that repo cloned and `setup_repo.py` run once.
   500-neuron data: the rotation plane figure is 7 rows (about 26 in tall)
   and may want splitting; the test needs 80 neurons because at 60 most
   networks fail the structural check, as they should. Not registered yet.
+- **FD-046, first part, merged (2026-11-21):** commits `7472175`,
+  `842244a`, `850402a`. `paper_opt_in_stages` has `outlier_spectra`,
+  `frequency_response`, `eigenvalue_density`; `with_spectral_supplement`
+  adds them and thirteen figure entries to the `mu7chain` bundles by
+  default (the regression bundle has none, asserted);
+  `with_switch_spectra(..., 'as_default', true)` makes `fig_main3_grouped`
+  the four-row switching composite (file
+  `Fig_Main3_Grouped_noC_switch_ritz_inset_realhist.png`), the baseline
+  composite kept as `fig_main3_grouped_baseline`; `cfg.local_lyapunov_K`
+  100. Both readers now use only the `ospec_*` accessors, and the two
+  fixtures are replaced by the real stage at tiny size (the old eigdens
+  reader would have failed on the first real run: the null spectra are
+  in `R.null`). Ten bundle and stage tests pass; a smoke through both
+  entry points at 40 to 60 neurons made 16 of 16 entries in under two
+  minutes. **Two incidents, both the worker's and both over:** a bare
+  `parfor` in `jacobian_spectra_at_states.m` (line 52), reached by
+  `test_local_lyapunov_spectra`, opened the default 8-worker pool
+  because automatic pool creation is ON in this MacBook's MATLAB
+  preferences (closed; the hazard remains until Tom turns the preference
+  off or that `parfor` goes through `pool_ensure`); and one smoke attempt
+  ran `local_lyapunov` at 500 neurons for 8.7 minutes because MATLAB had
+  not re-read an edited file (output deleted).
+- **Found at the merge (2026-11-21), and it matters for the full run:**
+  this clone's `main` was 75 commits ahead of `origin/main` and, after a
+  fetch, 15 BEHIND it: the PC's FD-031 work of 2026-11-17 and 18 (the
+  Figure 3 paper layout as the default, K = 150 for the larger modes,
+  `cfg.fs` 500 Hz and `cfg.ode_solver` reaching every stage, the IED
+  bundle, the solver audit; head `2dd8f0a`). Ten files are changed on
+  both sides (`mu7chain_config.m`, `run_all_paper_analyses.m`,
+  `run_local_lyapunov.m`, `run_eig_heatmap.m`, `run_lyapunov_spectrum.m`,
+  `fig_grouped_main.m`, `fig_main3_stability.m`, two bundle tests,
+  `ISSUES.md`). Everything since FD-032 was built without those commits.
+  Lead's decision: merge `origin/main` into `main` here, with the
+  conflicts resolved by a worker and the new stages made to take the
+  bundle's `fs` and solver, before Tom pulls on the PC.
