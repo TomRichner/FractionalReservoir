@@ -144,6 +144,12 @@ function names = slow_test_names()
         'test_RMTBlocks_predictions'        %  37 s  eigenvalue statistics over many draws
         'test_eig_heatmap_stage'            %  33 s  analysis stage + three figures
         'test_noise_switch_stage'           %  73 s  the noise-switch stage end to end through both entry points (figure pass 54 s of it, 4 workers)
+        % Plan 2 (2026-11-21), timed by the packages and at integration:
+        'test_leading_direction'            % 142 s  Figure 4C: joint sample and uncoupled reference at tiny size
+        'test_composite_spectral_figures'   % 110-240 s  Figures 5, 6 and S6 to S8 from the spectral stages at tiny size
+        'test_memory_supplement_composites' %  91 s  Figure 7, S1, S2, S4, S5, S9 from small runs
+        'test_burst_mode_stage'             % TIMING  the burst_mode stage and Figure 8 A to C, S10
+        'test_ied_network_mode_stage'       % TIMING  the modular network's network-mode stage and its figure
         };
 end
 

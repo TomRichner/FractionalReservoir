@@ -499,7 +499,8 @@ for md = {'essential', 'fast'}
         % Block A's stages include the opt-in lyapunov_spectrum_n80 (FD-032)
         % and the four spectral stages (FD-046), which run first of the
         % opt-in stages.
-        assert(isequal(pl.stages, [stages_A, {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', ...
+        assert(isequal(pl.stages, [stages_A, {'lyapunov_spectrum_n80', 'concept_examples', 'uncoupled_reference', ...
+            'outlier_spectra', 'frequency_response', ...
             'eigenvalue_density', 'outlier_structures', 'mc_gain_sweep', 'noise_switch'}]), ...
             '%s: block A''s stages, then block C''s, then the noise switch', md{1});
         assert(pl.runs.noise_switch && ~ismember('noise_switch', [paper_stage_plan(A).stages, ...
@@ -511,9 +512,17 @@ for md = {'essential', 'fast'}
         assert(strcmp(ac.run_dir, ['data/mu7chain_AC_' md{1}]) && ...
             strcmp(ac.fig_root, ['figs/mu7chain_AC_' md{1} '_' fs{1}]));
         names = cellfun(@(f) f.name, ac.figures, 'UniformOutput', false);
+        % Plan 2: the paper's Figure 7 and S9 (blocks A and C together)
+        % between block C's entries and the noise switch's, from 'fast' up.
+        memory = {'fig_main7_grouped', 'fig_supp9_grouped'};
+        if strcmp(md{1}, 'essential'); memory = {}; end
         assert(isequal(names, [cellfun(@(f) f.name, A.figures, 'UniformOutput', false), entry_names, ...
-            {'fig_noise_switch_rollouts'}]) && numel(unique(names)) == numel(names), ...
-            'block A''s entries, then block C''s, then the noise switch''s');
+            memory, {'fig_noise_switch_rollouts'}]) && numel(unique(names)) == numel(names), ...
+            'block A''s entries, then block C''s, then Figure 7 and S9, then the noise switch''s');
+        for e = ac.figures(ismember(names, memory))
+            assert(isempty(arg_or_empty(e{1}.args, 'mc_run_dir')) && strcmp(arg(e{1}.args, 'run_mode'), md{1}) && ...
+                strcmp(arg(e{1}.args, 'figure_set'), fs{1}), '%s: %s reads both blocks from this run', md{1}, e{1}.name);
+        end
         ns = ac.figures{end};
         assert(isequal(ns.fn, @fig_noise_switch_rollouts) && isempty(ns.args) && ~ns.in_paper, ...
             'the noise-switch entry draws through fig_noise_switch_rollouts with the bundle''s arguments only');
@@ -523,7 +532,7 @@ for md = {'essential', 'fast'}
             isequal(ns_plan.conditions, want), ...
             'the noise switch runs the bundle''s noisy preset, the bundle''s conditions, into noise_switch/');
         assert(isequal(ac.run_conditions, A.run_conditions) && isequal(ac.figure_sets, A.figure_sets));
-        grouped = ac.figures(startsWith(names, 'fig_main') & ~strcmp(names, 'fig_main_mc_grouped'));   % Fig 7 is block C's, with no source root
+        grouped = ac.figures(cellfun(@(f) any(strcmp(f.args(1:2:end), 'source_fig_root')), ac.figures));   % the entries that read source figures
         assert(~isempty(grouped) && all(cellfun(@(f) strcmp(arg(f.args, 'source_fig_root'), ac.fig_root), grouped)), ...
             'the grouped figures read their sources from this bundle''s figure root');
         % mc_lean: the bundle sets it so block A's two memory-capacity
@@ -763,9 +772,9 @@ for k = 1:numel(all_stages); p.runs.(all_stages{k}) = ismember(all_stages{k}, st
 end
 
 function p = with_n80(p)
-% The plan with the opt-in lyapunov_spectrum_n80 (FD-032) and the three
-% spectral stages (FD-046) run after its stages: mu7chain_config's.
-added = {'lyapunov_spectrum_n80', 'outlier_spectra', 'frequency_response', 'eigenvalue_density', 'outlier_structures'};
+% The plan with the opt-in lyapunov_spectrum_n80 (FD-032), concept_examples and
+% uncoupled_reference (Plan 2) and the spectral stages (FD-046): mu7chain_config's.
+added = {'lyapunov_spectrum_n80', 'concept_examples', 'uncoupled_reference', 'outlier_spectra', 'frequency_response', 'eigenvalue_density', 'outlier_structures'};
 p.stages = [p.stages, added];
 for k = 1:numel(added); p.runs.(added{k}) = true; end
 end

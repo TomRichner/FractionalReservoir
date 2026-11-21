@@ -56,17 +56,25 @@ function cfg = ied_stim_config(run_mode, overrides)
 % and must never be force-added to git.
 %
 % FIGURE 8 IN THE NEW ORDER (Plan 2, package E; Tom, 2026-11-21): entry
-% Fig_Main8_Stim draws A to C the bursting network from the opt-in paper
-% stage burst_mode, D to F the clinical panels, G to I this bundle's
-% model. cfg.burst_mode_dir is the paper run directory holding
-% burst_mode/ (override 'burst_mode_dir'); by default the mu7chain_AC run
-% of the same mode (fastmedium for the 2026-11-17 data). Fig_Stim_Combined
-% (the present order) is kept as it was.
+% Fig_Main8_Stim draws A to C the bursting network from the stage
+% burst_mode, D to F the clinical panels, G to I this bundle's model.
+% STIMULATION IS SELF-CONTAINED IN THIS BUNDLE (Plan 2, integration,
+% 2026-11-21): ied_stim_run runs burst_mode into <run_dir>/burst_mode
+% (burst_mode_stage_plan, on cfg.burst_mode_stage: this mode's size, the
+% bursting preset, fs and the paper's integrator), and Fig_Main8_Stim, S10
+% and fig_burst_mode read it from there. cfg.burst_mode_dir is that run
+% directory, cfg.run_dir; the override 'burst_mode_dir' exists only to draw
+% from another run by hand (the legacy mode's run has no burst_mode/).
+% Until then it was the mu7chain_AC run of the same mode.
+% Fig_Stim_Combined (the old order) is kept, in the appendix.
 %
 % THE NETWORK-MODE STAGE (appendix, kept separate): run_ied_network_mode_stage(cfg)
 % writes <run_dir>/network_mode (ied_network_mode_stage_plan has the sizes
-% by mode); entry fig_ied_network_mode draws it. cfg.network_mode holds its
-% knobs (empty: the mode's sizes).
+% by mode); ied_stim_run runs it after the blocks; entry fig_ied_network_mode
+% draws it. cfg.network_mode holds its knobs (empty: the mode's sizes).
+%
+% GROUPS (paper_figure_groups): Fig_Main8_Stim 'main' (Figure 8),
+% fig_supp10_grouped 'supplement' (S10), every other entry 'appendix'.
 %
 % See also: ied_stim_run, ied_stim_blocks, ied_stim_figures,
 %           fig_ied_stim_blocks, ied_stim_fig_combined, fig_stim_combined,
@@ -122,44 +130,59 @@ cfg.clinical_files = struct('traces', 'Fig_Awake_Main_PanelD.fig', ...
 % no-harmonic-removal default).
 cfg.clinical_psd_fig = overrides.clinical_psd_fig;
 
-%% Figure 8 A to C and the network-mode stage
-% The paper run whose burst_mode stage Figure 8 A to C is drawn from: the
-% mu7chain_AC run of the same mode (the 2026-11-17 data go with fastmedium).
-paper_mode = run_mode;
-if strcmp(run_mode, 'stim_blocks_20261117'); paper_mode = 'fastmedium'; end
-cfg.burst_mode_dir = pick(overrides.burst_mode_dir, fullfile(root, 'data', ['mu7chain_AC_' paper_mode]));
+%% Figure 8 A to C: the burst_mode stage, in this bundle's run directory
+% ied_stim_run runs it (burst_mode_stage_plan(cfg.burst_mode_stage), then
+% run_burst_mode_stage into cfg.run_dir) after the blocks. Its config: this
+% mode's size (the legacy mode, which is redrawn and never simulated, is
+% given production's), the bursting figures' preset, this bundle's rate and
+% the paper's integrator (SRA1, as every paper simulation; Tom,
+% 2026-11-17). Knobs of the stage (cfg.burst_mode_stage.burst_mode_<name>)
+% may be added to that struct; none is set here.
+stage_mode = run_mode;
+if strcmp(run_mode, 'stim_blocks_20261117'); stage_mode = 'production'; end
+cfg.burst_mode_stage = struct('run_mode', stage_mode, 'bursting_preset', 'bursting_pairs', ...
+    'fs', cfg.sim.fs, 'ode_solver', 'sra1', 'verbose', 'minimal');
+cfg.burst_mode_dir = pick(overrides.burst_mode_dir, cfg.run_dir);
 cfg.network_mode = struct();    % knobs of ied_network_mode_stage_plan; empty: the mode's sizes
 
 %% The figure registry
 % add(F, name, handle, group, extra-args), built by paper_figure_entry;
 % ied_stim_figures calls fn('data_dir', cfg.run_dir, 'out_dir',
 % <fig_root>/<name>, 'visible', ..., args{:}) in this order. The combined
-% figure reads the first entry's .fig, so it comes last. GROUPS (Plan 2,
-% package A, 2026-11-21; paper_figure_groups): Fig 8 (Fig_Stim_Combined) is
-% 'main'; the other three are 'appendix' (the supplementary state-change
-% figure becomes a panel of S10, built by package E; until 2026-11-21 it was
-% in_paper true). in_paper follows the group.
+% figures read the first entry's .fig, so they come after it. Functions
+% with the paper's standard signature (run_dir, out_dir, save, visible)
+% are called through standard_entry, which maps data_dir to run_dir.
+% GROUPS (paper_figure_groups; the figure plan of 2026-11-21): Figure 8
+% (Fig_Main8_Stim) 'main', S10 (fig_supp10_grouped) 'supplement', the rest
+% 'appendix'. in_paper follows the group.
 F = {};
-% Model traces / normalised rate / PSD: the source of Fig 8's panels D-F.
+% Model traces / normalised rate / PSD: the source of Fig 8's panels G-I.
 F = add(F, 'fig_ied_stim_blocks',            @fig_ied_stim_blocks, 'appendix', {'which', 'main'});
 F = add(F, 'fig_ied_stim_blocks_rate',       @fig_ied_stim_blocks, 'appendix', {'which', 'rate'});
-% Supplement: change with stimulation of the mean rate, SFA feedback and
-% the increase in depression (1 - b_1), one point per network.
+% Change with stimulation of the mean rate, SFA feedback and the increase
+% in depression (1 - b_1), one point per network (S10 A draws the same).
 F = add(F, 'fig_ied_stim_blocks_supp_state', @fig_ied_stim_blocks, 'appendix',  {'which', 'supp_state'});
-% Fig 8: clinical A-C over model D-F, mirror layout.
-F = add(F, 'Fig_Stim_Combined',              @ied_stim_fig_combined, 'main', ...
+% The old Fig 8: clinical A-C over model D-F, mirror layout (appendix since
+% the figure plan of 2026-11-21).
+F = add(F, 'Fig_Stim_Combined',              @ied_stim_fig_combined, 'appendix', ...
         {'model_fig', fullfile(cfg.fig_root, 'fig_ied_stim_blocks', 'fig_ied_stim_blocks.fig'), ...
          'clinical_dir', cfg.clinical_dir, 'clinical_files', cfg.clinical_files, ...
          'clinical_psd_fig', cfg.clinical_psd_fig, 'run_name', cfg.run_name, 'sim', cfg.sim});
-% Fig 8 in the new order: the bursting network A-C (burst_mode stage of the
-% paper run in cfg.burst_mode_dir), clinical D-F, this model G-I.
-F = add(F, 'Fig_Main8_Stim',                 @ied_stim_fig_combined, true, ...
+% Figure 8: the bursting network A-C (burst_mode, in cfg.burst_mode_dir),
+% clinical D-F, this model G-I.
+F = add(F, 'Fig_Main8_Stim',                 @ied_stim_fig_combined, 'main', ...
         {'model_fig', fullfile(cfg.fig_root, 'fig_ied_stim_blocks', 'fig_ied_stim_blocks.fig'), ...
          'clinical_dir', cfg.clinical_dir, 'clinical_files', cfg.clinical_files, ...
          'clinical_psd_fig', cfg.clinical_psd_fig, 'run_name', cfg.run_name, 'sim', cfg.sim, ...
          'burst_mode_dir', cfg.burst_mode_dir, 'tag', 'Fig_Main8_Stim'});
-% Appendix: the full Jacobian's network mode (the network_mode stage).
-F = add(F, 'fig_ied_network_mode',           @fig_ied_network_mode, false, {});
+% S10: the modular model's state change (this run's summary.mat) and the
+% bursting network's onset, crossings and synchrony (burst_mode).
+F = add(F, 'fig_supp10_grouped', standard_entry(@fig_supp10_grouped), 'supplement', ...
+        {'ied_run_dir', cfg.run_dir, 'burst_dir', cfg.burst_mode_dir});
+% Appendix: Figure 8 A to C on their own, and the full Jacobian's network
+% mode of the modular network (the network_mode stage).
+F = add(F, 'fig_burst_mode', standard_entry(@fig_burst_mode), 'appendix', {'burst_dir', cfg.burst_mode_dir});
+F = add(F, 'fig_ied_network_mode',           @fig_ied_network_mode, 'appendix', {});
 cfg.figures = F;
 end
 
@@ -169,4 +192,24 @@ F{end+1} = paper_figure_entry(name, fn, group, args);
 end
 function v = pick(v, default)
 if isempty(v), v = default; end
+end
+
+function h = standard_entry(fn)
+% A figure with the paper's standard signature (run_dir, out_dir, save,
+% visible, ...) as an entry of this bundle, whose driver passes data_dir,
+% out_dir and visible (ied_stim_figures). The burst_mode stage's folder is
+% read from 'burst_dir' (the entry's own argument, cfg.burst_mode_dir) as
+% the function's run_dir.
+h = @(varargin) call_standard(fn, varargin{:});
+end
+
+function out = call_standard(fn, varargin)
+names = varargin(1:2:end);
+values = varargin(2:2:end);
+keep = ~ismember(names, {'data_dir', 'burst_dir'});
+run_dir = values{find(strcmp(names, 'data_dir'), 1)};
+k = find(strcmp(names, 'burst_dir'), 1);
+if ~isempty(k); run_dir = values{k}; end
+rest = [names(keep); values(keep)];
+out = fn('run_dir', run_dir, 'save', true, rest{:});
 end

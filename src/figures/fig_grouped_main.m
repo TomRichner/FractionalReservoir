@@ -23,6 +23,15 @@ function out = fig_grouped_main(group, cfg)
 % N gain panels in one row; group 6 one timescale panel and one
 % leading-vector panel per condition the tau sweep holds, side by side. With
 % three conditions every geometry is the one used before FD-006.
+%
+% WHO CALLS WHICH GROUP (Plan 2, integration, 2026-11-21; one path each):
+%   2, 3      fig_main2_grouped, fig_main3_grouped: the paper's Figures 2
+%             and 3 (registry entries of the same names)
+%   4         fig_main4_connectivity, for panels A and B of the paper's
+%             Figure 4 (entry fig_main4_grouped)
+%   1,5,6,7,8 fig_grouped_main_appendix: the old composites, appendix
+%             entries (grouped_figure_registry); the paper's Figures 1, 5,
+%             6, 7 and 8 are other functions now
 arguments
     group (1,1) double
     cfg.run_dir (1,:) char = ''
@@ -198,7 +207,6 @@ if ismember(group,[1 2 3 8])
     elseif group==3
         tt=findall(fig,'Type','axes','-regexp','Tag','^stability_r1_c\d+$');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
-        set(findall(fig,'Tag','accumulated_lambda_label'),'FontSize',12);
         set(findall(fig,'Tag','ritz_inset'),'FontSize',9); set(findall(fig,'-regexp','Tag','^ritz_(annotation|tick_label)$'),'FontSize',9);
         if cfg.real_histogram_row
             % Each histogram under the plot box of the heat map above it, as
@@ -275,12 +283,6 @@ end
     end
     function native(src,pos)
         drawnow; copy_axes(src,fig,pos);
-    end
-    function raster(rel,pos)
-        assert(~isempty(cfg.source_fig_root),'fig_grouped_main:NoArchive','Supply source_fig_root for archived illustrative panels.');
-        f=fullfile(cfg.source_fig_root,rel); assert(isfile(f),'fig_grouped_main:MissingArchive','Missing explicitly selected archive %s',f);
-        ax=axes(panel(pos),'Position',[0 0 1 1]); imshow(imread(f),'Parent',ax); sources{end+1}=f;
-        notes{end+1}=['Archived raster panel: ' rel];
     end
     function external(f,pos,msg)
         if ~isempty(f) && isfile(f)

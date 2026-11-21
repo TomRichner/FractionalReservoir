@@ -24,7 +24,11 @@ function cfg = with_ritz_overlay(cfg, K)
 %     prefix):
 %       fig_eig_heatmap_ritz         the density with the points
 %       fig_eig_heatmap_ritz_inset   the same with the inset near zero
-%       fig_main3_grouped_ritz       the composite Figure 3 with both
+%       fig_main3_grouped_baseline_ritz  the composite Figure 3 with both
+%                                    (named so since 2026-11-21: the
+%                                    bundles' default fig_main3_grouped_ritz
+%                                    is the switching composite with the
+%                                    overlay of with_switch_spectra)
 %     All are in the group 'appendix' (none in_paper). The composite is a version of the BASELINE
 %     composite, the one that reads the eig_heatmap stage: in the mu7chain
 %     bundles since FD-046 that is fig_main3_grouped_baseline (the paper's
@@ -51,7 +55,7 @@ if ~isempty(missing)
     error('with_ritz_overlay:MissingEntry', ...
         'The config''s registry lacks %s, which the overlay''s entries are versions of.', strjoin(missing, ', '));
 end
-if any(startsWith(names, 'fig_eig_heatmap_ritz')) || any(strcmp(names, 'fig_main3_grouped_ritz'))
+if any(startsWith(names, 'fig_eig_heatmap_ritz')) || any(strcmp(names, 'fig_main3_grouped_baseline_ritz'))
     error('with_ritz_overlay:AlreadyAdded', 'This config already carries the Ritz overlay''s entries.');
 end
 cfg.eig_heatmap_ritz_K = K;
@@ -65,7 +69,7 @@ added_heat = { ...
     paper_figure_entry('fig_eig_heatmap_ritz', heat.fn, 'appendix', [heat.args, overlay]), ...
     paper_figure_entry('fig_eig_heatmap_ritz_inset', heat.fn, 'appendix', ...
         [heat.args, overlay, {'ritz_inset', true}])};
-added_main3 = {paper_figure_entry('fig_main3_grouped_ritz', main3.fn, 'appendix', ...
+added_main3 = {paper_figure_entry('fig_main3_grouped_baseline_ritz', main3.fn, 'appendix', ...
     [main3.args, overlay, {'ritz_inset', true}])};
 
 F = {};
