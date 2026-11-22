@@ -37,6 +37,7 @@ function out = fig_freqresp_network(cfg)
 % over seeds and states, in Hz), for the conditions with slow variables;
 % bars at the bottom: the range of rotation rates of the frozen bulk, from
 % the lowest frequency drawn to R_frozen / (2 pi tau_d), per condition.
+% (bulk_bars = false leaves the bars out; the table keeps their numbers.)
 % The three columns each share one y range over the rows.
 %
 % NOTHING BUT THE DRAWING ON THE PANELS. Fig_Freqresp_Network_table.md
@@ -60,6 +61,8 @@ arguments
     cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
     cfg.networks                  = {}    % networks (rows) to draw, in order; empty = all the stage ran
     cfg.panels      (1,:) double {mustBeMember(cfg.panels, [1 2 3])} = [1 2 3]   % columns: 1 bulk radius, 2 rightmost real part, 3 loop gain
+    cfg.bulk_bars   (1,1) logical = true    % the bars at the foot of the loop-gain panel (false: Main Figure 6, where nothing on the panel explains them)
+    cfg.fig_size    double        = []      % [width height] of the figure in pixels; [] = 1250 x 350 per row for three panels, narrower in proportion for fewer
 end
 
 setup_paths();
@@ -73,7 +76,9 @@ gray = [0.6 0.6 0.6];
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 panels = unique(cfg.panels, 'stable'); n_p = numel(panels);
-fig = figure('Color', 'w', 'Position', [80 80 round(1250 * n_p / 3), 350 * n_net], 'Visible', vis);
+fig_size = cfg.fig_size;
+if isempty(fig_size); fig_size = [round(1250 * n_p / 3), 350 * n_net]; end
+fig = figure('Color', 'w', 'Position', [80 80 fig_size(1:2)], 'Visible', vis);
 % A column that is not asked for is drawn on a scrap figure and thrown
 % away: the table needs all three, and the drawing code stays one piece.
 scrap = figure('Visible', 'off'); scrap_closer = onCleanup(@() close(scrap));
@@ -148,7 +153,9 @@ for w = 1:n_net
     for c = 1:n_cond
         m = marks{w, c};
         y_bar = (0.025 + 0.022 * (c - 1)) * y_hi(3);
-        plot(ax(w, 3), [m.f1, m.f_bulk], [y_bar y_bar], '-', 'Color', m.col, 'LineWidth', 3);
+        if cfg.bulk_bars
+            plot(ax(w, 3), [m.f1, m.f_bulk], [y_bar y_bar], '-', 'Color', m.col, 'LineWidth', 3);
+        end
         if m.has_slow && isfinite(m.f_cont) && m.f_cont > 0
             plot(ax(w, 3), m.f_cont, 0.95 * y_hi(3), 'v', 'Color', m.col, 'MarkerFaceColor', m.col, 'MarkerSize', 8);
         end
