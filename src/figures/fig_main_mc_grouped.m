@@ -234,6 +234,7 @@ out = struct('figs', fig, 'files', {{}}, 'source', {[{A.source}, B.source]}, 'la
     struct('A', 'gain x self-coupling maps: memory capacity (top row)', ...
            'B', 'gain x self-coupling maps: lambda_1 (bottom row)', ...
            'C', 'memory capacity against input noise sigma_u'));
+out.noise_levels = u_levels(:)';                % sigma_u at the ticks of the noise panel, left to right
 if cfg.save
     outdir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
     if ~isfolder(outdir); mkdir(outdir); end
