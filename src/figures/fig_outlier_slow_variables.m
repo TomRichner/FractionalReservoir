@@ -18,7 +18,17 @@ function out = fig_outlier_slow_variables(cfg)
 %   dots            the network modes: eigenvalues whose eigenvector has at
 %                   least x_thr (0.1) of its squared norm in the dendritic
 %                   variables. The single-neuron slow modes, thousands on
-%                   the negative real axis, are left out.
+%                   the negative real axis, are not network modes.
+%   gray dots       those left-out eigenvalues (dendritic share below
+%                   x_thr), faint and under everything else, so that
+%                   the picture is the whole spectrum of the window.
+%                   Until 2026-11-22 they were not drawn, which left
+%                   white lens-shaped voids about the negative real
+%                   axis in the adapting conditions: eigenvalues there
+%                   are mostly slow single-neuron modes with a small
+%                   imaginary part, and a reader took the hole for a
+%                   feature of the spectrum. cfg.show_filtered = false
+%                   leaves them out again.
 %   open circles    the rightmost eigenvalue of the FROZEN-gain matrix at
 %                   each state, as a rate, with its conjugate when complex
 %   filled circles  its CONTINUATION: the eigenvalue of the full Jacobian
@@ -67,6 +77,9 @@ arguments
     cfg.dot_size (1,1) double     = 5
     cfg.dot_alpha (1,1) double    = 0.2
     cfg.mark_size (1,1) double    = 7
+    cfg.show_filtered (1,1) logical = true    % the eigenvalues below x_thr, faint gray, under the network modes
+    cfg.filtered_color (1,3) double = [0.62 0.62 0.62]
+    cfg.filtered_alpha (1,1) double = 0.18
 end
 
 setup_paths();
@@ -105,6 +118,7 @@ fig_h = top_m + n_net * ph + (n_net - 1) * row_gap + bottom;
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w fig_h], 'Visible', vis);
 n_marks_out = zeros(n_net, n_cond);
+n_filtered = zeros(n_net, n_cond);
 for w = 1:n_net
     for c = 1:n_cond
         ax = axes(fig, 'Units', 'inches', 'Position', ...
@@ -116,6 +130,13 @@ for w = 1:n_net
         d = P{w, c};
         if ~isempty(d)
             col = F.colors{c};
+            if cfg.show_filtered
+                zf = filtered_modes(F.folder, d);
+                zf = zf(real(zf) >= re_lim(1) & real(zf) <= re_lim(2) & abs(imag(zf)) <= im_lim(2));
+                n_filtered(w, c) = numel(zf);
+                scatter(ax, cp.x(real(zf)), imag(zf), cfg.dot_size, cfg.filtered_color, 'filled', ...
+                    'MarkerFaceAlpha', cfg.filtered_alpha, 'MarkerEdgeColor', 'none', 'Tag', 'slow_variables_filtered');
+            end
             z = d.net(~isnan(d.net));
             z = z(real(z) >= re_lim(1) & real(z) <= re_lim(2) & abs(imag(z)) <= im_lim(2));
             scatter(ax, cp.x(real(z)), imag(z), cfg.dot_size, col, 'filled', 'MarkerFaceAlpha', cfg.dot_alpha, 'MarkerEdgeColor', 'none');
@@ -185,6 +206,17 @@ if cfg.save
             'oscillation in the band between the adaptation filter and the dendritic low-pass; the table says ' ...
             'where each panel''s continuation lies.\n\n'], ...
             strjoin(F.networks, ', '), first.n_cal, F.seeds(F.i_seed, :), first.n, cfg.x_thr);
+        if cfg.show_filtered
+            fprintf(fid, ['GRAY DOTS, faint and under the others: the eigenvalues that filter leaves out (dendritic share ' ...
+                'below %g), mostly the slow modes of single neurons, on and close to the negative real axis. They are ' ...
+                'drawn so that the window shows the whole spectrum: without them the adapting conditions have white ' ...
+                'lens-shaped holes about the real axis, which are the filter and no property of the network modes. ' ...
+                'Drawn in the window, per panel in reading order: %s.\n\n'], cfg.x_thr, ...
+                strjoin(arrayfun(@(v) sprintf('%d', v), reshape(n_filtered.', 1, []), 'UniformOutput', false), ', '));
+        else
+            fprintf(fid, ['The eigenvalues that filter leaves out are not drawn (show_filtered false): white holes ' ...
+                'about the negative real axis in the adapting conditions are the filter, not the spectrum.\n\n']);
+        end
         fprintf(fid, ['AXES: through the origin (`complex_plane_axes`), one unit of Re as long as one unit of Im, ' ...
             'identical in every panel, no break: real axis [%.3g, %.3g] 1/s, imaginary axis [%.3g, %.3g] 1/s. The ' ...
             'imaginary axis is the stability boundary. The view is a cut: the spectrum continues to the left, above ' ...
@@ -233,6 +265,22 @@ end
 end
 
 %% ------------------------------------------------------------------------
+function z = filtered_modes(folder, d)
+% The eigenvalues of the dense full-Jacobian spectra of d's run that the
+% dendritic-share filter leaves out (xfrac below d.x_thr), every
+% calibration state, as a row. outlier_fig_data keeps the network modes
+% only, so the run's file is read once more here.
+runs = ospec_read_index(folder);
+k = find(strcmp(runs.network, d.network) & strcmp(runs.condition, d.condition) & ...
+    runs.seed1 == d.seed(1) & runs.seed2 == d.seed(2) & runs.ok, 1);
+z = zeros(1, 0);
+if isempty(k); return; end
+R = ospec_load_run(folder, runs(k, :));
+if ~R.has_dense || isempty(R.dense); return; end
+lam = double([R.dense.lam]); xf = double([R.dense.xfrac]);
+z = reshape(lam(xf < d.x_thr & isfinite(lam)), 1, []);
+end
+
 function z = with_conjugates(z)
 % The conjugate of each complex eigenvalue appended; a real one (|Im| below
 % 1e-9 of the larger of its modulus and 1) is kept once, on the real axis.

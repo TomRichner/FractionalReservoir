@@ -73,13 +73,22 @@ function plan = concept_examples_stage_plan(cfg)
 % the floor or the ceiling.
 %
 % THE DEFAULT GALLERY (S3; all at level 1, seed [7 8] unless stated):
-% balanced (reference); E-to-E up (EEx1p5); E-to-E down (EEx0p9, a complex
-% pair to the left of the boundary at -21 +- 81i 1/s); I-to-I up (IIx1p25,
-% a real eigenvalue at +93 1/s); E-I loop (EEx1p6-EIx1p33-IEx1p33);
-% local outlier (reference on weight seed [27 28], a real eigenvalue at
-% +54 1/s); added real low-rank mode (lrA1p5W0p0); added rotating
-% low-rank mode (lrA1p4W1p0). Most are networks of the outlier_structures
-% stage (outlier_structures_stage_plan), the list S7 draws from.
+% balanced (reference); E-to-E up (EEx1p5); I-to-E down (EIx0p9); I-to-I
+% up (IIx1p25, a real eigenvalue at +93 1/s); E-I loop
+% (EEx1p6-EIx1p33-IEx1p33); local outlier (reference on weight seed
+% [27 28], a real eigenvalue at +54 1/s); added real low-rank mode
+% (lrA1p5W0p0); added rotating low-rank mode (lrA1p4W1p0).
+% EVERY ONE IS A NETWORK OF THE outlier_structures STAGE
+% (outlier_structures_stage_plan's default list, same name and weight
+% seed), eight that span its three groups: the block means (three single
+% routes and the E-I loop), the local outliers (one, and the reference
+% network they are compared with) and the added low-rank modes (one real,
+% one rotating). So what S3 shows is what S7 panel B tests
+% (fig_supp7_grouped draws the gallery's networks there). Until 2026-11-22
+% the third structure was 'E-to-E down' (EEx0p9, a complex pair to the left
+% of the boundary at -21 +- 81i 1/s), which that stage does not run: S3
+% showed a structure S7 said nothing about. A gallery given through
+% cfg.concept_examples_gallery may still name any network.
 %
 % THE CONFIG
 %   cfg.preset_name   the bundle's two-type SRNNCellTypePairs preset; it
@@ -242,7 +251,7 @@ function spec = default_gallery()
 spec = { ...
     'balanced',      'reference',              1, []; ...
     'EE_up',         'EEx1p5',                 1, []; ...
-    'EE_down',       'EEx0p9',                 1, []; ...
+    'IE_down',       'EIx0p9',                 1, []; ...
     'II_up',         'IIx1p25',                1, []; ...
     'EI_loop',       'EEx1p6-EIx1p33-IEx1p33', 1, []; ...
     'local_outlier', 'reference',              1, [27 28]; ...
