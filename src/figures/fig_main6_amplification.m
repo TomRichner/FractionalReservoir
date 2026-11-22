@@ -89,14 +89,18 @@ if isempty(tr_dir); tr_dir = cfg.run_dir; end
 % 2026-11-22: the row left a third of the width empty). The bars at the foot
 % of (D) are left out: nothing on the panel says what they are; they stay in
 % the stand-alone figure and in the sidecar.
-ROW_W = 13.3; ppi = get(groot, 'ScreenPixelsPerInch');
-[f_ab, t_ab, src_ab] = draw_margin_and_gain(cfg, tr_dir);
+% The common canvas (Plan 2, canvas standard): every row is canvas_w less
+% composite_figure's side margins; the type is set by role at the end
+% (canvas_type).
+st = manuscript_style(); MARGIN = [0.15 0.15 0.1 0.15];
+ROW_W = st.canvas_w - MARGIN(1) - MARGIN(2); ppi = get(groot, 'ScreenPixelsPerInch');
+[f_ab, t_ab, src_ab] = draw_margin_and_gain(cfg, tr_dir, ROW_W);
 [f_net, t_net, o_net] = composite_part(@fig_freqresp_network, cfg, 'networks', {cfg.network}, 'panels', [1 3], ...
     'bulk_bars', false, 'fig_size', round([ROW_W * ppi, 340]));
 [f_plane, t_plane] = composite_part(@fig_freqresp_plane, cfg, 'networks', {cfg.network}, 'seed', cfg.seed);
 
-[fig, B] = composite_figure({struct('fig', f_ab, 'width', []), struct('fig', f_net, 'width', ROW_W), ...
-    struct('fig', f_plane, 'width', [])}, 'visible', cfg.visible);
+[fig, B] = composite_figure({struct('fig', f_ab, 'width', ROW_W), struct('fig', f_net, 'width', ROW_W), ...
+    struct('fig', f_plane, 'width', ROW_W)}, 'visible', cfg.visible, 'margin', MARGIN, 'width', st.canvas_w);
 ab = B{1}(1).ax;                                     % margin, then the gain panels, left to right
 composite_letter(fig, B{1}(1), 'A', ab(1));
 composite_letter(fig, B{1}(1), 'B', ab(2));
@@ -104,6 +108,7 @@ net = B{2}(1).ax;
 composite_letter(fig, B{2}(1), 'C', net(1));
 composite_letter(fig, B{2}(1), 'D', net(2));
 composite_letter(fig, B{3}(1), 'E');
+canvas_type(fig);
 
 caption = sprintf(['Main Figure 6. (A) Non-normal margin of the dendritic block of the Jacobian, numerical minus ' ...
     'spectral abscissa, per sampled state and condition: line 5 to 95 %%, box the interquartile range, bar the median. ' ...
@@ -124,7 +129,7 @@ out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Main Figure 6: selective a
 end
 
 %% ------------------------------------------------------------------------
-function [fig, txt, sources] = draw_margin_and_gain(cfg, run_dir)
+function [fig, txt, sources] = draw_margin_and_gain(cfg, run_dir, fig_w)
 % Panels (A) and (B) on a figure of their own, laid out in inches: one
 % margin panel and one gain panel per condition, the directions' legend
 % under the gain panels. Returns the numbers as markdown.
@@ -145,7 +150,7 @@ results = G.results(g_idx);
 n_m = numel(m_names); n_g = numel(g_names);
 
 % Geometry (inches).
-fig_w = 13.3; fig_h = 4.35; bottom = 1.45; ph = 2.25;
+fig_h = 4.35; bottom = 1.45; ph = 2.25;
 m_left = 1.0; m_w = 0.55 + 0.5 * n_m;
 g_left = m_left + m_w + 1.25; g_gap = 0.4;
 g_w = (fig_w - 0.2 - g_left - (n_g - 1) * g_gap) / n_g;
