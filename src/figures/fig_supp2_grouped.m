@@ -46,6 +46,7 @@ arguments
 end
 setup_paths();
 T = composite_tools();
+st = manuscript_style();
 variants = {'solver', 'lya_method', 'jacobian'};
 source_row = {'last', 'first', 'first'};       % which row of each variant is drawn
 
@@ -61,7 +62,7 @@ end
 %% The canvas
 W = 1100; H = 915;
 fig = T.canvas(W, H, cfg.visible);
-X0 = 100; CW = 180; GAP = 62; RH = 190;
+X0 = 100; CW = 195; GAP = 62; RH = 190;     % CW: the keys at the right end near the canvas edge
 ROW_Y = [650 365 80];
 ax = cell(1, 3); lg = cell(1, 3); notes = cell(1, 3);
 nc = 0;
@@ -102,7 +103,7 @@ end
 if all(~cellfun(@isempty, names))
     T.retitle(ax{1}, names, true);
 else
-    for c = 1:nc; title(ax{1}(c), cond_titles{c}, 'FontWeight', 'normal', 'FontSize', 14); end
+    for c = 1:nc; title(ax{1}(c), cond_titles{c}, 'FontWeight', 'normal', 'FontSize', st.title_fs); end
 end
 % (A): the fitted slopes differ by condition; the legend names the lines.
 if ~isempty(lg{1})
@@ -135,6 +136,10 @@ for v = 1:3
     end
 end
 
+%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.style(fig);                % again: the labels and titles set since take their roles' sizes
+T.fit(fig);
+
 %% Panel letters
 letters = 'ABC';
 dy = [42 22 22];
@@ -164,8 +169,8 @@ caption = sprintf(['Supplementary Figure S2, numerical checks (drawn by fig_supp
     'network: the local rates of the QR method (thin, gray, the first exponent dark to the last light) and of Benettin''s method (thick), and both accumulated ' ...
     'values (horizontal lines). (C) The analytic Jacobian against central finite differences at sampled states: ' ...
     'relative Frobenius error and mismatch of the leading eigenvalues, with the acceptance threshold (dotted). ' ...
-    'The numbers the source figures print in their titles and legends are in this table. Canvas %d x %d px, ' ...
-    'text 14 pt.'], cfg.run_dir, W, H);
+    'The numbers the source figures print in their titles and legends are in this table. Canvas %d x %d px (canvas_w of manuscript_style), ' ...
+    'type in points by role.'], cfg.run_dir, getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Supplementary Figure S2: numerical checks', caption, parts, sources);

@@ -86,7 +86,7 @@ for r = 1:3
     ax{r} = Cp.axes(order);
     if r == 1
         nc = numel(ax{r});
-        CW = (W - X0 - 40 - (nc - 1) * GAP) / nc;
+        CW = (W - X0 - 15 - (nc - 1) * GAP) / nc;
         names = condition_names(ax{r}, cfg.conditions);
     end
     assert(numel(ax{r}) == nc, 'fig_supp5_grouped:Columns', ...
@@ -136,7 +136,7 @@ hold(ax{3}(1), 'on');
 key = [patch(ax{3}(1), NaN, NaN, [0.82 0.82 0.82], 'EdgeColor', 'none'), ...
        patch(ax{3}(1), NaN, NaN, [0.40 0.40 0.40], 'EdgeColor', 'none')];
 hold(ax{3}(1), 'off');
-legends = legend(ax{3}(1), key, {'Local', 'Accumulated'}, 'Box', 'off', 'FontSize', 14, ...   % the caption says what is pooled
+legends = legend(ax{3}(1), key, {'Local', 'Accumulated'}, 'Box', 'off', 'FontSize', st.tick_fs, ...   % the caption says what is pooled
     'Orientation', 'horizontal', 'NumColumns', 2, 'Units', 'pixels', 'Location', 'none', 'AutoUpdate', 'off');
 legends.ItemTokenSize = [22 18];
 for pass = 1:2
@@ -145,6 +145,10 @@ for pass = 1:2
     q = ax{3}(1).Position;
     legends.Position = [q(1), q(2) + q(4) + 4, p(3), p(4)];
 end
+
+%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.style(fig);                % again: the labels and titles set since take their roles' sizes
+T.fit(fig);
 
 %% Panel letters
 T.letter(ax{1}(1), 'A', -85, 42);
@@ -180,8 +184,8 @@ caption = sprintf(['Supplementary Figure S5, the joint sample (drawn by fig_supp
     'preset''s value): density of the local rate of the leading direction pooled over time and networks (light) ' ...
     'and of the finite-time lambda_1 per network (dark), with its median as a line; dotted: zero; the key above ' ...
     'the first panel is in gray and holds for the three columns. The histograms of (A) and (B) are gray in ' ...
-    'fig_param_space_allStd and take the condition colours here. Canvas %d x %d px, text 14 pt.'], ...
-    cfg.run_dir, strjoin(names, ', '), W, H);
+    'fig_param_space_allStd and take the condition colours here. Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
+    cfg.run_dir, strjoin(names, ', '), getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Supplementary Figure S5: the joint sample', caption, parts, sources);
