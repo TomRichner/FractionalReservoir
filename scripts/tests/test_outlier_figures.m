@@ -107,6 +107,25 @@ insets = findall(o.figs, 'Tag', 'fig_outlier_plane_inset');
 assert(numel(insets) == 6, 'one inset per panel');
 dots = findall(insets(1), 'Type', 'scatter');
 assert(numel(dots.XData) == 60 * 3, 'one dot per neuron per state in the inset');
+% Polish of 2026-11-22: no eigenvalue dot lies on a tick label (a tick whose
+% label would be covered in any panel is left out of every panel).
+assert(isempty(intersect(o.window.re_ticks, o.window.hidden_re_ticks)) && ...
+    isempty(intersect(o.window.im_ticks, o.window.hidden_im_ticks)), 'a hidden tick is not among the ticks drawn');
+txt = fileread(fullfile(fig_dir, 'plane', 'Fig_Outlier_Plane_table.md'));
+assert(contains(txt, 'TICKS LEFT OUT') ~= (isempty(o.window.hidden_re_ticks) && isempty(o.window.hidden_im_ticks)), ...
+    'the sidecar says which ticks were left out, or that none was');
+n_covered = 0;
+panels = setdiff(findall(o.figs, 'Type', 'axes'), insets);
+for a = panels'
+    sc = findall(a, 'Type', 'scatter');
+    x = [sc.XData]; y = [sc.YData];
+    for t = findall(a, 'Type', 'text', 'Tag', 'complex_plane_axes')'
+        if iscell(t.String) || isempty(regexp(t.String, ['^[\d.' char(8722) ']+$'], 'once')); continue; end   % tick labels only
+        e = t.Extent; pad = 0.15 * e(4);                   % the glyphs are a little inside the text box
+        n_covered = n_covered + nnz(x > e(1) & x < e(1) + e(3) & y > e(2) + pad & y < e(2) + e(4) - pad);
+    end
+end
+assert(n_covered == 0, '%d eigenvalue dot(s) lie on a tick label', n_covered);
 close(o.figs);
 
 o2 = draw(@fig_outlier_plane, [common, {'seed', [1 2], 'outlier_factor', 1.3, 'inset', false, 'networks', {'EEx1p5'}, ...

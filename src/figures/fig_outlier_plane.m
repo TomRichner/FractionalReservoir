@@ -54,8 +54,9 @@ function out = fig_outlier_plane(cfg)
 % argument of the nonlinearity relative to the neuron's own setpoint.
 % Vertical: the rate plus a one-sided random offset, excitatory neurons
 % from the curve UP and inhibitory ones from the curve DOWN (inset_jitter),
-% in the established E and I colors (excitatory_colormap(1),
-% inhibitory_colormap(1)). Neurons beyond |u| = inset_u_lim are drawn in a
+% in the manuscript's one E and one I color (manuscript_style E_color,
+% I_color; until 2026-11-22 the dark rose and teal of
+% excitatory_colormap(1) / inhibitory_colormap(1)). Neurons beyond |u| = inset_u_lim are drawn in a
 % short strip past a gap in the floor or ceiling line: "further out", not
 % how far. The only text on it: the letters E and I (inset_marks), each in
 % its cell-type color on its side of the curve.
@@ -144,10 +145,15 @@ g = complex_plane_axes([], axes_args{:});
 fig_w = 13; left = 0.6; right = 0.12; col_gap = 0.3; top_m = 0.5; row_gap = 0.35; bottom = 0.15;
 pw = (fig_w - left - right - (n_cond - 1) * col_gap) / n_cond;
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
+% A tick whose label a dot or a diamond of ANY panel would lie on is left out
+% of every panel (the panels share their ticks); the sidecar names it.
+[hidden_re, hidden_im] = covered_ticks(g, P, cfg, st.tick_fs, diff(g.x_lim) / pw);
+g.re_ticks = setdiff(g.re_ticks, hidden_re); g.im_ticks = setdiff(g.im_ticks, hidden_im);
+g.hidden_re_ticks = hidden_re; g.hidden_im_ticks = hidden_im;
 fig_h = top_m + n_net * ph + (n_net - 1) * row_gap + bottom;
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w fig_h], 'Visible', vis);
-ei_col = [excitatory_colormap(1); inhibitory_colormap(1)];
+ei_col = [st.E_color; st.I_color];                % the manuscript's one E and one I color
 rs = RandStream('mt19937ar', 'Seed', cfg.inset_seed);   % private: the jitter does not touch the global stream
 th = linspace(0, 2 * pi, 361);
 n_not_drawn = zeros(n_net, n_cond); n_marked_drawn = zeros(n_net, n_cond);
@@ -159,6 +165,7 @@ for w = 1:n_net
         if w == n_net; names{2} = 'Re (s^{-1})'; end
         if c == 1;     names{4} = 'Im (s^{-1})'; end
         cp = complex_plane_axes(ax, axes_args{:}, names{:});
+        remove_ticks(cp, hidden_re, hidden_im);
         p = P{w, c};
         if ~isempty(p)
             col = F.colors{c};
@@ -401,14 +408,14 @@ fprintf(fid, ['Rows: the networks (%s). Columns: the conditions. Each panel over
     first.window_s, c0, f);
 fprintf(fid, ['AXES: through the origin (`complex_plane_axes`), one unit of Re as long as one unit of Im, identical in ' ...
     'every panel: real axis [%.3g, %.3g] 1/s, imaginary axis [%.3g, %.3g] 1/s; ticks only outside the largest dashed ' ...
-    'circle (radius %.3g 1/s). %s %s\n\n'], g.re_lim, g.y_lim, rad_max, break_txt, left_txt);
+    'circle (radius %.3g 1/s). %s %s %s\n\n'], g.re_lim, g.y_lim, rad_max, break_txt, left_txt, hidden_ticks_text(g));
 if cfg.inset
     a = first.S_a / 2;
     fprintf(fid, ['INSET (lower right of each panel; the letters E and I mark the two cell types). The black curve is the firing-rate nonlinearity, ' ...
         'the piecewise sigmoid (S_a = %g): rate 0 (floor) below u = %g, quadratic up to %g, slope 1 up to %g, quadratic ' ...
         'up to %g, rate 1 (ceiling) above. Each dot is one neuron at one of the drawn states, at its operating point; ' ...
-        'excitatory neurons in magenta ABOVE the curve, inhibitory ones in teal BELOW it (the cell-type colors of ' ...
-        '`excitatory_colormap(1)` and `inhibitory_colormap(1)`, unrelated to the condition colors). Horizontal: ' ...
+        'excitatory neurons in orange-red ABOVE the curve, inhibitory ones in blue BELOW it (the one E and one I color ' ...
+        'of `manuscript_style`, E_color and I_color; they are not the condition colors). Horizontal: ' ...
         'u = x - (c/K) sum_k a_k - S_c, the argument of the nonlinearity relative to the neuron''s own setpoint, so ' ...
         'that every neuron lies on the one curve; shown from %g to %g. Vertical: the rate, plus a uniform random ' ...
         'offset of 0 to %g away from the curve (up for E, down for I; fixed seed %d): the dots are ON the curve, and ' ...
@@ -490,4 +497,71 @@ function s = nice_step(x)
 e = 10^floor(log10(x));
 m = [1 2 5 10];
 s = e * m(find(m * e <= x, 1, 'last'));
+end
+
+function [hidden_re, hidden_im] = covered_ticks(g, P, cfg, fs, units_per_inch)
+% The ticks whose LABEL a drawn dot or a diamond of any panel would lie on
+% (polish list of 2026-11-22: marked eigenvalues at the left end of the
+% real axis sat on the "-30"). The label boxes are those of
+% complex_plane_axes: under the real axis, centered on the tick; left of
+% the imaginary axis, centered on the tick's height. Sizes from the font
+% (a digit is about 0.56 em wide), a little generous, plus the marker's
+% radius.
+pt = units_per_inch / 72;                            % one point, in axis units
+tl = 0.018 * diff(g.y_lim);                          % complex_plane_axes' tick length
+x = []; y = []; r = [];
+for k = 1:numel(P)
+    p = P{k};
+    if isempty(p); continue; end
+    z = p.d.z(:); is_out = p.is_out(:);
+    keep = real(z) >= g.re_lim(1) & real(z) <= last_re(g) & abs(imag(z)) <= g.y_lim(2);
+    z = z(keep); is_out = is_out(keep);
+    x = [x; g.x(real(z)); g.x(p.diamond)]; %#ok<AGROW>
+    y = [y; imag(z); 0]; %#ok<AGROW>
+    r = [r; (sqrt(cfg.dot_size) / 2) * pt * ~is_out + (sqrt(cfg.outlier_size) / 2) * pt * is_out; 4.5 * pt]; %#ok<AGROW>
+end
+label_w = @(t) 0.56 * fs * pt * (numel(sprintf('%g', abs(t))) + (t < 0));
+label_h = 0.85 * fs * pt;
+top = -1.5 * tl - 0.1 * fs * pt;                     % the glyphs begin a little under the top of the text box
+hidden_re = [];
+for t = g.re_ticks
+    xc = g.x(t); w = label_w(t);
+    if any(abs(x - xc) <= w / 2 + r & y <= top + r & y >= top - label_h - r)
+        hidden_re(end + 1) = t; %#ok<AGROW>
+    end
+end
+hidden_im = [];
+for t = g.im_ticks
+    w = label_w(t);
+    if any(x <= -1.6 * tl + r & x >= -1.6 * tl - w - r & abs(y - t) <= label_h / 2 + r)
+        hidden_im(end + 1) = t; %#ok<AGROW>
+    end
+end
+end
+
+function remove_ticks(cp, hidden_re, hidden_im)
+% Delete the tick marks and labels complex_plane_axes drew at the hidden
+% ticks: each label is a text at the tick's place, its mark the handle
+% drawn just before it.
+h = cp.handles;
+for k = 2:numel(h)
+    if ~isgraphics(h(k), 'text') || iscell(h(k).String) || ~isgraphics(h(k - 1), 'line'); continue; end
+    pos = h(k).Position;
+    is_re = strcmp(h(k).HorizontalAlignment, 'center') && any(abs(cp.x(hidden_re) - pos(1)) < 1e-9);
+    is_im = strcmp(h(k).HorizontalAlignment, 'right') && any(abs(hidden_im - pos(2)) < 1e-9);
+    if is_re || is_im; delete(h([k - 1, k])); end
+end
+end
+
+function s = hidden_ticks_text(g)
+% The sidecar's sentence on the ticks left out.
+if isempty(g.hidden_re_ticks) && isempty(g.hidden_im_ticks)
+    s = 'No tick was left out.';
+    return;
+end
+parts = {};
+if ~isempty(g.hidden_re_ticks); parts{end + 1} = ['on the real axis at ' strjoin(compose('%g', g.hidden_re_ticks), ', ') ' 1/s']; end
+if ~isempty(g.hidden_im_ticks); parts{end + 1} = ['on the imaginary axis at ' strjoin(compose('%g', g.hidden_im_ticks), ', ') ' 1/s']; end
+s = ['TICKS LEFT OUT, in every panel, because an eigenvalue dot or a diamond of some panel lies where the tick''s ' ...
+    'label would be: ' strjoin(parts, ' and ') '. The window is unchanged.'];
 end
