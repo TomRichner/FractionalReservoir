@@ -108,6 +108,12 @@ n_fail = n_fail + check(strcmp(h.String, '(A)') && h.FontSize == 14 && strcmp(h.
 tl = T.condition_title('sfa3_stdc2', true);
 n_fail = n_fail + check(strcmp(T.condition_title('no_adaptation'), 'No adaptation') && ...
     isequal(tl, {'Multiple-timescale', 'adaptation'}), 'tools: condition titles in sentence case, two lines when asked');
+n_fail = n_fail + check(isequal(T.sentence({'noise-free', 'n_a = 3', '\lambda_1', 'Kept', 'top-20 mismatch'}), ...
+    {'Noise-free', 'n_a = 3', '\lambda_1', 'Kept', 'Top-20 mismatch'}) && strcmp(T.sentence('slope 2'), 'Slope 2'), ...
+    'tools: sentence capitalizes a first word and leaves a symbol');
+m = T.margin(dst, 4);
+n_fail = n_fail + check(isscalar(findall(dst, 'Tag', 'composite_crop_margin')) && ~isequal(m.Color, [1 1 1]) && min(m.Color) > 0.98, ...
+    'tools: margin puts one almost-white line on the canvas (the crop counts it, the eye does not)');
 close([src dst]);
 
 %% The fixture run
@@ -144,7 +150,7 @@ jobs = { ...   function, its own arguments, the panel letters, the file tag
     @fig_supp2_grouped, {'conditions', three},                                                 'ABC',    'Fig_Supp2_Grouped'; ...
     @fig_supp4_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp4_Grouped'; ...
     @fig_supp5_grouped, {'preset_name', reg_preset, 'conditions', three},                      'ABC',    'Fig_Supp5_Grouped'; ...
-    @fig_supp9_grouped, {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'},  'ABCD',   'Fig_Supp9_Grouped'};
+    @fig_supp9_grouped, {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'},  'ABCDE',  'Fig_Supp9_Grouped'};
 ppi = get(groot, 'ScreenPixelsPerInch');
 for j = 1:size(jobs, 1)
     fn = jobs{j, 1}; args = [base, jobs{j, 2}]; letters = jobs{j, 3}; tag = jobs{j, 4};
@@ -162,6 +168,7 @@ for j = 1:size(jobs, 1)
     n_fail = n_fail + check(ok, sprintf('%s builds: one figure, letters %s, a source named for each, no file', name, letters));
     if strcmp(name, 'fig_supp4_grouped'); n_fail = n_fail + gain_panel_check(o.figs, run_dir, three); end
     if strcmp(name, 'fig_main7_memory'); n_fail = n_fail + main7_polish_check(o.figs, three); end
+    n_fail = n_fail + polish_checks(name, o.figs, pulse);
     canvas = o.figs.Position(3:4);
     close(o.figs);
     n_fail = n_fail + check(isempty(setdiff(findall(groot, 'Type', 'figure'), open_before)), ...
@@ -203,6 +210,86 @@ close(setdiff(findall(groot, 'Type', 'figure'), figs_before));
 finish(n_fail);
 
 %% ------------------------------------------------------------------------
+function n = polish_checks(name, fig, pulse)
+% What the polish of 2026-11-22 (Plan 2, group 3) put into the composites.
+n = 0;
+st = manuscript_style();
+cond = cell2mat(cellfun(@(k) st.condition_color(k), {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}', 'UniformOutput', false));
+ax = findall(fig, 'Type', 'axes');
+switch name
+    case 'fig_supp1_grouped'
+        % (A): a single mechanism is in a colour of its own, full strength,
+        % and its column is titled by the mechanism.
+        for want = {'sfa1_std0', 'SFA alone'; 'sfa0_std1', 'Depression alone'}'
+            if ~ismember(want{1}, pulse); continue; end
+            a = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.Title.String), ' '), want{2}), ax));
+            ok = isscalar(a);
+            if ok
+                col = a.Title.Color;
+                g = composite_grid_column(ax, a);
+                traces = findall(g, 'Type', 'line');
+                cols = unique(vertcat(traces.Color), 'rows');
+                ok = ~ismember(col, cond, 'rows') && max(col) - min(col) > 0.4 && ...       % not a condition's, not pale
+                    all(ismember(cols, [col; 0 0 0], 'rows'));
+            end
+            n = n + check(ok, sprintf('S1 (A): the %s column is titled ''%s'' and drawn in one colour that is no condition''s', want{1}, want{2}));
+        end
+    case 'fig_supp2_grouped'
+        % (B): the QR lines are neutral (gray), never a condition's hue.
+        thin = findall(fig, 'Type', 'line', 'LineWidth', 0.8);
+        c = vertcat(thin.Color);
+        n = n + check(~isempty(c) && all(max(c, [], 2) - min(c, [], 2) < 1e-12), 'S2 (B): the QR local rates are drawn in grays');
+    case 'fig_supp4_grouped'
+        n = n + check(isscalar(findall(fig, 'Tag', 'composite_crop_margin')), 'S4: a margin is kept under the bottom row''s x labels');
+    case 'fig_supp5_grouped'
+        vals = ax(arrayfun(@(h) isstruct(h.UserData) && isfield(h.UserData, 'values'), ax));
+        ok = numel(vals) == 3;
+        for k = 1:numel(vals)
+            h = findall(vals(k), 'Type', 'histogram');
+            v = vals(k).UserData.values;
+            ok = ok && isscalar(h) && abs(sum(h.Values) - 1) < 1e-9 && ...                  % nothing gathered, nothing dropped
+                max(abs(v)) <= 10^max(abs(vals(k).XLim)) * 0.1 && ~isempty(vals(k).XTickLabel);
+        end
+        n = n + check(ok, 'S5 (A): three symmetric-log histograms that hold every value of the sample');
+        lg = findall(fig, 'Type', 'legend');
+        ok = isscalar(lg);
+        if ok
+            lg.Units = 'pixels'; own = lg.Axes; own.Units = 'pixels';
+            ok = lg.Position(2) >= own.Position(2) + own.Position(4) - 1 && isequal(lg.String, {'Local', 'Accumulated'});
+        end
+        n = n + check(ok, 'S5 (C): one key, above its panel, clear of the data');
+    case 'fig_supp9_grouped'
+        boxed = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Lyapunov') && strcmp(h.Box, 'on'), ax));
+        n = n + check(isempty(boxed), 'S9 (E): the scatter panels are open, not boxed');
+        key = findall(fig, 'Tag', 'mc_sweep_scatter_size_legend');
+        ok = isscalar(key);
+        if ok
+            drawnow;
+            tx = findall(key, 'Type', 'text');
+            tx = tx(arrayfun(@(t) strcmp(t.VerticalAlignment, 'top'), tx));
+            set(tx, 'Units', 'pixels');
+            e = sortrows(cell2mat(arrayfun(@(t) t.Extent, tx, 'UniformOutput', false)), 1);
+            ok = size(e, 1) >= 2 && all(e(2:end, 1) - (e(1:end - 1, 1) + e(1:end - 1, 3)) > 2);
+        end
+        n = n + check(ok, 'S9 (E): the labels of the marker-size key do not run into each other');
+        lg = findall(fig, 'Type', 'legend');
+        state = lg(arrayfun(@(l) any(strcmp(l.String, 'SFA')), lg));
+        ok = isscalar(state);
+        if ok
+            state.Units = 'pixels'; own = state.Axes; own.Units = 'pixels';
+            ok = state.Position(1) >= own.Position(1) + own.Position(3) && ...
+                state.Position(2) >= own.Position(2) && state.Position(2) + state.Position(4) <= own.Position(2) + own.Position(4) + 1;
+        end
+        n = n + check(ok, 'S9 (B): its key is beside it, level with it');
+end
+end
+
+function g = composite_grid_column(ax, a)
+% The axes of ax in the column of a (the same left edge, within 2 px).
+set(ax, 'Units', 'pixels');
+g = ax(arrayfun(@(h) abs(h.Position(1) - a.Position(1)) < 2 && h.Position(3) == a.Position(3), ax));
+end
+
 function finish(n_fail)
 if n_fail > 0
     error('test_memory_supplement_composites:Failed', '%d check(s) failed.', n_fail);

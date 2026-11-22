@@ -181,9 +181,7 @@ end
 
 %% ------------------------------------------------------------------------
 function t = tile_titles(given, X)
-DEFAULT = struct('balanced', 'Balanced', 'EE_up', 'E-to-E up', 'EE_down', 'E-to-E down', 'II_up', 'I-to-I up', ...
-    'EI_loop', 'E-I loop', 'local_outlier', 'Local outlier', 'lowrank_real', 'Real low-rank mode', ...
-    'lowrank_rot', 'Rotating low-rank mode');
+% Given, or by key (cx_gallery_names, which S7 panel B uses too).
 m = numel(X);
 if ~isempty(given)
     if numel(given) ~= m
@@ -192,10 +190,7 @@ if ~isempty(given)
     t = cellstr(given);
     return
 end
-t = cell(1, m);
-for k = 1:m
-    if isfield(DEFAULT, X(k).key); t{k} = DEFAULT.(X(k).key); else; t{k} = X(k).label; end
-end
+t = cx_gallery_names(X);
 end
 
 function write_table(fid, fig_tag, C, X, titles, g, w_clim, rad_max)
@@ -227,22 +222,33 @@ end
 function a = tick_args(cfg, x, re_lim, far_k, im_lim)
 % The candidate ticks that fall outside this tile's bulk (1.15 radii, as
 % its clear interval) and inside its window; [] leaves complex_plane_axes'
-% multiples.
+% multiples. A tick whose LABEL an eigenvalue clear of the bulk would sit on
+% is not drawn in that tile. The label of a tick on the imaginary axis is
+% left of the axis and the label of a tick on the real axis below it, so the
+% spot is a box on that side of the tick, in units of the tile's radius
+% (the fonts are fixed and the window is about six radii wide). Until
+% 2026-11-22 only eigenvalues within 0.35 radii of the imaginary axis
+% counted, on either side: a conjugate pair at -21 +- 81i 1/s (0.44 radii
+% left, where the label is) sat on the '75' and '-75' of its tile.
 a = {};
-clear_re = x.center + [-1 1] * 1.15 * x.R_rate;
-clear_im = [-1 1] * 1.15 * x.R_rate;
+R = x.R_rate;
+clear_re = x.center + [-1 1] * 1.15 * R;
+clear_im = [-1 1] * 1.15 * R;
+marked = x.ev(abs(x.ev - x.center) > 1.05 * R);
 if ~isempty(cfg.re_tick_candidates)
     t = cfg.re_tick_candidates;
     ok = (t <= clear_re(1) | t >= clear_re(2)) & t >= re_lim(1) & t <= re_lim(2) & t ~= 0;
-    if ~isempty(far_k); ok = (ok & t <= re_lim(2) - 0.4 * x.R_rate) | (t >= far_k(1) & t <= far_k(2)); end   % no main tick against the break
+    if ~isempty(far_k); ok = (ok & t <= re_lim(2) - 0.4 * R) | (t >= far_k(1) & t <= far_k(2)); end   % no main tick against the break
+    for j = 1:numel(t)       % the label: below the axis, about a radius wide
+        if any(abs(real(marked) - t(j)) < 0.6 * R & imag(marked) < -0.04 * R & imag(marked) > -0.75 * R); ok(j) = false; end
+    end
     a = [a, {'re_ticks', t(ok)}];
 end
 if ~isempty(cfg.im_tick_candidates)
     t = cfg.im_tick_candidates;
     ok = (t <= clear_im(1) | t >= clear_im(2)) & t >= im_lim(1) & t <= im_lim(2) & t ~= 0;
-    near_axis = x.ev(abs(real(x.ev)) < 0.35 * x.R_rate & abs(x.ev - x.center) > 1.05 * x.R_rate);       % an eigenvalue on the label's spot hides it
-    for j = 1:numel(t)
-        if any(abs(imag(near_axis) - t(j)) < 0.25 * x.R_rate); ok(j) = false; end
+    for j = 1:numel(t)       % the label: left of the axis, about a radius wide
+        if any(real(marked) > -1.1 * R & real(marked) < 0.3 * R & abs(imag(marked) - t(j)) < 0.3 * R); ok(j) = false; end
     end
     a = [a, {'im_ticks', t(ok)}];
 end

@@ -68,13 +68,28 @@ function T = composite_tools()
 %                              sentence case and the condition's colour
 %                              (manuscript_style), in normal weight.
 %   close(figs)                closes the ones that still exist.
+%   sentence(strings)          legend entries or titles with their first
+%                              word capitalized ('noise-free' becomes
+%                              'Noise-free'); text that opens with a
+%                              symbol ('n_a = 3', 'lambda_1') is left.
+%   margin(fig, px)            keeps the canvas down to px pixels above its
+%                              bottom edge in the cropped export.
+%                              exportgraphics crops to the drawn pixels,
+%                              so a bottom row's x labels end 2 px from
+%                              the image edge (S4, 2026-11-22). A short
+%                              line at mid-width, px above the bottom, in
+%                              a white that is not the background's
+%                              (0.99), is counted by the crop and is not
+%                              seen. A line in the background's own white
+%                              is not counted (tried).
 %
 % See also: composite_save, composite_figure, fig_main7_memory, fig_grouped_main
 
 T = struct('canvas', @canvas, 'copy', @copy_graphics, 'place', @place_block, 'grid', @axes_grid, ...
     'letter', @panel_letter, 'style', @house_style, ...
     'axes_table', @axes_table, 'grid_table', @grid_table, ...
-    'condition_title', @condition_title, 'retitle', @retitle, 'close', @close_valid);
+    'condition_title', @condition_title, 'retitle', @retitle, 'close', @close_valid, ...
+    'sentence', @sentence_case, 'margin', @crop_margin);
 end
 
 %% ------------------------------------------------------------------------
@@ -273,4 +288,24 @@ for k = 1:numel(axs)
     title(axs(k), condition_title(names{k}, two_line), 'FontWeight', 'normal', 'FontSize', 14, ...
         'Color', color, 'Interpreter', 'tex');
 end
+end
+
+function s = sentence_case(s)
+% The first word capitalized when the text opens with two lowercase letters
+% (a word; 'n_a' and 'lambda' are symbols and stay).
+was_char = ischar(s);
+s = cellstr(s);
+for k = 1:numel(s)
+    if ~isempty(regexp(s{k}, '^[a-z][a-z]', 'once')); s{k}(1) = upper(s{k}(1)); end
+end
+if was_char; s = s{1}; end
+end
+
+function h = crop_margin(fig, px)
+% An almost-white line at mid-width, px above the canvas bottom (see the header).
+if nargin < 2; px = 2; end
+p = getpixelposition(fig);
+y = px / p(4);
+h = annotation(fig, 'line', 0.5 + [0, 3 / p(3)], [y y], 'Color', [0.99 0.99 0.99], 'LineWidth', 0.5, ...
+    'Tag', 'composite_crop_margin');
 end

@@ -113,6 +113,11 @@ if ~isempty(legends)
     end
 end
 
+% The x labels of (B)'s bottom row are the lowest thing drawn, and the
+% cropped export ended on them (flush with the image edge, 2026-11-22):
+% keep a margin under them.
+T.margin(fig, 6);
+
 %% Panel letters
 T.letter(ax{1}(1), 'A', -85, 18);
 T.letter(ax{2}(1), 'B', -85, 18);

@@ -204,12 +204,63 @@ close(o.figs);
 % S7
 o = draw(@fig_supp7_grouped, common, fullfile(fig_dir, 'supp7'), 'Fig_Supp7_Grouped', 'AB', ...
     {'Panel A (fig_outlier_slow_variables)', 'Panel B (fig_ostruct_summary)'});
+% Without a gallery in the run, B draws every network of the stage under the stage's names.
+assert(isempty(o.gallery_keys) && numel(findall(o.figs, 'Tag', 'slow_variables_filtered')) >= 1, ...
+    'S7: no gallery, the stage''s own list; the filtered eigenvalues are drawn in A');
+scr = get(groot, 'ScreenSize'); ppi = get(groot, 'ScreenPixelsPerInch');
+assert(all(o.figs.Position(3:4) <= 0.9 * scr(3:4) / ppi), 'S7 fits 0.9 of the screen in both dimensions (%.1f x %.1f in)', o.figs.Position(3:4));
 close(o.figs);
+% With a gallery (the concept_examples stage, tiny), B draws the gallery's
+% structures that the outlier_structures stage ran, in the gallery's order
+% and under S3's titles, and names the others.
+cg = mu7chain_AC_config('fast');
+cg.verbose = 'near-none';
+cg.concept_examples_n_override = 80; cg.concept_examples_T = 2; cg.concept_examples_lya_from = 1;
+cg.concept_examples_n_trace = 3; cg.concept_examples_n_image = 20;
+cg.concept_examples_examples = {'decay', 'reference', 0.15, []};
+cg.concept_examples_gallery = {'lowrank_real', 'lrA1p5W0p0', 1, []; 'balanced', 'reference', 1, []; ...
+    'II_up', 'IIx1p25', 1, []; 'local_outlier', 'reference', 1, [27 28]};
+evalc('run_concept_examples_stage(cg, tmp, concept_examples_stage_plan(cg));');
+o = fig_supp7_grouped(common{:}, 'out_dir', fullfile(fig_dir, 'supp7g'));
+Fs = ostruct_figure_data(struct('data_file', '', 'run_dir', tmp, 'conditions', {{}}), 'test');
+g_keys = {'lrA1p5W0p0', 'reference', 'IIx1p25', 'reference_w27'};            % the gallery, as keys of the outlier_structures stage
+g_titles = {'Real low-rank mode', 'Balanced', 'I-to-I up', 'Local outlier'};
+in = ismember(g_keys, Fs.keys);
+assert(any(in) && ~all(in), 'the tiny stage holds some of the gallery''s structures (%s of %s)', strjoin(g_keys(in), ', '), strjoin(Fs.keys(:)', ', '));
+assert(isequal(o.gallery_keys, g_keys(in)) && isequal(o.gallery_labels, g_titles(in)) && isequal(o.gallery_missing, g_titles(~in)), ...
+    'S7 (B): the gallery''s structures that the stage ran, in the gallery''s order, under its titles (drawn: %s)', strjoin(o.gallery_keys, ', '));
+ax = findall(o.figs, 'Type', 'axes');
+named = ax(arrayfun(@(a) isequal(reshape(cellstr(a.XTickLabel), 1, []), g_titles(in)), ax));
+assert(isscalar(named) && isequal(named.XLim, [0.4, nnz(in) + 0.6]), 'S7 (B): those networks drawn, named under the bottom row');
+txt = fileread(fullfile(fig_dir, 'supp7g', 'Fig_Supp7_Grouped_table.md'));
+assert(contains(txt, 'NOT IN PANEL B') && contains(txt, strjoin(g_titles(~in), ', ')) && ...
+    contains(txt, sprintf('DRAWN HERE: %d of the stage''s %d networks', nnz(in), numel(Fs.keys))), ...
+    'S7: the sidecar says which structures B draws and which it cannot');
+close(o.figs);
+o = fig_supp7_grouped(common{:}, 'save', false, 'gallery', false);
+assert(isempty(o.gallery_keys), 'gallery false: the stage''s own list');
+close(o.figs);
+rmdir(fullfile(tmp, 'concept_examples'), 's');
+% The default gallery is made of networks the outlier_structures stage runs by default.
+pg = concept_examples_stage_plan(mu7chain_AC_config('fast'));
+[~, okeys] = cx_gallery_names(pg.gallery, pg.seed);
+po = outlier_structures_stage_plan(mu7chain_AC_config('fast'));
+assert(numel(okeys) == 8 && all(ismember(okeys, {po.networks.key})) && numel(unique({po.networks(ismember({po.networks.key}, okeys)).group})) == 3, ...
+    'every structure of the default gallery is tested by the outlier_structures stage, across its three groups');
 
 % S8
 o = draw(@fig_supp8_grouped, common, fullfile(fig_dir, 'supp8'), 'Fig_Supp8_Grouped', 'AB', ...
-    {'Panel A (fig_freqresp_single_neuron)', 'Panel B (fig_freqresp_phase)'});
-assert(numel(findall(o.figs, 'Type', 'axes')) == 7, 'A six panels, B one');
+    {'Panels A and B (fig_freqresp_single_neuron)'});
+ax = findall(o.figs, 'Type', 'axes');
+assert(numel(ax) == 6, 'A the three gain panels, B the three phase panels: each drawn once');
+titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), ax);
+assert(nnz(strlength(titles) > 0) == 3 && all(ismember(["E neuron, median rate", "I neuron, median rate", "E neuron, driven hard"], titles)), ...
+    'S8: a title over each column');
+lg = findall(o.figs, 'Type', 'legend');
+assert(isscalar(lg) && all(ismember({'Adaptation and depression', 'Adaptation alone', 'Depression alone'}, lg.String)), ...
+    'S8: one key that names the three line styles');
+hA = findall(o.figs, 'Tag', 'panel_letter_A'); hB = findall(o.figs, 'Tag', 'panel_letter_B');
+assert(hB.Position(2) < hA.Position(2) - 0.2, 'S8: (B) is at the phase row, below (A)');
 close(o.figs);
 
 %% 5. The source figures' new options
@@ -239,11 +290,22 @@ close(o.figs);
 o = fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false);
 F = ostruct_figure_data(struct('data_file', '', 'run_dir', tmp, 'conditions', {{}}), 'test');
 ax = findall(o.figs, 'Type', 'axes');
-top = ax(arrayfun(@(a) contains(a.YLabel.String, 'bulk radius'), ax));
+top = ax(arrayfun(@(a) contains(strjoin(cellstr(a.YLabel.String), ' '), 'bulk radius'), ax));
 lo = min([F.lo.mode_rho(:); -1], [], 'omitnan'); hi = max([F.hi.mode_rho_uniform(:); F.hi.mode_rho(:); 1], [], 'omitnan');
 assert(isscalar(top) && strcmp(top.YScale, 'linear') && top.YLim(1) < lo && top.YLim(2) > hi, ...
     'every detachment is inside the axis (%.3g to %.3g in [%.3g, %.3g])', lo, hi, top.YLim);
+assert(isequal(top.XLim, [0.4, numel(F.keys) + 0.6]), 'the default draws every network of the stage');
 close(o.figs);
+% Some networks, in the order given, under the labels given.
+o = fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false, 'networks', F.keys([3 1]), 'labels', {'third', 'first'}, ...
+    'fig_size', [6 7], 'compact', true);
+ax = findall(o.figs, 'Type', 'axes');
+assert(all(arrayfun(@(a) isequal(a.XLim, [0.4 2.6]), ax)) && any(arrayfun(@(a) isequal(cellstr(a.XTickLabel)', {'third', 'first'}), ax)) && ...
+    max(abs(o.figs.Position(3:4) - [6 7])) < 0.05, 'networks, labels and fig_size are taken');
+close(o.figs);
+assert(throws(@() fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false, 'networks', {'nope'}), 'fig_ostruct_summary:NoNetwork'));
+assert(throws(@() fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false, 'networks', F.keys(1), 'labels', {'a', 'b'}), ...
+    'fig_ostruct_summary:Labels'));
 
 %% 6. Errors, never a fallback; nothing left open
 fns = {@fig_main5_mechanism, @fig_main6_amplification, @fig_supp6_grouped, @fig_supp7_grouped, @fig_supp8_grouped};

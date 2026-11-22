@@ -29,7 +29,11 @@ function out = fig_freqresp_single_neuron(cfg)
 %           seeds as a band; dashed: adaptation alone; dotted: depression
 %           alone
 %
-% NOTHING BUT THE DRAWING ON THE PANELS. Fig_Freqresp_Single_Neuron_table.md
+% ON THE PANELS: the drawing, a title over each column saying which neuron
+% it is, and one key at the right (the conditions' colors and the three
+% line styles). Until 2026-11-22 there was neither, and the columns and
+% the solid, dashed and dotted lines could only be told from the caption.
+% Fig_Freqresp_Single_Neuron_table.md
 % holds the caption and, per column, condition and mechanism, the medians
 % over seeds of the operating point, the zero-frequency gain, the corner
 % frequencies, the largest phase lead, and the agreement of the closed form
@@ -77,7 +81,7 @@ styles = {'-', '--', ':'};
 f = D.settings.f_single;
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
-fig = figure('Color', 'w', 'Position', [80 80 1100 600], 'Visible', vis);
+fig = figure('Color', 'w', 'Position', [80 80 1380 620], 'Visible', vis);
 tl = tiledlayout(fig, 2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 rows = {};
 ax1 = gobjects(1, 3); ax2 = gobjects(1, 3);
@@ -110,6 +114,24 @@ for p = 1:3
         end
     end
 end
+% The columns' titles and the key.
+column_titles = {'E neuron, median rate', 'I neuron, median rate', 'E neuron, driven hard'};
+for p = 1:3
+    title(ax1(p), column_titles{p}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', 'k');
+end
+key = gobjects(1, 0); key_names = {};
+cond_titles = grouped_condition_label(conditions, 'sentence');
+for c = 1:numel(conditions)
+    key(end + 1) = plot(ax1(3), NaN, NaN, '-', 'Color', st.condition_color(conditions{c}), 'LineWidth', st.line_lw); %#ok<AGROW>
+    key_names{end + 1} = cond_titles{c}; %#ok<AGROW>
+end
+style_names = {'Adaptation and depression', 'Adaptation alone', 'Depression alone'};
+for m = 1:3
+    key(end + 1) = plot(ax1(3), NaN, NaN, styles{m}, 'Color', [0.35 0.35 0.35], 'LineWidth', st.line_lw); %#ok<AGROW>
+    key_names{end + 1} = style_names{m}; %#ok<AGROW>
+end
+lg = legend(ax1(3), key, key_names, 'Box', 'off', 'FontSize', st.tick_fs, 'AutoUpdate', 'off');
+lg.Layout.Tile = 'east';
 ticks = 10 .^ (ceil(log10(f(1)) - 1e-9):floor(log10(f(end)) + 1e-9));
 for p = 1:3
     set([ax1(p), ax2(p)], 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out', ...
