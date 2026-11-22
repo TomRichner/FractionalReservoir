@@ -100,6 +100,29 @@ assert(any(strcmp(o1.files, 'Fig_Main1_Concept_Networks.png')) && any(strcmp(o1.
 assert(o1.n_far(2) >= 1, 'the E-to-E outlier beyond the break');
 tab = fileread(fullfile(fd, 'f1', 'Fig_Main1_Concept_Networks_table.md'));
 assert(contains(tab, 'EEx1p5') && contains(tab, 'lambda_1'), 'its table');
+% Polish list, 2026-11-22: eigenvalues right of the boundary are a group of
+% their own (filled), those left of it pale; what is not drawn is said in the
+% table; the diagrams' axis names and the added mode's title in sentence case.
+st = manuscript_style(); red = st.condition_color('no_adaptation');
+for k = 1:numel(o1.axes.spectrum)
+    ax = o1.axes.spectrum(k);
+    hc = [findobj(ax, 'Tag', 'eig_crossed'); findobj(ax, 'Tag', 'eig_crossed_outlier')];
+    hl = [findobj(ax, 'Tag', 'eig_left'); findobj(ax, 'Tag', 'eig_left_outlier')];
+    ev_k = C.examples(k).ev;
+    assert(sum(arrayfun(@(h) numel(h.XData), hc)) == nnz(real(ev_k) > 0) && o1.n_crossed(k) == nnz(real(ev_k) > 0), ...
+        'column %d: the filled dots are the eigenvalues right of the boundary', k);
+    assert(sum(arrayfun(@(h) numel(h.XData), hl)) == nnz(real(ev_k) <= 0) - o1.n_left(k), ...
+        'column %d: the pale dots are the eigenvalues left of the boundary that the window holds', k);
+    assert(all(arrayfun(@(h) max(abs(h.CData(1, :) - red)) < 1e-12, hc)) && ...
+        all(arrayfun(@(h) all(h.CData(1, :) >= red) && any(h.CData(1, :) > red), hl)), ...
+        'column %d: right of the boundary full strength, left of it a lighter tint', k);
+end
+assert(contains(tab, 'Eigenvalues right of the boundary') && ...
+    (contains(tab, 'Not drawn (left of the window') == any(o1.n_left > 0)) && ...
+    (contains(tab, 'Every eigenvalue is drawn') == ~any(o1.n_left > 0)), 'the table says what is not drawn');
+assert(strcmp(o1.axes.concepts(1).XLabel.String, 'Dendritic potential') && ...
+    strcmp(o1.axes.concepts(3).YLabel.String, 'Synaptic output'), 'panel B: axis names in sentence case');
+assert(any(strcmp(o1.titles, 'Added rotating mode')) == any(strcmp({C.examples.key}, 'oscillation')), 'the added mode''s title');
 close(o1.figs);
 o3 = fig_supp3_connectivity_gallery('run_dir', tmp, 'out_dir', fullfile(fd, 's3'), 'visible', false);
 assert(any(strcmp(o3.files, 'Fig_Supp3_Connectivity_Gallery.png')) && numel(o3.axes.spectrum) == 3, 'S3 written');

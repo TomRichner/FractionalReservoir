@@ -26,9 +26,14 @@ function out = fig_main1_concept_networks(cfg)
 %          eigenvalues (columns without one leave the room empty).
 %          Eigenvalues LEFT of the window are not drawn (with the E-to-E
 %          mean raised by half, one real eigenvalue near -141 1/s); the
-%          table counts them. Dots in the no-adaptation color (these are
-%          unadapted networks); an eigenvalue clear of the bulk (farther from
-%          -1/tau_d than R/tau_d + 0.2 of the largest radius) drawn larger.
+%          table lists them, in a sentence of their own. Dots in the
+%          no-adaptation color (these are unadapted networks): an eigenvalue
+%          RIGHT of the boundary (Re > 0) filled at full strength, one left
+%          of it or on it in a lighter tint (left_tint), drawn first, so
+%          which eigenvalues have crossed is seen at a glance (polish list,
+%          2026-11-22; until then all were one red). An eigenvalue clear of
+%          the bulk (farther from -1/tau_d than R/tau_d + 0.2 of the largest
+%          radius) is drawn larger.
 %   row 3  the dendritic potential x of n_E E and n_I I neurons of the
 %          unadapted run over t_window, in the E and I colors; one y range
 %          for the columns whose traces fit within 1.5 times the median span,
@@ -67,6 +72,7 @@ arguments
     cfg.tick_step double          = 50
     cfg.dot_size (1,1) double     = 6
     cfg.outlier_size (1,1) double = 36
+    cfg.left_tint (1,1) double {mustBeGreaterThanOrEqual(cfg.left_tint, 0), mustBeLessThanOrEqual(cfg.left_tint, 1)} = 0.6   % share of white in the dots left of the boundary; 0 = one color
     cfg.scale_bar_s (1,1) double  = 2
     cfg.fig_size double           = [13 9.6]   % inches
 end
@@ -85,6 +91,7 @@ st = manuscript_style();
 fs = st.tick_fs;
 red = st.condition_color('no_adaptation');
 gray = [0.55 0.55 0.55];
+pale = red + cfg.left_tint * (1 - red);     % eigenvalues left of the boundary
 titles = column_titles(cfg.titles, X);
 
 %% The spectrum window: one geometry for every column
@@ -169,7 +176,7 @@ end
 
 %% Row 2: the equal-gain spectra
 th = linspace(0, 2 * pi, 361);
-n_left = zeros(1, m); n_far = zeros(1, m);
+n_left = zeros(1, m); n_far = zeros(1, m); n_crossed = zeros(1, m);
 ax_spec = gobjects(1, m);
 for k = 1:m
     ax = axes(fig, 'Units', 'inches', 'Position', [x0(k), y_spec, pw, ph_spec]);
@@ -203,9 +210,17 @@ for k = 1:m
             k, nnz(~shown) - n_left(k));
     end
     is_out = abs(z - X(k).center) > X(k).R_rate + 0.2 * rad_max;   % clear of the bulk, not its finite-size edge
-    zs = z(shown & ~is_out); zo = z(shown & is_out);
-    scatter(ax, cp.x(real(zs)), imag(zs), cfg.dot_size, red, 'filled', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.75);
-    scatter(ax, cp.x(real(zo)), imag(zo), cfg.outlier_size, red, 'filled', 'MarkerEdgeColor', 'none');
+    % Left of the boundary first and pale, right of it on top at full strength.
+    crossed = real(z) > 0;
+    n_crossed(k) = nnz(crossed);
+    sides = {~crossed, pale, 'eig_left'; crossed, red, 'eig_crossed'};
+    for q = 1:2
+        zs = z(shown & ~is_out & sides{q, 1}); zo = z(shown & is_out & sides{q, 1});
+        scatter(ax, cp.x(real(zs)), imag(zs), cfg.dot_size, sides{q, 2}, 'filled', 'MarkerEdgeColor', 'none', ...
+            'Tag', sides{q, 3});
+        scatter(ax, cp.x(real(zo)), imag(zo), cfg.outlier_size, sides{q, 2}, 'filled', 'MarkerEdgeColor', 'none', ...
+            'Tag', [sides{q, 3} '_outlier']);
+    end
     set(ax, 'XLim', cp.x_lim, 'YLim', cp.y_lim);
 end
 
@@ -275,7 +290,7 @@ text(lab, 0.08 / W_in, (yB + hB + 0.55) / H_in, '(B)', 'FontSize', fs, 'Vertical
 %% Save, and the numbers
 fig_tag = 'Fig_Main1_Concept_Networks';
 out = struct('figs', fig, 'files', {{}}, 'source', C.file, 'window', g, 'far', {far}, 'w_clim', w_clim, ...
-    'y_lims', y_lims, 'n_left', n_left, 'n_far', n_far, 'titles', {titles}, ...
+    'y_lims', y_lims, 'n_left', n_left, 'n_far', n_far, 'n_crossed', n_crossed, 'titles', {titles}, ...
     'axes', struct('image', ax_img, 'spectrum', ax_spec, 'activity', ax_act, 'concepts', A.axes));
 if cfg.save
     save_figure_stable(out_dir, fig_tag, fig);
@@ -284,7 +299,7 @@ if cfg.save
     fid = fopen(fullfile(out_dir, table_name), 'w');
     if fid > 0
         closer = onCleanup(@() fclose(fid));
-        write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, cfg, A);
+        write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, cfg, A);
         clear closer
         out.files{end + 1} = table_name;
     end
@@ -294,7 +309,7 @@ end
 %% ------------------------------------------------------------------------
 function t = column_titles(given, X)
 DEFAULT = struct('decay', 'Balanced, weak', 'irregular', 'Balanced, strong', ...
-    'runaway', ['E-to-E mean ' char(215) '1.5'], 'oscillation', 'Rotating low-rank');
+    'runaway', ['E-to-E mean ' char(215) '1.5'], 'oscillation', 'Added rotating mode');   % the caption says it is an added structure
 m = numel(X);
 if ~isempty(given)
     if numel(given) ~= m
@@ -326,7 +341,7 @@ q = raw / p;
 if q >= 5; s = 5 * p; elseif q >= 2; s = 2 * p; else; s = p; end
 end
 
-function write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, cfg, A)
+function write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, cfg, A)
 fprintf(fid, '# %s\n\n', fig_tag);
 fprintf(fid, 'Source: `%s` (stage concept_examples). Preset `%s`, condition `%s` (no adaptation).\n\n', ...
     C.file, C.settings.preset_name, C.settings.condition);
@@ -334,7 +349,8 @@ fprintf(fid, ['Panel A. Row 1: a %d x %d piece of each network''s weights (the s
     'neurons drawn with image seed %d), color range +-%.4g (95th percentile of the nonzero |w| of the four ' ...
     'pieces unless given). Row 2: the eigenvalues of J = (-I + W)/tau_d with every gain 1, in 1/s; gray circle ' ...
     'radius R/tau_d about -1/tau_d, R the structural bulk radius of the drawn matrix. Window Re [%g, %g], ' ...
-    'Im [%g, %g] 1/s, one scale in all columns. Row 3: dendritic potential x of %d E and %d I neurons of the ' ...
+    'Im [%g, %g] 1/s, one scale in all columns. An eigenvalue right of the stability boundary (Re > 0) is filled ' ...
+    'at full strength, one left of it in a lighter tint. Row 3: dendritic potential x of %d E and %d I neurons of the ' ...
     'unadapted run (noise of the preset), t in [%g, %g] s, from the class''s initial state.\n\n'], ...
     C.settings.n_image, C.settings.n_image, C.settings.n_image / 2, C.settings.n_image / 2, C.settings.image_seed, ...
     w_clim, g.re_lim, g.im_lim, cfg.n_E, cfg.n_I, cfg.t_window);
@@ -359,6 +375,21 @@ for k = 1:numel(X)
         x.nz_mean(1, 1), x.nz_mean(1, 2), x.nz_mean(2, 1), x.nz_mean(2, 2));
 end
 fprintf(fid, '\nDensity and nonzero means are (post, pre): EI is I-to-E. Of the whole network, not of the piece shown.\n\n');
+fprintf(fid, 'Eigenvalues right of the boundary (Re > 0, drawn filled): %s.\n\n', ...
+    strjoin(arrayfun(@(k) sprintf('%s %d of %d', strrep(titles{k}, '\times', 'x'), n_crossed(k), numel(X(k).ev)), ...
+    1:numel(X), 'UniformOutput', false), '; '));
+if any(n_left > 0)
+    fprintf(fid, '**Not drawn (left of the window, Re < %.1f 1/s):**', g.re_lim(1));
+    for k = find(n_left > 0)
+        zl = X(k).ev(real(X(k).ev) < g.re_lim(1));
+        fprintf(fid, ' column "%s": %d eigenvalue(s), at %s 1/s.', strrep(titles{k}, '\times', 'x'), n_left(k), ...
+            strjoin(arrayfun(@(z) sprintf('%.1f%+.1fi', real(z), imag(z)), zl(:)', 'UniformOutput', false), ', '));
+    end
+    fprintf(fid, [' The window keeps one scale for all the columns, and widening it to hold them would shrink ' ...
+        'every bulk. They lie far left of the boundary.\n\n']);
+else
+    fprintf(fid, 'Every eigenvalue is drawn (none lies left of the window).\n\n');
+end
 fprintf(fid, '## The unadapted runs\n\n');
 fprintf(fid, '| Column | T (s) | Mean rate E | Mean rate I | At the floor | At the ceiling | SD of x | lambda_1 (1/s) | over (s) |\n');
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|\n');
