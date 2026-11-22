@@ -9,7 +9,13 @@ function out = fig_supp5_grouped(cfg)
 % that owns it, invisibly and unsaved, and copied here (composite_tools).
 %   (A) the distribution of lambda_1 over the jointly varied configurations
 %       (the param_space sample): the lambda_1 sheet of
-%       fig_param_space_allStd.
+%       fig_param_space_allStd, asked for on its SYMMETRIC-LOG axis
+%       ('lle_scale', 'symlog': linear within about +-0.1 1/s, logarithmic
+%       beyond, every value at its place). Until 2026-11-22 it was that
+%       sheet's window of +-1.5 1/s with everything beyond gathered into
+%       the two end bins, which hid the distribution without adaptation
+%       (three quarters of it in the left end bin). The table gives each
+%       column's quartiles and the share below zero.
 %   (B) the distribution of the mean firing rate over the same
 %       configurations: its mean-rate sheet.
 %   (C) local against accumulated growth rates: fig_local_vs_finite_lle
@@ -55,7 +61,7 @@ if ~isempty(cfg.preset_name); ps_args = [ps_args, {'preset_name', cfg.preset_nam
 %% The source figures
 prep_before = prep_folders(cfg.run_dir);
 tidy = onCleanup(@() remove_new_prep(cfg.run_dir, prep_before));
-S_ps  = fig_param_space_allStd(ps_args{:});
+S_ps  = fig_param_space_allStd(ps_args{:}, 'lle_scale', 'symlog');
 cleanup_ps = onCleanup(@() T.close(S_ps.figs));
 S_loc = fig_local_vs_finite_lle('run_dir', cfg.run_dir, 'conditions', cfg.conditions, quiet{:});
 cleanup_loc = onCleanup(@() T.close(S_loc.figs));
@@ -67,13 +73,12 @@ assert(all(found) && numel(S_ps.figs) >= max(sheet), 'fig_supp5_grouped:Sheets',
     'fig_param_space_allStd returned no sheet for %s.', strjoin(measures(~found), ', '));
 
 %% The canvas: three rows of one panel per condition
-W = 1100; H = 860;
+W = 1100; H = 890;             % under 0.9 of the workstation screen
 fig = T.canvas(W, H, cfg.visible);
 X0 = 100; GAP = 50; RH = 170;
-ROW_Y = [620 350 80];
+ROW_Y = [650 380 80];          % 30 px more above (C) than between (A) and (B): its key sits there
 ax = cell(1, 3);
 src = {S_ps.figs(sheet(1)), S_ps.figs(sheet(2)), S_loc.figs};
-legends = gobjects(0);
 nc = 0;
 for r = 1:3
     Cp = T.copy(src{r}, fig);
@@ -90,10 +95,9 @@ for r = 1:3
         ax{r}(c).Position = [X0 + (c - 1) * (CW + GAP), ROW_Y(r), CW, RH];
     end
     if r == 3
-        % One key for the two histograms of (C): the first panel's.
-        keep = Cp.legends(arrayfun(@(l) isequal(l.Axes, ax{r}(1)), Cp.legends));
-        delete(Cp.legends(~ismember(Cp.legends, keep)));
-        legends = keep;
+        % One key for the two histograms of (C), made below: the source's
+        % own (one per panel, inside it) go.
+        delete(Cp.legends);
     end
 end
 
@@ -123,15 +127,23 @@ for c = 1:nc
     xlabel(ax{3}(c), 'Growth Rate (s^{-1})', 'Interpreter', 'tex');
 end
 ylabel(ax{3}(1), 'Density');
-if ~isempty(legends)
-    legends.String = {'Local', 'Accumulated'};      % the caption says what is pooled
-    set(legends, 'Units', 'pixels', 'Location', 'none');
-    for pass = 1:2
-        drawnow;
-        p = legends.Position;
-        q = ax{3}(1).Position;
-        legends.Position = [q(1) + q(3) - p(3) + 6, q(2) + q(4) - p(4) + 6, p(3), p(4)];
-    end
+% The key of (C): light for the local rate, dark for the accumulated one,
+% in neutral grays (it serves the three columns, each in its own colour),
+% on one line ABOVE the first panel. Until 2026-11-22 it was the first
+% panel's own legend in its upper right corner, where it covered that
+% panel's median line and tallest bars.
+hold(ax{3}(1), 'on');
+key = [patch(ax{3}(1), NaN, NaN, [0.82 0.82 0.82], 'EdgeColor', 'none'), ...
+       patch(ax{3}(1), NaN, NaN, [0.40 0.40 0.40], 'EdgeColor', 'none')];
+hold(ax{3}(1), 'off');
+legends = legend(ax{3}(1), key, {'Local', 'Accumulated'}, 'Box', 'off', 'FontSize', 14, ...   % the caption says what is pooled
+    'Orientation', 'horizontal', 'NumColumns', 2, 'Units', 'pixels', 'Location', 'none', 'AutoUpdate', 'off');
+legends.ItemTokenSize = [22 18];
+for pass = 1:2
+    drawnow;
+    p = legends.Position;
+    q = ax{3}(1).Position;
+    legends.Position = [q(1), q(2) + q(4) + 4, p(3), p(4)];
 end
 
 %% Panel letters
@@ -153,18 +165,21 @@ if cfg.save
         'Densities of the local rate (pooled) and of the finite-time lambda_1 per network'};
     for r = 1:3
         for c = 1:nc
-            parts(end + 1, :) = {sprintf('Panel %s, %s (%s)', f{r}, names{c}, strtok(panels.(f{r}), ' ')), ...
-                T.axes_table(ax{r}(c), what{r})}; %#ok<AGROW>
+            body = T.axes_table(ax{r}(c), what{r});
+            if r == 1; body = [values_summary(ax{r}(c)), body]; end
+            parts(end + 1, :) = {sprintf('Panel %s, %s (%s)', f{r}, names{c}, strtok(panels.(f{r}), ' ')), body}; %#ok<AGROW>
         end
     end
 end
 caption = sprintf(['Supplementary Figure S5, the joint sample (drawn by fig_supp5_grouped; run `%s`; conditions %s), ' ...
     'one column per condition. (A) Distribution of the leading Lyapunov exponent lambda_1 over the jointly varied ' ...
-    'configurations (probability per bin; values beyond the window are gathered in its end bins; dashed: ' ...
+    'configurations, on a symmetric-log axis (linear within about 0.1 1/s of zero, logarithmic beyond; 40 bins of ' ...
+    'equal width on that axis, probability per bin; every value at its place, none gathered; dashed: ' ...
     'lambda_1 = 0). (B) Distribution of the mean firing rate over the same configurations. (C) Local against ' ...
     'accumulated growth rates for the networks near the preset (every 1-D sweep at its level nearest the ' ...
     'preset''s value): density of the local rate of the leading direction pooled over time and networks (light) ' ...
-    'and of the finite-time lambda_1 per network (dark); dotted: zero. The histograms of (A) and (B) are gray in ' ...
+    'and of the finite-time lambda_1 per network (dark), with its median as a line; dotted: zero; the key above ' ...
+    'the first panel is in gray and holds for the three columns. The histograms of (A) and (B) are gray in ' ...
     'fig_param_space_allStd and take the condition colours here. Canvas %d x %d px, text 14 pt.'], ...
     cfg.run_dir, strjoin(names, ', '), W, H);
 out_dir = '';
@@ -174,6 +189,22 @@ out.panels = panels;
 end
 
 %% ------------------------------------------------------------------------
+function txt = values_summary(ax)
+% The values behind a symmetric-log lambda_1 panel (fig_param_space_allStd
+% leaves them in the axes' UserData), as a paragraph for the table; '' for
+% a panel drawn the old way. The x of the series below it is in the axis'
+% own coordinate, sign(x) log10(1 + |x| / 0.1).
+txt = '';
+u = ax.UserData;
+if ~(isstruct(u) && isfield(u, 'values')) || isempty(u.values); return; end
+v = u.values(:);
+q = prctile(v, [25 50 75]);
+txt = sprintf(['lambda_1 over the %d configurations of `%s` (1/s): median %.3g, quartiles %.3g to %.3g, range %.3g to ' ...
+    '%.3g; share below zero %.3g; share beyond the old window of +-1.5: %.3g below, %.3g above. Axis: %s; the ' ...
+    'x of the series listed next is in that coordinate, sign(x) log10(1 + |x| / 0.1).\n\n'], ...
+    numel(v), u.condition, q(2), q(1), q(3), min(v), max(v), mean(v < 0), mean(v < -1.5), mean(v > 1.5), u.scale);
+end
+
 function names = condition_names(axs, requested)
 % The conditions of the columns: the selection when one was given (the
 % sources draw it in the order given), else read from the titles painted.
