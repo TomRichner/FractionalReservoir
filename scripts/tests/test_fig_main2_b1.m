@@ -51,6 +51,26 @@ end
 ax = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r6_c1');
 assert(isempty(findobj(ax, 'Type', 'line')), 'no adaptation: row F must be blank');
 assert(any(contains(out.notes, 'b1, the first depression variable')), 'the provenance must name b1');
+% Row (G): the accumulated lambda_1 in the column's condition color, the local
+% rate a lighter tint of it; neither black nor gray (polish list, 2026-11-22).
+st = manuscript_style();
+for c = 1:3
+    ax = findobj(fig, 'Type', 'axes', 'Tag', sprintf('dynamics_r7_c%d', c));
+    acc = findobj(ax, 'Tag', 'accumulated_lambda'); loc = findobj(ax, 'Tag', 'local_lambda');
+    col = st.condition_color(names{c});
+    assert(isscalar(acc) && isscalar(loc), 'row G of column %d: one accumulated and one local trace', c);
+    assert(max(abs(acc.Color - col)) < 1e-12, 'row G of column %d: the accumulated trace is not in the condition color', c);
+    assert(max(abs(loc.Color - (.6 + .4 * col))) < 1e-12 && all(loc.Color >= acc.Color), ...
+        'row G of column %d: the local trace is not a lighter tint of the condition color', c);
+end
+% The E/I key: right of row (B)'s last axes, outside them, the axes unmoved.
+lg = findobj(fig, 'Type', 'legend'); axb = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r2_c3');
+assert(isscalar(lg) && isequal(lg.String, {'E', 'I'}), 'one E/I key');
+lg.Units = 'normalized'; axb.Units = 'normalized';
+assert(lg.Position(1) >= axb.Position(1) + axb.Position(3) && lg.Position(1) + lg.Position(3) <= 1, ...
+    'the E/I key must stand right of row B''s axes, inside the canvas');
+axa = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r1_c3');
+assert(max(abs(axb.Position([1 3]) - axa.Position([1 3]))) < 1e-9, 'the key must not resize row B''s axes');
 close(fig);
 
 results(2).std_model = 'none';                          % stands in for an SFA-only column

@@ -122,7 +122,16 @@ else
 end
 le=plot(ax_all(2,end),NaN,NaN,'Color',ce,'LineWidth',.5);
 li=plot(ax_all(2,end),NaN,NaN,'Color',ci,'LineWidth',.5);
-legend(ax_all(2,end),[le li],{'E','I'},'FontSize',14,'Box','off','Location','northeast');
+% Beside the last column, right of row (B)'s axes and level with their top,
+% where there is no trace (polish list, 2026-11-22: inside the axes, at
+% 'northeast', it sat on the traces of that column). The axes keep their
+% place: the legend is positioned by hand, not by a Location that resizes.
+row_b=ax_all(2,end).Position;
+lg=legend(ax_all(2,end),[le li],{'E','I'},'FontSize',14,'Box','off','AutoUpdate','off','Tag','EI_key');
+lg.ItemTokenSize=[14 18]; lg.Units='normalized'; drawnow;
+q=lg.Position;
+lg.Position=[row_b(1)+row_b(3)+.004*s, row_b(2)+row_b(4)-q(4), q(3), q(4)];
+ax_all(2,end).Position=row_b;
 % Requested lower-left lambda panel, with explicit data coordinates.
 plot(ax_all(7,1),[5 15],[-4.8 -4.8],'k','LineWidth',4,'Tag','ten_second_bar');
 text(ax_all(7,1),10,-5.6,'10 seconds','FontSize',14,'HorizontalAlignment','center', ...
@@ -135,7 +144,8 @@ uistack(sep,'bottom');
 notes{end+1}=['Numeric rendering draws the first half of the saved neurons of each type (round(25/2): 25 saved -> 13 displayed), ' ...
     'the same indices in every state row, in the model''s own E/I palettes (excitatory_colormap / inhibitory_colormap, ' ...
     'the colours SRNNModel2.plot uses). Row (A) is the uniform input step. Row (G): the local rate is low-pass filtered at 2 Hz ' ...
-    '(2nd-order Butterworth, zero phase) for display only; the finite-time lambda_1 is unfiltered. ' ...
+    '(2nd-order Butterworth, zero phase) for display only and drawn in a lighter tint of the column''s condition color; ' ...
+    'the finite-time (accumulated) lambda_1 is unfiltered, in the condition color. The E/I key stands right of row (B), outside the axes. ' ...
     'The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.'];
 notes{end+1}=sprintf('Columns, left to right: %s (titled and coloured by condition name).',strjoin(names,', '));
 if numeric
@@ -152,8 +162,13 @@ if strcmp(field,'lambda')
         text(ax,.5,.5,'finite estimate not saved','Units','normalized','HorizontalAlignment','center','FontSize',14);
         return
     end
-    plot(ax,r.t_lya,lowpass_2hz(r.t_lya,r.local_lambda),'Color',[.6 .6 .6],'LineWidth',.8);
-    plot(ax,r.t_lya,r.finite_lambda,'k','LineWidth',1.25);
+    % The accumulated lambda_1 in the column's condition color, the local
+    % rate a lighter tint of it (polish list, 2026-11-22; they were black
+    % and gray, and no condition is drawn in black or gray).
+    st=manuscript_style(); col=[0 0 0];
+    if st.condition_color.isKey(r.name), col=st.condition_color(r.name); end
+    plot(ax,r.t_lya,lowpass_2hz(r.t_lya,r.local_lambda),'Color',.6+.4*col,'LineWidth',.8,'Tag','local_lambda');
+    plot(ax,r.t_lya,r.finite_lambda,'Color',col,'LineWidth',1.6,'Tag','accumulated_lambda');
     return
 end
 if strcmp(field,'u')
