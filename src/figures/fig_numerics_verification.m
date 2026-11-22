@@ -222,7 +222,11 @@ for i = 1:n_cond
     % Row 1: local exponents overlay
     ax = nexttile(tl, i);
     hold(ax, 'on');
-    cmap = parula(K);
+    % A neutral ramp, dark (lambda_1) to light (lambda_K). It was parula
+    % until 2026-11-22: its blue-to-yellow ran through the blue and the
+    % yellowish of the adapting conditions, so the QR lines could not be
+    % told from Benettin's, which is drawn in the condition's colour.
+    cmap = repmat(linspace(0.25, 0.82, K)', 1, 3);
     for j = K:-1:1
         h = plot(ax, Q.qr.t_lya, Q.qr.local_LE_spectrum_t(:, j), 'Color', cmap(j, :), 'LineWidth', 0.8, ...
             'HandleVisibility', 'off');

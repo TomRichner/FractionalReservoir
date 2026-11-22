@@ -117,7 +117,7 @@ for r = 1:nr
     for c = 1:ncol
         ax = ax_a(r, c);
         title(ax, '');
-        if r == 1; title(ax, col_titles{c}, 'FontWeight', 'normal', 'FontSize', 14); end
+        if r == 1; title(ax, pulse_title(cfg.pulse_conditions, c, col_titles{c}), 'FontWeight', 'normal', 'FontSize', 14); end
         ax.YTick = ax.YTick([1 end]);
         ax.XTick = ax.XLim(1):10:ax.XLim(2);
         if r < nr
@@ -148,7 +148,7 @@ end
 % the reference lines under it; the SFA key under its two panels.
 lgs = Cc.legends;
 for k = 1:numel(lgs)
-    lgs(k).String = sentence_conditions(lgs(k).String, T);
+    lgs(k).String = T.sentence(sentence_conditions(lgs(k).String, T));
 end
 set([B.legends; lgs], 'Units', 'pixels', 'Location', 'none');
 set(B.legends, 'NumColumns', 2, 'Orientation', 'horizontal');
@@ -204,7 +204,9 @@ end
 caption = sprintf(['Supplementary Figure S1, one neuron (drawn by fig_supp1_grouped; run `%s`, preset `%s`). (A) One ' ...
     'unconnected neuron driven by a pulse of input, with no adaptation, with SFA alone (one timescale) and with ' ...
     'depression alone (one pool): rows %s. SFA lowers the firing rate; depression leaves the rate and lowers the ' ...
-    'synaptic output. Each panel has its own y range. (B) SFA with three timescales and with one: the steady-state ' ...
+    'synaptic output. Each panel has its own y range. The two single mechanisms are not conditions of the paper ' ...
+    'and have colours of their own, named by the column titles: SFA alone purple [0.56 0.27 0.68], depression ' ...
+    'alone bluish green [0 0.62 0.45]. (B) SFA with three timescales and with one: the steady-state ' ...
     'SFA current against the rate (the two lines coincide), and its approach after a step of the rate. (C) ' ...
     'Depression with one pool (single-timescale condition) and with a reserve pool behind it (the chain, ' ...
     'multiple-timescale condition): steady-state depression factor and synaptic output against the rate (dotted: ' ...
@@ -219,6 +221,25 @@ out.panels = panels;
 end
 
 %% ------------------------------------------------------------------------
+function t = pulse_title(names, c, fallback)
+% The title over a column of (A), which is also the key to its colour: the
+% mechanism in words where the column isolates one (the source writes
+% 'SFA 1\tau', 'STD 1\tau'), else the source's own title.
+t = fallback;
+if c > numel(names); return; end
+tok = regexp(names{c}, '^sfa(\d+)_std(c?)(\d+)$', 'tokens', 'once');
+if strcmp(names{c}, 'no_adaptation')
+    t = 'No adaptation';
+elseif ~isempty(tok)
+    n_sfa = str2double(tok{1}); n_std = str2double(tok{3});
+    if n_sfa > 0 && n_std == 0
+        t = 'SFA alone';
+    elseif n_sfa == 0 && n_std > 0
+        t = 'Depression alone';
+    end
+end
+end
+
 function s = two_lines(s)
 % A label of more than one word on two lines, broken at its first space.
 k = find(s == ' ', 1);
