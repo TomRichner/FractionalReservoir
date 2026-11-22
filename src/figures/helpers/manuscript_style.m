@@ -42,6 +42,18 @@ s.tick_fs  = 14;
 s.label_fs = 15.4;
 s.title_fs = 14;
 
+% --- The common canvas (Tom, 2026-11-22: "The figures should have similar
+% canvas widths so that the letters appear proportionally the same"). Every
+% main and supplementary composite is laid out on one canvas width, with the
+% type sizes above in points and never scaled with a block, so letters and
+% labels have the same size relative to the figure in every figure. The
+% drawing fills the width (the cropped image is within canvas_tol of it).
+% Height is free up to canvas_max_h, a page at the same scale.
+s.canvas_w     = 13;     % inches
+s.canvas_tol   = 0.5;    % inches the cropped image may fall short of canvas_w
+s.canvas_max_h = 17;     % inches
+s.letter_fs    = 14;     % panel letters, (A), (B), ...
+
 % --- Line weights
 s.axis_lw     = 1.0;    % axis lines + tick marks
 s.line_lw     = 2.0;    % data traces
