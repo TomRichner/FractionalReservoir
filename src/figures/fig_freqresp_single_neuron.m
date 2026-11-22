@@ -55,6 +55,8 @@ arguments
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused; the networks are recorded in the .mat
     cfg.conditions                = {}    % names to draw, in order; empty = all with slow variables (select_conditions)
+    cfg.fig_size    (1,2) double  = [NaN NaN]   % inches [w h]; NaN = 1380 x 620 px (fig_supp8_grouped lays it out on the common canvas)
+    cfg.key         (1,:) char {mustBeMember(cfg.key, {'east', 'south'})} = 'east'   % where the key goes: right of the panels, or under them in three columns
 end
 
 setup_paths();
@@ -82,6 +84,7 @@ f = D.settings.f_single;
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Position', [80 80 1380 620], 'Visible', vis);
+if all(isfinite(cfg.fig_size)); fig.Units = 'inches'; fig.Position(3:4) = cfg.fig_size; end
 tl = tiledlayout(fig, 2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 rows = {};
 ax1 = gobjects(1, 3); ax2 = gobjects(1, 3);
@@ -131,7 +134,8 @@ for m = 1:3
     key_names{end + 1} = style_names{m}; %#ok<AGROW>
 end
 lg = legend(ax1(3), key, key_names, 'Box', 'off', 'FontSize', st.tick_fs, 'AutoUpdate', 'off');
-lg.Layout.Tile = 'east';
+lg.Layout.Tile = cfg.key;
+if strcmp(cfg.key, 'south'); lg.NumColumns = 3; end
 ticks = 10 .^ (ceil(log10(f(1)) - 1e-9):floor(log10(f(end)) + 1e-9));
 for p = 1:3
     set([ax1(p), ax2(p)], 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out', ...

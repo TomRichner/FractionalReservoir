@@ -58,19 +58,29 @@ end
 
 function out = build(cfg, out_dir)
 
-[f_one, t_one, o_one] = composite_part(@fig_freqresp_single_neuron, cfg);
-[fig, B] = composite_figure({struct('fig', f_one, 'width', [])}, 'visible', cfg.visible, 'margin', [0.45 0.15 0.1 0.15]);
+% The common canvas (Plan 2, canvas standard): the source is laid out at
+% canvas_w less the margins, its key under the panels in three columns so
+% that the panels keep the width (at the right the key took a quarter of
+% it). Type by role at the end (canvas_type).
+% The tiled layout keeps about half an inch free right of the last tick
+% label; the right margin is negative by as much, so that the drawing
+% reaches the canvas' right edge (the cropped PNG within canvas_tol).
+st = manuscript_style(); MARGIN = [0.45 -0.35 0.1 0.15];
+row_w = st.canvas_w - MARGIN(1) - MARGIN(2);
+[f_one, t_one, o_one] = composite_part(@fig_freqresp_single_neuron, cfg, 'fig_size', [row_w, 7.1], 'key', 'south');
+[fig, B] = composite_figure({struct('fig', f_one, 'width', [])}, 'visible', cfg.visible, 'margin', MARGIN, 'width', st.canvas_w);
 blk = B{1}(1);
 assert(numel(blk.ax) == 6, 'fig_supp8_grouped:Panels', ...
     'Expected the 2 x 3 panels of fig_freqresp_single_neuron, found %d axes.', numel(blk.ax));
 % (A) in the strip above the block; (B) at the same x, level with the top
 % of the phase row (the first axes of the second row), left of its y label.
-hA = composite_letter(fig, blk, 'A', [], 'dx', -0.4);
+hA = composite_letter(fig, blk, 'A', [], 'dx', -0.4, 'dy', -0.22);   % at the height of the column titles
 u = blk.ax(4).Units; blk.ax(4).Units = 'inches';
 p = blk.ax(4).Position;
 blk.ax(4).Units = u;
 hB = composite_letter(fig, blk, 'B', [], 'dx', -0.4, 'dy', (p(2) + p(4)) - blk.top - 0.12);
 out_letters = [hA hB]; %#ok<NASGU>
+canvas_type(fig);
 
 caption = ['Supplementary Figure S8, one neuron''s frequency response: the gain from its dendritic input to its ' ...
     'synaptic output with its slow variables free, relative to the frozen gain. (A) Its magnitude against ' ...
