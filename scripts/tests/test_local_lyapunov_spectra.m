@@ -128,7 +128,15 @@ for c = 1:numel(C)
         pb = plot_box_position(heat);
         ok = isequal(hx.XLim, heat.XLim) && max(abs(hx.Position([1 3]) - pb([1 3]))) < 1e-6 && ...
             hx.Position(2) + hx.Position(4) < pb(2) && ...
-            isempty(findobj(hx, 'Type', 'text', '-not', 'Tag', 'histogram_label'));   % only the named labels
+            isempty(findobj(hx, 'Type', 'text', '-not', 'Tag', 'histogram_label', '-not', 'Tag', 'histogram_key'));   % only the named labels and the key
+        % A label is right-aligned inside the panel, clear of the y axis and of
+        % the zero line; the dotted curve's key stands right of the last panel.
+        lb = findobj(hx, 'Tag', 'histogram_label'); ky = findobj(hx, 'Tag', 'histogram_key');
+        for q = 1:numel(lb)
+            ok = ok && strcmp(lb(q).HorizontalAlignment, 'right') && lb(q).Position(1) < 0 && ...
+                lb(q).Position(1) > hx.XLim(1) + 0.2 * diff(hx.XLim);
+        end
+        ok = ok && numel(ky) == (c == numel(C)) && (isempty(ky) || ky.Position(1) > hx.XLim(2));
     end
 end
 if ok
@@ -139,6 +147,8 @@ end
 % label above row (B) at that size too (Plan 2, package C).
 labs = findall(g4.figs, 'Tag', 'histogram_label'); lam = findall(g4.figs, 'Tag', 'accumulated_lambda_value');
 ok = ok && numel(labs) == 3 && all([labs.FontSize] == 14) && numel(lam) == numel(C) && all([lam.FontSize] == 14);
+keys = findall(g4.figs, 'Tag', 'histogram_key');
+ok = ok && isscalar(keys) && keys.FontSize == 14 && contains(strjoin(cellstr(keys.String), ' '), 'uniform');
 close(g4.figs);
 evalc('m4 = fig_main3_stability(on_dir, {}, ''spectra_source'', ''local_lyapunov'', ''real_histogram_row'', true, ''histogram_labels'', false);');
 ok = ok && n_tagged(m4.figs, 'histogram_label') == 0 && n_tagged(m4.figs, 'ritz_density') == 0 && n_tagged(m4.figs, 'ritz_inset') == 0;

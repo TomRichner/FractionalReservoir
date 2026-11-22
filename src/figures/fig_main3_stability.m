@@ -319,7 +319,7 @@ if opts.real_histogram_row
         'UniformOutput',false),'; ') ' (the table''s last column; its other columns give the disk and the rest).'];
     out.notes{end+1}=row_d;
     if opts.histogram_labels
-        out.notes{end+1}='Labels on row (D), each once (the named exception to no text on panels): "neurons at floor or ceiling" at the spike at -1/tau_d in the first column; "network modes" above the plateau with the dotted curve named under it in the second; "adaptive states" at the pile near zero in the last column that has adaptive variables.';
+        out.notes{end+1}='Labels on row (D), each once (the named exception to no text on panels): "neurons at floor or ceiling" left of the spike at -1/tau_d in the first column; "network modes" above the plateau, left of the spike, in the second; "adaptive states" beside the pile near zero in the last column that has adaptive variables; the dotted curve is named in a key right of the last panel, outside the axes ("uniform disk, same radius"). None touches a bar, the spike, the curve or an axis.';
     end
     out.height_scale=height_scale;
     out.table_text=sprintf('%s\n\n## Row (D) of the composite\n\n%s\n',hh.table_text,row_d);
