@@ -161,6 +161,7 @@ for j = 1:size(jobs, 1)
         isequal(sort(fieldnames(o.panels))', num2cell(letters));
     n_fail = n_fail + check(ok, sprintf('%s builds: one figure, letters %s, a source named for each, no file', name, letters));
     if strcmp(name, 'fig_supp4_grouped'); n_fail = n_fail + gain_panel_check(o.figs, run_dir, three); end
+    if strcmp(name, 'fig_main7_memory'); n_fail = n_fail + main7_polish_check(o.figs, three); end
     canvas = o.figs.Position(3:4);
     close(o.figs);
     n_fail = n_fail + check(isempty(setdiff(findall(groot, 'Type', 'figure'), open_before)), ...
@@ -207,6 +208,31 @@ if n_fail > 0
     error('test_memory_supplement_composites:Failed', '%d check(s) failed.', n_fail);
 end
 fprintf('test_memory_supplement_composites: all checks PASS\n');
+end
+
+function n = main7_polish_check(fig, names)
+% Polish of 2026-11-22. (C): the conditions by name, not '1TS' and 'MTS'.
+% (D): gain tick labels under the memory-capacity maps too. (E): the
+% labelled noise ticks read their values, and the axis has a break.
+ticks = findall(fig, 'Tag', 'main7_horizon_tick');
+words = arrayfun(@(t) string(strjoin(cellstr(t.String), '')), ticks);
+full = string(erase(grouped_condition_label(names, 'tick'), ' '));
+n = check(numel(ticks) == numel(names) && all(ismember(full, words)) && ...
+    isempty(findall(fig, 'Type', 'text', 'String', '1TS')), '(C) names its conditions in full, one text per tick');
+top = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r1_c%d', c)), 1:3);
+bottom = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r2_c%d', c)), 1:3);
+n = n + check(all(arrayfun(@(a, b) ~isempty(a.XTickLabel) && isequal(a.XTickLabel, b.XTickLabel), top, bottom)), ...
+    '(D) carries the gain tick labels of (F)');
+brk = findall(fig, 'Tag', 'main7_noise_break');
+ok = ~isempty(brk);
+if ok
+    ax = ancestor(brk(1), 'axes');
+    levels = getappdata(ax, 'noise_levels');
+    lbl = cellstr(ax.XTickLabel); shown = find(~cellfun(@(s) isempty(strtrim(s)), lbl));
+    ok = ~isempty(levels) && numel(shown) >= 2 && ...
+        all(arrayfun(@(k) strcmp(lbl{k}, sprintf('%g', levels(k))), shown)) && ~any(contains(lbl, 'times'));
+end
+n = n + check(ok, '(E) labels its noise ticks with their values and marks the break after 0');
 end
 
 function n = gain_panel_check(fig, run_dir, names)

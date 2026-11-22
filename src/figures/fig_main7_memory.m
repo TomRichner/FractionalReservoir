@@ -147,9 +147,14 @@ catch ME
     if ~strcmp(ME.identifier, 'grouped_condition_label:UnknownTitle'); rethrow(ME); end
     horizon_names = names;      % the source no longer labels by title: its order is the selection's
 end
-ax_c.XTickLabel = lower_after_space(grouped_condition_label(horizon_names, 'abbrev'));
-ax_c.XTickLabelRotation = 0;
-xlabel(ax_c, 'Adaptation Condition', 'Interpreter', 'none');
+% The conditions by name, on two lines and in their colors, where "1TS" and
+% "MTS" stood (polish list, 2026-11-22: the abbreviations are defined
+% nowhere on the figure). The names say what the axis is, so it has no
+% label of its own; there is no room for one under two lines.
+% Text objects, not tick labels: a tick label of two lines is set flush
+% left of its first line, not centered under its tick.
+horizon_ticks(ax_c, horizon_names, st);
+xlabel(ax_c, '');
 ax_c.YTick = 0:6:ax_c.YLim(2);
 % (D), (F): sentence-case condition titles, in the colour the source gave them.
 for c = 1:nc
@@ -163,6 +168,17 @@ for pass = 1:2          % the legend settles its width only after a redraw
     lp = M.legends.Position;
     M.legends.Position = [W - 10 - lp(3), lp(2), lp(3), lp(4)];
 end
+
+% (D): the gain tick labels under the memory-capacity maps too. The source
+% labels the bottom row only, which in this figure is two rows down, under
+% (F) (polish list, 2026-11-22).
+for c = 1:nc
+    maps(1, c).XTickLabel = maps(2, c).XTickLabel;
+end
+% (E): the labelled noise levels as their values (the source rounds to one
+% significant figure: 0.025 read "3 x 10^-2"), and a break drawn on the
+% axis between 0 and the lowest positive level, which are not a decade apart.
+relabel_noise_axis(ax_noise, S_map.noise_levels);
 
 %% Panel letters
 T.letter(ax_a, 'A', -90, 12);
@@ -206,10 +222,10 @@ caption = sprintf(['Main Figure 7, memory (drawn by fig_main7_memory; run `%s`, 
     'line, interquartile band and gray binned counts; the lower y limit is -0.2 and the mean markers of the source ' ...
     'figure are not drawn (Tom, 2026-11-17). (B) Reconstruction score R^2 of the past input against delay, mean ' ...
     'and band over trials as fig_memory_capacity draws them; dotted, the threshold of the memory horizon. (C) Memory ' ...
-    'horizon per trial, the same trial joined across conditions, and the mean per condition. (D) Memory capacity ' ...
+    'horizon per trial, the same trial joined across conditions, and the mean per condition; the conditions are named under the axis, in their colors. (D) Memory capacity ' ...
     '(median over seeds) over gain by self-coupling s, one map per condition; star: the preset. (E) Memory capacity ' ...
     'of the preset network against the input noise sigma_u: median over networks and interquartile band; the axis ' ...
-    'is broken between 0 and the lowest positive level. (F) lambda_1 with the task input on over the same grid ' ...
+    'is broken between 0 and the lowest positive level (break marks), and the labelled ticks read their levels. (F) lambda_1 with the task input on over the same grid ' ...
     '(median over seeds; symmetric-log colour scale with its darkest colour at zero). One legend names the ' ...
     'conditions. Panels (D) to (F) are fig_main_mc_grouped''s, with its scales. Canvas %d x %d px, text 14 pt.'], ...
     cfg.run_dir, cfg.mc_run_dir, strjoin(names, ', '), tau_name, W, H);
@@ -241,7 +257,48 @@ assert(isscalar(hit), 'fig_main7_memory:TauCondition', ...
 name = hit{1};
 end
 
-function labels = lower_after_space(labels)
-% 'No Adaptation' -> 'No adaptation' (sentence case); '1TS', 'MTS' unchanged.
-labels = regexprep(labels, '(?<=\s)([A-Z])(?=[a-z])', '${lower($1)}');
+function horizon_ticks(ax, names, st)
+% The horizon panel's conditions under their ticks: the condition's tick
+% name ('No adaptation', 'Single-timescale', 'Multiple-timescale') on two
+% lines, broken at its space or after its hyphen, centered, in its
+% condition color.
+words = grouped_condition_label(names, 'tick');
+assert(numel(words) == numel(ax.XTick), 'fig_main7_memory:HorizonTicks', ...
+    'The horizon panel has %d ticks for %d conditions.', numel(ax.XTick), numel(words));
+xt = ax.XTick; yl = ax.YLim;
+ax.XTickLabel = {};
+for k = 1:numel(words)
+    parts = regexp(words{k}, '^(\S+?-|\S+) ?(\S+)$', 'tokens', 'once');
+    if isempty(parts); parts = words(k); end
+    text(ax, xt(k), yl(1) - 0.04 * diff(yl), parts, 'Color', st.condition_color(names{k}), 'FontSize', 14, ...
+        'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', 'Clipping', 'off', 'Interpreter', 'none', ...
+        'Tag', 'main7_horizon_tick');
+end
+ax.YLim = yl;
+end
+
+function relabel_noise_axis(ax, levels)
+% The noise panel's x axis: every labelled tick reads its level (%g of the
+% saved value), and the axis line is broken between the 0 and the first
+% positive level, with a slanted stroke on each side of the gap.
+assert(numel(levels) == numel(ax.XTick), 'fig_main7_memory:NoiseLevels', ...
+    'The noise panel has %d ticks and %d levels.', numel(ax.XTick), numel(levels));
+lbl = cellstr(ax.XTickLabel);
+for k = 1:numel(lbl)
+    if ~isempty(strtrim(lbl{k})); lbl{k} = sprintf('%g', levels(k)); end
+end
+set(ax, 'XTickLabel', lbl, 'TickLabelInterpreter', 'tex');
+setappdata(ax, 'noise_levels', levels);              % the level at each tick, for whoever reads the figure back
+if ~(levels(1) == 0 && numel(levels) > 1); return; end
+drawnow;
+xt = ax.XTick; yl = ax.YLim; xl = ax.XLim;
+p = getpixelposition(ax);
+ux = diff(xl) / p(3); uy = diff(yl) / p(4);          % axis units per pixel
+xm = mean(xt(1:2)); half = 5 * ux;                   % a gap of 10 px, midway
+args = {'Clipping', 'off', 'HandleVisibility', 'off', 'Tag', 'main7_noise_break'};
+patch(ax, xm + half * [-1 1 1 -1], yl(1) + 3 * uy * [-1 -1 1 1], 'w', 'EdgeColor', 'none', args{:});
+for x0 = xm + half * [-1 1]
+    plot(ax, x0 + 3 * ux * [-1 1], yl(1) + 7 * uy * [-1 1], '-', 'Color', ax.XColor, 'LineWidth', ax.LineWidth, args{:});
+end
+set(ax, 'XLim', xl, 'YLim', yl);
 end

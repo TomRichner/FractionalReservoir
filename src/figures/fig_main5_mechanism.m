@@ -67,12 +67,16 @@ function out = build(cfg, out_dir)
 [f_dose, t_dose] = composite_part(@fig_outlier_dose, cfg);
 width = f_plane.Position(3);                         % inches: fig_outlier_plane lays itself out in inches
 [fig, B] = composite_figure({struct('fig', f_plane, 'width', []), struct('fig', f_dose, 'width', width)}, ...
-    'visible', cfg.visible);
-composite_letter(fig, B{1}(1), 'A');
+    'visible', cfg.visible, 'margin', [0.15 0.15 -0.2 0.15]);
+% (A) at the height of the condition titles, beside the first panel: the
+% plane figure keeps half an inch for its titles above the panels, and a
+% letter in the strip above that sat far from the panel (polish list,
+% 2026-11-22). The top margin is taken back by as much.
+composite_letter(fig, B{1}(1), 'A', 'dy', -0.36);
 dose_ax = B{2}(1).ax;
 letters = 'BCD';
 for k = 1:min(3, numel(dose_ax))
-    composite_letter(fig, B{2}(1), letters(k), dose_ax(k));
+    composite_letter(fig, B{2}(1), letters(k), dose_ax(k), 'dy', -0.12);
 end
 
 caption = sprintf(['Main Figure 5. (A) What adaptation does to the effective connectivity: eigenvalues of W D (each ' ...

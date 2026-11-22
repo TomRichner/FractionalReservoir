@@ -183,6 +183,24 @@ cond_short = { ...
     'sfa_and_std',      'SFA+STD'};
 s.condition_short = containers.Map(cond_short(:, 1), cond_short(:, 2));
 
+% --- The two cell types. ONE E color and ONE I color for every manuscript
+% figure that marks a neuron, a trace or a statistic by its cell type with a
+% single color (polish list of 2026-11-22: Figure 8 took the model's orange
+% and blue from SRNNCellTypePairs.type_colors, the insets of Figure 5 the
+% dark rose and teal of excitatory_colormap(1) / inhibitory_colormap(1)).
+% E reddish, I bluish (docs/Figure_style_guide.md). The values are the
+% model's own two anchors, SRNNCellTypePairs.type_colors(2), so the model's
+% time-series plots and the manuscript figures agree;
+% test_composite_spectral_figures pins the equality. The I blue is close to
+% the multiple-timescale condition blue and the E orange-red lies between
+% the no-adaptation red and the single-timescale yellow: a figure that uses
+% both encodings keeps them apart on the panel (an inset, a separate axes),
+% as Tom accepted on 2026-11-20. The many-neuron palettes
+% (excitatory_colormap, inhibitory_colormap) are a different thing: shades
+% that tell the neurons of one type apart.
+s.E_color = [0.8500 0.3250 0.0980];
+s.I_color = [0.0000 0.4470 0.7410];
+
 % --- Metric labels, so the axis of a given quantity reads the same everywhere.
 s.label_lle  = '\lambda_1';
 s.label_rate = 'Mean Pop. Firing Rate';

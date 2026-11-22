@@ -139,10 +139,22 @@ insets = findall(o.figs, 'Tag', 'fig_outlier_plane_inset');
 marks = findall(o.figs, 'Tag', 'fig_outlier_plane_inset_mark');
 assert(numel(insets) == 6 && numel(marks) == 12, 'six insets, each with an E and an I');
 assert(isequal(sort(get(marks, 'String')), sort(repmat({'E'; 'I'}, 6, 1))));
-ei = [excitatory_colormap(1); inhibitory_colormap(1)];
+st_ei = manuscript_style();
+ei = [st_ei.E_color; st_ei.I_color];
+assert(isequal(ei, SRNNCellTypePairs.type_colors(2)), 'the manuscript''s one E and one I color are the model''s two anchors');
 for k = 1:numel(marks)
-    assert(isequal(marks(k).Color, ei(1 + strcmp(marks(k).String, 'I'), :)), 'the marks are in the cell-type colors');
+    assert(isequal(marks(k).Color, ei(1 + strcmp(marks(k).String, 'I'), :)), 'the marks are in the manuscript_style E and I colors');
 end
+for k = 1:numel(insets)
+    sc = findall(insets(k), 'Type', 'scatter');
+    assert(all(ismember(sc.CData, ei, 'rows')), 'the inset dots are in the manuscript_style E and I colors');
+end
+la = findall(o.figs, 'Tag', 'panel_letter_A');
+assert(isscalar(la), 'one letter (A)');
+fig_px = getpixelposition(o.figs);
+top_px = max(arrayfun(@(a) sum(subsref(getpixelposition(a, true), substruct('()', {[2 4]}))), findall(o.figs, 'Type', 'axes')));
+gap_in = (la.Position(2) * fig_px(4) - top_px) / get(groot, 'ScreenPixelsPerInch');
+assert(gap_in < 0.45, '(A) sits %.2f in above the top of its panels: within half an inch', gap_in);
 runs = ospec_read_index(tmp);
 first_seed = [runs.seed1(1), runs.seed2(1)];
 txt = fileread(fullfile(fig_dir, 'main5', 'Fig_Main5_Grouped_table.md'));
@@ -164,6 +176,13 @@ assert(isequal(sort(get(net_ax, 'Tag')), {'freqresp_network_reference_c1'; 'freq
 for k = 1:2
     assert(strcmp(net_ax(k).XLabel.String, 'Frequency (Hz)') && ~isempty(net_ax(k).XTickLabel), 'C and D carry their own frequency axis');
 end
+% Polish of 2026-11-22: C and D fill the width; no bars at the foot of D; one unit on both axes of E.
+o.figs.Units = 'inches'; set(net_ax, 'Units', 'inches');
+span = max(arrayfun(@(a) sum(a.Position([1 3])), net_ax)) - min(arrayfun(@(a) a.Position(1), net_ax));
+assert(span > 0.85 * o.figs.Position(3), 'C and D together take the width of the figure (%.2f of %.2f in)', span, o.figs.Position(3));
+assert(isempty(findall(net_ax, 'Type', 'line', 'LineWidth', 3)), 'no bulk-rotation bars on D in the main figure');
+labels = string(get(findall(o.figs, 'Type', 'text', 'Tag', 'complex_plane_axes'), 'String'));
+assert(any(labels == "Im (s^{-1})") && any(labels == "Re (s^{-1})") && ~any(contains(labels, "rad")), 'E: s^-1 on both axes');
 plane_ax = findall(o.figs, '-regexp', 'Tag', '^freqresp_plane_');
 assert(numel(plane_ax) == 3 && all(startsWith(get(plane_ax, 'Tag'), 'freqresp_plane_reference_')), 'E: the reference network, one panel per condition');
 gain_ax = findall(o.figs, '-regexp', 'Tag', '^main6_gain_');

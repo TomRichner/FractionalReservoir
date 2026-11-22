@@ -79,6 +79,28 @@ assert(throws(@() bm_load_runs(tempname), ''), 'the loader refuses a run without
 %% 3. The figures
 out_dir = fullfile(run_dir, 'figs');
 o = fig_burst_mode('run_dir', run_dir, 'out_dir', fullfile(out_dir, 'a'), 'visible', false);
+% Polish of 2026-11-22: E and I in the manuscript's colors; the two modes of
+% A told apart by color and width; both legends of A after the step.
+st = manuscript_style();
+assert(isequal([st.E_color; st.I_color], SRNNCellTypePairs.type_colors(2)), ...
+    'the manuscript''s E and I colors are the model''s two anchors');
+lg = findall(o.figs, 'Type', 'legend');
+assert(numel(lg) == 2, 'two legends on A');
+B8 = bm_load_runs(run_dir, '', 'first');
+for k = 1:2
+    names = lg(k).String; h = lg(k).PlotChildren; ax = lg(k).Axes;
+    set([lg(k) ax], 'Units', 'normalized');
+    x_step = ax.Position(1) + ax.Position(3) * (B8.R{1}.t_step - ax.XLim(1)) / diff(ax.XLim);
+    assert(lg(k).Position(1) >= x_step, 'the legend "%s ..." begins after the step, clear of the onset transient', names{1});
+    if any(strcmp(names, 'E'))
+        assert(isequal(h(strcmp(names, 'E')).Color, st.E_color) && isequal(h(strcmp(names, 'I')).Color, st.I_color), ...
+            'E and I traces in the manuscript_style colors');
+    else
+        fz = h(strcmp(names, 'Gains frozen')); fj = h(strcmp(names, 'Full Jacobian'));
+        assert(~isequal(fz.Color, fj.Color) && fz.LineWidth >= 2 * fj.LineWidth, ...
+            'gains frozen and full Jacobian differ in color and in width');
+    end
+end
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode.png')) && isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode_table.md')));
 ied = fullfile(run_dir, 'ied'); mkdir(ied);
@@ -105,6 +127,13 @@ if isfolder(fullfile(c8.clinical_dir, 'panels')) && isfile(fullfile(legacy, 'sum
     assert(info.Width >= 2000 && info.Height > 1.6 * info.Width, 'Figure 8 is a tall 7-in page at 300 dpi: %d x %d', ...
         info.Width, info.Height);
     assert(all(cellfun(@isfile, o.files)));
+    % Titles of the clinical and modular panels: sentence case, no counts.
+    f8 = openfig(o.files{2}, 'invisible');
+    titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), findall(f8, 'Type', 'axes'));
+    close(f8);
+    assert(all(ismember(["No stimulation", "Stimulation", "Model, no stimulation", "Model, stimulation"], titles)) && ...
+        ~any(contains(titles, ["(", "Median", "No Stimulation"])), 'Figure 8: sentence-case titles without counts');
+    assert(contains(fileread(o.files{4}), 'Titles restyled on the composite'), 'the provenance lists the original titles');
 else
     note = ' (new Figure 8 skipped: no clinical panels or no 2026-11-17 model run on this machine)';
 end
