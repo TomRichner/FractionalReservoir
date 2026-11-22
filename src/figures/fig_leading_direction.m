@@ -12,11 +12,14 @@ function out = fig_leading_direction(cfg)
 % lambda_1, vertically the share of the leading perturbation's squared norm
 % that lies in the dendritic coordinates (lead_frac_x, saved per run by the
 % sweep; the rest lies in the adaptation and depression variables). A
-% dashed line at zero growth, and a dotted line at the growth rate of the
-% nearly uncoupled network (the uncoupled_reference stage).
+% dashed line at zero growth. NO line at the uncoupled rate by default (Tom,
+% 2026-11-21: Figure 4C is drawn without it); 'reference_line', true draws
+% it dotted. The uncoupled rate and the share of runs near it are in the
+% table whenever the uncoupled_reference stage's output exists, because the
+% text quotes them.
 %
 % WHAT IT SHOWS. Where an adapting network contracts, its points sit near
-% the dotted line with almost no dendritic share: what decays slowly there
+% the uncoupled rate with almost no dendritic share: what decays slowly there
 % is each neuron's own adaptation, not a mode of the network. Where it
 % expands, the leading perturbation is mostly dendritic. Without adaptation
 % the state is dendritic only, so every point is at 1.
@@ -30,11 +33,11 @@ function out = fig_leading_direction(cfg)
 % THE REFERENCE. <run_dir>/uncoupled_reference/uncoupled_reference_data.mat
 % (run_uncoupled_reference_stage), or the file given as 'reference_file'
 % (the escape hatch for a run made before the stage existed: the caller
-% says which reference it is). Each condition's line is the median over the
-% stage's repetitions at its first (lowest) gain. A run WITHOUT the stage
-% is drawn without the dotted line, with a printed note and a sentence in
-% the table: the panel's points do not depend on it. 'require_reference',
-% true makes its absence an error.
+% says which reference it is). Each condition's reference is the median over
+% the stage's repetitions at its first (lowest) gain. A run WITHOUT the stage
+% is drawn as any other (the panel's points do not depend on it), with a
+% printed note and a sentence in the table that its columns are empty.
+% 'require_reference', true makes its absence an error.
 %
 % OPTIONS
 %   conditions   names to draw, in order; empty = all the run holds
@@ -45,6 +48,8 @@ function out = fig_leading_direction(cfg)
 %   lambda0      linear scale of the axis, 1/s (default 0.05)
 %   clip         |lambda_1| drawn at most here, 1/s (default 10)
 %   reference_file, require_reference   see above
+%   reference_line  draw the dotted line at the uncoupled rate (default
+%                false); the table holds the numbers either way
 %
 % No text on the panels. Numbers: Fig_Leading_Direction_table.md.
 %
@@ -68,6 +73,7 @@ arguments
     cfg.clip           (1,1) double {mustBePositive} = 10
     cfg.reference_file (1,:) char    = ''
     cfg.require_reference (1,1) logical = false
+    cfg.reference_line (1,1) logical = false   % draw the dotted line at the uncoupled rate (off: Tom, 2026-11-21)
 end
 
 setup_paths();
@@ -129,7 +135,7 @@ if isempty(ref_file)
             cfg.run_dir);
     end
     vprintf(cfg.verbose, 'minimal', ['[fig_leading_direction] no uncoupled reference in %s (stage uncoupled_reference): ' ...
-        'the dotted line is not drawn.\n'], cfg.run_dir);
+        'the table''s uncoupled columns are empty.\n'], cfg.run_dir);
 else
     U = load(ref_file, 'ref', 'settings');
     ref_settings = U.settings;
@@ -163,7 +169,7 @@ for i = 1:n_cond
     col = st.condition_color(names{i});
     plot(ax(i), [0 0], [-0.05 1.05], '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw, ...
         'Tag', 'zero_growth_reference');
-    if isfinite(S(i).reference)
+    if cfg.reference_line && isfinite(S(i).reference)
         plot(ax(i), to_x(S(i).reference) * [1 1], [-0.05 1.05], ':', 'Color', [0.25 0.25 0.25], 'LineWidth', 1.6, ...
             'Tag', 'uncoupled_reference');
     end
@@ -189,22 +195,27 @@ end
 
 %% Table
 fig_tag = 'Fig_Leading_Direction';
+if cfg.reference_line
+    line_txt = ' Dotted: the nearly uncoupled network.';
+else
+    line_txt = ' The uncoupled rate is not drawn (Tom, 2026-11-21); it is in the table.';
+end
 L = {};
 L{end + 1} = '# What decays slowly: the dendritic share of the leading perturbation against the leading growth rate';
 L{end + 1} = '';
 L{end + 1} = sprintf(['Joint parameter-space sample: `%s`. One point per configuration that ran. Vertical: `lead_frac_x`, the ' ...
     'share of the leading tangent vector''s squared norm in the dendritic coordinates (the rest is in the adaptation and ' ...
     'depression variables). Horizontal: the leading growth rate, on a symmetric-logarithmic axis (linear within %g 1/s of ' ...
-    'zero; |lambda_1| above %g 1/s drawn at %g). Dashed: zero growth. Dotted: the nearly uncoupled network.'], ...
-    psa_dir, cfg.lambda0, cfg.clip, cfg.clip);
+    'zero; |lambda_1| above %g 1/s drawn at %g). Dashed: zero growth.%s'], ...
+    psa_dir, cfg.lambda0, cfg.clip, cfg.clip, line_txt);
 L{end + 1} = '';
 if isempty(ref_file)
-    L{end + 1} = ['**No uncoupled reference in this run** (stage `uncoupled_reference`): the dotted line is not drawn and ' ...
-        'the reference columns are empty.'];
+    L{end + 1} = ['**No uncoupled reference in this run** (stage `uncoupled_reference`): the reference columns are ' ...
+        'empty.'];
 else
     L{end + 1} = sprintf(['Uncoupled reference: `%s`. The same network with every recurrent weight scaled to %s of the ' ...
         'preset''s (level_of_chaos), %d repetitions (network seeds) per value, n = %g, T = [%g, %g] s, Lyapunov window ' ...
-        '[%g, %g] s, %g Hz, %s. The line is the median at the first value.'], ref_file, mat2str(ref_settings.gains), ...
+        '[%g, %g] s, %g Hz, %s. The reference is the median at the first value.'], ref_file, mat2str(ref_settings.gains), ...
         ref_settings.n_reps, ref_settings.n, ref_settings.T_range, ref_settings.lya_T_interval, ref_settings.fs, ...
         ref_settings.ode_solver);
 end
@@ -236,9 +247,11 @@ L{end + 1} = ['Columns. **dendritic share < 0.1**: share of runs whose leading p
 L{end + 1} = '';
 L{end + 1} = '## Caption sentence, to adapt';
 L{end + 1} = '';
+caption_line = '';
+if cfg.reference_line; caption_line = ' Dotted: the growth rate of the same network with its recurrent weights scaled to near zero.'; end
 L{end + 1} = ['For each condition, the share of the leading perturbation that lies in the dendritic coordinates against ' ...
     'the leading growth rate, one point per configuration of the joint sample (symmetric-logarithmic axis). Dashed: ' ...
-    'zero growth. Dotted: the growth rate of the same network with its recurrent weights scaled to near zero.'];
+    'zero growth.' caption_line];
 table_text = strjoin(L, newline);
 vprintf(cfg.verbose, 'verbose', '%s\n', table_text);
 

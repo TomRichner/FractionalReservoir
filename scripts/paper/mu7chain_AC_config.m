@@ -53,8 +53,11 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %   cfg.run_dir   data/mu7chain_AC_<run_mode>
 %   cfg.fig_root  figs/mu7chain_AC_<run_mode>_<figure_set>; the grouped
 %                 main figures read their source figures from this root
-%   cfg.figures   block A's entries, then block C's (the paper's Fig 7,
-%                 fig_main_mc_grouped, among them: FD-031 item 1), then
+%   cfg.figures   block A's entries (main Figures 1 to 6, S1 to S8 and the
+%                 appendix), then block C's (all appendix since Plan 2; the
+%                 old Fig 7, fig_main_mc_grouped, among them), then the
+%                 paper's Figure 7 and S9 (fig_main7_grouped,
+%                 fig_supp9_grouped; from 'fast' upward), then
 %                 fig_noise_switch_rollouts: one time-series figure per
 %                 condition of the set (Fig_noise_switch_timeseries_<c>_copies)
 %                 and the summary (Fig_noise_switch_divergence, with its
@@ -168,7 +171,25 @@ end
 % and Fig_noise_switch_divergence, are prefixes of no other tag, and it has
 % its own folder. In the appendix (the figure plan of 2026-11-21).
 noise_switch = paper_figure_entry('fig_noise_switch_rollouts', @fig_noise_switch_rollouts, 'appendix');
-cfg.figures = [figures_A, C.figures, {noise_switch}];
+% THE PAPER'S FIGURE 7 AND S9 (Plan 2, integration, 2026-11-21): the two
+% memory composites read block A (the tau sweep, memory_capacity,
+% mc_example) and block C (the gain x self-coupling grid and, for Figure 7,
+% the Wiener noise sweep) from THIS run directory (their mc_run_dir is left
+% empty, so it is run_dir), which is why they are entries of this bundle
+% and of neither part. Registered only where the run holds all of it: not
+% at 'essential', which skips block A's tau sweep and memory stages, and
+% not when block C's run_grids leave out either grid. run_mode and
+% figure_set name block C's registry entry whose map style they copy.
+mc_args = {'preset_name', cfg.preset_name, 'run_mode', run_mode, 'figure_set', figure_set};
+block_A_memory = all(ismember({'memory_capacity', 'mc_example'}, cfg.stages)) && ...
+    (isempty(cfg.sweeps) || ismember('tau', cfg.sweeps));
+grids = cfg.mc_gain_sweep.run_grids;
+memory = {};
+if block_A_memory && all(ismember({'selfcoupling', 'noise1d_wiener'}, grids))
+    memory = {paper_figure_entry('fig_main7_grouped', @fig_main7_memory, 'main', [mc_args, {'fig_tag', 'Fig_Main7_Grouped'}]), ...
+              paper_figure_entry('fig_supp9_grouped', @fig_supp9_grouped, 'supplement', [mc_args, {'fig_tag', 'Fig_Supp9_Grouped'}])};
+end
+cfg.figures = [figures_A, C.figures, memory, {noise_switch}];
 names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
 [~, first] = unique(names, 'stable');
 shared = unique(names(setdiff(1:numel(names), first)));

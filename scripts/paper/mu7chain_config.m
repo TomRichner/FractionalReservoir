@@ -221,13 +221,18 @@ cfg.param_space_seed = 7202;
 % out (paper_stage_names), then this one; nothing is skipped, as before.
 % Its settings (seeds by mode; K, window and rate fixed) are in
 % lyapunov_spectrum_n80_stage_plan.
+% PLUS, IN EVERY MODE (Plan 2, integration, 2026-11-21), the opt-in stages
+% 'concept_examples' (the four example networks of Figure 1 and the gallery
+% S3; concept_examples_stage_plan) and 'uncoupled_reference' (the growth
+% rate of the nearly uncoupled network, the dotted line of Figure 4C;
+% uncoupled_reference_stage_plan). Both take minutes at any size.
 is_essential = strcmp(run_mode, 'essential');
-cfg.stages = [paper_stage_names(), {'lyapunov_spectrum_n80'}];
+NEW_STAGES = {'lyapunov_spectrum_n80', 'concept_examples', 'uncoupled_reference'};
+cfg.stages = [paper_stage_names(), NEW_STAGES];
 cfg.sweeps = {};
 cfg.eig_heatmap_examples = [];
 if is_essential
-    cfg.stages = {'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations', ...
-        'lyapunov_spectrum_n80'};
+    cfg.stages = [{'sweeps', 'eig_heatmap', 'local_lyapunov', 'paper_illustrations'}, NEW_STAGES];
     cfg.sweeps = {'sensitivity', 'param_space'};
     % The reference network alone: fig_eig_heatmap (and figure 3 through it)
     % reads the reference; the two E:I-imbalanced examples feed only
@@ -342,11 +347,12 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 % manuscript repository's figures_main_supp_appen.md): every entry is
 % 'main', 'supplement' or 'appendix', and in_paper is derived from it (main
 % and supplement). The main figures here are the grouped composites
-% (grouped_figure_registry). Every single figure below is 'appendix': it is
-% either in the plan's appendix or only a panel of a future supplementary
-% composite (fig_supp<k>_grouped), which other Plan 2 packages build and the
-% wiring job registers as 'supplement'. Until 2026-11-21 several of them
-% were in_paper true, as panels of the old supplement.
+% (grouped_figure_registry: main Figures 1 to 4, supplementary S1 to S5,
+% the old composites in the appendix; with_spectral_supplement adds main 5
+% and 6 and S6 to S8, mu7chain_AC_config main 7 and S9). Every single
+% figure below is 'appendix': it is in the plan's appendix, or a panel of a
+% supplementary composite. Until 2026-11-21 several of them were in_paper
+% true, as panels of the old supplement.
 F = {};
 % The two entries that simulate while drawing take the bundle's rate and
 % integrator too (Tom, 2026-11-17: every paper simulation at SRA1, 500 Hz).
@@ -444,11 +450,19 @@ F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
 %   fig_main3_grouped                 local_lyapunov and eig_heatmap
 %   fig_main4_grouped                 the 1-D sweeps and the joint sample
 %   fig_lyapunov_ranked_spectrum      lyapunov_spectrum_n80 (FD-032)
+%   fig_main1_grouped, fig_supp3_grouped   concept_examples (Plan 2)
+%   fig_supp1_grouped                 single_neuron (paper_illustrations) and
+%                                     the preset's adaptation models
+%   fig_supp4_grouped                 the 1-D sweeps
+%   fig_supp5_grouped                 the joint sample and the 1-D sweeps
+% (main Figure 5 and S6 to S8 are added by with_spectral_supplement in
+% every mode; Figures 6 and 7, S2 and S9 need stages this mode skips.)
 if is_essential
     keep = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', ...
             'fig_param_space_allStd', 'fig_EI_weights_param_space', 'fig_lle_vs_rate', ...
             'fig_eig_heatmap', 'fig_eig_real_histogram', 'fig_lyapunov_ranked_spectrum', ...
-            'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped'};
+            'fig_main1_grouped', 'fig_main2_grouped', 'fig_main3_grouped', 'fig_main4_grouped', ...
+            'fig_supp1_grouped', 'fig_supp3_grouped', 'fig_supp4_grouped', 'fig_supp5_grouped'};
     names = cellfun(@(f) f.name, F, 'UniformOutput', false);
     missing = setdiff(keep, names);
     assert(isempty(missing), 'mu7chain_config:EssentialRegistry', ...

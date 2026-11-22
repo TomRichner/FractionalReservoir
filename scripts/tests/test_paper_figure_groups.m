@@ -17,7 +17,10 @@ function test_paper_figure_groups()
 %   4. the bundles that make the paper, mu7chain_AC_config (Figures 1 to 7
 %      and the supplement) and ied_stim_config (Figure 8), together register
 %      more main or supplementary figures than the limits allow, or name one
-%      entry in both;
+%      entry in both; and from 'fast' upward they register exactly the
+%      figure plan's eight main figures (fig_main1_grouped to
+%      fig_main7_grouped, Fig_Main8_Stim) and ten supplementary ones
+%      (fig_supp1_grouped to fig_supp10_grouped), by name and in order;
 %   5. a name has one group in mu7chain_config or mu7chain_gainbias_config
 %      and another in mu7chain_AC_config, which composes them;
 %   6. paper_figure_entry accepts a group it does not know.
@@ -28,6 +31,10 @@ function test_paper_figure_groups()
 
 G = paper_figure_groups();
 group_names = {G.name};
+% The figure plan's main and supplementary figures, in the order of the
+% bundles' registries (AC, then the stimulation bundle).
+PLAN_MAIN = [arrayfun(@(k) sprintf('fig_main%d_grouped', k), 1:7, 'UniformOutput', false), {'Fig_Main8_Stim'}];
+PLAN_SUPP = arrayfun(@(k) sprintf('fig_supp%d_grouped', k), 1:10, 'UniformOutput', false);
 modes = run_mode_names();
 n_bad = 0;
 
@@ -76,6 +83,17 @@ for m = modes
         end
     end
     fprintf('paper at %-10s (AC + IED %s): %s\n', m{1}, ied_mode, strjoin(counts, ', '));
+    % 4b. From 'fast' upward the paper is exactly the figure plan's: eight
+    % main and ten supplementary figures, by name (Plan 2, integration,
+    % 2026-11-21). 'essential' skips stages and draws a subset.
+    if ~strcmp(m{1}, 'essential')
+        got_main = names(strcmp(groups, 'main'));
+        got_supp = names(strcmp(groups, 'supplement'));
+        if ~isequal(got_main, PLAN_MAIN) || ~isequal(got_supp, PLAN_SUPP)
+            fprintf('BAD  paper at %s: main %s; supplement %s\n', m{1}, strjoin(got_main, ', '), strjoin(got_supp, ', '));
+            n_bad = n_bad + 1;
+        end
+    end
 end
 
 %% 5. The parts agree with the composition

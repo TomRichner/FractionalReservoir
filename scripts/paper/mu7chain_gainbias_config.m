@@ -316,10 +316,12 @@ cfg.fig_root = ['figs/mu7chain_gainbias_' run_mode '_' figure_set];
 % Each entry gets run_dir, out_dir, save, visible, verbose and the set's
 % conditions from make_all_paper_figures, then its own arguments. Every
 % entry names its grid; the figure reads that grid's result and no other.
-% GROUPS (Plan 2, package A, 2026-11-21; paper_figure_groups): the paper's
-% Fig 7, fig_main_mc_grouped, is 'main'; every other entry is 'appendix'
-% (in the plan's appendix, or a panel of the future merged memory figure or
-% of supplementary S9, which other packages build). in_paper follows the
+% GROUPS (Plan 2, 2026-11-21; paper_figure_groups): every entry here is
+% 'appendix' (in the plan's appendix, or a panel of the merged memory
+% Figure 7 or of S9). The old Fig 7, fig_main_mc_grouped, is 'appendix'
+% since the integration of Plan 2: the paper's Figure 7 (fig_main7_memory)
+% and S9 read blocks A and C together and are entries of
+% mu7chain_AC_config, not of this block-C-only bundle. in_paper follows the
 % group (paper_figure_entry); until then the maps, curves, robustness,
 % MC against lambda_1 and the noise sweeps were in_paper true.
 % The maps' color scales: memory capacity linear from 0 to its maximum;
@@ -409,7 +411,7 @@ cfg.figures = entries_of_grids(cfg.figures, RUN_GRIDS);
 % of their grids run. Its function takes no 'grid'/'grids' argument, hence
 % the explicit check instead of entries_of_grids.
 if all(ismember({SELF, NOISE_WIENER}, cfg.mc_gain_sweep.run_grids))
-    main_mc = paper_figure_entry('fig_main_mc_grouped', @fig_main_mc_grouped, 'main', ...
+    main_mc = paper_figure_entry('fig_main_mc_grouped', @fig_main_mc_grouped, 'appendix', ...
         {'run_mode', run_mode, 'figure_set', figure_set, 'fig_tag', 'Fig_Main_MC_Grouped'});
     names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
     after = find(ismember(names, {'fig_mc_maps_selfcoupling', 'fig_mc_noise_sweeps'}), 1, 'last');

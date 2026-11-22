@@ -9,7 +9,9 @@ function out = fig_main4_connectivity(cfg)
 % over the joint sample), unchanged in size and style. Panel (C), new, is
 % fig_leading_direction in its 'column' layout, placed to the right of
 % them: for each condition, the dendritic share of the leading perturbation
-% against lambda_1 over the joint sample, with the uncoupled reference.
+% against lambda_1 over the joint sample. No line at the uncoupled rate
+% (Tom, 2026-11-21); its numbers are in the table when the run holds the
+% uncoupled_reference stage.
 %
 % WHY (C) IS A COLUMN ON THE RIGHT, NOT A ROW BELOW. A third row would make
 % the canvas about 1040 px tall. A window taller than the workstation's
@@ -36,6 +38,8 @@ function out = fig_main4_connectivity(cfg)
 %   conditions       passed to both inner figures (FD-006)
 %   reference_file, require_reference   passed to fig_leading_direction
 %                    (the uncoupled reference; see there)
+%   reference_line   passed to fig_leading_direction: the dotted line at
+%                    the uncoupled rate (default false)
 %   fig_tag          the file name stem, default 'Fig_Main4_Connectivity'.
 %                    The registry passes 'Fig_Main4_Grouped' so that the
 %                    manuscript's figure_sources.json needs no repointing.
@@ -58,6 +62,7 @@ arguments
     cfg.conditions                   = {}
     cfg.reference_file (1,:) char    = ''
     cfg.require_reference (1,1) logical = false
+    cfg.reference_line (1,1) logical = false
     cfg.fig_tag        (1,:) char    = 'Fig_Main4_Connectivity'
 end
 
@@ -80,7 +85,7 @@ top = a_box(2) + a_box(4);                                   % the top of (A)'s 
 %% Panel (C): the column, as tall as the canvas below the level of (A)
 c = fig_leading_direction('run_dir', cfg.run_dir, 'save', false, 'visible', false, 'verbose', cfg.verbose, ...
     'conditions', cfg.conditions, 'layout', 'column', 'reference_file', cfg.reference_file, ...
-    'require_reference', cfg.require_reference);
+    'require_reference', cfg.require_reference, 'reference_line', cfg.reference_line);
 c.figs.Position(3:4) = [C_WIDTH, round(top * ab_size(2))];
 drawnow;
 sources = [reshape(cellstr(ab.source), 1, []), reshape(c.source, 1, [])];
@@ -113,7 +118,11 @@ caption = ['(A) Leading growth rate against each connectivity parameter, median 
     '(1-D sweeps). (B) Leading growth rate against mean firing rate over the joint sample, per condition, colored by ' ...
     'the E:I weight balance. (C) For each condition, the share of the leading perturbation that lies in the dendritic ' ...
     'coordinates against the leading growth rate, one point per configuration of the joint sample; dashed, zero ' ...
-    'growth; dotted, the growth rate of the same network with its recurrent weights scaled to near zero.'];
+    'growth'];
+if cfg.reference_line
+    caption = [caption '; dotted, the growth rate of the same network with its recurrent weights scaled to near zero'];
+end
+caption = [caption '.'];
 parts = {'Panels (A) and (B)', ['the grouped Figure 4 (fig_grouped_main, group 4). Their numbers are in the tables of ' ...
     'fig_sensitivity_medians and fig_lle_vs_rate (Fig_LLE_vs_Rate_table.md).']; ...
     'Panel (C)', c.table_text};
