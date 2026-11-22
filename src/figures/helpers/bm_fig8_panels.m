@@ -11,8 +11,9 @@ function P = bm_fig8_panels(fig, rect, R, opts)
 %
 % A  the whole run: the input (mean over neurons); mean E and I rates, the
 %    frozen-adaptation arm dashed after the step; the real part of the
-%    rightmost mode as a rate (1/s), gains frozen (gray) and the rightmost
-%    network mode of the full Jacobian (the bursting condition's color),
+%    rightmost mode as a rate (1/s), gains frozen (a wide pale line of the
+%    bursting condition's hue) and the rightmost network mode of the full
+%    Jacobian (a thin black line on top of it),
 %    the frozen arm's frozen-gain mode dashed. A light band marks the burst
 %    of B; the four sampled states of C are marked on A and B.
 % B  that burst, from 1 s before its onset to 0.5 s after: rates, and the
@@ -53,10 +54,15 @@ st = manuscript_style();
 fs = opts.font_size; lw = opts.line_scale;
 tau = R.tau_d; H = R.t_step;
 I = R.intact; F = R.full; Z = R.frozen;
-ec = SRNNCellTypePairs.type_colors(2);
+ec = [st.E_color; st.I_color];                    % the manuscript's one E and one I color (the values SRNNCellTypePairs.type_colors(2) gave)
 cond_col = st.condition_color(R.condition);
-mode_col = 0.6 * cond_col;                        % the condition's hue, darkened to read as a line
-fg_col = [0.62 0.62 0.62];                        % gains frozen
+% The two modes must be told apart where they run together (polish list,
+% 2026-11-22: a thin gray line under a thin darkened condition color read as
+% one line): the frozen-gain mode is a WIDE PALE line of the condition's
+% hue, the full Jacobian's a THIN BLACK line on top of it.
+mode_col = [0 0 0];                               % the full Jacobian's rightmost network mode
+fg_col = cond_col + 0.35 * (1 - cond_col);        % gains frozen: the condition's hue, pale
+fg_w = 2.2; mode_w = 0.7;                         % their widths (times line_scale)
 purple = [0.494 0.247 0.596]; green = [0 0.62 0.45];   % no stimulation / stimulation (Figure 8's)
 state_col = {[0 0 0], 0.45 * purple + 0.55, purple, 0.6 * purple, green};
 state_name = {'Structure', 'Quiet', 'Before burst', 'Burst', 'Stimulation'};
@@ -143,23 +149,23 @@ end
 h(3) = plot(ax, NaN, NaN, '--', 'Color', [0.3 0.3 0.3], 'LineWidth', 0.8 * lw);
 ylim(ax, [0 1]); yticks(ax, [0 0.5 1]);
 ylabel(ax, 'Mean rate');
-lg = legend(ax, h, {'E', 'I', 'Adaptation frozen'}, 'Location', 'northwest', 'Box', 'off', ...
-    'FontSize', opts.annot_size, 'NumColumns', 3, 'AutoUpdate', 'off'); lg.ItemTokenSize = [12 8];
+lg_rate = legend(ax, h, {'E', 'I', 'Adaptation frozen'}, 'Box', 'off', ...
+    'FontSize', opts.annot_size, 'NumColumns', 2, 'AutoUpdate', 'off'); lg_rate.ItemTokenSize = [12 8];   % two columns: three in a row reach back to the step
 ax = P.ax_A(3);
 zl = mode_limits(re1, real(F.net), real(Z.z1));
 band(ax, zoom, zl);
 yline(ax, 0, ':', 'Color', [0 0 0], 'LineWidth', 0.6 * lw);
 hm = gobjects(1, 2);
-hm(1) = plot(ax, I.t, re1, '-', 'Color', fg_col, 'LineWidth', 0.6 * lw);
+hm(1) = plot(ax, I.t, re1, '-', 'Color', fg_col, 'LineWidth', fg_w * lw);
 after = Z.t >= H;
-plot(ax, Z.t(after), real(Z.z1(after)), '--', 'Color', fg_col, 'LineWidth', 0.8 * lw);
+plot(ax, Z.t(after), real(Z.z1(after)), '--', 'Color', 0.75 * fg_col, 'LineWidth', 0.8 * lw);
 c = F.is_coarse;
-hm(2) = plot(ax, F.t(c), real(F.net(c)), '-', 'Color', mode_col, 'LineWidth', 0.8 * lw);
+hm(2) = plot(ax, F.t(c), real(F.net(c)), '-', 'Color', mode_col, 'LineWidth', mode_w * lw);
 ylim(ax, zl);
 ylabel(ax, 'Re \lambda (s^{-1})');
 xlabel(ax, 'Time (s)');
-lg = legend(ax, hm, {'Gains frozen', 'Full Jacobian'}, 'Location', 'northeast', 'Box', 'off', ...
-    'FontSize', opts.annot_size, 'AutoUpdate', 'off'); lg.ItemTokenSize = [12 8];
+lg_mode = legend(ax, hm, {'Gains frozen', 'Full Jacobian'}, 'Box', 'off', ...
+    'FontSize', opts.annot_size, 'AutoUpdate', 'off'); lg_mode.ItemTokenSize = [14 8];
 for r = 1:3
     xlim(P.ax_A(r), [I.t(1) I.t(end)]);
     if r < 3; P.ax_A(r).XTickLabel = {}; end
@@ -185,9 +191,9 @@ ylim(ax, [0 1]); yticks(ax, [0 0.5 1]); ax.XTickLabel = {};
 ax = P.ax_B(2);
 band(ax, [on(b) off(b)], zl);
 yline(ax, 0, ':', 'Color', [0 0 0], 'LineWidth', 0.6 * lw);
-plot(ax, I.t(kz), re1(kz), '-', 'Color', fg_col, 'LineWidth', 0.8 * lw);
+plot(ax, I.t(kz), re1(kz), '-', 'Color', fg_col, 'LineWidth', fg_w * lw);
 kf = F.t >= zoom(1) & F.t <= zoom(2);
-plot(ax, F.t(kf), real(F.net(kf)), '-', 'Color', mode_col, 'LineWidth', 1.0 * lw);
+plot(ax, F.t(kf), real(F.net(kf)), '-', 'Color', mode_col, 'LineWidth', mode_w * lw);
 for q = 2:4
     plot(ax, t_state(q), zl(2), 'v', 'MarkerSize', 4.5, 'MarkerFaceColor', state_col{q}, ...
         'MarkerEdgeColor', 'none', 'Clipping', 'off');
@@ -222,12 +228,30 @@ for a = [P.ax_A P.ax_B]
     set(a, 'FontSize', fs, 'TickDir', 'out', 'Box', 'off', 'LineWidth', 0.6 * lw, ...
         'TitleFontSizeMultiplier', 1, 'LabelFontSizeMultiplier', 1);
 end
+% The two legends of A, in the stretch after the step where no trace runs:
+% between the settled rates and the frozen arm's, and above the settled
+% mode. At the upper left the rate legend lay on the onset transient and
+% on the bursts' peaks (polish list, 2026-11-22). Placed by hand (Location
+% 'none'), which stim_fig8_compose carries over.
+drawnow;
+place_legend(lg_rate, P.ax_A(2), H, [I.t(1) I.t(end)], 0.62);
+place_legend(lg_mode, P.ax_A(3), H, [I.t(1) I.t(end)], 0.72);
 P.info = struct('burst', b, 'zoom', zoom, 't_state', t_state, 'state_name', {state_name}, ...
     'z_right', cellfun(@(z) max(real(z)), zs), 'rad', rad, 're_lim', re_lim, 'im_lim', im_lim, ...
     'mode_lim', zl);
 end
 
 %% ------------------------------------------------------------------------
+function place_legend(lg, ax, t_step, t_lim, y_frac)
+% The legend centered on the stretch after the step, its middle at y_frac
+% of the axes' height.
+set([lg ax], 'Units', 'inches');
+p = ax.Position; q = lg.Position;
+x_mid = p(1) + p(3) * ((t_step + t_lim(2)) / 2 - t_lim(1)) / diff(t_lim);
+x = min(max(x_mid - q(3) / 2, p(1) + p(3) * (t_step - t_lim(1)) / diff(t_lim) + 0.03), p(1) + p(3) - q(3));
+lg.Position = [x, p(2) + y_frac * p(4) - q(4) / 2, q(3), q(4)];
+end
+
 function k = nearest_index(t, tt)
 [~, k] = min(abs(t - tt));
 end

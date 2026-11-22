@@ -22,6 +22,10 @@ function files = stim_fig8_compose(r, B, out_dir, tag, clinical_note, model_note
 % the same pixels as the printed size at 300 dpi (2100 px wide). The .fig
 % and .svg are at the scaled size.
 %
+% The titles and condition tick labels of the clinical and modular panels
+% are put in sentence case and lose their counts here (restyle_titles); the
+% provenance file lists the originals.
+%
 % Called by ied_stim_fig_combined; the output holds clinical recordings
 % (never git add -f).
 %
@@ -50,6 +54,7 @@ fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.2 0.2 W * s Ht * s]
 move_into(top, fig, Hm / Ht, Htop / Ht, containers.Map({'(A)', '(B)', '(C)'}, {'(A)', '(B)', '(C)'}));
 move_into(old, fig, 0, Hm / Ht, containers.Map({'(A)', '(B)', '(C)', '(D)', '(E)', '(F)'}, ...
     {'(D)', '(E)', '(F)', '(G)', '(H)', '(I)'}));
+changes = restyle_titles(fig);
 scale_marks(fig, s);
 if ~isfolder(out_dir); mkdir(out_dir); end
 for ext = {'.png', '.fig', '.svg'}
@@ -64,7 +69,7 @@ exportgraphics(fig, fullfile(out_dir, [tag '.png']), 'Resolution', round(300 / s
 savefig(fig, fullfile(out_dir, [tag '.fig']));
 print(fig, fullfile(out_dir, [tag '.svg']), '-dsvg', '-vector');
 prov = fullfile(out_dir, [tag '_provenance.md']);
-write_provenance(prov, r, B, clinical_note, model_note, W, Ht);
+write_provenance(prov, r, B, clinical_note, model_note, W, Ht, changes);
 tbl = fullfile(out_dir, [tag '_table.md']);
 bm_write_table(tbl, B, P.info, 'Figure 8 A to C');
 files = [fullfile(out_dir, strcat(tag, {'.png', '.fig', '.svg'})), {prov, tbl}];
@@ -140,7 +145,7 @@ function close_if(f)
 if ~isempty(f) && isvalid(f); close(f); end
 end
 
-function write_provenance(file, r, B, clinical_note, model_note, W, Ht)
+function write_provenance(file, r, B, clinical_note, model_note, W, Ht, changes)
 fid = fopen(file, 'w'); guard = onCleanup(@() fclose(fid));
 fprintf(fid, ['# Figure 8 (new order) provenance\n\nWritten by `scripts/paper/stim_fig8_compose.m` (through ' ...
     '`ied_stim_fig_combined`) on %s. Panels D to I are the axes of the present figure (`fig_stim_combined`, ' ...
@@ -161,5 +166,53 @@ m = r.letters; new = 'DEFGHI';
 for k = 1:size(m, 1)
     fprintf(fid, '| (%s) | %s | %s (was %s) |\n', new(k), m{k, 2}, m{k, 3}, m{k, 1});
 end
+if ~isempty(changes)
+    fprintf(fid, ['\n## Titles restyled on the composite\n\nThe saved panel figures carry these titles and tick labels; ' ...
+        'the composite shows them in sentence case, without counts (an empty new title: the title left the panel, ' ...
+        'and what it said belongs in the caption).\n\n| In the panel figure | On Figure 8 |\n|---|---|\n']);
+    for k = 1:size(changes, 1)
+        fprintf(fid, '| %s | %s |\n', changes{k, 1}, changes{k, 2});
+    end
+end
 fprintf(fid, '\n## Canvas\n\n%.2f x %.2f in (the printed size), PNG by print at 450 dpi.\n', W, Ht);
+end
+
+function changes = restyle_titles(fig)
+% The titles and the condition tick labels of the clinical and modular
+% panels, as the paper's style has them: sentence case, no counts and no
+% parentheses (polish list, 2026-11-22). They are written in the saved
+% panel figures that fig_stim_combined loads (the clinical ones in another
+% repository), so they are restyled here, on the composite. A title that
+% only states a statistic and a count ("Median, IQR over subjects
+% (n = 12)") leaves the panel; the provenance file keeps every original.
+% Returns the changes, n x 2 {was, is}.
+changes = cell(0, 2);
+for ax = findall(fig, 'Type', 'axes')'
+    was = ax.Title.String;
+    if ischar(was) && ~isempty(was)
+        is = restyled(was);
+        if ~strcmp(is, was); ax.Title.String = is; changes(end + 1, :) = {was, is}; end %#ok<AGROW>
+    end
+    lab = ax.XTickLabel;
+    if iscell(lab) && ~isempty(lab) && all(cellfun(@(s) ~isempty(regexp(s, '^[A-Za-z]', 'once')), lab))
+        new = cellfun(@restyled, lab, 'UniformOutput', false);
+        if ~isequal(new, lab)
+            ax.XTickLabel = new;
+            changes = [changes; [lab(:), new(:)]]; %#ok<AGROW>
+        end
+    end
+end
+[~, k] = unique(strcat(changes(:, 1), '|', changes(:, 2)), 'stable');
+changes = changes(k, :);
+end
+
+function s = restyled(s)
+if startsWith(s, 'Median, IQR'); s = ''; return; end
+s = strtrim(regexprep(s, '\s*\([^)]*\)', ''));          % "(n = 12)", "(Uniform Input 0.2)"
+words = strsplit(s, ' ');
+for k = 2:numel(words)                                  % all but the first word; acronyms keep their capitals
+    w = words{k};
+    if ~isempty(regexp(w, '^[A-Z][a-z]+[,.]?$', 'once')); words{k} = [lower(w(1)) w(2:end)]; end
+end
+s = strjoin(words, ' ');
 end
