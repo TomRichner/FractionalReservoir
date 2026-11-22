@@ -29,7 +29,7 @@ function out = fig_supp7_grouped(cfg)
 %        B and named in the table.
 %
 % LAYOUT (Plan 2 canvas standard, 2026-11-22). The figure is canvas_w wide:
-% A on top, centered at cfg.width_a (11.2 in; at the full width it would be
+% A on top, centered at cfg.width_a (0.88 of the row; at the full width it would be
 % 9.5 in tall), B under it across the width (cfg.width_b, cfg.height_b).
 % Until then A and B stood side by side (15.4 in wide, a white band under
 % A where B ran longer; before the polish of that morning stacked at their
@@ -57,7 +57,7 @@ arguments
     cfg.networks                  = {'reference', 'EEx1p5'}
     cfg.seed double               = []
     cfg.fig_tag     (1,:) char    = 'Fig_Supp7_Grouped'
-    cfg.width_a     (1,1) double  = NaN   % inches; NaN = 11.2 (A centered: at the full width it is 9.5 in tall)
+    cfg.width_a     (1,1) double  = NaN   % inches; NaN = 0.88 of the row (A centered: at the full width it is 0.75 of the width tall)
     cfg.width_b     (1,1) double  = NaN   % inches; NaN = canvas_w less the margins
     cfg.height_b    (1,1) double  = 6.0   % inches
     cfg.gallery     (1,1) logical = true
@@ -88,7 +88,7 @@ st = manuscript_style(); MARGIN = [0.15 0.15 -0.3 0.15];
 [f_slow, t_slow, o_slow] = composite_part(@fig_outlier_slow_variables, cfg, 'networks', cfg.networks, 'seed', cfg.seed, ...
     'mark_size', 5.5);
 row_w = st.canvas_w - MARGIN(1) - MARGIN(2);
-width_a = cfg.width_a; if isnan(width_a); width_a = 11.2; end
+width_a = cfg.width_a; if isnan(width_a); width_a = 0.88 * row_w; end
 width_b = cfg.width_b; if isnan(width_b); width_b = row_w; end
 
 % (B): the gallery's structures, when the run has a gallery; drawn at its

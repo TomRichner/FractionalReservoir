@@ -49,8 +49,8 @@ guard = onCleanup(@() close_if(old));
 
 %% Geometry (inches), bottom up
 W = st.canvas_w;
-xT = [1.0, 3.95]; wT = 2.65;                     % trace columns of D and G (names left of the first)
-xR = 8.75; wR = W - 0.15 - xR;                   % right column: E, F, H, I
+xT = [1.0, 0.304 * W]; wT = 0.204 * W;                    % trace columns of D and G (names left of the first)
+xR = 0.673 * W; wR = W - 0.15 - xR;                  % right column: E, F, H, I
 wLg = 1.75;                                      % E's and H's keys, right of their axes
 hR = 1.6;                                       % E, F, H, I axes height
 yI = 0.75;                 yH = yI + hR + 0.85;

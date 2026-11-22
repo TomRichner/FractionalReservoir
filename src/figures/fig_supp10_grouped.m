@@ -70,9 +70,11 @@ y2 = 1.0; h2 = 2.8;                               % row 2 (C, D): axes bottom an
 hC2 = 2.2;                                        % C right: room above it for its key
 y1 = y2 + h2 + 1.1; h1 = 3.2;                     % row 1 (A, B): above row 2's letters and B's time axis
 Ht = y1 + h1 + 0.55;
-xL = 1.05; wL = 3.6;                              % left column (A, C left)
-xB = 6.1; wB = W - 0.2 - xB;                      % B, C right
-xD = 9.85; wD = W - 0.2 - xD;
+% Horizontal places as shares of the canvas, so that a wider or narrower
+% canvas_w moves the columns with it; the room for labels stays in inches.
+xL = 1.05; wL = 0.277 * W;                       % left column (A, C left)
+xB = 0.469 * W; wB = W - 0.2 - xB;                     % B, C right
+xD = 0.758 * W; wD = W - 0.2 - xD;
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.5 0.5 W Ht], 'Visible', vis);
 mk = @(p) axes(fig, 'Units', 'inches', 'Position', p);
 
@@ -146,7 +148,7 @@ axC1.XTickLabelRotation = 0;
 xlabel(axC1, 'Network (seed)'); ylabel(axC1, 'Bursts before the step');
 lg = legend(axC1, [h1s h2s], {'Bursts', 'Preceded by a crossing'}, 'Location', 'northwest', 'Box', 'off');
 lg.ItemTokenSize = [12 12];
-axC2 = mk([xB y2 2.4 hC2]); hold(axC2, 'on');
+axC2 = mk([xB y2 0.185 * W hC2]); hold(axC2, 'on');
 pairs = {T.frac_beyond_before_frozen_gain, T.frac_beyond_during_frozen_gain, fg_col; ...
     T.frac_beyond_before_full, T.frac_beyond_during_full, mode_col};
 hc = gobjects(1, 2);
