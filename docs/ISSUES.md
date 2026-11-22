@@ -2399,3 +2399,68 @@ takes about 35 minutes; run it in pieces.
   C's integrator guard) and two sheets redrawn that a stray tool call of
   mine interrupted. Stimulation bundle at `essential`: 8 of 8 figures,
   3.7 min.
+
+### FD-054 Memory in a `fastmedium` run: the DC staircase stage took 87 GB on a 63 GB machine
+
+- **Status:** open. Logged at Tom's request, 2026-11-22, while the run was
+  going. Nothing was changed in the run.
+- **Serves:** the paper's runs (every block that `mu7chain_AC_run` feeds). A
+  run that pages is slower than its estimate and can fail for want of memory.
+- **What happened.** `mu7chain_AC_run('fastmedium')`, started 2026-11-22 05:45
+  from `main` at `b3dd9d8`, pool of 12, on the machine with 63.4 GB of RAM.
+  Stage 8 of 18, `dc_lle` (`run_dc_lle_analysis`), brought the machine to
+  0 MB available. Tom saw it in the task manager at about 11:35.
+- **Measured** (Windows counters, not MATLAB's):
+  - The pool's 12 workers started at 11:06:21. At 11:35 each held 7.24 to
+    7.26 GB of private bytes, 87 GB together; all MATLAB processes 98.4 GB.
+  - Free physical memory 1.8 GB, then 1.3 GB. Commit charge 135.7 GB of a
+    limit of 141.4 GB (the page file then grew; limit 151.8 GB). At 11:37:53:
+    available 0 MB, modified page list 41.5 GB, about 58,000 pages per second.
+  - Each worker got 0.4 to 0.6 of a core (2.4 to 3.5 CPU seconds in 6 s), and
+    its resident memory was under 1 GB against a peak of 3.6 to 4.5 GB: the
+    workers were waiting on the page file.
+  - The first round of 12 seeds ended between 11:38 and 11:41, 32 to 35 min
+    after the pool started. Unpaged, a round takes 8 to 10 min (5 seeds in one
+    round: 7.8 min in the `fast` run of 2026-11-21, 9.7 min on 2026-11-13).
+    After it: 41.2 GB free, commit 49.3 GB; the second round is 3 seeds.
+  - No error was raised and the run went on.
+- **Why this stage.** The parfor is over seeds and each seed is one
+  simulation of the whole staircase: 9 levels of 30 s at 400 Hz, 108,000
+  steps, the three conditions one after another inside the seed.
+  `store_full_state` is false, yet a worker holds 7.25 GB, which is about
+  8,400 doubles per step, more than the state. **Which arrays those are has
+  not been traced.** `fastmedium` has 15 seeds, so 12 simulations run at once;
+  `fast` has 5, about 36 GB, which is why the `fast` run showed nothing.
+- **Not the run's:** two MATLAB sessions of agents drawing figures (2.3 and
+  2.6 GB, no pool) and an idle editor session (2.9 GB). The two agents were
+  stopped, which gave back about 5 GB; the cause was the stage. The pool
+  budget of 12 counts workers, not memory. No stage sizes its parfor from
+  memory (two pass a worker limit to parfor for other reasons:
+  `run_outlier_spectra_stage`, `run_mc_gain_sweep_set`). `pool_restart`
+  (MatlabAgenticOrg) prints the client's available RAM and records an earlier
+  episode, August 2026, in which a stage returned "Out of memory" on 88 of
+  195 runs, cause not established.
+- **Not known:** memory per worker of every other stage at this size. The
+  lead's estimate for `outlier_spectra` (3.5 to 4 GB per worker from its 200 s
+  windows, so 42 to 48 GB) is not a measurement. Whether the paper run of
+  2026-11-15 paged is not known; nobody looked.
+- **Being measured now:** a sampler writes one line a minute for the rest of
+  this run (free memory, commit, MATLAB private bytes, the largest pool
+  worker, the stage) to `data/p2_fastmedium_launch/memory_log.csv`. Its peak
+  per stage is to be added here when the run ends.
+- **Done means:**
+  1. The arrays behind the 7.25 GB are named, and the staircase simulation
+     keeps only what its result needs (the local exponent and the level
+     means), or the stage caps its own parfor at what fits.
+  2. A stage whose jobs are large caps its workers from an estimate of memory
+     per job and the machine's RAM (`parfor (..., max_workers)`), so the cap
+     is in the stage and holds on any machine. The estimate is checked against
+     a measured peak in a test at small size.
+  3. The run log records the peak memory of the client and of the largest
+     worker for each stage, next to the stage's time.
+  4. The mode tables that give times (`run_dc_lle_analysis`,
+     `mu7chain_AC_config`, `mu7chain_AC_run`) give memory per worker as well.
+  5. A `fastmedium` run on this machine with a pool of 12 stays above 5 GB of
+     free physical memory in every stage.
+- **Depends on:** the end of the present run (for the measured peaks), and
+  Tom's agreement on items 1 and 2 before any stage is changed.
