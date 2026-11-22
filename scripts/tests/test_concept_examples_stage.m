@@ -37,6 +37,16 @@ assert(isequal({pl.examples.key}, {'decay', 'irregular', 'runaway', 'oscillation
 assert(isequal({pl.examples.name}, {'reference', 'reference', 'EEx1p5', 'lrA2p5W1p0'}), 'their networks');
 assert(isequal([pl.examples.level_of_chaos], [0.15 1 1 1]), 'their levels');
 assert(numel(pl.gallery) == 8 && isequal(pl.gallery(6).seed, [27 28]) && isequal(pl.gallery(1).seed, [7 8]), 'the gallery');
+% The gallery shows structures the outlier_structures stage tests (S7 panel
+% B summarizes them): the same names and weight seeds, and no 'E-to-E down',
+% which that stage does not run.
+assert(isequal({pl.gallery.name}, {'reference', 'EEx1p5', 'EIx0p9', 'IIx1p25', 'EEx1p6-EIx1p33-IEx1p33', 'reference', ...
+    'lrA1p5W0p0', 'lrA1p4W1p0'}), 'the gallery''s networks');
+[g_titles, g_keys] = cx_gallery_names(pl.gallery, pl.seed);
+po = outlier_structures_stage_plan(cfg);
+assert(all(ismember(g_keys, {po.networks.key})) && strcmp(g_keys{6}, 'reference_w27'), 'every gallery structure is a network of outlier_structures');
+assert(isequal(g_titles, {'Balanced', 'E-to-E up', 'I-to-E down', 'I-to-I up', 'E-I loop', 'Local outlier', 'Real low-rank mode', ...
+    'Rotating low-rank mode'}), 'the tiles'' titles');
 assert(pl.T == 12 && pl.dt_sample == 0.01 && pl.n_trace == 5 && pl.n_image == 30 && pl.lya && pl.n_override == 0, 'knobs');
 bad = {{'concept_examples_bogus', 1}, {'concept_examples_n_image', 31}, {'concept_examples_lya_from', 20}, ...
     {'concept_examples_examples', {'a', 'notAName', 1, []}}, {'concept_examples_dt_sample', 0.0031}};

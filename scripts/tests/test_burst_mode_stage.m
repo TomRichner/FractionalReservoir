@@ -87,6 +87,15 @@ rows = table([42; 42; 73; 73], [1; 2; 1; 2], [false; true; false; true], [0.10; 
     'VariableNames', {'seed', 'block', 'stim', 'mean_rate', 'sfa_feedback', 'depression'});
 save(fullfile(ied, 'summary.mat'), 'rows');
 o = fig_supp10_grouped('run_dir', run_dir, 'ied_run_dir', ied, 'out_dir', fullfile(out_dir, 'b'), 'visible', false);
+% Panel B: no trace leaves its axes (the depression trace used to dip under the floor).
+axs = findall(o.figs, 'Type', 'axes');
+for k = 1:numel(axs)
+    ln = findall(axs(k), 'Type', 'line');
+    y = arrayfun(@(l) [min(l.YData), max(l.YData)], ln, 'UniformOutput', false);
+    y = vertcat(y{:});
+    if isempty(y) || ~startsWith(strjoin(cellstr(axs(k).YLabel.String), ' '), 'Depr.'); continue; end
+    assert(axs(k).YLim(1) < min(y(:, 1)) && axs(k).YLim(2) >= max(y(:, 2)), 'S10 (B): the depression traces are inside their axes');
+end
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'b', 'Fig_Supp10_Grouped.png')) && isfile(fullfile(out_dir, 'b', 'Fig_Supp10_Grouped_table.md')));
 assert(throws(@() fig_supp10_grouped('run_dir', run_dir, 'ied_run_dir', tempname, 'save', false, 'visible', false), ''), ...
