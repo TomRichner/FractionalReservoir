@@ -53,24 +53,47 @@ function out = fig_eig_real_histogram(cfg)
 % row (D) of fig_main3_stability's 'real_histogram_row'.
 %
 % LABELS (Tom, 2026-11-21; default false: no text on the panels). true writes
-% the labels of the paper's Figure 3, row (D), one group per panel, where
-% each is clearest and has room (a panel of the composite is about 30
-% characters of 14-point text wide, so they are broken over short lines):
-% in the first panel "neurons at floor or ceiling" beside the spike at
-% -1/tau_d (neurons whose slope is zero leave their eigenvalue at the leak
-% rate); in the second panel (the first when there is one) "network modes"
-% above the plateau, and under it a row of dots and "uniform disk, same
-% radius", which names the dotted curve (only "uniform disk" when the
-% radius drawn is not the rms-gain one); in the last panel that has
-% adaptive variables (N > n) "adaptive states" beside the pile near zero.
-% They are text objects tagged 'histogram_label' in data coordinates, so
-% they travel with a copied axes and keep their place on any canvas. The
-% count axis gets headroom for them (its top is 8 instead of 1.5 times the
-% tallest bar). Needs count_scale 'log'. It is the named exception to the
-% rule of no text on panels. Tried and dropped: all labels in one panel
-% (they overlap at 14 points), "network modes" and "adaptive states" in one
-% panel (read as "network states"), a drawn line sample (its height
-% depends on the canvas).
+% the labels of the paper's Figure 3, row (D), one per panel, placed so that
+% none touches a bar, the spike, the dotted curve or an axis (a panel of the
+% composite is about 30 characters of 14-point text wide and six lines
+% tall, so they are broken over short lines):
+%   first panel   "neurons at floor or ceiling", right-aligned just left of
+%                 the spike at -1/tau_d (neurons whose slope is zero leave
+%                 their eigenvalue at the leak rate); leader to the spike
+%   second panel  (the first when there is one) "network modes", over the
+%                 plateau left of the spike; leader down to the plateau
+%                 halfway between the disk's edge and the spike (the
+%                 reference disk's center and radius), ending just above
+%                 the bars and the dotted curve there
+%   last panel that has adaptive variables (N > n)   "adaptive states", as
+%                 far right toward the pile near zero as the bars under its
+%                 two lines allow (label_right_edge, from the counts);
+%                 leader level to the flank of the pile (the tallest bin
+%                 right of the spike), or down to its top when it is lower
+% A LABEL POINTS AT WHAT IT NAMES (lead's review, 2026-11-22): without the
+% leaders "adaptive states", which has room only left of the spike, read as
+% a name for the disk, and "network modes" as a name for the spike beside
+% it. The leaders are thin gray lines tagged 'histogram_leader'
+% (UserData.target 'spike', 'plateau', 'pile'), their end points computed
+% from the counts and the reference disk, never typed in.
+%   right of the last panel, outside the axes   the key to the dotted
+%                 curve: a row of dots and "uniform disk, same radius"
+%                 (only "uniform disk" when the radius drawn is not the
+%                 rms-gain one)
+% The three labels are text objects tagged 'histogram_label' and the key
+% 'histogram_key', in data coordinates with clipping off, so they travel
+% with a copied axes and keep their place on any canvas. The count axis
+% gets headroom for them (its top is 8 instead of 1.5 times the tallest
+% bar), and this figure 150 px for the key. Needs count_scale 'log'. It is
+% the named exception to the rule of no text on panels.
+% WHAT WAS WRONG BEFORE (polish list, 2026-11-22): "network modes" and the
+% key were three lines from the left edge of the second panel; they touched
+% the y axis, and the spike at -1/tau_d ran through the second line. There
+% is no place inside a panel for the key's 28 characters: left of the spike
+% holds about 15 per line, right of it the pile near zero begins.
+% Tried and dropped earlier: all labels in one panel (they overlap at 14
+% points), "network modes" and "adaptive states" in one panel (read as
+% "network states"), a drawn line sample (its height depends on the canvas).
 %
 % x limits are fig_eig_heatmap's window (the same quantile rule over the
 % drawn conditions), so the two figures read together. No text on the
@@ -172,7 +195,12 @@ for i = 1:n_cond
 end
 
 %% Draw
-fig = figure('Color', 'w', 'Position', [150, 150, 430 * n_cond, 330]);
+% What the label placement assumes of the panel as the paper's Figure 3
+% draws it (14-point text on a panel about 250 px wide and 150 px tall):
+LABEL_CHARS_PER_PANEL = 30;    % characters of label text across the panel
+LABEL_LINE_SHARE = 0.17;       % one line of label text, as a share of the panel's height
+KEY_WIDTH_PX = 150;            % room right of the last panel for the dotted curve's key
+fig = figure('Color', 'w', 'Position', [150, 150, 430 * n_cond + cfg.labels * KEY_WIDTH_PX, 330]);
 if ~cfg.visible; set(fig, 'Visible', 'off'); end
 tl = tiledlayout(fig, 1, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
 floor_count = 0.5 / max([ref.n_states]);            % half an eigenvalue in one state: the log axis's floor
@@ -213,29 +241,89 @@ for i = 1:n_cond
         'Tag', 'zero_eigenvalue_reference');
     xlim(ax(i), re_lim); box(ax(i), 'off'); set(ax(i), 'TickDir', 'out');
     title(ax(i), titles{i}, 'FontWeight', 'normal', 'FontSize', 14, 'Color', col);
-    xlabel(ax(i), 'Re(ambda) (s^{-1})');
+    xlabel(ax(i), 'Re(\lambda) (s^{-1})');   % the backslash was missing: the stand-alone figure read "Re(ambda)"
     if i == 1; ylabel(ax(i), 'Eigenvalues per state'); end
 end
 
 if cfg.labels
-    % Each label once, where it is clearest (see the header).
-    lab = {'Color', [0.15 0.15 0.15], 'FontSize', st.tick_fs, 'Tag', 'histogram_label', 'Clipping', 'off'};
+    % Each label once, clear of data and axes, with a thin gray leader to
+    % the thing it names; every leader's end is computed from the histogram
+    % (see LABELS in the header).
+    lab = {'Color', [0.15 0.15 0.15], 'FontSize', st.tick_fs, 'Clipping', 'off', 'Tag', 'histogram_label', ...
+        'VerticalAlignment', 'top'};
     span = diff(re_lim);
+    char_w = span / LABEL_CHARS_PER_PANEL;                 % one character, in 1/s
+    line_y = @(k) top_log * (floor_count / top_log) ^ (k * LABEL_LINE_SHARE);   % the foot of k lines of text
+    gap = 0.012 * span;                                    % between a label's edge and its leader
+    bin_of = @(x) min(cfg.n_bins, max(1, discretize(x, edges)));
     adapting = find(arrayfun(@(r) r.N > r.n, ref));
     i_mid = min(2, n_cond);
-    if strcmp(ref(i_mid).mode, 'gain')
-        net_words = {'network modes', '{\bf\cdot\cdot\cdot} uniform disk,', 'same radius'};
+
+    % "neurons at floor or ceiling": right-aligned left of the spike at
+    % -1/tau_d; the leader runs from the label's edge to the spike, level
+    % with the middle of the label, or lower when the spike is shorter.
+    r = ref(1);
+    x_lab = r.c - 0.045 * span;
+    text(ax(1), x_lab, top_log, {'neurons', 'at floor', 'or ceiling'}, 'HorizontalAlignment', 'right', lab{:});
+    spike = r.counts(bin_of(r.c));
+    y_from = line_y(1.5);
+    draw_leader(ax(1), [x_lab + gap, r.c], [y_from, min(y_from, sqrt(spike * max(r.expected)))], 'spike');
+
+    % "network modes": over the plateau of the disk, halfway between the
+    % disk's edge and the spike (on the side away from zero; with one panel,
+    % where that side holds the first label, on the other); the leader drops
+    % from the label's foot to just above the bars and the dotted curve.
+    r = ref(i_mid);
+    side = -1; if i_mid == 1; side = 1; end
+    x_tgt = r.c + side * 0.5 * min(r.rho, abs(re_lim(1.5 + side / 2) - r.c));
+    w = 7 * char_w;                                        % "network"
+    if side < 0
+        x_lab = min(r.c - 0.045 * span, x_tgt + w / 2);
+        x_lab = max(x_lab, re_lim(1) + 0.03 * span + w);   % clear of the y axis
+        text(ax(i_mid), x_lab, top_log, {'network', 'modes'}, 'HorizontalAlignment', 'right', lab{:});
+        x_from = min(max(x_tgt, x_lab - w), x_lab);
     else
-        net_words = {'network modes', '{\bf\cdot\cdot\cdot} uniform disk'};
+        x_lab = max(r.c + 0.045 * span, x_tgt - w / 2);
+        text(ax(i_mid), x_lab, top_log, {'network', 'modes'}, 'HorizontalAlignment', 'left', lab{:});
+        x_from = min(max(x_tgt, x_lab), x_lab + w);
     end
-    text(ax(1), ref(1).c - 0.02 * span, top_log, {'neurons', 'at floor', 'or ceiling'}, ...
-        'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', lab{:});
-    text(ax(i_mid), re_lim(1) + 0.01 * span, top_log, net_words, ...
-        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'Interpreter', 'tex', lab{:});
+    b = bin_of(x_tgt);
+    plateau = max(r.counts(b), r.expected(b));
+    draw_leader(ax(i_mid), [x_from, x_tgt], [line_y(2.25), 1.7 * plateau], 'plateau');
+
     if ~isempty(adapting)
-        text(ax(adapting(end)), -0.05 * span, top_log, {'adaptive', 'states'}, ...
-            'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', lab{:});
+        % "adaptive states": as far right as the bars under its two lines
+        % allow; the leader runs level from the label's edge to the flank of
+        % the pile of slow eigenvalues (the tallest bin right of the spike),
+        % or slants down to its top when the pile is lower than the label.
+        ia = adapting(end);
+        r = ref(ia);
+        w = 8 * char_w;                                    % "adaptive"
+        x_lab = label_right_edge(r.counts, edges, line_y(2) / 2, w, -0.03 * span, 0.02 * span);
+        if isnan(x_lab); x_lab = r.c - 0.045 * span; end
+        text(ax(ia), x_lab, top_log, {'adaptive', 'states'}, 'HorizontalAlignment', 'right', lab{:});
+        right_of_spike = find(centers > r.c + 2 * width & centers > x_lab + gap);
+        [pile, k] = max(r.counts(right_of_spike));
+        i_pile = right_of_spike(k);
+        y_from = line_y(1);
+        if pile >= y_from
+            i_flank = right_of_spike(find(r.counts(right_of_spike) >= y_from, 1));
+            draw_leader(ax(ia), [x_lab + gap, edges(i_flank)], [y_from, y_from], 'pile');
+        else
+            draw_leader(ax(ia), [x_lab + gap, centers(i_pile)], [y_from, 1.3 * pile], 'pile');
+        end
     end
+    % The key to the dotted curve, right of the last panel.
+    if strcmp(ref(n_cond).mode, 'gain')
+        key_words = {'{\bf\cdot\cdot\cdot} uniform', 'disk, same', 'radius'};
+    else
+        key_words = {'{\bf\cdot\cdot\cdot} uniform', 'disk'};
+    end
+    text(ax(n_cond), re_lim(2) + 0.05 * span, top_log, key_words, 'HorizontalAlignment', 'left', ...
+        'Interpreter', 'tex', lab{:}, 'Tag', 'histogram_key');
+    % Room for the key on this figure (a composite that copies the panels
+    % has its own margin there).
+    tl.Units = 'normalized'; tl.OuterPosition = [0 0 1 - KEY_WIDTH_PX / fig.Position(3) 1];
 end
 
 %% Table
@@ -311,4 +399,26 @@ function F = semicircle_cdf(u)
 % Share of a uniform unit disk left of the vertical line at u.
 u = min(1, max(-1, u));
 F = 0.5 + (u .* sqrt(1 - u .^ 2) + asin(u)) / pi;
+end
+
+function x_right = label_right_edge(counts, edges, y_foot, width, x_max, margin)
+% The largest right edge x <= x_max of a label of the given width (1/s)
+% whose foot is at y_foot (counts per state), such that every bar under it,
+% and within margin on either side, is lower than y_foot. NaN when no place
+% is clear.
+x_right = NaN;
+for x = fliplr(edges(edges <= x_max))
+    under = edges(2:end) > x - width - margin & edges(1:end - 1) < x + margin;
+    if x - width - margin >= edges(1) && all(counts(under) < y_foot)
+        x_right = x;
+        return
+    end
+end
+end
+
+function h = draw_leader(ax, x, y, target)
+% A thin gray line from a label, (x(1), y(1)), to the thing it names,
+% (x(2), y(2)); tagged 'histogram_leader', UserData.target its name.
+h = plot(ax, x, y, '-', 'Color', [0.45 0.45 0.45], 'LineWidth', 0.75, 'Clipping', 'off', ...
+    'HandleVisibility', 'off', 'Tag', 'histogram_leader', 'UserData', struct('target', target));
 end
