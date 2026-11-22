@@ -64,8 +64,8 @@ for j=1:numel(lg)
     assert(~isempty(zero_ref),'style_main4_grouped:ZeroReference','Expected a zero-growth reference line.');
     zero_ref=zero_ref(1);
     zero_ref.HandleVisibility='on';
-    zero_ref.DisplayName='Zero Growth';
-    lg(j)=legend(leg_ax,[handles(:);zero_ref],[colored {'Zero Growth'}],'Interpreter','tex');
+    zero_ref.DisplayName='Zero growth';
+    lg(j)=legend(leg_ax,[handles(:);zero_ref],[colored {'Zero growth'}],'Interpreter','tex');
 end
 set(lg,'Orientation','vertical','NumColumns',1,'Box','off','Units','normalized');
 drawnow;
@@ -73,7 +73,7 @@ drawnow;
 for k=1:numel(lg)
     p=lg(k).Position; p(1)=.97-p(3); p(2)=.98-p(4);
     lg(k).Position=p;
-    % Reserve space for every key (the conditions and Zero Growth) while
+    % Reserve space for every key (the conditions and Zero growth) while
     % keeping upper-row x labels in place.
     upper=axs(arrayfun(@(ax)ax.Position(2)>.65,axs));
     for j=1:numel(upper)
@@ -92,11 +92,12 @@ for k=1:numel(cb)
 end
 rate_axes=axs(arrayfun(@(ax)ax.Position(2)<.3,axs));
 [~,last]=max(arrayfun(@(ax)ax.Position(1),rate_axes));
-ax=rate_axes(last); p=ax.Position; ax.Title.Units='normalized';
-title_x=ax.Title.Position(1)*p(3);
+ax=rate_axes(last); p=ax.Position;
 p(3)=min(p(3),.88-p(1)); ax.Position=p;
-% Keep the long condition title centered at its original location.
-ax.Title.Position(1)=title_x/p(3);
+% The title stays centered over its own, narrowed, panel. Until 2026-11-22 it
+% was kept at the center of the panel's original width, which put the end of
+% the longest title ("Multiple-timescale adaptation") against the
+% colorbar's top tick label (polish list).
 % Block A spans both sensitivity rows; block B is the rate row.
 delete(findall(fig,'Tag','main4_block_A')); delete(findall(fig,'Tag','main4_block_B'));
 % (B) sits at a fixed place up and to the left of the first rate panel. (A)

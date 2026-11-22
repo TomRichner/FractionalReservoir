@@ -22,6 +22,17 @@ function out = fig_sensitivity_medians(cfg)
 %      Adaptation median, which runs to -10 1/s on this network, stayed
 %      visible; TR reversed that: the fixed ruler is what the paper wants, and
 %      the fully-stable extreme of No Adaptation is off the scale by design.
+%      OFF-SCALE MARKERS (cfg.offscale_markers, default true; polish list,
+%      2026-11-22). The window is kept, and a curve that has left it is
+%      marked: at every sweep value whose MEDIAN lies above the window a
+%      small upward triangle on the top edge, below it a downward triangle
+%      on the bottom edge, in the condition's color (lines tagged
+%      'offscale_marker', UserData.condition the name, not in the legend,
+%      not clipped). So a reader sees that the curve is there and on which
+%      side. On this network the no-adaptation median is off scale in most
+%      of the six sweeps and was simply absent. Conditions marked at the
+%      same sweep value and edge are set side by side (offscale_step of
+%      the x range apart). false draws the sheet as before.
 %   2. SIX PARAMETERS, not seven. level_of_chaos ("Synaptic Gain") is dropped so
 %      the rest fit 2 x 3; it is the least surprising of the seven, since it
 %      simply scales W.
@@ -51,6 +62,9 @@ arguments
     cfg.save        (1,1) logical = true
     cfg.visible     (1,1) logical = true
     cfg.conditions                = {}          % names to draw, in order; empty = the preset's (select_conditions)
+    cfg.offscale_markers (1,1) logical = true   % triangles on the top / bottom edge where a median has left the y window
+    cfg.offscale_size    (1,1) double {mustBePositive} = 5       % marker size, points
+    cfg.offscale_step    (1,1) double {mustBeNonnegative} = 0.035 % share of the x range between two conditions' markers at one place
 end
 
 setup_paths();
@@ -353,6 +367,14 @@ for mi = 1:numel(metric_specs)
                     set(ax, 'XTickLabel', rs.xticklabels);
                 end
             end
+        end
+
+        % --- Off-scale markers: where a median has left the y window --------
+        if cfg.offscale_markers
+            medians = cellfun(@(nm) cx.y.(nm)(:, median_col), {cond_spec.name}, 'UniformOutput', false);
+            hold(ax, 'on');
+            draw_offscale_markers(ax, cx.x, medians, cond_spec, y_window, cfg.offscale_size, cfg.offscale_step);
+            hold(ax, 'off');
         end
 
         % Default marker LAST: it re-pins xlim/ylim, so everything that sets
