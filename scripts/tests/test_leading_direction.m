@@ -16,10 +16,12 @@
 %      rate is near -1/tau_d; with adaptation the rate is slower and the
 %      perturbation is not dendritic.
 %   3. fig_leading_direction: one panel per condition in the requested
-%      order, as many points as successful runs, the zero line, the dotted
+%      order, as many points as successful runs, the zero line, NO line at
+%      the uncoupled rate by default (Tom, 2026-11-21) but its numbers in the
+%      stats and the table; with 'reference_line', true the dotted
 %      line at the reference (symlog position), no text on the panels, the
 %      table. A run without the stage: no dotted line, said in the table;
-%      'require_reference' errors; 'reference_file' draws it. The column
+%      'require_reference' errors; 'reference_file' reads it. The column
 %      layout. A run without the joint sample errors through
 %      resolve_data_file.
 %   4. fig_main4_connectivity: the grouped Figure 4's panels and the three
@@ -115,7 +117,7 @@ end
 
 %% 3b. The figure with the reference
 sel = {'sfa3_std2', 'no_adaptation'};
-out = fig_leading_direction(base{:}, 'out_dir', fullfile(tmp, 'f1'), 'conditions', sel);
+out = fig_leading_direction(base{:}, 'out_dir', fullfile(tmp, 'f1'), 'conditions', sel, 'reference_line', true);
 ax = out.axes;
 ok = numel(ax) == 2 && isequal(arrayfun(@(a) char(a.Title.String), ax, 'UniformOutput', false), ...
     grouped_condition_label(sel, 'sentence')) && isempty(findobj(out.figs, 'Type', 'text'));
@@ -129,14 +131,16 @@ end
 tbl = fileread(fullfile(tmp, 'f1', 'Fig_Leading_Direction_table.md'));
 ok = ok && all(ismember({'Fig_Leading_Direction.png', 'Fig_Leading_Direction.fig'}, out.files)) && ...
     contains(tbl, 'Uncoupled reference') && contains(tbl, '0.02: ') && ~contains(tbl, 'No uncoupled reference');
-n_fail = n_fail + check(ok, ['figure: the selection in order, a point per run, the dotted line at the reference, ' ...
+n_fail = n_fail + check(ok, ['figure (reference_line on): the selection in order, a point per run, the dotted line at the reference, ' ...
     'no text on the panels, the table']);
 close(out.figs);
 out = fig_leading_direction('run_dir', tmp, 'data_file', fullfile(dir_of(run_dir, 'param_space_*'), 'psa_object.mat'), ...
     'reference_file', ref_file, 'save', false, 'visible', false, 'verbose', 'near-none', 'layout', 'column');
 p = reshape([out.axes.Position], 4, [])';
-n_fail = n_fail + check(n_tagged(out.figs, 'uncoupled_reference') == 3 && all(diff(p(:, 2)) < 0) && ...
-    max(abs(diff(p(:, 1)))) < 1e-6, 'figure: explicit joint sample and reference file; the column layout stacks the panels');
+n_fail = n_fail + check(n_tagged(out.figs, 'uncoupled_reference') == 0 && all(isfinite([out.stats.reference])) && ...
+    contains(out.table_text, 'Uncoupled reference') && all(diff(p(:, 2)) < 0) && ...
+    max(abs(diff(p(:, 1)))) < 1e-6, ['figure, default (no line, Tom 2026-11-21): explicit joint sample and reference file, ' ...
+    'the reference in the stats and the table, no line; the column layout stacks the panels']);
 close(out.figs);
 empty_run = fullfile(tmp, 'empty'); mkdir(empty_run);
 n_fail = n_fail + check(startsWith(error_of(@() fig_leading_direction('run_dir', empty_run, 'save', false, 'visible', false)), ...
@@ -149,7 +153,7 @@ evalc('g = fig_grouped_main(4, ''run_dir'', run_dir, ''preset_name'', preset, ''
 n_ab = numel(findall(g.figs, 'Type', 'axes')); ab_size = g.figs.Position(3:4); close(g.figs);
 evalc('m = fig_main4_connectivity(base{:}, ''preset_name'', preset, ''out_dir'', fullfile(tmp, ''m4''));');
 m_px = getpixelposition(m.figs);
-ok = numel(findall(m.figs, 'Type', 'axes')) == n_ab + 3 && n_tagged(m.figs, 'uncoupled_reference') == 3 && ...
+ok = numel(findall(m.figs, 'Type', 'axes')) == n_ab + 3 && n_tagged(m.figs, 'uncoupled_reference') == 0 && ...
     abs(m_px(4) - ab_size(2)) < 1.5 && m_px(3) > ab_size(1) && m_px(4) < 0.9 * 1073 && ...   % fits the workstation's screen
     all(arrayfun(@(t) isscalar(findall(m.figs, 'Tag', ['main4_block_' t])), 'ABC')) && ...
     all(ismember({'Fig_Main4_Connectivity.png', 'Fig_Main4_Connectivity.fig'}, m.files)) && ...
@@ -159,7 +163,8 @@ if ok
     cx = findall(m.figs, '-regexp', 'Tag', '^leading_direction_c\d+$'); la = findall(m.figs, 'Tag', 'main4_block_A');
     tops = arrayfun(@(a) sum(getpixelposition(a) * [0; 1; 0; 1]), cx);
     ok = max(tops) <= (la.Position(2) + la.Position(4)) * m_px(4) && ...
-        contains(fileread(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md')), 'Panel (C)');
+        contains(fileread(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md')), 'Panel (C)') && ...
+        contains(fileread(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md')), 'Uncoupled reference');
 end
 n_fail = n_fail + check(ok, 'composite: the grouped Figure 4''s panels and three of (C), same height, letters, (C) below the top of (A)''s letter, table');
 close(m.figs);
