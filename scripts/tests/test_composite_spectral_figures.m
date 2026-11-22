@@ -207,8 +207,11 @@ o = draw(@fig_supp7_grouped, common, fullfile(fig_dir, 'supp7'), 'Fig_Supp7_Grou
 % Without a gallery in the run, B draws every network of the stage under the stage's names.
 assert(isempty(o.gallery_keys) && numel(findall(o.figs, 'Tag', 'slow_variables_filtered')) >= 1, ...
     'S7: no gallery, the stage''s own list; the filtered eigenvalues are drawn in A');
-scr = get(groot, 'ScreenSize'); ppi = get(groot, 'ScreenPixelsPerInch');
-assert(all(o.figs.Position(3:4) <= 0.9 * scr(3:4) / ppi), 'S7 fits 0.9 of the screen in both dimensions (%.1f x %.1f in)', o.figs.Position(3:4));
+% The common canvas (Plan 2, 2026-11-22) replaces the polish's "under 0.9
+% of the screen": canvas_w wide, at most canvas_max_h tall.
+st = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6 && o.figs.Position(4) <= st.canvas_max_h, ...
+    'S7 is on the common canvas (%.1f x %.1f in)', o.figs.Position(3), o.figs.Position(4));
 close(o.figs);
 % With a gallery (the concept_examples stage, tiny), B draws the gallery's
 % structures that the outlier_structures stage ran, in the gallery's order
