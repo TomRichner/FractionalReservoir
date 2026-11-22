@@ -149,9 +149,21 @@ labs = findall(g4.figs, 'Tag', 'histogram_label'); lam = findall(g4.figs, 'Tag',
 ok = ok && numel(labs) == 3 && all([labs.FontSize] == 14) && numel(lam) == numel(C) && all([lam.FontSize] == 14);
 keys = findall(g4.figs, 'Tag', 'histogram_key');
 ok = ok && isscalar(keys) && keys.FontSize == 14 && contains(strjoin(cellstr(keys.String), ' '), 'uniform');
+% Each label has a leader to what it names, its end computed from the
+% histogram: the spike at -1/tau_d, the plateau on the far side of the spike
+% from zero, the pile of slow eigenvalues between the spike and zero.
+lead = findall(g4.figs, 'Tag', 'histogram_leader');
+ok = ok && numel(lead) == 3;
+if ok
+    U = [lead.UserData]; tg = {U.target}; x_end = arrayfun(@(h) h.XData(2), lead)';
+    c_leak = -1 / D.disk_by_cond{1}.tau_d;
+    ok = isequal(sort(tg), {'pile', 'plateau', 'spike'}) && abs(x_end(strcmp(tg, 'spike')) - c_leak) < 1e-9 && ...
+        x_end(strcmp(tg, 'plateau')) < c_leak && x_end(strcmp(tg, 'pile')) > c_leak && ...
+        all(arrayfun(@(h) all(h.YData > h.Parent.YLim(1) & h.YData < h.Parent.YLim(2)), lead));
+end
 close(g4.figs);
 evalc('m4 = fig_main3_stability(on_dir, {}, ''spectra_source'', ''local_lyapunov'', ''real_histogram_row'', true, ''histogram_labels'', false);');
-ok = ok && n_tagged(m4.figs, 'histogram_label') == 0 && n_tagged(m4.figs, 'ritz_density') == 0 && n_tagged(m4.figs, 'ritz_inset') == 0;
+ok = ok && n_tagged(m4.figs, 'histogram_label') == 0 && n_tagged(m4.figs, 'histogram_leader') == 0 &&n_tagged(m4.figs, 'ritz_density') == 0 && n_tagged(m4.figs, 'ritz_inset') == 0;
 close(m4.figs);
 evalc(['rh = fig_eig_real_histogram(''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''rh''), ''visible'', false, ' ...
     '''spectra_source'', ''local_lyapunov'');']);
