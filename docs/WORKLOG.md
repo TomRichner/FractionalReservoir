@@ -32,6 +32,15 @@ Entry template:
 **Next:** ...
 ```
 
+## 2026-11-21 19:00 (Plan 2 so far: phase 0, the six packages, integration; worker p2-a2 for the integration)
+
+**Issues touched:** FD-047 to FD-052 (open -> done), FD-053 (opened -> done on branch `p2-a2`, not merged).
+**Commits:** the package merges on `main`: B `9308f81`, D `22a2d56`, E `2c084b7`, A `bb508c5`, C `60272ab`, F `7c5ca6b`. Integration on `p2-a2`: `ab47f75` registry and stages, `953737a` tests, `c346f41` fs-plumbing stubs, `0698a26` stages reference, `776d165` Figure 4 without the dotted line, and the record. The plan and its status: the manuscript repository's `docs/Advancing_the_narrative/Plan2.md`; the figures: `figures_main_supp_appen.md` there.
+**Done:** phase 0 baseline (rapid tier bit for bit; stages tier one known leaf). Six packages built the new composites and stages (FD-048 to FD-052). The integration registered them: from `fast` upward the paper's bundles give exactly 8 main figures (`fig_main1_grouped` to `fig_main7_grouped` in `mu7chain_AC_config`, `Fig_Main8_Stim` in `ied_stim_config`) and 10 supplementary (`fig_supp1_grouped` to `fig_supp9_grouped`, `fig_supp10_grouped`), the rest appendix; `concept_examples` and `uncoupled_reference` run in every `mu7chain` mode; the stimulation bundle runs `burst_mode` and the network-mode stage into its own run directory. Tom's two decisions of the evening: Figure 4C without the dotted uncoupled line (an option, off; the numbers stay in the table), Figure 1 column 4 as built.
+**Verified:** with a pool of 4 on the workstation: the whole quick suite in pieces (107 of 107), the Plan 2 slow tests, the rapid tier; the stages tier differed from its 2026-11-13 reference by exactly the `P.ode_solver` leaf and 12 sentence-case titles, was re-captured, and passes. Smoke at tiny size through both entry points: AC bundle 88 of 88 entries (two stages rerun after the smoke's own substitute presets broke them), stimulation bundle 8 of 8 in 3.7 min.
+**Not verified / known gaps:** nothing at 500 neurons through the new registry; the `fast` cost is an estimate (FD-053's report: about 7 to 8 h for the AC bundle on 12 workers, about 10 min for the stimulation bundle). The figures were not looked at for style in the smoke (tiny networks), apart from Figure 4 (no dotted line). `call_figure`'s retry without `run_dir` hides the real error of a missing stage output; the stages tier compares 0 figure files.
+**Next:** the lead merges `p2-a2`; then phase 3, the `fast` run, after the estimate is accepted.
+
 ## 2026-11-21 (session e2fb4a9b, MacBook Air, 2026-11-19 to 21)
 
 **Issues touched:** FD-032 (opened -> built), FD-033 (opened -> built), FD-034 (opened -> built, now the bundle's Figure 3), FD-035 (opened -> function built), FD-036 to FD-039 (opened -> figure functions built, FD-045), FD-040 to FD-046 (opened -> built and merged).

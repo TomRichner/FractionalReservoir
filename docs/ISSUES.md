@@ -2238,7 +2238,7 @@ takes about 35 minutes; run it in pieces.
 
 ### FD-047 Plan 2, package A: the three groups, condition colors, 150 directions
 
-- **Status:** in progress (branch `p2-a`).
+- **Status:** done. First job merged `bb508c5`; the wiring is FD-053.
 - **What:** every entry of the paper bundles (`mu7chain_config`,
   `mu7chain_AC_config`, `mu7chain_gainbias_config`, `ied_stim_config`) in
   a group, `main`, `supplement` or `appendix` (`paper_figure_groups`,
@@ -2255,50 +2255,147 @@ takes about 35 minutes; run it in pieces.
   the rapid and stages tiers as at the baseline (title text apart); the
   other packages' rows wired, and `figure_groups.md` of a tiny-size pass
   lists eight main figures.
+- **Result:** the groups, the manifest and the guard as specified; the
+  stages tier differed only by the 12 sentence-case title leaves and the
+  known `P.ode_solver` leaf, re-captured in FD-053. Package E's merged rows
+  did not match the row form (a logical where the group goes); FD-053
+  fixed them.
 
 ### FD-048 Plan 2, package B: Figure 1 and S3
 
-- **Status:** open.
+- **Status:** done (merged `9308f81`; registered in FD-053).
 - **What:** the `concept_examples` stage (four example structures at 500
   neurons, their equal-gain spectra and unadapted activity), the
   representative 30 by 30 weight image, the new Figure 1 with the kept
   sigmoid and circle diagrams, and the connectivity gallery S3.
 - **Done means:** stage and figures built and tested at tiny size, PNGs
   looked at, registry rows handed to package A.
+- **Result:** `fig_main1_concept_networks` (entry `fig_main1_grouped`),
+  `fig_supp3_connectivity_gallery` (`fig_supp3_grouped`), stage
+  `concept_examples` in every mode of the `mu7chain` bundles. No
+  strengthened E-I loop oscillates in this model without adaptation, so
+  column 4 is an added rotating low-rank mode (slightly off Dale's law).
+  **Tom, 2026-11-21: column 4 stays as built**; no code change.
 
 ### FD-049 Plan 2, package C: Figures 3 and 4
 
-- **Status:** open.
+- **Status:** done (merged `60272ab`; registered in FD-053).
 - **What:** Figure 3 without the Ritz overlay in the composite and with the
   three labels on row D; `fig_local_lyapunov` on the stage's window;
   Figure 4 panel C (dendritic share of the leading perturbation against
   lambda_1, with the uncoupled reference).
 - **Done means:** as FD-048.
+- **Result:** Figure 3 on a canvas that fits the screen (the baseline
+  failure of `test_local_lyapunov_spectra` was the clamped window); stage
+  `uncoupled_reference` (-0.110 1/s with multiple timescales, -0.60 with
+  one); `fig_main4_connectivity` (entry `fig_main4_grouped`). **Tom,
+  2026-11-21: panel C is drawn WITHOUT the dotted uncoupled-rate line.**
+  FD-053 made the line an option, off by default (`reference_line`), in
+  `fig_leading_direction` and `fig_main4_connectivity`; the stage stays in
+  the bundles and its numbers (the uncoupled rate per condition, the share
+  of all and of contracting runs within 25 percent of it) stay in the
+  `_table.md` sidecar for the text. Neither figure errors without the
+  stage's output.
 
 ### FD-050 Plan 2, package D: Figures 5 and 6, S6 to S8
 
-- **Status:** open.
+- **Status:** done (merged `22a2d56`; registered in FD-053).
 - **What:** Figure 5 from `fig_outlier_plane` and `fig_outlier_dose` (E and
   I marks on the insets); Figure 6 from the transient-gain and
   frequency-response panels; the supplementary composites S6, S7, S8; the
   layout defects of the spectral figures of 2026-11-21, tall figures cut at
   export among them.
 - **Done means:** as FD-048.
+- **Result:** `fig_main5_mechanism`, `fig_main6_amplification`,
+  `fig_supp6_grouped` to `fig_supp8_grouped`, the `composite_*` helpers;
+  figures taller than the screen print whole. Registered by
+  `with_spectral_supplement` (Figure 6 only where `transient_gain` runs).
 
 ### FD-051 Plan 2, package E: Figure 8, S10
 
-- **Status:** open.
+- **Status:** done (merged `2c084b7`; registered in FD-053).
 - **What:** the `burst_mode` stage (the bursting network before and during
   sustained input, several seeds, the frozen-adaptation arm, the network
   mode with gains frozen and in the full Jacobian), its panels A to C as
   rates, the combined Figure 8 in the new order, S10, and the network mode
   in the modular network as an appendix figure.
 - **Done means:** as FD-048.
+- **Result:** stage `burst_mode`, `Fig_Main8_Stim`, `fig_supp10_grouped`,
+  `fig_burst_mode`, stage and figure `ied_network_mode`. A crossing of the
+  network mode is necessary for a burst, not sufficient. Since FD-053 the
+  stimulation bundle runs both stages into its own run directory.
 
 ### FD-052 Plan 2, package F: Figure 7, S1, S2, S4, S5, S9
 
-- **Status:** open.
+- **Status:** done (merged `7c5ca6b`; registered in FD-053).
 - **What:** the merged memory figure; the supplementary composites of
   existing figures (single neuron and depression models; numerics;
   sensitivity; joint sample; memory with the new responsive-share maps).
 - **Done means:** as FD-048.
+- **Result:** `fig_main7_memory`, `fig_supp1_grouped`, `_supp2_`,
+  `_supp4_`, `_supp5_`, `_supp9_`; the responsive share as a row of
+  `fig_mc_gain_bias_maps`. Figure 7 and S9 are entries of
+  `mu7chain_AC_config` and read both blocks from its run directory
+  (`mc_run_dir` left empty).
+
+### FD-053 Plan 2, integration: the registry in three groups, the new stages, tests, the stages reference, a smoke, the `fast` estimate
+
+- **Status:** done on branch `p2-a2` (worktree `../FractionalReservoir_wt_p2a2`),
+  for the lead to merge. Commits `ab47f75`, `953737a`, `c346f41`,
+  `0698a26`, `776d165` and the record.
+- **The groups**, from `fast` upward (asserted by name in
+  `test_paper_figure_groups`): main 8 (`fig_main1_grouped` to
+  `fig_main7_grouped` in `mu7chain_AC_config`, `Fig_Main8_Stim` in
+  `ied_stim_config`), supplement 10 (`fig_supp1_grouped` to
+  `fig_supp9_grouped` in AC, `fig_supp10_grouped` in the stimulation
+  bundle), appendix the rest (72 in AC, 6 in the stimulation bundle).
+  Where they are written: `grouped_figure_registry` (main 1 to 4, S1 to
+  S5, the old composites), `with_spectral_supplement` (main 5 and 6, S6 to
+  S8), `with_switch_spectra` (the paper's Figure 3 without the Ritz
+  overlay; `fig_main3_grouped_ritz` with overlay and inset in the
+  appendix), `mu7chain_AC_config` (main 7, S9), `ied_stim_config`.
+  `fig_main_mc_grouped` and `Fig_Stim_Combined` are appendix. `essential`
+  draws Figures 1 to 5, S1, S3 to S8 (what its stages make).
+- **One path per figure:** wrappers `fig_main1/4/5/6/7/8_grouped.m`
+  removed; the old composites of `fig_grouped_main` (groups 1, 5, 6, 7, 8)
+  are appendix entries through `fig_grouped_main_appendix`, with tags of
+  their own (`Fig_Main5_Transient_old` and so on); group 4 is reached only
+  through `fig_main4_connectivity`; the no-op `accumulated_lambda_label`
+  line and the unused nested `raster()` are gone. `with_ritz_overlay`'s
+  composite is renamed `fig_main3_grouped_baseline_ritz`.
+- **Stages:** `concept_examples` and `uncoupled_reference` in
+  `paper_opt_in_stages` (after `lyapunov_spectrum_n80`) and in every mode
+  of the `mu7chain` bundles. Stimulation is self-contained: `ied_stim_run`
+  runs `run_ied_network_mode_stage` and `burst_mode`
+  (`cfg.burst_mode_stage`: the mode's size, `bursting_pairs`, 500 Hz,
+  SRA1) into its own run directory, skipping a stage whose index is
+  complete; Figure 8, S10 and `fig_burst_mode` read it there.
+  `burst_mode` is not an opt-in stage of the `mu7chain` bundles.
+- **Found:** package E's rows passed `true`/`false` as the group, so
+  `ied_stim_config` errored in every mode; S10 and `fig_burst_mode` have
+  the standard signature, which `ied_stim_figures` cannot call (an adapter
+  in `ied_stim_config` maps `data_dir`). `test_bundle_fs_plumbing` had no
+  stub for the two new stages and ran both for real at 500 neurons (29 min
+  instead of 9 s); stubbed. Open, not fixed: `call_figure` in
+  `make_all_paper_figures` retries without `run_dir` on any error whose
+  message mentions `run_dir`, which turns a missing stage output into a
+  misleading `resolve_data_file:NoRunDir`; the stages tier digests 0
+  figure files (old and new reference alike), so its figure-name check
+  compares nothing.
+- **Tests:** the bundle and guard tests follow the registry; the slow list
+  gains `test_leading_direction`, `test_composite_spectral_figures`,
+  `test_memory_supplement_composites`, `test_burst_mode_stage`,
+  `test_concept_examples_stage`. Quick suite, in pieces with a pool of 4:
+  107 of 107 pass. Rapid tier passes. Stages tier: before the re-capture
+  exactly 1 extra leaf (`P.ode_solver`) and 12 title texts, no value;
+  re-captured (`0698a26`), then passes.
+- **Smoke (tiny):** AC bundle, every stage at `essential` sizes on the
+  80-neuron preset with the stages' size knobs: 88 of 88 entries written
+  (main 7 of 7, supplement 9 of 9, appendix 72 of 72), after
+  `outlier_structures` and `mc_gain_sweep` were rerun on the 500-neuron
+  presets with their own size knobs (the smoke's substitute presets broke
+  them: `outlier_structures` on the 80-neuron preset failed
+  `SRNNCellTypePairs`' indegree check, and a noisy memory preset is refused by block
+  C's integrator guard) and two sheets redrawn that a stray tool call of
+  mine interrupted. Stimulation bundle at `essential`: 8 of 8 figures,
+  3.7 min.
