@@ -13,17 +13,27 @@ function out = fig_supp9_grouped(cfg)
 %       Figure 7B and panel (B) here carry them for the ensemble).
 %   (B) which state variables carry the leading perturbation, against the
 %       longest SFA time constant: the second figure of fig_sfa_EOC_allStd
-%       (was 6B), and beside it the cumulative memory capacity against
-%       delay, the first axes of fig_memory_capacity (was the left half of
-%       6C).
-%   (C) the responsive share of neurons over the gain by self-coupling
+%       (was 6B), with its key (SFA, STD, dendritic state) beside it.
+%   (C) the cumulative memory capacity against delay, the first axes of
+%       fig_memory_capacity (was the left half of 6C), with the
+%       conditions' key under it.
+%   (D) the responsive share of neurons over the gain by self-coupling
 %       grid, one map per condition, in the layout of the capacity maps of
 %       Figure 7D: fig_mc_gain_bias_maps with rows {'responsive'} (median
 %       over seeds of 1 - frac_pinned - frac_silent, the quantity
 %       'frac_on_slope' of mc_sweep_quantity).
-%   (D) memory capacity against lambda_1 for every run of that grid:
+%   (E) memory capacity against lambda_1 for every run of that grid:
 %       fig_mc_vs_lambda1 with the bundle's registry arguments. Its
 %       statistics boxes are not drawn; their text is in the table.
+%
+% THE LETTERS differ from the figure plan's by one from (C) on, on purpose
+% (2026-11-22): the plan lists four panels and does not name the
+% cumulative capacity, which stood beside (B) without a letter and read as
+% an unexplained panel. It has its own letter now, so the plan's C and D
+% (the responsive share; capacity against lambda_1) are D and E here. Also
+% since then: the key of (B) is beside (B) (it sat beside the maps, two
+% rows down); the scatter panels are open, not boxed; and the marker-size
+% key under them is spaced for 14 pt (its labels ran into each other).
 %
 % WHICH RUN: as fig_main7_memory. run_dir holds mc_example, the tau sweep
 % and memory_capacity; the gain by self-coupling grid is read from
@@ -94,7 +104,7 @@ tx = findall(ex_axes(is_trace), 'Type', 'text');            % the source's own p
 delete(tx(arrayfun(@(t) ~isempty(regexp(strjoin(cellstr(t.String), ' '), '^\([a-z]\)$', 'once')), tx)));
 A = T.copy(ex_axes(is_trace), fig, false);
 [~, order] = sort(arrayfun(@(a) -a.Position(2), A.axes)); ax_a = A.axes(order);   % top first
-T.place(ax_a, [40 Y1 - 20 385 H1 + 20]);
+T.place(ax_a, [40 Y1 - 20 345 H1 + 20]);
 
 % (B): leading-vector fractions (second figure of the tau sweep), then the
 % cumulative capacity (first axes of fig_memory_capacity).
@@ -103,7 +113,8 @@ assert(isscalar(Bv.axes), 'fig_supp9_grouped:TauPanels', ...
     'Expected one leading-vector panel from the tau sweep, found %d. Select one of its conditions.', ...
     numel(Bv.axes));
 ax_b1 = Bv.axes;
-T.place(ax_b1, [560 Y1 215 H1]);
+XB = 510; WB = 195;            % (B), with room at its right for its key
+T.place(ax_b1, [XB Y1 WB H1]);
 mc_axes = findall(S_mc.figs, 'Type', 'axes');
 assert(numel(mc_axes) == 3, 'fig_supp9_grouped:MemoryAxes', ...
     'Expected three memory-capacity axes, found %d.', numel(mc_axes));
@@ -111,7 +122,7 @@ assert(numel(mc_axes) == 3, 'fig_supp9_grouped:MemoryAxes', ...
 
 Bc = T.copy(mc_axes(1), fig, false);
 ax_b2 = Bc.axes;
-T.place(ax_b2, [885 Y1 190 H1]);
+T.place(ax_b2, [940 Y1 145 H1]);
 
 % (C): the responsive-share maps and their colour bar.
 Cm = T.copy(S_map.figs, fig);
@@ -133,7 +144,7 @@ sct = Ds.axes(~is_key);
 [~, order] = sort(arrayfun(@(a) a.Position(1), sct)); sct = sct(order);
 T.place(sct, [95 Y3 880 H3], Ds.colorbars);
 if any(is_key)
-    Ds.axes(is_key).Position = [95 12 880 60];
+    respace_size_key(Ds.axes(is_key), W);
 end
 
 %% Style
@@ -203,65 +214,66 @@ for c = 1:numel(sct)
     xlabel(sct(c), 'Lyapunov Exp., \lambda_1 (s^{-1})', 'Interpreter', 'tex');
 end
 ylabel(sct(1), 'Memory Capacity');
+set(sct, 'Box', 'off');                  % open axes, as every other panel (the source boxes them)
 if ~isempty(Ds.colorbars); Ds.colorbars.Label.String = 'Gain'; end
 
-% The two keys of (B) go under it, in the free space right of the maps: the
-% state coordinates' above, the conditions' below (inside the narrow
-% leading-vector panel a key covers the curves). Legends settle their size
-% only after a redraw; then they are placed.
+% The keys. That of the state coordinates of (B) is at the right of (B), at
+% its top (inside the narrow panel a key covers the curves; until
+% 2026-11-22 it was right of the maps, where it read as their key). That of
+% the conditions is under (C), whose lines it names, in the free space
+% right of the maps. Legends settle their size only after a redraw; then
+% they are placed.
 x_keys = x_cb + 122;
 set([Bv.legends(:); lg(:)], 'ItemTokenSize', [22 18]);
 for pass = 1:2
     drawnow;
-    y = Y2 + MH + 25;
     if ~isempty(Bv.legends)
         p = Bv.legends.Position;
-        y = y - p(4);
-        Bv.legends.Position = [x_keys, y, p(3), p(4)];
+        Bv.legends.Position = [XB + WB + 4, Y1 + H1 - p(4), p(3), p(4)];
     end
     if ~isempty(lg)
         p = lg.Position;
-        y = y - p(4) - 16;
-        lg.Position = [x_keys, y, p(3), p(4)];
+        lg.Position = [x_keys, Y2 + MH - p(4), p(3), p(4)];
     end
 end
 
 %% Panel letters
 T.letter(ax_a(1), 'A', -30, 22);
 T.letter(ax_b1, 'B', -95, 12);
-T.letter(maps(1), 'C', -95, 50);
-T.letter(sct(1), 'D', -80, 25);
+T.letter(ax_b2, 'C', -75, 12);
+T.letter(maps(1), 'D', -95, 50);
+T.letter(sct(1), 'E', -80, 25);
 
 %% Save
 panels = struct( ...
     'A', 'fig_memory_capacity_example (its four trace axes): example reconstructions at several delays', ...
-    'B', ['fig_sfa_EOC_allStd (second figure): leading-vector squared-norm fractions against the longest SFA ' ...
-          'time constant; fig_memory_capacity (first axes): cumulative memory capacity against delay'], ...
-    'C', 'fig_mc_gain_bias_maps with rows {''responsive''}: responsive share of neurons over gain by self-coupling', ...
-    'D', 'fig_mc_vs_lambda1 (fig_mc_sweep_scatter): memory capacity against lambda_1, every run of the grid');
+    'B', 'fig_sfa_EOC_allStd (second figure): leading-vector squared-norm fractions against the longest SFA time constant', ...
+    'C', 'fig_memory_capacity (first axes): cumulative memory capacity against delay', ...
+    'D', 'fig_mc_gain_bias_maps with rows {''responsive''}: responsive share of neurons over gain by self-coupling', ...
+    'E', 'fig_mc_vs_lambda1 (fig_mc_sweep_scatter): memory capacity against lambda_1, every run of the grid');
 sources = [{S_ex.source, S_tau.source, S_mc.source}, cellstr(string(S_map.source)), cellstr(string(S_sct.source))];
 parts = cell(0, 2);
 if cfg.save
     R = S_map.responsive_share;
     delays = arrayfun(@(a) ['- ' strjoin(cellstr(a.Title.String), ' ')], ax_a, 'UniformOutput', false);
     parts = {['Panel A, ' panels.A], strjoin([{'The delays drawn and the score of each reconstruction:', ''}, delays(:)'], newline); ...
-        'Panel B, left (fig_sfa_EOC_allStd, second figure)', T.axes_table(ax_b1, 'The squared-norm fraction of the leading Lyapunov vector in each block of state variables'); ...
-        'Panel B, right (fig_memory_capacity, first axes)', T.axes_table(ax_b2, 'The cumulative memory capacity, mean over trials, per condition')};
+        'Panel B (fig_sfa_EOC_allStd, second figure)', T.axes_table(ax_b1, 'The squared-norm fraction of the leading Lyapunov vector in each block of state variables'); ...
+        'Panel C (fig_memory_capacity, first axes)', T.axes_table(ax_b2, 'The cumulative memory capacity, mean over trials, per condition')};
     for c = 1:nc
-        parts(end + 1, :) = {sprintf('Panel C, map %d of %d (fig_mc_gain_bias_maps, rows {''responsive''})', c, nc), ...
+        parts(end + 1, :) = {sprintf('Panel D, map %d of %d (fig_mc_gain_bias_maps, rows {''responsive''})', c, nc), ...
             T.grid_table(sprintf('Responsive share (1 - pinned - silent), median over seeds, %s', names{c}), ...
             R.median(:, :, c), R.second_levels, R.first_levels, 'self-coupling s', 'gain')}; %#ok<AGROW>
     end
-    parts(end + 1, :) = {['Panel D, ' panels.D], strjoin([{'The statistics the source figure prints on its panels (not drawn here):', ''}, stats_text], newline)};
+    parts(end + 1, :) = {['Panel E, ' panels.E], strjoin([{'The statistics the source figure prints on its panels (not drawn here):', ''}, stats_text], newline)};
 end
 caption = sprintf(['Supplementary Figure S9, memory (drawn by fig_supp9_grouped; run `%s`, grid from `%s`; conditions %s). ' ...
     '(A) Example reconstructions of the past input (black: target; colour: the readout) at four delays, with the ' ...
-    'score of each; the example''s two summary axes are left out. (B) Left: the share of the squared norm of the ' ...
+    'score of each; the example''s two summary axes are left out. (B) The share of the squared norm of the ' ...
     'leading Lyapunov vector in the SFA, depression and dendritic coordinates against the longest SFA time ' ...
-    'constant (%s; the state coordinates have their own colours and markers). Right: cumulative memory capacity ' ...
-    'against delay, per condition. (C) Responsive share of neurons, 1 - frac_pinned - frac_silent (time-mean rate ' ...
+    'constant (%s; the state coordinates have their own colours and markers). (C) Cumulative memory capacity ' ...
+    'against delay, per condition. (D) Responsive share of neurons, 1 - frac_pinned - frac_silent (time-mean rate ' ...
     'neither above 0.9 nor below 0.01), median over seeds, over gain by self-coupling s, one map per condition in ' ...
-    'the layout of Figure 7D; white 0, dark green 1; star: the preset. (D) Memory capacity against lambda_1 with the ' ...
+    'the layout of Figure 7D; white 0, dark green 1; star: the preset. (E) Memory capacity against lambda_1 with the ' ...
     'task input on for every run of that grid, coloured by gain, marker area by |s| (filled s >= 0, ring s < 0), ' ...
     'open squares at the edge where |lambda_1| exceeds the axis; the statistics boxes of the source figure are in ' ...
     'this table, not on the panels. Canvas %d x %d px, text 14 pt.'], ...
@@ -278,6 +290,31 @@ for k = 1:numel(figures)
     if strcmp(figures{k}.name, name); e = figures{k}; return; end
 end
 error('fig_supp9_grouped:NoEntry', 'The bundle registers no figure %s.', name);
+end
+
+function respace_size_key(key, W)
+% The marker-size key under the scatter panels, laid out for this canvas.
+% The source spaces its reference markers for its own 10-point labels on
+% a wider sheet; at the composite's 14 points the values ('-2.33',
+% '-0.667') ran into each other. The key's axes are given the canvas'
+% width and an x range in which one marker step is as wide as the room
+% between the key's heading (right-aligned at x = 0.4) and the clipped
+% mark's note (from x = n + 1.7) allows, at most 70 px.
+HEAD_PX = 220; NOTE_PX = 285; LEFT = 20;
+tx = findall(key, 'Type', 'text');
+n = nnz(arrayfun(@(t) strcmp(t.VerticalAlignment, 'top'), tx));      % the value labels
+has_note = numel(tx) > n + 1;
+x_last = n + 0.6;
+if has_note; x_last = n + 1.7; else; NOTE_PX = 10; end
+width = W - 2 * LEFT;
+u = min(70, (width - HEAD_PX - NOTE_PX) / (x_last - 0.4));                % px per marker step
+key.Units = 'pixels';
+key.Position = [LEFT, 14, width, 66];
+x0 = 0.4 - HEAD_PX / u;
+key.XLim = [x0, x0 + width / u];
+T = composite_tools();
+for k = 1:numel(tx); tx(k).String = T.sentence(tx(k).String); end          % 'Self-coupling s (R_W):'
+T.margin(ancestor(key, 'figure'), 2);                                      % the labels are the lowest thing drawn
 end
 
 function x = pixel_x(ax)

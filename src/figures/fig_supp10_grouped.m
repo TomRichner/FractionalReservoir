@@ -99,6 +99,14 @@ for r = 1:3
     hz = plot(axB(r), Z.t(kz), series{r, 2}(kz), '--', 'Color', ec(1, :), 'LineWidth', 0.9);
     xlim(axB(r), win); ylabel(axB(r), series{r, 3});
     if r < 3; axB(r).XTickLabel = {}; end
+    if r == 3
+        % The depression factor is at most 1. A floor a tenth below the
+        % deepest point of the window: until 2026-11-22 the automatic limit
+        % sat at that point (about 0.47) and the dip after the step was
+        % drawn through the time axis.
+        lo = min([series{r, 1}(ki); series{r, 2}(kz)]);
+        ylim(axB(r), [0.1 * floor(10 * lo - 0.5), 1]);
+    end
     if r == 1
         lg = legend(axB(r), [hi hz], {'Intact', 'Adaptation frozen'}, 'Location', 'northeast', ...
             'Box', 'off', 'FontSize', fa, 'AutoUpdate', 'off'); lg.ItemTokenSize = [12 8];
