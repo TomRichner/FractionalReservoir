@@ -214,22 +214,21 @@ end
 
 function house_style(fig)
 % Type by role (Plan2_canvas_standard.md): everything at tick_fs first, then
-% the axis names and colour-bar labels at label_fs and the titles at
-% title_fs, each set on the label itself (the multipliers are 1).
+% each piece of type its role's size by the shared canvas_type (axis names
+% and colour-bar labels label_fs, titles title_fs, panel letters
+% letter_fs; the roles are canvas_audit's, the ones test_canvas_standard
+% checks), each set on the label itself (the multipliers are 1).
 st = manuscript_style();
 ax = findall(fig, '-isa', 'matlab.graphics.axis.Axes');
 set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'TitleFontSizeMultiplier', 1, 'LabelFontSizeMultiplier', 1);
 set(findall(fig, '-property', 'FontSize'), 'FontSize', st.tick_fs);
 for k = 1:numel(ax)
     ax(k).Title.FontWeight = 'normal';
-    ax(k).Title.FontSize = st.title_fs;
-    if isprop(ax(k), 'Subtitle'); ax(k).Subtitle.FontWeight = 'normal'; ax(k).Subtitle.FontSize = st.title_fs; end
-    set([ax(k).XLabel, ax(k).YLabel, ax(k).ZLabel], 'FontSize', st.label_fs);
+    if isprop(ax(k), 'Subtitle'); ax(k).Subtitle.FontWeight = 'normal'; end
 end
+canvas_type(fig);
 set(findall(fig, 'Type', 'legend'), 'Box', 'off');
-cb = findall(fig, 'Type', 'colorbar');
-set(cb, 'Box', 'off', 'LineWidth', st.axis_lw);
-for k = 1:numel(cb); cb(k).Label.FontSize = st.label_fs; end
+set(findall(fig, 'Type', 'colorbar'), 'Box', 'off', 'LineWidth', st.axis_lw);
 end
 
 function fit_width(fig)

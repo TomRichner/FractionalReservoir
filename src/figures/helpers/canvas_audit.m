@@ -31,7 +31,7 @@ function A = canvas_audit(fig, exceptions)
 %
 % Nothing is changed in the figure; canvas_type sets the sizes.
 %
-% See also: canvas_type, manuscript_style, test_canvas_standard_a
+% See also: canvas_type, manuscript_style, test_canvas_standard
 
 arguments
     fig (1,1) matlab.ui.Figure
