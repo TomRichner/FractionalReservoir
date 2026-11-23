@@ -155,7 +155,7 @@ for c = 1:nc
     if strcmp(ax{1}(c).YScale, 'log'); ax{1}(c).YLim = decade_limits(ax{1}(c)); end
 end
 % (B): zoomed, even where that clips the first transient.
-ylabel(ax{2}(1), {'Local Lyapunov', 'Exponent (s^{-1})'}, 'Interpreter', 'tex');
+ylabel(ax{2}(1), {'Local growth', 'rate (s^{-1})'}, 'Interpreter', 'tex');   % G3 (Tom, 2026-11-23): a local rate is a 'local growth rate'
 for c = 1:nc
     xlabel(ax{2}(c), 'Time (s)');
     yl = cfg.local_ylim_adaptation;
