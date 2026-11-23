@@ -351,9 +351,11 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 % manuscript repository's figures_main_supp_appen.md): every entry is
 % 'main', 'supplement' or 'appendix', and in_paper is derived from it (main
 % and supplement). The main figures here are the grouped composites
-% (grouped_figure_registry: main Figures 1 to 4, supplementary S1 to S5,
+% (grouped_figure_registry: main Figures 1 to 4, supplementary S1 to S5
+% and the leading-direction figure,
 % the old composites in the appendix; with_spectral_supplement adds main 5
-% and 6 and S6 to S8, mu7chain_AC_config main 7 and S9). Every single
+% and 6 and S6, S7 (and S8 in the appendix since Plan 3: its panels are
+% S6 D and E), mu7chain_AC_config main 7 and S9). Every single
 % figure below is 'appendix': it is in the plan's appendix, or a panel of a
 % supplementary composite. Until 2026-11-21 several of them were in_paper
 % true, as panels of the old supplement.
@@ -459,8 +461,10 @@ F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
 %                                     the preset's adaptation models
 %   fig_supp4_grouped                 the 1-D sweeps
 %   fig_supp5_grouped                 the joint sample and the 1-D sweeps
-% (main Figure 5 and S6 to S8 are added by with_spectral_supplement in
-% every mode; Figures 6 and 7, S2 and S9 need stages this mode skips.)
+% (main Figure 5, S6, S7 and, in the appendix, S8 are added by
+% with_spectral_supplement in
+% every mode; Figures 6 and 7, S2, S9 and fig_supp_leading_grouped need
+% stages this mode skips: the leading-direction figure reads the tau sweep.)
 if is_essential
     keep = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', ...
             'fig_param_space_allStd', 'fig_EI_weights_param_space', 'fig_lle_vs_rate', ...

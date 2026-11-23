@@ -337,8 +337,9 @@ want_figs = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', 'fig_
     'fig_ostruct_plane_rotation', 'fig_ostruct_plane_local', 'fig_ostruct_plane_blockmean', ...
     'fig_ostruct_rotation', 'fig_ostruct_h1', ...
     'fig_main5_grouped', 'fig_supp6_grouped', 'fig_supp7_grouped', 'fig_supp8_grouped'};
-% (Plan 2: Figures 1 and 5 and S1, S3 to S8 are drawn at 'essential' too;
-% Figure 6 needs transient_gain, Figure 7, S2 and S9 the stages it skips.)
+% (Plan 2: Figures 1 to 5 and S1, S3 to S8 are drawn at 'essential' too, S8
+% in the appendix since Plan 3; Figure 6 needs transient_gain, Figure 7,
+% S2, S9 and fig_supp_leading_grouped the stages it skips.)
 names = cellfun(@(f) f.name, cfg.figures, 'UniformOutput', false);
 assert(isequal(names, want_figs), 'the essential registry is: %s', strjoin(names, ', '));
 % Each entry is the fast registry's own, except that a grouped entry reads

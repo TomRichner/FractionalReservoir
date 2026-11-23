@@ -53,8 +53,9 @@ function cfg = mu7chain_AC_config(run_mode, figure_set)
 %   cfg.run_dir   data/mu7chain_AC_<run_mode>
 %   cfg.fig_root  figs/mu7chain_AC_<run_mode>_<figure_set>; the grouped
 %                 main figures read their source figures from this root
-%   cfg.figures   block A's entries (main Figures 1 to 6, S1 to S8 and the
-%                 appendix), then block C's (all appendix since Plan 2; the
+%   cfg.figures   block A's entries (main Figures 1 to 6, S1 to S7, the
+%                 leading-direction figure, and the appendix, S8 in it
+%                 since Plan 3), then block C's (all appendix since Plan 2; the
 %                 old Fig 7, fig_main_mc_grouped, among them), then the
 %                 paper's Figure 7 and S9 (fig_main7_grouped,
 %                 fig_supp9_grouped; from 'fast' upward), then
