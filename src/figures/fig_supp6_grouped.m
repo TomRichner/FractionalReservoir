@@ -147,6 +147,6 @@ tok = regexp(name, '^([EI])([EI])x(\d+)p(\d+)$', 'tokens', 'once');
 if isempty(tok)
     s = name;
 else
-    s = sprintf('%s-to-%s \\times %s.%s', tok{1}, tok{2}, tok{3}, tok{4});
+    s = sprintf('%s-to-%s %s %s.%s', tok{1}, tok{2}, char(215), tok{3}, tok{4});   % the sign itself, as Figure 5, S3 and S7 A write it (TeX's times set it with wide spaces)
 end
 end
