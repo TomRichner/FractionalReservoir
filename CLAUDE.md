@@ -18,8 +18,22 @@ dead end.
 
 ## Current work (as of 2026-11-12)
 
-**Since 2026-11-21 the work in hand is Plan 2, the figures of the new figure
-plan** (Tom, 2026-11-21). The plan and its status are in the manuscript
+**Since 2026-11-22 the work in hand is Plan 3, the figure revisions after
+Tom's review** of all 18 main and supplementary figures. Read, in the
+manuscript repository under
+`../StochasticPlasticDynamicalSystemPaper/docs/Advancing_the_narrative/`:
+`Plan3.md` (the plan: workers, branches, waves, the checks at the end),
+`Plan2_figure_feedback.md` (Tom's notes figure by figure, with the rules
+for every figure at its foot: this is the specification) and
+`Plan3_worker_brief.md` (the rules for a worker). In short: the integration
+branch is `p3` in `../FractionalReservoir_wt_p3`, one worktree and branch
+per package (`../FractionalReservoir_wt_p3_<name>`, `p3-<name>`); every
+main and supplementary figure on one 9 in canvas with the type sizes of
+`manuscript_style`; no pool while the long run goes; nothing merged into
+`main` and nothing written in the main checkout until that run ends.
+
+Plan 3 revises what Plan 2 built. **From 2026-11-21 that was Plan 2, the
+figures of the new figure plan** (Tom, 2026-11-21). The plan and its status are in the manuscript
 repository:
 `../StochasticPlasticDynamicalSystemPaper/docs/Advancing_the_narrative/Plan2.md`.
 The specification of every figure (main, supplement, appendix; panel by
