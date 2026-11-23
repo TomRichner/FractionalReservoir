@@ -66,8 +66,8 @@
 %      on a product route, [] on an undepressed one; combine_std_pair,
 %      apply_std_zero_floor_pair and std_zero_floor_pmin raise
 %      ProductRouteOnly on a chain route and still serve a product route.
-%  13. plot and plot_celltypes draw b1 for a chain route, not b1 b2, and
-%      for a product route exactly prod(b), as before.
+%  13. plot and plot_celltypes draw each presynaptic neuron's b1 for a
+%      chain route and prod(b) for a product route.
 %  14. A chain model reproduces bit for bit: two fresh objects, run() twice
 %      on one, and an object saved, loaded, built and run again.
 %
@@ -365,20 +365,42 @@ ok = isequal(drawn_EE, sortrows(b1_EE)) && isequal(drawn_IE, sortrows(reshape(pd
 close(fig);
 all_passed = check('13. plot_celltypes draws b1 for the chain routes (not b1 b2) and b for the product route', ok) && all_passed;
 [fig, ax1] = m.plot();
-mean_lines = findall(ax1(6), 'Type', 'line');
-drawn = sortrows(vertcat(mean_lines.YData));
-expected = sortrows([mean(b1_EE, 1); mean(reshape(pd.b.E.I, nE, []), 1); mean(reshape(pd.b.I.E(:, 1, :), nI, []), 1)]);
-ok = isequal(drawn, expected);
+std_ax = ax1(std_row);
+colors = lines(4);
+ok = isequal(route_line_rows(std_ax, colors(1, :)), b1_EE) && ...
+    isequal(route_line_rows(std_ax, colors(2, :)), reshape(pd.b.E.I, nE, [])) && ...
+    isequal(route_line_rows(std_ax, colors(3, :)), reshape(pd.b.I.E(:, 1, :), nI, [])) && ...
+    numel(findall(std_ax, 'Type', 'line')) == 2 * nE + nI && ...
+    isequal(std_ax.Legend.String, {'E->E', 'E->I', 'I->E'}) && ...
+    strcmp(std_ax.YLabel.String, 'STD factor');
 close(fig);
-all_passed = check('13. plot draws each route''s mean factor', ok) && all_passed;
+all_passed = check('13. plot draws one STD trace per presynaptic neuron in each mixed route, with one legend key per route', ok) && all_passed;
+% Only E->E has depression. The undepressed routes do not enter the label.
+only_chain.E.E = sc.E.E;
+m_chain = build(@() small_network(only_chain));
+m_chain.run();
+[fig, ax_chain] = m_chain.plot();
+drawn = route_line_rows(ax_chain(std_row), colors(1, :));
+expected = reshape(m_chain.plot_data.b.E.E(:, 1, :), nE, []);
+ok = isequal(drawn, expected) && ...
+    numel(findall(ax_chain(std_row), 'Type', 'line')) == nE && ...
+    isequal(ax_chain(std_row).Legend.String, {'E->E'}) && ...
+    strcmp(ax_chain(std_row).YLabel.String, 'STD (b_1)');
+close(fig);
+all_passed = check('13. plot labels the releasable pool and draws each neuron''s b1 for chained STD', ok) && all_passed;
 m_prod = build(@() small_network(all_product));
 m_prod.run();
+expected = reshape(prod(m_prod.plot_data.b.E.E, 2), nE, []);
 [fig, axp] = m_prod.plot_celltypes();
 drawn = line_rows(axp(std_row, 1), 'PostType_E');
-ok = isequal(drawn, sortrows(reshape(prod(m_prod.plot_data.b.E.E, 2), nE, []))) && ...
+ok = isequal(drawn, sortrows(expected)) && ...
     strcmp(axp(std_row, 1).YLabel.String, 'STD (product)');
 close(fig);
-all_passed = check('13. a product network draws prod(b) under the label it had', ok) && all_passed;
+[fig, axp] = m_prod.plot();
+ok = ok && isequal(route_line_rows(axp(std_row), colors(1, :)), expected) && ...
+    strcmp(axp(std_row).YLabel.String, 'STD (product)');
+close(fig);
+all_passed = check('13. both plots draw each presynaptic neuron''s prod(b) under the product label', ok) && all_passed;
 
 %% 14. reproducibility
 A = small_network(sc, 'lya_method', 'topk', 'lya_K', 5, 'lya_K_auto', false, 'lya_dt', 0.1, ...
@@ -651,6 +673,12 @@ function rows = line_rows(ax, tag)
 % The YData of the lines with this tag, one row per line, sorted.
 found = findall(ax, 'Type', 'line', 'Tag', tag);
 rows = sortrows(vertcat(found.YData));
+end
+
+function rows = route_line_rows(ax, color)
+% Axes stack lines in reverse drawing order, including hidden handles.
+found = flip(findall(ax, 'Type', 'line', 'Color', color));
+rows = vertcat(found.YData);
 end
 
 function value = leading_exponent(m)

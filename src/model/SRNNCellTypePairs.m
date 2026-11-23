@@ -2413,7 +2413,7 @@ classdef SRNNCellTypePairs < handle
                 % releasable pool b1 on a chain route.
                 [b_collapsed, std_label] = SRNNCellTypePairs.std_factors(p.b, obj.get_params());
                 SRNNCellTypePairs.plot_route_series( ...
-                    p.t, b_collapsed, obj.cell_type_names, std_label, true);
+                    p.t, b_collapsed, obj.cell_type_names, std_label, true, true);
             end
             if has_g
                 panel = panel + 1; ax_handles(panel) = nexttile;
@@ -4296,8 +4296,8 @@ classdef SRNNCellTypePairs < handle
             % factor.<pre>.<post> is npre x nt, the route's factor at every
             % time (std_route_factor), [] where the route has no
             % depression. label is the axis label for a panel of them:
-            % 'STD (product)' while every depressed route is a product,
-            % 'STD factor' once any is a chain (whose factor is b1).
+            % 'STD (b_1)' for chained pools, 'STD (product)' for product
+            % routes, and 'STD factor' when both appear in the panel.
             factor = b_named;
             names = params.cell_type_names;
             for pre = 1:numel(names)
@@ -4308,9 +4308,13 @@ classdef SRNNCellTypePairs < handle
                     factor.(names{pre}).(names{post}) = reshape(D, size(D, 1), []);
                 end
             end
-            label = 'STD (product)';
-            if any(params.std_chain(:))
+            chained = params.std_chain(params.n_b_pairs > 0);
+            if ~isempty(chained) && all(chained)
+                label = 'STD (b_1)';
+            elseif any(chained)
                 label = 'STD factor';
+            else
+                label = 'STD (product)';
             end
         end
 
@@ -4383,8 +4387,9 @@ classdef SRNNCellTypePairs < handle
             end
         end
 
-        function plot_route_series(t, data, names, label, show_legend)
+        function plot_route_series(t, data, names, label, show_legend, draw_neurons)
             if nargin < 5, show_legend = true; end
+            if nargin < 6, draw_neurons = false; end
             colors = lines(max(1, numel(names)^2));
             hold on;
             % Enumerate the non-empty routes in NATURAL order first, so each one
@@ -4404,7 +4409,14 @@ classdef SRNNCellTypePairs < handle
             handles = gobjects(1, n_routes); labels = cell(1, n_routes);
             for k = SRNNCellTypePairs.draw_order(n_routes)
                 values = data.(route_pre{k}).(route_post{k});
-                handles(k) = plot(t, mean(values, 1), 'Color', colors(k, :));
+                if draw_neurons
+                    % Rows follow the presynaptic neuron order in the dendritic state.
+                    route_lines = plot(t, values', 'Color', colors(k, :));
+                    handles(k) = route_lines(1);
+                    set(route_lines(2:end), 'HandleVisibility', 'off');
+                else
+                    handles(k) = plot(t, mean(values, 1), 'Color', colors(k, :));
+                end
                 labels{k} = sprintf('%s->%s', route_pre{k}, route_post{k});
             end
             hold off;
