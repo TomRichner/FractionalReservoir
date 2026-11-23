@@ -73,7 +73,8 @@ function out = fig_outlier_plane(cfg)
 % short strip past a gap in the floor or ceiling line: "further out", not
 % how far. The only text on it: the letters E and I (inset_marks), each in
 % its cell-type color on its side of the curve, at tick_fs (11 pt while the
-% insets were small).
+% insets were small); inset_mark_pull (0 by default; 0.3 in Figure 5)
+% moves each letter toward the curve by that share of its white gap.
 %
 % Text on the figure: the condition names above the columns, in their
 % colors, the network names beside the rows, the axis names and ticks.
@@ -120,6 +121,7 @@ arguments
     cfg.inset_box (1,2) double {mustBePositive} = [1.3 1.05] % the inset's [width height], inches, hanging from its top right corner
     cfg.inset_marks (1,1) logical = true    % the letters E and I on the inset
     cfg.inset_mark_fs double = []           % [] = manuscript_style tick_fs
+    cfg.inset_mark_pull (1,1) double {mustBeInRange(cfg.inset_mark_pull, 0, 1, 'exclude-upper')} = 0   % share of the white gap between each letter and the curve taken out (0: as placed)
     cfg.inset_clear (1,1) double {mustBeNonnegative} = 0.08   % inches from an inset's bottom to the top of the row below
     cfg.dashed_circle (1,1) logical = true  % the thin dashed circle (kappa times the bulk radius); false leaves it out
     cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
@@ -406,9 +408,37 @@ if cfg.inset_marks
     % corners of the inset.
     mark = {'FontSize', cfg.inset_mark_fs, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
         'Tag', 'fig_outlier_plane_inset_mark'};
-    text(ax, -0.7 * L, 0.5 + 2 * jit, 'E', 'Color', ei_col(1, :), mark{:});
-    text(ax,  0.7 * L, 0.5 - 2 * jit, 'I', 'Color', ei_col(2, :), mark{:});
+    hE = text(ax, -0.7 * L, 0.5 + 2 * jit, 'E', 'Color', ei_col(1, :), mark{:});
+    hI = text(ax,  0.7 * L, 0.5 - 2 * jit, 'I', 'Color', ei_col(2, :), mark{:});
+    if cfg.inset_mark_pull > 0
+        % Each letter moved toward the curve so that the white gap between
+        % the letter's box and the nearest point of the drawn curve (sigmoid,
+        % floor and ceiling) shrinks by inset_mark_pull, measured in inches
+        % (Tom, 2026-11-23, Figure 5: "the red E and blue I can be closer to
+        % the sigmoid by about 30%"). The letters move along the line to
+        % that nearest point; the inset itself does not move.
+        sl = linspace(0, 1, 60)';
+        P = [uu(:), SRNNCellTypePairs.piecewiseSigmoid(uu(:), d.S_a, 0); ...
+            -L - gap - strip * sl, zeros(60, 1); L + gap + strip * sl, ones(60, 1)];
+        for h = [hE, hI]
+            pull_mark(ax, h, P, rect, cfg.inset_mark_pull);
+        end
+    end
 end
+end
+
+function pull_mark(ax, h, P, rect, pull)
+% Moves the text h toward the polyline points P (data units) so that the gap
+% from its box (Extent) to the nearest point shrinks by the share pull.
+s = [rect(3) / diff(ax.XLim), rect(4) / diff(ax.YLim)];   % inches per data unit
+e = h.Extent;
+lo = e(1:2) .* s; hi = (e(1:2) + e(3:4)) .* s;            % the letter's box, inches
+Q = P .* s;
+B = min(max(Q, lo), hi);                                  % each curve point's nearest point of the box
+[gap_in, k] = min(vecnorm(Q - B, 2, 2));
+if gap_in <= 0; return; end
+step = -pull * (B(k, :) - Q(k, :)) ./ s;                  % toward the curve, data units
+h.Position(1:2) = h.Position(1:2) + step;
 end
 
 function s = panel_numbers(runs, f, re_left, u_lim)
