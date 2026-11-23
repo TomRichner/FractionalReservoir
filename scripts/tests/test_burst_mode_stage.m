@@ -69,6 +69,9 @@ for k = 1:2
     assert(all(imag(R.full.net) >= 0));
     assert(xor(k == 1, all(R.full.is_coarse)), 'dense full-Jacobian grid in the first network only');
     assert(isempty(R.intact.ev) == (k > 1));
+    % The no-stimulation continuation (Figure 8 G): the intact run before the step.
+    assert(R.check.nostim_pre_step_mismatch == 0 && R.nostim.t(1) < R.t_step && all(R.nostim.u < R.dc_level / 2), ...
+        'no-stimulation continuation, network %d', k);
 end
 R = B.R{1};
 assert(B.runs.n_bursts_before(1) >= 1, 'the first network bursts before the step');
@@ -79,28 +82,26 @@ assert(throws(@() bm_load_runs(tempname), ''), 'the loader refuses a run without
 %% 3. The figures
 out_dir = fullfile(run_dir, 'figs');
 o = fig_burst_mode('run_dir', run_dir, 'out_dir', fullfile(out_dir, 'a'), 'visible', false);
-% Polish of 2026-11-22: E and I in the manuscript's colors; the two modes of
-% A told apart by color and width; both legends of A after the step.
+% Polish of 2026-11-22: E and I in the manuscript's colors; the two modes
+% told apart by color and width. Plan 3 (Figure 8 G): one key, above the
+% time course, with the no-stimulation continuation dashed; the
+% adaptation-frozen arm is not drawn.
 st = manuscript_style();
 assert(isequal([st.E_color; st.I_color], SRNNCellTypePairs.type_colors(2)), ...
     'the manuscript''s E and I colors are the model''s two anchors');
 lg = findall(o.figs, 'Type', 'legend');
-assert(numel(lg) == 2, 'two legends on A');
-B8 = bm_load_runs(run_dir, '', 'first');
-for k = 1:2
-    names = lg(k).String; h = lg(k).PlotChildren; ax = lg(k).Axes;
-    set([lg(k) ax], 'Units', 'normalized');
-    x_step = ax.Position(1) + ax.Position(3) * (B8.R{1}.t_step - ax.XLim(1)) / diff(ax.XLim);
-    assert(lg(k).Position(1) >= x_step, 'the legend "%s ..." begins after the step, clear of the onset transient', names{1});
-    if any(strcmp(names, 'E'))
-        assert(isequal(h(strcmp(names, 'E')).Color, st.E_color) && isequal(h(strcmp(names, 'I')).Color, st.I_color), ...
-            'E and I traces in the manuscript_style colors');
-    else
-        fz = h(strcmp(names, 'Gains frozen')); fj = h(strcmp(names, 'Full Jacobian'));
-        assert(~isequal(fz.Color, fj.Color) && fz.LineWidth >= 2 * fj.LineWidth, ...
-            'gains frozen and full Jacobian differ in color and in width');
-    end
-end
+assert(isscalar(lg), 'one key on G');
+names = lg.String; h = lg.PlotChildren; ax = lg.Axes;
+assert(isequal(names, {'E', 'I', 'Gains frozen', 'Full Jacobian', 'Without stimulation'}), 'the key of G');
+assert(isequal(h(1).Color, st.E_color) && isequal(h(2).Color, st.I_color), 'E and I traces in the manuscript_style colors');
+assert(~isequal(h(3).Color, h(4).Color) && h(3).LineWidth >= 2 * h(4).LineWidth, ...
+    'gains frozen and full Jacobian differ in color and in width');
+assert(strcmp(h(5).LineStyle, '--'), 'the continuation without stimulation is dashed');
+set(lg, 'Units', 'inches');
+top = max(arrayfun(@(a) a.Position(2) + a.Position(4), findall(o.figs, 'Type', 'axes')'));
+assert(lg.Position(2) >= top - 1e-6, 'the key sits above the time course');
+assert(nnz(arrayfun(@(l) strcmp(l.LineStyle, '--'), findall(ax, 'Type', 'line'))) == 3, ...
+    'dashed in the rate axes: E and I without stimulation, and the key''s entry');
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode.png')) && isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode_table.md')));
 ied = fullfile(run_dir, 'ied'); mkdir(ied);

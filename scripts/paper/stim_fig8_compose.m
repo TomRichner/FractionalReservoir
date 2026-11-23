@@ -57,7 +57,7 @@ hR = 1.0;          % rate and spectrum axes
 gR = 0.45;         % between them: the rate panel's condition names, one line
 xlabC = 0.32;      % under C: tick labels
 xlabF = 0.58;      % under F: tick labels and the x label
-wR = 1.6; xR = W - 0.15 - wR;                    % right column: B, C, E, F
+wR = 1.6; xR = W - 0.22 - wR;                    % right column: B, C, E, F (room right for the "100" under C and F)
 xN = 0.95;                                       % left edge of the traces (channel names left of it)
 gT = 0.2; wT = (xR - 1.5 - xN - gT) / 2;         % two trace strips; the stimulation strip's bars and the
 xT = [xN, xN + wT + gT];                         % rate panels' y labels right of them
@@ -108,6 +108,7 @@ changes = restyle_titles(new_ax, [new_lg{:}]);
 
 %% Type by role, then the rate axes, the spectra and the letters
 canvas_type(fig, fig8_type_exceptions());
+set([P.ax_A P.ax_B], 'LineWidth', st.axis_lw);   % bm_fig8_panels scales its axis lines with line_scale
 drawnow;
 for k = [3 7]                                    % B and E: rates as % of no stimulation
     a = new_ax(k);
