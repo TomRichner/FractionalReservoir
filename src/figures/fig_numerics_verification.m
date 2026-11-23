@@ -246,7 +246,13 @@ for i = 1:n_cond
         'DisplayName', 'Benettin local \lambda_1');
     yline(ax, LLE_b, '--', 'Color', col, 'LineWidth', 1.2, 'DisplayName', 'Benettin \lambda_1');
     for j = K:-1:1
-        h = plot(ax, Q.qr.t_lya, Q.qr.local_LE_spectrum_t(:, j), 'Color', cmap(j, :), 'LineWidth', 0.8, ...
+        y = Q.qr.local_LE_spectrum_t(:, j);
+        % "QR local lambda_1" is the column that started from Benettin's
+        % vector where the stage saved it (local_start, since 2026-11-23):
+        % a local rate belongs to its vector, so only that column is
+        % Benettin's to compare with. Older runs: the first sorted column.
+        if j == 1 && isfield(Q.qr, 'local_start'); y = Q.qr.local_start; end
+        h = plot(ax, Q.qr.t_lya, y, 'Color', cmap(j, :), 'LineWidth', 0.8, ...
             'HandleVisibility', 'off');
         if j == K && K > 1; set(h, 'DisplayName', sprintf('QR local \\lambda_{%d}', K), 'HandleVisibility', 'on'); end
         if j == 1; set(h, 'DisplayName', 'QR local \lambda_1', 'HandleVisibility', 'on'); end
