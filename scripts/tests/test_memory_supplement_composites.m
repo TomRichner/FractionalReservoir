@@ -405,17 +405,18 @@ fprintf('test_memory_supplement_composites: all checks PASS\n');
 end
 
 function n = main7_polish_check(fig, names)
-% Polish of 2026-11-22. (C): the conditions by name, not '1TS' and 'MTS'.
-% (E): gain tick labels under the memory-capacity maps too. (D): the
-% labelled noise ticks read their values, and the axis has a break.
+% Polish of 2026-11-22 and Tom's answers of 2026-11-23. (C): the conditions
+% as "No adaptation", "STS" and "MTS" (one text per tick). (E): gain tick
+% labels under the memory-capacity maps too. (D): no break; the noise
+% levels at their values on a linear axis from 0, labelled 0, 0.01, 0.02.
 % Tom's review of 2026-11-22 (Figure 7 notes 1 to 6): four panels in the
 % top row, no lambda_1 against the SFA time constant, self-coupling 0
 % marked on every map.
 ticks = findall(fig, 'Tag', 'main7_horizon_tick');
-words = arrayfun(@(t) string(strjoin(cellstr(t.String), '')), ticks);
-full = string(erase(grouped_condition_label(names, 'tick'), ' '));
-n = check(numel(ticks) == numel(names) && all(ismember(full, words)) && ...
-    isempty(findall(fig, 'Type', 'text', 'String', '1TS')), '(C) names its conditions in full, one text per tick');
+words = arrayfun(@(t) string(strjoin(cellstr(t.String), ' ')), ticks);
+want = regexprep(grouped_condition_label(names, 'tick'), {'^Single-timescale$', '^Multiple-timescale$'}, {'STS', 'MTS'});
+n = check(numel(ticks) == numel(names) && all(ismember(string(want), words)) && ...
+    isempty(findall(fig, 'Type', 'text', 'String', '1TS')), '(C) names its conditions as No adaptation, STS, MTS, one text per tick');
 top = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r1_c%d', c)), 1:3);
 bottom = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r2_c%d', c)), 1:3);
 n = n + check(all(arrayfun(@(a, b) ~isempty(a.XTickLabel) && isequal(a.XTickLabel, b.XTickLabel), top, bottom)), ...
@@ -431,16 +432,16 @@ n = n + check(numel(others) == 4 && max(y) - min(y) < 1 && min(y) > max(arrayfun
     'the top row holds four panels, level, above the maps');
 words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')), ax);
 n = n + check(~any(contains(words, 'SFA time', 'IgnoreCase', true)), 'lambda_1 against the longest SFA time constant has left Figure 7');
-brk = findall(fig, 'Tag', 'main7_noise_break');
-ok = ~isempty(brk);
-if ok
-    ax = ancestor(brk(1), 'axes');
-    levels = getappdata(ax, 'noise_levels');
-    lbl = cellstr(ax.XTickLabel); shown = find(~cellfun(@(s) isempty(strtrim(s)), lbl));
-    ok = ~isempty(levels) && numel(shown) >= 2 && ...
-        all(arrayfun(@(k) strcmp(lbl{k}, sprintf('%g', levels(k))), shown)) && ~any(contains(lbl, 'times'));
+ok = isempty(findall(fig, 'Tag', 'main7_noise_break'));
+noise = ax(arrayfun(@(a) ~isempty(getappdata(a, 'noise_levels')), ax));
+if ok && isscalar(noise)
+    levels = getappdata(noise, 'noise_levels');
+    ok = strcmp(noise.XScale, 'linear') && isequal(noise.XLim, [0 max(levels)]) && ...
+        isequal(noise.XTick, [0 0.01 0.02]) && isequal(reshape(cellstr(noise.XTickLabel), 1, []), {'0', '0.01', '0.02'});
+else
+    ok = false;
 end
-n = n + check(ok, '(D) labels its noise ticks with their values and marks the break after 0');
+n = n + check(ok, '(D) no break: the noise levels at their values on a linear axis, ticks 0, 0.01, 0.02');
 end
 
 function n = gain_panel_check(fig, run_dir, names)
