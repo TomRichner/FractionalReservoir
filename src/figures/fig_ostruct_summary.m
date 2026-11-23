@@ -46,6 +46,9 @@ function out = fig_ostruct_summary(cfg)
 %              the stage's short names)
 %   fig_size   [width height] inches ([] : 1.15 in per network plus 2, at
 %              least 9, by 10)
+%   label_rotation  35. Degrees the names under the bottom row are turned;
+%              fig_supp7_grouped passes less, so that the names take less of
+%              the height its page leaves.
 %   compact    false. true: smaller markers set closer, for a panel with
 %              less than about an inch per network.
 %
@@ -64,6 +67,7 @@ arguments
     cfg.networks    (1,:) cell    = {}
     cfg.labels      (1,:) cell    = {}
     cfg.fig_size    double        = []
+    cfg.label_rotation (1,1) double = 35
     cfg.compact     (1,1) logical = false
 end
 
@@ -73,7 +77,7 @@ MS = [8 7];                              % marker sizes: filled, open
 if cfg.compact; SUB = 0.07; SPREAD = 0.27; MS = [6 5.5]; end
 setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
-F = ostruct_figure_data(rmfield(cfg, {'networks', 'labels', 'fig_size', 'compact'}), 'fig_ostruct_summary');
+F = ostruct_figure_data(rmfield(cfg, {'networks', 'labels', 'fig_size', 'compact', 'label_rotation'}), 'fig_ostruct_summary');
 st = F.st;
 n_c = numel(F.cond_names);
 % The networks drawn: indices into F.keys, in drawing order.
@@ -101,7 +105,7 @@ vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig_size = [max(9, 1.15 * n_net + 2), 10];
 if ~isempty(cfg.fig_size); fig_size = cfg.fig_size(:)'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_size], 'Visible', vis);
-tl = tiledlayout(fig, 3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+tl = tiledlayout(fig, 3, 1, 'TileSpacing', 'compact', 'Padding', 'tight');   % tight: the rows reach the figure's edges (at 9 in 'compact' left 0.4 in white on the right)
 rho_all = [F.lo.mode_rho(sel, :); F.hi.mode_rho(sel, :); F.lo.mode_rho_uniform(sel, :); F.hi.mode_rho_uniform(sel, :)];
 rho_all = rho_all(isfinite(rho_all));
 rho_lim = [min([rho_all; -1]), max([rho_all; 1])];
@@ -154,7 +158,7 @@ for p = 1:3
     end
     set(ax, 'XTick', 1:n_net, 'XTickLabel', {}, 'XLim', [0.4, n_net + 0.6], 'FontSize', st.tick_fs, ...
         'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
-    if p == 3; set(ax, 'XTickLabel', names, 'XTickLabelRotation', 35, 'TickLabelInterpreter', 'tex'); end
+    if p == 3; set(ax, 'XTickLabel', names, 'XTickLabelRotation', cfg.label_rotation, 'TickLabelInterpreter', 'tex'); end
 end
 
 fig_tag = 'Fig_Ostruct_Summary';

@@ -184,7 +184,18 @@ s0 = o.numbers{1, 1};                                   % no adaptation: the ful
 assert(max(abs(s0.cont_ov - 1)) < 1e-6 && max(abs(s0.cont_re - s0.frozen_re)) < 1e-3, 'without slow variables the two coincide');
 assert(o.window.re_lim(1) < 0 && o.window.re_lim(2) > 0 && all(o.window.re_ticks > 0) && isempty(o.window.far_lim), ...
     'through the origin, no break, real ticks right of zero only');
+% The common canvas: canvas_w wide unless a composite passes fig_w; a tick
+% whose label a mark would lie on is left out, never the last of its axis.
+sty = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - sty.canvas_w) < 1e-6, 'the stand-alone figure is canvas_w wide (%.2f in)', o.figs.Position(3));
+assert(isempty(intersect(o.window.re_ticks, o.window.hidden_re_ticks)) && ~isempty(o.window.re_ticks) && ...
+    isempty(intersect(o.window.im_ticks, o.window.hidden_im_ticks)) && ~isempty(o.window.im_ticks), ...
+    'ticks under a mark are left out; one stays on each axis');
 close(o.figs);
+o2 = fig_outlier_slow_variables(common{:}, 'save', false, 'visible', false, 'fig_w', 6);
+o2.figs.Units = 'inches';
+assert(abs(o2.figs.Position(3) - 6) < 1e-6, 'fig_w sets the width');
+close(o2.figs);
 o2 = draw(@fig_outlier_slow_variables, [common, {'seed', 1, 'x_thr', 0.3, 're_lim', [-14 10], 'im_lim', [-9 9], ...
     'networks', {'reference'}, 'conditions', {'sfa1_std1'}}], fullfile(fig_dir, 'slow_opts'), 'Fig_Outlier_Slow_Variables');
 assert(isequal(o2.window.re_lim, [-14 10]) && isequal(o2.window.y_lim, [-9 9]) && isequal(size(o2.numbers), [1 1]));
