@@ -110,23 +110,29 @@ assert(any(strcmp(o1.files, 'Fig_Main1_Concept_Networks.png')) && any(strcmp(o1.
 assert(o1.n_far(2) >= 1, 'the E-to-E outlier beyond the break');
 tab = fileread(fullfile(fd, 'f1', 'Fig_Main1_Concept_Networks_table.md'));
 assert(contains(tab, 'EEx1p5') && contains(tab, 'lambda_1'), 'its table');
-% Polish list, 2026-11-22: eigenvalues right of the boundary are a group of
-% their own (filled), those left of it pale; what is not drawn is said in the
-% table; the diagrams' axis names and the added mode's title in sentence case.
-st = manuscript_style(); red = st.condition_color('no_adaptation');
+% Tom, 2026-11-22: eigenvalues left of the boundary gray, right of it
+% black, an outlier far to the right larger and green; what is not drawn is
+% said in the table; the diagrams' axis names and the added mode's title in
+% sentence case; letters by row (A to D); the rate r_i on one 0-to-1 axis;
+% the arrows Increasing SFA and Increasing STD in row D.
+n_dots = @(hs) sum(arrayfun(@(h) numel(h.XData), hs));
 for k = 1:numel(o1.axes.spectrum)
     ax = o1.axes.spectrum(k);
-    hc = [findobj(ax, 'Tag', 'eig_crossed'); findobj(ax, 'Tag', 'eig_crossed_outlier')];
-    hl = [findobj(ax, 'Tag', 'eig_left'); findobj(ax, 'Tag', 'eig_left_outlier')];
+    hc = findobj(ax, 'Tag', 'eig_crossed'); hl = findobj(ax, 'Tag', 'eig_left'); ho = findobj(ax, 'Tag', 'eig_outlier');
     ev_k = C.examples(k).ev;
-    assert(sum(arrayfun(@(h) numel(h.XData), hc)) == nnz(real(ev_k) > 0) && o1.n_crossed(k) == nnz(real(ev_k) > 0), ...
-        'column %d: the filled dots are the eigenvalues right of the boundary', k);
-    assert(sum(arrayfun(@(h) numel(h.XData), hl)) == nnz(real(ev_k) <= 0) - o1.n_left(k), ...
-        'column %d: the pale dots are the eigenvalues left of the boundary that the window holds', k);
-    assert(all(arrayfun(@(h) max(abs(h.CData(1, :) - red)) < 1e-12, hc)) && ...
-        all(arrayfun(@(h) all(h.CData(1, :) >= red) && any(h.CData(1, :) > red), hl)), ...
-        'column %d: right of the boundary full strength, left of it a lighter tint', k);
+    assert(o1.n_crossed(k) == nnz(real(ev_k) > 0), 'column %d: the count right of the boundary', k);
+    assert(n_dots(hc) + n_dots(hl) + n_dots(ho) == numel(ev_k) - o1.n_left(k) && n_dots(ho) == o1.n_out(k), ...
+        'column %d: every eigenvalue the window holds drawn once, the outliers on their own', k);
+    assert(n_dots(hc) <= nnz(real(ev_k) > 0), 'column %d: black only right of the boundary', k);
+    assert(all(arrayfun(@(h) isequal(h.CData(1, :), [0 0 0]), hc)) && ...
+        all(arrayfun(@(h) h.CData(1, 1) > 0 && h.CData(1, 1) < 1 && all(h.CData(1, :) == h.CData(1, 1)), hl)) && ...
+        all(arrayfun(@(h) h.CData(1, 2) > h.CData(1, 1) && h.CData(1, 2) > h.CData(1, 3), ho)), ...
+        'column %d: black right of the boundary, gray left of it, the outliers green', k);
 end
+assert(all(arrayfun(@(ax) isequal(ax.YTick, [0 1]), o1.axes.activity)) && isequal(o1.y_lims, repmat([0 1], numel(o1.axes.activity), 1)), ...
+    'row C: the rate on one axis 0 to 1');
+assert(all(arrayfun(@(L) ~isempty(findall(o1.figs, 'Tag', ['letter_' L])), 'ABCD')), 'letters by row, A to D');
+assert(~isempty(findall(o1.figs, 'Tag', 'text_sfa')) && ~isempty(findall(o1.figs, 'Tag', 'arrow_std')), 'row D: the arrows');
 assert(contains(tab, 'Eigenvalues right of the boundary') && ...
     (contains(tab, 'Not drawn (left of the window') == any(o1.n_left > 0)) && ...
     (contains(tab, 'Every eigenvalue is drawn') == ~any(o1.n_left > 0)), 'the table says what is not drawn');
@@ -136,6 +142,12 @@ assert(any(strcmp(o1.titles, 'Added rotating mode')) == any(strcmp({C.examples.k
 close(o1.figs);
 o3 = fig_supp3_connectivity_gallery('run_dir', tmp, 'out_dir', fullfile(fd, 's3'), 'visible', false);
 assert(any(strcmp(o3.files, 'Fig_Supp3_Connectivity_Gallery.png')) && numel(o3.axes.spectrum) == 3, 'S3 written');
+% S3 (Tom, 2026-11-22): balanced plus added, the added matrix on its own
+% color range; a tile with nothing added shows one image.
+has_add = o3.add_clim > 0;
+assert(isequal(isgraphics(o3.axes.added), has_add) && ~has_add(1) && any(has_add), ...
+    'S3: an added image exactly where something was added, none on the balanced tile');
+assert(numel(findall(o3.figs, 'Tag', 'plus')) == nnz(has_add), 'S3: one plus sign per added image');
 close(o3.figs);
 empty = fullfile(tmp, 'empty'); mkdir(empty);
 for f = {@fig_main1_concept_networks, @fig_supp3_connectivity_gallery}

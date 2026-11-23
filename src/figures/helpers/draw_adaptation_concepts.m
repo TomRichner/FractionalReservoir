@@ -1,8 +1,9 @@
-function A = draw_adaptation_concepts(fig, preset_name, pos)
+function A = draw_adaptation_concepts(fig, preset_name, pos, opts)
 %DRAW_ADAPTATION_CONCEPTS The four concept diagrams of adaptation (Figure 1): SFA-shifted sigmoids and discs, STD-scaled sigmoids and discs.
 %
 %   A = draw_adaptation_concepts(fig, preset_name)
 %   A = draw_adaptation_concepts(fig, preset_name, pos)
+%   A = draw_adaptation_concepts(fig, preset_name, pos, 'arrows', true, 'font_size', 14)
 %
 %   fig          the figure to draw into
 %   preset_name  the preset whose fully adapted condition sets the
@@ -10,11 +11,18 @@ function A = draw_adaptation_concepts(fig, preset_name, pos)
 %   pos          4 x 4, normalized [x y w h] of the SFA sigmoid, the SFA
 %                discs, the STD sigmoid and the STD discs; default: the
 %                bottom row of fig_main1_concepts
+%   arrows       (false) 'Increasing SFA' over the SFA curves with an arrow
+%                pointing right, 'Increasing STD' over the STD curves with
+%                an arrow pointing down, as in the first concept figure
+%                (Fig_FI_curve, commit 1d3e9b4); Figure 1 asks for them
+%   font_size    (14) of the arrows' words
 %
 %   A.axes       1 x 4 axes handles, tags sfa_sigmoid, sfa_discs,
 %                std_sigmoid, std_discs
 %   A.sfa_colors, A.std_colors, A.b_levels, A.is_chain
 %   A.std_note, A.frozen_note   the provenance sentences for the caller's notes
+%   A.arrows     the two arrows (figure annotations) and their words (text
+%                in the curves' axes); empty without 'arrows'
 %
 % Moved out of fig_main1_concepts (Plan 2, package B) so that the new
 % Figure 1 (fig_main1_concept_networks) draws the same panel without
@@ -32,6 +40,8 @@ arguments
     fig
     preset_name (1,:) char
     pos double = [.065 .10 .18 .235; .295 .10 .19 .235; .555 .10 .18 .235; .77 .10 .18 .235]
+    opts.arrows (1,1) logical = false     % 'Increasing SFA' and 'Increasing STD' with their arrows
+    opts.font_size (1,1) double = 14      % of the arrows' text
 end
 
 [~,~,conditions]=srnn_param_preset(preset_name);
@@ -95,8 +105,45 @@ else
         'not the self-consistent rate-dependent steady-state input-output relation. ' ...
         'The two-timescale product must not be identified with a single depression variable.'];
 end
+arrows=gobjects(0);
+if opts.arrows
+    arrows=draw_arrows(fig,ax1,ax3,opts.font_size);
+end
 A=struct('axes',[ax1 ax2 ax3 ax4],'sfa_colors',sfa_colors,'std_colors',std_colors,'b_levels',b_levels, ...
-    'is_chain',is_chain,'std_note',std_note,'frozen_note',frozen_note);
+    'is_chain',is_chain,'std_note',std_note,'frozen_note',frozen_note,'arrows',arrows);
+end
+
+function h=draw_arrows(fig,ax_sfa,ax_std,fs)
+% The arrows of the first concept figure (Fig_FI_curve, 2026-07-28,
+% commit 1d3e9b4), brought back as they were (Tom, 2026-11-22): over the
+% SFA curves 'Increasing SFA' with a brown arrow under it pointing right
+% (the curve shifts right), over the STD curves 'Increasing STD' with a
+% dark-blue arrow pointing down (the curve is scaled down); black text,
+% 'vback2' heads. Placed in data units of each axes. Annotations live in
+% the figure: the caller sets the axes' final positions first.
+% On the 9 in canvas the open corner left of the curves is narrower than
+% the words (they crossed the y axis there), so the words sit on one line
+% just above each axes (the caller leaves about 0.4 in for them): the SFA
+% arrow under its words, over the tops of the curves; the STD arrow down
+% from its words, across the plateaus it scales.
+h=gobjects(1,4);
+p=d2f(ax_sfa,[-.15 .85],[1.08 1.08]);
+h(1)=annotation(fig,'arrow',p.x,p.y,'Color',[.35 .2 0],'HeadStyle','vback2','LineWidth',1,'Tag','arrow_sfa');
+h(2)=text(ax_sfa,.35,1.13,'Increasing SFA','FontSize',fs,'Color',[0 0 0],'HorizontalAlignment','center', ...
+    'VerticalAlignment','bottom','Clipping','off','Tag','text_sfa');
+p=d2f(ax_std,[1.25 1.25],[1.08 .27]);
+h(3)=annotation(fig,'arrow',p.x,p.y,'Color',[0 .25 .5],'HeadStyle','vback2','LineWidth',1,'Tag','arrow_std');
+h(4)=text(ax_std,1.25,1.13,'Increasing STD','FontSize',fs,'Color',[0 0 0],'HorizontalAlignment','center', ...
+    'VerticalAlignment','bottom','Clipping','off','Tag','text_std');
+end
+
+function p=d2f(ax,x,y)
+% Data coordinates of ax to normalized figure coordinates (linear axes,
+% limits set).
+u=ax.Units; ax.Units='normalized'; pos=ax.Position; ax.Units=u;
+xl=ax.XLim; yl=ax.YLim;
+p.x=pos(1)+(x-xl(1))/diff(xl)*pos(3);
+p.y=pos(2)+(y-yl(1))/diff(yl)*pos(4);
 end
 
 function concept_axes(ax,xr,yr)

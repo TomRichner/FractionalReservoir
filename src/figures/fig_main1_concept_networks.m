@@ -9,13 +9,15 @@ function out = fig_main1_concept_networks(cfg)
 % (cx_load); errors when the run directory does not hold it; simulates
 % nothing.
 %
-% PANEL A, four columns (the stage's examples, in order) by three rows:
-%   row 1  a representative 30 x 30 piece of the network's weights
+% Four columns (the stage's examples, in order); the panel letters go by
+% row (Tom, 2026-11-22): A the weight images, B the eigenvalues, C the
+% activity, D the adaptation diagrams.
+%   A      a representative 30 x 30 piece of the network's weights
 %          (weight_image_sample, draw_weight_image): E columns red, I
 %          columns blue, absent connections white, ONE color range for all
 %          four (w_clim; default the 95th percentile of the nonzero |w| of
 %          the four pieces), a thin gray line between the E and I columns
-%   row 2  the eigenvalues of the Jacobian with every gain equal, as rates
+%   B      the eigenvalues of the Jacobian with every gain equal, as rates
 %          (lambda(W) - 1)/tau_d in 1/s, through complex_plane_axes: axes
 %          through the origin, 1:1, ONE scale in all four panels, the
 %          imaginary axis the stability boundary, the bulk circle (radius
@@ -26,25 +28,27 @@ function out = fig_main1_concept_networks(cfg)
 %          eigenvalues (columns without one leave the room empty).
 %          Eigenvalues LEFT of the window are not drawn (with the E-to-E
 %          mean raised by half, one real eigenvalue near -141 1/s); the
-%          table lists them, in a sentence of their own. Dots in the
-%          no-adaptation color (these are unadapted networks): an eigenvalue
-%          RIGHT of the boundary (Re > 0) filled at full strength, one left
-%          of it or on it in a lighter tint (left_tint), drawn first, so
-%          which eigenvalues have crossed is seen at a glance (polish list,
-%          2026-11-22; until then all were one red). An eigenvalue clear of
-%          the bulk (farther from -1/tau_d than R/tau_d + 0.2 of the largest
-%          radius) is drawn larger.
-%   row 3  the dendritic potential x of n_E E and n_I I neurons of the
-%          unadapted run over t_window, in the E and I colors; one y range
-%          for the columns whose traces fit within 1.5 times the median span,
-%          a range of its own for a column that does not (the runaway); a
-%          time scale bar under the first column
-% Column headings (cfg.titles) above the first row.
+%          table lists them, in a sentence of their own. Gray and black
+%          (Tom, 2026-11-22; until then red and pink): an eigenvalue left
+%          of the boundary or on it gray (left_gray), drawn first; one right
+%          of it (Re > 0) black. An OUTLIER FAR TO THE RIGHT (clear of the
+%          bulk, farther from -1/tau_d than R/tau_d + 0.2 of the largest
+%          radius, and right of the bulk's right edge) is drawn larger and
+%          green (outlier_color), whichever side of the boundary it is on.
+%   C      the rate r_i (after the nonlinearity, 0 to 1) of n_E E and n_I I
+%          neurons of the unadapted run over t_window, in the E and I
+%          colors, on ONE axis 0 to 1 in all columns (ticks 0 and 1, labels
+%          on the first column; until 2026-11-22 the potential x_i, whose
+%          runaway column needed an axis of its own); a time scale bar under
+%          the first column
+% Column headings (cfg.titles) above row A.
 %
-% PANEL B, the adaptation diagrams of the present Figure 1C, unchanged
-% (draw_adaptation_concepts): SFA shifts the response curve, depression
-% scales it; their product is the neuron's gain, which scales its column of
-% the weights.
+%   D      the adaptation diagrams (draw_adaptation_concepts), two pairs
+%          of a response curve and its discs, each pair close together,
+%          with the arrows 'Increasing SFA' and 'Increasing STD' of the
+%          first concept figure: SFA shifts the response curve, depression
+%          scales it; their product is the neuron's gain, which scales its
+%          column of the weights.
 %
 % Writes Fig_Main1_Concept_Networks.{png,svg,fig} and
 % Fig_Main1_Concept_Networks_table.md (the numbers behind every column).
@@ -72,9 +76,10 @@ arguments
     cfg.tick_step double          = 50
     cfg.dot_size (1,1) double     = 6
     cfg.outlier_size (1,1) double = 36
-    cfg.left_tint (1,1) double {mustBeGreaterThanOrEqual(cfg.left_tint, 0), mustBeLessThanOrEqual(cfg.left_tint, 1)} = 0.6   % share of white in the dots left of the boundary; 0 = one color
+    cfg.left_gray (1,1) double {mustBeGreaterThanOrEqual(cfg.left_gray, 0), mustBeLessThanOrEqual(cfg.left_gray, 1)} = 0.62   % gray level of the dots left of the boundary
+    cfg.outlier_color (1,3) double = [0 0.6 0]   % an outlier far to the right
     cfg.scale_bar_s (1,1) double  = 2
-    cfg.fig_size double           = []   % [width height] inches; [] (the default): manuscript_style's canvas_w by 9.6
+    cfg.fig_size double           = []   % [width height] inches; [] (the default): manuscript_style's canvas_w by what the rows need
 end
 
 setup_paths();
@@ -89,9 +94,10 @@ preset_name = cfg.preset_name;
 if isempty(preset_name); preset_name = C.settings.preset_name; end
 st = manuscript_style();
 fs = st.tick_fs;
-red = st.condition_color('no_adaptation');
-gray = [0.55 0.55 0.55];
-pale = red + cfg.left_tint * (1 - red);     % eigenvalues left of the boundary
+gray = [0.55 0.55 0.55];                    % the bulk circle
+col_left = cfg.left_gray * [1 1 1];         % eigenvalues left of the stability boundary
+col_right = [0 0 0];                        % right of it
+col_out = cfg.outlier_color;                % an outlier far to the right
 titles = column_titles(cfg.titles, X);
 
 %% The spectrum window: one geometry for every column
@@ -144,19 +150,20 @@ geom_args = {'re_lim', re_lim, 'im_lim', im_lim, 'tick_step', cfg.tick_step, 'fo
 if ~isempty(proto_far); geom_args = [geom_args, {'gap', gap}]; end
 g = complex_plane_axes([], geom_args{:}, 'far_lim', proto_far);
 
-%% Layout (inches)
-fig_size = cfg.fig_size;
-if isempty(fig_size); fig_size = [st.canvas_w, 9.6]; end
-W_in = fig_size(1); H_in = fig_size(2);
+%% Layout (inches), built from the bottom up: the height is what the rows need
+W_in = st.canvas_w;
+if ~isempty(cfg.fig_size); W_in = cfg.fig_size(1); end
 left = 0.75; right = 0.2; col_gap = 0.3;
 pw = (W_in - left - right - (m - 1) * col_gap) / m;
 ph_spec = pw * diff(g.y_lim) / diff(g.x_lim);
 img = min(1.75, pw);
-ph_act = 1.45;
-top = 0.55;
-y_img = H_in - top - img;
-y_spec = y_img - 0.28 - ph_spec;
-y_act = y_spec - 0.42 - ph_act;
+ph_act = 1.3;
+yB = 0.62; hB = 1.6;                        % row D
+y_act = yB + hB + 0.95;                     % room for the time scale bar and, above row D, the arrows' words
+y_spec = y_act + ph_act + 0.45;
+y_img = y_spec + ph_spec + 0.3;
+H_in = y_img + img + 0.5;
+if ~isempty(cfg.fig_size); H_in = cfg.fig_size(2); end
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.5 0.5 W_in H_in], 'Visible', vis, ...
     'PaperPositionMode', 'auto');
@@ -178,7 +185,7 @@ end
 
 %% Row 2: the equal-gain spectra
 th = linspace(0, 2 * pi, 361);
-n_left = zeros(1, m); n_far = zeros(1, m); n_crossed = zeros(1, m);
+n_left = zeros(1, m); n_far = zeros(1, m); n_crossed = zeros(1, m); n_out = zeros(1, m);
 ax_spec = gobjects(1, m);
 for k = 1:m
     ax = axes(fig, 'Units', 'inches', 'Position', [x0(k), y_spec, pw, ph_spec]);
@@ -192,10 +199,19 @@ for k = 1:m
         end
     end
     names = {'re_label', '', 'im_label', ''};
-    if k == m; names{2} = 'Re (s^{-1})'; end
-    if k == 1; names{4} = 'Im (s^{-1})'; end
+    if k == 1; names{2} = 'Re (s^{-1})'; names{4} = 'Im (s^{-1})'; end   % both on the first column, clear of every eigenvalue
     args = [args, {'re_ticks', column_re_ticks(X(k), re_lim, far{k}, cfg.tick_step, gap)}]; %#ok<AGROW>
     cp = complex_plane_axes(ax, args{:}, names{:});
+    % Axis names at label_fs (complex_plane_axes sets one font size). Its
+    % texts are hidden handles, which findobj misses, and the Re name under
+    % the ticks is the cell {' ', name}: so through cp.handles.
+    for hx = reshape(cp.handles(isgraphics(cp.handles, 'text')), 1, [])
+        s = hx.String; if iscell(s); s = s{end}; end
+        if ~isempty(s) && any(strcmp(s, names([2 4]))); hx.FontSize = st.label_fs; end
+        % The first column draws no far segment: its Re name moves to the
+        % segment's right end, off the Im tick label -50 under the axis.
+        if k == 1 && iscell(hx.String) && strcmp(s, names{2}); hx.Position(1) = cp.x_lim(2); end
+    end
     plot(ax, cp.x(X(k).center + X(k).R_rate * cos(th)), X(k).R_rate * sin(th), '-', 'Color', gray, 'LineWidth', 1.25);
     z = X(k).ev;
     shown = real(z) >= re_lim(1) & abs(imag(z)) <= im_lim(2) & ~cp.in_break(real(z));
@@ -211,26 +227,32 @@ for k = 1:m
             'Column %d: %d eigenvalue(s) fall outside the window other than on its left; widen im_lim or far_width.', ...
             k, nnz(~shown) - n_left(k));
     end
-    is_out = abs(z - X(k).center) > X(k).R_rate + 0.2 * rad_max;   % clear of the bulk, not its finite-size edge
-    % Left of the boundary first and pale, right of it on top at full strength.
+    % An outlier far to the right: clear of the bulk (not its finite-size
+    % edge) and right of the bulk's right edge. Drawn larger and green.
+    is_out = abs(z - X(k).center) > X(k).R_rate + 0.2 * rad_max & real(z) > X(k).center + X(k).R_rate;
+    n_out(k) = nnz(shown & is_out);
+    % Left of the boundary gray and first, right of it black on top.
     crossed = real(z) > 0;
     n_crossed(k) = nnz(crossed);
-    sides = {~crossed, pale, 'eig_left'; crossed, red, 'eig_crossed'};
+    sides = {~crossed, col_left, 'eig_left'; crossed, col_right, 'eig_crossed'};
     for q = 1:2
-        zs = z(shown & ~is_out & sides{q, 1}); zo = z(shown & is_out & sides{q, 1});
+        zs = z(shown & ~is_out & sides{q, 1});
         scatter(ax, cp.x(real(zs)), imag(zs), cfg.dot_size, sides{q, 2}, 'filled', 'MarkerEdgeColor', 'none', ...
             'Tag', sides{q, 3});
-        scatter(ax, cp.x(real(zo)), imag(zo), cfg.outlier_size, sides{q, 2}, 'filled', 'MarkerEdgeColor', 'none', ...
-            'Tag', [sides{q, 3} '_outlier']);
     end
+    zo = z(shown & is_out);
+    scatter(ax, cp.x(real(zo)), imag(zo), cfg.outlier_size, col_out, 'filled', 'MarkerEdgeColor', 'none', ...
+        'Tag', 'eig_outlier');
     set(ax, 'XLim', cp.x_lim, 'YLim', cp.y_lim);
 end
 
-%% Row 3: activity
+%% Row C: activity, the rate r_i of each kept neuron on one 0-to-1 axis
+% (Tom, 2026-11-22: x_i of the runaway needed an axis of its own; the rate,
+% after the nonlinearity, is bounded, so one axis serves every column)
 nE = min(cfg.n_E, nnz([X(1).trace_type] == 1)); nI = min(cfg.n_I, nnz([X(1).trace_type] == 2));
 colE = excitatory_colormap(max(nE, 1)); colI = inhibitory_colormap(max(nI, 1));
-spans = zeros(m, 2);
-sel = cell(1, m);
+ax_act = gobjects(1, m);
+yl = [0 1];
 for k = 1:m
     tt = X(k).t;
     in_w = tt >= cfg.t_window(1) & tt <= cfg.t_window(2);
@@ -239,63 +261,61 @@ for k = 1:m
             cfg.t_window, tt(end));
     end
     iE = find(X(k).trace_type == 1, nE); iI = find(X(k).trace_type == 2, nI);
-    sel{k} = struct('in_w', in_w, 'iE', iE, 'iI', iI);
-    v = X(k).x_trace([iE; iI], in_w);
-    spans(k, :) = [min(v(:)), max(v(:))];
-end
-width = diff(spans, 1, 2);
-own = width > 1.5 * median(width);
-shared = [min(spans(~own, 1)), max(spans(~own, 2))];
-ax_act = gobjects(1, m);
-y_lims = zeros(m, 2);
-for k = 1:m
     ax = axes(fig, 'Units', 'inches', 'Position', [x0(k) + 0.25, y_act, pw - 0.25, ph_act]);
     ax_act(k) = ax;
     hold(ax, 'on');
-    s = sel{k};
-    tt = X(k).t(s.in_w);
-    for j = 1:numel(s.iE)
-        plot(ax, tt, X(k).x_trace(s.iE(j), s.in_w), '-', 'Color', colE(j, :), 'LineWidth', 0.8);
+    tt = tt(in_w);
+    for j = 1:numel(iE)
+        plot(ax, tt, X(k).rate_trace(iE(j), in_w), '-', 'Color', colE(j, :), 'LineWidth', 0.8);
     end
-    for j = 1:numel(s.iI)
-        plot(ax, tt, X(k).x_trace(s.iI(j), s.in_w), '-', 'Color', colI(j, :), 'LineWidth', 0.8);
+    for j = 1:numel(iI)
+        plot(ax, tt, X(k).rate_trace(iI(j), in_w), '-', 'Color', colI(j, :), 'LineWidth', 0.8);
     end
-    if own(k); yl = spans(k, :); else; yl = shared; end
-    yl = nice_lim(yl);
-    y_lims(k, :) = yl;
-    set(ax, 'XLim', cfg.t_window, 'YLim', yl, 'FontSize', fs, 'LineWidth', st.axis_lw, 'Box', 'off', ...
-        'TickDir', 'out', 'YTick', nice_ticks(yl));
+    set(ax, 'XLim', cfg.t_window, 'YLim', yl + [-0.02 0.02], 'FontSize', fs, 'LineWidth', st.axis_lw, 'Box', 'off', ...
+        'TickDir', 'out', 'YTick', [0 1]);
     ax.XAxis.Visible = 'off';
     if k == 1
-        ylabel(ax, 'x_i', 'FontSize', st.label_fs, 'Interpreter', 'tex');
+        ylabel(ax, 'r_i', 'FontSize', st.label_fs, 'Interpreter', 'tex');
         % the time scale bar
         xb = cfg.t_window(1) + [0 cfg.scale_bar_s];
-        yb = yl(1) - 0.08 * diff(yl);
+        yb = yl(1) - 0.1 * diff(yl);
         plot(ax, xb, [yb yb], 'k-', 'LineWidth', 2.5, 'Clipping', 'off');
         text(ax, mean(xb), yb - 0.04 * diff(yl), sprintf('%g s', cfg.scale_bar_s), 'FontSize', fs, ...
             'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
+    else
+        ax.YTickLabel = {};                  % one axis for the row: its labels on the first column
     end
 end
+y_lims = repmat(yl, m, 1);
 
-%% Panel B: the adaptation diagrams (unchanged drawing)
-yB = 0.62; hB = 1.5;
+%% Row D: the adaptation diagrams, two pairs (response curves, discs)
+% Inches from the left margin: each response curve with its discs close
+% beside it; the second pair starts where the first pair's 'Re' and the
+% second curve's axis name both have room.
+sig_w = 1.85; c_gap = 0.12; c_w = 1.4; pair_gap = 0.83;
+xD = left + [0, sig_w + c_gap];
+xD = [xD, xD + sig_w + c_gap + c_w + pair_gap];
+wD = [sig_w c_w sig_w c_w];
 in2n = @(x, y, w, h) [x / W_in, y / H_in, w / W_in, h / H_in];
-% Left edges and widths as shares of the canvas width (laid out on 13 in).
-xB = [0.75 3.75 7.0 10.1] / 13 * W_in; wB = [2.0 2.3 2.0 2.3] / 13 * W_in;
-posB = [in2n(xB(1), yB, wB(1), hB); in2n(xB(2), yB, wB(2), hB); in2n(xB(3), yB, wB(3), hB); in2n(xB(4), yB, wB(4), hB)];
-A = draw_adaptation_concepts(fig, preset_name, posB);
+posB = zeros(4, 4);
+for k = 1:4; posB(k, :) = in2n(xD(k), yB, wD(k), hB); end
+A = draw_adaptation_concepts(fig, preset_name, posB, 'arrows', true, 'font_size', fs);
 set(findall(A.axes, '-property', 'FontSize'), 'FontSize', fs);
 for k = 1:numel(A.axes); set([A.axes(k).XLabel, A.axes(k).YLabel], 'FontSize', st.label_fs); end   % axis names at label_fs
 
-%% Panel letters
+%% Panel letters, one per row
 lab = axes(fig, 'Position', [0 0 1 1], 'XLim', [0 1], 'YLim', [0 1], 'Visible', 'off', 'Tag', 'panel_letters');
-text(lab, 0.08 / W_in, 1 - 0.12 / H_in, '(A)', 'FontSize', st.letter_fs, 'VerticalAlignment', 'top', 'Tag', 'letter_A');
-text(lab, 0.08 / W_in, (yB + hB + 0.55) / H_in, '(B)', 'FontSize', st.letter_fs, 'VerticalAlignment', 'top', 'Tag', 'letter_B');
+letter_y = [H_in - 0.1, y_spec + ph_spec + 0.25, y_act + ph_act + 0.4, yB + hB + 0.6];
+for k = 1:4
+    L = char('A' + k - 1);
+    text(lab, 0.08 / W_in, letter_y(k) / H_in, ['(' L ')'], 'FontSize', st.letter_fs, 'VerticalAlignment', 'top', ...
+        'Tag', ['letter_' L]);
+end
 
 %% Save, and the numbers
 fig_tag = 'Fig_Main1_Concept_Networks';
 out = struct('figs', fig, 'files', {{}}, 'source', C.file, 'window', g, 'far', {far}, 'w_clim', w_clim, ...
-    'y_lims', y_lims, 'n_left', n_left, 'n_far', n_far, 'n_crossed', n_crossed, 'titles', {titles}, ...
+    'y_lims', y_lims, 'n_left', n_left, 'n_far', n_far, 'n_crossed', n_crossed, 'n_out', n_out, 'titles', {titles}, ...
     'axes', struct('image', ax_img, 'spectrum', ax_spec, 'activity', ax_act, 'concepts', A.axes));
 if cfg.save
     save_figure_stable(out_dir, fig_tag, fig);
@@ -304,7 +324,7 @@ if cfg.save
     fid = fopen(fullfile(out_dir, table_name), 'w');
     if fid > 0
         closer = onCleanup(@() fclose(fid));
-        write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, cfg, A);
+        write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, n_out, cfg, A);
         clear closer
         out.files{end + 1} = table_name;
     end
@@ -329,36 +349,20 @@ for k = 1:m
 end
 end
 
-function yl = nice_lim(yl)
-step = nice_step(diff(yl) / 4);
-yl = [floor(yl(1) / step) * step, ceil(yl(2) / step) * step];
-if diff(yl) == 0; yl = yl + [-1 1]; end
-end
-
-function t = nice_ticks(yl)
-step = nice_step(diff(yl) / 3);
-t = (ceil(yl(1) / step):floor(yl(2) / step)) * step;
-end
-
-function s = nice_step(raw)
-p = 10 ^ floor(log10(raw));
-q = raw / p;
-if q >= 5; s = 5 * p; elseif q >= 2; s = 2 * p; else; s = p; end
-end
-
-function write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, cfg, A)
+function write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, n_out, cfg, A)
 fprintf(fid, '# %s\n\n', fig_tag);
 fprintf(fid, 'Source: `%s` (stage concept_examples). Preset `%s`, condition `%s` (no adaptation).\n\n', ...
     C.file, C.settings.preset_name, C.settings.condition);
-fprintf(fid, ['Panel A. Row 1: a %d x %d piece of each network''s weights (the submatrix on %d E and %d I ' ...
+fprintf(fid, ['(A) A %d x %d piece of each network''s weights (the submatrix on %d E and %d I ' ...
     'neurons drawn with image seed %d), color range +-%.4g (95th percentile of the nonzero |w| of the four ' ...
-    'pieces unless given). Row 2: the eigenvalues of J = (-I + W)/tau_d with every gain 1, in 1/s; gray circle ' ...
+    'pieces unless given). (B) The eigenvalues of J = (-I + W)/tau_d with every gain 1, in 1/s; gray circle ' ...
     'radius R/tau_d about -1/tau_d, R the structural bulk radius of the drawn matrix. Window Re [%g, %g], ' ...
-    'Im [%g, %g] 1/s, one scale in all columns. An eigenvalue right of the stability boundary (Re > 0) is filled ' ...
-    'at full strength, one left of it in a lighter tint. Row 3: dendritic potential x of %d E and %d I neurons of the ' ...
-    'unadapted run (noise of the preset), t in [%g, %g] s, from the class''s initial state.\n\n'], ...
+    'Im [%g, %g] 1/s, one scale in all columns. Gray: left of the stability boundary (Re <= 0); black: right of it; ' ...
+    'larger and green: an outlier far to the right (clear of the bulk and right of its edge; per column %s). ' ...
+    '(C) The rate r_i (0 to 1) of %d E and %d I neurons of the ' ...
+    'unadapted run (noise of the preset), t in [%g, %g] s, from the class''s initial state, one axis 0 to 1.\n\n'], ...
     C.settings.n_image, C.settings.n_image, C.settings.n_image / 2, C.settings.n_image / 2, C.settings.image_seed, ...
-    w_clim, g.re_lim, g.im_lim, cfg.n_E, cfg.n_I, cfg.t_window);
+    w_clim, g.re_lim, g.im_lim, mat2str(n_out), cfg.n_E, cfg.n_I, cfg.t_window);
 fprintf(fid, ['| Column | Network | Level of chaos | Seed | n | R/tau_d (1/s) | Rightmost (1/s) | Added mode (1/s) | ' ...
     'Beyond the break | Left of the window | Density EE, EI, IE, II | Nonzero mean EE, EI, IE, II |\n']);
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|---|\n');
@@ -380,7 +384,7 @@ for k = 1:numel(X)
         x.nz_mean(1, 1), x.nz_mean(1, 2), x.nz_mean(2, 1), x.nz_mean(2, 2));
 end
 fprintf(fid, '\nDensity and nonzero means are (post, pre): EI is I-to-E. Of the whole network, not of the piece shown.\n\n');
-fprintf(fid, 'Eigenvalues right of the boundary (Re > 0, drawn filled): %s.\n\n', ...
+fprintf(fid, 'Eigenvalues right of the boundary (Re > 0, drawn black): %s.\n\n', ...
     strjoin(arrayfun(@(k) sprintf('%s %d of %d', strrep(titles{k}, '\times', 'x'), n_crossed(k), numel(X(k).ev)), ...
     1:numel(X), 'UniformOutput', false), '; '));
 if any(n_left > 0)
@@ -412,7 +416,7 @@ for k = 1:numel(X)
     fprintf(fid, '| %s | %.3f | %.4f, %.4f, %.4f, %.4f |\n', strrep(titles{k}, '\times', 'x'), s.density_all, ...
         s.block_mean(1, 1), s.block_mean(1, 2), s.block_mean(2, 1), s.block_mean(2, 2));
 end
-fprintf(fid, '\nPanel B: the adaptation diagrams of the present Figure 1C (draw_adaptation_concepts). %s\n', A.std_note);
+fprintf(fid, '\n(D) The adaptation diagrams (draw_adaptation_concepts), with the arrows Increasing SFA and Increasing STD. %s\n', A.std_note);
 end
 
 function t = column_re_ticks(x, re_lim, far_k, step, gap)

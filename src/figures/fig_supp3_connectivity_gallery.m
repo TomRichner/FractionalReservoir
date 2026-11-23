@@ -11,18 +11,28 @@ function out = fig_supp3_connectivity_gallery(cfg)
 % not hold the stage or the stage has no gallery; simulates nothing.
 %
 % One tile per structure, in the stage's order, n_cols per row:
-%   top     a representative 30 x 30 piece of the network's weights
-%           (weight_image_sample, draw_weight_image): E columns red, I
-%           columns blue, absent connections white, one color range for
-%           every tile (w_clim; default the 95th percentile of the nonzero
-%           |w| of all pieces)
+%   top     the structure as a SUM of two matrices (Tom, 2026-11-22), on a
+%           representative 30 x 30 piece of the network (weight_image_sample,
+%           draw_weight_image): left the balanced matrix of the network's
+%           own draw (E columns red, I columns blue, absent connections
+%           white, one color range for every tile: w_clim, default the 95th
+%           percentile of the nonzero |w| of all pieces), a plus sign, and
+%           right the matrix the structure ADDED, from the construction (the
+%           stage's added_part: the block-mean shift on the network's own
+%           connections, or the low-rank term), on a color range of its
+%           own (its largest |entry| on the piece; the table gives it), so
+%           that it can be seen. A tile to which nothing was added (the
+%           balanced network; the local outlier, which is a draw of the
+%           balanced ensemble chosen for its outlier) shows one image.
 %   bottom  the eigenvalues of J = (-I + W)/tau_d with every gain 1, in
 %           1/s (complex_plane_axes: axes through the origin, 1:1, ONE
 %           window and scale for every tile, the imaginary axis the
 %           stability boundary, ticks outside the bulk only), the bulk
-%           circle in gray, the eigenvalues clear of the bulk (farther from
-%           -1/tau_d than R/tau_d + 0.2 of the largest radius) drawn
-%           larger. The window holds every eigenvalue on the left (no left
+%           circle in gray; as in Figure 1, eigenvalues left of the
+%           boundary gray, right of it black, and an outlier far to the
+%           right (farther from -1/tau_d than R/tau_d + 0.2 of the largest
+%           radius, and right of the bulk's edge) larger and green. The
+%           window holds every eigenvalue on the left (no left
 %           break); eigenvalues far to the right (beyond c0 + far_factor
 %           radii) are drawn beyond a break, the far segment placed for the
 %           tile that has them and left empty in the others.
@@ -50,8 +60,11 @@ arguments
     cfg.im_tick_candidates double = [-75 75]
     cfg.dot_size (1,1) double     = 5
     cfg.outlier_size (1,1) double = 30
+    cfg.left_gray (1,1) double    = 0.62      % gray level of the eigenvalues left of the boundary
+    cfg.outlier_color (1,3) double = [0 0.6 0] % an outlier far to the right
     cfg.fig_width double          = []    % inches; [] (the default): manuscript_style's canvas_w
-    cfg.image_size (1,1) double   = 1.2   % inches
+    cfg.image_size (1,1) double   = 0.85  % inches, each of the two images of a tile
+    cfg.plus_w (1,1) double       = 0.3   % inches between the two images, for the plus sign
 end
 
 setup_paths();
@@ -64,9 +77,14 @@ if m < 1
 end
 st = manuscript_style();
 fs = st.tick_fs;
-red = st.condition_color('no_adaptation');
-gray = [0.55 0.55 0.55];
+gray = [0.55 0.55 0.55];                    % the bulk circle
+col_left = cfg.left_gray * [1 1 1];
+col_right = [0 0 0];
 titles = tile_titles(cfg.titles, X);
+if ~isfield(X, 'added_part')
+    error('fig_supp3_connectivity_gallery:NoAddedPart', ['The stage file %s predates the added matrices ' ...
+        '(added_part, 2026-11-22); run the concept_examples stage again.'], C.file);
+end
 
 %% One window for every tile
 c0 = X(1).center;
@@ -110,8 +128,10 @@ if isempty(W_in); W_in = st.canvas_w; end
 left = 0.05; right = 0; col_gap = 0.2;     % the drawing fills the canvas (the axes boxes are wider than their axis lines)
 pw = (W_in - left - right - (nc - 1) * col_gap) / nc;
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
-img = min(cfg.image_size, pw);
-title_h = 0.35; gap_is = 0.12; row_gap = 0.45; top = 0.15; bottom = 0.45;
+half_h = 0.5 * st.tick_fs / 72 * diff(g.y_lim) / ph;   % half the height of a tick label, in 1/s
+img = min(cfg.image_size, (pw - cfg.plus_w) / 2);
+pair_w = 2 * img + cfg.plus_w;
+title_h = 0.35; gap_is = 0.2; row_gap = 0.3; top = 0.15; bottom = 0.45;
 tile_h = title_h + img + gap_is + ph;
 H_in = top + nr * tile_h + (nr - 1) * row_gap + bottom;
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
@@ -126,14 +146,32 @@ if isempty(w_clim)
 end
 th = linspace(0, 2 * pi, 361);
 n_out = zeros(1, m);
-ax_img = gobjects(1, m); ax_spec = gobjects(1, m);
+add_clim = zeros(1, m);
+ax_img = gobjects(1, m); ax_add = gobjects(1, m); ax_spec = gobjects(1, m);
 for k = 1:m
     r = ceil(k / nc); c = k - (r - 1) * nc;
     x0 = left + (c - 1) * (pw + col_gap);
     y_top = H_in - top - (r - 1) * (tile_h + row_gap) - title_h;
-    ax_img(k) = axes(fig, 'Units', 'inches', 'Position', [x0 + (pw - img) / 2, y_top - img, img, img]);
-    draw_weight_image(ax_img(k), X(k).sample.W, X(k).sample.type, w_clim, 'divider', true, 'line_width', st.axis_lw);
-    title(ax_img(k), titles{k}, 'FontSize', fs, 'FontWeight', 'normal', 'Color', 'k');
+    a = X(k).added_part;
+    add_clim(k) = max(abs(a.W(:)));
+    % The tile's title over the whole image row, on an axes of its own.
+    ax_t = axes(fig, 'Units', 'inches', 'Position', [x0 + (pw - pair_w) / 2, y_top - img, pair_w, img], ...
+        'XLim', [0 pair_w], 'YLim', [0 img], 'Visible', 'off', 'Tag', 'tile_title');
+    title(ax_t, titles{k}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', 'k', 'Visible', 'on');
+    if add_clim(k) > 0
+        % balanced + added
+        ax_img(k) = axes(fig, 'Units', 'inches', 'Position', [x0 + (pw - pair_w) / 2, y_top - img, img, img]);
+        draw_weight_image(ax_img(k), a.base_W, X(k).sample.type, w_clim, 'divider', true, 'line_width', st.axis_lw);
+        text(ax_t, pair_w / 2, img / 2, '+', 'FontSize', st.title_fs, 'HorizontalAlignment', 'center', ...
+            'VerticalAlignment', 'middle', 'Tag', 'plus');
+        ax_add(k) = axes(fig, 'Units', 'inches', 'Position', [x0 + (pw + pair_w) / 2 - img, y_top - img, img, img], ...
+            'Tag', 'added');
+        draw_weight_image(ax_add(k), a.W, X(k).sample.type, add_clim(k), 'divider', true, 'line_width', st.axis_lw);
+    else
+        % nothing added: the matrix itself
+        ax_img(k) = axes(fig, 'Units', 'inches', 'Position', [x0 + (pw - img) / 2, y_top - img, img, img]);
+        draw_weight_image(ax_img(k), X(k).sample.W, X(k).sample.type, w_clim, 'divider', true, 'line_width', st.axis_lw);
+    end
 
     ax = axes(fig, 'Units', 'inches', 'Position', [x0, y_top - img - gap_is - ph, pw, ph]);
     ax_spec(k) = ax;
@@ -148,24 +186,41 @@ for k = 1:m
     names = {'re_label', '', 'im_label', ''};
     if k == 1; names{2} = 'Re (s^{-1})'; end    % the names once, on a tile with nothing at its right end
     if k == 1; names{4} = 'Im (s^{-1})'; end
-    args = [args, tick_args(cfg, X(k), re_lim, far{k}, im_lim)]; %#ok<AGROW>
+    args = [args, tick_args(cfg, X(k), re_lim, far{k}, im_lim, half_h)]; %#ok<AGROW>
     cp = complex_plane_axes(ax, args{:}, names{:});
+    % Axis names at label_fs (complex_plane_axes sets one font size). Its
+    % texts are hidden handles, which findobj misses, and the Re name under
+    % the ticks is the cell {' ', name}: so through cp.handles.
+    for hx = reshape(cp.handles(isgraphics(cp.handles, 'text')), 1, [])
+        s = hx.String; if iscell(s); s = s{end}; end
+        if ~isempty(s) && any(strcmp(s, names([2 4]))); hx.FontSize = st.label_fs; end
+        % Off the tick labels and the bulk: the Re name to the end of the
+        % tile's empty far segment, off the Im tick label under the axis;
+        % the Im name level with the top of its axis, above the bulk.
+        if k == 1 && iscell(hx.String) && strcmp(s, names{2}); hx.Position(1) = cp.x_lim(2); end
+        if k == 1 && ~iscell(hx.String) && strcmp(s, names{4}); hx.VerticalAlignment = 'middle'; end
+    end
     plot(ax, cp.x(X(k).center + X(k).R_rate * cos(th)), X(k).R_rate * sin(th), '-', 'Color', gray, 'LineWidth', 1.25);
     z = X(k).ev;
-    is_out = abs(z - X(k).center) > X(k).R_rate + 0.2 * rad_max;
+    % gray left of the boundary, black right of it, an outlier far to the right larger and green
+    is_out = abs(z - X(k).center) > X(k).R_rate + 0.2 * rad_max & real(z) > X(k).center + X(k).R_rate;
     n_out(k) = nnz(is_out);
     if any(cp.in_break(real(z)))
         error('fig_supp3_connectivity_gallery:InBreak', 'Tile %d (%s) has an eigenvalue in the removed stretch.', k, X(k).key);
     end
-    scatter(ax, cp.x(real(z(~is_out))), imag(z(~is_out)), cfg.dot_size, red, 'filled', 'MarkerEdgeColor', 'none', ...
-        'MarkerFaceAlpha', 0.75);
-    scatter(ax, cp.x(real(z(is_out))), imag(z(is_out)), cfg.outlier_size, red, 'filled', 'MarkerEdgeColor', 'none');
+    crossed = real(z) > 0;
+    zl = z(~is_out & ~crossed); zr = z(~is_out & crossed); zo = z(is_out);
+    scatter(ax, cp.x(real(zl)), imag(zl), cfg.dot_size, col_left, 'filled', 'MarkerEdgeColor', 'none', 'Tag', 'eig_left');
+    scatter(ax, cp.x(real(zr)), imag(zr), cfg.dot_size, col_right, 'filled', 'MarkerEdgeColor', 'none', 'Tag', 'eig_crossed');
+    scatter(ax, cp.x(real(zo)), imag(zo), cfg.outlier_size, cfg.outlier_color, 'filled', 'MarkerEdgeColor', 'none', ...
+        'Tag', 'eig_outlier');
     set(ax, 'XLim', cp.x_lim, 'YLim', cp.y_lim);
 end
 
 fig_tag = 'Fig_Supp3_Connectivity_Gallery';
 out = struct('figs', fig, 'files', {{}}, 'source', C.file, 'window', g, 'far', {far}, 'w_clim', w_clim, ...
-    'n_out', n_out, 'titles', {titles}, 'axes', struct('image', ax_img, 'spectrum', ax_spec));
+    'add_clim', add_clim, 'n_out', n_out, 'titles', {titles}, ...
+    'axes', struct('image', ax_img, 'added', ax_add, 'spectrum', ax_spec));
 if cfg.save
     save_figure_stable(out_dir, fig_tag, fig);
     out.files = existing_outputs(out_dir, fig_tag);
@@ -173,7 +228,7 @@ if cfg.save
     fid = fopen(fullfile(out_dir, table_name), 'w');
     if fid > 0
         closer = onCleanup(@() fclose(fid));
-        write_table(fid, fig_tag, C, X, titles, g, w_clim, rad_max);
+        write_table(fid, fig_tag, C, X, titles, g, w_clim, add_clim, rad_max);
         clear closer
         out.files{end + 1} = table_name;
     end
@@ -194,17 +249,22 @@ end
 t = cx_gallery_names(X);
 end
 
-function write_table(fid, fig_tag, C, X, titles, g, w_clim, rad_max)
+function write_table(fid, fig_tag, C, X, titles, g, w_clim, add_clim, rad_max)
 fprintf(fid, '# %s\n\n', fig_tag);
 fprintf(fid, 'Source: `%s` (stage concept_examples, gallery; structure only). Preset `%s`, condition `%s`.\n\n', ...
     C.file, C.settings.preset_name, C.settings.condition);
-fprintf(fid, ['Top of each tile: a %d x %d piece of the weights (submatrix on half E, half I neurons, image seed %d), ' ...
-    'color range +-%.4g. Bottom: the eigenvalues of J = (-I + W)/tau_d with every gain 1 (1/s); gray circle radius ' ...
-    'R/tau_d about -1/tau_d; larger dots: farther from the center than R/tau_d + %.3g 1/s. Window Re [%g, %g], ' ...
-    'Im [%g, %g] 1/s in every tile.\n\n'], C.settings.n_image, C.settings.n_image, C.settings.image_seed, w_clim, ...
-    0.2 * rad_max, g.re_lim, g.im_lim);
-fprintf(fid, '| Structure | Network | Level of chaos | Weight seed | R/tau_d (1/s) | Eigenvalues clear of the bulk (1/s) | Added mode (1/s) | Block means x n_pre: K (EE, EI, IE, II) |\n');
-fprintf(fid, '|---|---|---|---|---|---|---|---|\n');
+fprintf(fid, ['Top of each tile: a %d x %d piece of the weights (submatrix on half E, half I neurons, image seed %d) ' ...
+    'as the balanced matrix of the network''s own draw (color range +-%.4g, every tile) plus the matrix the structure ' ...
+    'added (from the construction; color range +- the "Added range" column, per tile). A tile with nothing added ' ...
+    'shows the matrix alone. Bottom: the eigenvalues of J = (-I + W)/tau_d with every gain 1 (1/s); gray circle radius ' ...
+    'R/tau_d about -1/tau_d; dots gray left of the stability boundary, black right of it; larger and green: an ' ...
+    'outlier far to the right (farther from the center than R/tau_d + %.3g 1/s and right of the bulk''s edge). ' ...
+    'Window Re [%g, %g], Im [%g, %g] 1/s in every tile.\n\n'], C.settings.n_image, C.settings.n_image, ...
+    C.settings.image_seed, w_clim, 0.2 * rad_max, g.re_lim, g.im_lim);
+fprintf(fid, ['| Structure | Network | Level of chaos | Weight seed | R/tau_d (1/s) | Eigenvalues clear of the bulk (1/s) | ' ...
+    'Added mode (1/s) | Block means x n_pre: K (EE, EI, IE, II) | Added | Shift of each connection (EE, EI, IE, II) | ' ...
+    'Added range on the piece | Largest added entry (network) |\n']);
+fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|---|\n');
 for k = 1:numel(X)
     x = X(k);
     z = x.ev(abs(x.ev - x.center) > x.R_rate + 0.2 * rad_max);
@@ -213,14 +273,21 @@ for k = 1:numel(X)
     if isempty(zs); zs = 'none'; end
     lr = '';
     if ~isnan(x.lowrank_rate); lr = sprintf('%.1f%+.1fi', real(x.lowrank_rate), imag(x.lowrank_rate)); end
-    fprintf(fid, '| %s | `%s` (%s) | %g | [%d %d] | %.2f | %s | %s | %.2f, %.2f, %.2f, %.2f |\n', titles{k}, x.name, ...
-        x.label, x.level_of_chaos, x.seed, x.R_rate, zs, lr, x.K_struct(1, 1), x.K_struct(1, 2), x.K_struct(2, 1), x.K_struct(2, 2));
+    a = x.added_part;
+    dm = a.delta_mu;
+    fprintf(fid, ['| %s | `%s` (%s) | %g | [%d %d] | %.2f | %s | %s | %.2f, %.2f, %.2f, %.2f | %s | %.4f, %.4f, %.4f, %.4f | ' ...
+        '%.4g | %.4g |\n'], titles{k}, x.name, x.label, x.level_of_chaos, x.seed, x.R_rate, zs, lr, x.K_struct(1, 1), ...
+        x.K_struct(1, 2), x.K_struct(2, 1), x.K_struct(2, 2), a.kind, dm(1, 1), dm(1, 2), dm(2, 1), dm(2, 2), add_clim(k), a.max_abs);
 end
 fprintf(fid, ['\nOnly the upper half-plane member of a conjugate pair is listed. K is (post, pre), the structural mean ' ...
-    'matrix of ospec_weight_stats (realized block mean, zeros included, times the presynaptic count).\n']);
+    'matrix of ospec_weight_stats (realized block mean, zeros included, times the presynaptic count). Added: ' ...
+    '"blockmean" is the change of the block means applied to every existing connection of the block (the sparsity ' ...
+    'mask and the random part are the same draw as the balanced matrix); "lowrank" is the added term U G U'' ' ...
+    '(dense, every pair); "none": nothing was put in (the local outlier is a draw of the balanced ensemble, chosen ' ...
+    'because it has an outlier). The shift is (post, pre): EI is I-to-E.\n']);
 end
 
-function a = tick_args(cfg, x, re_lim, far_k, im_lim)
+function a = tick_args(cfg, x, re_lim, far_k, im_lim, half_h)
 % The candidate ticks that fall outside this tile's bulk (1.15 radii, as
 % its clear interval) and inside its window; [] leaves complex_plane_axes'
 % multiples. A tick whose LABEL an eigenvalue clear of the bulk would sit on
@@ -234,7 +301,7 @@ function a = tick_args(cfg, x, re_lim, far_k, im_lim)
 a = {};
 R = x.R_rate;
 clear_re = x.center + [-1 1] * 1.15 * R;
-clear_im = [-1 1] * 1.15 * R;
+clear_im = [-1 1] * max(1.15 * R, R + 1.1 * half_h);   % the label is about 2 half_h tall: its lower edge clears the circle (E-I loop, R 64.6: its 75 sat on the circle)
 marked = x.ev(abs(x.ev - x.center) > 1.05 * R);
 if ~isempty(cfg.re_tick_candidates)
     t = cfg.re_tick_candidates;
@@ -251,6 +318,6 @@ if ~isempty(cfg.im_tick_candidates)
     for j = 1:numel(t)       % the label: left of the axis, about a radius wide
         if any(real(marked) > -1.1 * R & real(marked) < 0.3 * R & abs(imag(marked) - t(j)) < 0.3 * R); ok(j) = false; end
     end
-    a = [a, {'im_ticks', t(ok)}];
+    a = [a, {'im_ticks', t(ok), 'im_clear', clear_im}];   % im_clear too: with no tick left the default multiples would bring 75 back
 end
 end
