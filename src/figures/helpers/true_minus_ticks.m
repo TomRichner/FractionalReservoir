@@ -29,7 +29,8 @@ function info = true_minus_ticks(fig)
 % figure without negative ticks is exported exactly as before.
 %
 % info: struct with fields changed (number of rulers rewritten) and
-% skipped (cell of descriptions of rulers left because of an exponent).
+% skipped (cell of descriptions of rulers left: a common exponent, or
+% labels that cannot be paired one to one with the ticks shown).
 
 minus = char(8722);
 info = struct('changed', 0, 'skipped', {{}});
@@ -55,6 +56,9 @@ cbs = findall(fig, 'Type', 'colorbar');
 for k = 1:numel(cbs)
     info = fix_ruler(cbs(k), 'Ticks', info, minus, sprintf('color bar %d', k));
 end
+if nargout == 0 && ~isempty(info.skipped)
+    warning('true_minus_ticks:Skipped', 'Tick labels left with the hyphen: %s.', strjoin(info.skipped, '; '));
+end
 end
 
 function info = fix_ruler(r, tick_prop, info, minus, what)
@@ -74,9 +78,28 @@ if strcmp(r.TickLabelsMode, 'auto') && has_exponent(r)
     info.skipped{end + 1} = what;
     return
 end
-if strcmp(r.([tick_prop 'Mode']), 'auto')
-    r.(tick_prop) = r.(tick_prop);                 % fix the ticks where they are
+% Fix the ticks where they are. Automatic labels name only the ticks inside
+% the limits, while the tick values may run past them (S7 C has 10^-3 to
+% 10^3 on an axis from 0.008 to 32): keep the shown ones, so that the
+% fixed labels pair with the same ticks as before.
+% Labels set by hand already pair with the tick values as they stand.
+if strcmp(r.TickLabelsMode, 'manual')
+    if was_char; new = char(new); end
+    r.TickLabels = new;
+    info.changed = info.changed + 1;
+    return
 end
+t = r.(tick_prop);
+lim = r.Limits;
+tol = 1e-9 * max(1, max(abs(lim)));
+if numel(t) ~= numel(labels)
+    t = t(t >= lim(1) - tol & t <= lim(2) + tol);
+end
+if numel(t) ~= numel(labels)
+    info.skipped{end + 1} = sprintf('%s (%d ticks, %d labels)', what, numel(t), numel(labels));
+    return
+end
+r.(tick_prop) = t;
 if was_char; new = char(new); end
 r.TickLabels = new;
 info.changed = info.changed + 1;
