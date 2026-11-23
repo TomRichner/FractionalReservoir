@@ -18,8 +18,9 @@ function out = fig_main4_connectivity(cfg)
 %   (C) lambda_1 against mean population firing rate over the joint sample
 %       ONLY, every dot one size (fig_lle_vs_rate with include_sweeps false;
 %       note 5), colored by E:I weight ratio; the median of lambda_1 per bin
-%       of rate in black, on top of the points over a white halo (note 3,
-%       question 5), with a key saying so just above the multiple-timescale
+%       of rate in black, the topmost object of its axes (above the points
+%       and the zero line), with no white halo (note 3, question 5; Tom,
+%       2026-11-23), and a key saying so just above the multiple-timescale
 %       panel (note 4).
 % (B) and (C) share one E:I color bar at the right. The dendritic share of
 % the leading perturbation (fig_leading_direction, the old panel C) has left
@@ -78,7 +79,7 @@ S_ei = fig_EI_weights_param_space(args{:});
 cleanup_ei = onCleanup(@() T.close(S_ei.figs));
 % The median line thinner than the source's 2.5 (Plan 3 fix X7: in the
 % multiple-timescale panel it lay on the zero line and hid most of the
-% points); its white halo stays. One width in all three panels and the key.
+% points). No white halo (Tom, 2026-11-23). One width in all three panels and the key.
 S_rate = fig_lle_vs_rate('run_dir', cfg.run_dir, 'conditions', cfg.conditions, 'include_sweeps', false, ...
     'median_lw', 1.25, quiet{:});
 cleanup_rate = onCleanup(@() T.close(S_rate.figs));
@@ -211,6 +212,19 @@ for c = 1:nc
     end
     axC(c).XLim = axC(c).XLim + [-1 1] * r_in * diff(axC(c).XLim) / (px(3) / ppi);
     axC(c).YLim = axC(c).YLim + [-1 1] * r_in * diff(axC(c).YLim) / (px(4) / ppi);
+end
+% The median the topmost object of each axes of (C) (Tom, 2026-11-23: "put
+% the median line as the top layer"). A ConstantLine is drawn above every
+% other child (its Layer is 'top'), so the zero line is redrawn as a plain
+% line in its own style: above the points, as before, and below the median.
+for c = 1:nc
+    for z = reshape(findall(axC(c), 'Type', 'constantline'), 1, [])
+        if z.Value ~= 0; continue; end
+        line(axC(c), [-1 2], [0 0], 'Color', z.Color, 'LineStyle', z.LineStyle, 'LineWidth', z.LineWidth, ...
+            'Tag', 'zero_growth_line', 'HandleVisibility', 'off');
+        delete(z);
+    end
+    uistack(findall(axC(c), 'Tag', 'rate_bin_median'), 'top');
 end
 for pass = 1:2
     drawnow;

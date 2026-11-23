@@ -36,7 +36,8 @@ for k=1:numel(axs)
         name=grouped_condition_label(ax.Title.String,'name_of_title');
         % The median is fig_lle_vs_rate's, black in every panel and on top of
         % the points (Plan 3, 2026-11-22; it was in the condition's colour,
-        % under the points, from 2026-11-21); its white halo stays white.
+        % under the points, from 2026-11-21). It has no white halo since
+        % 2026-11-23; the filter spares the halo of a figure saved before.
         set(findall(ax,'Type','line','-not','Tag','rate_bin_median_halo'),'Color',[0 0 0],'LineWidth',2.5);
         ax.Title.Color=st.condition_color(name{1});
         % Long titles collide over narrow panels (four conditions, or the
