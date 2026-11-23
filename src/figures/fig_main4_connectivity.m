@@ -76,7 +76,11 @@ S_sens = fig_sensitivity_medians(args{:});
 cleanup_sens = onCleanup(@() T.close(S_sens.figs));
 S_ei = fig_EI_weights_param_space(args{:});
 cleanup_ei = onCleanup(@() T.close(S_ei.figs));
-S_rate = fig_lle_vs_rate('run_dir', cfg.run_dir, 'conditions', cfg.conditions, 'include_sweeps', false, quiet{:});
+% The median line thinner than the source's 2.5 (Plan 3 fix X7: in the
+% multiple-timescale panel it lay on the zero line and hid most of the
+% points); its white halo stays. One width in all three panels and the key.
+S_rate = fig_lle_vs_rate('run_dir', cfg.run_dir, 'conditions', cfg.conditions, 'include_sweeps', false, ...
+    'median_lw', 1.25, quiet{:});
 cleanup_rate = onCleanup(@() T.close(S_rate.figs));
 assert(numel(S_sens.figs) >= lle_sheet && numel(S_ei.figs) >= lle_sheet, 'fig_main4_connectivity:Sheets', ...
     'A source figure returned no lambda_1 sheet.');
@@ -101,7 +105,7 @@ src = S_sens.figs(lle_sheet);
 G = T.grid(findall(src, 'Type', 'axes'));
 assert(isequal(size(G), [2 3]), 'fig_main4_connectivity:Panels', ...
     'Expected the 2 x 3 panels of fig_sensitivity_medians, found %d x %d.', size(G, 1), size(G, 2));
-y_label = G(1, 1).YLabel.String;
+y_label = strrep(G(1, 1).YLabel.String, '(1/s)', '(s^{-1})');   % the unit as s^-1 (Plan 3 fix X6)
 Cp = T.copy(reshape(G', [], 1), fig, true);      % row by row; the sheet's legend comes along
 axA = Cp.axes;
 for k = 1:6
@@ -144,11 +148,15 @@ for c = 1:nc
     for a = [axB(c), axC(c)]
         ylabel(a, ''); box(a, 'off');
     end
-    xlabel(axB(c), [st.label_lle ' (1/s)'], 'Interpreter', 'tex');
+    xlabel(axB(c), [st.label_lle ' (s^{-1})'], 'Interpreter', 'tex');
     xlabel(axC(c), st.label_rate);
+    % Points and the median clipped AT the axes (Plan 3 fix X7): with the
+    % default clipping a marker whose center is inside was drawn whole over
+    % the axis line, and the thick median ran out of the bottom.
+    axC(c).ClippingStyle = 'rectangle';
 end
 ylabel(axB(1), 'Probability');
-ylabel(axC(1), [st.label_lle ' (1/s)'], 'Interpreter', 'tex');
+ylabel(axC(1), [st.label_lle ' (s^{-1})'], 'Interpreter', 'tex');
 T.retitle(axB, names, true);
 T.retitle(axC, names, true);
 % One E:I color bar for (B) and (C), about one row tall, centered on the
@@ -182,6 +190,26 @@ lgC.ItemTokenSize = [26 18];
 T.margin(fig, 6);
 T.style(fig);                % again: the labels and titles set since take their roles' sizes
 T.fit(fig);                  % laid out on canvas_w already: nothing moves
+% (C): MATLAB draws a marker whole when its center is inside the axes, so
+% the dots at the edge of the window lay over the axis lines (Plan 3 fix
+% X7). The window grows by one marker radius on every side, so each drawn
+% dot stays inside; dots beyond it still fall off, and the median is cut
+% at the axes (ClippingStyle above).
+ppi = get(groot, 'ScreenPixelsPerInch');
+for c = 1:nc
+    sc = findall(axC(c), 'Type', 'scatter');
+    if isempty(sc); continue; end
+    r_in = sqrt(max([sc.SizeData])) / 2 / 72 * 1.15;      % marker radius (points) in inches, with a little room
+    px = getpixelposition(axC(c));
+    axC(c).XTick = axC(c).XTick; axC(c).YTick = axC(c).YTick;   % the ticks stay where they were
+    % The dots that fell off the old window (centers outside it) stay off.
+    for s = reshape(sc, 1, [])
+        off = s.YData < axC(c).YLim(1) | s.YData > axC(c).YLim(2) | s.XData < axC(c).XLim(1) | s.XData > axC(c).XLim(2);
+        s.YData(off) = NaN;
+    end
+    axC(c).XLim = axC(c).XLim + [-1 1] * r_in * diff(axC(c).XLim) / (px(3) / ppi);
+    axC(c).YLim = axC(c).YLim + [-1 1] * r_in * diff(axC(c).YLim) / (px(4) / ppi);
+end
 for pass = 1:2
     drawnow;
     p = lgA.Position;

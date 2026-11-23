@@ -131,7 +131,6 @@ for p = 1:3
     end
     if p == 1
         yline(ax, 1, '-', 'Color', gray, 'LineWidth', 1.5);
-        plot(ax, x_med, diamond, '-d', 'Color', 'k', 'MarkerSize', 8, 'MarkerFaceColor', 'w', 'LineWidth', 1.25);
     end
     for c = 1:n_cond
         col = F.colors{c};
@@ -158,10 +157,21 @@ for p = 1:3
             'MarkerFaceColor', col, 'MarkerEdgeColor', 'w');
     end
     if p == 1
+        % The equal-gain diamonds on top of the medians (Plan 3 fix X9: the
+        % first one was hidden behind a dot).
+        plot(ax, x_med, diamond, '-d', 'Color', 'k', 'MarkerSize', 8, 'MarkerFaceColor', 'w', 'LineWidth', 1.25, ...
+            'Tag', 'equal_gain_diamonds');
         ticks = 2 .^ (ceil(log2(y_lim(1))):floor(log2(y_lim(2))));
         set(ax, 'YScale', 'log', 'YLim', y_lim, 'YTick', ticks, 'YMinorTick', 'off');
     else
-        ylim(ax, [0, max(1.1, 1.08 * max(Y(:), [], 'omitnan'))]);
+        % Room under 0 for half a marker (MarkerSize 8 pt across), so a median
+        % at 0 is drawn whole above the axis line and its line to the point
+        % before it no longer ends in a stub on the axis (Plan 3 fix X9).
+        y_hi = max(1.1, 1.08 * max(Y(:), [], 'omitnan'));
+        drawnow; px = getpixelposition(ax);
+        r = 0.6 * 8 / 72 * get(groot, 'ScreenPixelsPerInch') / px(4) * y_hi;   % a little over the marker radius, in data units
+        set(ax, 'YLim', [-r, y_hi], 'YTickMode', 'auto');
+        yt = ax.YTick; ax.YTick = yt(yt >= 0);
     end
     xlim(ax, x_lim);
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');

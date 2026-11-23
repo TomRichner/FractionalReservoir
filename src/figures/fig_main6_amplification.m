@@ -92,13 +92,17 @@ if isempty(tr_dir); tr_dir = cfg.run_dir; end
 % The common canvas (Plan 2, canvas standard): every row is canvas_w less
 % composite_figure's side margins; the type is set by role at the end
 % (canvas_type).
-st = manuscript_style(); MARGIN = [0.15 0.15 0.1 0.45];   % room at the foot for the Re name of (E), under its tick labels
+% The Re name of (E) sits ABOVE the right end of the last plane's real axis,
+% as in Figure 5 (Plan 3 fix X11: under the tick labels it was about 0.4 in
+% below its axis), raised clear of what that panel draws under it
+% (lift_re_label, below); so the foot needs no room for it.
+st = manuscript_style(); MARGIN = [0.15 0.15 0.1 0.1];
 ROW_W = st.canvas_w - MARGIN(1) - MARGIN(2); ppi = get(groot, 'ScreenPixelsPerInch');
 [f_ab, t_ab, src_ab] = draw_margin_and_gain(cfg, tr_dir, ROW_W);
 [f_net, t_net, o_net] = composite_part(@fig_freqresp_network, cfg, 'networks', {cfg.network}, 'panels', [1 3], ...
     'bulk_bars', false, 'fig_size', round([ROW_W * ppi, 2.65 * ppi]));   % 2.65 in tall: the figure fits canvas_max_h
 [f_plane, t_plane] = composite_part(@fig_freqresp_plane, cfg, 'networks', {cfg.network}, 'seed', cfg.seed, ...
-    're_label_side', 'below');   % above the axis it sat on the edge curve of the last panel at 9 in
+    're_label_side', 'above');
 
 [fig, B] = composite_figure({struct('fig', f_ab, 'width', ROW_W), struct('fig', f_net, 'width', ROW_W), ...
     struct('fig', f_plane, 'width', ROW_W)}, 'visible', cfg.visible, 'margin', MARGIN, 'row_gap', 0.2, 'width', st.canvas_w);
@@ -110,6 +114,7 @@ composite_letter(fig, B{2}(1), 'C', net(1));
 composite_letter(fig, B{2}(1), 'D', net(2));
 composite_letter(fig, B{3}(1), 'E');
 canvas_type(fig);
+lift_re_label(fig);
 
 % The dendritic time constant, for the caption's corner frequency (Tom's
 % question on panel C, 2026-11-22).
@@ -259,4 +264,46 @@ k = strfind(t, ' adaptation');
 if ~isempty(k) && ~startsWith(t, 'No ')
     t = {t(1:k(1) - 1), t(k(1) + 1:end)};
 end
+end
+
+function lift_re_label(fig)
+% The Re name of (E), above the right end of the last plane's real axis, is
+% raised until nothing that plane draws under it (the eigenvalues, the edge
+% curves, the frozen circle) touches it: 0.05 in clear of the highest such
+% point within its width (Plan 3 fix X11). The axis lines and their tick
+% labels (Tag complex_plane_axes) are not counted.
+h = findall(fig, 'Type', 'text', 'String', 'Re (s^{-1})');
+if ~isscalar(h); return; end
+ax = h.Parent;
+drawnow;
+e = h.Extent;                                        % data units
+xs = []; ys = [];
+for g = reshape(findall(ax, 'Type', 'line'), 1, [])
+    if strcmp(g.Tag, 'complex_plane_axes'); continue; end
+    xs = [xs, g.XData(:)']; ys = [ys, g.YData(:)']; %#ok<AGROW>
+end
+for g = reshape(findall(ax, 'Type', 'contour'), 1, [])
+    M = g.ContourMatrix; k = 1;
+    while k < size(M, 2)
+        n = M(2, k); xs = [xs, M(1, k + 1:k + n)]; ys = [ys, M(2, k + 1:k + n)]; %#ok<AGROW>
+        k = k + n + 1;
+    end
+end
+px = getpixelposition(ax); ppi = get(groot, 'ScreenPixelsPerInch');
+pad_x = 0.05 * ppi * diff(ax.XLim) / px(3); pad_y = 0.05 * ppi * diff(ax.YLim) / px(4);
+% First to the right, by at most 0.4 in past the axis end, so that it
+% starts clear of what is drawn beside it at its height (the frozen
+% circle's foot); only what is still under it then raises it.
+low = ys >= 0 & ys <= e(2) + e(4) + pad_y;
+x_end = h.Position(1);
+if any(low & xs > e(1) - pad_x)
+    right = max(xs(low)) + pad_x + e(3);
+    if right > x_end && right - x_end <= 0.4 * ppi * diff(ax.XLim) / px(3)
+        h.Position(1) = right; drawnow; e = h.Extent;
+    end
+end
+under = xs >= e(1) & xs <= e(1) + e(3) & ys >= 0;
+if ~any(under); return; end
+lift = max(ys(under)) + pad_y - e(2);
+if lift > 0; h.Position(2) = h.Position(2) + lift; end
 end

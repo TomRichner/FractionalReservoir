@@ -84,7 +84,10 @@ for b = 1:2
     G = T.grid(findall(src, 'Type', 'axes'));
     assert(isequal(size(G), [2 3]), 'fig_supp4_grouped:Panels', ...
         'Expected the 2 x 3 panels of fig_sensitivity_medians, found %d x %d.', size(G, 1), size(G, 2));
-    y_label = G(1, 1).YLabel.String;
+    % The unit as s^-1 and the rate named as in Figure 4 (Plan 3 fix X6;
+    % sweep_metrics, which other figures read, keeps its own wording).
+    y_label = strrep(G(1, 1).YLabel.String, '(1/s)', '(s^{-1})');
+    if strcmp(y_label, 'Mean Firing Rate'); y_label = st.label_rate; end
     order = [G(1, 1); G(1, 2); G(1, 3); G(2, 1); G(2, 2); G(2, 3)];   % ratio, size, EE, IE, EI, II
     Cp = T.copy(order, fig, b == 1);         % the legend comes with the first block only
     a = Cp.axes;

@@ -103,7 +103,8 @@ rows={'u','x','r','syn','sfa','b1','lambda'};
 % 2026-11-22, note 6: the labels need not be LaTeX apart from the symbols).
 labels={'Input, {\itu_i}',{'Dendritic','potential, {\itx_i}'},'Spike rate, {\itr_i}', ...
     {'Synaptic','output, \theta_{\iti}'},{'Spike-','Frequency','Adaptation'}, ...
-    {'Synaptic','Depression'},{'Lyapunov','Exp., \lambda_1'}};
+    {'Synaptic','Depression'},{'Lyapunov','Exp., \lambda_1','(s^{-1})'}};
+% Row (G) carries its unit on a third line (Plan 3 fix X5), as row (E) has three lines.
 % (The label stays "Synaptic Depression": with ", b_1" its long second line
 % runs into the labels of rows E and G. The provenance names b1.)
 titles=grouped_condition_label(names,'sentence');
@@ -124,6 +125,12 @@ for c=1:n_col
         ax.XAxis.Visible='off';
         if c==1
             ylabel(ax,labels{j},'Interpreter','tex','FontSize',st.label_fs);
+            if j==7
+                % Three lines: the first ("Lyapunov") would touch the
+                % letter (G) above it; the label sits .06 in lower.
+                ax.YLabel.Units='normalized';
+                ax.YLabel.Position(2)=.5-.06/G.row_h;
+            end
             % Near the sheet's left edge, a little above the top of the row
             % (moved right and up, second round).
             text(ax,(G.letter_dx-G.left)/G.ax_w,1.05+G.letter_dy/G.row_h,sprintf('(%c)',char('A'+j-1)),'Units','normalized', ...
@@ -181,13 +188,17 @@ lg.ItemTokenSize=[14 18]; lg.Units='normalized'; drawnow;
 q=lg.Position;
 lg.Position=[row_b(1)+row_b(3)-q(3), row_b(2)+row_b(4)-q(4), q(3), q(4)];
 ax_all(2,end).Position=row_b;
-% Lower-left lambda panel: the time bar on the axis floor, its label under
-% it. A quarter of a 20 s window or a third of a 30 s one: 5 s or 10 s.
-yl=ax_all(7,1).YLim;
+% Lower-left lambda panel: the time bar UNDER the axes, clear of the traces
+% and of the bottom tick label, and its label under it, "5 s" as the scale
+% bars of Figures 1 and 8 (Plan 3 fix X4; it was drawn inside the axes, on
+% the -5 level, labelled "5 seconds"). Offsets in inches, turned into data
+% units of the row. A quarter of a 20 s window or a third of a 30 s one: 5 s or 10 s.
+yl=ax_all(7,1).YLim; per_in=diff(yl)/G.row_h;
 bar_s=10; if diff(window)<30, bar_s=5; end
 bar_x=window(1)+diff(window)/6+[0 bar_s];
-plot(ax_all(7,1),bar_x,(yl(1)+.02*diff(yl))*[1 1],'k','LineWidth',4,'Tag','time_bar');
-text(ax_all(7,1),mean(bar_x),yl(1)-.06*diff(yl),sprintf('%d seconds',bar_s),'FontSize',st.tick_fs,'HorizontalAlignment','center', ...
+bar_y=yl(1)-.08*per_in;
+plot(ax_all(7,1),bar_x,bar_y*[1 1],'k','LineWidth',4,'Clipping','off','Tag','time_bar');
+text(ax_all(7,1),mean(bar_x),bar_y-.05*per_in,sprintf('%d s',bar_s),'FontSize',st.tick_fs,'HorizontalAlignment','center', ...
     'VerticalAlignment','top','Clipping','off','Tag','time_bar_label');
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
 % Between the columns, clear of the tick labels of every row: the place is
