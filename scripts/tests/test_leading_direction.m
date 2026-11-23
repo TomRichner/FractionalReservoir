@@ -154,7 +154,7 @@ n_fail = n_fail + check(strcmp(error_of(@() fig_leading_direction(base{:}, 'save
 st = manuscript_style();
 evalc('m = fig_main4_connectivity(base{:}, ''preset_name'', preset, ''out_dir'', fullfile(tmp, ''m4''));');
 m_px = getpixelposition(m.figs);
-letters = sort(arrayfun(@(t) t.String(2), findall(m.figs, 'Tag', 'composite_panel_letter'))');
+letters = sort(arrayfun(@(t) t.String(2), findall(m.figs, 'Tag', 'composite_panel_letter'))); letters = letters(:)';
 med = findall(m.figs, 'Tag', 'rate_bin_median');
 scat = findall(m.figs, 'Type', 'scatter');
 sz = arrayfun(@(h) unique(h.SizeData), scat, 'UniformOutput', false);

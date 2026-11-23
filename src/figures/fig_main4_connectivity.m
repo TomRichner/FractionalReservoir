@@ -151,8 +151,12 @@ ylabel(axB(1), 'Probability');
 ylabel(axC(1), [st.label_lle ' (1/s)'], 'Interpreter', 'tex');
 T.retitle(axB, names, true);
 T.retitle(axC, names, true);
-% One E:I color bar for (B) and (C), the height of both rows.
-cb = ei_colorbar(axC(end), bar_axes, [W - CB_W + 10, C_Y, 13, B_Y + B_H - C_Y]);
+% One E:I color bar for (B) and (C), about one row tall, centered on the
+% gap between the two rows, which both read it (Tom, 2026-11-22, second
+% round: spanning both rows it was unusually tall).
+cb_mid = (C_Y + C_H + B_Y) / 2;
+cb_h = (B_Y + B_H - C_Y) / 2;
+cb = ei_colorbar(axC(end), bar_axes, [W - CB_W + 10, cb_mid - cb_h / 2, 13, cb_h]);
 delete(bar_axes);
 % The legend of (A): the conditions and the zero line, two columns above
 % the block, right-aligned.
