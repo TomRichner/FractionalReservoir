@@ -82,7 +82,8 @@ W = round(st.canvas_w * get(groot, 'ScreenPixelsPerInch'));
 KEY_Y = 6; KEY_H = 70;
 Y3 = 140; H3 = 170;                          % (C)
 Y2 = Y3 + H3 + 48 + 72; MH = 180;            % (B): above the titles of (C) and the x labels of (B)
-TR_H = 66; TR_GAP = 34;                      % (A): one trace, and the room for the title of the one below
+TR_H = 100; TR_GAP = 34;                     % (A): one trace (66 until the traces were no longer cut flat:
+                                             % their range is now the readout's, up to about 4 times the input's), the title below
 Y1 = Y2 + MH + 48 + 46;                      % bottom row of (A): above the titles of (B) and the scale bar
 H = Y1 + 2 * TR_H + TR_GAP + 52;            % the titles of the top traces and the letter above them
 fig = T.canvas(W, H, cfg.visible);
@@ -123,7 +124,7 @@ Cs = T.copy(S_sct.figs, fig);
 is_key = arrayfun(@(a) strcmp(a.Tag, 'mc_sweep_scatter_size_legend'), Cs.axes);
 sct = Cs.axes(~is_key);
 [~, order] = sort(arrayfun(@(a) a.Position(1), sct)); sct = sct(order);
-SX0 = 72; SGAP = 36; SCB_ROOM = 86;
+SX0 = 72; SGAP = 36; SCB_ROOM = 104;          % room for the colour bar's ticks and its 'Gain' (at 86 it touched the edge)
 SW = (W - SX0 - (nc - 1) * SGAP - 12 - 14 - SCB_ROOM) / nc;
 for c = 1:numel(sct)
     set(sct(c), 'Units', 'pixels', 'PositionConstraint', 'innerposition', ...
@@ -137,6 +138,21 @@ end
 T.style(fig);
 % (A)
 set(ax_a, 'TitleFontSizeMultiplier', 1);
+% A key for the two traces (Plan 3 review: nothing said which was the input
+% and which the reconstruction), under the bottom-left traces, off the data,
+% beside the scale bar of the bottom-right ones.
+hold(ax_a(3), 'on');
+tr = findall(ax_a(3), 'Type', 'line');
+in_col = [0 0 0];
+rec = tr(arrayfun(@(l) ~isequal(l.Color, in_col) && numel(l.XData) > 2, tr));
+hk = [plot(ax_a(3), NaN, NaN, '-', 'Color', in_col, 'LineWidth', 1.5), ...
+    plot(ax_a(3), NaN, NaN, '-', 'Color', rec(1).Color, 'LineWidth', 1.5)];
+lgA = legend(ax_a(3), hk, {'Input', 'Reconstruction'}, 'Orientation', 'horizontal', 'Box', 'off', ...
+    'AutoUpdate', 'off', 'FontSize', st.tick_fs);
+lgA.ItemTokenSize = [24 10];
+% The scale bar's label as Figure 8's ("1 a.u."), whatever the source wrote.
+au = findall(ax_a, 'Type', 'text');
+set(au(arrayfun(@(t) any(strcmp(strtrim(cellstr(t.String)), '1 AU')), au)), 'String', '1 a.u.');
 % (B): ticks and labels as Figure 7 styles the capacity maps.
 GAIN_TICKS = [0.05 0.25 1 5];
 for c = 1:nc
@@ -172,13 +188,17 @@ end
 ylabel(sct(1), 'Memory Capacity');
 set(sct, 'Box', 'off');                  % open axes, as every other panel (the source boxes them)
 if ~isempty(Cs.colorbars); Cs.colorbars.Label.String = 'Gain'; end
+clip_note = '';
 if any(is_key)
-    respace_size_key(Cs.axes(is_key), W, KEY_Y, KEY_H);
+    clip_note = respace_size_key(Cs.axes(is_key), W, KEY_Y, KEY_H);
 end
 
 %% The common canvas (the layout is on canvas_w already: fit moves nothing)
 T.style(fig);                % again: the labels and titles set since take their roles' sizes
 T.fit(fig);
+% (A)'s key under the bottom-left traces, level with the scale bar's time label.
+set(lgA, 'Units', 'pixels', 'Location', 'none');
+lgA.Position(1:2) = [TR_X(1), Y1 - lgA.Position(4) - 6];
 
 %% Panel letters
 T.letter(ax_a(1), 'A', -TR_X(1), 22);
@@ -202,6 +222,12 @@ if cfg.save
             R.median(:, :, c), R.second_levels, R.first_levels, 'self-coupling s', 'gain')}; %#ok<AGROW>
     end
     parts(end + 1, :) = {['Panel C, ' panels.C], strjoin([{'The statistics the source figure prints on its panels (not drawn here):', ''}, stats_text], newline)};
+    if ~isempty(clip_note)
+        % The key's note on the clipped mark, left off the panel (rule 1, no
+        % explanatory text on a panel; Plan 3 review) and kept for the caption.
+        parts(end + 1, :) = {'Panel C, for the caption', sprintf(['Open squares: runs with %s ' ...
+            '(the source key''s note, not drawn on the figure).'], clip_note)};
+    end
 end
 caption = sprintf(['Supplementary Figure S9, memory (drawn by fig_supp9_grouped; run `%s`, grid from `%s`; conditions %s). ' ...
     '(A) Example reconstructions of the past input (black: target; colour: the readout) at four delays, with the ' ...
@@ -227,14 +253,15 @@ end
 error('fig_supp9_grouped:NoEntry', 'The bundle registers no figure %s.', name);
 end
 
-function respace_size_key(key, W, y, h)
+function note = respace_size_key(key, W, y, h)
 % The marker-size key under the scatter panels, laid out for the 9 in
 % canvas. The source spaces its reference markers for its own small labels
 % on a wider sheet, with the heading left of the markers and the note on
 % the clipped mark right of them; at tick_fs on 9 in the three do not fit
-% in one line. Here the heading stays at the left, the markers and their
-% values take the rest of the width, and the clipped mark and its note go
-% under the heading, level with the values.
+% in one line. Here the heading stays at the left and the markers and their
+% values take the rest of the width; the clipped mark and its note are
+% removed and the note returned (until the Plan 3 review they went under
+% the heading, level with the values).
 HEAD_PX = 250; LEFT = 16; RIGHT_PAD = 30;
 tx = findall(key, 'Type', 'text');
 is_val = arrayfun(@(t) strcmp(t.VerticalAlignment, 'top'), tx);
@@ -249,11 +276,14 @@ x0 = 0.4 - HEAD_PX / u;
 key.XLim = [x0, x0 + width / u];
 T = composite_tools();
 for k = 1:numel(tx); tx(k).String = T.sentence(tx(k).String); end          % 'Self-coupling s (R_W):'
+% The clipped mark and its note ("|lambda_1| > 5, drawn at the edge") leave
+% the figure (Plan 3 review, rule 1: no explanatory text on a panel); the
+% note is returned for the table, where the caption takes it from.
+note = '';
 if any(is_note)
-    y_note = -1.0;
-    sq = findall(key, 'Type', 'scatter', 'Marker', 'square');
-    set(sq, 'XData', x0 + 8 / u, 'YData', y_note);
-    set(tx(is_note), 'Position', [x0 + 18 / u, y_note, 0], 'HorizontalAlignment', 'left');
+    note = strjoin(cellfun(@(s) strjoin(cellstr(s), ' '), {tx(is_note).String}, 'UniformOutput', false), '; ');
+    delete(tx(is_note));
+    delete(findall(key, 'Type', 'scatter', 'Marker', 'square'));
 end
 T.margin(ancestor(key, 'figure'), 2);                                      % the labels are the lowest thing drawn
 end
