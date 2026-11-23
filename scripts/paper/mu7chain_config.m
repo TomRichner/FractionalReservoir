@@ -324,10 +324,14 @@ cfg.local_lyapunov_warmup_s = 10;
 cfg.local_lyapunov_simulation_start_s = -15; % alignment [-10,0]
 cfg.illustration_lya_start_s = 0; % first finite estimate after the [0,0.05] s segment
 cfg.illustration_lya_warmup_s = 10; % alignment over [-10,0] s; simulation starts -15
-cfg.illustration_display_window = [0 30];
-% The step occupies the MIDDLE THIRD of the display window, [10 20] s, and
-% 25 neurons of each type are saved (50 drawn).
-cfg.illustration_step_window = [10 20];
+% 20 s shown, in every run mode (Tom, 2026-11-22, second round on Figure 2:
+% 30 s made the figure too tight left to right). Was [0 30] with the step
+% over [10 20] s. The single-neuron illustration of the same stage (S1,
+% panel A) shares this window.
+cfg.illustration_display_window = [0 20];
+% The step occupies the MIDDLE THIRD of the display window, [20/3 40/3] s
+% (about 6.7 to 13.3 s), and 25 neurons of each type are saved.
+cfg.illustration_step_window = [20/3 40/3];
 cfg.illustration_neurons_per_type = 25;
 cfg.transient_gain_horizon_s = 5;
 cfg.transient_gain_duration_s = 40; % sample starts [25,35] s, 5-s horizon

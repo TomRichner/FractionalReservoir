@@ -105,15 +105,16 @@ switch group
         a=fig_main2_dynamics(cfg.run_dir,cfg.source_fig_root,cfg.conditions);
         % The common canvas (manuscript_style's canvas_w; N columns keep the
         % three-column pitch, so the canvas widens with them). The sheet is
-        % drawn at 0.95 of the canvas and is copied below into its middle
-        % 0.95, so its layout in inches and its type in points are kept.
+        % drawn at the full canvas and is copied below onto all of it (no
+        % 0.95 frame since the second round of 2026-11-22), so its layout in
+        % inches and its type in points are kept.
         % A new figure of that size, not the first one resized: an invisible
         % figure resized after its creation was seen to go back to the size
         % it was created with (1300 x 950) on about every other call.
         cst=manuscript_style();
         close(fig);
         fig=figure('Visible',onoff(cfg.visible),'Color','w','Position', ...
-            [40 40 round(cst.canvas_w*get(groot,'ScreenPixelsPerInch')*a.width_scale) round(a.figs.Position(4)/.95)]);
+            [40 40 round(cst.canvas_w*get(groot,'ScreenPixelsPerInch')*a.width_scale) round(a.figs.Position(4))]);
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 3
@@ -212,7 +213,7 @@ switch group
 end
 % Flatten layout containers into ordinary native axes for portable export.
 flat=figure('Visible','off','Color','w','Position',fig.Position);
-if ismember(group,[1 2 3])
+if ismember(group,[1 3])     % Figure 2's sheet is the whole canvas (second round, 2026-11-22)
     copy_axes(fig,flat,[.025 .025 .95 .95]);
 else
     copy_axes(fig,flat,[0 0 1 1]);

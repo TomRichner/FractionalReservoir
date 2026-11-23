@@ -13,7 +13,7 @@ function out=fig_main2_dynamics(run_dir,source_fig_root,conditions)
 % (one column and one gap of the three-column sheet) and the canvas widens
 % with them; out.width_scale is the canvas width relative to the common
 % canvas (manuscript_style canvas_w; 1 for three columns). The sheet itself
-% is 0.95 of that canvas (see THE LAYOUT below). The archived raster
+% is that canvas (see THE LAYOUT below). The archived raster
 % (no numeric stage) holds exactly the three columns of the mu7 run it was
 % calibrated on, no_adaptation / sfa1_std1 / sfa3_std2, and is selected from
 % by the same rule.
@@ -59,24 +59,35 @@ else
 end
 % THE LAYOUT (Plan 3, 2026-11-22: the common canvas, manuscript_style's
 % canvas_w, with the type at its role's size in points). The sheet is drawn
-% at 0.95 of the canvas, because fig_grouped_main copies it into the middle
-% 0.95 of the composite: what is measured here in inches is then the same
-% on the composite. Everything below is in inches and turned into
+% at the full canvas width, and fig_grouped_main copies it onto the whole
+% composite: what is measured here in inches is then the same on the
+% composite. (Until the second round it was 0.95 of the canvas, copied into
+% the middle 0.95; with the letters moved right the drawing no longer
+% filled the canvas, so the margin went to the columns.) Everything below is in inches and turned into
 % normalized units; nothing is scaled from a wider sheet. N columns keep
 % the three-column pitch and the canvas widens with them.
 st=manuscript_style();
 n_col=numel(names);
-G.left=1.52;    % panel letter, y label (up to three lines) and tick labels of column 1
-G.right=.50;    % the E/I key beside the last column
+% Second round (Tom, 2026-11-22): the panel letters moved right and up
+% (letter_dx, letter_dy, inches from the sheet's left edge and the old
+% height), the E/I key moved left into row (B) of the last column, and the
+% three columns widened into the room this gives (G.left and G.right were
+% 1.52 and .50 in). On the left the three-line label of row (E) fills its
+% row and the gaps beside it, so the letters can move right only as far as
+% its left edge allows: little is gained there. The key's place gives the
+% rest.
+G.left=1.50;    % panel letter, y label (up to three lines) and tick labels of column 1
+G.right=.16;    % what the last column's title and tick marks need beyond the axes
+G.letter_dx=.06; G.letter_dy=.08;
 G.gap=.56;      % between columns: the divider, and row (G)'s own tick labels
 G.top=.62;      % the column titles (two lines)
 G.bottom=.40;   % the scale bar's label under row (G)
 G.row_h=1.02; G.row_gap=.20;
-sheet_w3=.95*st.canvas_w;                              % three columns
+sheet_w3=st.canvas_w;                                  % three columns
 G.ax_w=(sheet_w3-G.left-G.right-2*G.gap)/3;
 sheet_w=G.left+G.right+n_col*G.ax_w+(n_col-1)*G.gap;
 sheet_h=G.top+G.bottom+7*G.row_h+6*G.row_gap;
-width_scale=(sheet_w/.95)/st.canvas_w;                 % 1 for three columns
+width_scale=sheet_w/st.canvas_w;                       % 1 for three columns
 ppi=get(groot,'ScreenPixelsPerInch');
 fig=figure('Visible','off','Color','w','Position',[40 40 sheet_w*ppi sheet_h*ppi]);
 % SEVEN rows, (A)-(G): the input step first, the local lambda(t) smoothed
@@ -113,9 +124,11 @@ for c=1:n_col
         ax.XAxis.Visible='off';
         if c==1
             ylabel(ax,labels{j},'Interpreter','tex','FontSize',st.label_fs);
-            % At the sheet's left edge, level with the top of the row.
-            text(ax,-G.left/G.ax_w,1.05,sprintf('(%c)',char('A'+j-1)),'Units','normalized', ...
-                'FontSize',st.letter_fs,'HorizontalAlignment','left','VerticalAlignment','top','Clipping','off');
+            % Near the sheet's left edge, a little above the top of the row
+            % (moved right and up, second round).
+            text(ax,(G.letter_dx-G.left)/G.ax_w,1.05+G.letter_dy/G.row_h,sprintf('(%c)',char('A'+j-1)),'Units','normalized', ...
+                'FontSize',st.letter_fs,'HorizontalAlignment','left','VerticalAlignment','top','Clipping','off', ...
+                'Tag','dynamics_letter');
         end
         % Few ticks (Tom, 2026-11-22): an axis from 0 to 1 has 0 and 1 only;
         % the input row runs 0 to .35 with 0 and .25.
@@ -155,22 +168,27 @@ else
 end
 le=plot(ax_all(2,end),NaN,NaN,'Color',ce,'LineWidth',.5);
 li=plot(ax_all(2,end),NaN,NaN,'Color',ci,'LineWidth',.5);
-% Beside the last column, right of row (B)'s axes and level with their top,
-% where there is no trace (polish list, 2026-11-22: inside the axes, at
-% 'northeast', it sat on the traces of that column). The axes keep their
-% place: the legend is positioned by hand, not by a Location that resizes.
+% In row (B) of the last column, one line ("E  I") along the top right of
+% the axes (second round, Tom 2026-11-22: the key further left, so that the
+% columns can take the room it had beside them). The adapting columns' x
+% traces stay near 0 on a [-6 6] axis, so the top of the axes is empty
+% there; the sidecar says where it is. Before: right of the axes, outside.
+% The axes keep their place: the legend is positioned by hand.
 row_b=ax_all(2,end).Position;
-lg=legend(ax_all(2,end),[le li],{'E','I'},'FontSize',st.tick_fs,'Box','off','AutoUpdate','off','Tag','EI_key');
+lg=legend(ax_all(2,end),[le li],{'E','I'},'FontSize',st.tick_fs,'Box','off','AutoUpdate','off','Tag','EI_key', ...
+    'Orientation','horizontal');
 lg.ItemTokenSize=[14 18]; lg.Units='normalized'; drawnow;
 q=lg.Position;
-% Flush with the sheet's right edge, so the drawing fills the canvas width.
-lg.Position=[max(row_b(1)+row_b(3),1-q(3)), row_b(2)+row_b(4)-q(4), q(3), q(4)];
+lg.Position=[row_b(1)+row_b(3)-q(3), row_b(2)+row_b(4)-q(4), q(3), q(4)];
 ax_all(2,end).Position=row_b;
-% Lower-left lambda panel: the time bar on the axis floor, its label under it.
+% Lower-left lambda panel: the time bar on the axis floor, its label under
+% it. A quarter of a 20 s window or a third of a 30 s one: 5 s or 10 s.
 yl=ax_all(7,1).YLim;
-plot(ax_all(7,1),[5 15],(yl(1)+.02*diff(yl))*[1 1],'k','LineWidth',4,'Tag','ten_second_bar');
-text(ax_all(7,1),10,yl(1)-.06*diff(yl),'10 seconds','FontSize',st.tick_fs,'HorizontalAlignment','center', ...
-    'VerticalAlignment','top','Clipping','off','Tag','ten_second_label');
+bar_s=10; if diff(window)<30, bar_s=5; end
+bar_x=window(1)+diff(window)/6+[0 bar_s];
+plot(ax_all(7,1),bar_x,(yl(1)+.02*diff(yl))*[1 1],'k','LineWidth',4,'Tag','time_bar');
+text(ax_all(7,1),mean(bar_x),yl(1)-.06*diff(yl),sprintf('%d seconds',bar_s),'FontSize',st.tick_fs,'HorizontalAlignment','center', ...
+    'VerticalAlignment','top','Clipping','off','Tag','time_bar_label');
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
 % Between the columns, clear of the tick labels of every row: the place is
 % measured on the drawn axes (column_dividers), not typed in, and measured
@@ -178,11 +196,13 @@ sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag
 % the top of row (A), below the titles.
 column_dividers(sep,'dynamics',n_col,[(G.bottom-.25)/sheet_h 1-(G.top-.04)/sheet_h],'Color',[.88 .88 .88],'LineWidth',2.5);
 uistack(sep,'bottom');
-notes{end+1}=['Numeric rendering draws the first half of the saved neurons of each type (round(25/2): 25 saved -> 13 displayed), ' ...
+notes{end+1}=sprintf('Time shown: %g to %g s; the scale bar under row (G) is %d s.',window,bar_s);
+notes{end+1}=['Numeric rendering draws the first 30 percent of the saved neurons of each type (round(0.3*25): 25 saved -> 8 displayed; ' ...
+    'Tom, 2026-11-22: about 60 percent of the 13 drawn before), ' ...
     'the same indices in every state row, in the model''s own E/I palettes (excitatory_colormap / inhibitory_colormap, ' ...
     'the colours SRNNModel2.plot uses). Row (A) is the uniform input step. Row (G): the local rate is low-pass filtered at 2 Hz ' ...
     '(2nd-order Butterworth, zero phase) for display only and drawn in a lighter tint of the column''s condition color; ' ...
-    'the finite-time (accumulated) lambda_1 is unfiltered, in the condition color. The E/I key stands right of row (B), outside the axes. ' ...
+    'the finite-time (accumulated) lambda_1 is unfiltered, in the condition color. The E/I key is one line at the top right of row (B) of the last column, inside the axes. ' ...
     'The green dashed 0.5-point zero reference and the y labels (words in the figure typeface, symbols in italics) apply to both sources. Y ticks: 0 and 1 on the unit axes, 0 and 0.25 on the input row (limits 0 to 0.35); tick labels on the left column only, except row (G), where no adaptation is on plus or minus 5 and the adapting conditions are on plus or minus 1 with their own tick labels (the local rate is clipped there).'];
 notes{end+1}=sprintf('Columns, left to right: %s (titled and coloured by condition name).',strjoin(names,', '));
 if numeric
@@ -226,8 +246,10 @@ Y=r.(field); counts=cellfun(@numel,r.selected); offsets=[0 cumsum(counts)];
 for q=numel(counts):-1:1
     % EVERY saved neuron, same indices for every state row (TR, 2026-09-15:
     % half of four per type was too few; the stage now saves 25 per type).
-    % Half of the saved neurons (TR, 2026-09-16), the model's E / I colours.
-    n=max(1,round(counts(q)/2)); ids=offsets(q)+(1:n);
+    % Half of the saved neurons (TR, 2026-09-16), then about 60 percent of
+    % those (Tom, 2026-11-22, second round): the first 30 percent, 8 of 25.
+    % The model's E / I colours.
+    n=max(1,round(.3*counts(q))); ids=offsets(q)+(1:n);
     if q==1, cmap=excitatory_colormap(n); else, cmap=inhibitory_colormap(n); end
     lw=.8; if n>8, lw=.5; end
     for k=n:-1:1, plot(ax,r.t,Y(ids(k),:),'Color',cmap(k,:),'LineWidth',lw); end
