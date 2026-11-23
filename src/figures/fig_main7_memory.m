@@ -385,7 +385,7 @@ switch scale
         lim = [min(pos) max(pos)];
         dec = 10 .^ (ceil(log10(lim(1)) - 1e-9):floor(log10(lim(2)) + 1e-9));
         lbl = arrayfun(@(d) sprintf('10^{%d}', round(log10(d))), dec, 'UniformOutput', false);
-        if numel(dec) == 1          % the end of the range farther from the decade
+        if isscalar(dec)             % the end of the range farther from the decade
             [~, far] = max(abs(log10(lim) - log10(dec)));
             dec = [dec lim(far)]; lbl = [lbl {sprintf('%g', lim(far))}];
         elseif isempty(dec)

@@ -121,7 +121,7 @@ arguments
     cfg.inset_box (1,2) double {mustBePositive} = [1.3 1.05] % the inset's [width height], inches, hanging from its top right corner
     cfg.inset_marks (1,1) logical = true    % the letters E and I on the inset
     cfg.inset_mark_fs double = []           % [] = manuscript_style tick_fs
-    cfg.inset_mark_pull (1,1) double {mustBeInRange(cfg.inset_mark_pull, 0, 1, 'exclude-upper')} = 0   % share of the white gap between each letter and the curve taken out (0: as placed)
+    cfg.inset_mark_pull (1,1) double {mustBeNonnegative, mustBeLessThan(cfg.inset_mark_pull, 1)} = 0   % share of the white gap between each letter and the curve taken out (0: as placed)
     cfg.inset_clear (1,1) double {mustBeNonnegative} = 0.08   % inches from an inset's bottom to the top of the row below
     cfg.dashed_circle (1,1) logical = true  % the thin dashed circle (kappa times the bulk radius); false leaves it out
     cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
