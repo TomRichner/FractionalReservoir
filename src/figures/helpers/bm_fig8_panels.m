@@ -19,12 +19,15 @@ function P = bm_fig8_panels(fig, rect, R, opts)
 %    of it). After the step the same network WITHOUT the step continues
 %    dashed: the E rate and the full Jacobian's mode as they would have been
 %    with no input (the stage's no-stimulation continuation, R.nostim: same
-%    network, same noise; Tom, 2026-11-22, note 3), thin and in one quiet
-%    gray; the I rate and frozen-gain mode of the continuation are not drawn
-%    (Plan 3 review, the lead's decision 16: four dashed traces over the
-%    stimulated ones could not be followed). The adaptation-frozen arm is
-%    no longer drawn here (note 4; S10 B shows it). A light band marks the
-%    burst of the zoom; the stimulation moment of H is marked along the top
+%    network, same noise; Tom, 2026-11-22, note 3), thin, under the
+%    stimulated traces, each in the color of the line it continues, in a
+%    tight dash drawn by tight_dash (Tom, 2026-11-23, R9); the I rate and
+%    frozen-gain mode of the continuation are not drawn (Plan 3 review, the
+%    lead's decision 16: four dashed traces over the stimulated ones could
+%    not be followed). The adaptation-frozen arm is no longer drawn here
+%    (note 4; S10 B shows it). A thin gray box over the rate and mode axes
+%    marks the window of the zoom (R10; a light filled band until
+%    2026-11-23); the stimulation moment of H is marked along the top
 %    by a triangle in its color (the three moments of the zoom fall on one
 %    spot of the 100 s axis and are marked in the zoom only).
 % G, right (the zoom): that burst, from 1 s before its onset to 0.5 s
@@ -104,10 +107,17 @@ green = [0 0.62 0.45];                            % stimulation (Figure 8's)
 state_col = {[0 0 0], [0.17 0.45 0.75], [0.95 0.55 0.1], [0.72 0.1 0.12], green};
 state_name = {'Structure', 'Quiet', 'Before burst', 'Burst', 'Stimulation'};
 % The continuation after the step (Plan 3 review, the lead's decision 16):
-% two dashed traces only, the E rate and the full Jacobian's mode, thin and
-% in one quiet gray so that the stimulated traces stay readable; the I rate
-% and the frozen-gain mode without stimulation stay in the data, not drawn.
-nostim_col = [0.62 0.62 0.62]; nostim_w = 0.6;
+% two dashed traces only, the E rate and the full Jacobian's mode; the I
+% rate and the frozen-gain mode without stimulation stay in the data, not
+% drawn. Each in the color of the line it continues (E red, the mode
+% black), thin, under the stimulated traces, with a TIGHT dash (Tom,
+% 2026-11-23, R9: "a tighter dashed line with less gap between the
+% dashes"): MATLAB's '--' leaves a gap about as long as its dash, so the
+% pattern is drawn (tight_dash): dashes of dash_in inches, gaps a third of
+% that, measured along the curve as printed. Until then both were one
+% quiet gray in MATLAB's '--'.
+nostim_w = 0.55; dash_in = 0.045; gap_in = dash_in / 3;
+key_col = [0.35 0.35 0.35];                       % the key's dash: the pattern, not a line's color
 
 %% The burst of the zoom and the five states
 on = R.bursts.t_on; off = R.bursts.t_off;
@@ -181,47 +191,61 @@ plot(ax, I.t, I.u, '-', 'Color', [0.3 0.3 0.3], 'LineWidth', 0.8 * lw);
 ylim(ax, [min(I.u) - 0.05, max(I.u) + 0.1]);
 yticks(ax, unique(round([0 R.dc_level], 2)));
 ylabel(ax, 'Input', 'Rotation', 0, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');   % across: turned, it ran into the rate's name below
+t_lim = [I.t(1) I.t(end)];
 ax = P.ax_A(2);
-band(ax, zoom, [0 1]);
 after = N.t >= H;
-plot(ax, N.t(after), N.rate(after, 1), '--', 'Color', nostim_col, 'LineWidth', nostim_w * lw);
+xlim(ax, t_lim); ylim(ax, [0 1]);                % the dash is laid out on the final limits
+h_cont = tight_dash(ax, N.t(after), N.rate(after, 1), dash_in, gap_in, ec(1, :), nostim_w * lw);
 for q = 2:-1:1
     plot(ax, I.t, I.rate(:, q), '-', 'Color', ec(q, :), 'LineWidth', 0.8 * lw);
 end
-ylim(ax, [0 1]); yticks(ax, [0 1]);
+uistack(h_cont, 'bottom');                        % under the stimulated traces
+yticks(ax, [0 1]);
 % Across, as 'Input' above it: turned, it was taller than its axes and
 % crowded the top tick ('Mean rate' ran into the mode's name below at 9 in).
 ylabel(ax, 'Rate', 'Rotation', 0, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
 ax = P.ax_A(3);
 naf = N.full.t >= H;
 zl = mode_limits(re1, real(F.net), real(N.z1(after)), real(N.full.net(naf)));
-band(ax, zoom, zl);
+xlim(ax, t_lim); ylim(ax, zl);
 yline(ax, 0, ':', 'Color', [0 0 0], 'LineWidth', 0.6 * lw);
 plot(ax, I.t, re1, '-', 'Color', fg_col, 'LineWidth', fg_w * lw);
 c = F.is_coarse;
 plot(ax, F.t(c), real(F.net(c)), '-', 'Color', mode_col, 'LineWidth', mode_w * lw);
-plot(ax, N.full.t(naf), real(N.full.net(naf)), '--', 'Color', nostim_col, 'LineWidth', nostim_w * lw);
-ylim(ax, zl);
+h_cont = tight_dash(ax, N.full.t(naf), real(N.full.net(naf)), dash_in, gap_in, mode_col, nostim_w * lw);
+uistack(h_cont, 'bottom');
 ylabel(ax, 'Re \lambda (s^{-1})');
 xlabel(ax, 'Time (s)');
 for r = 1:3
-    xlim(P.ax_A(r), [I.t(1) I.t(end)]);
+    xlim(P.ax_A(r), t_lim);
     if r < 3; P.ax_A(r).XTickLabel = {}; end
 end
 % Only the stimulation moment on the 100 s axis: the three moments of the
-% zoom fall on one spot there and are marked in the zoom (Plan 3 review).
+% zoom fall on one spot there and are marked in the zoom (Plan 3 review;
+% Tom, 2026-11-23, R10).
 for q = 5
     plot(P.ax_A(3), t_state(q), zl(2), 'v', 'MarkerSize', 5.5, 'MarkerFaceColor', state_col{q}, ...
         'MarkerEdgeColor', 'none', 'Clipping', 'off');
 end
-% The key: proxies in the rate axes (a legend takes the objects of its own axes).
+% What the zoom shows: a thin gray box (an outline) over the rate and mode
+% axes of the 100 s run, from the zoom's start to its end (Tom, 2026-11-23,
+% R10: "a little box ... showing what is being zoomed in on. It could be a
+% thin gray box"; until then a light filled band in each axes).
+pr = P.ax_A(2).Position; pm = P.ax_A(3).Position;
+xb = pm(1) + (zoom - t_lim(1)) / diff(t_lim) * pm(3);
+P.zoom_box = annotation(fig, 'rectangle', 'Units', 'inches', ...
+    'Position', [xb(1), pm(2), diff(xb), pr(2) + pr(4) - pm(2)], ...
+    'Color', [0.45 0.45 0.45], 'LineWidth', 0.5 * lw, 'FaceColor', 'none', 'Tag', 'fig8_zoom_box');
+% The key: proxies in the rate axes (a legend takes the objects of its own
+% axes). "Without stimulation" is not a legend entry: a legend draws only
+% MATLAB's own dash, so its entry is drawn beside the legend with the
+% tight dash itself (after the legend is placed, below).
 ax = P.ax_A(2);
 hk = [plot(ax, NaN, NaN, '-', 'Color', ec(1, :), 'LineWidth', 0.8 * lw), ...
     plot(ax, NaN, NaN, '-', 'Color', ec(2, :), 'LineWidth', 0.8 * lw), ...
     plot(ax, NaN, NaN, '-', 'Color', fg_col, 'LineWidth', fg_w * lw), ...
-    plot(ax, NaN, NaN, '-', 'Color', mode_col, 'LineWidth', mode_w * lw), ...
-    plot(ax, NaN, NaN, '--', 'Color', nostim_col, 'LineWidth', 0.8 * lw)];
-P.legend = legend(ax, hk, {'E', 'I', 'Gains frozen', 'Full Jacobian', 'Without stimulation'}, ...
+    plot(ax, NaN, NaN, '-', 'Color', mode_col, 'LineWidth', mode_w * lw)];
+P.legend = legend(ax, hk, {'E', 'I', 'Gains frozen', 'Full Jacobian'}, ...
     'Orientation', 'horizontal', 'Box', 'off', 'FontSize', opts.annot_size, 'AutoUpdate', 'off');
 P.legend.ItemTokenSize = [18 8];
 
@@ -298,6 +322,18 @@ set([P.legend P.ax_A(1)], 'Units', 'inches');
 q = P.ax_A(1).Position;
 P.legend.Location = 'none';
 P.legend.Position(1:2) = [q(1) - 0.1, q(2) + q(4) + 0.03];
+% "Without stimulation" right of the legend, as one more entry of it: a
+% token of the legend's token length in the tight dash, then the name. In
+% an axes of its own, invisible, laid out in inches.
+lp = P.legend.Position;
+tok = P.legend.ItemTokenSize(1) / 72; pad = 0.08; txt_gap = 0.06;
+P.key_dash = axes(fig, 'Units', 'inches', 'Position', [lp(1) + lp(3), lp(2), tok + pad + 2, lp(4)], ...
+    'Visible', 'off', 'XLim', [0, tok + pad + 2], 'YLim', [0 lp(4)], 'Tag', 'fig8_key_dash', ...
+    'HitTest', 'off', 'PickableParts', 'none');
+hold(P.key_dash, 'on');
+tight_dash(P.key_dash, [pad, pad + tok], lp(4) / 2 * [1 1], dash_in, gap_in, key_col, nostim_w * lw);
+text(P.key_dash, pad + tok + txt_gap, lp(4) / 2, 'Without stimulation', 'FontSize', opts.annot_size, ...
+    'FontName', P.legend.FontName, 'VerticalAlignment', 'middle', 'HorizontalAlignment', 'left', 'Tag', 'fig8_key_text');
 P.info = struct('burst', b, 'zoom', zoom, 't_state', t_state, 'state_name', {state_name}, ...
     'z_right', cellfun(@(z) max(real(z)), zs), 'rad', rad, 're_lim', re_lim, 'im_lim', im_lim, ...
     'mode_lim', zl);
@@ -306,6 +342,28 @@ end
 %% ------------------------------------------------------------------------
 function k = nearest_index(t, tt)
 [~, k] = min(abs(t - tt));
+end
+
+function h = tight_dash(ax, x, y, dash_in, gap_in, col, width)
+% A dashed line of dash_in-inch dashes and gap_in-inch gaps along the curve
+% (x, y) as printed in ax, whose limits are final: the curve is resampled
+% every eighth of a dash along its length in inches, and the samples that
+% fall in a gap become NaN. One line object.
+u = ax.Units; ax.Units = 'inches'; p = ax.Position; ax.Units = u;
+x = double(x(:)); y = double(y(:));
+ok = isfinite(x) & isfinite(y); x = x(ok); y = y(ok);
+sx = p(3) / diff(ax.XLim); sy = p(4) / diff(ax.YLim);
+s = [0; cumsum(hypot(diff(x) * sx, diff(y) * sy))];
+keep = [true; diff(s) > 0];                       % repeated points carry no length
+s = s(keep); x = x(keep); y = y(keep);
+if numel(s) < 2
+    h = plot(ax, NaN, NaN, '-', 'Color', col, 'LineWidth', width, 'HandleVisibility', 'off'); return
+end
+sq = (0:dash_in / 8:s(end))';
+xq = interp1(s, x, sq); yq = interp1(s, y, sq);
+gap = mod(sq, dash_in + gap_in) > dash_in;
+xq(gap) = NaN; yq(gap) = NaN;
+h = plot(ax, xq, yq, '-', 'Color', col, 'LineWidth', width, 'HandleVisibility', 'off', 'Tag', 'tight_dash');
 end
 
 function band(ax, x, y)

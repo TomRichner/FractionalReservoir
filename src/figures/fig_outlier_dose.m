@@ -170,8 +170,9 @@ for p = 1:3
         y_hi = max(1.1, 1.08 * max(Y(:), [], 'omitnan'));
         drawnow; px = getpixelposition(ax);
         r = 0.6 * 8 / 72 * get(groot, 'ScreenPixelsPerInch') / px(4) * y_hi;   % a little over the marker radius, in data units
-        set(ax, 'YLim', [-r, y_hi], 'YTickMode', 'auto');
-        yt = ax.YTick; ax.YTick = yt(yt >= 0);
+        % Ticks in steps of 0.5 from 0 (Tom, 2026-11-23, R7: "0, 0.5, and 1"
+        % on C and D), so a 0-to-1 fraction or ratio reads 0, 0.5, 1.
+        set(ax, 'YLim', [-r, y_hi], 'YTick', 0:0.5:y_hi);
     end
     xlim(ax, x_lim);
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');

@@ -87,29 +87,47 @@ o = fig_burst_mode('run_dir', run_dir, 'out_dir', fullfile(out_dir, 'a'), 'visib
 % time course, with the no-stimulation continuation dashed; the
 % adaptation-frozen arm is not drawn.
 st = manuscript_style();
-assert(isequal([st.E_color; st.I_color], SRNNCellTypePairs.type_colors(2)), ...
-    'the manuscript''s E and I colors are the model''s two anchors');
+% Tom, 2026-11-23 (G2, "red and blue families everywhere"): E and I are the
+% first anchors of the many-neuron color maps (until then the model's two
+% type colors, SRNNCellTypePairs.type_colors). The I blue is MATLAB's
+% default blue, which inhibitory_colormap rounds to two places.
+e_map = excitatory_colormap(8); i_map = inhibitory_colormap(8);
+assert(isequal(st.E_color, e_map(1, :)) && max(abs(st.I_color - i_map(1, :))) < 0.005, ...
+    'the manuscript''s E and I colors are the first anchors of excitatory_colormap and inhibitory_colormap');
 lg = findall(o.figs, 'Type', 'legend');
 assert(isscalar(lg), 'one key on G');
 names = lg.String; h = lg.PlotChildren; ax = lg.Axes;
-assert(isequal(names, {'E', 'I', 'Gains frozen', 'Full Jacobian', 'Without stimulation'}), 'the key of G');
+assert(isequal(names, {'E', 'I', 'Gains frozen', 'Full Jacobian'}), 'the key of G');
 assert(isequal(h(1).Color, st.E_color) && isequal(h(2).Color, st.I_color), 'E and I traces in the manuscript_style colors');
 assert(~isequal(h(3).Color, h(4).Color) && h(3).LineWidth >= 2 * h(4).LineWidth, ...
     'gains frozen and full Jacobian differ in color and in width');
-assert(strcmp(h(5).LineStyle, '--'), 'the continuation without stimulation is dashed');
+% "Without stimulation" is the key's last entry, drawn beside the legend in
+% the tight dash (a legend can only show MATLAB's own '--'; R9).
+key_ax = findall(o.figs, 'Tag', 'fig8_key_dash');
+key_txt = findall(o.figs, 'Tag', 'fig8_key_text');
+assert(isscalar(key_ax) && isscalar(key_txt) && strcmp(key_txt.String, 'Without stimulation') && ...
+    isscalar(findall(key_ax, 'Tag', 'tight_dash')), 'the key''s "Without stimulation" in the tight dash');
 set(lg, 'Units', 'inches');
-top = max(arrayfun(@(a) a.Position(2) + a.Position(4), findall(o.figs, 'Type', 'axes')'));
+vis = findall(o.figs, 'Type', 'axes', 'Visible', 'on');
+top = max(arrayfun(@(a) a.Position(2) + a.Position(4), vis'));
 assert(lg.Position(2) >= top - 1e-6, 'the key sits above the time course');
-% Plan 3 review (the lead's decision 16): after the step only the E rate and
-% the full Jacobian's mode continue dashed, in one quiet gray.
-dashed = findall(ax, 'Type', 'line', 'LineStyle', '--');
-assert(numel(dashed) == 2, 'dashed in the rate axes: E without stimulation, and the key''s entry');
-assert(isequal(dashed(1).Color, dashed(2).Color) && isequal(h(5).Color, dashed(1).Color), ...
-    'the continuation and its key entry in one gray');
-mode_ax = findall(o.figs, 'Type', 'axes');
-mode_ax = mode_ax(arrayfun(@(a) startsWith(strjoin(cellstr(a.YLabel.String), ' '), 'Re'), mode_ax));
-n_mode_dash = sum(arrayfun(@(a) numel(findall(a, 'Type', 'line', 'LineStyle', '--')), mode_ax));
-assert(n_mode_dash == 1, 'one dashed mode (the full Jacobian''s) without stimulation, found %d', n_mode_dash);
+% Tom, 2026-11-23 (R9): after the step only the E rate and the full
+% Jacobian's mode continue, each in its own line's color, in a tight dash
+% (solid line objects broken by NaN gaps, Tag tight_dash), under the
+% stimulated traces; nothing in MATLAB's '--' any more.
+cont = findall(ax, 'Tag', 'tight_dash');
+assert(isscalar(cont) && isequal(cont.Color, st.E_color) && any(isnan(cont.YData)), ...
+    'the E rate without stimulation in the E color, tight-dashed');
+kids = allchild(ax); assert(kids(end) == cont, 'the continuation under the stimulated traces');
+mode_ax = vis(arrayfun(@(a) startsWith(strjoin(cellstr(a.YLabel.String), ' '), 'Re'), vis));
+cont_m = findall(mode_ax, 'Tag', 'tight_dash');
+assert(isscalar(cont_m) && isequal(cont_m.Color, [0 0 0]), ...
+    'one continued mode (the full Jacobian''s), in its own black, tight-dashed');
+assert(isempty(findall(o.figs, 'Type', 'line', 'LineStyle', '--')), 'no MATLAB dash left in G');
+% R10: the zoom's window as a thin gray outline over the 100 s run, no band.
+box = findall(o.figs, 'Tag', 'fig8_zoom_box');
+assert(isscalar(box) && strcmp(box.FaceColor, 'none'), 'a thin gray box shows the zoom''s window');
+assert(isempty(findall(mode_ax, 'Type', 'patch')), 'no filled band on the 100 s run');
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode.png')) && isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode_table.md')));
 ied = fullfile(run_dir, 'ied'); mkdir(ied);

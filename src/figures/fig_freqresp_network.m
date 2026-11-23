@@ -177,7 +177,7 @@ for w = 1:n_net
     for c = 1:3
         set(ax(w, c), 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out', ...
             'Layer', 'top', 'XScale', 'log', 'XLim', D.settings.f([1 end]), 'XTick', decade_ticks(D.settings.f), ...
-            'XMinorTick', 'off', 'YLim', [y_lo(c), y_hi(c)]);
+            'XMinorTick', 'off', 'YLim', [y_lo(c), y_hi(c)], 'YTick', few_ticks(y_lo(c), y_hi(c)));
         if w == n_net
             xlabel(ax(w, c), 'Frequency (Hz)', 'FontSize', st.label_fs);
         else
@@ -250,4 +250,16 @@ end
 
 function t = decade_ticks(f)
 t = 10 .^ (ceil(log10(f(1)) - 1e-9):floor(log10(f(end)) + 1e-9));
+end
+
+function t = few_ticks(lo, hi)
+% At most four y ticks, on the finest step of 1, 2 or 5 times a power of ten
+% that gives no more (Tom, 2026-11-23, G5: "fewer ticks", "three or four at most
+% where that still reads"). A 0-to-2 axis reads 0, 1, 2.
+e = floor(log10(max(hi - lo, eps)));
+steps = kron(10 .^ (e - 1:e + 1), [1 2 5]);
+for step = steps
+    t = step * (ceil(lo / step - 1e-9):floor(hi / step + 1e-9));
+    if numel(t) <= 4; return; end
+end
 end

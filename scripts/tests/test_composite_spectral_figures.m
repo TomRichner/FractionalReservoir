@@ -141,7 +141,12 @@ assert(numel(insets) == 6 && numel(marks) == 12, 'six insets, each with an E and
 assert(isequal(sort(get(marks, 'String')), sort(repmat({'E'; 'I'}, 6, 1))));
 st_ei = manuscript_style();
 ei = [st_ei.E_color; st_ei.I_color];
-assert(isequal(ei, SRNNCellTypePairs.type_colors(2)), 'the manuscript''s one E and one I color are the model''s two anchors');
+% Tom, 2026-11-23 (G2): the first anchors of the many-neuron color maps
+% (inhibitory_colormap rounds MATLAB's default blue to two places); until
+% then the model's type colors, SRNNCellTypePairs.type_colors.
+e_map = excitatory_colormap(8); i_map = inhibitory_colormap(8);
+assert(isequal(ei(1, :), e_map(1, :)) && max(abs(ei(2, :) - i_map(1, :))) < 0.005, ...
+    'the manuscript''s one E and one I color are the first anchors of excitatory_colormap and inhibitory_colormap');
 for k = 1:numel(marks)
     assert(isequal(marks(k).Color, ei(1 + strcmp(marks(k).String, 'I'), :)), 'the marks are in the manuscript_style E and I colors');
 end
