@@ -63,7 +63,7 @@ for k = 1:numel(ax)
     med = findobj(kids, 'flat', 'Tag', 'rate_bin_median');
     sc = find(arrayfun(@(h) isa(h, 'matlab.graphics.chart.primitive.Scatter'), kids));
     ok = ok && isscalar(med) && isequal(med.Color, [0 0 0]) && find(kids == med) < min(sc) && ...
-        isscalar(findobj(kids, 'flat', 'Tag', 'rate_bin_median_halo'));
+        isscalar(findall(ax(k), 'Tag', 'rate_bin_median_halo'));   % findall: the halo is kept out of the legend
 end
 n_fail = n_fail + check(ok, 'median per rate bin: black, on top of the points, with its halo, in every panel');
 close(out.figs);
