@@ -257,7 +257,32 @@ r = ied_stim_fig_combined('out_dir', out_dir, 'model_fig', model_fig, 'clinical_
     'clinical_files', c.clinical_files, 'run_name', c.run_name, 'sim', c.sim, 'burst_mode_dir', ied_dir, ...
     'tag', 'Fig_Main8_Stim', 'visible', false);
 fig_file = r.files(endsWith(r.files, '.fig'));
-o = struct('figs', openfig(fig_file{1}, 'invisible'), 'files', {r.files});
+fig = openfig(fig_file{1}, 'invisible');
+% openfig moves a reopened figure onto the screen (movegui 'onscreen'), and
+% the window it realizes is shrunk to the screen's height: Figure 8 is
+% 11.75 in, a 1090 px screen holds about 10.7, and its inch-placed axes then
+% hang below the bottom. A figure that is shrunk this way stays shrunk when
+% its Position is set back (figure_inches cannot restore it), so its
+% children are reparented (not copied, which resets the type of titles and
+% labels) into a new invisible figure of the saved size, which
+% no window manager has touched.
+sz = getappdata(fig, 'composite_size');
+if numel(sz) == 2
+    fig.Units = 'inches';
+    if any(abs(fig.Position(3:4) - sz) > 1e-6)
+        full = figure('Visible', 'off', 'Color', fig.Color, 'Units', 'inches', 'Position', [0.2 0.2 sz]);
+        setappdata(full, 'composite_size', sz);
+        kids = allchild(fig);
+        type = lower(string(get(kids, "Type")));
+        pane = type == "annotationpane";
+        follows = ismember(type, ["legend", "colorbar"]);   % they move with their axes
+        set(kids(~pane & ~follows), "Parent", full);
+        copyobj(kids(pane), full);              % the pane of letters cannot be reparented
+        close(fig);
+        fig = full;
+    end
+end
+o = struct('figs', fig, 'files', {r.files});
 end
 
 function o = draw_supp10(ied_dir, out_dir)
