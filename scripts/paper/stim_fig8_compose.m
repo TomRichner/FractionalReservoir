@@ -151,7 +151,7 @@ letter(fig, 'H', 0.05, P.ax_C(1), 0.3);
 if ~isfolder(out_dir); mkdir(out_dir); end
 fig.Position(3:4) = [W Ht];
 drawnow; true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
-save_figure_stable(out_dir, tag, fig);
+save_figure_stable(out_dir, tag, fig, canvas_export_args());   % the whole canvas, untrimmed
 prov = fullfile(out_dir, [tag '_provenance.md']);
 write_provenance(prov, r, B, clinical_note, model_note, W, Ht, changes);
 tbl = fullfile(out_dir, [tag '_table.md']);

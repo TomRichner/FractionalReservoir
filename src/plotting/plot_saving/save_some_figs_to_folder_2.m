@@ -1,4 +1,6 @@
-function [] = save_some_figs_to_folder_2(save_folder, save_name, fig_vec, fig_type)
+function [] = save_some_figs_to_folder_2(save_folder, save_name, fig_vec, fig_type, export_args)
+% export_args (optional, default {}): further exportgraphics options for the
+% PNG and SVG, e.g. canvas_export_args() to save the whole canvas untrimmed.
 
 if not(exist(save_folder,'dir'))
     mkdir(save_folder)
@@ -19,6 +21,9 @@ end
 
 if isempty(fig_type)
     fig_type = {'fig','png'};
+end
+if nargin < 5
+    export_args = {};
 end
     
 h = get(0,'children');
@@ -83,7 +88,7 @@ for i=fig_vec
         if any(strcmpi(fig_type,'png'))
             png_file = fullfile(save_folder, [save_name '_figure_' num2str(i) '.png']);
             if ~oversize
-                exportgraphics(fh, png_file, 'Resolution', png_resolution(fh))
+                exportgraphics(fh, png_file, 'Resolution', png_resolution(fh), export_args{:})
                 drawnow;                % a resize can arrive after the export returns
                 oversize = was_resized(fh, size_before);
             end
@@ -99,7 +104,7 @@ for i=fig_vec
             set(fh, 'Renderer', 'painters');
             svg_file = fullfile(save_folder, [save_name '_figure_' num2str(i) '.svg']);
             if ~oversize
-                exportgraphics(fh, svg_file, 'BackgroundColor', 'none', 'ContentType', 'vector');
+                exportgraphics(fh, svg_file, 'BackgroundColor', 'none', 'ContentType', 'vector', export_args{:});
                 drawnow;
                 oversize = was_resized(fh, size_before);
             end
