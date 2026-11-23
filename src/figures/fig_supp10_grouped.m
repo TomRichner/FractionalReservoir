@@ -4,9 +4,11 @@ function out = fig_supp10_grouped(cfg)
 %   out = FIG_SUPP10_GROUPED('run_dir', d, 'ied_run_dir', e)
 %
 % Four panels (figures_main_supp_appen.md, S10):
-%   A  the modular (IED) model: change of the mean firing rate, the SFA
-%      feedback and the depression 1 - b_1 under stimulation, one point per
-%      network from its block means, the median as a line. The numbers of
+%   A  the modular (IED) model: change of the SFA feedback and of the
+%      depression 1 - b_1 under stimulation, one point per network from its
+%      block means, the median as a line (two columns since 2026-11-23, Tom:
+%      "we can remove the rate column and just have SFA and Depression").
+%      The numbers of
 %      fig_ied_stim_blocks' supp_state panel, computed here from the same
 %      summary.mat of an ied_stim run (ied_run_dir) by the same rule.
 %   B  the bursting network (burst_mode's first seed) around the step
@@ -71,7 +73,7 @@ lw = st.line_lw; thin = 0.6 * st.line_lw;         % traces; connecting and refer
 % shows changed). The 13-in layout had been carried to 9 in by shares of
 % the width: A's category names turned by 30 degrees, B's two-line y label
 % ran into A, and B's key reached the canvas edge. Now the columns are
-% placed in inches: A wide enough for its three names upright, B with room
+% placed in inches: A wide enough for its names upright, B with room
 % for its two-line label; in the lower row C's two parts and D each with
 % room for their y labels.
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
@@ -80,8 +82,10 @@ y2 = 0.95; h2 = 2.6;                              % row 2 (C, D): axes bottom an
 hC2 = 2.05;                                       % C right: room above it for its key
 y1 = y2 + h2 + 1.1; h1 = 3.0;                     % row 1 (A, B): above row 2's letters and B's time axis
 Ht = y1 + h1 + 0.5;
-xL = 1.0; wL = 2.6;                               % A and C left
-xB = xL + wL + 1.45; wB = W - 0.3 - xB;           % B: room for its two-line y label, and right of it
+xL = 1.0; wL = 2.6;                               % C left
+wA = 2.0;                                         % A: two columns (SFA, depression) since 2026-11-23,
+                                                  % narrower than C left; B takes the room
+xB = xL + wA + 1.45; wB = W - 0.3 - xB;           % B: room for its two-line y label, and right of it
                                                   % for half its last tick label (the "65" touched the edge)
 wD = 1.6; xD = W - 0.15 - wD;                     % D
 wC2 = 1.6; xC2 = xD - 0.9 - wC2;                  % C right, its y label clear of C left
@@ -90,23 +94,23 @@ mk = @(p) axes(fig, 'Units', 'inches', 'Position', p);
 
 %% A: state change in the modular model
 S = L.rows; seeds = unique(S.seed, 'stable')'; nS = numel(seeds);
-state = zeros(nS, 3, 2);
+state = zeros(nS, 2, 2);
 for i = 1:nS
     for c = 1:2
         Tc = S(S.seed == seeds(i) & S.stim == (c == 2), :);
-        state(i, :, c) = [mean(Tc.mean_rate) mean(Tc.sfa_feedback) mean(Tc.depression)];
+        state(i, :, c) = [mean(Tc.sfa_feedback) mean(Tc.depression)];
     end
 end
 pct = 100 * (state(:, :, 2) ./ state(:, :, 1) - 1);
-axA = mk([xL y1 wL h1]); hold(axA, 'on');
+axA = mk([xL y1 wA h1]); hold(axA, 'on');
 rng(7, 'twister');
-for c = 1:3
+for c = 1:2
     jit = 0.18 * (rand(nS, 1) - 0.5);
     scatter(axA, c + jit, pct(:, c), 50, green, 'filled', 'MarkerFaceAlpha', 0.8);
     plot(axA, [c - 0.3, c + 0.3], median(pct(:, c)) * [1 1], '-', 'Color', 0.55 * green, 'LineWidth', 1.5 * lw);
 end
 yline(axA, 0, ':', 'Color', [0 0 0], 'LineWidth', st.axis_lw);
-xlim(axA, [0.5 3.5]); xticks(axA, 1:3); axA.XTickLabelRotation = 0; xticklabels(axA, {'Rate', 'SFA', 'Depression'});
+xlim(axA, [0.4 2.6]); xticks(axA, 1:2); axA.XTickLabelRotation = 0; xticklabels(axA, {'SFA', 'Depression'});
 ylabel(axA, 'Change with stimulation (%)');
 
 %% B: onset, adaptation intact against frozen
@@ -222,11 +226,12 @@ if cfg.save
     bm_write_table(tfile, B, [], 'Supplementary S10, panels B to D');
     fid = fopen(tfile, 'a'); guard = onCleanup(@() fclose(fid));
     fprintf(fid, ['\n## Panel A: modular model, change with stimulation (%%), per network from its block means\n\n' ...
-        'Source: `%s`.\n\n| Seed | Rate | SFA | Depression 1 - b_1 |\n|---|---|---|---|\n'], ied_file);
+        'Source: `%s`. Two columns, SFA and depression (the rate column was removed on 2026-11-23).\n\n' ...
+        '| Seed | SFA | Depression 1 - b_1 |\n|---|---|---|\n'], ied_file);
     for i = 1:nS
-        fprintf(fid, '| %d | %+.1f | %+.1f | %+.1f |\n', seeds(i), pct(i, :));
+        fprintf(fid, '| %d | %+.1f | %+.1f |\n', seeds(i), pct(i, :));
     end
-    fprintf(fid, '| median | %+.1f | %+.1f | %+.1f |\n', median(pct, 1));
+    fprintf(fid, '| median | %+.1f | %+.1f |\n', median(pct, 1));
     fprintf(fid, ['\nPanel B: network %s, window %s s; intact and frozen from t = %.3f s (the last sample ' ...
         'before the step). Drawn: mean E rate, mean (c/K) sum a of E, mean E-to-E depression factor.\n'], ...
         mat2str(R.seed), mat2str(win), Z.t_freeze);
