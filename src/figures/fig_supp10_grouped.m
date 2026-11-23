@@ -188,6 +188,14 @@ xlim(axD, [0.6 2.4]); xticks(axD, [1 2]); xticklabels(axD, {'Before', 'Step'});
 ylim(axD, [0 max([T.rho_before; T.rho_during]) * 1.1]);
 ylabel(axD, 'Synchrony \rho');
 
+%% Fewer ticks (Tom, 2026-11-23, G5): a short 0-to-1 axis gets 0 and 1, a
+% roomy one 0, 0.5, 1; the others at most four, on a 1-2-5 step.
+yticks(axB(1), [0 1]);                      % wide and short
+yticks(axC2, [0 0.5 1]);                    % tall
+for a = [axA axB(2) axC1 axD]
+    a.YTick = few_ticks(a.YLim);
+end
+
 %% Style, the keys above B and C, and the letters
 all_ax = [axA axB axC1 axC2 axD];
 set(all_ax, 'TickDir', 'out', 'Box', 'off', 'LineWidth', st.axis_lw, 'TitleFontSizeMultiplier', 1, ...
@@ -232,4 +240,14 @@ st = manuscript_style();
 annotation(fig, 'textbox', 'Units', 'inches', 'Position', [x_in, y_in, 0.5, 0.3], ...
     'String', ['(' ch ')'], 'FontSize', st.letter_fs, 'FontName', 'Helvetica', 'LineStyle', 'none', ...
     'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left', 'Margin', 0, 'Tag', 'letter');
+end
+
+function t = few_ticks(lim)
+% At most four ticks inside lim, on the finest step of 1, 2 or 5 times a
+% power of ten that gives no more.
+e = floor(log10(max(diff(lim), eps)));
+for step = kron(10 .^ (e - 1:e + 1), [1 2 5])
+    t = step * (ceil(lim(1) / step - 1e-9):floor(lim(2) / step + 1e-9));
+    if numel(t) <= 4; return; end
+end
 end
