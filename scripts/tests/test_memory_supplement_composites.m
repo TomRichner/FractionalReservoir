@@ -146,7 +146,7 @@ pulse = pulse(1:min(3, numel(pulse)));
 base = {'run_dir', run_dir, 'visible', false, 'verbose', 'near-none'};
 jobs = { ...   function, its own arguments, the panel letters, the file tag
     @fig_main7_memory,  {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'}, 'ABCDEF', 'Fig_Main7_Grouped'; ...
-    @fig_supp1_grouped, {'preset_name', chain_preset, 'pulse_conditions', pulse},              'ABC',    'Fig_Supp1_Grouped'; ...
+    @fig_supp1_grouped, {'preset_name', chain_preset, 'pulse_conditions', pulse},              'AB',     'Fig_Supp1_Grouped'; ...
     @fig_supp2_grouped, {'conditions', three},                                                 'ABC',    'Fig_Supp2_Grouped'; ...
     @fig_supp4_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp4_Grouped'; ...
     @fig_supp5_grouped, {'preset_name', reg_preset, 'conditions', three},                      'ABC',    'Fig_Supp5_Grouped'; ...
@@ -234,11 +234,74 @@ switch name
             end
             n = n + check(ok, sprintf('S1 (A): the %s column is titled ''%s'' and drawn in one colour that is no condition''s', want{1}, want{2}));
         end
+        % Tom's review of 2026-11-22 (Plan2_figure_feedback.md, S1): two
+        % panels. (B) is the two widest axes, one above the other.
+        set(ax, 'Units', 'pixels');
+        P = vertcat(ax.Position);
+        is_b = P(:, 3) > 1.5 * min(P(:, 3));
+        b = ax(is_b); a = ax(~is_b);
+        ok = numel(b) == 2 && abs(b(1).Position(1) - b(2).Position(1)) < 1 && abs(b(1).Position(3) - b(2).Position(3)) < 1 && ...
+            abs(b(1).Position(2) - b(2).Position(2)) > b(1).Position(4);
+        n = n + check(ok, 'S1 (B): the two step responses, one above the other');
+        % (A): every row on one y axis from 0, two ticks, the first at 0.
+        [~, ~, row] = unique(round(P(~is_b, 2)));
+        ok = numel(a) == 3 * numel(pulse) && max(row) == 3;
+        for r = 1:max(row)
+            g = a(row == r);
+            ok = ok && all(arrayfun(@(h) isequal(h.YLim, g(1).YLim) && h.YLim(1) == 0 && numel(h.YTick) == 2 && h.YTick(1) == 0, g));
+        end
+        n = n + check(ok, 'S1 (A): the columns of a row share one y axis that starts at 0, with ticks at 0 and one round value');
+        lg = findall(fig, 'Type', 'legend');
+        ok = isscalar(lg);
+        if ok
+            s = cellstr(lg.String);
+            kids = findall(lg.Axes, 'Type', 'line');
+            ok = any(strcmp(s, 'Rate r(t)')) && any(strcmp(s, 'Steady state')) && ~any(contains(s, 'Undepressed')) && ...
+                ~any(contains(s, 'n_a')) && any(strcmp(s, 'Reserve b_2 (chain)')) == any(strcmp({kids.Tag}, 'std_step_reserve'));
+            lg.Units = 'pixels';
+            ok = ok && lg.Position(1) >= b(1).Position(1) + b(1).Position(3);
+        end
+        n = n + check(ok, 'S1 (B): one key, beside the plots, with the entries they use (no undepressed line, no SFA entries)');
     case 'fig_supp2_grouped'
         % (B): the QR lines are neutral (gray), never a condition's hue.
         thin = findall(fig, 'Type', 'line', 'LineWidth', 0.8);
         c = vertcat(thin.Color);
         n = n + check(~isempty(c) && all(max(c, [], 2) - min(c, [], 2) < 1e-12), 'S2 (B): the QR local rates are drawn in grays');
+        % Tom's review of 2026-11-22 (Plan2_figure_feedback.md, S2).
+        lg = findall(fig, 'Type', 'legend');
+        all_keys = {};
+        for k = 1:numel(lg); all_keys = [all_keys, cellstr(lg(k).String)]; end %#ok<AGROW>
+        n = n + check(any(strcmp(all_keys, 'Slope 1.5 (SRA1 lower bound)')) && ~any(contains(all_keys, 'strong')), ...
+            'S2 (A): the 1.5 reference is the lower bound of SRA1');
+        band = findall(fig, 'Tag', 'numerics_slope2_band');
+        ok = numel(band) == 3;
+        for k = 1:numel(band)
+            kids = findall(band(k).Parent, 'Type', 'line');          % top of the stack first
+            data = kids(arrayfun(@(h) ~strcmp(h.Marker, 'none'), kids));
+            ok = ok && isequal(kids(end), band(k)) && band(k).LineWidth > 2 * max([data.LineWidth]) && min(band(k).Color) > 0.6;
+        end
+        n = n + check(ok, 'S2 (A): the slope-2 reference is a wide pale band behind the data, in every column');
+        b_key = lg(arrayfun(@(l) any(strcmp(l.String, 'QR \lambda_1')), lg));
+        n = n + check(isscalar(b_key) && isequal(b_key.String, {'Benettin local \lambda_1', 'Benettin \lambda_1', 'QR local \lambda_1', 'QR \lambda_1'}), ...
+            'S2 (B): four traces in the key, Benettin''s two and the QR method''s two');
+        ax_b = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.XLabel.String), ' '), 'Time (s)'), ax));
+        ok = numel(ax_b) == 3;
+        n_wide = 0;
+        for k = 1:numel(ax_b)
+            kids = findall(ax_b(k), 'Type', 'line');
+            is_thin = arrayfun(@(h) h.LineWidth == 0.8, kids);
+            ok = ok && nnz(is_thin) == 1 && nnz(~is_thin) == 1 && find(is_thin) < find(~is_thin) && ...   % the QR line over Benettin's
+                (isequal(ax_b(k).YLim, [-4 4]) || isequal(ax_b(k).YLim, [-15 5]));
+            n_wide = n_wide + isequal(ax_b(k).YLim, [-15 5]);
+        end
+        n = n + check(ok && n_wide == 1, 'S2 (B): one thin QR line on top of Benettin''s thick one; -15 to 5 without adaptation, plus or minus 4 with');
+        ax_c = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.XLabel.String), ' '), 'Snapshot'), ax));
+        ok = numel(ax_c) == 3 && all(arrayfun(@(h) isequal(h.YLim, [1e-12 1e-8]), ax_c)) && ...
+            isempty(findall(fig, 'Tag', 'numerics_jacobian_threshold')) && isempty(findall(ax_c, 'Type', 'constantline')) && ...
+            ~any(contains(lower(all_keys), 'threshold'));
+        n = n + check(ok, 'S2 (C): three panels on 1e-12 to 1e-8, named by snapshot, with no threshold in the panel or the key');
+        words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')), ax);
+        n = n + check(~any(contains(lower(words), 'state')), 'S2: no axis calls a sampled time point a state');
     case 'fig_supp4_grouped'
         n = n + check(isscalar(findall(fig, 'Tag', 'composite_crop_margin')), 'S4: a margin is kept under the bottom row''s x labels');
     case 'fig_supp5_grouped'

@@ -495,18 +495,22 @@ legend(ax2, h_id, {'undepressed  y = r'}, 'Box', 'off', 'FontSize', 9, 'Location
 
 % --- 3 (tiles 3-4): step response, depression ---
 ax3 = nexttile(tl, 3, [1 2]); hold(ax3, 'on');
-h3r = plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', ref_color);
+% The lines a key may name carry a Tag and a DisplayName (fig_supp1_grouped
+% builds its key of this panel from them); the legend below is unchanged.
+h3r = plot(ax3, t, r_t, '-', 'LineWidth', 1.5, 'Color', ref_color, 'Tag', 'std_step_rate', 'DisplayName', 'rate  r(t)');
 for k = numel(C):-1:1
     for j = 1:numel(cfg.step_rates)
         plot(ax3, seg_start([2*j 2*j+1]), C(k).step_ss.D([j j]), ':', ...
             'LineWidth', 1.2, 'Color', C(k).color);
     end
     if C(k).has_reserve
-        plot(ax3, t, C(k).s_t(:, 2), '--', 'LineWidth', 1, 'Color', C(k).color);
+        plot(ax3, t, C(k).s_t(:, 2), '--', 'LineWidth', 1, 'Color', C(k).color, ...
+            'Tag', 'std_step_reserve', 'DisplayName', 'reserve b_2 (chain)');
     end
-    plot(ax3, t, C(k).D_t, 'LineWidth', lw, 'Color', C(k).color);
+    plot(ax3, t, C(k).D_t, 'LineWidth', lw, 'Color', C(k).color, ...
+        'Tag', 'std_step_condition', 'DisplayName', tex_safe(C(k).title));
 end
-h3s = plot(ax3, NaN, NaN, ':', 'LineWidth', 1.2, 'Color', [0.3 0.3 0.3]);
+h3s = plot(ax3, NaN, NaN, ':', 'LineWidth', 1.2, 'Color', [0.3 0.3 0.3], 'Tag', 'std_step_steady', 'DisplayName', 'steady state');
 box(ax3, 'off'); set(ax3, 'FontSize', tick_fs);
 xlim(ax3, [0 t(end)]); ylim(ax3, [0 1.05]);
 xlabel(ax3, 'time (s)', 'FontSize', label_fs);
