@@ -113,8 +113,11 @@ assert(contains(tab, 'EEx1p5') && contains(tab, 'lambda_1'), 'its table');
 % Tom, 2026-11-22: eigenvalues left of the boundary gray, right of it
 % black, an outlier far to the right larger and green; what is not drawn is
 % said in the table; the diagrams' axis names and the added mode's title in
-% sentence case; letters by row (A to D); the rate r_i on one 0-to-1 axis;
-% the arrows Increasing SFA and Increasing STD in row D.
+% sentence case; letters by row (A to D); the arrows Increasing SFA and
+% Increasing STD in row D. Tom, 2026-11-23: row C back to the potential x_i
+% (the runaway column with a y range of its own), at most four y ticks;
+% row A as S3 (balanced + added where something was added); arrows on the
+% discs too.
 n_dots = @(hs) sum(arrayfun(@(h) numel(h.XData), hs));
 for k = 1:numel(o1.axes.spectrum)
     ax = o1.axes.spectrum(k);
@@ -129,8 +132,11 @@ for k = 1:numel(o1.axes.spectrum)
         all(arrayfun(@(h) h.CData(1, 2) > h.CData(1, 1) && h.CData(1, 2) > h.CData(1, 3), ho)), ...
         'column %d: black right of the boundary, gray left of it, the outliers green', k);
 end
-assert(all(arrayfun(@(ax) isequal(ax.YTick, [0 1]), o1.axes.activity)) && isequal(o1.y_lims, repmat([0 1], numel(o1.axes.activity), 1)), ...
-    'row C: the rate on one axis 0 to 1');
+assert(strcmp(o1.axes.activity(1).YLabel.String, 'x_i') && all(arrayfun(@(ax) numel(ax.YTick) <= 4, o1.axes.activity)), ...
+    'row C: the potential x_i, at most four ticks');
+assert(isequal(isgraphics(o1.axes.added), o1.add_clim > 0) && ...
+    numel(findall(o1.figs, 'Tag', 'plus')) == nnz(o1.add_clim > 0), 'row A: an added image and a plus sign where something was added');
+assert(~isempty(findall(o1.figs, 'Tag', 'arrow_sfa_discs')) && ~isempty(findall(o1.figs, 'Tag', 'text_std_discs')), 'row D: the arrows on the discs');
 assert(all(arrayfun(@(L) ~isempty(findall(o1.figs, 'Tag', ['letter_' L])), 'ABCD')), 'letters by row, A to D');
 assert(~isempty(findall(o1.figs, 'Tag', 'text_sfa')) && ~isempty(findall(o1.figs, 'Tag', 'arrow_std')), 'row D: the arrows');
 assert(contains(tab, 'Eigenvalues right of the boundary') && ...

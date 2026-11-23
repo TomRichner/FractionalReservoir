@@ -35,18 +35,30 @@ function out = fig_main1_concept_networks(cfg)
 %          bulk, farther from -1/tau_d than R/tau_d + 0.2 of the largest
 %          radius, and right of the bulk's right edge) is drawn larger and
 %          green (outlier_color), whichever side of the boundary it is on.
-%   C      the rate r_i (after the nonlinearity, 0 to 1) of n_E E and n_I I
-%          neurons of the unadapted run over t_window, in the E and I
-%          colors, on ONE axis 0 to 1 in all columns (ticks 0 and 1, labels
-%          on the first column; until 2026-11-22 the potential x_i, whose
-%          runaway column needed an axis of its own); a time scale bar under
-%          the first column
+%          A network that is the balanced matrix plus something (E-to-E
+%          x 1.5, the added rotating mode) is shown as S3 shows it (Tom,
+%          2026-11-23): the balanced matrix, a plus sign and the matrix
+%          that was added (the stage's added_part), the added one on a
+%          color range of its own (its largest |entry| on the piece). A
+%          network to which nothing was added shows one image. The tiles
+%          are therefore of different widths: laid out in a row of their
+%          own, equal gaps between them, not on the columns below.
+%   C      the dendritic potential x_i of n_E E and n_I I neurons of the
+%          unadapted run over t_window, in the E and I colors; one y range
+%          for the columns whose traces fit within 1.5 times the median
+%          span, a range of its own for a column that does not (the
+%          runaway); a time scale bar under the first column. (From
+%          2026-11-22 to 11-23 the rate r_i on one 0-to-1 axis; Tom: "Change
+%          it back to what you had before.")
 % Column headings (cfg.titles) above row A.
 %
 %   D      the adaptation diagrams (draw_adaptation_concepts), two pairs
 %          of a response curve and its discs, each pair close together,
 %          with the arrows 'Increasing SFA' and 'Increasing STD' of the
-%          first concept figure: SFA shifts the response curve, depression
+%          first concept figure, over the response curves and (Tom,
+%          2026-11-23) on the discs too; the SFA discs larger and the
+%          curves scaled down (sfa_disc_w, sig_scale). SFA shifts the
+%          response curve, depression
 %          scales it; their product is the neuron's gain, which scales its
 %          column of the weights.
 %
@@ -79,6 +91,13 @@ arguments
     cfg.left_gray (1,1) double {mustBeGreaterThanOrEqual(cfg.left_gray, 0), mustBeLessThanOrEqual(cfg.left_gray, 1)} = 0.62   % gray level of the dots left of the boundary
     cfg.outlier_color (1,3) double = [0 0.6 0]   % an outlier far to the right
     cfg.scale_bar_s (1,1) double  = 2
+    cfg.sig_scale (1,1) double    = 0.86  % row D: the response curves' size, of 1.85 x 1.6 in
+    cfg.sfa_disc_w (1,1) double   = 1.9   % row D: inches, the SFA discs' axes (the STD discs' 1.45)
+    cfg.image_max (1,1) double    = 1.75  % inches, the largest a weight image may be (row A)
+    cfg.plus_w (1,1) double       = 0.28  % inches between the balanced and the added image, for the plus sign
+    cfg.rowA_gap (1,1) double     = 0.3   % inches, the least gap between the tiles of row A
+    cfg.rowA_left (1,1) double    = 0.6   % inches, where row A starts
+    cfg.rowA_right (1,1) double   = 0.12  % inches, margin right of row A
     cfg.fig_size double           = []   % [width height] inches; [] (the default): manuscript_style's canvas_w by what the rows need
 end
 
@@ -156,10 +175,30 @@ if ~isempty(cfg.fig_size); W_in = cfg.fig_size(1); end
 left = 0.75; right = 0.2; col_gap = 0.3;
 pw = (W_in - left - right - (m - 1) * col_gap) / m;
 ph_spec = pw * diff(g.y_lim) / diff(g.x_lim);
-img = min(1.75, pw);
+% Row A: a tile per column, one image, or the balanced matrix + the added
+% one; the tiles are of different widths, so they are laid out on their
+% own between rowA_span. Each tile has a slot as wide as its images or its
+% title, whichever is wider (two single images side by side would otherwise
+% have their titles run into each other), at least rowA_gap between slots;
+% the images take the largest size that lets the slots fit (image_max at
+% most), and the spare width is shared equally between the gaps.
+has_add = arrayfun(@(x) isfield(x, 'added_part') && ~isempty(x.added_part) && any(x.added_part.W(:)), X);
+rowA_span = [cfg.rowA_left, W_in - cfg.rowA_right];
+title_w = text_widths(titles, fs);
+img = cfg.image_max;
+slot = @(im) max(im * (1 + has_add) + cfg.plus_w * has_add, title_w);
+while img > 0.3 && sum(slot(img)) + (m - 1) * cfg.rowA_gap > diff(rowA_span)
+    img = img - 0.01;
+end
+tile_w = img * (1 + has_add) + cfg.plus_w * has_add;
+slot_w = slot(img);
+gapA = (diff(rowA_span) - sum(slot_w)) / max(m - 1, 1);
+slot_x = rowA_span(1) + [0, cumsum(slot_w(1:end - 1) + gapA)];
+tile_x = slot_x + (slot_w - tile_w) / 2;
 ph_act = 1.3;
-yB = 0.62; hB = 1.6;                        % row D
-y_act = yB + hB + 0.95;                     % room for the time scale bar and, above row D, the arrows' words
+yB = 0.62; hB = 1.6;                        % row D: the discs' boxes; the response curves are sig_scale of it
+top_D = yB + max(hB * cfg.sig_scale + 0.4, hB);   % the top of row D: the words over the curves, or the discs
+y_act = top_D + 0.55;                       % room for the time scale bar
 y_spec = y_act + ph_act + 0.45;
 y_img = y_spec + ph_spec + 0.3;
 H_in = y_img + img + 0.5;
@@ -176,18 +215,34 @@ if isempty(w_clim)
     for k = 1:m; s = X(k).sample.W; v = [v; abs(s(s ~= 0))]; end %#ok<AGROW>
     w_clim = prctile(v, 95);
 end
-ax_img = gobjects(1, m);
+ax_img = gobjects(1, m); ax_add = gobjects(1, m);
+add_clim = zeros(1, m);
 for k = 1:m
-    ax_img(k) = axes(fig, 'Units', 'inches', 'Position', [x0(k) + (pw - img) / 2, y_img, img, img]);
-    draw_weight_image(ax_img(k), X(k).sample.W, X(k).sample.type, w_clim, 'divider', true, 'line_width', st.axis_lw);
-    ht = title(ax_img(k), titles{k}, 'FontSize', fs, 'FontWeight', 'normal', 'Color', 'k');
-    % A title wider than its image that would run past the image's right
-    % edge ("Added rotating mode" reached the canvas edge; Plan 3 fix X2)
-    % ends at that edge instead of being centered over the image.
-    ht.Units = 'inches'; e = ht.Extent;
-    if k == m && e(1) + e(3) > img
-        ht.HorizontalAlignment = 'right'; ht.Position(1) = img;
+    if has_add(k)
+        % the balanced matrix + the added one, on its own color range (as S3)
+        a = X(k).added_part;
+        add_clim(k) = max(abs(a.W(:)));
+        ax_img(k) = axes(fig, 'Units', 'inches', 'Position', [tile_x(k), y_img, img, img]);
+        draw_weight_image(ax_img(k), a.base_W, X(k).sample.type, w_clim, 'divider', true, 'line_width', st.axis_lw);
+        ax_add(k) = axes(fig, 'Units', 'inches', 'Position', [tile_x(k) + img + cfg.plus_w, y_img, img, img], 'Tag', 'added');
+        draw_weight_image(ax_add(k), a.W, X(k).sample.type, add_clim(k), 'divider', true, 'line_width', st.axis_lw);
+    else
+        ax_img(k) = axes(fig, 'Units', 'inches', 'Position', [tile_x(k), y_img, img, img]);
+        draw_weight_image(ax_img(k), X(k).sample.W, X(k).sample.type, w_clim, 'divider', true, 'line_width', st.axis_lw);
     end
+    % The title (and the plus sign) on an invisible axes over the whole tile.
+    ax_t = axes(fig, 'Units', 'inches', 'Position', [tile_x(k), y_img, tile_w(k), img], ...
+        'XLim', [0 tile_w(k)], 'YLim', [0 img], 'Visible', 'off', 'Tag', 'tile_title');
+    ht = title(ax_t, titles{k}, 'FontSize', fs, 'FontWeight', 'normal', 'Color', 'k', 'Visible', 'on');
+    if has_add(k)
+        text(ax_t, img + cfg.plus_w / 2, img / 2, '+', 'FontSize', fs, 'HorizontalAlignment', 'center', ...
+            'VerticalAlignment', 'middle', 'Tag', 'plus');
+    end
+    % A title wider than its tile kept inside the canvas: it ends at the
+    % canvas edge (less 0.05 in) instead of being centered over the tile.
+    ht.Units = 'inches'; e = ht.Extent;
+    over = tile_x(k) + e(1) + e(3) - (W_in - 0.05);
+    if over > 0; ht.Position(1) = ht.Position(1) - over; end
     ht.Units = 'data';
 end
 
@@ -269,13 +324,13 @@ for k = 1:m
     set(ax, 'XLim', cp.x_lim, 'YLim', cp.y_lim);
 end
 
-%% Row C: activity, the rate r_i of each kept neuron on one 0-to-1 axis
-% (Tom, 2026-11-22: x_i of the runaway needed an axis of its own; the rate,
-% after the nonlinearity, is bounded, so one axis serves every column)
+%% Row C: activity, the dendritic potential x_i (Tom, 2026-11-23: back from the rate r_i);
+% one y range for the columns whose traces fit within 1.5 times the median
+% span, a range of its own for a column that does not (the runaway)
 nE = min(cfg.n_E, nnz([X(1).trace_type] == 1)); nI = min(cfg.n_I, nnz([X(1).trace_type] == 2));
 colE = excitatory_colormap(max(nE, 1)); colI = inhibitory_colormap(max(nI, 1));
-ax_act = gobjects(1, m);
-yl = [0 1];
+spans = zeros(m, 2);
+sel = cell(1, m);
 for k = 1:m
     tt = X(k).t;
     in_w = tt >= cfg.t_window(1) & tt <= cfg.t_window(2);
@@ -284,51 +339,68 @@ for k = 1:m
             cfg.t_window, tt(end));
     end
     iE = find(X(k).trace_type == 1, nE); iI = find(X(k).trace_type == 2, nI);
+    sel{k} = struct('in_w', in_w, 'iE', iE, 'iI', iI);
+    v = X(k).x_trace([iE; iI], in_w);
+    spans(k, :) = [min(v(:)), max(v(:))];
+end
+width = diff(spans, 1, 2);
+own = width > 1.5 * median(width);
+shared = [min(spans(~own, 1)), max(spans(~own, 2))];
+ax_act = gobjects(1, m);
+y_lims = zeros(m, 2);
+for k = 1:m
     ax = axes(fig, 'Units', 'inches', 'Position', [x0(k) + 0.25, y_act, pw - 0.25, ph_act]);
     ax_act(k) = ax;
     hold(ax, 'on');
-    tt = tt(in_w);
-    for j = 1:numel(iE)
-        plot(ax, tt, X(k).rate_trace(iE(j), in_w), '-', 'Color', colE(j, :), 'LineWidth', 0.8);
+    s = sel{k};
+    tt = X(k).t(s.in_w);
+    for j = 1:numel(s.iE)
+        plot(ax, tt, X(k).x_trace(s.iE(j), s.in_w), '-', 'Color', colE(j, :), 'LineWidth', 0.8);
     end
-    for j = 1:numel(iI)
-        plot(ax, tt, X(k).rate_trace(iI(j), in_w), '-', 'Color', colI(j, :), 'LineWidth', 0.8);
+    for j = 1:numel(s.iI)
+        plot(ax, tt, X(k).x_trace(s.iI(j), s.in_w), '-', 'Color', colI(j, :), 'LineWidth', 0.8);
     end
-    set(ax, 'XLim', cfg.t_window, 'YLim', yl + [-0.02 0.02], 'FontSize', fs, 'LineWidth', st.axis_lw, 'Box', 'off', ...
-        'TickDir', 'out', 'YTick', [0 1]);
+    if own(k); yl = spans(k, :); else; yl = shared; end
+    yl = nice_lim(yl);
+    y_lims(k, :) = yl;
+    set(ax, 'XLim', cfg.t_window, 'YLim', yl, 'FontSize', fs, 'LineWidth', st.axis_lw, 'Box', 'off', ...
+        'TickDir', 'out', 'YTick', nice_ticks(yl));
     ax.XAxis.Visible = 'off';
     if k == 1
-        ylabel(ax, 'r_i', 'FontSize', st.label_fs, 'Interpreter', 'tex');
+        ylabel(ax, 'x_i', 'FontSize', st.label_fs, 'Interpreter', 'tex');
         % the time scale bar
         xb = cfg.t_window(1) + [0 cfg.scale_bar_s];
-        yb = yl(1) - 0.1 * diff(yl);
+        yb = yl(1) - 0.08 * diff(yl);
         plot(ax, xb, [yb yb], 'k-', 'LineWidth', 2.5, 'Clipping', 'off');
         text(ax, mean(xb), yb - 0.04 * diff(yl), sprintf('%g s', cfg.scale_bar_s), 'FontSize', fs, ...
             'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
-    else
-        ax.YTickLabel = {};                  % one axis for the row: its labels on the first column
     end
 end
-y_lims = repmat(yl, m, 1);
 
 %% Row D: the adaptation diagrams, two pairs (response curves, discs)
 % Inches from the left margin: each response curve with its discs close
 % beside it; the second pair starts where the first pair's 'Re' and the
-% second curve's axis name both have room.
-sig_w = 1.85; c_gap = 0.12; c_w = 1.4; pair_gap = 0.83;
+% second curve's axis name both have room. Tom, 2026-11-23: the SFA discs
+% a bit bigger (sfa_disc_w), both response curves scaled down in
+% proportion (sig_scale of their 1.85 x 1.6 in), and the left pair given
+% more room; the discs carry arrows of their own (draw_adaptation_concepts).
+sig_w = 1.85 * cfg.sig_scale; sig_h = hB * cfg.sig_scale;
+c_gap = 0.12; pair_gap = 0.83;
+c_w = [cfg.sfa_disc_w, 1.45];
 xD = left + [0, sig_w + c_gap];
-xD = [xD, xD + sig_w + c_gap + c_w + pair_gap];
-wD = [sig_w c_w sig_w c_w];
+xD = [xD, xD(2) + c_w(1) + pair_gap + [0, sig_w + c_gap]];
+wD = [sig_w c_w(1) sig_w c_w(2)];
+hD = [sig_h hB sig_h hB];
 in2n = @(x, y, w, h) [x / W_in, y / H_in, w / W_in, h / H_in];
 posB = zeros(4, 4);
-for k = 1:4; posB(k, :) = in2n(xD(k), yB, wD(k), hB); end
+for k = 1:4; posB(k, :) = in2n(xD(k), yB, wD(k), hD(k)); end
 A = draw_adaptation_concepts(fig, preset_name, posB, 'arrows', true, 'font_size', fs);
 set(findall(A.axes, '-property', 'FontSize'), 'FontSize', fs);
 for k = 1:numel(A.axes); set([A.axes(k).XLabel, A.axes(k).YLabel], 'FontSize', st.label_fs); end   % axis names at label_fs
 
 %% Panel letters, one per row
 lab = axes(fig, 'Position', [0 0 1 1], 'XLim', [0 1], 'YLim', [0 1], 'Visible', 'off', 'Tag', 'panel_letters');
-letter_y = [H_in - 0.1, y_spec + ph_spec + 0.25, y_act + ph_act + 0.4, yB + hB + 0.6];
+letter_y = [H_in - 0.1, y_spec + ph_spec + 0.25, y_act + ph_act + 0.4, top_D + 0.2];
 for k = 1:4
     L = char('A' + k - 1);
     text(lab, 0.08 / W_in, letter_y(k) / H_in, ['(' L ')'], 'FontSize', st.letter_fs, 'VerticalAlignment', 'top', ...
@@ -339,7 +411,7 @@ end
 fig_tag = 'Fig_Main1_Concept_Networks';
 out = struct('figs', fig, 'files', {{}}, 'source', C.file, 'window', g, 'far', {far}, 'w_clim', w_clim, ...
     'y_lims', y_lims, 'n_left', n_left, 'n_far', n_far, 'n_crossed', n_crossed, 'n_out', n_out, 'titles', {titles}, ...
-    'axes', struct('image', ax_img, 'spectrum', ax_spec, 'activity', ax_act, 'concepts', A.axes));
+    'add_clim', add_clim, 'axes', struct('image', ax_img, 'added', ax_add, 'spectrum', ax_spec, 'activity', ax_act, 'concepts', A.axes));
 if cfg.save
     save_figure_stable(out_dir, fig_tag, fig);
     out.files = existing_outputs(out_dir, fig_tag);
@@ -347,7 +419,7 @@ if cfg.save
     fid = fopen(fullfile(out_dir, table_name), 'w');
     if fid > 0
         closer = onCleanup(@() fclose(fid));
-        write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, n_out, cfg, A);
+        write_table(fid, fig_tag, C, X, titles, g, far, w_clim, add_clim, y_lims, n_left, n_far, n_crossed, n_out, cfg, A);
         clear closer
         out.files{end + 1} = table_name;
     end
@@ -372,20 +444,61 @@ for k = 1:m
 end
 end
 
-function write_table(fid, fig_tag, C, X, titles, g, far, w_clim, n_left, n_far, n_crossed, n_out, cfg, A)
+function yl = nice_lim(yl)
+step = nice_step(diff(yl) / 4);
+yl = [floor(yl(1) / step) * step, ceil(yl(2) / step) * step];
+if diff(yl) == 0; yl = yl + [-1 1]; end
+end
+
+function t = nice_ticks(yl)
+% The finest round step (1, 2 or 5 times a power of ten) that gives at most
+% four ticks (Tom, 2026-11-23: fewer ticks).
+step = nice_step(diff(yl) / 4);
+t = (ceil(yl(1) / step):floor(yl(2) / step)) * step;
+while numel(t) > 4
+    p = 10 ^ floor(log10(step)); q = round(step / p);
+    if q < 2; step = 2 * p; elseif q < 5; step = 5 * p; else; step = 10 * p; end
+    t = (ceil(yl(1) / step):floor(yl(2) / step)) * step;
+end
+end
+
+function w = text_widths(strs, fs)
+% Widths in inches of single-line texts at font size fs, measured on a
+% hidden figure.
+f = figure('Visible', 'off', 'Units', 'inches', 'Position', [0 0 9 2]);
+cleanup = onCleanup(@() close(f));
+ax = axes(f, 'Units', 'inches', 'Position', [0 0 9 2], 'Visible', 'off');
+w = zeros(1, numel(strs));
+for k = 1:numel(strs)
+    h = text(ax, 0, 0, strs{k}, 'FontSize', fs, 'Units', 'inches');
+    w(k) = h.Extent(3);
+    delete(h);
+end
+end
+
+function s = nice_step(raw)
+p = 10 ^ floor(log10(raw));
+q = raw / p;
+if q >= 5; s = 5 * p; elseif q >= 2; s = 2 * p; else; s = p; end
+end
+
+function write_table(fid, fig_tag, C, X, titles, g, far, w_clim, add_clim, y_lims, n_left, n_far, n_crossed, n_out, cfg, A)
 fprintf(fid, '# %s\n\n', fig_tag);
 fprintf(fid, 'Source: `%s` (stage concept_examples). Preset `%s`, condition `%s` (no adaptation).\n\n', ...
     C.file, C.settings.preset_name, C.settings.condition);
 fprintf(fid, ['(A) A %d x %d piece of each network''s weights (the submatrix on %d E and %d I ' ...
     'neurons drawn with image seed %d), color range +-%.4g (95th percentile of the nonzero |w| of the four ' ...
-    'pieces unless given). (B) The eigenvalues of J = (-I + W)/tau_d with every gain 1, in 1/s; gray circle ' ...
+    'pieces unless given); a network that is the balanced matrix plus an added part is drawn as the balanced ' ...
+    'matrix + the added matrix, the latter on a range of its own (per column, 0 where nothing was added: %s). ' ...
+    '(B) The eigenvalues of J = (-I + W)/tau_d with every gain 1, in 1/s; gray circle ' ...
     'radius R/tau_d about -1/tau_d, R the structural bulk radius of the drawn matrix. Window Re [%g, %g], ' ...
     'Im [%g, %g] 1/s, one scale in all columns. Gray: left of the stability boundary (Re <= 0); black: right of it; ' ...
     'larger and green: an outlier far to the right (clear of the bulk and right of its edge; per column %s). ' ...
-    '(C) The rate r_i (0 to 1) of %d E and %d I neurons of the ' ...
-    'unadapted run (noise of the preset), t in [%g, %g] s, from the class''s initial state, one axis 0 to 1.\n\n'], ...
+    '(C) The dendritic potential x_i of %d E and %d I neurons of the unadapted run (noise of the preset), ' ...
+    't in [%g, %g] s, from the class''s initial state; one y range for the columns whose traces fit within 1.5 ' ...
+    'times the median span, a range of its own for a column that does not (y ranges per column: %s).\n\n'], ...
     C.settings.n_image, C.settings.n_image, C.settings.n_image / 2, C.settings.n_image / 2, C.settings.image_seed, ...
-    w_clim, g.re_lim, g.im_lim, mat2str(n_out), cfg.n_E, cfg.n_I, cfg.t_window);
+    w_clim, mat2str(add_clim, 4), g.re_lim, g.im_lim, mat2str(n_out), cfg.n_E, cfg.n_I, cfg.t_window, mat2str(y_lims, 4));
 fprintf(fid, ['| Column | Network | Level of chaos | Seed | n | R/tau_d (1/s) | Rightmost (1/s) | Added mode (1/s) | ' ...
     'Beyond the break | Left of the window | Density EE, EI, IE, II | Nonzero mean EE, EI, IE, II |\n']);
 fprintf(fid, '|---|---|---|---|---|---|---|---|---|---|---|---|\n');
