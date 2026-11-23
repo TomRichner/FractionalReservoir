@@ -3,6 +3,7 @@ function out = fig_outlier_dwell(cfg)
 %
 %   out = FIG_OUTLIER_DWELL('run_dir', d)
 %   out = FIG_OUTLIER_DWELL('run_dir', d, 'band', 'range')
+%   out = FIG_OUTLIER_DWELL('run_dir', d, 'networks', {'reference', 'EEx1p5'})
 %
 % Draws what the opt-in stage outlier_spectra saved (FD-040), through
 % outlier_fig_data. Reads one run directory, or the index file given as
@@ -11,7 +12,16 @@ function out = fig_outlier_dwell(cfg)
 % seeds and then we could plot the median for each. And we would need to
 % run it for much longer"). Supplementary candidate.
 %
-% ONE PANEL PER NETWORK (the reference and E-to-E x 1.5). An EXCURSION is
+% THE REFERENCE NETWORK ONLY, by default (Tom, 2026-11-23, FD-057: "I don't
+% think we need the E to E x 1.5 panel in this plot. We can remove that.
+% The current 200 s excursion time figure for the reference network
+% answers the question sufficiently for me."). cfg.networks names others,
+% one panel each, side by side on the same canvas width; the stage gives
+% the long window (outlier_spectra_long_networks) to the reference only,
+% so another network's curves are over its own, usually shorter, window
+% (the table gives each window). The figure is manuscript_style canvas_w
+% wide whatever the number of panels; one panel is drawn a little less
+% tall than two, so its aspect stays that of a plot. An EXCURSION is
 % a run of consecutive sampled states at which the rightmost eigenvalue
 % has positive real part (ospec_excursions); the curves are the fraction
 % of excursions that last longer than the time on the horizontal axis
@@ -69,7 +79,7 @@ arguments
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
-    cfg.networks                  = {'reference', 'EEx1p5'}
+    cfg.networks                  = {'reference'}    % Tom, 2026-11-23 (FD-057): the reference only
     cfg.conditions                = {}
     cfg.seed double               = []    % unused: every seed enters the medians
     cfg.band (1,:) char {mustBeMember(cfg.band, {'iqr', 'range', 'none'})} = 'iqr'
@@ -108,7 +118,8 @@ end
 
 %% Draw
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
-fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 5.6 * n_net + 0.6, 4.6], 'Visible', vis);
+fig_h = 4.6; if n_net == 1; fig_h = 4.2; end             % one panel: the canvas width, a little less tall
+fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 st.canvas_w, fig_h], 'Visible', vis);
 tl = tiledlayout(fig, 1, n_net, 'TileSpacing', 'compact', 'Padding', 'compact');
 x_lim = [dt_min / 1.25, 1.6 * window_max];
 for w = 1:n_net
@@ -239,8 +250,6 @@ end
 
 function write_table(fid, fig_tag, F, C, series_txt, cfg)
 [n_net, n_cond, ~] = size(C);
-any_curve = C(~cellfun(@isempty, C));
-windows = unique(cellfun(@(q) q.window_s, any_curve));
 n_seed = size(F.seeds, 1);
 switch cfg.band
     case 'iqr';   band_txt = 'Bands: the 25th to 75th percentile across seeds of the per-seed estimates.';
@@ -265,7 +274,7 @@ else
         'length; its dwell time is longer than the window, and no more is known): ' strjoin(whole, '; ') '.'];
 end
 fprintf(fid, '# %s\n\n', fig_tag);
-fprintf(fid, ['One panel per network (%s). An excursion is a run of consecutive sampled states at which the rightmost ' ...
+fprintf(fid, ['One panel per network drawn (%s; by default the reference only, Tom 2026-11-23). An excursion is a run of consecutive sampled states at which the rightmost ' ...
     'eigenvalue has positive real part. The curves give the fraction of excursions that last longer than the time on ' ...
     'the horizontal axis (log). Colors are the conditions (%s). DASHED, thin: the rightmost eigenvalue of the ' ...
     'frozen-gain effective connectivity (slow variables held). SOLID, thick: the rightmost network mode of the full ' ...
@@ -276,9 +285,8 @@ fprintf(fid, ['One panel per network (%s). An excursion is a run of consecutive 
     'excursions contribute. A curve that ends above zero ends in a right-pointing TRIANGLE: the excursions still going ' ...
     'there were cut off by the window. A condition without a curve has no excursion in any seed. %s\n\n'], ...
     strjoin(F.networks, ', '), strjoin(F.titles, ', '), band_txt, whole_txt);
-fprintf(fid, ['Length of the series %s s (samples times step, after settling); %d seed(s): %s. Lengths are numbers of samples times the sampling ' ...
-    'step (`step`), so the resolution is one step. Data: `%s`.\n\n'], strjoin(arrayfun(@(v) sprintf('%g', v), windows, ...
-    'UniformOutput', false), ' and '), n_seed, ...
+fprintf(fid, ['Length of the series %s (samples times step, after settling); %d seed(s): %s. Lengths are numbers of samples times the sampling ' ...
+    'step (`step`), so the resolution is one step. Data: `%s`.\n\n'], F.window_txt, n_seed, ...
     strjoin(arrayfun(@(k) sprintf('[%d %d]', F.seeds(k, :)), 1:n_seed, 'UniformOutput', false), ', '), F.file);
 fprintf(fid, ['`time beyond zero`: fraction of the sampled states with the eigenvalue beyond zero, median over seeds ' ...
     '[min, max]. `excursions`: the total over seeds (and per seed, median [min, max]). `cut`: of those, how many the ' ...

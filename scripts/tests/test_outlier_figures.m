@@ -23,7 +23,8 @@
 %      numbers it reports equal to what the run files hold (the marked
 %      eigenvalues per state counted again in units of W against each
 %      state's own radius; the dose values against ospec_measures; the
-%      dwell counts against ospec_excursions).
+%      dwell counts against ospec_excursions). The dwell figure draws the
+%      reference alone by default and both full networks when named (FD-057).
 %   4. Each errors on an EMPTY run directory and on no run directory
 %      (resolve_data_file: no fallback), on a network the index lacks, on
 %      a seed it lacks; the slow-variables figure on a network without
@@ -205,8 +206,14 @@ assert(throws(@() fig_outlier_slow_variables(common{:}, 'save', false, 'networks
     'fig_outlier_slow_variables:NeedsDense'));
 
 %% 3d. fig_outlier_dwell
+% The reference only by default (Tom, 2026-11-23, FD-057), one panel on the canvas width.
+st_ = manuscript_style();
 o = draw(@fig_outlier_dwell, common, fullfile(fig_dir, 'dwell'), 'Fig_Outlier_Dwell');
-assert(isequal(size(o.curves), [2 3 2]));
+assert(isequal(size(o.curves), [1 3 2]) && isscalar(findall(o.figs, 'Type', 'axes')) && ...
+    abs(o.figs.Position(3) - st_.canvas_w) < 1e-9, 'the dwell figure: the reference alone, one panel, canvas_w wide');
+close(o.figs);
+o = draw(@fig_outlier_dwell, [common, {'networks', {'reference', 'EEx1p5'}}], fullfile(fig_dir, 'dwell_both'), 'Fig_Outlier_Dwell');
+assert(isequal(size(o.curves), [2 3 2]) && numel(findall(o.figs, 'Type', 'axes')) == 2, 'both networks when named');
 q = o.curves{1, 3, 1};                                  % reference, multiple timescales, frozen gains
 Ra = ospec_load_run(tmp, struct('network', 'reference', 'condition', 'sfa3_stdc2', 'seed', [7 8]));
 Ea = ospec_excursions(Ra.t, Ra.rate_top);
