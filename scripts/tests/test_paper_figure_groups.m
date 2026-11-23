@@ -20,7 +20,9 @@ function test_paper_figure_groups()
 %      entry in both; and from 'fast' upward they register exactly the
 %      figure plan's eight main figures (fig_main1_grouped to
 %      fig_main7_grouped, Fig_Main8_Stim) and ten supplementary ones
-%      (fig_supp1_grouped to fig_supp10_grouped), by name and in order;
+%      (fig_supp1_grouped to fig_supp5_grouped, fig_supp_leading_grouped,
+%      fig_supp6_grouped, fig_supp7_grouped, fig_supp9_grouped,
+%      fig_supp10_grouped; Plan 3), by name and in order;
 %   5. a name has one group in mu7chain_config or mu7chain_gainbias_config
 %      and another in mu7chain_AC_config, which composes them;
 %   6. paper_figure_entry accepts a group it does not know.
@@ -34,7 +36,12 @@ group_names = {G.name};
 % The figure plan's main and supplementary figures, in the order of the
 % bundles' registries (AC, then the stimulation bundle).
 PLAN_MAIN = [arrayfun(@(k) sprintf('fig_main%d_grouped', k), 1:7, 'UniformOutput', false), {'Fig_Main8_Stim'}];
-PLAN_SUPP = arrayfun(@(k) sprintf('fig_supp%d_grouped', k), 1:10, 'UniformOutput', false);
+% Plan 3 (2026-11-22): S8 is no longer supplementary (its panels are S6 D
+% and E; fig_supp8_grouped is appendix) and the leading-direction figure
+% is (registered after S5). The names keep their numbers until the text
+% fixes the order of first citation.
+PLAN_SUPP = [arrayfun(@(k) sprintf('fig_supp%d_grouped', k), 1:5, 'UniformOutput', false), ...
+    {'fig_supp_leading_grouped', 'fig_supp6_grouped', 'fig_supp7_grouped', 'fig_supp9_grouped', 'fig_supp10_grouped'}];
 modes = run_mode_names();
 n_bad = 0;
 

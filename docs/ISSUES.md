@@ -2515,3 +2515,102 @@ takes about 35 minutes; run it in pieces.
   lives (the pool module is in another repository). Related: FD-054 (memory in
   the same run); the two together say what a large pool costs the rest of the
   machine.
+
+### FD-056 Plan 3: the figure revisions after Tom's review of 2026-11-22
+
+- **Status:** in progress. Integration branch `p3` (worktree
+  `../FractionalReservoir_wt_p3`), one branch per package, merged by the lead;
+  `p3` goes to `main` only after the `fastmedium` run ends. The plan, the
+  packages and the lead's decisions are in the manuscript repository's
+  `docs/Advancing_the_narrative/Plan3.md`; Tom's notes, figure by figure, in
+  `Plan2_figure_feedback.md` there. Neither is copied here.
+- **Serves:** the 18 main and supplementary figures of the manuscript, drawn
+  from the `fast` run of 2026-11-21/22 for Tom to look at, then from the
+  larger run.
+- **The canvas:** every main and supplementary figure is 9 in wide
+  (`manuscript_style`: `canvas_w` 9, `canvas_max_h` 11.8, `canvas_tol` 0.35),
+  type unchanged in points by role. One test, `test_canvas_standard`, over
+  the 18 (it replaces `test_canvas_standard_a` and `_b`); the gray column
+  dividers of Figures 2 and 3 are placed from the drawn tick labels
+  (`column_dividers`).
+- **What changed, figure by figure** (registry name in brackets):
+  - Figure 1 (`fig_main1_grouped`): eigenvalues gray and black either side
+    of the boundary, far outliers larger and green; letters by row; the
+    activity row as rates r_i on one 0 to 1 axis; the SFA and STD arrows
+    back; row D closer.
+  - Figure 2 (`fig_main2_grouped`): ticks 0 and 1 on unit axes, tick labels
+    on the left column, row G on plus or minus 1 with adaptation, input axis
+    0 to 0.35; 20 s with the pulse in the middle third, 8 neurons per type,
+    key and letters moved.
+  - Figure 3 (`fig_main3_grouped`): row D simplified (-11 to +3, no disk
+    curve, no labels, "Eigenvalues per snapshot"); inputs colored by E or I;
+    row B on one axis, 0 to 75 bits/s.
+  - Figure 4 (`fig_main4_grouped`): three rows: the sweeps without off-scale
+    markers, lambda_1 by E:I weight ratio, lambda_1 against rate from the
+    joint sample only with a black median line and its key; the former
+    panel C left for the leading-direction figure.
+  - Figure 5 (`fig_main5_grouped`): laid out for 9 in; larger response-curve
+    insets hanging down and left; 40 percent less space under them; no
+    dashed circles.
+  - Figure 6 (`fig_main6_grouped`): laid out for 9 in.
+  - Figure 7 (`fig_main7_grouped`): a top row of four (reconstruction against
+    delay, its cumulative sum, the memory horizon, capacity against input
+    noise), then the two maps with self-coupling 0 marked; the former panel A
+    left for the leading-direction figure.
+  - Figure 8 (`Fig_Main8_Stim`): in progress in package `fig8` (patients
+    first, the new patient panel, 5 s and circles on the model signals,
+    scale bars, the no-stimulation continuation).
+  - S1 (`fig_supp1_grouped`): two panels (shared y axes from 0; the two step
+    responses stacked); its single neuron on the 20 s illustration run.
+  - S2 (`fig_supp2_grouped`): legend wording, the slope-2 line as a band
+    behind the data, panel B zoomed with four traces and QR on top, panel C
+    at 15 time points on 1e-12 to 1e-8 with no threshold.
+  - S3 (`fig_supp3_grouped`): the eigenvalue convention of Figure 1; each
+    structure as the balanced matrix plus what was added.
+  - S4 (`fig_supp4_grouped`): no off-scale markers.
+  - S5 (`fig_supp5_grouped`): histograms stacked by E:I weight ratio; the
+    lambda_1 histogram is now Figure 4B.
+  - S6 (`fig_supp6_grouped`): panel C as box plots with the reference
+    diamonds beside; S8's gain and phase panels as D and E.
+  - S7 (`fig_supp7_grouped`): laid out for 9 in.
+  - The leading direction (`fig_supp_leading_grouped`, new, supplement, not
+    yet numbered): lambda_1 and the leading-direction shares against the
+    longest SFA time constant, the dendritic share against lambda_1 per
+    condition (Figure 7's former A, S9's former B, Figure 4's former C).
+  - S9 (`fig_supp9_grouped`): memory only (reconstructions, the responsive
+    share with self-coupling -4, 0 and 6 marked, capacity against lambda_1).
+  - S10 (`fig_supp10_grouped`): in progress in package `fig8`.
+  - S8 (`fig_supp8_grouped`) is no longer supplementary: one neuron, one gain
+    and one phase panel, registered in the appendix; its panels are S6 D and
+    E.
+- **The registry:** from `fast` upward again 8 main and 10 supplementary
+  figures (`test_paper_figure_groups`, by name and order): main
+  `fig_main1_grouped` to `fig_main7_grouped`, `Fig_Main8_Stim`; supplement
+  `fig_supp1_grouped` to `fig_supp5_grouped`, `fig_supp_leading_grouped`,
+  `fig_supp6_grouped`, `fig_supp7_grouped`, `fig_supp9_grouped` (AC bundle),
+  `fig_supp10_grouped` (stimulation bundle). Function names keep their
+  numbers; the order of first citation in the text sets the final numbers.
+  `essential` draws main 1 to 5 and 8, S1, S3 to S7 and S10 (no tau sweep,
+  so neither S9 nor the leading-direction figure).
+- **Saved data that changed** (each stage's test and the stages exact tier
+  change with it):
+  - `numerics`: the Jacobian check at 15 time points (S2 C).
+  - `concept_examples`: the added part of each structure and the rates
+    (Figure 1, S3).
+  - the illustrations (`paper_illustrations`): 20 s with the step over the
+    middle third, in every mode (`mu7chain_config`:
+    `illustration_display_window`, `illustration_step_window`); this also
+    makes S1 panel A's single-neuron run 20 s.
+  - `burst_mode`: the no-stimulation continuation of each network (Figure 8
+    G), in progress in package `fig8`.
+- **Leftovers, recorded and not cleaned up:** `fig_grouped_main` group 4 has
+  no caller any more (kept for its tests); `draw_offscale_markers.m` was
+  deleted; `fig_ostruct_plane.m` (appendix) still types `fig_w = 12`.
+- **Left for after the long run** (Plan 3, phase 7): the joint sample at 256
+  networks (needs the pool); the stage tests and both exact tiers, once, on
+  `p3` merged into `main`; the stages reference re-captured; the patient
+  panel's branch in the clinical repository (`p3-patient-panel`) merged and
+  its panels made again in the main checkout.
+- **Done means:** the 18 figures accepted by Tom (phases 4 to 6 of the plan),
+  redrawn from the `fastmedium` data, `p3` merged into `main` with the tests
+  above passing.

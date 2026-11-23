@@ -66,9 +66,15 @@ function cfg = with_spectral_supplement(cfg)
 %       fig_main6_grouped   main        fig_main6_amplification
 %                                       (frequency_response; transient_gain
 %                                       and eig_heatmap of the same run)
-%       fig_supp6_grouped   supplement  eigenvalue_density
+%       fig_supp6_grouped   supplement  eigenvalue_density, and since Plan 3
+%                                       frequency_response (S8's two panels
+%                                       are its D and E)
 %       fig_supp7_grouped   supplement  outlier_spectra, outlier_structures
-%       fig_supp8_grouped   supplement  frequency_response
+%       fig_supp8_grouped   appendix    frequency_response. Since Plan 3
+%                                       (2026-11-22) its two panels are
+%                                       S6 D and E, so it is no longer a
+%                                       supplementary figure; it still draws
+%                                       them on their own
 %
 % TO ADD A STAGE OR FIGURES: a row of PARTS. A new stage is a row with its
 % name, its entries and the plan that says which conditions it simulates
@@ -170,9 +176,9 @@ COMPOSITES = { ...
     'fig_main5_grouped', @fig_main5_mechanism,     'main',       {'fig_tag', 'Fig_Main5_Grouped'}, {'outlier_spectra'}; ...
     'fig_main6_grouped', @fig_main6_amplification, 'main',       {'fig_tag', 'Fig_Main6_Grouped'}, ...
         {'frequency_response', 'transient_gain', 'eig_heatmap'}; ...
-    'fig_supp6_grouped', @fig_supp6_grouped,       'supplement', {}, {'eigenvalue_density'}; ...
+    'fig_supp6_grouped', @fig_supp6_grouped,       'supplement', {}, {'eigenvalue_density', 'frequency_response'}; ...
     'fig_supp7_grouped', @fig_supp7_grouped,       'supplement', {}, {'outlier_spectra', 'outlier_structures'}; ...
-    'fig_supp8_grouped', @fig_supp8_grouped,       'supplement', {}, {'frequency_response'}};
+    'fig_supp8_grouped', @fig_supp8_grouped,       'appendix',   {}, {'frequency_response'}};
 already = intersect(COMPOSITES(:, 1), names);
 if ~isempty(already)
     error('with_spectral_supplement:AlreadyAdded', 'cfg.figures already holds %s.', strjoin(already, ', '));
