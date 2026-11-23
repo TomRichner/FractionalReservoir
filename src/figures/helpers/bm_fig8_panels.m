@@ -1,45 +1,67 @@
 function P = bm_fig8_panels(fig, rect, R, opts)
-%BM_FIG8_PANELS Draw Figure 8 A to C (the bursting network's mode) into a rectangle of a figure.
+%BM_FIG8_PANELS Draw Figure 8 G and H (the bursting network's mode) into a rectangle of a figure.
 %
 %   P = bm_fig8_panels(fig, rect, R)
 %   P = bm_fig8_panels(fig, rect, R, 'font_size', 9, ...)
 %
 % fig   the figure (Units are set to inches)
-% rect  [x y w h] in inches, the area the three panels fill
+% rect  [x y w h] in inches, the area the panels fill
 % R     one network of the burst_mode stage (bm_load_runs(...).R{1}: the
 %       stage's first seed)
 %
-% A  the whole run: the input (mean over neurons); mean E and I rates, the
-%    frozen-adaptation arm dashed after the step; the real part of the
-%    rightmost mode as a rate (1/s), gains frozen (a wide pale line of the
-%    bursting condition's hue) and the rightmost network mode of the full
-%    Jacobian (a thin black line on top of it),
-%    the frozen arm's frozen-gain mode dashed. A light band marks the burst
-%    of B; the four sampled states of C are marked on A and B.
-% B  that burst, from 1 s before its onset to 0.5 s after: rates, and the
-%    two modes on the full Jacobian's dense grid (every dt_sample there).
-% C  the eigenvalues of M as rates z = (lambda - 1)/tau_d in the complex
+% The letters are Figure 8's of Plan 3 (Tom, 2026-11-22: patients A to C,
+% modular model D to F, then this example). Until then they were A to C.
+%
+% G, left: the whole run: the input (mean over neurons); mean E and I
+%    rates; the real part of the rightmost mode as a rate (1/s), gains
+%    frozen (a wide pale line of the bursting condition's hue) and the
+%    rightmost network mode of the full Jacobian (a thin black line on top
+%    of it). After the step the same network WITHOUT the step continues
+%    dashed: rates and both modes as they would have been with no input
+%    (the stage's no-stimulation continuation, R.nostim: same network, same
+%    noise; Tom, 2026-11-22, note 3). The adaptation-frozen arm is no longer
+%    drawn here (note 4; S10 B shows it). A light band marks the burst of
+%    the zoom; the four sampled moments of H are marked along the top by
+%    triangles in their colors.
+% G, right (the zoom): that burst, from 1 s before its onset to 0.5 s
+%    after: rates, and the two modes on the full Jacobian's dense grid
+%    (every dt_sample there); the three moments of H in this window as dots
+%    of their colors on the frozen-gain mode.
+% H  the eigenvalues of M as rates z = (lambda - 1)/tau_d in the complex
 %    plane (complex_plane_axes: the imaginary axis is the boundary, the
 %    bulk is centered at -1/tau_d), one scale across the five panels:
 %    the structure (W alone: every gain 1), a quiet moment, just before the
-%    burst, during it, and under stimulation. The bulk circle has the
-%    radius predicted from that state's gains (R_eff/tau_d; R_struct for
-%    W); the rightmost eigenvalue is drawn larger.
+%    burst, during it, and under stimulation, each name in its color. The
+%    bulk circle has the radius predicted from that state's gains
+%    (R_eff/tau_d; R_struct for W); the rightmost eigenvalue is drawn
+%    larger in its moment's color. Ticks only outside the bulk, with room
+%    for their labels (the imaginary-axis tick at least 1.25 bulk radii up:
+%    at the first multiple above the radius the Structure plane's circle ran
+%    through its label).
 %
-% THE FIVE STATES (rules, not choices made by eye): the burst of B is the
-% one before the step whose onset is closest to the middle of the baseline
-% window; quiet = 0.9 s before its onset; before = the maximum of the
-% frozen-gain mode within tol (0.6 s) before onset; during = the burst's
-% peak (the mean E rate's maximum); stimulation = 5 s before the end of
-% the run.
+% THE COLORS of the moments (Tom, 2026-11-22, note 5: as the mockup, more
+% colorful than black, purples and green): structure black, quiet blue,
+% before burst orange, burst dark red, stimulation the figure's green.
+%
+% THE FIVE STATES (rules, not choices made by eye): the burst of the zoom
+% is the one before the step whose onset is closest to the middle of the
+% baseline window; quiet = 0.9 s before its onset; before = the maximum of
+% the frozen-gain mode within tol (0.6 s) before onset; during = the
+% burst's peak (the mean E rate's maximum); stimulation = 5 s before the
+% end of the run.
+%
+% THE KEY: one row above G (E, I, gains frozen, full Jacobian, without
+% stimulation), placed by the caller through P.legend (in G's axes there
+% is no stretch free of traces once the continuation runs after the step).
 %
 % Options: font_size (9), annot_size (8), left (0.52), c_title (0.2), ab_room
 % (0.42; inches, the room for labels, so that larger type can be given room
 % on the common canvas, stim_fig8_compose), line_scale (1, multiplies every
-% line width), plane_gap (0.12 in), colors (struct, see below).
+% line width), plane_gap (0.12 in), key_room (0.3 in above G for the key).
 %
-% P: handles ax_A (3 axes, top to bottom), ax_B (2), ax_C (5), and info:
-% the chosen times and the window of the complex plane (for the table).
+% P: handles ax_A (3 axes of G's time course, top to bottom), ax_B (2, the
+% zoom), ax_C (5 planes of H), legend, and info: the chosen times and the
+% window of the complex plane (for the table).
 %
 % See also: fig_burst_mode, ied_stim_fig_combined, complex_plane_axes
 
@@ -51,28 +73,33 @@ arguments
     opts.annot_size (1,1) double = 8
     opts.line_scale (1,1) double = 1
     opts.plane_gap (1,1) double = 0.12
-    opts.left (1,1) double = 0.52      % inches left of A and C for their y labels
-    opts.c_title (1,1) double = 0.2    % inches above C for its state names
-    opts.ab_room (1,1) double = 0.42   % inches between C's names and A, B (their time axis)
+    opts.left (1,1) double = 0.52      % inches left of G and H for their y labels
+    opts.c_title (1,1) double = 0.2    % inches above H for its state names
+    opts.ab_room (1,1) double = 0.42   % inches between H's names and G (its time axis)
+    opts.key_room (1,1) double = 0.3   % inches above G for the key
+end
+if ~isfield(R, 'nostim')
+    error('bm_fig8_panels:NoContinuation', ['The burst_mode file of seed %s has no no-stimulation continuation ' ...
+        '(R.nostim); run the burst_mode stage again (bm_run_network writes it since 2026-11-22).'], mat2str(R.seed));
 end
 st = manuscript_style();
 fs = opts.font_size; lw = opts.line_scale;
 tau = R.tau_d; H = R.t_step;
-I = R.intact; F = R.full; Z = R.frozen;
-ec = [st.E_color; st.I_color];                    % the manuscript's one E and one I color (the values SRNNCellTypePairs.type_colors(2) gave)
+I = R.intact; F = R.full; N = R.nostim;
+ec = [st.E_color; st.I_color];                    % the manuscript's one E and one I color
 cond_col = st.condition_color(R.condition);
 % The two modes must be told apart where they run together (polish list,
-% 2026-11-22: a thin gray line under a thin darkened condition color read as
-% one line): the frozen-gain mode is a WIDE PALE line of the condition's
+% 2026-11-22): the frozen-gain mode is a WIDE PALE line of the condition's
 % hue, the full Jacobian's a THIN BLACK line on top of it.
-mode_col = [0 0 0];                               % the full Jacobian's rightmost network mode
-fg_col = cond_col + 0.35 * (1 - cond_col);        % gains frozen: the condition's hue, pale
-fg_w = 2.2; mode_w = 0.7;                         % their widths (times line_scale)
-purple = [0.494 0.247 0.596]; green = [0 0.62 0.45];   % no stimulation / stimulation (Figure 8's)
-state_col = {[0 0 0], 0.45 * purple + 0.55, purple, 0.6 * purple, green};
+mode_col = [0 0 0];
+fg_col = cond_col + 0.35 * (1 - cond_col);
+fg_w = 2.2; mode_w = 0.7;
+green = [0 0.62 0.45];                            % stimulation (Figure 8's)
+state_col = {[0 0 0], [0.17 0.45 0.75], [0.95 0.55 0.1], [0.72 0.1 0.12], green};
 state_name = {'Structure', 'Quiet', 'Before burst', 'Burst', 'Stimulation'};
+gray_dash = [0.35 0.35 0.35];                     % the key's entry for the continuation
 
-%% The burst of B and the five states
+%% The burst of the zoom and the five states
 on = R.bursts.t_on; off = R.bursts.t_off;
 cand = find(on < H & on - 1 > 0);
 if isempty(cand)
@@ -103,36 +130,37 @@ end
 zall = vertcat(zs{:}); rmax = max(rad);
 re_lim = [cen - 1.15 * rmax, max(cen + 1.15 * rmax, 0.2 * rmax)];
 re_lim(2) = max(re_lim(2), max(real(zall)) + 0.08 * rmax);
-im_lim = [-1.3 1.3] * max(rmax, max(abs(imag(zall))));      % room above the bulk for the Im name
+im_lim = [-1.3 1.3] * max(rmax, max(abs(imag(zall))));
 step = nice_step(rmax / 2);
-% Few ticks on small panels: on the real axis the multiples of step well
-% clear of the largest bulk (a quarter radius), on the imaginary axis the
-% first multiple outside it.
+% Few ticks on small panels, all well outside the largest bulk: on the real
+% axis the multiples of step beyond a quarter radius past its edge, on the
+% imaginary axis the first multiple above 1.25 radii (the label must clear
+% the circle, not only the tick).
 mult = @(lo, hi) step * (ceil(lo / step):floor(hi / step));
 re_ticks = mult(cen + 1.25 * rmax, re_lim(2));
 if isempty(re_ticks); re_ticks = mult(cen + 1.02 * rmax, re_lim(2)); end
-im_t = mult(1.0001 * rmax, im_lim(2));
+im_t = mult(1.25 * rmax, im_lim(2));
 if isempty(im_t)                                  % widen the window to the next multiple
-    im_t = step * ceil(1.0001 * rmax / step);
+    im_t = step * ceil(1.25 * rmax / step);
     im_lim = [-1.08 1.08] * im_t;
 end
-im_ticks = [-im_t(1), im_t(1)];
+im_ticks = im_t(1);   % the upper one only: the lower one's label met the Re name of the last plane
 axes_args = {'re_lim', re_lim, 'im_lim', im_lim, 'bulk_center', cen, 'bulk_radius', rmax, ...
     're_ticks', re_ticks, 'im_ticks', im_ticks, 'font_size', opts.annot_size, 'line_width', 0.6 * lw};
 g = complex_plane_axes([], axes_args{:});
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
 c_title = opts.c_title;
-yC = y0 + 0.05;
-yAB = yC + ph + c_title + opts.ab_room;                  % room for B's x label and C's titles
-hA = [0.32 0.8 0.95]; gA = 0.1;
-top = y0 + Ht;
+yC = y0 + 0.27;                                   % the Re name under the last plane
+yAB = yC + ph + c_title + opts.ab_room;           % room for G's time axis and H's names
+hA = [0.45 0.8 0.95]; gA = 0.1;
+top = y0 + Ht - opts.key_room;
 avail = top - yAB;
 scale = (avail - 2 * gA) / sum(hA);
 hA = hA * scale;
 ya = [yAB + hA(3) + hA(2) + 2 * gA, yAB + hA(3) + gA, yAB];
 wA = 0.60 * W - left; xB = x0 + 0.71 * W; wB = W - 0.71 * W - 0.05;
 
-%% A
+%% G, the time course
 P.ax_A = gobjects(1, 3);
 for r = 1:3
     P.ax_A(r) = axes(fig, 'Units', 'inches', 'Position', [x0 + left, ya(r), wA, hA(r)]);
@@ -142,45 +170,49 @@ ax = P.ax_A(1);
 plot(ax, I.t, I.u, '-', 'Color', [0.3 0.3 0.3], 'LineWidth', 0.8 * lw);
 ylim(ax, [min(I.u) - 0.05, max(I.u) + 0.1]);
 yticks(ax, unique(round([0 R.dc_level], 2)));
-ylabel(ax, 'Input');
+ylabel(ax, 'Input', 'Rotation', 0, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');   % across: turned, it ran into the rate's name below
 ax = P.ax_A(2);
 band(ax, zoom, [0 1]);
-h = gobjects(1, 3);
+after = N.t >= H;
 for q = 2:-1:1
-    h(q) = plot(ax, I.t, I.rate(:, q), '-', 'Color', ec(q, :), 'LineWidth', 0.8 * lw);
-    after = Z.t >= H;
-    plot(ax, Z.t(after), Z.rate(after, q), '--', 'Color', ec(q, :), 'LineWidth', 0.8 * lw);
+    plot(ax, N.t(after), N.rate(after, q), '--', 'Color', ec(q, :), 'LineWidth', 0.6 * lw);
+    plot(ax, I.t, I.rate(:, q), '-', 'Color', ec(q, :), 'LineWidth', 0.8 * lw);
 end
-h(3) = plot(ax, NaN, NaN, '--', 'Color', [0.3 0.3 0.3], 'LineWidth', 0.8 * lw);
-ylim(ax, [0 1]); yticks(ax, [0 0.5 1]);
-ylabel(ax, 'Mean rate');
-lg_rate = legend(ax, h, {'E', 'I', 'Adaptation frozen'}, 'Box', 'off', ...
-    'FontSize', opts.annot_size, 'NumColumns', 2, 'AutoUpdate', 'off'); lg_rate.ItemTokenSize = [12 8];   % two columns: three in a row reach back to the step
+ylim(ax, [0 1]); yticks(ax, [0 1]);
+ylabel(ax, 'Rate');   % 'Mean rate' ran into the mode's name below at 9 in
 ax = P.ax_A(3);
-zl = mode_limits(re1, real(F.net), real(Z.z1));
+naf = N.full.t >= H;
+zl = mode_limits(re1, real(F.net), real(N.z1(after)), real(N.full.net(naf)));
 band(ax, zoom, zl);
 yline(ax, 0, ':', 'Color', [0 0 0], 'LineWidth', 0.6 * lw);
-hm = gobjects(1, 2);
-hm(1) = plot(ax, I.t, re1, '-', 'Color', fg_col, 'LineWidth', fg_w * lw);
-after = Z.t >= H;
-plot(ax, Z.t(after), real(Z.z1(after)), '--', 'Color', 0.75 * fg_col, 'LineWidth', 0.8 * lw);
+plot(ax, N.t(after), real(N.z1(after)), '--', 'Color', fg_col, 'LineWidth', 1.2 * lw);
+plot(ax, I.t, re1, '-', 'Color', fg_col, 'LineWidth', fg_w * lw);
+plot(ax, N.full.t(naf), real(N.full.net(naf)), '--', 'Color', mode_col, 'LineWidth', mode_w * lw);
 c = F.is_coarse;
-hm(2) = plot(ax, F.t(c), real(F.net(c)), '-', 'Color', mode_col, 'LineWidth', mode_w * lw);
+plot(ax, F.t(c), real(F.net(c)), '-', 'Color', mode_col, 'LineWidth', mode_w * lw);
 ylim(ax, zl);
 ylabel(ax, 'Re \lambda (s^{-1})');
 xlabel(ax, 'Time (s)');
-lg_mode = legend(ax, hm, {'Gains frozen', 'Full Jacobian'}, 'Box', 'off', ...
-    'FontSize', opts.annot_size, 'AutoUpdate', 'off'); lg_mode.ItemTokenSize = [14 8];
 for r = 1:3
     xlim(P.ax_A(r), [I.t(1) I.t(end)]);
     if r < 3; P.ax_A(r).XTickLabel = {}; end
 end
 for q = 2:5
-    plot(P.ax_A(3), t_state(q), zl(2), 'v', 'MarkerSize', 4.5, 'MarkerFaceColor', state_col{q}, ...
+    plot(P.ax_A(3), t_state(q), zl(2), 'v', 'MarkerSize', 5.5, 'MarkerFaceColor', state_col{q}, ...
         'MarkerEdgeColor', 'none', 'Clipping', 'off');
 end
+% The key: proxies in the rate axes (a legend takes the objects of its own axes).
+ax = P.ax_A(2);
+hk = [plot(ax, NaN, NaN, '-', 'Color', ec(1, :), 'LineWidth', 0.8 * lw), ...
+    plot(ax, NaN, NaN, '-', 'Color', ec(2, :), 'LineWidth', 0.8 * lw), ...
+    plot(ax, NaN, NaN, '-', 'Color', fg_col, 'LineWidth', fg_w * lw), ...
+    plot(ax, NaN, NaN, '-', 'Color', mode_col, 'LineWidth', mode_w * lw), ...
+    plot(ax, NaN, NaN, '--', 'Color', gray_dash, 'LineWidth', 0.8 * lw)];
+P.legend = legend(ax, hk, {'E', 'I', 'Gains frozen', 'Full Jacobian', 'Without stimulation'}, ...
+    'Orientation', 'horizontal', 'Box', 'off', 'FontSize', opts.annot_size, 'AutoUpdate', 'off');
+P.legend.ItemTokenSize = [18 8];
 
-%% B
+%% G, the zoom
 P.ax_B = gobjects(1, 2);
 for r = 1:2
     P.ax_B(r) = axes(fig, 'Units', 'inches', 'Position', [xB, ya(r + 1), wB, hA(r + 1)]);
@@ -192,7 +224,7 @@ kz = I.t >= zoom(1) & I.t <= zoom(2);
 for q = 2:-1:1
     plot(ax, I.t(kz), I.rate(kz, q), '-', 'Color', ec(q, :), 'LineWidth', 1.0 * lw);
 end
-ylim(ax, [0 1]); yticks(ax, [0 0.5 1]); ax.XTickLabel = {};
+ylim(ax, [0 1]); yticks(ax, [0 1]); ax.XTickLabel = {};
 ax = P.ax_B(2);
 band(ax, [on(b) off(b)], zl);
 yline(ax, 0, ':', 'Color', [0 0 0], 'LineWidth', 0.6 * lw);
@@ -200,13 +232,13 @@ plot(ax, I.t(kz), re1(kz), '-', 'Color', fg_col, 'LineWidth', fg_w * lw);
 kf = F.t >= zoom(1) & F.t <= zoom(2);
 plot(ax, F.t(kf), real(F.net(kf)), '-', 'Color', mode_col, 'LineWidth', mode_w * lw);
 for q = 2:4
-    plot(ax, t_state(q), zl(2), 'v', 'MarkerSize', 4.5, 'MarkerFaceColor', state_col{q}, ...
-        'MarkerEdgeColor', 'none', 'Clipping', 'off');
+    plot(ax, t_state(q), re1(idx(q - 1)), 'o', 'MarkerSize', 6.5, 'MarkerFaceColor', state_col{q}, ...
+        'MarkerEdgeColor', 'w', 'LineWidth', 0.5);
 end
 ylim(ax, zl); xlabel(ax, 'Time (s)');
 for r = 1:2; xlim(P.ax_B(r), zoom); end
 
-%% C
+%% H
 P.ax_C = gobjects(1, 5);
 th = linspace(0, 2 * pi, 241);
 for q = 1:5
@@ -225,6 +257,15 @@ for q = 1:5
     set(axq, 'XLim', cp.x_lim, 'YLim', cp.y_lim);
     text(axq, mean(cp.x_lim), cp.y_lim(2) + 0.04 * diff(cp.y_lim), state_name{q}, 'Color', state_col{q}, ...
         'FontSize', fs, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom');
+    if q == 5
+        % The Re name under the plane, at its right end: under the real
+        % axis' tick labels (complex_plane_axes' place) it is wider than the
+        % stretch right of the imaginary axis and the axis ran through it.
+        tr = findall(axq, 'Type', 'text');
+        tr = tr(arrayfun(@(t) any(strcmp(cellstr(t.String), 'Re (s^{-1})')), tr));
+        set(tr, 'String', 'Re (s^{-1})', 'Position', [cp.x_lim(2), cp.y_lim(1), 0], ...
+            'HorizontalAlignment', 'right', 'VerticalAlignment', 'top');
+    end
     P.ax_C(q) = axq;
 end
 
@@ -233,30 +274,18 @@ for a = [P.ax_A P.ax_B]
     set(a, 'FontSize', fs, 'TickDir', 'out', 'Box', 'off', 'LineWidth', 0.6 * lw, ...
         'TitleFontSizeMultiplier', 1, 'LabelFontSizeMultiplier', 1);
 end
-% The two legends of A, in the stretch after the step where no trace runs:
-% between the settled rates and the frozen arm's, and above the settled
-% mode. At the upper left the rate legend lay on the onset transient and
-% on the bursts' peaks (polish list, 2026-11-22). Placed by hand (Location
-% 'none'), which stim_fig8_compose carries over.
+% The key in one row above G, at the left edge of its time course.
 drawnow;
-place_legend(lg_rate, P.ax_A(2), H, [I.t(1) I.t(end)], 0.62);
-place_legend(lg_mode, P.ax_A(3), H, [I.t(1) I.t(end)], 0.72);
+set([P.legend P.ax_A(1)], 'Units', 'inches');
+q = P.ax_A(1).Position;
+P.legend.Location = 'none';
+P.legend.Position(1:2) = [q(1) - 0.1, q(2) + q(4) + 0.03];
 P.info = struct('burst', b, 'zoom', zoom, 't_state', t_state, 'state_name', {state_name}, ...
     'z_right', cellfun(@(z) max(real(z)), zs), 'rad', rad, 're_lim', re_lim, 'im_lim', im_lim, ...
     'mode_lim', zl);
 end
 
 %% ------------------------------------------------------------------------
-function place_legend(lg, ax, t_step, t_lim, y_frac)
-% The legend centered on the stretch after the step, its middle at y_frac
-% of the axes' height.
-set([lg ax], 'Units', 'inches');
-p = ax.Position; q = lg.Position;
-x_mid = p(1) + p(3) * ((t_step + t_lim(2)) / 2 - t_lim(1)) / diff(t_lim);
-x = min(max(x_mid - q(3) / 2, p(1) + p(3) * (t_step - t_lim(1)) / diff(t_lim) + 0.03), p(1) + p(3) - q(3));
-lg.Position = [x, p(2) + y_frac * p(4) - q(4) / 2, q(3), q(4)];
-end
-
 function k = nearest_index(t, tt)
 [~, k] = min(abs(t - tt));
 end
