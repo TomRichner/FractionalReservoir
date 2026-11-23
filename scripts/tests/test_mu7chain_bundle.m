@@ -214,13 +214,19 @@ for m = run_mode_names()
             frequency_response_stage_plan(k); eigenvalue_density_stage_plan(k);
             ps = outlier_structures_stage_plan(k);
             assert(isequal(pl.conditions, three_spec) && isequal(ps.conditions, three_spec), '%s: the stages'' conditions', tag);
-            % fig_outlier_plane, _slow_variables and _dwell draw 'reference'
-            % and 'EEx1p5' and need their dense pass and full-Jacobian
-            % series: the stage's default full_networks, every run of them.
+            % fig_outlier_plane and _slow_variables draw 'reference' and
+            % 'EEx1p5' and need their dense pass and full-Jacobian series:
+            % the stage's default full_networks, every run of them. The
+            % dwell figure draws the reference only, over the long window
+            % (FD-057: long_networks).
             dense_nets = {'reference', 'EEx1p5'};
             assert(isequal(pl.full_networks, dense_nets) && all(ismember(dense_nets, pl.networks)) && ...
                 all([pl.runs(ismember({pl.runs.network}, dense_nets)).full]) && ...
                 ~any([pl.runs(~ismember({pl.runs.network}, dense_nets)).full]), '%s: the dense pass of reference and EEx1p5', tag);
+            assert(isequal(pl.long_networks, {'reference'}) && ...
+                all([pl.runs(strcmp({pl.runs.network}, 'reference')).window_s] == pl.full_window_s) && ...
+                all([pl.runs(~strcmp({pl.runs.network}, 'reference')).window_s] == pl.window_s), ...
+                '%s: the long window for the reference only', tag);
             % The entries, none in the paper, each with the conditions it can draw.
             names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
             want = spectral_entry_names();

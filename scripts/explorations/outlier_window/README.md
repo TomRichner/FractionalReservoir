@@ -34,3 +34,13 @@ Data: a copy of `mu7chain_AC_fastmedium/outlier_spectra` (10 seeds) in
 - Window-wide quantities of `fig_outlier_dose` and `fig_outlier_plane` (detachment,
   E fraction on the slope, E/I gain) change by far less than the spread across seeds
   between the first 20 s and 200 s.
+
+## Follow-up, FD-057 (2026-11-23)
+
+Tom kept the 200 s dwell figure for the reference network only. The stage's new knob
+`outlier_spectra_long_networks` (default `{'reference'}`) names the full networks that
+get the long window; E-to-E x 1.5 keeps its full-Jacobian and dense passes over 20 s at
+10 ms. `ow_plan_compare.m` ('before' / 'after') shows the plans of `essential` and `fast`
+unchanged run by run, and 30 E-to-E x 1.5 runs changed (200 s at 0.05 s to 20 s at
+0.01 s) in each larger mode. `ow_cost_fd057.m` estimates the stage at about 254 min on
+12 workers, bounded by the longest reference run (245 min).
