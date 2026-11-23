@@ -27,8 +27,10 @@ function out = fig_grouped_main(group, cfg)
 % WHO CALLS WHICH GROUP (Plan 2, integration, 2026-11-21; one path each):
 %   2, 3      fig_main2_grouped, fig_main3_grouped: the paper's Figures 2
 %             and 3 (registry entries of the same names)
-%   4         fig_main4_connectivity, for panels A and B of the paper's
-%             Figure 4 (entry fig_main4_grouped)
+%   4         nobody since Plan 3 (2026-11-22): the old grouped Figure 4
+%             (sweeps over the rate panels, 13 in layout), kept for its
+%             tests; the paper's Figure 4 is fig_main4_connectivity, built
+%             from the source figures with composite_tools
 %   1,5,6,7,8 fig_grouped_main_appendix: the old composites, appendix
 %             entries (grouped_figure_registry); the paper's Figures 1, 5,
 %             6, 7 and 8 are other functions now

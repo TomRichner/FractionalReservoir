@@ -24,9 +24,11 @@
 %      'require_reference' errors; 'reference_file' reads it. The column
 %      layout. A run without the joint sample errors through
 %      resolve_data_file.
-%   4. fig_main4_connectivity: the grouped Figure 4's panels and the three
-%      of (C) on a canvas of the same height that fits the screen (built
-%      with composite_figure), letters (A), (B), (C), files and _table.md.
+%   4. fig_main4_connectivity (Plan 3): the six sweeps, lambda_1 by E:I
+%      weight ratio and lambda_1 against rate per condition on the 9 in
+%      canvas, one colour bar, letters A to C, no off-scale triangles, the
+%      joint sample in one dot size, black medians and their key, files
+%      and _table.md; fig_leading_direction is no longer part of it.
 %
 % About 2 to 3 minutes (the grouped Figure 4 rebuilds its networks).
 
@@ -148,29 +150,36 @@ n_fail = n_fail + check(startsWith(error_of(@() fig_leading_direction('run_dir',
 n_fail = n_fail + check(strcmp(error_of(@() fig_leading_direction(base{:}, 'save', false, 'conditions', {'sfa3_stdc2'})), ...
     'select_conditions:NoSuchCondition'), 'figure: a condition the run lacks -> NoSuchCondition');
 
-%% 4. The composite
-evalc('g = fig_grouped_main(4, ''run_dir'', run_dir, ''preset_name'', preset, ''save'', false);');
-n_ab = numel(findall(g.figs, 'Type', 'axes')); ab_size = g.figs.Position(3:4); close(g.figs);
+%% 4. The composite (Plan 3: the sweeps, lambda_1 by E:I weight ratio, lambda_1 against rate)
+st = manuscript_style();
 evalc('m = fig_main4_connectivity(base{:}, ''preset_name'', preset, ''out_dir'', fullfile(tmp, ''m4''));');
 m_px = getpixelposition(m.figs);
-ok = numel(findall(m.figs, 'Type', 'axes')) == n_ab + 3 && n_tagged(m.figs, 'uncoupled_reference') == 0 && ...
-    abs(m_px(4) - ab_size(2)) < 1.5 && m_px(3) > ab_size(1) && m_px(4) < 0.9 * 1073 && ...   % fits the workstation's screen
-    all(arrayfun(@(t) isscalar(findall(m.figs, 'Tag', ['main4_block_' t])), 'ABC')) && ...
+letters = sort(arrayfun(@(t) t.String(2), findall(m.figs, 'Tag', 'composite_panel_letter'))');
+med = findall(m.figs, 'Tag', 'rate_bin_median');
+scat = findall(m.figs, 'Type', 'scatter');
+sz = arrayfun(@(h) unique(h.SizeData), scat, 'UniformOutput', false);
+lgC = findall(m.figs, 'Tag', 'main4_legend_C');
+ok = numel(findall(m.figs, 'Type', 'axes')) == 6 + 2 * numel(C) && isscalar(findall(m.figs, 'Type', 'colorbar')) && ...
+    isequal(letters, 'ABC') && n_tagged(m.figs, 'leading_direction_points') == 0 && ...       % the old (C) has left
+    isempty(findall(m.figs, 'Tag', 'offscale_marker')) && ...                                % no triangles
+    numel(med) == numel(C) && all(arrayfun(@(h) isequal(h.Color, [0 0 0]), med)) && ...      % black medians
+    numel(scat) == numel(C) && all(cellfun(@isscalar, sz)) && isscalar(unique([sz{:}])) && ...   % one dot size
+    isscalar(lgC) && isequal(lgC.String, {'Median per rate bin'}) && ...
+    abs(m_px(3) / get(groot, 'ScreenPixelsPerInch') - st.canvas_w) < 0.01 && ...
     all(ismember({'Fig_Main4_Connectivity.png', 'Fig_Main4_Connectivity.fig'}, m.files)) && ...
     isfile(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md'));
 if ok
-    % (C)'s column ends level with (B)'s panels and starts no higher than (A)'s letter.
-    cx = findall(m.figs, '-regexp', 'Tag', '^leading_direction_c\d+$'); la = findall(m.figs, 'Tag', 'main4_block_A');
-    tops = arrayfun(@(a) sum(getpixelposition(a) * [0; 1; 0; 1]), cx);
-    ok = max(tops) <= (la.Position(2) + la.Position(4)) * m_px(4) && ...
-        contains(fileread(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md')), 'Panel (C)') && ...
-        contains(fileread(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md')), 'Uncoupled reference');
+    % The median's key sits above the multiple-timescale panel (the last here).
+    lgC.Units = 'pixels'; own = lgC.Axes; own.Units = 'pixels';
+    ok = lgC.Position(2) >= own.Position(2) + own.Position(4) && contains(own.Title.String{1}, 'Multiple') && ...
+        contains(fileread(fullfile(tmp, 'm4', 'Fig_Main4_Connectivity_table.md')), '## Panel C');
 end
-n_fail = n_fail + check(ok, 'composite: the grouped Figure 4''s panels and three of (C), same height, letters, (C) below the top of (A)''s letter, table');
+n_fail = n_fail + check(ok, ['composite: six sweeps, lambda_1 by E:I ratio and lambda_1 against rate per condition, one color bar, ' ...
+    'letters A to C, no triangles, the joint sample in one dot size, black medians with their key above the multiple-timescale panel, table']);
 close(m.figs);
 evalc('m = fig_main4_connectivity(base{:}, ''preset_name'', preset, ''out_dir'', fullfile(tmp, ''m4''), ''fig_tag'', ''Fig_Main4_Grouped'', ''conditions'', sel);');
-n_fail = n_fail + check(any(strcmp(m.files, 'Fig_Main4_Grouped.png')) && n_tagged(m.figs, 'leading_direction_points') == 2, ...
-    'composite: the registry''s file name; a selection reaches panel (C)');
+n_fail = n_fail + check(any(strcmp(m.files, 'Fig_Main4_Grouped.png')) && numel(findall(m.figs, 'Type', 'scatter')) == 2, ...
+    'composite: the registry''s file name; a selection reaches (B) and (C)');
 close(m.figs);
 
 if n_fail == 0

@@ -34,9 +34,10 @@ for k=1:numel(axs)
         % are the separate zero references and retain their original styling.
         % The panel's condition, from its title (fig_lle_vs_rate titles by name).
         name=grouped_condition_label(ax.Title.String,'name_of_title');
-        % The median in the condition's colour (Plan 2, package A, 2026-11-21:
-        % no condition in gray; it was gray [.5 .5 .5] until then).
-        set(findall(ax,'Type','line'),'Color',st.condition_color(name{1}),'LineWidth',2.5);
+        % The median is fig_lle_vs_rate's, black in every panel and on top of
+        % the points (Plan 3, 2026-11-22; it was in the condition's colour,
+        % under the points, from 2026-11-21); its white halo stays white.
+        set(findall(ax,'Type','line','-not','Tag','rate_bin_median_halo'),'Color',[0 0 0],'LineWidth',2.5);
         ax.Title.Color=st.condition_color(name{1});
         % Long titles collide over narrow panels (four conditions, or the
         % product's '(product)' title): those go on two lines. The paper's
