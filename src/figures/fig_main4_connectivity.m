@@ -220,7 +220,9 @@ end
 for c = 1:nc
     for z = reshape(findall(axC(c), 'Type', 'constantline'), 1, [])
         if z.Value ~= 0; continue; end
-        line(axC(c), [-1 2], [0 0], 'Color', z.Color, 'LineStyle', z.LineStyle, 'LineWidth', z.LineWidth, ...
+        % with the ConstantLine's transparency (its Alpha, 0.7 by default)
+        % as a fourth color component, or the line reads darker than before
+        line(axC(c), [-1 2], [0 0], 'Color', [z.Color, z.Alpha], 'LineStyle', z.LineStyle, 'LineWidth', z.LineWidth, ...
             'Tag', 'zero_growth_line', 'HandleVisibility', 'off');
         delete(z);
     end
