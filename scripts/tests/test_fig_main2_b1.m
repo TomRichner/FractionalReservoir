@@ -77,9 +77,11 @@ lg.Units = 'normalized'; axb.Units = 'normalized';
 assert(abs(lg.Position(1) + lg.Position(3) - axb.Position(1) - axb.Position(3)) < 1e-9 && ...
     abs(lg.Position(2) + lg.Position(4) - axb.Position(2) - axb.Position(4)) < 1e-9 && lg.Position(1) > axb.Position(1), ...
     'the E/I key must stand at the top right inside row B''s last axes');
-% The time bar: 5 s on a 20 s window, labelled so.
+% The time bar: 5 s on a 20 s window, labelled "5 s", under row G's axes (Plan 3 fix X4).
 bar = findobj(fig, 'Tag', 'time_bar'); lab = findobj(fig, 'Tag', 'time_bar_label');
-assert(isscalar(bar) && abs(diff(bar.XData) - 5) < 1e-12 && strcmp(lab.String, '5 seconds'), 'a 5 s bar on a 20 s window');
+assert(isscalar(bar) && abs(diff(bar.XData) - 5) < 1e-12 && strcmp(lab.String, '5 s'), 'a 5 s bar on a 20 s window');
+axg = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r7_c1');
+assert(all(bar.YData < axg.YLim(1)), 'the time bar must lie under row G''s axes');
 axa = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r1_c3');
 assert(max(abs(axb.Position([1 3]) - axa.Position([1 3]))) < 1e-9, 'the key must not resize row B''s axes');
 
