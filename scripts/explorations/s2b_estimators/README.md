@@ -117,7 +117,64 @@ exponents are the eigenvalues of the Jacobian at the fixed point.
 - With the input noise of the paper (this check runs without noise) the
   network would not settle on a fixed point; whether the leading exponent then
   separates from the slow group at 30 neurons was not tested.
-- Sizes above 60 neurons were not run.
+- Sizes above 60 neurons were not run (but see the follow-up below, at 500).
+
+## Follow-up: the local rates of the paper's own figures (`s2b_06_paper_runs`)
+
+Figure 2 row G (`run_paper_illustrations`, `representative_dynamics`) and S5
+panel B (the 1-D sweeps, `lya_summary`) do not use Benettin's method. Both use
+the top-K method (`lyapunov_topk`, K = 15, QR every 0.05 s, initial basis from
+a fixed seed, 424243), and what they call the leading local rate is
+`local_LE_spectrum_t(:, 1)`: the column whose average over the window is the
+largest, whichever of the 15 vectors that is. Network of 500 neurons (2000
+states single, 4000 multiple), input noise 0.025, sra1 at 500 Hz. Windows:
+
+- Figure 2 G: T = [-15, 20] with the step over [20/3, 40/3] s, alignment over
+  [-10, 0], window [0, 20]; drawn low-passed at 2 Hz.
+- S5 B: a sweep job; at 'fast' (the data now drawn) T = [0, 10], window
+  [5, 10] after 5 s of alignment; at 'production' T = [0, 50], window [20, 50]
+  after 5 s of alignment.
+
+One trajectory per case (seeds [1 2], the preset's default network), four
+seeds of the initial basis (the class's and three others):
+
+| case | condition | accumulated lambda_1 per seed | gap 1-2 | cos start / end (median) | rms difference / std of the local rate | share > 0 per seed (halves of seed 1) |
+|---|---|---|---|---|---|---|
+| Fig 2 G | multiple | -0.098, -0.102, -0.103, -0.095 | 0.0003 to 0.007 | 0.03 / 0.06 | 226% | 0.08, 0.06, 0.15, 0.11 (0.12, 0.04) |
+| Fig 2 G | single | -0.074, -0.040, -0.023, -0.025 | 0.05 to 0.15 | 0.61 / 1.00 | 33% | 0.44, 0.45, 0.45, 0.45 (0.49, 0.39) |
+| S5 B production | multiple | -0.103, -0.098, -0.098, -0.096 | 0.001 to 0.005 | 0.07 / 0.10 | 132% | 0.13, 0.22, 0.19, 0.29 (0.09, 0.17) |
+| S5 B production | single | 0.118, 0.082, 0.116, 0.152 | 0.04 to 0.18 | 0.94 / 1.00 | 55% | 0.49, 0.51, 0.49, 0.50 (0.49, 0.49) |
+| S5 B fast | multiple | -0.057, -0.025, -0.105, -0.059 | 0.03 to 0.11 | 0.59 / 0.48 | 115% | 0.39, 0.46, 0.42, 0.49 (0.38, 0.40) |
+| S5 B fast | single | 0.379, 0.201, 0.382, 0.094 | 0.02 to 0.40 | 0.59 / 0.98 | 59% | 0.60, 0.48, 0.58, 0.45 (0.66, 0.54) |
+
+- Multiple-timescale: the local rate IS vector-dependent under the paper's
+  conditions. The five leading exponents sit within 0.006 s^-1 of each other
+  (-0.099 to -0.104), the leading vectors of different seeds are unrelated at
+  the end of the window (|cos| 0.06 to 0.10), the plotted column is a different
+  one of the 15 for each seed (raw columns 15, 13, 4, 9), and two seeds' traces
+  differ by more than a trace varies. In the production window the pooled
+  share above zero changes between seeds (0.13 to 0.29) by twice what it
+  changes between halves of the window (0.09, 0.17); the upper quartile moves
+  by 0.10 s^-1 against 0.03. The median is stable (0.02).
+- The accumulated lambda_1 of the multiple-timescale network is NOT sensitive
+  in the long windows: range 0.008 (Fig 2 G) and 0.007 (production), because
+  every slow direction decays at nearly the same rate. In the 5-s 'fast'
+  window it ranges over 0.08.
+- Single-timescale: the vectors align within the window, so the local traces
+  agree late in it, but they start unaligned (|cos| 0.6 after 10 s, 0.94 after
+  20 s). The accumulated lambda_1 is MORE seed-dependent than in the
+  multiple-timescale case: range 0.05 (Fig 2 G), 0.07 (production), 0.29
+  (fast). The sign did not change in any case.
+
+Not determined: one network and one noise path per case; other reps, swept
+levels and the pooled S5 B over all jobs were not rerun (pooling over jobs
+averages over networks, but every job uses the same basis seed, so it does not
+average over vectors). K above 15 was not tried.
+
+`s2b_topk_seeds.m` runs `lyapunov_topk` with several basis seeds on one stored
+trajectory; `s2b_06_paper_runs.m` (both conditions, three cases, about 12
+minutes, no pool) saves `s2b_06_paper_runs.mat`; `s2b_06_report.m` prints the
+comparison.
 
 ## Files
 
