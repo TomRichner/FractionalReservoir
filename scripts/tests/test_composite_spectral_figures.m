@@ -181,7 +181,8 @@ o.figs.Units = 'inches'; set(net_ax, 'Units', 'inches');
 span = max(arrayfun(@(a) sum(a.Position([1 3])), net_ax)) - min(arrayfun(@(a) a.Position(1), net_ax));
 assert(span > 0.8 * o.figs.Position(3), 'C and D together take the width of the figure (%.2f of %.2f in)', span, o.figs.Position(3));
 assert(isempty(findall(net_ax, 'Type', 'line', 'LineWidth', 3)), 'no bulk-rotation bars on D in the main figure');
-labels = string(get(findall(o.figs, 'Type', 'text', 'Tag', 'complex_plane_axes'), 'String'));
+labels = get(findall(o.figs, 'Type', 'text', 'Tag', 'complex_plane_axes'), 'String');   % the Re name under the tick labels is two lines, the first blank
+labels = string(strtrim(cellfun(@(s) strjoin(cellstr(s), ' '), labels, 'UniformOutput', false)));
 assert(any(labels == "Im (s^{-1})") && any(labels == "Re (s^{-1})") && ~any(contains(labels, "rad")), 'E: s^-1 on both axes');
 plane_ax = findall(o.figs, '-regexp', 'Tag', '^freqresp_plane_');
 assert(numel(plane_ax) == 3 && all(startsWith(get(plane_ax, 'Tag'), 'freqresp_plane_reference_')), 'E: the reference network, one panel per condition');
@@ -190,15 +191,47 @@ assert(numel(gain_ax) == 3 && isscalar(findall(o.figs, 'Tag', 'main6_margin')) &
     'A and B: one margin panel, a gain panel per selected condition, one legend');
 txt = fileread(fullfile(fig_dir, 'main6', 'Fig_Main6_Grouped_table.md'));
 assert(contains(txt, '| no_adaptation | Worst case |') && ~contains(txt, 'sfa3_std2'), 'the numbers of A and B, the selected conditions only');
+assert(contains(txt, 'radius of the effective connectivity as a perturbation at that frequency sees it') && ...
+    contains(txt, 'because the dendrite filters fast input'), 'the caption answers Tom''s question on panel C (notes of 2026-11-22)');
+st = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6 && o.figs.Position(4) <= st.canvas_max_h, ...
+    'Figure 6 is on the common canvas (%.2f x %.2f in)', o.figs.Position(3:4));
 close(o.figs);
 assert(throws(@() fig_main6_amplification(common{:}, 'network', 'EEx9p9', 'save', false), 'fresp_pick_networks:NoSuchNetwork'));
 
 % S6
-o = draw(@fig_supp6_grouped, common, fullfile(fig_dir, 'supp6'), 'Fig_Supp6_Grouped', 'ABC', ...
-    {'Panel A (fig_eigdens_gains, reference)', 'Panel B, panel 1', 'Panel B, panel 2', 'Panel C (fig_eigdens_measures, reference)'});
+o = draw(@fig_supp6_grouped, common, fullfile(fig_dir, 'supp6'), 'Fig_Supp6_Grouped', 'ABCDE', ...
+    {'Panel A (fig_eigdens_gains, reference)', 'Panel B, panel 1', 'Panel B, panel 2', 'Panel C (fig_eigdens_measures, reference)', ...
+    'Panels D and E (fig_freqresp_single_neuron, neuron 1'});
 titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), findall(o.figs, 'Type', 'axes'));
 assert(nnz(titles == "Reference") == 1 && nnz(contains(titles, "E-to-E")) == 1, 'B: one cumulative panel per network, titled by it');
-assert(numel(findall(o.figs, 'Type', 'axes')) == 2 + 2 + 4, 'A two panels, B two, C four');
+assert(numel(findall(o.figs, 'Type', 'axes')) == 2 + 2 + 4 + 2, 'A two panels, B two, C four, D and E one each');
+assert(isscalar(findall(o.figs, 'Tag', 'freqresp_single_gain_1')) && isscalar(findall(o.figs, 'Tag', 'freqresp_single_phase_1')), ...
+    'D and E: the gain and the phase of neuron 1 (the E neuron of median rate)');
+% C (Tom's notes, S6 note 3): a box per condition and panel, the reference
+% diamonds in a column of their own right of the box, never on it.
+for q = 1:4
+    ax = findall(o.figs, 'Tag', sprintf('eigdens_measures_%d', q));
+    boxes = findall(ax, 'Tag', 'eigdens_box');
+    assert(isscalar(ax) && numel(boxes) == numel(conditions), 'C panel %d: one box per condition', q);
+    refs = findall(ax, 'Tag', 'eigdens_reference');
+    assert((q == 4) == isempty(refs), 'C panel %d: reference diamonds in panels 1 to 3 only', q);
+    for r = reshape(refs, 1, [])
+        c = round(r.XData(1));
+        bx = boxes(arrayfun(@(b) abs(mean(b.XData) - (c - 0.14)) < 1e-9, boxes));
+        assert(isscalar(bx) && min(r.XData) > max(bx.XData), 'C panel %d, condition %d: the diamonds are right of the box', q, c);
+    end
+end
+lg = findall(o.figs, 'Type', 'legend');
+assert(isscalar(lg) && all(ismember({'Spike-frequency adaptation and depression', 'Spike-frequency adaptation alone', 'Depression alone'}, lg.String)), ...
+    'S6 (D, E): the key names spike-frequency adaptation as such');
+st = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6 && o.figs.Position(4) <= st.canvas_max_h, ...
+    'S6 is on the common canvas (%.2f x %.2f in)', o.figs.Position(3:4));
+close(o.figs);
+% A box over the networks, whatever their number (ten in the larger run).
+o = fig_eigdens_measures('run_dir', tmp, 'visible', false, 'save', false);
+assert(numel(findall(o.figs, 'Tag', 'eigdens_box')) == 4 * numel(conditions), 'fig_eigdens_measures: a box per condition and panel');
 close(o.figs);
 
 % S7
@@ -253,17 +286,22 @@ assert(numel(okeys) == 8 && all(ismember(okeys, {po.networks.key})) && numel(uni
 
 % S8
 o = draw(@fig_supp8_grouped, common, fullfile(fig_dir, 'supp8'), 'Fig_Supp8_Grouped', 'AB', ...
-    {'Panels A and B (fig_freqresp_single_neuron)'});
+    {'Panels A and B (fig_freqresp_single_neuron, neuron 1'});
 ax = findall(o.figs, 'Type', 'axes');
-assert(numel(ax) == 6, 'A the three gain panels, B the three phase panels: each drawn once');
-titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), ax);
-assert(nnz(strlength(titles) > 0) == 3 && all(ismember(["E neuron, median rate", "I neuron, median rate", "E neuron, driven hard"], titles)), ...
-    'S8: a title over each column');
+assert(numel(ax) == 2 && isscalar(findall(o.figs, 'Tag', 'freqresp_single_gain_1')) && isscalar(findall(o.figs, 'Tag', 'freqresp_single_phase_1')), ...
+    'S8 (Tom''s notes of 2026-11-22): one gain panel and one phase panel, the E neuron of median rate');
 lg = findall(o.figs, 'Type', 'legend');
-assert(isscalar(lg) && all(ismember({'Adaptation and depression', 'Adaptation alone', 'Depression alone'}, lg.String)), ...
-    'S8: one key that names the three line styles');
+assert(isscalar(lg) && all(ismember({'Spike-frequency adaptation and depression', 'Spike-frequency adaptation alone', 'Depression alone'}, lg.String)), ...
+    'S8: one key that names the three line styles, spike-frequency adaptation as such');
 hA = findall(o.figs, 'Tag', 'panel_letter_A'); hB = findall(o.figs, 'Tag', 'panel_letter_B');
-assert(hB.Position(2) < hA.Position(2) - 0.2, 'S8: (B) is at the phase row, below (A)');
+assert(hB.Position(1) > hA.Position(1) + 0.2, 'S8: (B) at the phase panel, right of (A)');
+txt = fileread(fullfile(fig_dir, 'supp8', 'Fig_Supp8_Grouped_table.md'));
+assert(contains(txt, '| E median |') && contains(txt, '| I median |') && contains(txt, '| E driven |'), ...
+    'S8: the neurons not drawn are in the table');
+close(o.figs);
+% The stand-alone figure keeps its three columns by default.
+o = fig_freqresp_single_neuron('run_dir', tmp, 'visible', false, 'save', false);
+assert(numel(findall(o.figs, 'Type', 'axes')) == 6, 'fig_freqresp_single_neuron: three neurons by default');
 close(o.figs);
 
 %% 5. The source figures' new options

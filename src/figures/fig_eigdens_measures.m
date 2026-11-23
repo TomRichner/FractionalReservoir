@@ -1,33 +1,45 @@
 function out = fig_eigdens_measures(cfg)
-% FIG_EIGDENS_MEASURES The four eigenvalue-density counts by condition, one marker per seed.
+% FIG_EIGDENS_MEASURES The four eigenvalue-density counts by condition: a box over the networks, the reference values beside it.
 %
 %   out = FIG_EIGDENS_MEASURES('run_dir', d)
 %   out = FIG_EIGDENS_MEASURES('run_dir', d, 'network', 'EEx1p5')
 %
 % Draws what the opt-in stage eigenvalue_density saved (FD-042). Reads one
 % run directory or the file given; simulates nothing. Supplementary.
-% Definitions of the measures: eigdens_measures. Each marker is one seed,
-% the mean over its calibration states; the conditions are on the
-% horizontal axis by their names (grouped_condition_label 'tick'),
-% spread a little within a condition so the seeds do not overlap.
+% Definitions of the measures: eigdens_measures. Each network (seed) gives
+% one value, the mean over its calibration states; the conditions are on
+% the horizontal axis by their names (grouped_condition_label 'tick').
+%
+% BOX AND WHISKER OVER THE NETWORKS (Tom's notes of 2026-11-22, S6 panel
+% C): per condition, the measured values of its networks as a box in the
+% condition's color (the box the 25th to 75th percentile, MATLAB's
+% prctile; the thick bar the median; whiskers to the most extreme network
+% within 1.5 interquartile ranges of the box; a network beyond them a
+% dot), and right of the box, apart from it, the REFERENCE values as open
+% gray diamonds, one per network, in one column. With few networks the
+% box says little: with 2 (the `fast` run) prctile puts the box on the two
+% values themselves and the bar on their mean, and the whiskers have no
+% length; with 1 the box is a bar. Until 2026-11-22 the networks were
+% dots spread within a condition with the diamond on top of each.
 %
 %   1  rim occupancy: the fraction of the eigenvalues of M = W D beyond
-%      0.8 R_eff, over the 0.36 of a uniform disk. Filled: measured; open
-%      gray diamond: the theory with the saved gains; dotted: uniform.
+%      0.8 R_eff, over the 0.36 of a uniform disk. Box: measured; diamond:
+%      the theory with the saved gains; dotted: uniform.
 %   2  the number of eigenvalues of the frozen-gain dendritic block with
-%      rate in (-2, 0] 1/s ((lambda - 1)/tau_d, tau_d = 0.1 s). Filled:
-%      measured; open diamond: a uniform disk of the same radius.
-%   3  the number with rate above 0. Filled: frozen gains; open diamond:
-%      the full Jacobian at the same states (slow variables free).
+%      rate in (-2, 0] 1/s ((lambda - 1)/tau_d, tau_d = 0.1 s). Box:
+%      measured; diamond: a uniform disk of the same radius.
+%   3  the number with rate above 0. Box: frozen gains; diamond: the full
+%      Jacobian at the same states (slow variables free).
 %   4  the number of eigenvalues of the FULL Jacobian with rate in
 %      (-2, 0] 1/s whose eigenvector lies mostly (at least half its norm^2)
 %      in the dendritic variables: the fast modes, without the slow
-%      variables' own eigenvalues.
+%      variables' own eigenvalues. No reference: the box alone.
 % Panels 3 (diamonds) and 4 are empty for a run without the dense pass.
 %
 % No text on the panels; Fig_Eigdens_Measures<suffix>_table.md has every
 % run (seed) of the network with every measure, and the definitions.
-% Options as fig_eigdens_radial.
+% Options as fig_eigdens_radial, and fig_size (inches [w h]; NaN: 34 x 11
+% cm).
 %
 % See also: eigdens_measures, eigdens_run_measures, fig_eigdens_radial
 
@@ -42,6 +54,7 @@ arguments
     cfg.preset_name (1,:) char    = ''    % unused
     cfg.network     (1,:) char    = 'reference'
     cfg.conditions                = {}
+    cfg.fig_size    (1,2) double  = [NaN NaN]   % inches [w h]; NaN = 34 x 11 cm (fig_supp6_grouped lays it out at the canvas width)
 end
 
 setup_paths();
@@ -54,36 +67,39 @@ gray = [0.45 0.45 0.45];
 ax_style = {'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out'};
 mrow = @(r, M, name) mean(r.(M)(strcmp(r.measure_names, name), :), 'omitnan');
 band_lbl = sprintf('%g to 0 s^{-1}', -S.band / S.tau_d);
+% The axis names in two lines: at the canvas width a panel is about 1.2 in
+% wide and its axis about 1.5 in tall.
 panels = { ...
-    @(r) mrow(r, 'm_M', 'shell') / uniform_shell, @(r) mrow(r, 'm_theory', 'shell') / uniform_shell, 'Rim occupancy / uniform disk'; ...
-    @(r) mrow(r, 'm_M', 'n_band'),                @(r) mrow(r, 'm_uniform', 'n_band'),               ['Eigenvalues, ' band_lbl]; ...
-    @(r) mrow(r, 'm_M', 'n_unstable'),            @(r) mean(r.full.n_unstable),                     'Eigenvalues above 0'; ...
-    @(r) mean(r.full.n_band_x),                   @(r) NaN,                                         ['Full Jacobian, ' band_lbl]};
+    @(r) mrow(r, 'm_M', 'shell') / uniform_shell, @(r) mrow(r, 'm_theory', 'shell') / uniform_shell, {'Rim occupancy /', 'uniform disk'}; ...
+    @(r) mrow(r, 'm_M', 'n_band'),                @(r) mrow(r, 'm_uniform', 'n_band'),               {'Eigenvalues,', band_lbl}; ...
+    @(r) mrow(r, 'm_M', 'n_unstable'),            @(r) mean(r.full.n_unstable),                     {'Eigenvalues', 'above 0'}; ...
+    @(r) mean(r.full.n_band_x),                   @(r) NaN,                                         {'Full Jacobian,', band_lbl}};
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Visible', vis, 'Color', 'w', 'Units', 'centimeters', 'Position', [2 2 34 11]);
+if all(isfinite(cfg.fig_size)); fig.Units = 'inches'; fig.Position(3:4) = cfg.fig_size; end
 tl = tiledlayout(fig, 1, size(panels, 1), 'TileSpacing', 'compact', 'Padding', 'compact');
 for q = 1:size(panels, 1)
     ax = nexttile(tl); hold(ax, 'on');
+    ax.Tag = sprintf('eigdens_measures_%d', q);
     if q == 1; plot(ax, [0.4 n_c + 0.6], [1 1], ':', 'Color', [0.55 0.55 0.55], 'LineWidth', 1.8); end
     y_hi = 0;
     for c = 1:n_c
         rs = F.by_cond{c};
-        x = c + linspace(-0.15, 0.15, numel(rs));
-        if isscalar(rs); x = c; end
-        for k = 1:numel(rs)
-            yc = panels{q, 2}(rs(k)); ym = panels{q, 1}(rs(k));
-            if isfinite(yc)
-                plot(ax, x(k), yc, 'd', 'Color', gray, 'MarkerFaceColor', 'w', 'MarkerSize', 9, 'LineWidth', 1.3);
-            end
-            plot(ax, x(k), ym, 'o', 'Color', F.colors{c}, 'MarkerFaceColor', F.colors{c}, 'MarkerSize', 8);
-            y_hi = max([y_hi, yc, ym], [], 'omitnan');
+        ym = arrayfun(panels{q, 1}, rs); yc = arrayfun(panels{q, 2}, rs);
+        has_ref = any(isfinite(yc));
+        x_box = c - 0.14 * has_ref;                   % the box left of the reference column, or centered when there is none
+        box_whisker(ax, x_box, ym(isfinite(ym)), F.colors{c});
+        if has_ref
+            plot(ax, repmat(c + 0.24, 1, nnz(isfinite(yc))), yc(isfinite(yc)), 'd', 'Color', gray, ...
+                'MarkerFaceColor', 'w', 'MarkerSize', 7, 'LineWidth', 1.2, 'Tag', 'eigdens_reference');
         end
+        y_hi = max([y_hi, yc, ym], [], 'omitnan');
     end
     if q == 1; y_hi = max(y_hi, 1); end
     if ~(y_hi > 0); y_hi = 1; end
     set(ax, ax_style{:}, 'XLim', [0.4 n_c + 0.6], 'XTick', 1:n_c, 'XTickLabel', F.ticks, ...
-        'YLim', [0 y_hi * 1.08], 'XTickLabelRotation', 30);
+        'YLim', [0 y_hi * 1.08], 'XTickLabelRotation', 45);
     ylabel(ax, panels{q, 3}, 'FontSize', st.label_fs);
 end
 
@@ -136,4 +152,23 @@ s = sprintf(['| %s | %d-%d | %d | %.3f | %.3f | %.3f | %.3f / %.3f / %.3f / %.3f
     m('m_M', 'n_unstable'), m('m_theory', 'n_unstable'), m('m_uniform', 'n_unstable'), ...
     mean(r.full.n_band), mean(r.full.n_band_x), mean(r.full.n_unstable), mean(r.full.n_unstable_x), ...
     r.lambda_1, max(r.theory_gap));
+end
+
+function box_whisker(ax, x, v, col)
+% A box over the values v at x: 25th to 75th percentile (prctile), the
+% median as a thick bar, whiskers to the most extreme value within 1.5
+% interquartile ranges of the box, values beyond them as dots.
+if isempty(v); return; end
+q = prctile(v, [25 50 75]);
+iqr_ = q(3) - q(1);
+inside = v(v >= q(1) - 1.5 * iqr_ & v <= q(3) + 1.5 * iqr_);
+w = 0.13;
+plot(ax, [x x], [min(inside) q(1)], '-', 'Color', col, 'LineWidth', 1.2, 'Tag', 'eigdens_whisker');
+plot(ax, [x x], [q(3) max(inside)], '-', 'Color', col, 'LineWidth', 1.2, 'Tag', 'eigdens_whisker');
+patch(ax, x + w * [-1 1 1 -1], q([1 1 3 3]), col, 'FaceAlpha', 0.35, 'EdgeColor', col, 'LineWidth', 1, 'Tag', 'eigdens_box');
+plot(ax, x + w * [-1 1], q([2 2]), '-', 'Color', col, 'LineWidth', 2.5, 'Tag', 'eigdens_median');
+out = v(v < min(inside) | v > max(inside));
+if ~isempty(out)
+    plot(ax, repmat(x, size(out)), out, '.', 'Color', col, 'MarkerSize', 10, 'Tag', 'eigdens_outlier');
+end
 end
