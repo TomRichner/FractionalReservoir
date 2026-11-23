@@ -207,6 +207,7 @@ if ~isscalar(ia)
     error('fig_main6_amplification:NoActive', '%s has no ''active'' propagator variant.', f_gain);
 end
 gain_ax = gobjects(1, n_g); hh = gobjects(1, 5);
+g_range = [Inf -Inf];                               % the medians drawn, over all panels
 glines = {sprintf('| condition | direction | regular states | largest median gain in the first %g s | median gain at %g s |', ...
     cfg.gain_window_s, cfg.gain_window_s), '|---|---|---|---|---|'};
 for i = 1:n_g
@@ -219,6 +220,7 @@ for i = 1:n_g
     for k = 1:5
         Y = cell2mat(arrayfun(@(s) s.(keys{k})(ia, :), smp(:), 'UniformOutput', false));
         md = median(Y, 1);
+        g_range = [min(g_range(1), min(md(shown))), max(g_range(2), max(md(shown)))];
         hh(k) = plot(ax, t, md, 'Color', colors(k, :), 'LineStyle', styles{k}, 'LineWidth', 1.8, 'Marker', marks{k}, ...
             'MarkerIndices', unique(round(linspace(2, numel(t), 8))), 'MarkerSize', 4);
         glines{end + 1} = sprintf('| %s | %s | %d | %.3g | %.3g |', g_names{i}, labels{k}, numel(smp), ...
@@ -234,6 +236,12 @@ for i = 1:n_g
         ylabel(ax, 'Active dendritic gain', 'FontSize', st.tick_fs);
     end
 end
+% One shared axis that holds every median drawn, with a little room at both
+% ends: MATLAB's tight limit cut the dotted curve of the third panel at the
+% floor (Tom, 2026-11-23, R8: "extend it ever so slightly so that it
+% doesn't clip"). The room is 4 percent of the span in decades.
+pad = 0.04 * max(log10(g_range(2) / g_range(1)), 1);
+set(gain_ax, 'YLim', g_range .* 10 .^ [-pad pad]);
 linkaxes(gain_ax, 'y');
 % The decades, every other one when there are many: at 1.7 in MATLAB's own
 % choice kept only 10^0 (9 in canvas, 2026-11-22).
