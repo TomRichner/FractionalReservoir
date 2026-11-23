@@ -47,7 +47,17 @@ function out = fig_outlier_plane(cfg)
 % drawn; the table counts them, over every seed, and the caption paragraph
 % names them.
 %
-% THE INSET, lower right of each panel (inset = false leaves it out): the
+% SIZE: the figure is manuscript_style canvas_w wide (or fig_w, which a
+% composite sets to its block), laid out for that width, never a wider
+% layout shrunk. Real-axis tick labels sit low enough to clear a diamond on
+% the axis, and ticks whose labels would run together at this width are
+% left out from the left (the sidecar names them).
+%
+% THE INSET, lower right of each panel (inset = false leaves it out): its
+% top right corner at the panel's right edge, inset_height radii above the
+% panel's bottom edge; it is inset_box inches large and hangs down and left
+% from that corner, below the panel if need be (Tom, 2026-11-22: "bigger";
+% the rows are spaced for it). The
 % firing-rate nonlinearity, the piecewise sigmoid centered on 0, and one
 % dot per neuron per drawn state at the neuron's operating point, from the
 % stage's saved states (nothing is re-simulated). Horizontal: u, the
@@ -59,10 +69,13 @@ function out = fig_outlier_plane(cfg)
 % excitatory_colormap(1) / inhibitory_colormap(1)). Neurons beyond |u| = inset_u_lim are drawn in a
 % short strip past a gap in the floor or ceiling line: "further out", not
 % how far. The only text on it: the letters E and I (inset_marks), each in
-% its cell-type color on its side of the curve.
+% its cell-type color on its side of the curve, at tick_fs (11 pt while the
+% insets were small).
 %
 % Text on the figure: the condition names above the columns, in their
 % colors, the network names beside the rows, the axis names and ticks.
+% The Re name is above the real axis at its right end in the bottom row
+% (below it is the inset).
 % Fig_Outlier_Plane_table.md has a caption paragraph and, per panel, as
 % the median and range over ALL seeds of the index: the radius, kappa, the
 % detachment, the diamond, the marked eigenvalues per state (all, right of
@@ -100,9 +113,11 @@ arguments
     cfg.inset_size (1,1) double   = 1.5
     cfg.inset_alpha (1,1) double  = 0.2
     cfg.inset_seed (1,1) double   = 1
-    cfg.inset_height (1,1) double {mustBePositive} = 0.62   % in largest dashed radii
+    cfg.inset_height (1,1) double {mustBePositive} = 0.62   % the inset's TOP, in largest dashed radii above the panel's bottom edge
+    cfg.inset_box (1,2) double {mustBePositive} = [1.3 1.05] % the inset's [width height], inches, hanging from its top right corner
     cfg.inset_marks (1,1) logical = true    % the letters E and I on the inset
-    cfg.inset_mark_fs (1,1) double = 11
+    cfg.inset_mark_fs double = []           % [] = manuscript_style tick_fs
+    cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
 end
 
 setup_paths();
@@ -142,12 +157,40 @@ if ~isempty(W.far_lim); axes_args = [axes_args, {'gap', W.gap}]; end
 g = complex_plane_axes([], axes_args{:});
 
 %% Panels placed by hand (inches): identical sizes, 1:1
-fig_w = 13; left = 0.6; right = 0.12; col_gap = 0.3; top_m = 0.5; row_gap = 0.35; bottom = 0.15;
+% The width is the common canvas (manuscript_style canvas_w) or the block a
+% composite gives it, so the figure is drawn at the size it is printed.
+fig_w = cfg.fig_w; if isempty(fig_w); fig_w = st.canvas_w; end
+if isempty(cfg.inset_mark_fs); cfg.inset_mark_fs = st.tick_fs; end
+left = 0.5; right = 0.05; col_gap = 0.22; bottom = 0.08;
 pw = (fig_w - left - right - (n_cond - 1) * col_gap) / n_cond;
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
+pt_in = 1 / 72;
 % A tick whose label a dot or a diamond of ANY panel would lie on is left out
 % of every panel (the panels share their ticks); the sidecar names it.
-[hidden_re, hidden_im] = covered_ticks(g, P, cfg, st.tick_fs, diff(g.x_lim) / pw);
+% The real-axis tick labels sit low enough to clear a diamond on the axis
+% (MarkerSize 9 reaches about 6.5 pt from its center), not at the 1.5 tick
+% lengths of complex_plane_axes, where at 9 in every far tick was under one.
+re_label_y = -max(1.5 * 0.018 * diff(g.y_lim), 7.5 / 72 * diff(g.x_lim) / pw);
+[hidden_re, hidden_im] = covered_ticks(g, P, cfg, st.tick_fs, diff(g.x_lim) / pw, re_label_y);
+% Of the real-axis ticks left, the labels must not run into each other at
+% this width (the far segment beyond a break held 30, 35 and 40 within half
+% an inch): from the left, a tick is kept when its label clears the last
+% one kept. The sidecar names those left out.
+[keep_re, thinned_re] = spaced_ticks(g, setdiff(g.re_ticks, hidden_re), st.tick_fs, pw / diff(g.x_lim));
+if ~isempty(thinned_re) || ~isempty(hidden_re)
+    axes_args = [axes_args, {'re_ticks', keep_re}];
+    g = complex_plane_axes([], axes_args{:});
+end
+g.thinned_re_ticks = thinned_re;
+% Above the panels: the condition titles, raised clear of the top tick label.
+top_m = 0.5 * st.tick_fs * pt_in + 0.06 + 1.25 * st.title_fs * pt_in;
+% The inset hangs from its top right corner (inset_height radii above the
+% panel's bottom edge, at its right edge) and may reach below the panel; the
+% space under each row is what it needs.
+drop = 0;
+if cfg.inset; drop = max(0, cfg.inset_box(2) - cfg.inset_height * rad_max * pw / diff(g.x_lim)); end
+row_gap = max(0.3, drop + 0.08);
+bottom = max(bottom, drop + 0.04);
 g.re_ticks = setdiff(g.re_ticks, hidden_re); g.im_ticks = setdiff(g.im_ticks, hidden_im);
 g.hidden_re_ticks = hidden_re; g.hidden_im_ticks = hidden_im;
 fig_h = top_m + n_net * ph + (n_net - 1) * row_gap + bottom;
@@ -162,10 +205,17 @@ for w = 1:n_net
         ax = axes(fig, 'Units', 'inches', 'Position', ...
             [left + (c - 1) * (pw + col_gap), bottom + (n_net - w) * (ph + row_gap), pw, ph]);
         names = {'re_label', '', 'im_label', ''};       % the names once per row and per column
-        if w == n_net; names{2} = 'Re (s^{-1})'; end
         if c == 1;     names{4} = 'Im (s^{-1})'; end
         cp = complex_plane_axes(ax, axes_args{:}, names{:});
+        if w == n_net
+            % Re at the right end of the real axis, ABOVE it, since below it
+            % is the inset; high enough to clear a diamond on the axis.
+            text(ax, cp.x_lim(2), 7.5 * pt_in * diff(cp.x_lim) / pw, 'Re (s^{-1})', 'HorizontalAlignment', 'right', ...
+                'VerticalAlignment', 'bottom', 'FontSize', st.label_fs, 'Interpreter', 'tex', 'Tag', 'complex_plane_axes', ...
+                'HandleVisibility', 'off', 'Clipping', 'off');
+        end
         remove_ticks(cp, hidden_re, hidden_im);
+        lower_re_labels(cp, re_label_y);
         p = P{w, c};
         if ~isempty(p)
             col = F.colors{c};
@@ -183,12 +233,16 @@ for w = 1:n_net
         set(ax, 'XLim', cp.x_lim, 'YLim', cp.y_lim);    % plotting must not have moved them
         if cfg.inset && ~isempty(p)
             per = ax.Position(3) / diff(cp.x_lim);      % inches per unit (1:1, so the same for Im)
-            rect = [ax.Position(1) + (W.inset_x - cp.x_lim(1)) * per, ax.Position(2), ...
-                (cp.x_lim(2) - W.inset_x) * per, cfg.inset_height * rad_max * per];
+            % The top right corner where it always was; the box grows down and left.
+            top = ax.Position(2) + cfg.inset_height * rad_max * per;
+            rect = [ax.Position(1) + ax.Position(3) - cfg.inset_box(1), top - cfg.inset_box(2), cfg.inset_box];
             draw_inset(fig, rect, p.d, ei_col, rs, cfg, st.axis_lw);
         end
         if w == 1
-            title(ax, F.titles{c}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', F.colors{c});
+            % Raised above the top tick label of the imaginary axis.
+            title(ax, F.titles{c}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', F.colors{c}, ...
+                'Units', 'data', 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center', ...
+                'Position', [mean(cp.x_lim), cp.y_lim(2) + (0.5 * st.tick_fs * pt_in + 0.06) * diff(cp.x_lim) / pw, 0]);
         end
         if c == 1
             set(ax.YLabel, 'String', F.net_labels{w}, 'FontSize', st.label_fs, 'Visible', 'on', 'Color', 'k');
@@ -283,6 +337,22 @@ end
 W.re_lim = re_lim; W.im_lim = im_lim; W.far_lim = far_lim;
 W.tick_step = cfg.tick_step;
 if isempty(W.tick_step); W.tick_step = nice_step(rad_max / 1.8); end
+end
+
+function [keep, dropped] = spaced_ticks(g, ticks, fs, in_per_unit)
+% Of the real-axis ticks given, those whose labels clear each other, kept
+% from the left: a label is about 0.56 em per character wide and needs
+% 0.1 in beside it.
+keep = []; dropped = []; right_edge = -Inf;
+for t = ticks(:)'
+    w = 0.56 * fs / 72 * (numel(sprintf('%g', abs(t))) + (t < 0));
+    xc = g.x(t) * in_per_unit;
+    if xc - w / 2 >= right_edge + 0.1
+        keep(end + 1) = t; right_edge = xc + w / 2; %#ok<AGROW>
+    else
+        dropped(end + 1) = t; %#ok<AGROW>
+    end
+end
 end
 
 function hi = last_re(g)
@@ -499,7 +569,7 @@ m = [1 2 5 10];
 s = e * m(find(m * e <= x, 1, 'last'));
 end
 
-function [hidden_re, hidden_im] = covered_ticks(g, P, cfg, fs, units_per_inch)
+function [hidden_re, hidden_im] = covered_ticks(g, P, cfg, fs, units_per_inch, re_label_y)
 % The ticks whose LABEL a drawn dot or a diamond of any panel would lie on
 % (polish list of 2026-11-22: marked eigenvalues at the left end of the
 % real axis sat on the "-30"). The label boxes are those of
@@ -518,11 +588,11 @@ for k = 1:numel(P)
     z = z(keep); is_out = is_out(keep);
     x = [x; g.x(real(z)); g.x(p.diamond)]; %#ok<AGROW>
     y = [y; imag(z); 0]; %#ok<AGROW>
-    r = [r; (sqrt(cfg.dot_size) / 2) * pt * ~is_out + (sqrt(cfg.outlier_size) / 2) * pt * is_out; 4.5 * pt]; %#ok<AGROW>
+    r = [r; (sqrt(cfg.dot_size) / 2) * pt * ~is_out + (sqrt(cfg.outlier_size) / 2) * pt * is_out; 6.5 * pt]; %#ok<AGROW>   % the diamond (MarkerSize 9) reaches about 6.5 pt from its center
 end
 label_w = @(t) 0.56 * fs * pt * (numel(sprintf('%g', abs(t))) + (t < 0));
 label_h = 0.85 * fs * pt;
-top = -1.5 * tl - 0.1 * fs * pt;                     % the glyphs begin a little under the top of the text box
+top = re_label_y - 0.1 * fs * pt;                       % the glyphs begin a little under the top of the text box
 hidden_re = [];
 for t = g.re_ticks
     xc = g.x(t); w = label_w(t);
@@ -554,14 +624,29 @@ end
 end
 
 function s = hidden_ticks_text(g)
-% The sidecar's sentence on the ticks left out.
+% The sidecar's sentences on the ticks left out.
+thinned = '';
+if ~isempty(g.thinned_re_ticks)
+    thinned = [' Real-axis ticks also left out so that their labels do not run together at this width: ' ...
+        strjoin(compose('%g', g.thinned_re_ticks), ', ') ' 1/s.'];
+end
 if isempty(g.hidden_re_ticks) && isempty(g.hidden_im_ticks)
-    s = 'No tick was left out.';
+    s = ['No tick was left out under a mark.' thinned];
     return;
 end
 parts = {};
 if ~isempty(g.hidden_re_ticks); parts{end + 1} = ['on the real axis at ' strjoin(compose('%g', g.hidden_re_ticks), ', ') ' 1/s']; end
 if ~isempty(g.hidden_im_ticks); parts{end + 1} = ['on the imaginary axis at ' strjoin(compose('%g', g.hidden_im_ticks), ', ') ' 1/s']; end
 s = ['TICKS LEFT OUT, in every panel, because an eigenvalue dot or a diamond of some panel lies where the tick''s ' ...
-    'label would be: ' strjoin(parts, ' and ') '. The window is unchanged.'];
+    'label would be: ' strjoin(parts, ' and ') '. The window is unchanged.' thinned];
+end
+
+function lower_re_labels(cp, y)
+% Move the real-axis tick labels complex_plane_axes drew (texts centered on
+% their tick, below the axis) down to y, in data units.
+for h = cp.handles
+    if isgraphics(h, 'text') && ~iscell(h.String) && strcmp(h.HorizontalAlignment, 'center') && h.Position(2) < 0
+        h.Position(2) = y;
+    end
+end
 end

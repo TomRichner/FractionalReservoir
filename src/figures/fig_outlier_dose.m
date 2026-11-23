@@ -48,7 +48,10 @@ function out = fig_outlier_dose(cfg)
 %
 % The left panel's upper limit leaves headroom above the top diamond; a
 % detachment below detachment_floor is drawn at the bottom of the axis.
-% Nothing but axis names on the panels; the conditions are told by color
+% The figure is manuscript_style canvas_w wide (or fig_w, which a composite
+% sets to its block) and fig_h tall; the vertical names are on two lines and
+% the horizontal one, the same for all three panels, is written once, under
+% the middle panel. Nothing but axis names on the panels; the conditions are told by color
 % (the caption paragraph of Fig_Outlier_Dose_table.md names them), and the
 % table gives, per level and condition, median [min, max] over seeds of
 % everything drawn, then the per-seed values.
@@ -68,6 +71,8 @@ arguments
     cfg.seed double               = []    % unused: every seed is drawn
     cfg.spread (1,:) char {mustBeMember(cfg.spread, {'lines', 'band', 'none'})} = 'lines'
     cfg.detachment_floor (1,1) double {mustBePositive} = 0.25   % the lowest value the left panel's log axis shows
+    cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
+    cfg.fig_h (1,1) double {mustBePositive} = 3.1   % inches
 end
 
 setup_paths();
@@ -101,9 +106,13 @@ diamond = median(reshape(V.rho_uniform_theory, n_net, []), 2, 'omitnan');   % ov
 
 %% Draw
 ykey = {'ratio_theory_med', 'frac_on_E', 'gain_ratio_EI'};
-ylab = {'Detachment, Re \lambda_1 / bulk radius', 'Responsive fraction of E neurons', 'Mean gain, E / I'};
+% Two lines each, so that three panels and their names fit across the
+% common canvas; the horizontal name is the same for all three and is
+% written once, under the middle panel.
+ylab = {{'Detachment,', 'Re \lambda_1 / bulk radius'}, {'Responsive fraction', 'of E neurons'}, 'Mean gain, E / I'};
+fig_w = cfg.fig_w; if isempty(fig_w); fig_w = st.canvas_w; end
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
-fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 14 4.6], 'Visible', vis);
+fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w cfg.fig_h], 'Visible', vis);
 tl = tiledlayout(fig, 1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 x_pad = 0.06 * max(max(x_seed(:)) - min([x_seed(:); 0]), eps);
 x_lim = [min([0; x_seed(:)]) - x_pad * (min(x_seed(:)) < 0), max(x_seed(:)) + x_pad];
@@ -156,7 +165,7 @@ for p = 1:3
     end
     xlim(ax, x_lim);
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
-    xlabel(ax, 'Structural outlier / bulk radius', 'FontSize', st.label_fs);
+    if p == 2; xlabel(ax, 'Structural outlier / bulk radius', 'FontSize', st.label_fs); end
     ylabel(ax, ylab{p}, 'FontSize', st.label_fs);
 end
 
