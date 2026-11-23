@@ -197,7 +197,7 @@ for j = 1:n
         why{end + 1} = 'no PNG written'; %#ok<AGROW>
     else
         info = imfinfo(png);
-        dpi = png_dpi(info, fig, name);
+        dpi = png_dpi(info, fig);
         T.png_width(j) = info.Width / dpi; T.png_height(j) = info.Height / dpi;
         if T.png_width(j) < st.canvas_w - st.canvas_tol - 0.01 || T.png_width(j) > st.canvas_w + 0.01
             why{end + 1} = sprintf('the PNG is %.2f in wide (canvas_w %g, tolerance %g)', T.png_width(j), st.canvas_w, st.canvas_tol); %#ok<AGROW>
@@ -366,22 +366,20 @@ d = d(~contains({d.name}, '_panel'));
 if isscalar(d); png = fullfile(d.folder, d.name); end
 end
 
-function dpi = png_dpi(info, fig, name)
+function dpi = png_dpi(info, fig)
 % The resolution the PNG was written at: its own record where it has one,
-% else what the writer chose (fig_grouped_main writes at 200;
-% save_some_figs_to_folder_2's png_resolution otherwise).
+% else what every writer of the 18 chooses: save_some_figs_to_folder_2's
+% png_resolution, 600 dpi lowered so the longer side stays within 4000 px.
+% fig_grouped_main writes Figures 2 and 3 so too since Plan 3 fix X1 (they
+% were written at a fixed 200 dpi before it).
 dpi = NaN;
 if isfield(info, 'XResolution') && ~isempty(info.XResolution)
     dpi = info.XResolution;
     if strcmpi(info.ResolutionUnit, 'meter'); dpi = dpi * 0.0254; end
 end
 if isnan(dpi) || dpi < 10
-    if ismember(name, {'fig_main2_grouped', 'fig_main3_grouped'})
-        dpi = 200;
-    else
-        px = getpixelposition(fig);
-        dpi = min(600, floor(4000 * get(groot, 'ScreenPixelsPerInch') / max(px(3:4))));
-    end
+    px = getpixelposition(fig);
+    dpi = min(600, floor(4000 * get(groot, 'ScreenPixelsPerInch') / max(px(3:4))));
 end
 end
 
