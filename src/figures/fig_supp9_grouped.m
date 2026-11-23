@@ -281,7 +281,8 @@ for k = 1:numel(tx); tx(k).String = T.sentence(tx(k).String); end          % 'Se
 % note is returned for the table, where the caption takes it from.
 note = '';
 if any(is_note)
-    note = strjoin(cellfun(@(s) strjoin(cellstr(s), ' '), {tx(is_note).String}, 'UniformOutput', false), '; ');
+    note = cellfun(@(s) strtrim(strjoin(cellstr(s), ' ')), {tx(is_note).String}, 'UniformOutput', false);
+    note = strjoin(note(~cellfun(@isempty, note)), '; ');
     delete(tx(is_note));
     delete(findall(key, 'Type', 'scatter', 'Marker', 'square'));
 end
