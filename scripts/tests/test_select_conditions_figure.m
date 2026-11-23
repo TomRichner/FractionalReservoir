@@ -55,7 +55,7 @@ t = panel_titles(out.figs);
 want = cellfun(@(c) st.condition_title(c), run_conds, 'UniformOutput', false);
 n_fail = n_fail + check(isequal(t, want), sprintf('no selection: %d panels, run order, titled by name', numel(t)));
 % The rate-bin median (Plan 3, Figure 4 notes 3 and 5): one black line per
-% panel, above the points (drawn after them), over a white halo.
+% panel, above the points (drawn after them), with no white halo (2026-11-23).
 ax = findall(out.figs, 'Type', 'axes');
 ok = numel(ax) == numel(want);
 for k = 1:numel(ax)
@@ -63,9 +63,9 @@ for k = 1:numel(ax)
     med = findobj(kids, 'flat', 'Tag', 'rate_bin_median');
     sc = find(arrayfun(@(h) isa(h, 'matlab.graphics.chart.primitive.Scatter'), kids));
     ok = ok && isscalar(med) && isequal(med.Color, [0 0 0]) && find(kids == med) < min(sc) && ...
-        isscalar(findall(ax(k), 'Tag', 'rate_bin_median_halo'));   % findall: the halo is kept out of the legend
+        isempty(findall(ax(k), 'Tag', 'rate_bin_median_halo'));   % findall: a halo would be kept out of the legend
 end
-n_fail = n_fail + check(ok, 'median per rate bin: black, on top of the points, with its halo, in every panel');
+n_fail = n_fail + check(ok, 'median per rate bin: black, on top of the points, no halo, in every panel');
 close(out.figs);
 % Joint sample only: every dot one size.
 out = fig_lle_vs_rate(base{:}, 'save', false, 'include_sweeps', false);

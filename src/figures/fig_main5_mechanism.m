@@ -79,9 +79,10 @@ width = st.canvas_w - margin(1) - margin(2);
 % by inset_clear (0.08 -> 0.03 in, inset box to the next row), the second
 % by the composite's row gap (0.12 -> -0.196 in; the plane figure's own
 % bottom margin under its insets and the letters' strip above (B) to (D)
-% stay as they were).
+% stay as they were). Tom, 2026-11-23 (third round): the letters E and I
+% on the insets about 30 percent closer to the curve (inset_mark_pull).
 [f_plane, t_plane, o_plane] = composite_part(@fig_outlier_plane, cfg, 'networks', cfg.networks, 'seed', cfg.seed, ...
-    'fig_w', width, 'dashed_circle', false, 'inset_clear', 0.03);
+    'fig_w', width, 'dashed_circle', false, 'inset_clear', 0.03, 'inset_mark_pull', 0.3);
 [f_dose, t_dose] = composite_part(@fig_outlier_dose, cfg, 'fig_w', width);
 [fig, B] = composite_figure({struct('fig', f_plane, 'width', width), struct('fig', f_dose, 'width', width)}, ...
     'visible', cfg.visible, 'margin', margin, 'width', st.canvas_w, 'row_gap', 0.12 - 0.316);

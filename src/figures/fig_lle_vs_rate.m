@@ -32,7 +32,8 @@ function out = fig_lle_vs_rate(cfg)
 % axes (no clamping, no triangles; TR, 2026-09-15). The line ON the points
 % is the median of lambda_1 per bin of rate (ten bins of 0.1, a bin with
 % at least three networks), in one color in every panel (median_color,
-% black; Plan 3, 2026-11-22) over a white halo, tagged 'rate_bin_median',
+% black; Plan 3, 2026-11-22), plain, with no white halo under it (Tom,
+% 2026-11-23: "I don't want it to be black on top of white"), tagged 'rate_bin_median',
 % DisplayName 'Median per rate bin'. With include_sweeps false (main
 % Figure 4, panel C) only the joint sample is drawn, every dot one size.
 %
@@ -183,13 +184,11 @@ for i = 1:n_cond
     % every network: a plain filled circle, no edge; out-of-window points fall off the axes
     scatter(ax, x, y, sz, c, 'filled');
     % The median ON TOP of the points, in one color in every panel (black by
-    % default), over a wider white line so that it stands out where the
-    % points crowd (Tom, 2026-11-22, Figure 4 note 3: in the condition's
-    % colour and under the points it could not be made out in the
-    % multiple-timescale panel).
+    % default; Tom, 2026-11-22, Figure 4 note 3: in the condition's colour
+    % and under the points it could not be made out in the
+    % multiple-timescale panel). No white halo under it (Tom, 2026-11-23:
+    % "I just want the median line to be black").
     keep = ~isnan(bm);
-    plot(ax, bx(keep), bm(keep), '-', 'Color', [1 1 1], 'LineWidth', cfg.median_lw + 2.5, ...
-        'Tag', 'rate_bin_median_halo', 'HandleVisibility', 'off');
     plot(ax, bx(keep), bm(keep), '-', 'Color', cfg.median_color, 'LineWidth', cfg.median_lw, ...
         'Tag', 'rate_bin_median', 'DisplayName', 'Median per rate bin');
     hold(ax, 'off'); box(ax, 'off');
