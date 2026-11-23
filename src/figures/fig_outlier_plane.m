@@ -29,7 +29,9 @@ function out = fig_outlier_plane(cfg)
 %             gains, the MEDIAN over the drawn states, no finite-size factor
 %   thin dashed circle  that radius times the run's kappa: how far the
 %             rightmost eigenvalue of a structureless matrix with the same
-%             gains reaches (95th percentile of the null draws)
+%             gains reaches (95th percentile of the null draws).
+%             dashed_circle = false leaves it out (main Figure 5; Tom,
+%             2026-11-22); the window is still sized from that radius.
 %   diamond   where the rightmost eigenvalue would be with every gain equal
 %             (the rms gain): the outlier the weights alone make. Median
 %             over the drawn states.
@@ -57,7 +59,8 @@ function out = fig_outlier_plane(cfg)
 % top right corner at the panel's right edge, inset_height radii above the
 % panel's bottom edge; it is inset_box inches large and hangs down and left
 % from that corner, below the panel if need be (Tom, 2026-11-22: "bigger";
-% the rows are spaced for it). The
+% the rows are spaced for it: inset_clear inches from an inset's bottom to
+% the top of the row below, 0.08 by default). The
 % firing-rate nonlinearity, the piecewise sigmoid centered on 0, and one
 % dot per neuron per drawn state at the neuron's operating point, from the
 % stage's saved states (nothing is re-simulated). Horizontal: u, the
@@ -117,6 +120,8 @@ arguments
     cfg.inset_box (1,2) double {mustBePositive} = [1.3 1.05] % the inset's [width height], inches, hanging from its top right corner
     cfg.inset_marks (1,1) logical = true    % the letters E and I on the inset
     cfg.inset_mark_fs double = []           % [] = manuscript_style tick_fs
+    cfg.inset_clear (1,1) double {mustBeNonnegative} = 0.08   % inches from an inset's bottom to the top of the row below
+    cfg.dashed_circle (1,1) logical = true  % the thin dashed circle (kappa times the bulk radius); false leaves it out
     cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
 end
 
@@ -189,7 +194,7 @@ top_m = 0.5 * st.tick_fs * pt_in + 0.06 + 1.25 * st.title_fs * pt_in;
 % space under each row is what it needs.
 drop = 0;
 if cfg.inset; drop = max(0, cfg.inset_box(2) - cfg.inset_height * rad_max * pw / diff(g.x_lim)); end
-row_gap = max(0.3, drop + 0.08);
+row_gap = max(0.3, drop + cfg.inset_clear);
 bottom = max(bottom, drop + 0.04);
 g.re_ticks = setdiff(g.re_ticks, hidden_re); g.im_ticks = setdiff(g.im_ticks, hidden_im);
 g.hidden_re_ticks = hidden_re; g.hidden_im_ticks = hidden_im;
@@ -219,7 +224,9 @@ for w = 1:n_net
         p = P{w, c};
         if ~isempty(p)
             col = F.colors{c};
-            plot(ax, cp.x(p.center + p.rad_cal * cos(th)), p.rad_cal * sin(th), '--', 'Color', [0.72 0.72 0.72], 'LineWidth', 0.75);
+            if cfg.dashed_circle
+                plot(ax, cp.x(p.center + p.rad_cal * cos(th)), p.rad_cal * sin(th), '--', 'Color', [0.72 0.72 0.72], 'LineWidth', 0.75);
+            end
             plot(ax, cp.x(p.center + p.rad * cos(th)), p.rad * sin(th), '-', 'Color', gray, 'LineWidth', 1.5);
             z = p.d.z(:); is_out = p.is_out(:);
             shown = real(z) >= g.re_lim(1) & real(z) <= last_re(g) & abs(imag(z)) <= g.y_lim(2);
@@ -462,23 +469,32 @@ else
     left_txt = ['EIGENVALUES LEFT OF THE WINDOW ARE NOT DRAWN (there is no break on the left). Over all seeds: ' ...
         strjoin(left_txt, '; ') '.'];
 end
+% The circle kappa times the bulk radius: drawn dashed, or not drawn
+% (dashed_circle = false) though it still sizes the window and the ticks.
+calib = ['that radius times kappa, how far the rightmost eigenvalue of a structureless matrix with the same ' ...
+    'entries and gains reaches (95th percentile of the null draws)'];
+if cfg.dashed_circle
+    dash_txt = ['THIN DASHED CIRCLE: ' calib '.'];
+    dash_name = 'dashed circle';
+else
+    dash_txt = ['NO DASHED CIRCLE is drawn; the window and the ticks are still sized from the circle of ' calib '.'];
+    dash_name = 'such circle';
+end
 fprintf(fid, '# %s\n\n', fig_tag);
 fprintf(fid, ['Rows: the networks (%s). Columns: the conditions. Each panel overlays the %d calibration states of one ' ...
     'run, network seed [%d %d] (%d neurons; the states are spread evenly over the %g s measured window). DOTS: every ' ...
     'eigenvalue of the frozen-gain effective connectivity (each neuron''s outgoing weights times its gain at that ' ...
     'state, slow variables held), drawn as a rate (lambda - 1)/tau_d in 1/s, so the imaginary axis is the stability ' ...
     'boundary. SOLID GRAY CIRCLE: the theoretical bulk, centered on -1/tau_d = %.3g 1/s, radius R_eff/tau_d predicted ' ...
-    'from the gains, the median over the drawn states, with no finite-size factor. THIN DASHED CIRCLE: that radius ' ...
-    'times kappa, how far the rightmost eigenvalue of a structureless matrix with the same entries and gains reaches ' ...
-    '(95th percentile of the null draws). OPAQUE, LARGER DOTS: eigenvalues farther from the center than %.3g times the ' ...
+    'from the gains, the median over the drawn states, with no finite-size factor. %s OPAQUE, LARGER DOTS: eigenvalues farther from the center than %.3g times the ' ...
     'theoretical radius of THEIR OWN state, in any direction (so a marked dot can lie inside the drawn median circle ' ...
     'and an unmarked one outside it). OPEN DIAMOND: where the rightmost eigenvalue would be if every neuron had the ' ...
     'same gain (the rms of the observed gains): the outlier the weights alone make (median over the drawn states). ' ...
     'The rightmost eigenvalue of each state is not ringed.\n\n'], strjoin(F.networks, ', '), first.n_cal, seed, first.n, ...
-    first.window_s, c0, f);
+    first.window_s, c0, dash_txt, f);
 fprintf(fid, ['AXES: through the origin (`complex_plane_axes`), one unit of Re as long as one unit of Im, identical in ' ...
-    'every panel: real axis [%.3g, %.3g] 1/s, imaginary axis [%.3g, %.3g] 1/s; ticks only outside the largest dashed ' ...
-    'circle (radius %.3g 1/s). %s %s %s\n\n'], g.re_lim, g.y_lim, rad_max, break_txt, left_txt, hidden_ticks_text(g));
+    'every panel: real axis [%.3g, %.3g] 1/s, imaginary axis [%.3g, %.3g] 1/s; ticks only outside the largest %s ' ...
+    '(radius %.3g 1/s). %s %s %s\n\n'], g.re_lim, g.y_lim, dash_name, rad_max, break_txt, left_txt, hidden_ticks_text(g));
 if cfg.inset
     a = first.S_a / 2;
     fprintf(fid, ['INSET (lower right of each panel; the letters E and I mark the two cell types). The black curve is the firing-rate nonlinearity, ' ...
@@ -532,7 +548,8 @@ for w = 1:n_net
 end
 fprintf(fid, ['\nThe drawn panels (seed [%d %d]): the radii of the two circles, the marked dots in view, and the ' ...
     'eigenvalue dots outside the window on any side (not drawn), totals over the %d states.\n\n'], seed, first.n_cal);
-fprintf(fid, '| network | condition | solid radius (1/s) | dashed radius (1/s) | diamond (1/s) | marked, in view | not drawn |\n');
+if cfg.dashed_circle; dash_col = 'dashed radius (1/s)'; else; dash_col = 'kappa times radius (1/s; not drawn)'; end
+fprintf(fid, '| network | condition | solid radius (1/s) | %s | diamond (1/s) | marked, in view | not drawn |\n', dash_col);
 fprintf(fid, '|---|---|---|---|---|---|---|\n');
 for w = 1:n_net
     for c = 1:n_cond
