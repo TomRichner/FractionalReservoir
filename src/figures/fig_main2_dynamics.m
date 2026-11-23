@@ -10,9 +10,10 @@ function out=fig_main2_dynamics(run_dir,source_fig_root,conditions)
 % so a name the run lacks is an error. Column titles and colours come from
 % the condition NAME (grouped_condition_label 'sentence', manuscript_style),
 % not from the title the stage saved. N columns keep the three-column pitch
-% (.30 of the three-column width) and the canvas widens with them;
-% out.width_scale is the canvas width relative to the three-column sheet
-% (1 for three columns, whose geometry is unchanged). The archived raster
+% (one column and one gap of the three-column sheet) and the canvas widens
+% with them; out.width_scale is the canvas width relative to the common
+% canvas (manuscript_style canvas_w; 1 for three columns). The sheet itself
+% is 0.95 of that canvas (see THE LAYOUT below). The archived raster
 % (no numeric stage) holds exactly the three columns of the mu7 run it was
 % calibrated on, no_adaptation / sfa1_std1 / sfa3_std2, and is selected from
 % by the same rule.
@@ -56,11 +57,28 @@ else
         'x row maps[-10,10]; rate/synaptic/SFA rows[0,1]; depression[0,1.02]. ' ...
         'LLE tick calibration: pixel5690.5=0,34.6 pixels per inverse second. Raster-coordinate precision is about one source pixel.']};
 end
-% N columns at the three-column pitch: x positions and widths below are the
-% three-column sheet's, scaled by 1/width_scale, so three columns are exactly
-% the sheet of before and a fourth adds .30 of its width.
-n_col=numel(names); width_scale=1+(n_col-3)*.30; s=1/width_scale;
-fig=figure('Visible','off','Color','w','Position',[40 40 1450*width_scale 1200]);
+% THE LAYOUT (Plan 3, 2026-11-22: the common canvas, manuscript_style's
+% canvas_w, with the type at its role's size in points). The sheet is drawn
+% at 0.95 of the canvas, because fig_grouped_main copies it into the middle
+% 0.95 of the composite: what is measured here in inches is then the same
+% on the composite. Everything below is in inches and turned into
+% normalized units; nothing is scaled from a wider sheet. N columns keep
+% the three-column pitch and the canvas widens with them.
+st=manuscript_style();
+n_col=numel(names);
+G.left=1.52;    % panel letter, y label (up to three lines) and tick labels of column 1
+G.right=.50;    % the E/I key beside the last column
+G.gap=.56;      % between columns: the divider, and row (G)'s own tick labels
+G.top=.62;      % the column titles (two lines)
+G.bottom=.40;   % the scale bar's label under row (G)
+G.row_h=1.02; G.row_gap=.20;
+sheet_w3=.95*st.canvas_w;                              % three columns
+G.ax_w=(sheet_w3-G.left-G.right-2*G.gap)/3;
+sheet_w=G.left+G.right+n_col*G.ax_w+(n_col-1)*G.gap;
+sheet_h=G.top+G.bottom+7*G.row_h+6*G.row_gap;
+width_scale=(sheet_w/.95)/st.canvas_w;                 % 1 for three columns
+ppi=get(groot,'ScreenPixelsPerInch');
+fig=figure('Visible','off','Color','w','Position',[40 40 sheet_w*ppi sheet_h*ppi]);
 % SEVEN rows, (A)-(G): the input step first, the local lambda(t) smoothed
 % by a 2-Hz low-pass, half of the saved neurons in the model's E/I colours
 % (excitatory_colormap / inhibitory_colormap in src/plotting, the palettes SRNNModel2.plot uses; TR, 2026-09-16).
@@ -70,46 +88,61 @@ ax_all=gobjects(7,n_col);
 % Tom, 2026-11-17: b1 is the synaptic depression). Not the route's depression
 % factor `std` (prod(b) on a product route), which the stage also saves.
 rows={'u','x','r','syn','sfa','b1','lambda'};
-labels={'Input, $u_i$',{'Dendritic','potential, $x_i$'},'Spike rate, $r_i$', ...
-    {'Synaptic','output, $\theta_i$'},{'Spike-Frequency','Adaptation'}, ...
-    {'Synaptic','Depression'},{'Lyapunov Exp.,','$\lambda_1$'}};
-% (The label stays "Synaptic Depression": with ", $b_1$" its long second line
+% Words in the figure's own typeface, only the symbols in italics (Tom,
+% 2026-11-22, note 6: the labels need not be LaTeX apart from the symbols).
+labels={'Input, {\itu_i}',{'Dendritic','potential, {\itx_i}'},'Spike rate, {\itr_i}', ...
+    {'Synaptic','output, \theta_{\iti}'},{'Spike-','Frequency','Adaptation'}, ...
+    {'Synaptic','Depression'},{'Lyapunov','Exp., \lambda_1'}};
+% (The label stays "Synaptic Depression": with ", b_1" its long second line
 % runs into the labels of rows E and G. The provenance names b1.)
 titles=grouped_condition_label(names,'sentence');
-st=manuscript_style();
+% Row (G), Tom 2026-11-22: no adaptation on plus or minus 5, every adapting
+% condition on plus or minus 1.
+lambda_lim=ones(1,n_col); lambda_lim(strcmp(names,'no_adaptation'))=5;
 for c=1:n_col
     for j=1:7
-        ax=axes(fig,'Position',[(.105+(c-1)*.30)*s .085+(7-j)*.1225 .245*s .092], ...
+        x0=G.left+(c-1)*(G.ax_w+G.gap); y0=G.bottom+(7-j)*(G.row_h+G.row_gap);
+        ax=axes(fig,'Position',[x0/sheet_w y0/sheet_h G.ax_w/sheet_w G.row_h/sheet_h], ...
             'Tag',sprintf('dynamics_r%d_c%d',j,c)); ax_all(j,c)=ax; hold(ax,'on');
         if numeric
             draw_numeric(ax,D.results(c),rows{j});
         else
             draw_artwork(ax,artwork,j,cidx(c));
         end
-        set(ax,'FontSize',14,'LineWidth',1,'Box','off','YDir','normal','XLim',window);
+        set(ax,'FontSize',st.tick_fs,'LineWidth',st.axis_lw,'Box','off','YDir','normal','XLim',window);
         ax.XAxis.Visible='off';
         if c==1
-            ylabel(ax,labels{j},'Interpreter','latex','FontSize',14);
-            text(ax,-.40,1.05,sprintf('(%c)',char('A'+j-1)),'Units','normalized', ...
-                'FontSize',14,'HorizontalAlignment','left','VerticalAlignment','top','Clipping','off');
+            ylabel(ax,labels{j},'Interpreter','tex','FontSize',st.label_fs);
+            % At the sheet's left edge, level with the top of the row.
+            text(ax,-G.left/G.ax_w,1.05,sprintf('(%c)',char('A'+j-1)),'Units','normalized', ...
+                'FontSize',st.letter_fs,'HorizontalAlignment','left','VerticalAlignment','top','Clipping','off');
         end
+        % Few ticks (Tom, 2026-11-22): an axis from 0 to 1 has 0 and 1 only;
+        % the input row runs 0 to .35 with 0 and .25.
         switch j
-            case 1, ylim(ax,[-.05 .55]); yticks(ax,[0 .25 .5]);
+            case 1, ylim(ax,[0 .35]); yticks(ax,[0 .25]);
             case 2, ylim(ax,[-6 6]); yticks(ax,[-5 0 5]);
-            case {3,4}, ylim(ax,[0 1]); yticks(ax,[0 .5 1]);
+            case {3,4}, ylim(ax,[0 1]); yticks(ax,[0 1]);
             case 5, ylim(ax,[0 .6]); yticks(ax,[0 .5]);
             case 6
                 % b1 lies in [0,1]; the archived raster keeps its calibrated [0,1.02].
                 if numeric, ylim(ax,[0 1]); else, ylim(ax,[0 1.02]); end
-                yticks(ax,[0 .5 1]);
-            case 7, ylim(ax,[-5 5]); yticks(ax,[-5 0 5]);
+                yticks(ax,[0 1]);
+            case 7, ylim(ax,lambda_lim(c)*[-1 1]); yticks(ax,lambda_lim(c)*[-1 0 1]);
         end
+        % Tick labels on the left column only; in row (G) also on a column
+        % whose axis is not the left column's (the tick marks stay).
+        if c>1 && ~(j==7 && lambda_lim(c)~=lambda_lim(1)), ax.YTickLabel={}; end
         if j==7
             yline(ax,0,'--','Color',[0 .55 0],'LineWidth',.5,'Tag','lambda_zero');
         end
         if j==1
-            title(ax,titles{c},'FontSize',16,'FontWeight','normal','Color',st.condition_color(names{c}));
-            ax.Title.Units='normalized'; ax.Title.Position=[.5 1.20 0];
+            % "Single-timescale adaptation" is wider than a column of the
+            % 9 in canvas: the last word goes on a second line.
+            t=titles{c}; k=find(t==' ',1,'last');
+            if ~isempty(k) && numel(t)>16, t={t(1:k-1),t(k+1:end)}; end
+            title(ax,t,'FontSize',st.title_fs,'FontWeight','normal','Color',st.condition_color(names{c}));
+            ax.Title.Units='normalized'; ax.Title.Position=[.5 1+.10/G.row_h 0];
         end
     end
 end
@@ -127,27 +160,30 @@ li=plot(ax_all(2,end),NaN,NaN,'Color',ci,'LineWidth',.5);
 % 'northeast', it sat on the traces of that column). The axes keep their
 % place: the legend is positioned by hand, not by a Location that resizes.
 row_b=ax_all(2,end).Position;
-lg=legend(ax_all(2,end),[le li],{'E','I'},'FontSize',14,'Box','off','AutoUpdate','off','Tag','EI_key');
+lg=legend(ax_all(2,end),[le li],{'E','I'},'FontSize',st.tick_fs,'Box','off','AutoUpdate','off','Tag','EI_key');
 lg.ItemTokenSize=[14 18]; lg.Units='normalized'; drawnow;
 q=lg.Position;
-lg.Position=[row_b(1)+row_b(3)+.004*s, row_b(2)+row_b(4)-q(4), q(3), q(4)];
+% Flush with the sheet's right edge, so the drawing fills the canvas width.
+lg.Position=[max(row_b(1)+row_b(3),1-q(3)), row_b(2)+row_b(4)-q(4), q(3), q(4)];
 ax_all(2,end).Position=row_b;
-% Requested lower-left lambda panel, with explicit data coordinates.
-plot(ax_all(7,1),[5 15],[-4.8 -4.8],'k','LineWidth',4,'Tag','ten_second_bar');
-text(ax_all(7,1),10,-5.6,'10 seconds','FontSize',14,'HorizontalAlignment','center', ...
+% Lower-left lambda panel: the time bar on the axis floor, its label under it.
+yl=ax_all(7,1).YLim;
+plot(ax_all(7,1),[5 15],(yl(1)+.02*diff(yl))*[1 1],'k','LineWidth',4,'Tag','ten_second_bar');
+text(ax_all(7,1),10,yl(1)-.06*diff(yl),'10 seconds','FontSize',st.tick_fs,'HorizontalAlignment','center', ...
     'VerticalAlignment','top','Clipping','off','Tag','ten_second_label');
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
 % Between the columns, clear of the tick labels of every row: the place is
 % measured on the drawn axes (column_dividers), not typed in, and measured
-% again on the composite's canvas (fig_grouped_main).
-column_dividers(sep,'dynamics',n_col,[.07 .945],'Color',[.88 .88 .88],'LineWidth',2.5);
+% again on the composite's canvas (fig_grouped_main). From under row (G) to
+% the top of row (A), below the titles.
+column_dividers(sep,'dynamics',n_col,[(G.bottom-.25)/sheet_h 1-(G.top-.04)/sheet_h],'Color',[.88 .88 .88],'LineWidth',2.5);
 uistack(sep,'bottom');
 notes{end+1}=['Numeric rendering draws the first half of the saved neurons of each type (round(25/2): 25 saved -> 13 displayed), ' ...
     'the same indices in every state row, in the model''s own E/I palettes (excitatory_colormap / inhibitory_colormap, ' ...
     'the colours SRNNModel2.plot uses). Row (A) is the uniform input step. Row (G): the local rate is low-pass filtered at 2 Hz ' ...
     '(2nd-order Butterworth, zero phase) for display only and drawn in a lighter tint of the column''s condition color; ' ...
     'the finite-time (accumulated) lambda_1 is unfiltered, in the condition color. The E/I key stands right of row (B), outside the axes. ' ...
-    'The green dashed 0.5-point zero reference and descriptive LaTeX labels apply to both sources.'];
+    'The green dashed 0.5-point zero reference and the y labels (words in the figure typeface, symbols in italics) apply to both sources. Y ticks: 0 and 1 on the unit axes, 0 and 0.25 on the input row (limits 0 to 0.35); tick labels on the left column only, except row (G), where no adaptation is on plus or minus 5 and the adapting conditions are on plus or minus 1 with their own tick labels (the local rate is clipped there).'];
 notes{end+1}=sprintf('Columns, left to right: %s (titled and coloured by condition name).',strjoin(names,', '));
 if numeric
     notes{end+1}=['Row (F), Synaptic Depression: b1, the first depression variable (available resources, 0 to 1) ' ...

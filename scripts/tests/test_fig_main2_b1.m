@@ -9,7 +9,12 @@
 %      (SFA only), leave row (F) blank;
 %   3. the provenance notes name b1;
 %   4. a saved file without b1 (predating item 12) is refused with
-%      fig_main2_dynamics:NoB1.
+%      fig_main2_dynamics:NoB1;
+%   5. the y axes are as Tom asked on 2026-11-22 (0 and 1 on unit axes, the
+%      input row 0 to 0.35 with 0 and 0.25, tick labels on the left column
+%      only, row (G) on +-5 without adaptation and +-1 with), the type is at
+%      its role's size, and the column dividers stand in a gap, clear of the
+%      tick labels.
 % Asserts; prints one PASS line.
 %
 % See also: fig_main2_dynamics, run_paper_illustrations
@@ -67,10 +72,53 @@ end
 lg = findobj(fig, 'Type', 'legend'); axb = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r2_c3');
 assert(isscalar(lg) && isequal(lg.String, {'E', 'I'}), 'one E/I key');
 lg.Units = 'normalized'; axb.Units = 'normalized';
-assert(lg.Position(1) >= axb.Position(1) + axb.Position(3) && lg.Position(1) + lg.Position(3) <= 1, ...
+assert(lg.Position(1) >= axb.Position(1) + axb.Position(3) && lg.Position(1) + lg.Position(3) <= 1 + 1e-9, ...
     'the E/I key must stand right of row B''s axes, inside the canvas');
 axa = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r1_c3');
 assert(max(abs(axb.Position([1 3]) - axa.Position([1 3]))) < 1e-9, 'the key must not resize row B''s axes');
+
+% 5. The y axes (Tom's notes on Figure 2, 2026-11-22).
+want_lim = {[0 .35], [-6 6], [0 1], [0 1], [0 .6], [0 1]};
+want_tick = {[0 .25], [-5 0 5], [0 1], [0 1], [0 .5], [0 1]};
+for c = 1:3
+    for j = 1:6
+        ax = findobj(fig, 'Type', 'axes', 'Tag', sprintf('dynamics_r%d_c%d', j, c));
+        assert(isequal(ax.YLim, want_lim{j}) && isequal(ax.YTick, want_tick{j}), ...
+            'row %d of column %d: y limits %s, ticks %s', j, c, mat2str(ax.YLim), mat2str(ax.YTick));
+        assert((c == 1) ~= isempty(ax.YTickLabel), 'row %d: y tick labels belong on the left column only (column %d)', j, c);
+    end
+    % Row (G): no adaptation on +-5, the adapting conditions on +-1, each
+    % with its own tick labels since the axis is not the left column's.
+    ax = findobj(fig, 'Type', 'axes', 'Tag', sprintf('dynamics_r7_c%d', c));
+    lim = 1 + 4 * (c == 1);
+    assert(isequal(ax.YLim, lim * [-1 1]) && isequal(ax.YTick, lim * [-1 0 1]), 'row G of column %d: limits %s', c, mat2str(ax.YLim));
+    assert(~isempty(ax.YTickLabel), 'row G of column %d must carry tick labels', c);
+end
+% The type by role, and the sheet 0.95 of the common canvas wide.
+ax = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r4_c1');
+assert(ax.FontSize == st.tick_fs && ax.YLabel.FontSize == st.label_fs && strcmp(ax.YLabel.Interpreter, 'tex'), ...
+    'ticks at tick_fs, y labels at label_fs in the figure typeface');
+ax = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r1_c2');
+assert(ax.Title.FontSize == st.title_fs && iscell(ax.Title.String) && numel(ax.Title.String) == 2, ...
+    'a long column title is on two lines at title_fs');
+px = getpixelposition(fig);
+assert(abs(px(3) / get(groot, 'ScreenPixelsPerInch') - .95 * st.canvas_w) < .02 && abs(out.width_scale - 1) < 1e-9, ...
+    'three columns: the sheet is 0.95 of canvas_w wide');
+% The dividers: placed again without a NoGap warning, each between the
+% drawn extent of its left column and the tick labels of its right column.
+lastwarn('');
+column_dividers(fig);
+[~, wid] = lastwarn;
+assert(~strcmp(wid, 'column_dividers:NoGap'), 'the columns must leave a gap for the dividers');
+dv = sort(arrayfun(@(l) l.XData(1), findall(fig, 'Tag', 'column_divider'))) * px(3);
+assert(numel(dv) == 2, 'two dividers for three columns');
+for c = 1:2
+    lp = getpixelposition(findobj(fig, 'Type', 'axes', 'Tag', sprintf('dynamics_r7_c%d', c)));
+    ra = findobj(fig, 'Type', 'axes', 'Tag', sprintf('dynamics_r7_c%d', c + 1));
+    rp = getpixelposition(ra); ra.Units = 'pixels'; ti = ra.TightInset;
+    assert(dv(c) > lp(1) + lp(3) + 2 && dv(c) < rp(1) - ti(1) - 2, ...
+        'divider %d must lie between column %d and the tick labels of column %d', c, c, c + 1);
+end
 close(fig);
 
 results(2).std_model = 'none';                          % stands in for an SFA-only column
