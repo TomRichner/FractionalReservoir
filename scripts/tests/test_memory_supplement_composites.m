@@ -324,11 +324,11 @@ switch name
     case 'fig_supp5_grouped'
         % (A) is the firing-rate histogram stacked by E:I weight ratio, with
         % one color bar (Plan 3: the lambda_1 histogram is main Figure 4B).
-        rate = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Firing Rate'), ax));
+        rate = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'firing rate', 'IgnoreCase', true), ax));
         cb = findall(fig, 'Type', 'colorbar');
         ok = numel(rate) == 3 && all(arrayfun(@(h) ~isempty(findall(h, 'Type', 'patch')), rate)) && ...
             isscalar(cb) && strcmp(cb.Label.String, 'E:I weight ratio') && isempty(findall(fig, 'Type', 'image')) && ...
-            ~any(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Lyapunov'), ax));
+            ~any(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'lambda'), ax));   % lambda_1 by any name (G3)
         n = n + check(ok, 'S5 (A): three firing-rate histograms colored by E:I weight ratio, one color bar, no lambda_1 histogram');
         lg = findall(fig, 'Type', 'legend');
         ok = isscalar(lg);
@@ -338,7 +338,7 @@ switch name
         end
         n = n + check(ok, 'S5 (B): one key, above its panel, clear of the data');
     case 'fig_supp9_grouped'
-        boxed = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Lyapunov') && strcmp(h.Box, 'on'), ax));
+        boxed = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'lambda') && strcmp(h.Box, 'on'), ax));   % 'Growth rate, lambda_1' since G3
         n = n + check(isempty(boxed), 'S9 (C): the scatter panels are open, not boxed');
         key = findall(fig, 'Tag', 'mc_sweep_scatter_size_legend');
         ok = isscalar(key);
@@ -357,7 +357,7 @@ switch name
         words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')) + " " + ...
             string(strjoin(cellstr(h.YLabel.String), ' ')), ax);
         lgs = findall(fig, 'Type', 'legend');
-        n = n + check(~any(contains(words, 'SFA Time')) && ~any(contains(words, 'Cumulative')) && ...
+        n = n + check(~any(contains(words, 'SFA time', 'IgnoreCase', true)) && ~any(contains(words, 'Cumulative')) && ...
             isscalar(lgs) && isequal(cellstr(lgs.String), {'Input', 'Reconstruction'}), ...
             'S9: memory only (no leading-direction shares, no cumulative capacity); one key, (A)''s input and reconstruction');
         % Plan 3 review: (A)'s traces inside their axes, the scale bar in
@@ -381,7 +381,7 @@ switch name
         lg = findall(fig, 'Type', 'legend');
         ok = isscalar(lg) && any(startsWith(lg.String, 'Spike-frequency')) && ~any(strcmp(lg.String, 'SFA'));
         n = n + check(ok, 'leading (B): one key, spike-frequency adaptation written out');
-        tau = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'SFA Time'), ax));
+        tau = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'SFA time', 'IgnoreCase', true), ax));
         ok = numel(tau) == 2 && isequal(tau(1).XLim, tau(2).XLim);
         n = n + check(ok, 'leading (A), (B): both against the longest SFA time constant, on one x range');
         c = ax(startsWith(get(ax, {'Tag'}), 'leading_direction_c'));
@@ -430,7 +430,7 @@ y = arrayfun(@(a) a.Position(2), others);
 n = n + check(numel(others) == 4 && max(y) - min(y) < 1 && min(y) > max(arrayfun(@(a) getpixelposition(a, true) * [0; 1; 0; 1], top)), ...
     'the top row holds four panels, level, above the maps');
 words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')), ax);
-n = n + check(~any(contains(words, 'SFA Time')), 'lambda_1 against the longest SFA time constant has left Figure 7');
+n = n + check(~any(contains(words, 'SFA time', 'IgnoreCase', true)), 'lambda_1 against the longest SFA time constant has left Figure 7');
 brk = findall(fig, 'Tag', 'main7_noise_break');
 ok = ~isempty(brk);
 if ok
@@ -444,10 +444,10 @@ n = n + check(ok, '(D) labels its noise ticks with their values and marks the br
 end
 
 function n = gain_panel_check(fig, run_dir, names)
-% The 'All Weights' panel of block (A): its three lines are the medians of
+% The 'All weights' panel of block (A): its three lines are the medians of
 % lambda_1 over the repetitions at each level of the gain sweep.
 ax = findall(fig, 'Type', 'axes');
-ax = ax(arrayfun(@(a) strcmp(strjoin(cellstr(a.XLabel.String), ' '), 'All Weights'), ax));
+ax = ax(arrayfun(@(a) strcmp(strjoin(cellstr(a.XLabel.String), ' '), 'All weights'), ax));   % sentence case (Tom, 2026-11-23)
 ok = numel(ax) == 2;
 if ok
     [~, top] = max(arrayfun(@(a) a.Position(2), ax));

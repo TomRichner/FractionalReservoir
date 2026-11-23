@@ -151,7 +151,7 @@ T.letter(ax{2}(1), 'B', 4 - X0, 18);
 %% Save
 panels = struct( ...
     'A', ['fig_sensitivity_medians (lambda_1 sheet, six panels) and, drawn here by the same rule, the gain sweep ' ...
-          '(level_of_chaos, ''All Weights'')'], ...
+          '(level_of_chaos, ''All weights'')'], ...
     'B', 'fig_sensitivity_medians (mean-rate sheet, six panels) and the gain sweep drawn here');
 sources = {S.source};
 parts = cell(0, 2);
@@ -253,13 +253,13 @@ set(ax, 'YTick', donor.YTick, 'FontSize', donor.FontSize, 'Box', 'off', 'LineWid
     'TickDir', donor.TickDir);
 default = preset_default_values(run_dir, {param});
 if isKey(default, param) && default(param) ~= 0
-    apply_percent_axis(ax, default(param), 'All Weights', donor.XLabel.FontSize, [-50 0 50]);
+    apply_percent_axis(ax, default(param), 'All weights', donor.XLabel.FontSize, [-50 0 50]);
     if ~isempty(mark)
         frac = diff(mark(1).YData) / diff(donor.YLim);
         mark_default_value(ax, default(param), mark(1).Color, mark(1).LineWidth, frac);
     end
 else
-    xlabel(ax, 'All Weights');
+    xlabel(ax, 'All weights');
 end
 end
 

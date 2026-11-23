@@ -125,7 +125,7 @@ end
 y_top = 1.1 * max([R2_cum_ci_hi(:); R2_cum_mean(:); 1e-3]);
 xlim(ax_a, [0, delay_s(end)]); ylim(ax_a, [0, y_top]);
 xlabel(ax_a, 'Delay (s)', 'FontSize', label_fs);
-ylabel(ax_a, {'Cumulative', 'Memory Capacity'}, 'FontSize', label_fs);
+ylabel(ax_a, {'Cumulative', 'memory capacity'}, 'FontSize', label_fs);
 
 % (b) per-delay R^2 with the saved bootstrap band; carries the legend
 ax_b = nexttile(tl); hold(ax_b, 'on'); box(ax_b, 'off');
@@ -155,7 +155,7 @@ for i = 1:n_cond
 end
 xlim(ax_c, [0.5, n_cond + 0.5]);
 set(ax_c, 'XTick', xpos, 'XTickLabel', cond_titles);
-ylabel(ax_c, 'Memory Horizon (s)', 'FontSize', label_fs);
+ylabel(ax_c, 'Memory horizon (s)', 'FontSize', label_fs);
 y_h = max([H_trials(:); 0.1]);
 ylim(ax_c, [0, 1.35 * y_h]);
 % The paired tests (sign-flip p, Cohen's d_z) and n are NOT printed on the

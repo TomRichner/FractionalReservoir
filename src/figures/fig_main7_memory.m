@@ -149,11 +149,12 @@ set(cb_l, 'Units', 'pixels', 'Position', [x_cb, Y_F, 14, MAP_H]);
 %% Style
 T.style(fig);
 % (A)
-ylabel(ax_a, {'Input', 'Reconstruction', 'Score (R^2)'}, 'Interpreter', 'tex');   % three lines: on two it was taller than the panel
+% Axis labels in sentence case (Tom, 2026-11-23, G1).
+ylabel(ax_a, {'Input', 'reconstruction', 'score (R^2)'}, 'Interpreter', 'tex');   % three lines: on two it was taller than the panel
 ax_a.YTick = [0 1];
 ax_a.YLabel.PositionMode = 'auto';      % beside its tick labels (the copy kept the source's place, 0.5 wide)
 % (B)
-ylabel(ax_b, {'Cumulative', 'Memory Capacity'}, 'Interpreter', 'none');
+ylabel(ax_b, {'Cumulative', 'memory capacity'}, 'Interpreter', 'none');
 ax_b.YTick = ax_b.YTick([1 end]);
 % (C): ticks by condition NAME (the source labels them with the titles).
 try
@@ -173,6 +174,10 @@ ax_c.XLim = [0.72, numel(ax_c.XTick) + 0.28];
 horizon_ticks(ax_c, horizon_names, st);
 xlabel(ax_c, '');
 ax_c.YTick = 0:6:ax_c.YLim(2);
+ylabel(ax_c, 'Memory horizon (s)');
+% (D): memory capacity labelled every 5, as (B) (G5, Tom 2026-11-23: every 2
+% to 12 was seven labels on a narrow axes). The noise axis is as Tom set it.
+ax_noise.YTick = 0:5:ax_noise.YLim(2);
 % (E), (F): sentence-case condition titles over (E), in the colour the
 % source gave them; the gain tick labels under (E) too (the source labels
 % the bottom row only; polish list, 2026-11-22); self-coupling marked at
@@ -185,7 +190,8 @@ for c = 1:nc
         mark_zero_coupling(maps(r, c), c == 1);
     end
 end
-cb_l.Label.String = {'Lyapunov Exp.,', '\lambda_1 (s^{-1})'};
+% The growth rate by its one name (G3, Tom 2026-11-23), on two lines as before.
+cb_l.Label.String = {[extractBefore(st.label_growth, ',') ','], [st.label_lle ' (s^{-1})']};
 cb_l.Label.Interpreter = 'tex';
 % The key: the conditions, in one line above the top row, whose lines it
 % names ((A), (B), (D); (C) names them under its axis, (E) over its maps).

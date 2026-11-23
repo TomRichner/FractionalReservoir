@@ -22,8 +22,8 @@ function out = fig_supp_leading_grouped(cfg)
 %       over the joint sample: fig_leading_direction (Figure 4's former
 %       panel C), one panel per condition, no line at the uncoupled rate
 %       (Tom, 2026-11-21).
-% The axis names are in Title Case, as on Figure 7 and S9; lambda_1 is
-% named as in (A) on every panel.
+% The axis names are in sentence case (Tom, 2026-11-23, G1); lambda_1 is
+% named 'Growth rate, lambda_1 (s^-1)' on every panel (G3).
 %
 % WHICH RUN. run_dir holds the tau sweep (tau_sensitivity_*) and the joint
 % sample (param_space_*): both are block A's, in the mu7chain run and in
@@ -107,13 +107,13 @@ end
 
 %% Style
 T.style(fig);
-lam_name = 'Lyapunov Exp., \lambda_1 (s^{-1})';
-tau_label = {'Longest SFA Time', 'Constant (s)'};
+lam_name = [st.label_growth ' (s^{-1})'];     % G3 (Tom, 2026-11-23): one name for lambda_1
+tau_label = {'Longest SFA time', 'constant (s)'};
 % (A), as Figure 7 drew it (style_main6_grouped; Tom, 2026-11-17).
 tau_name = tau_condition(S_tau.source, names);
 set(ax_a, 'XScale', 'linear');
 xlabel(ax_a, tau_label, 'Interpreter', 'none');
-ylabel(ax_a, {'Lyapunov Exp.,', '\lambda_1 (s^{-1})'}, 'Interpreter', 'tex');
+ylabel(ax_a, {[extractBefore(st.label_growth, ',') ','], [st.label_lle ' (s^{-1})']}, 'Interpreter', 'tex');   % two lines: one is taller than the panel
 title(ax_a, T.condition_title(tau_name), 'FontWeight', 'normal', 'Interpreter', 'tex', ...
     'Color', st.condition_color(tau_name));
 zero_ref = findall(ax_a, 'Type', 'constantline');
@@ -128,7 +128,7 @@ ax_a.YLim(1) = -0.2;
 % colours), on the x axis of (A).
 set(ax_b, 'XScale', 'linear', 'XLim', ax_a.XLim, 'XTick', ax_a.XTick);
 xlabel(ax_b, tau_label, 'Interpreter', 'none');
-ylabel(ax_b, {'Leading-Vector', 'Squared-Norm Fraction'}, 'Interpreter', 'none');
+ylabel(ax_b, {'Leading-vector', 'squared-norm fraction'}, 'Interpreter', 'none');
 title(ax_b, '');
 ax_b.YTick = [0 0.5 1];
 % The key: spike-frequency adaptation written out (rule 7 of "For every
@@ -150,8 +150,8 @@ delete(B.legends);
 lg = legend(ax_b, h_state, keys, 'Box', 'off', 'FontSize', st.tick_fs, 'Location', 'none', 'Units', 'pixels', ...
     'Interpreter', 'none');
 lg.ItemTokenSize = [22 18];
-% (C): titles on two lines in the condition colours, the names in Title
-% Case and lambda_1 named as in (A).
+% (C): titles on two lines in the condition colours, the names in sentence
+% case and lambda_1 named as in (A).
 for c = 1:nc
     title(ax_c(c), T.condition_title(names{c}, true), 'FontWeight', 'normal', 'FontSize', st.title_fs, ...
         'Color', st.condition_color(names{c}), 'Interpreter', 'tex');
@@ -163,7 +163,7 @@ for c = 1:nc
     ax_c(c).XTickLabel = lbl;
     if c > 1; ax_c(c).YTickLabel = {}; ylabel(ax_c(c), ''); end
 end
-ylabel(ax_c(1), {'Dendritic Share', 'of the Leading', 'Perturbation'}, 'Interpreter', 'none');   % on two lines it was taller than the panel
+ylabel(ax_c(1), {'Dendritic share', 'of the leading', 'perturbation'}, 'Interpreter', 'none');   % on two lines it was taller than the panel
 % The y labels beside their tick labels (the copies kept the sources' places).
 set([ax_a.YLabel, ax_c(1).YLabel], 'PositionMode', 'auto');
 
