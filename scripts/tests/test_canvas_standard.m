@@ -78,8 +78,6 @@ FIGURES = { ...
 % The type that may depart from its role's size, by figure: {pattern on
 % canvas_audit's name, reason}. Every figure not listed has none.
 EXCEPTIONS = struct();
-EXCEPTIONS.fig_main5_grouped = {'^[EI] \| axes fig_outlier_plane_inset', ...
-    'E and I marks inside the response-curve insets (inset_mark_fs): at 14 pt they cover the points they label'};
 
 if isempty(names); names = FIGURES; end
 names = cellstr(names);
