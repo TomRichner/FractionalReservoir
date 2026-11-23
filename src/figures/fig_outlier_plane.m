@@ -188,7 +188,18 @@ if ~isempty(thinned_re) || ~isempty(hidden_re)
 end
 g.thinned_re_ticks = thinned_re;
 % Above the panels: the condition titles, raised clear of the top tick label.
-top_m = 0.5 * st.tick_fs * pt_in + 0.06 + 1.25 * st.title_fs * pt_in;
+% A title longer than a short phrase goes on two lines, its last word on the
+% second, as at this width in most figures ("Multiple-timescale
+% adaptation" ran to the canvas edge; Plan 3 fix X8). The strip above the
+% panels grows by the extra line; the rows of the planes keep their gap.
+titles = cell(1, n_cond);
+for c = 1:n_cond
+    t = F.titles{c}; k = find(t == ' ', 1, 'last');
+    if ~isempty(k) && numel(t) > 16; t = {t(1:k - 1), t(k + 1:end)}; end
+    titles{c} = t;
+end
+n_title_lines = max(cellfun(@(t) numel(cellstr(t)), titles));
+top_m = 0.5 * st.tick_fs * pt_in + 0.06 + 1.25 * n_title_lines * st.title_fs * pt_in;
 % The inset hangs from its top right corner (inset_height radii above the
 % panel's bottom edge, at its right edge) and may reach below the panel; the
 % space under each row is what it needs.
@@ -247,7 +258,7 @@ for w = 1:n_net
         end
         if w == 1
             % Raised above the top tick label of the imaginary axis.
-            title(ax, F.titles{c}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', F.colors{c}, ...
+            title(ax, titles{c}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', F.colors{c}, ...
                 'Units', 'data', 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center', ...
                 'Position', [mean(cp.x_lim), cp.y_lim(2) + (0.5 * st.tick_fs * pt_in + 0.06) * diff(cp.x_lim) / pw, 0]);
         end

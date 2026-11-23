@@ -160,7 +160,7 @@ first_seed = [runs.seed1(1), runs.seed2(1)];
 txt = fileread(fullfile(fig_dir, 'main5', 'Fig_Main5_Grouped_table.md'));
 assert(isequal(o.seed, first_seed) && contains(txt, sprintf('network seed [%d %d], the first of the stage', first_seed)), ...
     'the seed drawn in A is the stage''s first and the sidecar says so');
-titles = arrayfun(@(a) string(a.Title.String), findall(o.figs, 'Type', 'axes'));
+titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), findall(o.figs, 'Type', 'axes'));   % two-line titles (Plan 3 fix X8)
 assert(all(ismember(["No adaptation", "Single-timescale adaptation", "Multiple-timescale adaptation"], titles)), 'sentence-case titles');
 close(o.figs);
 o = fig_main5_mechanism(common{:}, 'seed', [2 3], 'networks', {'EEx1p5'}, 'save', false);
