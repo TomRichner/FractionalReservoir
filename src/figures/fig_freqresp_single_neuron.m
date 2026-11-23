@@ -181,7 +181,7 @@ for j = 1:n_d
     set([ax1(j), ax2(j)], 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out', ...
         'Layer', 'top', 'XScale', 'log', 'XLim', f([1 end]), 'XTick', ticks, 'XMinorTick', 'off');
     set(ax1(j), 'YLim', [0 y_hi(1)]);
-    set(ax2(j), 'YLim', [0 y_hi(2)], 'YTick', 0:20:y_hi(2));
+    set(ax2(j), 'YLim', [0 y_hi(2)], 'YTick', 0:40:y_hi(2));   % three ticks on 0 to 80 (Tom, 2026-11-23, G5)
     xlabel(ax2(j), 'Frequency (Hz)', 'FontSize', st.label_fs);
     if n_d == 1
         xlabel(ax1(j), 'Frequency (Hz)', 'FontSize', st.label_fs);   % side by side: each its own axis

@@ -84,7 +84,7 @@ end
 for c = 1:n_c
     plot(ax, u, med_iqr(stack(F.by_cond{c}, 'cdf_theory')), '--', 'Color', 'k', 'LineWidth', 1.1);
 end
-set(ax, ax_style{:}, 'XLim', [0 1.2], 'YLim', [0 1], 'XTick', 0:0.5:1, 'YTick', 0:0.2:1, 'XTickLabelRotation', 0);   % three x ticks: a panel of S6 is about 1.3 in wide
+set(ax, ax_style{:}, 'XLim', [0 1.2], 'YLim', [0 1], 'XTick', 0:0.5:1, 'YTick', 0:0.5:1, 'XTickLabelRotation', 0);   % three x ticks: a panel of S6 is about 1.3 in wide
 xlabel(ax, 'r / R_{eff}', 'FontSize', st.label_fs);
 ylabel(ax, {'Fraction of eigenvalues', 'within r'}, 'FontSize', st.label_fs);
 end
