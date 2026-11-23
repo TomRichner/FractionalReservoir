@@ -180,7 +180,15 @@ ax_img = gobjects(1, m);
 for k = 1:m
     ax_img(k) = axes(fig, 'Units', 'inches', 'Position', [x0(k) + (pw - img) / 2, y_img, img, img]);
     draw_weight_image(ax_img(k), X(k).sample.W, X(k).sample.type, w_clim, 'divider', true, 'line_width', st.axis_lw);
-    title(ax_img(k), titles{k}, 'FontSize', fs, 'FontWeight', 'normal', 'Color', 'k');
+    ht = title(ax_img(k), titles{k}, 'FontSize', fs, 'FontWeight', 'normal', 'Color', 'k');
+    % A title wider than its image that would run past the image's right
+    % edge ("Added rotating mode" reached the canvas edge; Plan 3 fix X2)
+    % ends at that edge instead of being centered over the image.
+    ht.Units = 'inches'; e = ht.Extent;
+    if k == m && e(1) + e(3) > img
+        ht.HorizontalAlignment = 'right'; ht.Position(1) = img;
+    end
+    ht.Units = 'data';
 end
 
 %% Row 2: the equal-gain spectra
@@ -201,16 +209,31 @@ for k = 1:m
     names = {'re_label', '', 'im_label', ''};
     if k == 1; names{2} = 'Re (s^{-1})'; names{4} = 'Im (s^{-1})'; end   % both on the first column, clear of every eigenvalue
     args = [args, {'re_ticks', column_re_ticks(X(k), re_lim, far{k}, cfg.tick_step, gap)}]; %#ok<AGROW>
+    % The first column's Re name ABOVE the real axis at its right end (Plan 3
+    % fix X3; under the tick labels it sat beside the Im tick -50, far below
+    % the axis), as in Figures 5 and 6.
+    if k == 1; names = [names, {'re_label_side', 'above'}]; end %#ok<AGROW>
     cp = complex_plane_axes(ax, args{:}, names{:});
     % Axis names at label_fs (complex_plane_axes sets one font size). Its
-    % texts are hidden handles, which findobj misses, and the Re name under
-    % the ticks is the cell {' ', name}: so through cp.handles.
+    % texts are hidden handles, which findobj misses: so through cp.handles.
+    bulk_re = max(real(X(k).ev(abs(X(k).ev - X(k).center) <= X(k).R_rate + 0.2 * rad_max)));   % rightmost dot of the bulk
     for hx = reshape(cp.handles(isgraphics(cp.handles, 'text')), 1, [])
         s = hx.String; if iscell(s); s = s{end}; end
         if ~isempty(s) && any(strcmp(s, names([2 4]))); hx.FontSize = st.label_fs; end
-        % The first column draws no far segment: its Re name moves to the
-        % segment's right end, off the Im tick label -50 under the axis.
-        if k == 1 && iscell(hx.String) && strcmp(s, names{2}); hx.Position(1) = cp.x_lim(2); end
+        % Right-aligned at the axis end it would lie over the first
+        % column's small bulk: it starts just right of the imaginary axis
+        % instead and runs a little past the end of the real axis.
+        if k == 1 && strcmp(s, names{2})
+            hx.HorizontalAlignment = 'left'; hx.Position(1) = cp.x(0) + 0.05 * diff(cp.x_lim) / pw;
+        end
+        % A positive Re tick label beside the bulk (column 2's "50" touched
+        % its rightmost dots; Plan 3 fix X3) moves right until its left edge
+        % clears the rightmost dot by .06 in; the tick mark stays.
+        v = str2double(strrep(s, char(8722), '-'));
+        if ~isnan(v) && v > 0 && hx.Position(2) < 0 && v < cp.x_lim(2)
+            e = hx.Extent; clear_x = cp.x(bulk_re) + 0.06 * diff(cp.x_lim) / pw;
+            if e(1) < clear_x; hx.Position(1) = hx.Position(1) + clear_x - e(1); end
+        end
     end
     plot(ax, cp.x(X(k).center + X(k).R_rate * cos(th)), X(k).R_rate * sin(th), '-', 'Color', gray, 'LineWidth', 1.25);
     z = X(k).ev;
@@ -334,7 +357,7 @@ end
 %% ------------------------------------------------------------------------
 function t = column_titles(given, X)
 DEFAULT = struct('decay', 'Balanced, weak', 'irregular', 'Balanced, strong', ...
-    'runaway', ['E-to-E mean ' char(215) '1.5'], 'oscillation', 'Added rotating mode');   % the caption says it is an added structure
+    'runaway', ['E-to-E ' char(215) ' 1.5'], 'oscillation', 'Added rotating mode');   % the caption says it is an added structure
 m = numel(X);
 if ~isempty(given)
     if numel(given) ~= m
