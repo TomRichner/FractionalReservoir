@@ -93,7 +93,7 @@ C = T.copy(S_ld.axes, fig, false);
 [~, order] = sort(arrayfun(@(a) a.Position(1), C.axes)); ax_c = C.axes(order);
 
 %% Geometry (pixels)
-MA = 108; WA = 228; GAP = 18; MB = 84; WB = 192;   % the margins hold a y label of two lines beside tick labels like '-0.2'
+MA = 112; WA = 228; GAP = 18; MB = 84; WB = 192;   % the margins hold a y label of two lines beside tick labels like '-0.2' (MA 108 until the true minus of 2026-11-23, which is wider than the hyphen: panel A reached 1 px past the edge)
 set(ax_a, 'Units', 'pixels', 'PositionConstraint', 'innerposition', 'Position', [MA, Y_AB, WA, H_AB]);
 XB = MA + WA + GAP + MB;
 set(ax_b, 'Units', 'pixels', 'PositionConstraint', 'innerposition', 'Position', [XB, Y_AB, WB, H_AB]);

@@ -82,7 +82,7 @@ end
 
 %% The canvas: the common width itself, so that T.fit has nothing to stretch
 W = round(st.canvas_w * get(groot, 'ScreenPixelsPerInch'));
-X0 = 98; RM = 16; GAP = 62;     % left of the first plot box; right margin; between columns (the next column's tick labels)
+X0 = 104; RM = 16; GAP = 62;    % left of the first plot box (98 until the true minus of 2026-11-23, wider than the hyphen, put B's "−15" 4 px past the edge); right margin; between columns (the next column's tick labels)
 RH = 160;                       % a row's plot boxes
 TOP = 64;                       % column titles on two lines, and the letter (A)
 BELOW = 58;                     % tick labels and the axis name under a row
