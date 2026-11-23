@@ -101,8 +101,17 @@ switch group
         sources=a.source; notes=a.notes;
     case 2
         a=fig_main2_dynamics(cfg.run_dir,cfg.source_fig_root,cfg.conditions);
-        % N columns at the three-column pitch: the canvas widens with them.
-        fig.Position(3)=fig.Position(3)*a.width_scale;
+        % The common canvas (manuscript_style's canvas_w; N columns keep the
+        % three-column pitch, so the canvas widens with them). The sheet is
+        % drawn at 0.95 of the canvas and is copied below into its middle
+        % 0.95, so its layout in inches and its type in points are kept.
+        % A new figure of that size, not the first one resized: an invisible
+        % figure resized after its creation was seen to go back to the size
+        % it was created with (1300 x 950) on about every other call.
+        cst=manuscript_style();
+        close(fig);
+        fig=figure('Visible',onoff(cfg.visible),'Color','w','Position', ...
+            [40 40 round(cst.canvas_w*get(groot,'ScreenPixelsPerInch')*a.width_scale) round(a.figs.Position(4)/.95)]);
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 3
@@ -202,8 +211,9 @@ close(fig); fig=flat;
 if ismember(group,[1 2 3 8])
     set(findall(fig,'-property','FontSize'),'FontSize',14);
     if group==2
-        tt=findall(fig,'Type','axes','-regexp','Tag','^dynamics_r1_c\d+$');
-        for k=1:numel(tt), tt(k).Title.FontSize=16; end
+        % Type by role (manuscript_style: axis labels label_fs, titles
+        % title_fs, panel letters letter_fs), after the line above.
+        canvas_type(fig);
     elseif group==3
         tt=findall(fig,'Type','axes','-regexp','Tag','^stability_r1_c\d+$');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
