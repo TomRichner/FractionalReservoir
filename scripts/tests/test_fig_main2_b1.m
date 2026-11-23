@@ -4,7 +4,8 @@
 % conditions in which b1 and the route factor `std` differ (a product route
 % has std = b1 b2). Checks that
 %   1. row (F) of every depressed column draws the saved b1 of the displayed
-%      neurons (13 E + 13 I of 25 + 25), not std, with y limits [0 1];
+%      neurons (8 E + 8 I of 25 + 25: about 60 percent of the 13 + 13 drawn
+%      before, Tom 2026-11-22), not std, with y limits [0 1];
 %   2. the no-adaptation column, and a column whose std_model is 'none'
 %      (SFA only), leave row (F) blank;
 %   3. the provenance notes name b1;
@@ -23,7 +24,7 @@ tmp = tempname; mkdir(fullfile(tmp, 'representative_dynamics'));
 cleanup = onCleanup(@() rmdir(tmp, 's'));
 f = fullfile(tmp, 'representative_dynamics', 'representative_dynamics_data.mat');
 
-nt = 301; t = linspace(0, 30, nt); n = 50; sel = {1:25, 1:25};
+nt = 301; t = linspace(0, 20, nt); n = 50; sel = {1:25, 1:25};
 names = {'no_adaptation', 'sfa1_std1', 'sfa3_std2'};
 models = {'none', 'product', 'product'};
 rng(7);
@@ -37,17 +38,17 @@ for c = 1:3
         'finite_lambda', zeros(nt, 1), 'LLE', 0);
     results(c) = r; %#ok<SAGROW>
 end
-settings = struct('display_window', [0 30]);
+settings = struct('display_window', [0 20]);
 save(f, 'results', 'settings');
 
 %% 1-3. Row (F) is b1
 out = fig_main2_dynamics(tmp, tmp, names);
 fig = out.figs;
-shown = [1:13, 26:38];                % round(25/2) = 13 of each type, as the figure draws
+shown = [1:8, 26:33];                  % round(0.3*25) = 8 of each type, as the figure draws
 for c = 2:3
     ax = findobj(fig, 'Type', 'axes', 'Tag', sprintf('dynamics_r6_c%d', c));
     L = findobj(ax, 'Type', 'line');
-    assert(numel(L) == 26, 'row F of column %d draws %d lines, not 26', c, numel(L));
+    assert(numel(L) == 16, 'row F of column %d draws %d lines, not 16', c, numel(L));
     Y = sortrows(vertcat(L.YData));
     assert(isequal(Y, sortrows(results(c).b1(shown, :))), 'row F of column %d is not b1', c);
     assert(~isequal(Y, sortrows(results(c).std(shown, :))));
@@ -68,12 +69,17 @@ for c = 1:3
     assert(max(abs(loc.Color - (.6 + .4 * col))) < 1e-12 && all(loc.Color >= acc.Color), ...
         'row G of column %d: the local trace is not a lighter tint of the condition color', c);
 end
-% The E/I key: right of row (B)'s last axes, outside them, the axes unmoved.
+% The E/I key: one line at the top right of row (B)'s last axes, inside them
+% (second round, Tom 2026-11-22: further left), the axes unmoved.
 lg = findobj(fig, 'Type', 'legend'); axb = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r2_c3');
-assert(isscalar(lg) && isequal(lg.String, {'E', 'I'}), 'one E/I key');
+assert(isscalar(lg) && isequal(lg.String, {'E', 'I'}) && strcmp(lg.Orientation, 'horizontal'), 'one E/I key, on one line');
 lg.Units = 'normalized'; axb.Units = 'normalized';
-assert(lg.Position(1) >= axb.Position(1) + axb.Position(3) && lg.Position(1) + lg.Position(3) <= 1 + 1e-9, ...
-    'the E/I key must stand right of row B''s axes, inside the canvas');
+assert(abs(lg.Position(1) + lg.Position(3) - axb.Position(1) - axb.Position(3)) < 1e-9 && ...
+    abs(lg.Position(2) + lg.Position(4) - axb.Position(2) - axb.Position(4)) < 1e-9 && lg.Position(1) > axb.Position(1), ...
+    'the E/I key must stand at the top right inside row B''s last axes');
+% The time bar: 5 s on a 20 s window, labelled so.
+bar = findobj(fig, 'Tag', 'time_bar'); lab = findobj(fig, 'Tag', 'time_bar_label');
+assert(isscalar(bar) && abs(diff(bar.XData) - 5) < 1e-12 && strcmp(lab.String, '5 seconds'), 'a 5 s bar on a 20 s window');
 axa = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r1_c3');
 assert(max(abs(axb.Position([1 3]) - axa.Position([1 3]))) < 1e-9, 'the key must not resize row B''s axes');
 
@@ -94,7 +100,7 @@ for c = 1:3
     assert(isequal(ax.YLim, lim * [-1 1]) && isequal(ax.YTick, lim * [-1 0 1]), 'row G of column %d: limits %s', c, mat2str(ax.YLim));
     assert(~isempty(ax.YTickLabel), 'row G of column %d must carry tick labels', c);
 end
-% The type by role, and the sheet 0.95 of the common canvas wide.
+% The type by role, and the sheet as wide as the common canvas.
 ax = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r4_c1');
 assert(ax.FontSize == st.tick_fs && ax.YLabel.FontSize == st.label_fs && strcmp(ax.YLabel.Interpreter, 'tex'), ...
     'ticks at tick_fs, y labels at label_fs in the figure typeface');
@@ -102,8 +108,8 @@ ax = findobj(fig, 'Type', 'axes', 'Tag', 'dynamics_r1_c2');
 assert(ax.Title.FontSize == st.title_fs && iscell(ax.Title.String) && numel(ax.Title.String) == 2, ...
     'a long column title is on two lines at title_fs');
 px = getpixelposition(fig);
-assert(abs(px(3) / get(groot, 'ScreenPixelsPerInch') - .95 * st.canvas_w) < .02 && abs(out.width_scale - 1) < 1e-9, ...
-    'three columns: the sheet is 0.95 of canvas_w wide');
+assert(abs(px(3) / get(groot, 'ScreenPixelsPerInch') - st.canvas_w) < .02 && abs(out.width_scale - 1) < 1e-9, ...
+    'three columns: the sheet is canvas_w wide');
 % The dividers: placed again without a NoGap warning, each between the
 % drawn extent of its left column and the tick labels of its right column.
 lastwarn('');
