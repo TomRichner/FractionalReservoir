@@ -8,9 +8,13 @@ function out = fig_ied_stim_blocks(opts)
 %           (opts.example_seed, blocks opts.example_blocks): mean E, mean I and
 %           the five subnet means, candidate events as triangles along the
 %           top and open circles on the subnets that took part (event_rows),
-%           a triangle only where there is a circle. Window by the fixed rule
-%           of fig_ied_stim (event count closest to the block's median over
-%           windows of win_len s).
+%           a triangle only where there is a circle. Window by rule
+%           (choose_example; Tom, 2026-11-23, R11): the no-stimulation
+%           window with 3 to 6 marked detections (nearest 4.5, then the
+%           most typical rms),
+%           the stimulation window at the same offset in the matching
+%           block. Until then (window_rule 'median_count') the rule of
+%           fig_ied_stim: event count closest to the block's median.
 %   rate    candidate-event rate normalised as the clinical panel: each block's
 %           rate divided by that network's pooled no-stimulation rate (all
 %           no-stimulation events / all no-stimulation time), one marker per
@@ -47,11 +51,18 @@ arguments
     opts.win_len (1,1) double = 5         % s of signal drawn (30 until 2026-11-22)
     opts.amp_bar (1,1) double = 0.5       % a.u., the amplitude scale bar
     opts.time_bar (1,1) double = 1        % s, the time scale bar
+    % The example window (Tom, 2026-11-23, R11: "find another example that
+    % has a few more events marked for the no-stimulation case"). 'marked':
+    % the rule of choose_example below; 'median_count': the rule until then
+    % (pick_window in each example block, event count closest to its median).
+    opts.window_rule (1,:) char {mustBeMember(opts.window_rule,{'marked','median_count'})} = 'marked'
+    opts.marked_range (1,2) double = [3 6]   % marked detections wanted in the no-stimulation window
 end
 if ~isfolder(opts.out_dir), mkdir(opts.out_dir); end
 L=load(fullfile(opts.data_dir,'summary.mat')); S=L.rows; run_opts=L.opts;
 if isnan(opts.example_seed), opts.example_seed=S.seed(1); end
-if any(isnan(opts.example_blocks)), opts.example_blocks=[1 run_opts.n_no+1]; end
+blocks_given=~any(isnan(opts.example_blocks));
+if ~blocks_given, opts.example_blocks=[1 run_opts.n_no+1]; end
 want=@(w) any(strcmp(opts.which,{'all',w}));
 seeds=unique(S.seed,'stable')'; nS=numel(seeds);
 purple=[0.494 0.247 0.596]; green=[0 0.62 0.45]; red=[0.85 0.2 0.1];
@@ -74,7 +85,7 @@ end
 ratio=pooled(:,2)./pooled(:,1);
 f=S.psd_f{1};
 pct=100*(state(:,:,2)./state(:,:,1)-1);
-fig=[]; ex_info={'',''};
+fig=[]; ex_info={'',''}; rule_note='';
 
 if want('main')
 fig=figure('Color','w','Visible',onoff(opts.visible),'Units','inches','Position',[0 0 16 10]);
@@ -83,13 +94,22 @@ tl=tiledlayout(fig,2,2,'TileSpacing','loose','Padding','compact');
 % ---- traces --------------------------------------------------------------
 titles={'No Stimulation',sprintf('Stimulation (Uniform Input %.2g)',run_opts.amplitude)}; tc={purple,green};
 spacing=0.35; win_len=opts.win_len; ex_info=cell(1,2);
+load_block=@(b) getfield(load(fullfile(opts.data_dir,sprintf('seed%03d_block%d.mat',opts.example_seed,b)),'signals'),'signals');
+if strcmp(opts.window_rule,'marked')
+    no_blocks=1:run_opts.n_no; if blocks_given, no_blocks=opts.example_blocks(1); end
+    [ex_blocks,ex_off,rule_note]=choose_example(load_block,no_blocks,opts.example_blocks(2),blocks_given, ...
+        run_opts.n_no,run_opts.n_stim,win_len,opts.marked_range);
+else
+    ex_blocks=opts.example_blocks; ex_off=[NaN NaN];
+    rule_note='each block''s window with the event count closest to its median over windows (pick_window)';
+end
 for w=1:2
-    E=load(fullfile(opts.data_dir,sprintf('seed%03d_block%d.mat',opts.example_seed,opts.example_blocks(w))),'signals');
-    sig=E.signals; t=double(sig.t); G=size(sig.module_x,1);
+    sig=load_block(ex_blocks(w)); t=double(sig.t); G=size(sig.module_x,1);
     rows_x=[double(sig.mean_x_E);double(sig.mean_x_I);double(sig.module_x)]; nR=size(rows_x,1);
     names=[{'Mean E','Mean I'} compose('Subnet %d',1:G)];
-    ev=sig.events; t0=pick_window([t(1) t(end)],ev,t,double(sig.module_x),win_len);
-    ex_info{w}=sprintf('seed %d block %d, %.0f-%.0f s of the analysed block',opts.example_seed,opts.example_blocks(w),t0-t(1),t0-t(1)+win_len);
+    ev=sig.events;
+    if isnan(ex_off(w)), t0=pick_window([t(1) t(end)],ev,t,double(sig.module_x),win_len); else, t0=t(1)+ex_off(w); end
+    ex_info{w}=sprintf('seed %d block %d, %.0f-%.0f s of the analysed block',opts.example_seed,ex_blocks(w),t0-t(1),t0-t(1)+win_len);
     ax=nexttile(tl,w); hold(ax,'on');
     sel=t>=t0 & t<=t0+win_len; tt=t(sel)-t0;
     off=zeros(1,nR);
@@ -172,7 +192,7 @@ end
 
 % ---- stats -------------------------------------------------------------------
 stats=struct('seeds',seeds,'pooled_epm',pooled,'ratio',ratio,'norm_blocks',{norm_blk}, ...
-    'state_means',state,'state_pct',pct,'example',{ex_info},'run_opts',run_opts);
+    'state_means',state,'state_pct',pct,'example',{ex_info},'example_rule',rule_note,'run_opts',run_opts);
 if want('main')
     save(fullfile(opts.out_dir,'fig_ied_stim_blocks_stats.mat'),'stats');
     write_stats(fullfile(opts.out_dir,'fig_ied_stim_blocks_stats.md'),stats,S);
@@ -253,6 +273,46 @@ counts=arrayfun(@(a)nnz(ev>=a & ev<a+win_len),starts);
 rms=arrayfun(@(a)sqrt(mean(var(module_x(:,t>=a & t<a+win_len),0,2))),starts);
 [~,k]=min(abs(counts-median(counts))+1e-3*abs(rms-median(rms))); t0=starts(k);
 end
+function [blocks,off,note]=choose_example(load_block,no_blocks,stim_block,blocks_given,n_no,n_stim,win_len,range)
+% THE EXAMPLE WINDOW of Figure 8 D, by rule (Tom, 2026-11-23, R11). Over the
+% example network's no-stimulation blocks (no_blocks), every window of
+% win_len s on pick_window's grid (starts 5 s apart, from 5 s into the
+% block to win_len + 5 s before its end) is scored by its MARKED detections:
+% the detections that get a top mark, i.e. at least one circled subnet
+% (event_rows, the rule of the drawing; the detector is not touched). The
+% windows with range(1) to range(2) marked detections are the candidates;
+% of them the one whose marked count is closest to the middle of the range,
+% then whose signal rms is closest to the median rms over all windows
+% (pick_window's tie-break: a typical stretch), then the earliest. With no
+% candidate, the window with the most marked detections. The stimulation window is the MATCHING one: the same offset
+% in the stimulation block of the same rank (no-stimulation block k goes
+% with block n_no + k; the given stimulation block when blocks were given).
+cand=zeros(0,5);    % block, start offset, marked, rms, rank
+for b=no_blocks
+    sig=load_block(b); t=double(sig.t); mx=double(sig.module_x); ev=sig.events;
+    [has]=event_rows(t,mx,ev); marked=ev(any(has,1));
+    starts=t(1)+5:5:t(end)-5-win_len;
+    for a=starts
+        cand(end+1,:)=[b, a-t(1), nnz(marked>=a & marked<a+win_len), ...
+            sqrt(mean(var(mx(:,t>=a & t<a+win_len),0,2))), size(cand,1)]; %#ok<AGROW>
+    end
+end
+in=cand(:,3)>=range(1) & cand(:,3)<=range(2);
+if any(in)
+    c=cand(in,:); [~,k]=min(1e3*abs(c(:,3)-mean(range))+abs(c(:,4)-median(cand(:,4)))+1e-9*c(:,5));
+    how=sprintf('of the %d windows with %d to %d marked detections, the one with its count closest to %g, then rms closest to the median over all %d windows', ...
+        nnz(in),range(1),range(2),mean(range),size(cand,1));
+else
+    c=cand; [~,k]=max(c(:,3)-1e-9*c(:,5));
+    how=sprintf('no window had %d to %d marked detections; the one with the most (%d)',range(1),range(2),c(k,3));
+end
+b=c(k,1); off=[c(k,2) c(k,2)];
+if blocks_given, sb=stim_block; else, sb=n_no+min(find(no_blocks==b,1),n_stim); end
+blocks=[b sb];
+note=sprintf(['%s s windows on a 5 s grid over no-stimulation blocks %s; %s; the stimulation window at the same offset ' ...
+    'in block %d. A marked detection is one with at least one circled subnet (event_rows)'], ...
+    num2str(win_len),mat2str(no_blocks),how,sb);
+end
 function write_stats(file,st,S)
 fid=fopen(file,'w'); g=onCleanup(@()fclose(fid));
 o=st.run_opts; nS=numel(st.seeds);
@@ -260,7 +320,7 @@ fprintf(fid,'# fig_ied_stim_blocks statistics\n\nRun: ied_stim_blocks, amplitude
     o.amplitude,nS,mat2str(st.seeds),o.n_no,o.n_stim,o.block_len,o.settle);
 if isfield(o,'fs'), fprintf(fid,'Integration rate fs = %g Hz.\n\n',o.fs);
 else, fprintf(fid,'Integration rate fs = 400 Hz (ied_base_config; run made before fs was a run setting).\n\n'); end
-fprintf(fid,'Example traces: no stimulation %s; stimulation %s.\n\n',st.example{1},st.example{2});
+fprintf(fid,'Example traces: no stimulation %s; stimulation %s. Window rule: %s.\n\n',st.example{1},st.example{2},st.example_rule);
 fprintf(fid,'## Candidate events per minute, pooled per condition, and normalised block rates\n\n| Network | Seed | No stim (ev/min) | Stim (ev/min) | Stim / no stim | No-stim blocks (%% of pooled) | Stim blocks (%% of pooled no stim) |\n|---|---|---|---|---|---|---|\n');
 for i=1:nS
     fprintf(fid,'| N%d | %d | %.1f | %.1f | %.2f | %s | %s |\n',i,st.seeds(i),st.pooled_epm(i,1),st.pooled_epm(i,2),st.ratio(i), ...

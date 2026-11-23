@@ -70,7 +70,24 @@ tag = opts.tag; if isempty(tag); tag = 'Fig_Main8_Stim'; end
 B = bm_load_runs(opts.burst_mode_dir);          % errors (resolve_data_file) when the stage has not run there
 r = fig_stim_combined(panels, opts.model_fig, common{:}, 'save', false, 'visible', false);
 files = stim_fig8_compose(r, B, opts.out_dir, tag, clinical_note, model_note, opts.visible);
+append_model_window(fullfile(opts.out_dir, [tag '_table.md']), opts.model_fig);
 out = struct('files', {files}, 'out_dir', opts.out_dir);
+end
+
+function append_model_window(tbl, model_fig)
+% Panel D's block and window, and the rule that chose them (Tom,
+% 2026-11-23, R11), from the stats fig_ied_stim_blocks wrote beside the
+% model figure. Nothing is written when that file is not there.
+f = fullfile(fileparts(model_fig), 'fig_ied_stim_blocks_stats.mat');
+if ~isfile(f) || ~isfile(tbl); return; end
+s = load(f, 'stats'); s = s.stats;
+fid = fopen(tbl, 'a'); guard = onCleanup(@() fclose(fid));
+fprintf(fid, '\n## Panel D: the modular model''s example window\n\n- No stimulation: %s\n- Stimulation: %s\n', ...
+    s.example{1}, s.example{2});
+if isfield(s, 'example_rule') && ~isempty(s.example_rule)
+    fprintf(fid, '- Rule: %s\n', s.example_rule);
+end
+clear guard
 end
 
 function d = strip_sep(d)
