@@ -172,22 +172,40 @@ for c = 1:nc
     xlabel(ax, 'Gain');
     if c == 1
         ax.YTickLabel = compose('%g', ax.YTick);
-        ylabel(ax, 'Self-Coupling, s');
+        ylabel(ax, 'Self-coupling, s');          % sentence case (Tom, 2026-11-23, G1)
     else
         ax.YTickLabel = {};
         ylabel(ax, '');
     end
 end
-Bm.colorbars.Label.String = 'Responsive Share';
-% (C): two-line titles (on one line they ran into each other at 9 in).
+Bm.colorbars.Label.String = 'Responsive share';
+% A 0-to-1 share on a roomy bar: 0, 0.5 and 1 (G5, Tom 2026-11-23; it was
+% every 0.25).
+% The source sets the labels, so the ticks are kept by their labels.
+share_lbl = strtrim(cellstr(Bm.colorbars.TickLabels));
+keep = ismember(share_lbl, {'0', '0.5', '1'});
+assert(nnz(keep) == 3, 'fig_supp9_grouped:ShareTicks', 'The responsive-share bar has no ticks labelled 0, 0.5 and 1.');
+set(Bm.colorbars, 'Ticks', Bm.colorbars.Ticks(keep), 'TickLabels', share_lbl(keep));
+% (C): two-line titles (on one line they ran into each other at 9 in);
+% lambda_1 by its one name (G3, Tom 2026-11-23).
 for c = 1:numel(sct)
     title(sct(c), T.condition_title(names{c}, true), 'FontWeight', 'normal', 'Color', sct(c).Title.Color, ...
         'Interpreter', 'tex');
-    xlabel(sct(c), 'Lyapunov Exp., \lambda_1 (s^{-1})', 'Interpreter', 'tex');
+    xlabel(sct(c), [st.label_growth ' (s^{-1})'], 'Interpreter', 'tex');
 end
-ylabel(sct(1), 'Memory Capacity');
+ylabel(sct(1), 'Memory capacity');
 set(sct, 'Box', 'off');                  % open axes, as every other panel (the source boxes them)
-if ~isempty(Cs.colorbars); Cs.colorbars.Label.String = 'Gain'; end
+if ~isempty(Cs.colorbars)
+    Cs.colorbars.Label.String = 'Gain';
+    % The gain bar labelled at its ends and its middle level (0.05, 0.5, 5
+    % on its log scale) only: its seven labels (0.108, 0.232, 1.08, ...)
+    % were more than read comfortably (G5, Tom 2026-11-23).
+    k = numel(Cs.colorbars.Ticks);
+    if k > 3
+        keep = unique([1, ceil(k / 2), k]);
+        set(Cs.colorbars, 'Ticks', Cs.colorbars.Ticks(keep), 'TickLabels', Cs.colorbars.TickLabels(keep));
+    end
+end
 clip_note = '';
 if any(is_key)
     clip_note = respace_size_key(Cs.axes(is_key), W, KEY_Y, KEY_H);
