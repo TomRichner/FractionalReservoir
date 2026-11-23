@@ -176,10 +176,10 @@ assert(isequal(sort(get(net_ax, 'Tag')), {'freqresp_network_reference_c1'; 'freq
 for k = 1:2
     assert(strcmp(net_ax(k).XLabel.String, 'Frequency (Hz)') && ~isempty(net_ax(k).XTickLabel), 'C and D carry their own frequency axis');
 end
-% Polish of 2026-11-22: C and D fill the width; no bars at the foot of D; one unit on both axes of E.
+% Polish of 2026-11-22 (9 in canvas: 0.8 of the width, the rest is the y axis name and tick labels left of C): C and D fill the width; no bars at the foot of D; one unit on both axes of E.
 o.figs.Units = 'inches'; set(net_ax, 'Units', 'inches');
 span = max(arrayfun(@(a) sum(a.Position([1 3])), net_ax)) - min(arrayfun(@(a) a.Position(1), net_ax));
-assert(span > 0.85 * o.figs.Position(3), 'C and D together take the width of the figure (%.2f of %.2f in)', span, o.figs.Position(3));
+assert(span > 0.8 * o.figs.Position(3), 'C and D together take the width of the figure (%.2f of %.2f in)', span, o.figs.Position(3));
 assert(isempty(findall(net_ax, 'Type', 'line', 'LineWidth', 3)), 'no bulk-rotation bars on D in the main figure');
 labels = string(get(findall(o.figs, 'Type', 'text', 'Tag', 'complex_plane_axes'), 'String'));
 assert(any(labels == "Im (s^{-1})") && any(labels == "Re (s^{-1})") && ~any(contains(labels, "rad")), 'E: s^-1 on both axes');
