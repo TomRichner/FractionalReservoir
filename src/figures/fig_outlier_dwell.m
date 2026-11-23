@@ -83,6 +83,11 @@ arguments
     cfg.conditions                = {}
     cfg.seed double               = []    % unused: every seed enters the medians
     cfg.band (1,:) char {mustBeMember(cfg.band, {'iqr', 'range', 'none'})} = 'iqr'
+    % For a composite (S7 panel C, FD-057): the figure's size, the one
+    % panel's axes width placed by hand, and a key of the two line styles.
+    cfg.fig_size double           = []    % [w h] inches; [] = canvas_w by 4.2 (one panel) or 4.6 in
+    cfg.axes_w double             = []    % inches, with fig_size and one network; [] = the width less the margins
+    cfg.key (1,1) logical         = false % a key right of the axes: 'Gains frozen' dashed, 'Full Jacobian' solid, gray
 end
 
 setup_paths();
@@ -118,12 +123,26 @@ end
 
 %% Draw
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
-fig_h = 4.6; if n_net == 1; fig_h = 4.2; end             % one panel: the canvas width, a little less tall
-fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 st.canvas_w, fig_h], 'Visible', vis);
-tl = tiledlayout(fig, 1, n_net, 'TileSpacing', 'compact', 'Padding', 'compact');
+fig_w = st.canvas_w; fig_h = 4.6; if n_net == 1; fig_h = 4.2; end   % one panel: the canvas width, a little less tall
+by_hand = ~isempty(cfg.fig_size) && n_net == 1;
+if ~isempty(cfg.fig_size); fig_w = cfg.fig_size(1); fig_h = cfg.fig_size(2); end
+fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w, fig_h], 'Visible', vis);
+if ~by_hand
+    tl = tiledlayout(fig, 1, n_net, 'TileSpacing', 'compact', 'Padding', 'compact');
+end
+two_line = fig_h < 3.5;                                  % a short panel: the vertical name on two lines
 x_lim = [dt_min / 1.25, 1.6 * window_max];
 for w = 1:n_net
-    ax = nexttile(tl); hold(ax, 'on');
+    if by_hand
+        % Inches: the vertical name and ticks on the left, the horizontal
+        % name below, the title above; the key (cfg.key) right of the axes.
+        L = 0.62 + 0.25 * two_line + 0.35; B0 = 0.62; T0 = 0.32;
+        aw = cfg.axes_w; if isempty(aw); aw = fig_w - L - 0.15; end
+        ax = axes(fig, 'Units', 'inches', 'Position', [L, B0, aw, fig_h - B0 - T0]);
+    else
+        ax = nexttile(tl);
+    end
+    hold(ax, 'on');
     for pass = 1:2                                       % every band under every line
         for c = 1:n_cond
             col = F.colors{c};
@@ -149,7 +168,27 @@ for w = 1:n_net
         'XMinorTick', 'off', 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
     title(ax, F.net_labels{w}, 'FontSize', st.title_fs, 'FontWeight', 'normal');
     xlabel(ax, 'Time beyond zero (s)', 'FontSize', st.label_fs);
-    if w == 1; ylabel(ax, 'Fraction of excursions longer', 'FontSize', st.label_fs); end
+    if w == 1
+        y_name = 'Fraction of excursions longer';
+        if two_line; y_name = {'Fraction of', 'excursions longer'}; end
+        ylabel(ax, y_name, 'FontSize', st.label_fs);
+    end
+    if cfg.key && w == n_net
+        % The two line styles in neutral gray (the conditions are told by
+        % color elsewhere), named as Figure 8 G and S10 name them.
+        gray = [0.35 0.35 0.35];
+        hk = [plot(ax, NaN, NaN, style{1}, 'Color', gray, 'LineWidth', width(1)), ...
+              plot(ax, NaN, NaN, style{2}, 'Color', gray, 'LineWidth', width(2))];
+        lg = legend(ax, hk, {'Gains frozen', 'Full Jacobian'}, 'FontSize', st.tick_fs, 'Box', 'off', ...
+            'AutoUpdate', 'off');
+        if by_hand
+            lg.Units = 'inches';
+            p = ax.Position;
+            lg.Position(1:2) = [p(1) + p(3) + 0.25, p(2) + p(4) - lg.Position(4)];
+        else
+            lg.Location = 'northeast';
+        end
+    end
 end
 
 fig_tag = 'Fig_Outlier_Dwell';

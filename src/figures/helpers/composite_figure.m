@@ -18,6 +18,11 @@ function [fig, B] = composite_figure(rows, opts)
 %                    own width. The block is the source scaled uniformly to
 %                    that width, so 1:1 panels stay 1:1. Text keeps its
 %                    point size (only positions scale).
+%            strip   (optional) inches kept free above this row for its
+%                    letter, in place of opts.strip; [] or absent: opts.strip.
+%                    0 for a row whose source keeps a title strip of its own
+%                    where the letter goes (S7 panel C). The row takes the
+%                    largest of its blocks' values.
 %
 % Options
 %   visible   false
@@ -60,10 +65,14 @@ end
 
 ppi = get(groot, 'ScreenPixelsPerInch');
 n_rows = numel(rows);
-row_w = zeros(1, n_rows); row_h = zeros(1, n_rows);
+row_w = zeros(1, n_rows); row_h = zeros(1, n_rows); row_strip = opts.strip * ones(1, n_rows);
 S = cell(1, n_rows);
 for r = 1:n_rows
     blocks = rows{r};
+    if isfield(blocks, 'strip')
+        v = [blocks.strip];
+        if ~isempty(v); row_strip(r) = max(v); end
+    end
     S{r} = struct('scale', {}, 'w', {}, 'h', {});
     for k = 1:numel(blocks)
         drawnow;
@@ -85,7 +94,7 @@ if ~isempty(opts.width)
     fig_w = opts.width;
 end
 span = fig_w - m(1) - m(2);                          % the width the rows are aligned in
-fig_h = m(3) + sum(row_h) + n_rows * opts.strip + (n_rows - 1) * opts.row_gap + m(4);
+fig_h = m(3) + sum(row_h) + sum(row_strip) + (n_rows - 1) * opts.row_gap + m(4);
 vis = 'off'; if opts.visible; vis = 'on'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.5 0.5 fig_w fig_h], 'Visible', vis);
 % The size the layout is made for. A window larger than the screen can be
@@ -98,7 +107,7 @@ B = cell(1, n_rows);
 y_top = fig_h - m(3);
 for r = 1:n_rows
     blocks = rows{r};
-    y_top = y_top - opts.strip;                      % the letters' strip
+    y_top = y_top - row_strip(r);                    % the letters' strip
     x = m(1);
     if strcmp(opts.align, 'center'); x = m(1) + (span - row_w(r)) / 2; end
     for k = 1:numel(blocks)
