@@ -137,9 +137,10 @@ plot(ax_all(7,1),[5 15],[-4.8 -4.8],'k','LineWidth',4,'Tag','ten_second_bar');
 text(ax_all(7,1),10,-5.6,'10 seconds','FontSize',14,'HorizontalAlignment','center', ...
     'VerticalAlignment','top','Clipping','off','Tag','ten_second_label');
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
-for xpos=(.3775+(0:n_col-2)*.30)*s
-    plot(sep,[xpos xpos],[.07 .945],'Color',[.88 .88 .88],'LineWidth',2.5);
-end
+% Between the columns, clear of the tick labels of every row: the place is
+% measured on the drawn axes (column_dividers), not typed in, and measured
+% again on the composite's canvas (fig_grouped_main).
+column_dividers(sep,'dynamics',n_col,[.07 .945],'Color',[.88 .88 .88],'LineWidth',2.5);
 uistack(sep,'bottom');
 notes{end+1}=['Numeric rendering draws the first half of the saved neurons of each type (round(25/2): 25 saved -> 13 displayed), ' ...
     'the same indices in every state row, in the model''s own E/I palettes (excitatory_colormap / inhibitory_colormap, ' ...

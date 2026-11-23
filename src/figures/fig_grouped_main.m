@@ -235,6 +235,10 @@ if group==3 && cfg.ritz_overlay
 end
 if group==3 && cfg.real_histogram_row, tag=[tag '_realhist']; end
 if ~isempty(cfg.fig_tag), tag=cfg.fig_tag; end   % the registry's name wins over the name by options
+% The column dividers of groups 2 and 3, placed again on this canvas: the
+% panels were copied from a figure of another size, where type in points
+% took another share of the width (column_dividers; none in other groups).
+drawnow; column_dividers(fig);
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end

@@ -264,7 +264,10 @@ end
 close(a.figs);
 if opts.real_histogram_row, close(hh.figs); end
 sep=axes(fig,'Position',[0 0 1 1],'XLim',[0 1],'YLim',[0 1],'Visible','off','Tag','column_dividers'); hold(sep,'on');
-for xpos=(.3775+(0:n_col-2)*.30)*s, plot(sep,[xpos xpos],g.div,'Color',[.88 .88 .88],'LineWidth',2.5); end
+% Between the columns, clear of the tick labels of every row: the place is
+% measured on the drawn axes (column_dividers), not typed in; again below,
+% once the type has its final size, and on the composite's canvas.
+column_dividers(sep,'stability',n_col,g.div,'Color',[.88 .88 .88],'LineWidth',2.5);
 if ~show_lambda
     % Row letters in figure coordinates, one column, where letter() puts them
     % on a full-width axis (the heat map's plot box is narrower than its axis).
@@ -279,6 +282,7 @@ end
 uistack(sep,'bottom'); set(findall(fig,'-property','FontSize'),'FontSize',14);
 for c=1:n_col, ax=findobj(fig,'Tag',sprintf('stability_r1_c%d',c)); ax.Title.FontSize=16; end
 set(findall(fig,'Tag','ritz_inset'),'FontSize',9); set(findall(fig,'-regexp','Tag','^ritz_(annotation|tick_label)$'),'FontSize',9);
+column_dividers(fig);   % the type is final now: place the dividers on it
 if show_lambda
 notes={sprintf('Current switching data: K=%d; accumulation [%g,%g] s; saved segment-start timestamps retained. Settings are read from the completed saved analysis.',D.settings.K,D.settings.lya_T_interval), ...
     ['Input shows 24 fixed actual neurons (12 evenly spaced E and 12 I), identical indices across conditions. ' ...
