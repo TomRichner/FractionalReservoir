@@ -148,7 +148,9 @@ for c = 1:nc
     for a = [axB(c), axC(c)]
         ylabel(a, ''); box(a, 'off');
     end
-    xlabel(axB(c), [st.label_lle ' (s^{-1})'], 'Interpreter', 'tex');
+    % G3 (Tom, 2026-11-23): the long name where it fits (under (B)); (A)'s and
+    % (C)'s y axes, short and stacked, keep lambda_1 alone.
+    xlabel(axB(c), [st.label_growth ' (s^{-1})'], 'Interpreter', 'tex');
     xlabel(axC(c), st.label_rate);
     % Points and the median clipped AT the axes (Plan 3 fix X7): with the
     % default clipping a marker whose center is inside was drawn whole over
