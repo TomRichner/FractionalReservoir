@@ -17,12 +17,16 @@ function P = bm_fig8_panels(fig, rect, R, opts)
 %    frozen (a wide pale line of the bursting condition's hue) and the
 %    rightmost network mode of the full Jacobian (a thin black line on top
 %    of it). After the step the same network WITHOUT the step continues
-%    dashed: rates and both modes as they would have been with no input
-%    (the stage's no-stimulation continuation, R.nostim: same network, same
-%    noise; Tom, 2026-11-22, note 3). The adaptation-frozen arm is no longer
-%    drawn here (note 4; S10 B shows it). A light band marks the burst of
-%    the zoom; the four sampled moments of H are marked along the top by
-%    triangles in their colors.
+%    dashed: the E rate and the full Jacobian's mode as they would have been
+%    with no input (the stage's no-stimulation continuation, R.nostim: same
+%    network, same noise; Tom, 2026-11-22, note 3), thin and in one quiet
+%    gray; the I rate and frozen-gain mode of the continuation are not drawn
+%    (Plan 3 review, the lead's decision 16: four dashed traces over the
+%    stimulated ones could not be followed). The adaptation-frozen arm is
+%    no longer drawn here (note 4; S10 B shows it). A light band marks the
+%    burst of the zoom; the stimulation moment of H is marked along the top
+%    by a triangle in its color (the three moments of the zoom fall on one
+%    spot of the 100 s axis and are marked in the zoom only).
 % G, right (the zoom): that burst, from 1 s before its onset to 0.5 s
 %    after: rates, and the two modes on the full Jacobian's dense grid
 %    (every dt_sample there); the three moments of H in this window as dots
@@ -37,7 +41,9 @@ function P = bm_fig8_panels(fig, rect, R, opts)
 %    larger in its moment's color. Ticks only outside the bulk, with room
 %    for their labels (the imaginary-axis tick at least 1.25 bulk radii up:
 %    at the first multiple above the radius the Structure plane's circle ran
-%    through its label).
+%    through its label); a real tick whose label would touch a plane's
+%    rightmost eigenvalue moves by half a step (plane_ticks). The Re name
+%    on two lines at the end of the last plane's real axis, above it.
 %
 % THE COLORS of the moments (Tom, 2026-11-22, note 5: as the mockup, more
 % colorful than black, purples and green): structure black, quiet blue,
@@ -97,7 +103,11 @@ fg_w = 2.2; mode_w = 0.7;
 green = [0 0.62 0.45];                            % stimulation (Figure 8's)
 state_col = {[0 0 0], [0.17 0.45 0.75], [0.95 0.55 0.1], [0.72 0.1 0.12], green};
 state_name = {'Structure', 'Quiet', 'Before burst', 'Burst', 'Stimulation'};
-gray_dash = [0.35 0.35 0.35];                     % the key's entry for the continuation
+% The continuation after the step (Plan 3 review, the lead's decision 16):
+% two dashed traces only, the E rate and the full Jacobian's mode, thin and
+% in one quiet gray so that the stimulated traces stay readable; the I rate
+% and the frozen-gain mode without stimulation stay in the data, not drawn.
+nostim_col = [0.62 0.62 0.62]; nostim_w = 0.6;
 
 %% The burst of the zoom and the five states
 on = R.bursts.t_on; off = R.bursts.t_off;
@@ -150,7 +160,7 @@ axes_args = {'re_lim', re_lim, 'im_lim', im_lim, 'bulk_center', cen, 'bulk_radiu
 g = complex_plane_axes([], axes_args{:});
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
 c_title = opts.c_title;
-yC = y0 + 0.27;                                   % the Re name under the last plane
+yC = y0 + 0.05;                                   % the Re name is above the last plane's axis now (0.27 when it was under it)
 yAB = yC + ph + c_title + opts.ab_room;           % room for G's time axis and H's names
 hA = [0.45 0.8 0.95]; gA = 0.1;
 top = y0 + Ht - opts.key_room;
@@ -174,22 +184,23 @@ ylabel(ax, 'Input', 'Rotation', 0, 'HorizontalAlignment', 'right', 'VerticalAlig
 ax = P.ax_A(2);
 band(ax, zoom, [0 1]);
 after = N.t >= H;
+plot(ax, N.t(after), N.rate(after, 1), '--', 'Color', nostim_col, 'LineWidth', nostim_w * lw);
 for q = 2:-1:1
-    plot(ax, N.t(after), N.rate(after, q), '--', 'Color', ec(q, :), 'LineWidth', 0.6 * lw);
     plot(ax, I.t, I.rate(:, q), '-', 'Color', ec(q, :), 'LineWidth', 0.8 * lw);
 end
 ylim(ax, [0 1]); yticks(ax, [0 1]);
-ylabel(ax, 'Rate');   % 'Mean rate' ran into the mode's name below at 9 in
+% Across, as 'Input' above it: turned, it was taller than its axes and
+% crowded the top tick ('Mean rate' ran into the mode's name below at 9 in).
+ylabel(ax, 'Rate', 'Rotation', 0, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
 ax = P.ax_A(3);
 naf = N.full.t >= H;
 zl = mode_limits(re1, real(F.net), real(N.z1(after)), real(N.full.net(naf)));
 band(ax, zoom, zl);
 yline(ax, 0, ':', 'Color', [0 0 0], 'LineWidth', 0.6 * lw);
-plot(ax, N.t(after), real(N.z1(after)), '--', 'Color', fg_col, 'LineWidth', 1.2 * lw);
 plot(ax, I.t, re1, '-', 'Color', fg_col, 'LineWidth', fg_w * lw);
-plot(ax, N.full.t(naf), real(N.full.net(naf)), '--', 'Color', mode_col, 'LineWidth', mode_w * lw);
 c = F.is_coarse;
 plot(ax, F.t(c), real(F.net(c)), '-', 'Color', mode_col, 'LineWidth', mode_w * lw);
+plot(ax, N.full.t(naf), real(N.full.net(naf)), '--', 'Color', nostim_col, 'LineWidth', nostim_w * lw);
 ylim(ax, zl);
 ylabel(ax, 'Re \lambda (s^{-1})');
 xlabel(ax, 'Time (s)');
@@ -197,7 +208,9 @@ for r = 1:3
     xlim(P.ax_A(r), [I.t(1) I.t(end)]);
     if r < 3; P.ax_A(r).XTickLabel = {}; end
 end
-for q = 2:5
+% Only the stimulation moment on the 100 s axis: the three moments of the
+% zoom fall on one spot there and are marked in the zoom (Plan 3 review).
+for q = 5
     plot(P.ax_A(3), t_state(q), zl(2), 'v', 'MarkerSize', 5.5, 'MarkerFaceColor', state_col{q}, ...
         'MarkerEdgeColor', 'none', 'Clipping', 'off');
 end
@@ -207,7 +220,7 @@ hk = [plot(ax, NaN, NaN, '-', 'Color', ec(1, :), 'LineWidth', 0.8 * lw), ...
     plot(ax, NaN, NaN, '-', 'Color', ec(2, :), 'LineWidth', 0.8 * lw), ...
     plot(ax, NaN, NaN, '-', 'Color', fg_col, 'LineWidth', fg_w * lw), ...
     plot(ax, NaN, NaN, '-', 'Color', mode_col, 'LineWidth', mode_w * lw), ...
-    plot(ax, NaN, NaN, '--', 'Color', gray_dash, 'LineWidth', 0.8 * lw)];
+    plot(ax, NaN, NaN, '--', 'Color', nostim_col, 'LineWidth', 0.8 * lw)];
 P.legend = legend(ax, hk, {'E', 'I', 'Gains frozen', 'Full Jacobian', 'Without stimulation'}, ...
     'Orientation', 'horizontal', 'Box', 'off', 'FontSize', opts.annot_size, 'AutoUpdate', 'off');
 P.legend.ItemTokenSize = [18 8];
@@ -241,30 +254,35 @@ for r = 1:2; xlim(P.ax_B(r), zoom); end
 %% H
 P.ax_C = gobjects(1, 5);
 th = linspace(0, 2 * pi, 241);
+% A real-axis tick whose label would touch the plane's rightmost eigenvalue
+% (drawn larger, on or near the axis) moves by half a step to a side where
+% it is clear of that mark and of the bulk (Plan 3 review: in the Structure
+% plane the "20" touched the outlier); it stays where neither side is clear.
+clear_re = 0.16 * diff(g.x_lim) / pw;             % half a two-digit label and a mark, in Re units
+half_lab = 0.11 * diff(g.x_lim) / pw;             % half a two-digit label
 for q = 1:5
     axq = axes(fig, 'Units', 'inches', 'Position', [x0 + left + (q - 1) * (pw + gap), yC, pw, ph]);
     names = {'re_label', '', 'im_label', ''};
-    if q == 5; names{2} = 'Re (s^{-1})'; end
     if q == 1; names{4} = 'Im (s^{-1})'; end
-    cp = complex_plane_axes(axq, axes_args{:}, names{:});
+    z = zs{q};
+    [~, kr] = max(real(z));
+    cp = complex_plane_axes(axq, axes_args{:}, names{:}, ...
+        're_ticks', plane_ticks(re_ticks, z(kr), clear_re, step / 2, cen + rmax + half_lab, re_lim));
     hold(axq, 'on');
     plot(axq, cp.x(cen + rad(q) * cos(th)), rad(q) * sin(th), '-', 'Color', [0.6 0.6 0.6], 'LineWidth', 0.6 * lw);
-    z = zs{q};
     scatter(axq, cp.x(real(z)), imag(z), 5 * lw, [0.25 0.25 0.25], 'filled', 'MarkerEdgeColor', 'none');
-    [~, kr] = max(real(z));
     zr = z(abs(z - z(kr)) < 1e-9 | abs(z - conj(z(kr))) < 1e-9);   % the rightmost eigenvalue and its conjugate
     scatter(axq, cp.x(real(zr)), imag(zr), 22 * lw, state_col{q}, 'filled', 'MarkerEdgeColor', 'none');
     set(axq, 'XLim', cp.x_lim, 'YLim', cp.y_lim);
     text(axq, mean(cp.x_lim), cp.y_lim(2) + 0.04 * diff(cp.y_lim), state_name{q}, 'Color', state_col{q}, ...
         'FontSize', fs, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom');
     if q == 5
-        % The Re name under the plane, at its right end: under the real
-        % axis' tick labels (complex_plane_axes' place) it is wider than the
-        % stretch right of the imaginary axis and the axis ran through it.
-        tr = findall(axq, 'Type', 'text');
-        tr = tr(arrayfun(@(t) any(strcmp(cellstr(t.String), 'Re (s^{-1})')), tr));
-        set(tr, 'String', 'Re (s^{-1})', 'Position', [cp.x_lim(2), cp.y_lim(1), 0], ...
-            'HorizontalAlignment', 'right', 'VerticalAlignment', 'top');
+        % The Re name at the end of the last plane's real axis, just above
+        % it and on two lines: on one line it is wider than the stretch
+        % right of the imaginary axis (the axis ran through it), and at the
+        % foot of the plane (until the Plan 3 review) it sat far from its axis.
+        text(axq, cp.x_lim(2), 0.01 * diff(cp.y_lim), {'Re', '(s^{-1})'}, 'FontSize', opts.annot_size, ...
+            'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom');
     end
     P.ax_C(q) = axq;
 end
@@ -299,6 +317,22 @@ v = cat(1, varargin{:});
 v = v(isfinite(v));
 lo = floor((min(v) - 1) / 5) * 5; hi = ceil((max(v) + 1) / 5) * 5;
 zl = [lo, hi];
+end
+
+function t = plane_ticks(t, zr, clear_re, half, lo, re_lim)
+% The real ticks of one plane: a tick within clear_re of its rightmost
+% eigenvalue zr (when that lies near the real axis) moves by half a step,
+% left or right, to where it is clear of zr, right of lo (the bulk's edge
+% and half a label) and inside the window; it stays where neither side is.
+if abs(imag(zr)) > clear_re; return; end
+for k = 1:numel(t)
+    if abs(t(k) - real(zr)) >= clear_re; continue; end
+    for c = t(k) + [-half, half]
+        if abs(c - real(zr)) >= clear_re && c > lo && c < re_lim(2)
+            t(k) = c; break
+        end
+    end
+end
 end
 
 function s = nice_step(raw)

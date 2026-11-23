@@ -100,8 +100,16 @@ assert(strcmp(h(5).LineStyle, '--'), 'the continuation without stimulation is da
 set(lg, 'Units', 'inches');
 top = max(arrayfun(@(a) a.Position(2) + a.Position(4), findall(o.figs, 'Type', 'axes')'));
 assert(lg.Position(2) >= top - 1e-6, 'the key sits above the time course');
-assert(nnz(arrayfun(@(l) strcmp(l.LineStyle, '--'), findall(ax, 'Type', 'line'))) == 3, ...
-    'dashed in the rate axes: E and I without stimulation, and the key''s entry');
+% Plan 3 review (the lead's decision 16): after the step only the E rate and
+% the full Jacobian's mode continue dashed, in one quiet gray.
+dashed = findall(ax, 'Type', 'line', 'LineStyle', '--');
+assert(numel(dashed) == 2, 'dashed in the rate axes: E without stimulation, and the key''s entry');
+assert(isequal(dashed(1).Color, dashed(2).Color) && isequal(h(5).Color, dashed(1).Color), ...
+    'the continuation and its key entry in one gray');
+mode_ax = findall(o.figs, 'Type', 'axes');
+mode_ax = mode_ax(arrayfun(@(a) startsWith(strjoin(cellstr(a.YLabel.String), ' '), 'Re'), mode_ax));
+n_mode_dash = sum(arrayfun(@(a) numel(findall(a, 'Type', 'line', 'LineStyle', '--')), mode_ax));
+assert(n_mode_dash == 1, 'one dashed mode (the full Jacobian''s) without stimulation, found %d', n_mode_dash);
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode.png')) && isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode_table.md')));
 ied = fullfile(run_dir, 'ied'); mkdir(ied);
