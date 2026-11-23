@@ -97,7 +97,8 @@ MA = 108; WA = 228; GAP = 18; MB = 84; WB = 192;   % the margins hold a y label 
 set(ax_a, 'Units', 'pixels', 'PositionConstraint', 'innerposition', 'Position', [MA, Y_AB, WA, H_AB]);
 XB = MA + WA + GAP + MB;
 set(ax_b, 'Units', 'pixels', 'PositionConstraint', 'innerposition', 'Position', [XB, Y_AB, WB, H_AB]);
-MC = 114; CGAP = 36; RIGHT = 14;      % (C): a y label of three lines; the end labels of neighbours apart
+MC = 114; CGAP = 36; RIGHT = 30;      % (C): a y label of three lines; the end labels of neighbours apart;
+                                      % RIGHT: half the last tick label '10' (at 14 it touched the edge)
 WC = (W - MC - (nc - 1) * CGAP - RIGHT) / nc;
 for c = 1:nc
     set(ax_c(c), 'Units', 'pixels', 'PositionConstraint', 'innerposition', ...
@@ -117,7 +118,9 @@ title(ax_a, T.condition_title(tau_name), 'FontWeight', 'normal', 'Interpreter', 
     'Color', st.condition_color(tau_name));
 zero_ref = findall(ax_a, 'Type', 'constantline');
 zero_ref = zero_ref(arrayfun(@(h) h.Value == 0, zero_ref));
-set(zero_ref, 'Color', st.zeroline_color, 'LineStyle', '--', 'LineWidth', st.zeroline_lw);
+% Alpha 1: a constant line is drawn at 0.7 by default, so it came out a
+% paler green than the dashed lines of (C) (Plan 3 review).
+set(zero_ref, 'Color', st.zeroline_color, 'LineStyle', '--', 'LineWidth', st.zeroline_lw, 'Alpha', 1);
 delete(findall(ax_a, 'Type', 'line', 'Marker', 'o', 'LineStyle', 'none'));
 ax_a.YLim(1) = -0.2;
 % (B), as S9 drew it: the state coordinates' palette and markers of
