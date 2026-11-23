@@ -64,7 +64,7 @@ assert(all(found) && numel(S.figs) >= max(sheet), 'fig_supp4_grouped:Sheets', ..
 %% The canvas: two blocks of 2 x 4 slots
 W = 1100; H = 935;
 fig = T.canvas(W, H, cfg.visible);
-X0 = 95; CW = 190; GAP = 68; RH = 140;
+X0 = 95; CW = 196; GAP = 68; RH = 140;
 ROW_Y = [745 530; 295 80];                 % ROW_Y(block, row)
 slot = @(b, r, c) [X0 + (c - 1) * (CW + GAP), ROW_Y(b, r), CW, RH];
 
@@ -93,6 +93,12 @@ for b = 1:2
     ax{b} = [a(1); a(2); gain; a(3:6)];
     set(ax{b}, 'Units', 'pixels');
     for k = 1:7; ylabel(ax{b}(k), ''); ax{b}(k).XTickLabelRotation = 0; end
+    % A label of words on two lines: at label_fs 'Mean Firing Rate' was
+    % longer than the 140-px panel it names.
+    if ischar(y_label) && ~contains(y_label, '\') && numel(strsplit(y_label)) > 1
+        w = strsplit(y_label);
+        y_label = {strjoin(w(1:floor(end / 2)), ' '), strjoin(w(floor(end / 2) + 1:end), ' ')};
+    end
     ylabel(ax{b}(1), y_label, 'Interpreter', 'tex');
     ylabel(ax{b}(4), y_label, 'Interpreter', 'tex');
 end
@@ -117,6 +123,10 @@ end
 % cropped export ended on them (flush with the image edge, 2026-11-22):
 % keep a margin under them.
 T.margin(fig, 6);
+
+%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.style(fig);                % again: the labels and titles set since take their roles' sizes
+T.fit(fig);
 
 %% Panel letters
 T.letter(ax{1}(1), 'A', -85, 18);
@@ -150,8 +160,8 @@ caption = sprintf(['Supplementary Figure S4, sensitivity to each connectivity pa
     'connectivity, read presynaptic to postsynaptic, as percent departure from the preset. The y window is ' ...
     'fixed, so a curve that leaves it is clipped. (B) The mean firing rate for the same seven sweeps. The gain ' ...
     'panel of each block is drawn by this function from the saved sweep, by the rule of fig_sensitivity_medians ' ...
-    '(which omits it), in the style of the panels beside it. Canvas %d x %d px, text 14 pt.'], ...
-    cfg.run_dir, strjoin(names, ', '), W, H);
+    '(which omits it), in the style of the panels beside it. Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
+    cfg.run_dir, strjoin(names, ', '), getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Supplementary Figure S4: sensitivity to each connectivity parameter', ...
@@ -220,6 +230,17 @@ for c = 1:numel(names)
     plot(ax, x, P(c, :, 2), '-', 'Color', cond_lines(c).Color, 'LineWidth', cond_lines(c).LineWidth, ...
         'DisplayName', cond_lines(c).DisplayName);
 end
+% The off-scale markers that fig_sensitivity_medians draws on the panels
+% beside it (Plan2_canvas_standard.md: this panel, drawn here, had none):
+% a triangle on the top or bottom edge where a median has left the y
+% window, at the donor's marker size and fig_sensitivity_medians' default
+% spacing.
+donor_marks = findall(donor, 'Tag', 'offscale_marker');
+marker_size = 5;
+if ~isempty(donor_marks); marker_size = donor_marks(1).MarkerSize; end
+cond_spec = struct('name', names(:)', 'color', arrayfun(@(h) h.Color, cond_lines(:)', 'UniformOutput', false));
+draw_offscale_markers(ax, x, arrayfun(@(c) P(c, :, 2), 1:numel(names), 'UniformOutput', false), cond_spec, ...
+    donor.YLim, marker_size, 0.035);
 hold(ax, 'off');
 xlim(ax, [min(x), max(x)]);
 ylim(ax, donor.YLim);

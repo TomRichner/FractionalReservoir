@@ -74,7 +74,7 @@ arguments
     cfg.outlier_size (1,1) double = 36
     cfg.left_tint (1,1) double {mustBeGreaterThanOrEqual(cfg.left_tint, 0), mustBeLessThanOrEqual(cfg.left_tint, 1)} = 0.6   % share of white in the dots left of the boundary; 0 = one color
     cfg.scale_bar_s (1,1) double  = 2
-    cfg.fig_size double           = [13 9.6]   % inches
+    cfg.fig_size double           = []   % [width height] inches; [] (the default): manuscript_style's canvas_w by 9.6
 end
 
 setup_paths();
@@ -145,7 +145,9 @@ if ~isempty(proto_far); geom_args = [geom_args, {'gap', gap}]; end
 g = complex_plane_axes([], geom_args{:}, 'far_lim', proto_far);
 
 %% Layout (inches)
-W_in = cfg.fig_size(1); H_in = cfg.fig_size(2);
+fig_size = cfg.fig_size;
+if isempty(fig_size); fig_size = [st.canvas_w, 9.6]; end
+W_in = fig_size(1); H_in = fig_size(2);
 left = 0.75; right = 0.2; col_gap = 0.3;
 pw = (W_in - left - right - (m - 1) * col_gap) / m;
 ph_spec = pw * diff(g.y_lim) / diff(g.x_lim);
@@ -278,14 +280,17 @@ end
 %% Panel B: the adaptation diagrams (unchanged drawing)
 yB = 0.62; hB = 1.5;
 in2n = @(x, y, w, h) [x / W_in, y / H_in, w / W_in, h / H_in];
-posB = [in2n(0.75, yB, 2.0, hB); in2n(3.75, yB, 2.3, hB); in2n(7.0, yB, 2.0, hB); in2n(10.1, yB, 2.3, hB)];
+% Left edges and widths as shares of the canvas width (laid out on 13 in).
+xB = [0.75 3.75 7.0 10.1] / 13 * W_in; wB = [2.0 2.3 2.0 2.3] / 13 * W_in;
+posB = [in2n(xB(1), yB, wB(1), hB); in2n(xB(2), yB, wB(2), hB); in2n(xB(3), yB, wB(3), hB); in2n(xB(4), yB, wB(4), hB)];
 A = draw_adaptation_concepts(fig, preset_name, posB);
 set(findall(A.axes, '-property', 'FontSize'), 'FontSize', fs);
+for k = 1:numel(A.axes); set([A.axes(k).XLabel, A.axes(k).YLabel], 'FontSize', st.label_fs); end   % axis names at label_fs
 
 %% Panel letters
 lab = axes(fig, 'Position', [0 0 1 1], 'XLim', [0 1], 'YLim', [0 1], 'Visible', 'off', 'Tag', 'panel_letters');
-text(lab, 0.08 / W_in, 1 - 0.12 / H_in, '(A)', 'FontSize', fs, 'VerticalAlignment', 'top', 'Tag', 'letter_A');
-text(lab, 0.08 / W_in, (yB + hB + 0.55) / H_in, '(B)', 'FontSize', fs, 'VerticalAlignment', 'top', 'Tag', 'letter_B');
+text(lab, 0.08 / W_in, 1 - 0.12 / H_in, '(A)', 'FontSize', st.letter_fs, 'VerticalAlignment', 'top', 'Tag', 'letter_A');
+text(lab, 0.08 / W_in, (yB + hB + 0.55) / H_in, '(B)', 'FontSize', st.letter_fs, 'VerticalAlignment', 'top', 'Tag', 'letter_B');
 
 %% Save, and the numbers
 fig_tag = 'Fig_Main1_Concept_Networks';

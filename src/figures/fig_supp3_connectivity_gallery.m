@@ -50,7 +50,7 @@ arguments
     cfg.im_tick_candidates double = [-75 75]
     cfg.dot_size (1,1) double     = 5
     cfg.outlier_size (1,1) double = 30
-    cfg.fig_width (1,1) double    = 13    % inches
+    cfg.fig_width double          = []    % inches; [] (the default): manuscript_style's canvas_w
     cfg.image_size (1,1) double   = 1.2   % inches
 end
 
@@ -106,7 +106,8 @@ g = complex_plane_axes([], geom_args{:}, 'far_lim', proto_far);
 nc = min(cfg.n_cols, m);
 nr = ceil(m / nc);
 W_in = cfg.fig_width;
-left = 0.45; right = 0.2; col_gap = 0.3;
+if isempty(W_in); W_in = st.canvas_w; end
+left = 0.05; right = 0; col_gap = 0.2;     % the drawing fills the canvas (the axes boxes are wider than their axis lines)
 pw = (W_in - left - right - (nc - 1) * col_gap) / nc;
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
 img = min(cfg.image_size, pw);

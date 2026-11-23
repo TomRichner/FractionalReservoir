@@ -182,13 +182,13 @@ cond_lines = flipud(findall(ax_b2, 'Type', 'line'));
 lg = gobjects(0);
 if numel(cond_lines) == nc
     lg = legend(ax_b2, cond_lines, cellfun(@(n) T.condition_title(n), names, 'UniformOutput', false), ...
-        'Box', 'off', 'FontSize', 14, 'NumColumns', 1, 'Location', 'none', 'Units', 'pixels');
+        'Box', 'off', 'FontSize', st.tick_fs, 'NumColumns', 1, 'Location', 'none', 'Units', 'pixels');
 end
 % (C): ticks and labels as fig_main_mc_grouped styles the capacity maps.
 GAIN_TICKS = [0.05 0.25 1 5];
 for c = 1:nc
     ax = maps(c);
-    title(ax, T.condition_title(names{c}, true), 'FontWeight', 'normal', 'FontSize', 14, ...
+    title(ax, T.condition_title(names{c}, true), 'FontWeight', 'normal', 'FontSize', st.title_fs, ...
         'Color', st.condition_color(names{c}), 'Interpreter', 'tex');
     g_levels = ax.XTick;
     set(ax, 'XTick', log10(GAIN_TICKS), 'XTickLabel', compose('%g', GAIN_TICKS), ...
@@ -237,6 +237,10 @@ for pass = 1:2
     end
 end
 
+%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.style(fig);                % again: the labels and titles set since take their roles' sizes
+T.fit(fig);
+
 %% Panel letters
 T.letter(ax_a(1), 'A', -30, 22);
 T.letter(ax_b1, 'B', -95, 12);
@@ -276,8 +280,8 @@ caption = sprintf(['Supplementary Figure S9, memory (drawn by fig_supp9_grouped;
     'the layout of Figure 7D; white 0, dark green 1; star: the preset. (E) Memory capacity against lambda_1 with the ' ...
     'task input on for every run of that grid, coloured by gain, marker area by |s| (filled s >= 0, ring s < 0), ' ...
     'open squares at the edge where |lambda_1| exceeds the axis; the statistics boxes of the source figure are in ' ...
-    'this table, not on the panels. Canvas %d x %d px, text 14 pt.'], ...
-    cfg.run_dir, cfg.mc_run_dir, strjoin(names, ', '), tau_name, W, H);
+    'this table, not on the panels. Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
+    cfg.run_dir, cfg.mc_run_dir, strjoin(names, ', '), tau_name, getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Supplementary Figure S9: memory', caption, parts, sources);

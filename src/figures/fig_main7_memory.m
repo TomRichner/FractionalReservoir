@@ -88,7 +88,7 @@ assert(S_map.figs.Position(3) == W, 'fig_main7_memory:MapCanvas', ...
     'fig_main_mc_grouped drew on a canvas %g px wide; this figure is laid out for %d.', ...
     S_map.figs.Position(3), W);
 TOP_Y = H_MAPS + 55; TOP_H = 170;
-H = TOP_Y + TOP_H + 45;      % 955 px: under 0.9 of the workstation screen, so exported cropped as usual
+H = TOP_Y + TOP_H + 52;      % 962 px: under 0.9 of the workstation screen, so exported cropped as usual
 fig = T.canvas(W, H, cfg.visible);
 
 % (D), (E), (F) and the legend, where fig_main_mc_grouped put them.
@@ -129,7 +129,7 @@ T.style(fig);
 tau_name = tau_condition(S_tau.source, names);
 set(ax_a, 'XScale', 'linear');
 xlabel(ax_a, 'Longest SFA Time Constant (s)', 'Interpreter', 'none');
-ylabel(ax_a, 'Lyapunov Exp., \lambda_1 (s^{-1})', 'Interpreter', 'tex');
+ylabel(ax_a, {'Lyapunov Exp.,', '\lambda_1 (s^{-1})'}, 'Interpreter', 'tex');   % two lines: at 15.4 pt one line ran into (A)
 title(ax_a, T.condition_title(tau_name), 'FontWeight', 'normal', 'Interpreter', 'tex', ...
     'Color', st.condition_color(tau_name));
 zero_ref = findall(ax_a, 'Type', 'constantline');
@@ -158,7 +158,7 @@ xlabel(ax_c, '');
 ax_c.YTick = 0:6:ax_c.YLim(2);
 % (D), (F): sentence-case condition titles, in the colour the source gave them.
 for c = 1:nc
-    title(maps(1, c), T.condition_title(names{c}, true), 'FontWeight', 'normal', 'FontSize', 14, ...
+    title(maps(1, c), T.condition_title(names{c}, true), 'FontWeight', 'normal', 'FontSize', st.title_fs, ...
         'Color', maps(1, c).Title.Color, 'Interpreter', 'tex');
 end
 M.legends.String = cellfun(@(n) T.condition_title(n), names, 'UniformOutput', false);
@@ -180,10 +180,14 @@ end
 % axis between 0 and the lowest positive level, which are not a decade apart.
 relabel_noise_axis(ax_noise, S_map.noise_levels);
 
+%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.style(fig);                % again: the labels and titles set since take their roles' sizes
+T.fit(fig);
+
 %% Panel letters
-T.letter(ax_a, 'A', -90, 12);
-T.letter(ax_b, 'B', -85, 12);
-T.letter(ax_c, 'C', -65, 12);
+T.letter(ax_a, 'A', -100, 24);       % (A) to (C) level with the title of (A)
+T.letter(ax_b, 'B', -100, 24);
+T.letter(ax_c, 'C', -85, 24);
 T.letter(maps(1, 1), 'D', -95, 55);
 T.letter(ax_noise, 'E', -70, 12);
 T.letter(maps(2, 1), 'F', -95, 30);
@@ -227,8 +231,8 @@ caption = sprintf(['Main Figure 7, memory (drawn by fig_main7_memory; run `%s`, 
     'of the preset network against the input noise sigma_u: median over networks and interquartile band; the axis ' ...
     'is broken between 0 and the lowest positive level (break marks), and the labelled ticks read their levels. (F) lambda_1 with the task input on over the same grid ' ...
     '(median over seeds; symmetric-log colour scale with its darkest colour at zero). One legend names the ' ...
-    'conditions. Panels (D) to (F) are fig_main_mc_grouped''s, with its scales. Canvas %d x %d px, text 14 pt.'], ...
-    cfg.run_dir, cfg.mc_run_dir, strjoin(names, ', '), tau_name, W, H);
+    'conditions. Panels (D) to (F) are fig_main_mc_grouped''s, with its scales. Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
+    cfg.run_dir, cfg.mc_run_dir, strjoin(names, ', '), tau_name, getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Main Figure 7: memory', caption, parts, sources);
@@ -270,7 +274,7 @@ ax.XTickLabel = {};
 for k = 1:numel(words)
     parts = regexp(words{k}, '^(\S+?-|\S+) ?(\S+)$', 'tokens', 'once');
     if isempty(parts); parts = words(k); end
-    text(ax, xt(k), yl(1) - 0.04 * diff(yl), parts, 'Color', st.condition_color(names{k}), 'FontSize', 14, ...
+    text(ax, xt(k), yl(1) - 0.04 * diff(yl), parts, 'Color', st.condition_color(names{k}), 'FontSize', st.tick_fs, ...
         'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', 'Clipping', 'off', 'Interpreter', 'none', ...
         'Tag', 'main7_horizon_tick');
 end

@@ -51,6 +51,7 @@ arguments
 end
 setup_paths();
 T = composite_tools();
+st = manuscript_style();
 quiet = {'save', false, 'visible', false};
 preset = {};
 if ~isempty(cfg.preset_name); preset = {'preset_name', cfg.preset_name}; end
@@ -117,7 +118,7 @@ for r = 1:nr
     for c = 1:ncol
         ax = ax_a(r, c);
         title(ax, '');
-        if r == 1; title(ax, pulse_title(cfg.pulse_conditions, c, col_titles{c}), 'FontWeight', 'normal', 'FontSize', 14); end
+        if r == 1; title(ax, pulse_title(cfg.pulse_conditions, c, col_titles{c}), 'FontWeight', 'normal', 'FontSize', st.title_fs); end
         ax.YTick = ax.YTick([1 end]);
         ax.XTick = ax.XLim(1):10:ax.XLim(2);
         if r < nr
@@ -171,6 +172,10 @@ for pass = 1:2
     end
 end
 
+%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.style(fig);                % again: the labels and titles set since take their roles' sizes
+T.fit(fig);
+
 %% Panel letters
 T.letter(ax_a(1, 1), 'A', -75, 22);
 T.letter(ax_b(1), 'B', -65, 28);
@@ -211,8 +216,8 @@ caption = sprintf(['Supplementary Figure S1, one neuron (drawn by fig_supp1_grou
     'Depression with one pool (single-timescale condition) and with a reserve pool behind it (the chain, ' ...
     'multiple-timescale condition): steady-state depression factor and synaptic output against the rate (dotted: ' ...
     'the ceiling of the output; gray: the undepressed output), and both through three steps of the rate (gray: ' ...
-    'the rate; dotted: the steady state; dashed: the reserve). Canvas %d x %d px, text 14 pt.'], ...
-    cfg.run_dir, cfg.preset_name, strjoin(cfg.pulse_rows, ', '), W, H);
+    'the rate; dotted: the steady state; dashed: the reserve). Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
+    cfg.run_dir, cfg.preset_name, strjoin(cfg.pulse_rows, ', '), getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Supplementary Figure S1: one neuron, and one against several timescales', ...
