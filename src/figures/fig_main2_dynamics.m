@@ -172,7 +172,10 @@ end
 % One E/I key. Current raster shades remain original; numeric data use the
 % wider within-type color spread (no model simulation is involved).
 if numeric
-    ce=excitatory_colormap(1); ci=inhibitory_colormap(1);
+    % The key is a single-color mark: manuscript_style's E and I colors, the
+    % first anchors of the two color maps (Tom, 2026-11-23, G2; it drew
+    % excitatory_colormap(1), the map's one-color mauve).
+    ce=st.E_color; ci=st.I_color;
 else
     tc=SRNNCellTypePairs.type_colors(2); ce=tc(1,:); ci=tc(2,:);
 end
