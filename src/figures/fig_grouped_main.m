@@ -68,8 +68,8 @@ arguments
     % Group 3 only (Tom, 2026-11-20): a fourth row, (D), under the heat map:
     % the eigenvalues projected on the real axis against a uniform disk
     % (fig_main3_stability's real_histogram_row; needs show_lambda_row
-    % false). Saved with _realhist appended to the tag, on a taller canvas,
-    % with the numbers in <tag>_table.md.
+    % false). Saved with _realhist appended to the tag, with the numbers in
+    % <tag>_table.md.
     cfg.real_histogram_row (1,1) logical = false
     % The file name stem, when the registry names it (as fig_main_mc_grouped's
     % fig_tag, FD-031). '' (the default) names the file by its options:
@@ -109,8 +109,16 @@ switch group
         a=fig_main3_stability(cfg.run_dir,cfg.conditions,'show_lambda_row',cfg.show_lambda_row, ...
             'ritz_overlay',cfg.ritz_overlay,'ritz_k',cfg.ritz_k,'ritz_scaling',cfg.ritz_scaling,'ritz_inset',cfg.ritz_inset,'ritz_style',cfg.ritz_style, ...
             'spectra_source',cfg.spectra_source,'real_histogram_row',cfg.real_histogram_row);
-        fig.Position(3)=fig.Position(3)*a.width_scale;
-        if cfg.real_histogram_row, fig.Position(4)=fig.Position(4)*a.height_scale; table_text=a.table_text; end
+        % fig_main3_stability's own canvas (manuscript_style's canvas_w for
+        % three columns, the height its rows need): the layout is made for
+        % it. A NEW figure of that size, not this one resized: an invisible
+        % figure resized after creation was seen to go back to the size it
+        % was created with when the panels were copied into it (2026-11-22,
+        % worker sessions, here and in group 2). The flattened figure below
+        % is created at this figure's size, and its size is checked there.
+        canvas_px=a.figs.Position(3:4);
+        close(fig); fig=figure('Visible',onoff(cfg.visible),'Color','w','Position',[40 40 canvas_px]);
+        if cfg.real_histogram_row, table_text=a.table_text; end
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 4
@@ -205,18 +213,11 @@ if ismember(group,[1 2 3 8])
         tt=findall(fig,'Type','axes','-regexp','Tag','^dynamics_r1_c\d+$');
         for k=1:numel(tt), tt(k).Title.FontSize=16; end
     elseif group==3
-        tt=findall(fig,'Type','axes','-regexp','Tag','^stability_r1_c\d+$');
-        for k=1:numel(tt), tt(k).Title.FontSize=16; end
+        drawnow;
+        assert(max(abs(fig.Position(3:4)-canvas_px))<1,'fig_grouped_main:CanvasShrunk', ...
+            'Figure 3 is %g x %g px, not the %g x %g px of its layout (larger than the screen?).',fig.Position(3:4),canvas_px);
+        canvas_type(fig);   % type by role (manuscript_style), as fig_main3_stability set it
         set(findall(fig,'Tag','ritz_inset'),'FontSize',9); set(findall(fig,'-regexp','Tag','^ritz_(annotation|tick_label)$'),'FontSize',9);
-        if cfg.real_histogram_row
-            % Each histogram under the plot box of the heat map above it, as
-            % that box is on THIS canvas (fig_main3_stability's is another shape).
-            hx=findall(fig,'Type','axes','-regexp','Tag','^stability_r4_c\d+$');
-            for k=1:numel(hx)
-                heat=findall(fig,'Type','axes','Tag',strrep(hx(k).Tag,'_r4_','_r3_'));
-                pb=plot_box_position(heat); hx(k).Position([1 3])=pb([1 3]);
-            end
-        end
     end
 else
     set(findall(fig,'Type','axes'),'FontSize',10);
