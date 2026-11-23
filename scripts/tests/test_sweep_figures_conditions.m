@@ -55,31 +55,13 @@ out = fig_sensitivity_medians(base{:}, 'preset_name', preset, 'save', false);
 n_fail = n_fail + check(isequal(legend_text(out.figs(1)), ...
     cellfun(@(c) st.condition_title(c), {'no_adaptation', 'sfa1_std1', 'sfa3_std2'}, 'UniformOutput', false)), ...
     'medians, no selection: the preset''s three, in its order');
-% Off-scale markers (polish list, 2026-11-22): in every panel of the first
-% sheet, one marker per sweep value at which a median lies outside the y
-% window, on the edge it left by, in that curve's color, inside the x
-% limits; none in the legend (the legend check above); none when switched off.
-[ok_mark, n_mark] = offscale_markers_match(out.figs(1));
-n_fail = n_fail + check(ok_mark, sprintf('medians: off-scale markers match the medians outside the window (%d drawn)', n_mark));
+% No off-scale markers (Tom, 2026-11-22, Figure 4 note 2): the curves are
+% simply clipped by the y window, and the option that drew them is gone.
+n_fail = n_fail + check(isempty(findall(out.figs, 'Tag', 'offscale_marker')), ...
+    'medians: no off-scale markers, the curves simply clipped');
 close(out.figs);
-out = fig_sensitivity_medians(base{:}, 'preset_name', preset, 'save', false, 'offscale_markers', false);
-n_fail = n_fail + check(isempty(findall(out.figs, 'Tag', 'offscale_marker')), 'medians: offscale_markers false draws none');
-close(out.figs);
-% The helper on curves that must leave the window (the reference run's need not).
-f = figure('Visible', 'off'); axm = axes(f); hold(axm, 'on');
-spec = struct('name', {'a', 'b'}, 'color', {[1 0 0], [0 0 1]});
-hm = draw_offscale_markers(axm, 1:5, {[2 0 NaN -3 0], [3 0 0 0 5]}, spec, [-1 1], 5, 0.05);
-U = [hm.UserData];
-got = sortrows([[U.x]', [U.side]', strcmp({U.condition}, 'b')', [hm.XData]', [hm.YData]']);
-% x, side, is-b: (1, top, a), (1, top, b), (4, bottom, a), (5, top, b); the pair
-% at x = 1 side by side and moved inside the x limits, the one at x = 5 on the limit.
-want = [1 1 0; 1 1 1; 4 2 0; 5 1 1];
-ok_h = isequal(got(:, 1:3), want) && max(abs(got(:, 4) - [1; 1.2; 4; 5])) < 1e-12 && ...
-    all(abs(got([1 2 4], 5) - 0.95) < 1e-12) && abs(got(3, 5) + 0.95) < 1e-12 && ...
-    isequal({hm.Marker}, {'^', '^', 'v', '^'}) && all(strcmp({hm.HandleVisibility}, 'off')) && ...
-    all(strcmp({hm.Tag}, 'offscale_marker')) && isequal(hm(2).Color, [0 0 1]);
-n_fail = n_fail + check(ok_h, 'draw_offscale_markers: one per off-scale value, on its edge, by condition, inside the x limits, NaN unmarked');
-close(f);
+id = error_of(@() fig_sensitivity_medians(base{:}, 'preset_name', preset, 'save', false, 'offscale_markers', true));
+n_fail = n_fail + check(~isempty(id), 'medians: the off-scale option is gone');
 out = fig_sensitivity_medians(base{:}, 'preset_name', preset, 'save', false, 'conditions', sel);
 n_fail = n_fail + check(isequal(legend_text(out.figs(1)), want_sel), ...
     'medians, subset: exactly the selection, in the requested order');
@@ -182,34 +164,6 @@ try
     fn();
 catch ME
     id = ME.identifier;
-end
-end
-
-function [ok, n_mark] = offscale_markers_match(fig)
-% In every panel: the markers are exactly the (sweep value, edge, color) of
-% the median curves' points outside the y limits, and lie inside the x limits.
-ok = true; n_mark = 0;
-ax = findobj(fig, 'Type', 'axes');
-for k = 1:numel(ax)
-    mk = findall(ax(k), 'Tag', 'offscale_marker');   % findall: they are hidden from the legend
-    cur = findobj(ax(k), 'Type', 'line', 'LineStyle', '-', 'Marker', 'none');
-    cur = cur(arrayfun(@(h) numel(h.XData) > 2, cur));   % the medians, not the default mark
-    want = zeros(0, 5);
-    for j = 1:numel(cur)
-        y = cur(j).YData; x = cur(j).XData;
-        for side = 1:2
-            if side == 1; off = y > ax(k).YLim(2); else; off = y < ax(k).YLim(1); end
-            want = [want; [x(off)', side * ones(nnz(off), 1), repmat(cur(j).Color, nnz(off), 1)]]; %#ok<AGROW>
-        end
-    end
-    got = zeros(numel(mk), 5);
-    for j = 1:numel(mk)
-        got(j, :) = [mk(j).UserData.x, mk(j).UserData.side, mk(j).Color];
-        ok = ok && mk(j).XData >= ax(k).XLim(1) && mk(j).XData <= ax(k).XLim(2) && ...
-            mk(j).YData > ax(k).YLim(1) && mk(j).YData < ax(k).YLim(2);
-    end
-    ok = ok && isequal(sortrows(got), sortrows(want));
-    n_mark = n_mark + numel(mk);
 end
 end
 

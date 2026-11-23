@@ -61,12 +61,20 @@ measures = {'LLE', 'mean_rate'};
 assert(all(found) && numel(S.figs) >= max(sheet), 'fig_supp4_grouped:Sheets', ...
     'fig_sensitivity_medians returned no sheet for %s.', strjoin(measures(~found), ', '));
 
-%% The canvas: two blocks of 2 x 4 slots
-W = 1100; H = 935;
+%% The canvas: two blocks of 2 x 4 slots, laid out on canvas_w itself
+% (Plan 3, 2026-11-22: made again for the 9 in canvas, not stretched; laid
+% out on 1100 px and stretched to 864 the tick labels of neighbouring
+% panels ran together and the legend reached past the right edge).
+st = manuscript_style();
+W = round(st.canvas_w * get(groot, 'ScreenPixelsPerInch')); H = 935;
 fig = T.canvas(W, H, cfg.visible);
-X0 = 95; CW = 196; GAP = 68; RH = 140;
+X0 = 68; RH = 140;
+% The first gap is the widest: the last count of the E:I neuron ratio
+% (400:100) and the first network size (100) meet in it.
+GAP = [70 46 46];
+CW = (W - X0 - 8 - sum(GAP)) / 4;
 ROW_Y = [745 530; 295 80];                 % ROW_Y(block, row)
-slot = @(b, r, c) [X0 + (c - 1) * (CW + GAP), ROW_Y(b, r), CW, RH];
+slot = @(b, r, c) [X0 + (c - 1) * CW + sum(GAP(1:c - 1)), ROW_Y(b, r), CW, RH];
 
 ax = cell(1, 2);        % ax{b}(1:7): ratio, size, gain, EE, IE, EI, II
 legends = gobjects(0);
@@ -101,6 +109,11 @@ for b = 1:2
     end
     ylabel(ax{b}(1), y_label, 'Interpreter', 'tex');
     ylabel(ax{b}(4), y_label, 'Interpreter', 'tex');
+    % The E:I neuron counts at the two ends only (the middle tick unlabelled):
+    % three counts do not fit a quarter of the canvas.
+    if numel(ax{b}(1).XTick) == 3
+        lab = cellstr(ax{b}(1).XTickLabel); lab{2} = ''; ax{b}(1).XTickLabel = lab;
+    end
 end
 
 %% Style
@@ -108,7 +121,7 @@ T.style(fig);
 if ~isempty(legends)
     lg = legends(1);
     if ~isempty(names)
-        lg.String = cellfun(@(n) T.condition_title(n), names, 'UniformOutput', false);
+        lg.String = cellfun(@(n) strjoin(cellstr(T.condition_title(n, true)), newline), names, 'UniformOutput', false);
     end
     set(lg, 'Units', 'pixels', 'Location', 'none', 'Orientation', 'vertical', 'NumColumns', 1);
     lg.ItemTokenSize = [18 18];
@@ -129,8 +142,8 @@ T.style(fig);                % again: the labels and titles set since take their
 T.fit(fig);
 
 %% Panel letters
-T.letter(ax{1}(1), 'A', -85, 18);
-T.letter(ax{2}(1), 'B', -85, 18);
+T.letter(ax{1}(1), 'A', 4 - X0, 18);
+T.letter(ax{2}(1), 'B', 4 - X0, 18);
 
 %% Save
 panels = struct( ...
@@ -230,17 +243,6 @@ for c = 1:numel(names)
     plot(ax, x, P(c, :, 2), '-', 'Color', cond_lines(c).Color, 'LineWidth', cond_lines(c).LineWidth, ...
         'DisplayName', cond_lines(c).DisplayName);
 end
-% The off-scale markers that fig_sensitivity_medians draws on the panels
-% beside it (Plan2_canvas_standard.md: this panel, drawn here, had none):
-% a triangle on the top or bottom edge where a median has left the y
-% window, at the donor's marker size and fig_sensitivity_medians' default
-% spacing.
-donor_marks = findall(donor, 'Tag', 'offscale_marker');
-marker_size = 5;
-if ~isempty(donor_marks); marker_size = donor_marks(1).MarkerSize; end
-cond_spec = struct('name', names(:)', 'color', arrayfun(@(h) h.Color, cond_lines(:)', 'UniformOutput', false));
-draw_offscale_markers(ax, x, arrayfun(@(c) P(c, :, 2), 1:numel(names), 'UniformOutput', false), cond_spec, ...
-    donor.YLim, marker_size, 0.035);
 hold(ax, 'off');
 xlim(ax, [min(x), max(x)]);
 ylim(ax, donor.YLim);
