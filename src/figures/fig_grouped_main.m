@@ -278,6 +278,7 @@ if cfg.save
     % SVG, since cfg.svg is off by default). The appendix groups keep 200 dpi.
     res=200; want_svg=cfg.svg;
     if ismember(group,[2 3])
+        pad=canvas_export_args();   % Figures 2 and 3: the whole canvas, untrimmed, like the other 16
         px=getpixelposition(fig);
         res=min(600,floor(4000*get(groot,'ScreenPixelsPerInch')/max(px(3:4))));
         want_svg=true;

@@ -221,7 +221,7 @@ fig_tag = 'Fig_Supp10_Grouped';
 out = struct('figs', fig, 'files', {{}}, 'source', {{B.index_file, ied_file}});
 if cfg.save
     true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
-    save_figure_stable(out_dir, fig_tag, fig);
+    save_figure_stable(out_dir, fig_tag, fig, canvas_export_args());   % the whole canvas, untrimmed
     out.files = existing_outputs(out_dir, fig_tag);
     tfile = fullfile(out_dir, [fig_tag '_table.md']);
     bm_write_table(tfile, B, [], 'Supplementary S10, panels B to D');

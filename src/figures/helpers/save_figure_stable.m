@@ -1,7 +1,10 @@
-function save_figure_stable(out_dir, fig_tag, fh)
+function save_figure_stable(out_dir, fig_tag, fh, export_args)
 % SAVE_FIGURE_STABLE Save one figure as <fig_tag>.{png,svg,fig} in out_dir.
 %
 %   SAVE_FIGURE_STABLE(out_dir, fig_tag, fh)
+%   SAVE_FIGURE_STABLE(out_dir, fig_tag, fh, export_args)   % e.g. canvas_export_args()
+%
+% export_args (default {}) are passed to exportgraphics for the PNG and SVG.
 %
 % save_some_figs_to_folder_2 suffixes filenames with the (run-dependent) figure
 % number; save, then rename to fixed names so re-runs overwrite cleanly. First
@@ -18,6 +21,7 @@ function save_figure_stable(out_dir, fig_tag, fh)
 % Fig_sensitivity_analysis_allStd.m so fig_sensitivity_medians can share it.
 %
 % See also: save_some_figs_to_folder_2
+    if nargin < 4; export_args = {}; end
     old = dir(fullfile(out_dir, [fig_tag '*']));
     for a = 1:numel(old)
         fp = fullfile(old(a).folder, old(a).name);
@@ -26,7 +30,7 @@ function save_figure_stable(out_dir, fig_tag, fh)
         end
     end
 
-    save_some_figs_to_folder_2(out_dir, fig_tag, fh.Number, {'png', 'svg', 'fig'});
+    save_some_figs_to_folder_2(out_dir, fig_tag, fh.Number, {'png', 'svg', 'fig'}, export_args);
 
     num = num2str(fh.Number);
     renames = { ...
