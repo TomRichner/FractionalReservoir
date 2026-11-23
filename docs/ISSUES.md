@@ -2614,3 +2614,53 @@ takes about 35 minutes; run it in pieces.
 - **Done means:** the 18 figures accepted by Tom (phases 4 to 6 of the plan),
   redrawn from the `fastmedium` data, `p3` merged into `main` with the tests
   above passing.
+
+### FD-057 outlier_spectra: the long window for the reference network only; the dwell-time figure on the reference
+
+- **Status:** done on branch `p3-owin` (commits named in the closing report);
+  the wall time is to be confirmed by the next run at `fastmedium` or above.
+- **Serves:** the supplementary dwell-time figure (`fig_outlier_dwell`, drawn by
+  `scripts/paper/with_spectral_supplement.m` only) and the cost of the stage
+  `outlier_spectra` in every run mode above `fast`.
+- **Asked.** Tom, 2026-11-23, why the stage took 388 min on 12 workers in the
+  `fastmedium` run, and what its 200 s window (reference and E-to-E x 1.5,
+  added 2026-11-20 for the dwell-time figure, FD-039) buys. Then, on the page
+  with the study's figures: "I don't think we need the E to E x 1.5 panel in
+  this plot. We can remove that. The current 200 s excursion time figure for
+  the reference network answers the question sufficiently for me."
+- **Measured** (`scripts/explorations/outlier_window/`, on a copy of the
+  `fastmedium` stage; README there):
+  - The 60 long runs took 89 percent of the stage's worker time (3593 of 4030
+    worker-min); the 20 multiple-timescale long runs about 2800, nearly all in
+    the full-Jacobian pass (3 to 4 s a state at 4000 state variables, against
+    0.13 to 0.15 s for the frozen-gain spectrum).
+  - Truncating the 200 s series to 20, 50 and 100 s: the full-Jacobian dwell
+    quartiles are identical at every length (reference: median 0.8 s with
+    one adaptation timescale, 0.3 s with several; beyond zero throughout
+    without adaptation; E-to-E x 1.5: no excursion with adaptation).
+  - Only two frozen-gain medians need the length: the reference without
+    adaptation (not reached at 20 and 50 s, about 130 s at 200 s with half the
+    excursions cut off) and the reference with multiple timescales (12.7 s at
+    20 s, 2.3 s from 100 s on).
+  - The window-wide quantities of `fig_outlier_dose` and `fig_outlier_plane`
+    change between the first 20 s and 200 s by far less than the spread
+    across seeds.
+- **Changed.**
+  - `fig_outlier_dwell`: `cfg.networks` defaults to `{'reference'}`, one
+    panel on the canvas width; both networks when named.
+  - `outlier_spectra_stage_plan`: knob `outlier_spectra_long_networks`,
+    default `{'reference'}`, the full networks that get `full_window_s` and
+    `full_dt_sample`. E-to-E x 1.5 stays a full network (S6, S7 and
+    `fig_outlier_slow_variables` read its dense spectra) over 20 s at 10 ms,
+    its full pass every 0.1 s. Keeping it short is the lead's inference, not
+    Tom's words; `{'reference', 'EEx1p5'}` gives it 200 s again.
+  - `outlier_fig_data` returns `window_txt`, so the dwell, dose and plane
+    tables name each network's window instead of the first run's.
+  - Plans: `essential` and `fast` identical run by run; in `fastmedium`,
+    `medium`, `medium2`, `production` the 30 E-to-E x 1.5 runs go from 200 s
+    at 0.05 s to 20 s at 0.01 s, nothing else (`ow_plan_compare`).
+- **To confirm on the next run:** the stage's wall time, estimated at about
+  254 min on 12 workers (extrapolated from the measured per-pass times,
+  `ow_cost_fd057`), bounded by the longest reference run with multiple
+  timescales (245 min in `fastmedium`); and that the figures draw from data in
+  which the two full networks have different windows.
