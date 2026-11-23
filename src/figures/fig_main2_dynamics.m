@@ -102,10 +102,13 @@ rows={'u','x','r','syn','sfa','b1','lambda'};
 % Words in the figure's own typeface, only the symbols in italics (Tom,
 % 2026-11-22, note 6: the labels need not be LaTeX apart from the symbols).
 labels={'Input, {\itu_i}',{'Dendritic','potential, {\itx_i}'},'Spike rate, {\itr_i}', ...
-    {'Synaptic','output, \theta_{\iti}'},{'Spike-','Frequency','Adaptation'}, ...
-    {'Synaptic','Depression'},{'Lyapunov','Exp., \lambda_1','(s^{-1})'}};
-% Row (G) carries its unit on a third line (Plan 3 fix X5), as row (E) has three lines.
-% (The label stays "Synaptic Depression": with ", b_1" its long second line
+    {'Synaptic','output, \theta_{\iti}'},{'Spike-','frequency','adaptation'}, ...
+    {'Synaptic','depression'},[regexp(st.label_growth,'^(\S+) (.*)$','tokens','once') {'(s^{-1})'}]};
+% Sentence case (Tom, 2026-11-23, G1). Row (G) is manuscript_style's
+% label_growth, "Growth rate, \lambda_1" (G3; it was "Lyapunov Exp."), on
+% the three lines the row had: 'Growth' / 'rate, \lambda_1' / its unit
+% (Plan 3 fix X5), as row (E) has three lines.
+% (The label stays "Synaptic depression": with ", b_1" its long second line
 % runs into the labels of rows E and G. The provenance names b1.)
 titles=grouped_condition_label(names,'sentence');
 % Row (G), Tom 2026-11-22: no adaptation on plus or minus 5, every adapting
@@ -126,7 +129,7 @@ for c=1:n_col
         if c==1
             ylabel(ax,labels{j},'Interpreter','tex','FontSize',st.label_fs);
             if j==7
-                % Three lines: the first ("Lyapunov") would touch the
+                % Three lines: the first ("Growth") would touch the
                 % letter (G) above it; the label sits .06 in lower.
                 ax.YLabel.Units='normalized';
                 ax.YLabel.Position(2)=.5-.06/G.row_h;
@@ -169,7 +172,10 @@ end
 % One E/I key. Current raster shades remain original; numeric data use the
 % wider within-type color spread (no model simulation is involved).
 if numeric
-    ce=excitatory_colormap(1); ci=inhibitory_colormap(1);
+    % The key is a single-color mark: manuscript_style's E and I colors, the
+    % first anchors of the two color maps (Tom, 2026-11-23, G2; it drew
+    % excitatory_colormap(1), the map's one-color mauve).
+    ce=st.E_color; ci=st.I_color;
 else
     tc=SRNNCellTypePairs.type_colors(2); ce=tc(1,:); ci=tc(2,:);
 end
@@ -217,7 +223,7 @@ notes{end+1}=['Numeric rendering draws the first 30 percent of the saved neurons
     'The green dashed 0.5-point zero reference and the y labels (words in the figure typeface, symbols in italics) apply to both sources. Y ticks: 0 and 1 on the unit axes, 0 and 0.25 on the input row (limits 0 to 0.35); tick labels on the left column only, except row (G), where no adaptation is on plus or minus 5 and the adapting conditions are on plus or minus 1 with their own tick labels (the local rate is clipped there).'];
 notes{end+1}=sprintf('Columns, left to right: %s (titled and coloured by condition name).',strjoin(names,', '));
 if numeric
-    notes{end+1}=['Row (F), Synaptic Depression: b1, the first depression variable (available resources, 0 to 1) ' ...
+    notes{end+1}=['Row (F), Synaptic depression: b1, the first depression variable (available resources, 0 to 1) ' ...
         'of each neuron''s first outgoing route, field `b1` of the saved results, for every condition: the only b ' ...
         'of a one-variable route, the releasable pool of a chained route, the first factor of a product route. ' ...
         'Not the route''s depression factor `std`. Blank where the condition has no depression.'];

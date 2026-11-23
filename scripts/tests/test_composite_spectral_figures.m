@@ -262,7 +262,7 @@ evalc('run_concept_examples_stage(cg, tmp, concept_examples_stage_plan(cg));');
 o = fig_supp7_grouped(common{:}, 'out_dir', fullfile(fig_dir, 'supp7g'));
 Fs = ostruct_figure_data(struct('data_file', '', 'run_dir', tmp, 'conditions', {{}}), 'test');
 g_keys = {'lrA1p5W0p0', 'reference', 'IIx1p25', 'reference_w27'};            % the gallery, as keys of the outlier_structures stage
-g_titles = {'Real low-rank mode', 'Balanced', 'I-to-I up', 'Local outlier'};
+g_titles = {'Real low-rank mode', 'Reference', 'I-to-I up', 'Local outlier'};
 in = ismember(g_keys, Fs.keys);
 assert(any(in) && ~all(in), 'the tiny stage holds some of the gallery''s structures (%s of %s)', strjoin(g_keys(in), ', '), strjoin(Fs.keys(:)', ', '));
 assert(isequal(o.gallery_keys, g_keys(in)) && isequal(o.gallery_labels, g_titles(in)) && isequal(o.gallery_missing, g_titles(~in)), ...

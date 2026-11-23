@@ -45,7 +45,7 @@ assert(isequal({pl.gallery.name}, {'reference', 'EEx1p5', 'EIx0p9', 'IIx1p25', '
 [g_titles, g_keys] = cx_gallery_names(pl.gallery, pl.seed);
 po = outlier_structures_stage_plan(cfg);
 assert(all(ismember(g_keys, {po.networks.key})) && strcmp(g_keys{6}, 'reference_w27'), 'every gallery structure is a network of outlier_structures');
-assert(isequal(g_titles, {'Balanced', 'E-to-E up', 'I-to-E down', 'I-to-I up', 'E-I loop', 'Local outlier', 'Real low-rank mode', ...
+assert(isequal(g_titles, {'Reference', ['E-to-E ' char(215) ' 1.5'], 'I-to-E down', 'I-to-I up', 'E-I loop', 'Local outlier', 'Real low-rank mode', ...
     'Rotating low-rank mode'}), 'the tiles'' titles');
 assert(pl.T == 12 && pl.dt_sample == 0.01 && pl.n_trace == 5 && pl.n_image == 30 && pl.lya && pl.n_override == 0, 'knobs');
 bad = {{'concept_examples_bogus', 1}, {'concept_examples_n_image', 31}, {'concept_examples_lya_from', 20}, ...
@@ -113,8 +113,11 @@ assert(contains(tab, 'EEx1p5') && contains(tab, 'lambda_1'), 'its table');
 % Tom, 2026-11-22: eigenvalues left of the boundary gray, right of it
 % black, an outlier far to the right larger and green; what is not drawn is
 % said in the table; the diagrams' axis names and the added mode's title in
-% sentence case; letters by row (A to D); the rate r_i on one 0-to-1 axis;
-% the arrows Increasing SFA and Increasing STD in row D.
+% sentence case; letters by row (A to D); the arrows Increasing SFA and
+% Increasing STD in row D. Tom, 2026-11-23: row C back to the potential x_i
+% (the runaway column with a y range of its own), at most four y ticks;
+% row A as S3 (balanced + added where something was added); arrows on the
+% discs too.
 n_dots = @(hs) sum(arrayfun(@(h) numel(h.XData), hs));
 for k = 1:numel(o1.axes.spectrum)
     ax = o1.axes.spectrum(k);
@@ -129,8 +132,11 @@ for k = 1:numel(o1.axes.spectrum)
         all(arrayfun(@(h) h.CData(1, 2) > h.CData(1, 1) && h.CData(1, 2) > h.CData(1, 3), ho)), ...
         'column %d: black right of the boundary, gray left of it, the outliers green', k);
 end
-assert(all(arrayfun(@(ax) isequal(ax.YTick, [0 1]), o1.axes.activity)) && isequal(o1.y_lims, repmat([0 1], numel(o1.axes.activity), 1)), ...
-    'row C: the rate on one axis 0 to 1');
+assert(strcmp(o1.axes.activity(1).YLabel.String, 'x_i') && all(arrayfun(@(ax) numel(ax.YTick) <= 4, o1.axes.activity)), ...
+    'row C: the potential x_i, at most four ticks');
+assert(isequal(isgraphics(o1.axes.added), o1.add_clim > 0) && ...
+    numel(findall(o1.figs, 'Tag', 'plus')) == nnz(o1.add_clim > 0), 'row A: an added image and a plus sign where something was added');
+assert(~isempty(findall(o1.figs, 'Tag', 'arrow_sfa_discs')) && ~isempty(findall(o1.figs, 'Tag', 'text_std_discs')), 'row D: the arrows on the discs');
 assert(all(arrayfun(@(L) ~isempty(findall(o1.figs, 'Tag', ['letter_' L])), 'ABCD')), 'letters by row, A to D');
 assert(~isempty(findall(o1.figs, 'Tag', 'text_sfa')) && ~isempty(findall(o1.figs, 'Tag', 'arrow_std')), 'row D: the arrows');
 assert(contains(tab, 'Eigenvalues right of the boundary') && ...

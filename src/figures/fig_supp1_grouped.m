@@ -147,16 +147,22 @@ for r = 1:nr
             ax.XTickLabel = {}; xlabel(ax, '');
         else
             ax.XTickLabelMode = 'auto'; ax.XTickLabelRotation = 0;
-            xlabel(ax, 'time (s)');
+            xlabel(ax, 'Time (s)');
         end
-        if c == 1; ylabel(ax, two_lines(cfg.pulse_rows{r})); end
+        if c == 1; ylabel(ax, two_lines(cap_first(cfg.pulse_rows{r}))); end
     end
     linkaxes(ax_a(r, :), 'y');
 end
 % (B): time on the lower plot only (the two share it); the long y label on two lines.
+% Labels with a capital first letter (Tom, 2026-11-23, G1: the source's are
+% lowercase); time ticks every 20 s, four on the 65 s axis (G5: they were
+% every 10 s, seven).
 xlabel(ax_b(1), ''); ax_b(1).XTickLabel = {};
 ax_b(2).XTickLabelMode = 'auto';
-ylabel(ax_b(2), split_at(strjoin(cellstr(ax_b(2).YLabel.String), ' '), '\theta'));
+xlabel(ax_b(2), 'Time (s)');
+for k = 1:2; ax_b(k).XTick = 0:20:ax_b(k).XLim(2); end
+ylabel(ax_b(1), cap_first(strjoin(cellstr(ax_b(1).YLabel.String), ' ')));
+ylabel(ax_b(2), split_at(cap_first(strjoin(cellstr(ax_b(2).YLabel.String), ' ')), '\theta'));
 % One key for the two plots, at their right, with what they draw and nothing
 % else: the conditions, the reserve, the rate, the steady state. The lines
 % are named by fig_STD_steady_state (Tag and DisplayName).
@@ -248,6 +254,11 @@ elseif ~isempty(tok)
         t = 'Depression alone';
     end
 end
+end
+
+function s = cap_first(s)
+% A label with its first letter capitalized (sentence case; the rest as it is).
+if ~isempty(s); s(1) = upper(s(1)); end
 end
 
 function s = two_lines(s)

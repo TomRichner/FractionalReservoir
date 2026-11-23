@@ -214,7 +214,7 @@ for c=1:n_col
     end
     if c==n_col
         cb=colorbar(ax); cb.Units='normalized'; cb.Position=[heat_pos(1)+(col_w+.014)*s g.cbar(1) .012*s g.cbar(2)];
-        cb.Label.String='log log density'; cb.Ticks=[0 .25 .5]; cb.Box='off'; cb.LineWidth=st.axis_lw;
+        cb.Label.String='Log log density'; cb.Ticks=[0 .25 .5]; cb.Box='off'; cb.LineWidth=st.axis_lw;   % label in sentence case (Tom, 2026-11-23, G1)
         ax.Position=heat_pos;
     end
     for k=1:numel(insets)

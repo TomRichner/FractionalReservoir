@@ -10,7 +10,7 @@ function [titles, ostruct_keys] = cx_gallery_names(X, stage_seed)
 %                gallery row that names none
 %
 %   titles        1 x m cellstr: the tile titles of
-%                 fig_supp3_connectivity_gallery ('Balanced', 'E-to-E up',
+%                 fig_supp3_connectivity_gallery ('Reference', 'E-to-E × 1.5',
 %                 ...), by the row's key; a key not listed here is titled
 %                 by its network's label
 %   ostruct_keys  1 x m cellstr: the key the same network has in the
@@ -27,7 +27,10 @@ function [titles, ostruct_keys] = cx_gallery_names(X, stage_seed)
 % See also: cx_load, concept_examples_stage_plan, fig_supp3_connectivity_gallery,
 %           fig_supp7_grouped, outlier_structures_stage_plan
 
-TITLE = struct('balanced', 'Balanced', 'EE_up', 'E-to-E up', 'EE_down', 'E-to-E down', 'IE_down', 'I-to-E down', ...
+% 'Reference' and 'E-to-E × 1.5' (Tom, 2026-11-23: "Reference and E-to-E × 1.5
+% everywhere"; until then 'Balanced' and 'E-to-E up'), as Figures 1, 5, S6
+% and S7 panel A name the two networks.
+TITLE = struct('balanced', 'Reference', 'EE_up', ['E-to-E ' char(215) ' 1.5'], 'EE_down', 'E-to-E down', 'IE_down', 'I-to-E down', ...
     'II_up', 'I-to-I up', 'EI_loop', 'E-I loop', 'local_outlier', 'Local outlier', ...
     'lowrank_real', 'Real low-rank mode', 'lowrank_rot', 'Rotating low-rank mode');
 m = numel(X);
