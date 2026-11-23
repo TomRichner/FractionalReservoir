@@ -65,9 +65,14 @@ function out = build(cfg, out_dir)
 
 [f_plane, t_plane, o_plane] = composite_part(@fig_outlier_plane, cfg, 'networks', cfg.networks, 'seed', cfg.seed);
 [f_dose, t_dose] = composite_part(@fig_outlier_dose, cfg);
-width = f_plane.Position(3);                         % inches: fig_outlier_plane lays itself out in inches
-[fig, B] = composite_figure({struct('fig', f_plane, 'width', []), struct('fig', f_dose, 'width', width)}, ...
-    'visible', cfg.visible, 'margin', [0.15 0.15 -0.2 0.15]);
+% The common canvas (Plan 2, canvas standard; manuscript_style canvas_w):
+% both blocks scaled to its width less the margins. Only positions scale;
+% the type is set by role below (canvas_type).
+st = manuscript_style();
+margin = [0.15 0.15 -0.2 0.15];
+width = st.canvas_w - margin(1) - margin(2);
+[fig, B] = composite_figure({struct('fig', f_plane, 'width', width), struct('fig', f_dose, 'width', width)}, ...
+    'visible', cfg.visible, 'margin', margin, 'width', st.canvas_w);
 % (A) at the height of the condition titles, beside the first panel: the
 % plane figure keeps half an inch for its titles above the panels, and a
 % letter in the strip above that sat far from the panel (polish list,
@@ -78,6 +83,7 @@ letters = 'BCD';
 for k = 1:min(3, numel(dose_ax))
     composite_letter(fig, B{2}(1), letters(k), dose_ax(k), 'dy', -0.12);
 end
+canvas_type(fig, main5_type_exceptions());
 
 caption = sprintf(['Main Figure 5. (A) What adaptation does to the effective connectivity: eigenvalues of W D (each ' ...
     'neuron''s outgoing weights times its gain, slow variables held) drawn as rates in 1/s, so the imaginary axis is ' ...
@@ -93,4 +99,10 @@ caption = sprintf(['Main Figure 5. (A) What adaptation does to the effective con
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Main Figure 5: mechanism', caption, ...
     {'Panel A (fig_outlier_plane)', t_plane; 'Panels B to D (fig_outlier_dose)', t_dose}, {o_plane.source});
 out.seed = o_plane.seed;
+out.type_exceptions = main5_type_exceptions();   % for the canvas test (canvas_audit)
+end
+
+function ex = main5_type_exceptions()
+% The type that may differ from its role's size (canvas_audit), with why.
+ex = {'^[EI] \| axes fig_outlier_plane_inset', 'E and I marks inside the response-curve insets (inset_mark_fs): at 14 pt they cover the points they label'};
 end

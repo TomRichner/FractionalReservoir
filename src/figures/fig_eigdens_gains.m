@@ -37,6 +37,7 @@ arguments
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
     cfg.network     (1,:) char    = 'reference'
+    cfg.fig_size    (1,2) double  = [NaN NaN]   % inches [w h]; NaN = 26 x 11 cm (fig_supp6_grouped lays it out at the canvas width)
     cfg.conditions                = {}
 end
 
@@ -52,6 +53,7 @@ g_max = max(1, max(cellfun(@max, pooled)));
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Visible', vis, 'Color', 'w', 'Units', 'centimeters', 'Position', [2 2 26 11]);
+if all(isfinite(cfg.fig_size)); fig.Units = 'inches'; fig.Position(3:4) = cfg.fig_size; end
 tl = tiledlayout(fig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 ax = nexttile(tl); hold(ax, 'on');
 for c = 1:n_c

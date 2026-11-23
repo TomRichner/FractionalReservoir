@@ -147,10 +147,10 @@ for p = 1:3
         ylabel(ax, {'Re \lambda_{mode}', '/ bulk radius'}, 'FontSize', st.label_fs);
     elseif p == 2
         ylim(ax, [0 1.05]);
-        ylabel(ax, 'Responsive fraction', 'FontSize', st.label_fs);
+        ylabel(ax, {'Responsive', 'fraction'}, 'FontSize', st.label_fs);
     else
         yline(ax, 0, '--', 'Color', 'k', 'LineWidth', 1.0);
-        ylabel(ax, {'Rate of the mode', '(s^{-1})'}, 'FontSize', st.label_fs);
+        ylabel(ax, {'Mode rate', '(s^{-1})'}, 'FontSize', st.label_fs);
     end
     set(ax, 'XTick', 1:n_net, 'XTickLabel', {}, 'XLim', [0.4, n_net + 0.6], 'FontSize', st.tick_fs, ...
         'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');

@@ -59,12 +59,20 @@ function out = build(cfg, out_dir)
 st = manuscript_style();
 net = cfg.networks{1};
 
-[f_gain, t_gain, o_gain] = composite_part(@fig_eigdens_gains, cfg, 'network', net);
+% The common canvas (Plan 2, canvas standard): rows A and B are laid out
+% at its width less the margins (wider panels, the same height), so that
+% no row leaves a quarter of the width white; C is scaled to it. Type by
+% role at the end (canvas_type).
+MARGIN = [0.15 0.15 0.1 0.15]; COL_GAP = 0.35;
+row_w = st.canvas_w - MARGIN(1) - MARGIN(2);
 n_b = numel(cfg.networks);
+h_row = 11 / 2.54;                                  % the blocks' own height
+[f_gain, t_gain, o_gain] = composite_part(@fig_eigdens_gains, cfg, 'network', net, 'fig_size', [row_w, h_row]);
 radial = struct('fig', cell(1, n_b), 'width', []);
 parts = {sprintf('Panel A (fig_eigdens_gains, %s)', net), t_gain};
 for k = 1:n_b
-    [radial(k).fig, t_rad] = composite_part(@fig_eigdens_radial, cfg, 'network', cfg.networks{k}, 'panels', {'cumulative'});
+    [radial(k).fig, t_rad] = composite_part(@fig_eigdens_radial, cfg, 'network', cfg.networks{k}, 'panels', {'cumulative'}, ...
+        'fig_size', [(row_w - (n_b - 1) * COL_GAP) / n_b, h_row]);
     % The one thing that tells the panels of (B) apart: the network.
     ax = findall(radial(k).fig, 'Type', 'axes');
     title(ax(1), network_title(cfg.networks{k}), 'FontWeight', 'normal', 'FontSize', st.title_fs);
@@ -73,11 +81,12 @@ end
 [f_meas, t_meas] = composite_part(@fig_eigdens_measures, cfg, 'network', net);
 parts(end + 1, :) = {sprintf('Panel C (fig_eigdens_measures, %s)', net), t_meas};
 
-[fig, B] = composite_figure({struct('fig', f_gain, 'width', []), radial, struct('fig', f_meas, 'width', [])}, ...
-    'visible', cfg.visible);
+[fig, B] = composite_figure({struct('fig', f_gain, 'width', []), radial, struct('fig', f_meas, 'width', row_w)}, ...
+    'visible', cfg.visible, 'margin', MARGIN, 'col_gap', COL_GAP, 'width', st.canvas_w);
 composite_letter(fig, B{1}(1), 'A');
 composite_letter(fig, B{2}(1), 'B');
 composite_letter(fig, B{3}(1), 'C');
+canvas_type(fig);
 
 caption = sprintf(['Supplementary Figure S6. (A) Gains of the neurons by condition, network `%s`: left, cumulative ' ...
     'distribution of the gain d (slope of the response curve times available vesicle fraction) over every neuron, ' ...

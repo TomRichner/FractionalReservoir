@@ -33,7 +33,9 @@ function P = bm_fig8_panels(fig, rect, R, opts)
 % peak (the mean E rate's maximum); stimulation = 5 s before the end of
 % the run.
 %
-% Options: font_size (9), annot_size (8), line_scale (1, multiplies every
+% Options: font_size (9), annot_size (8), left (0.52), c_title (0.2), ab_room
+% (0.42; inches, the room for labels, so that larger type can be given room
+% on the common canvas, stim_fig8_compose), line_scale (1, multiplies every
 % line width), plane_gap (0.12 in), colors (struct, see below).
 %
 % P: handles ax_A (3 axes, top to bottom), ax_B (2), ax_C (5), and info:
@@ -49,6 +51,9 @@ arguments
     opts.annot_size (1,1) double = 8
     opts.line_scale (1,1) double = 1
     opts.plane_gap (1,1) double = 0.12
+    opts.left (1,1) double = 0.52      % inches left of A and C for their y labels
+    opts.c_title (1,1) double = 0.2    % inches above C for its state names
+    opts.ab_room (1,1) double = 0.42   % inches between C's names and A, B (their time axis)
 end
 st = manuscript_style();
 fs = opts.font_size; lw = opts.line_scale;
@@ -85,7 +90,7 @@ idx = arrayfun(@(tt) nearest_index(I.t, tt), t_state(2:end));
 %% Geometry (inches)
 set(fig, 'Units', 'inches');
 x0 = rect(1); y0 = rect(2); W = rect(3); Ht = rect(4);
-gap = opts.plane_gap; left = 0.52;
+gap = opts.plane_gap; left = opts.left;
 pw = (W - left - 4 * gap) / 5;
 
 % complex plane window, shared
@@ -116,9 +121,9 @@ axes_args = {'re_lim', re_lim, 'im_lim', im_lim, 'bulk_center', cen, 'bulk_radiu
     're_ticks', re_ticks, 'im_ticks', im_ticks, 'font_size', opts.annot_size, 'line_width', 0.6 * lw};
 g = complex_plane_axes([], axes_args{:});
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
-c_title = 0.2;
+c_title = opts.c_title;
 yC = y0 + 0.05;
-yAB = yC + ph + c_title + 0.42;                   % room for B's x label and C's titles
+yAB = yC + ph + c_title + opts.ab_room;                  % room for B's x label and C's titles
 hA = [0.32 0.8 0.95]; gA = 0.1;
 top = y0 + Ht;
 avail = top - yAB;

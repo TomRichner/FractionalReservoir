@@ -28,17 +28,19 @@ function out = fig_supp7_grouped(cfg)
 %        structure the outlier_structures stage did not run is left out of
 %        B and named in the table.
 %
-% LAYOUT. A and B side by side, each at a width of its own, so that the
-% figure stays under 0.9 of the workstation screen in both dimensions and
-% is exported cropped as usual (until 2026-11-22 they were stacked at their
-% own sizes: 19 by 20 inches, a third of A's row empty, and the text small
-% at any printed width). cfg.width_a and cfg.width_b are those widths.
+% LAYOUT (Plan 2 canvas standard, 2026-11-22). The figure is canvas_w wide:
+% A on top, centered at cfg.width_a (0.88 of the row; at the full width it would be
+% 9.5 in tall), B under it across the width (cfg.width_b, cfg.height_b).
+% Until then A and B stood side by side (15.4 in wide, a white band under
+% A where B ran longer; before the polish of that morning stacked at their
+% own sizes, 19 by 20 in). Side by side on 13 in, B's three rows overlapped
+% their y labels and A's panels came down to 2.3 in.
 %
 % The panels are the source figures' own drawings (composite_figure).
 % Fig_Supp7_Grouped_table.md: a caption paragraph and their sidecars.
 %
 % Options: run_dir, out_dir, save, visible, verbose, preset_name (unused),
-% conditions, networks (the rows of A), seed, fig_tag, width_a, width_b,
+% conditions, networks (the rows of A), seed, fig_tag, width_a, width_b, height_b,
 % gallery (true: B draws the gallery's structures when the run has them).
 %
 % See also: fig_outlier_slow_variables, fig_ostruct_summary, composite_figure,
@@ -55,8 +57,9 @@ arguments
     cfg.networks                  = {'reference', 'EEx1p5'}
     cfg.seed double               = []
     cfg.fig_tag     (1,:) char    = 'Fig_Supp7_Grouped'
-    cfg.width_a     (1,1) double  = 8.45  % inches
-    cfg.width_b     (1,1) double  = 6.85
+    cfg.width_a     (1,1) double  = NaN   % inches; NaN = 0.88 of the row (A centered: at the full width it is 0.75 of the width tall)
+    cfg.width_b     (1,1) double  = NaN   % inches; NaN = canvas_w less the margins
+    cfg.height_b    (1,1) double  = 6.0   % inches
     cfg.gallery     (1,1) logical = true
 end
 
@@ -74,40 +77,32 @@ end
 end
 
 function out = build(cfg, out_dir)
-T = composite_tools();
+
+% The common canvas (Plan 2, canvas standard). A's source keeps room above
+% its titles and below its bottom row; the negative top margin and the
+% row gap take back what would stand white.
+st = manuscript_style(); MARGIN = [0.15 0.15 -0.3 0.15];
 
 % Smaller marks than the stand-alone figure's 7 pt: at this width they
 % would reach the tick labels beside the origin.
 [f_slow, t_slow, o_slow] = composite_part(@fig_outlier_slow_variables, cfg, 'networks', cfg.networks, 'seed', cfg.seed, ...
     'mark_size', 5.5);
-drawnow;
-px = getpixelposition(f_slow);
-h_a = px(4) / px(3) * cfg.width_a;                  % the height A has at its width
+row_w = st.canvas_w - MARGIN(1) - MARGIN(2);
+width_a = cfg.width_a; if isnan(width_a); width_a = 0.88 * row_w; end
+width_b = cfg.width_b; if isnan(width_b); width_b = row_w; end
 
-% (B): the gallery's structures, when the run has a gallery.
+% (B): the gallery's structures, when the run has a gallery; drawn at its
+% place's size (its three rows share the structures' axis).
 [keys, labels, missing, gallery_file] = gallery_networks(cfg);
-b_args = {'fig_size', [cfg.width_b, min(max(h_a, 7.0), 8.6)], 'compact', true};
+b_args = {'fig_size', [width_b, cfg.height_b]};
 if ~isempty(keys); b_args = [b_args, {'networks', keys, 'labels', labels}]; end
 [f_sum, t_sum, o_sum] = composite_part(@fig_ostruct_summary, cfg, b_args{:});
 
-[fig, B] = composite_figure({[struct('fig', f_slow, 'width', cfg.width_a), struct('fig', f_sum, 'width', cfg.width_b)]}, ...
-    'visible', cfg.visible, 'strip', 0.6);
-% (A): the conditions over its columns on two lines (at this width the
-% full names on one line run into each other).
-top = B{1}(1).ax;
-top = top(arrayfun(@(a) ~isempty(strtrim(strjoin(cellstr(a.Title.String), ' '))), top));
-for k = 1:numel(top)
-    try
-        name = grouped_condition_label({strjoin(cellstr(top(k).Title.String), ' ')}, 'name_of_title');
-        top(k).Title.String = T.condition_title(name{1}, true);
-    catch err
-        if ~any(strcmp(err.identifier, {'grouped_condition_label:UnknownTitle', 'grouped_condition_label:AmbiguousTitle'}))
-            rethrow(err);
-        end
-    end
-end
-composite_letter(fig, B{1}(1), 'A', [], 'dy', 0.3);
-composite_letter(fig, B{1}(2), 'B', [], 'dy', 0.3);
+[fig, B] = composite_figure({struct('fig', f_slow, 'width', width_a), struct('fig', f_sum, 'width', width_b)}, ...
+    'visible', cfg.visible, 'margin', MARGIN, 'width', st.canvas_w, 'align', 'center', 'row_gap', -0.25);
+composite_letter(fig, B{1}(1), 'A', [], 'dy', -0.3);    % at the height of the condition titles
+composite_letter(fig, B{2}(1), 'B');
+canvas_type(fig, supp7_type_exceptions());
 
 if isempty(keys)
     what_b = ['every network of the stage outlier_structures, in three groups separated by dotted lines (low-rank ' ...
@@ -126,7 +121,7 @@ caption = sprintf(['Supplementary Figure S7. (A) The reined-in mode once the ada
     'linear axis with the bulk (-1 to 1) shaded; open diamonds: the same with every gain equal. Middle: responsive ' ...
     'share of the E (filled) and I (open) neurons. Bottom: the mode''s rate with the slow variables frozen (open) ' ...
     'and free (filled). Conditions in their colors. Figure %.2f in wide (A %.2f, B %.2f).'], ...
-    strjoin(cfg.networks, ', '), what_b, fig.Position(3), cfg.width_a, cfg.width_b);
+    strjoin(cfg.networks, ', '), what_b, fig.Position(3), width_a, width_b);
 note = '';
 if ~isempty(gallery_file)
     note = sprintf('The structures of panel B are those of the gallery in `%s`, keys in the outlier_structures stage: %s.', ...
@@ -169,4 +164,9 @@ function keys = ostruct_stage_keys(cfg)
 F = ostruct_figure_data(struct('run_dir', cfg.run_dir, 'data_file', '', 'conditions', {cfg.conditions}, ...
     'verbose', cfg.verbose), 'fig_supp7_grouped');
 keys = F.keys(:)';
+end
+
+function ex = supp7_type_exceptions()
+% The type that may differ from its role's size (canvas_audit), with why. None so far.
+ex = cell(0, 2);
 end

@@ -111,13 +111,22 @@ save(fullfile(ied, 'summary.mat'), 'rows');
 o = fig_supp10_grouped('run_dir', run_dir, 'ied_run_dir', ied, 'out_dir', fullfile(out_dir, 'b'), 'visible', false);
 % Panel B: no trace leaves its axes (the depression trace used to dip under the floor).
 axs = findall(o.figs, 'Type', 'axes');
+n_dep = 0;
 for k = 1:numel(axs)
     ln = findall(axs(k), 'Type', 'line');
     y = arrayfun(@(l) [min(l.YData), max(l.YData)], ln, 'UniformOutput', false);
     y = vertcat(y{:});
-    if isempty(y) || ~startsWith(strjoin(cellstr(axs(k).YLabel.String), ' '), 'Depr.'); continue; end
+    if isempty(y) || ~startsWith(strjoin(cellstr(axs(k).YLabel.String), ' '), 'Depr'); continue; end
+    n_dep = n_dep + 1;
     assert(axs(k).YLim(1) < min(y(:, 1)) && axs(k).YLim(2) >= max(y(:, 2)), 'S10 (B): the depression traces are inside their axes');
 end
+assert(n_dep == 1, 'S10 (B): one depression panel checked, found %d', n_dep);
+% The common canvas (Plan 2): canvas_w wide, type by role.
+st = manuscript_style();
+o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6, 'S10 is canvas_w wide');
+A = canvas_audit(o.figs);
+assert(all(A.ok), 'S10: type by role; off: %s', strjoin(A.name(~A.ok), '; '));
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'b', 'Fig_Supp10_Grouped.png')) && isfile(fullfile(out_dir, 'b', 'Fig_Supp10_Grouped_table.md')));
 assert(throws(@() fig_supp10_grouped('run_dir', run_dir, 'ied_run_dir', tempname, 'save', false, 'visible', false), ''), ...
@@ -133,8 +142,10 @@ if isfolder(fullfile(c8.clinical_dir, 'panels')) && isfile(fullfile(legacy, 'sum
         'model_fig', fullfile(mdir, 'fig_ied_stim_blocks.fig'), 'clinical_dir', c8.clinical_dir, ...
         'burst_mode_dir', run_dir);
     info = imfinfo(o.files{1});
-    assert(info.Width >= 2000 && info.Height > 1.6 * info.Width, 'Figure 8 is a tall 7-in page at 300 dpi: %d x %d', ...
-        info.Width, info.Height);
+    st = manuscript_style();
+    dpi = info.XResolution * 0.0254;                 % the PNG's resolution is in pixels per meter
+    assert(abs(info.Width / dpi - st.canvas_w) <= st.canvas_tol && info.Height / dpi <= st.canvas_max_h + 0.01, ...
+        'Figure 8 is on the common canvas: %.2f x %.2f in', info.Width / dpi, info.Height / dpi);
     assert(all(cellfun(@isfile, o.files)));
     % Titles of the clinical and modular panels: sentence case, no counts.
     f8 = openfig(o.files{2}, 'invisible');
