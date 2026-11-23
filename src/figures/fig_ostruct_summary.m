@@ -151,6 +151,7 @@ for p = 1:3
         ylabel(ax, {'Re \lambda_{mode}', '/ bulk radius'}, 'FontSize', st.label_fs);
     elseif p == 2
         ylim(ax, [0 1.05]);
+        ax.YTick = [0 1];                     % a short 0-to-1 axis: 0 and 1 only (Tom, 2026-11-23)
         ylabel(ax, {'Responsive', 'fraction'}, 'FontSize', st.label_fs);
     else
         % The zero line of manuscript_style (Plan 3 review: black here, green elsewhere).
