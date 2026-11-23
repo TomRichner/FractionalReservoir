@@ -2479,7 +2479,7 @@ takes about 35 minutes; run it in pieces.
   figures at the same time and had two processors between them and the
   system. Their calls were slow, a PowerShell query of the load took over two
   minutes, and Tom saw the figure work lagging.
-- **What was done, by hand, about 22:45.** The 12 pool worker processes (the
+- **What was done, by hand, at 22:39.** The 12 pool worker processes (the
   children of the client, `MATLAB.exe -parallelserver`) were set to
   below-normal priority from PowerShell, without stopping anything:
   `(Get-Process -Id <pid>).PriorityClass = 'BelowNormal'` for each. The
@@ -2489,7 +2489,7 @@ takes about 35 minutes; run it in pieces.
   every processor nobody else wants and give one up when another process asks.
   Nothing is paused.
 - **Not measured:** how much the run slows while other work is going. To be
-  read from the rate of the memory-grid stage before and after 22:45 when the
+  read from the rate of the memory-grid stage before and after 22:39 when the
   run ends.
 - **Known limits of the hand fix:** a pool that a stage starts again comes up
   at normal priority; nothing records that the priority was changed; it is
