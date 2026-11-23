@@ -4,11 +4,13 @@ function out = fig_ied_stim_blocks(opts)
 %
 % Main model figure (fig_ied_stim_blocks.{png,fig,svg}), the source of panels
 % D-F of fig_stim_combined's mirror layout:
-%   traces  30 s of one network's no-stimulation block and stimulation block
+%   traces  5 s (win_len; 30 s until 2026-11-22) of one network's no-stimulation and stimulation block
 %           (opts.example_seed, blocks opts.example_blocks): mean E, mean I and
-%           the five subnet means, candidate events as triangles. Window by the
-%           fixed rule of fig_ied_stim (event count closest to the block's
-%           median over 30-s windows).
+%           the five subnet means, candidate events as triangles along the
+%           top and open circles on the subnets that took part (event_rows),
+%           a triangle only where there is a circle. Window by the fixed rule
+%           of fig_ied_stim (event count closest to the block's median over
+%           windows of win_len s).
 %   rate    candidate-event rate normalised as the clinical panel: each block's
 %           rate divided by that network's pooled no-stimulation rate (all
 %           no-stimulation events / all no-stimulation time), one marker per
@@ -38,6 +40,13 @@ arguments
     opts.example_blocks (1,2) double = [NaN NaN]
     opts.floor_pct (1,1) double = 0.5     % where a zero-event block is drawn
     opts.visible (1,1) logical = false
+    % Figure 8 D (Tom, 2026-11-22; Plan 3 phase 0, question 6): 5 s of
+    % signal, open circles on the subnet traces at the detections, a mark
+    % along the top only where a drawn trace has a circle (as the patient
+    % panel, top_marks_drawn_only), a 0.5 a.u. and 1 s scale bar.
+    opts.win_len (1,1) double = 5         % s of signal drawn (30 until 2026-11-22)
+    opts.amp_bar (1,1) double = 0.5       % a.u., the amplitude scale bar
+    opts.time_bar (1,1) double = 1        % s, the time scale bar
 end
 if ~isfolder(opts.out_dir), mkdir(opts.out_dir); end
 L=load(fullfile(opts.data_dir,'summary.mat')); S=L.rows; run_opts=L.opts;
@@ -73,7 +82,7 @@ tl=tiledlayout(fig,2,2,'TileSpacing','loose','Padding','compact');
 
 % ---- traces --------------------------------------------------------------
 titles={'No Stimulation',sprintf('Stimulation (Uniform Input %.2g)',run_opts.amplitude)}; tc={purple,green};
-spacing=0.35; win_len=30; ex_info=cell(1,2);
+spacing=0.35; win_len=opts.win_len; ex_info=cell(1,2);
 for w=1:2
     E=load(fullfile(opts.data_dir,sprintf('seed%03d_block%d.mat',opts.example_seed,opts.example_blocks(w))),'signals');
     sig=E.signals; t=double(sig.t); G=size(sig.module_x,1);
@@ -83,24 +92,45 @@ for w=1:2
     ex_info{w}=sprintf('seed %d block %d, %.0f-%.0f s of the analysed block',opts.example_seed,opts.example_blocks(w),t0-t(1),t0-t(1)+win_len);
     ax=nexttile(tl,w); hold(ax,'on');
     sel=t>=t0 & t<=t0+win_len; tt=t(sel)-t0;
+    off=zeros(1,nR);
     for k=1:nR
-        tr=rows_x(k,sel); plot(ax,tt,tr-median(tr)+(nR-k)*spacing,'-','Color',tc{w},'LineWidth',0.9);
+        tr=rows_x(k,sel); off(k)=median(tr);
+        plot(ax,tt,tr-off(k)+(nR-k)*spacing,'-','Color',tc{w},'LineWidth',0.9);
     end
-    in=ev(ev>=t0 & ev<=t0+win_len)-t0;
-    if ~isempty(in), plot(ax,in,((nR-1)*spacing+0.33)*ones(size(in)),'v','Color',[.15 .15 .15],'MarkerFaceColor',[.15 .15 .15],'MarkerSize',6); end
+    % Circles: each subnet that took part in a detection, at its own peak
+    % (event_rows); a mark along the top only for a detection with a circle.
+    in=ev(ev>=t0 & ev<=t0+win_len);
+    [has,pk_t,pk_x]=event_rows(t,double(sig.module_x),in);
+    for j=1:numel(in)
+        for g=find(has(:,j))'
+            k=2+g;   % the subnet's row, under Mean E and Mean I
+            plot(ax,pk_t(g,j)-t0,pk_x(g,j)-off(k)+(nR-k)*spacing,'o','Color','k', ...
+                'MarkerFaceColor','none','MarkerSize',7,'LineWidth',1,'Tag','event_circle');
+        end
+    end
+    top=in(any(has,1))-t0;
+    if ~isempty(top), plot(ax,top,((nR-1)*spacing+0.33)*ones(size(top)),'v','Color',[.15 .15 .15],'MarkerFaceColor',[.15 .15 .15],'MarkerSize',6,'Tag','event_mark'); end
+    ex_info{w}=sprintf('%s; %d detections in the window, %d with a circle, %d circles',ex_info{w}, ...
+        numel(in),numel(top),nnz(has));
     yticks(ax,(0:nR-1)*spacing); yticklabels(ax,names(end:-1:1));
     xlim(ax,[0 win_len]); ylim(ax,[-0.25 (nR-1)*spacing+0.45]);
     title(ax,titles{w},'FontWeight','normal','Color',tc{w});
     style(ax,fs); ax.XAxis.Visible='off';
     if w==2
-        yl=ax.YLim; x0=win_len-0.6; y0=yl(1)+0.02;
-        plot(ax,[x0 x0],[y0 y0+0.2],'k-','LineWidth',2);
-        text(ax,x0+0.15,y0+0.1,'0.2 a.u.','FontSize',12);
+        % As the patient panel: an L of a time and an amplitude bar right of
+        % the strip and under it, the amplitude label along its bar.
+        yl=ax.YLim; x1=win_len+0.15; y0=yl(1)-0.05;
+        plot(ax,[x1-opts.time_bar x1],[y0 y0],'k-','LineWidth',1.5,'Clipping','off','Tag','scalebar');
+        plot(ax,[x1 x1],[y0 y0+opts.amp_bar],'k-','LineWidth',1.5,'Clipping','off','Tag','scalebar');
+        text(ax,x1-opts.time_bar/2,y0-0.02,sprintf('%g s',opts.time_bar),'FontSize',12,'HorizontalAlignment','center', ...
+            'VerticalAlignment','top','Clipping','off','Tag','scalebar_label');
+        text(ax,x1+0.06,y0+opts.amp_bar/2,sprintf('%g a.u.',opts.amp_bar),'FontSize',12,'Rotation',90, ...
+            'HorizontalAlignment','center','VerticalAlignment','top','Clipping','off','Tag','scalebar_label');
     end
 end
 
 % ---- normalised rate ------------------------------------------------------
-ax=nexttile(tl,3); rate_axes(ax,norm_blk,pooled,cols,seeds,opts.floor_pct,fs);
+ax=nexttile(tl,3); rate_axes(ax,norm_blk,pooled,cols,seeds,opts.floor_pct,fs,false);   % no key (Figure 8 E)
 % ---- PSD -------------------------------------------------------------------
 ax=nexttile(tl,4); hold(ax,'on');
 keep=f>=0.3 & f<=100; fk=f(keep); hs=gobjects(1,2); cc={purple,green};
@@ -121,7 +151,7 @@ end
 % ---- standalone rate figure --------------------------------------------------
 if want('rate')
 f2=figure('Color','w','Visible','off','Units','inches','Position',[0 0 7 4.5]);
-rate_axes(axes(f2),norm_blk,pooled,cols,seeds,opts.floor_pct,fs);
+rate_axes(axes(f2),norm_blk,pooled,cols,seeds,opts.floor_pct,fs,true);
 save_fig(f2,opts.out_dir,'fig_ied_stim_blocks_rate'); close(f2);
 end
 
@@ -152,7 +182,7 @@ if ~opts.visible && ~isempty(fig), close(fig); out.fig=[]; end
 end
 
 % ------------------------------------------------------------------------------
-function rate_axes(ax,norm_blk,pooled,cols,seeds,floor_pct,fs)
+function rate_axes(ax,norm_blk,pooled,cols,seeds,floor_pct,fs,with_key)
 hold(ax,'on'); nS=numel(seeds); h=gobjects(1,nS);
 fl=@(v) max(v,floor_pct);
 offs=linspace(-0.22,0.22,nS);
@@ -170,12 +200,43 @@ yt=[floor_pct 1 2 5 10 20 50 100 200]; yticks(ax,yt);
 yticklabels(ax,[{'0'} compose('%g%%',yt(2:end))]);
 xlim(ax,[0.5 2.5]); xticks(ax,[1 2]); xticklabels(ax,{'No Stimulation','Stimulation'});
 ylabel(ax,'Event Rate (% of No Stim.)');
-lg=legend(ax,h,compose('N%d',1:nS),'Location','eastoutside','Box','off','NumColumns',2); lg.ItemTokenSize=[8 8];
+if with_key
+    lg=legend(ax,h,compose('N%d',1:nS),'Location','eastoutside','Box','off','NumColumns',2); lg.ItemTokenSize=[8 8];
+end
 style(ax,fs);
 end
 function c=net_colors(n)
-c=[lines(7); 0.6 0.6 0.6; 0.74 0.74 0.13; 0.09 0.75 0.81; 0 0 0; 0.55 0.34 0.29];
-c=c(1:n,:);
+% The colors of the patient rate panel's subjects S1 to S12, in order (its
+% lines, read from cscs_stim_stability's Fig_Awake_Main_PanelA_Normalized.fig
+% on 2026-11-22), so that network k of Figure 8 E has subject k's color in B
+% (Tom, 2026-11-22). Until then: lines(7), then five more.
+c=[0.12 0.47 0.71; 1 0.5 0.05; 0.84 0.15 0.16; 0.55 0.34 0.29; 0.89 0.47 0.76; 0.5 0.5 0.5; ...
+   0.09 0.75 0.81; 0.74 0.74 0.13; 0 0 0; 0.68 0.78 0.91; 1 0.73 0.47; 0.6 0.2 0.5];
+c=c(1+mod(0:n-1,size(c,1)),:);
+end
+function [has,pk_t,pk_x]=event_rows(t,module_x,ev)
+% Which subnets took part in each detection, and where to circle them.
+% The block files keep the detection times only, not the groups of each
+% detection (ied_detect_events works on every neuron, ied_stim_blocks
+% saves the subnet means), so the rule is applied to the subnet means: a
+% subnet takes part when its mean dendritic potential, smoothed over 25 ms
+% as the detector smooths, rises within 0.12 s of the detection (the
+% detector's merge window) above its block median plus 3 robust SD (the
+% detector's per-neuron rule). The circle is at that subnet's maximum in
+% the window, on the drawn (unsmoothed) trace.
+fsamp=1/median(diff(t));
+xs=movmean(module_x,max(1,round(.025*fsamp)),2);
+base=median(xs,2); rsd=1.4826*median(abs(xs-base),2);
+G=size(module_x,1); n=numel(ev);
+has=false(G,n); pk_t=nan(G,n); pk_x=nan(G,n);
+for j=1:n
+    k=find(abs(t-ev(j))<=.12);
+    for g=1:G
+        if max(xs(g,k))>base(g)+3*rsd(g)
+            [~,i]=max(module_x(g,k)); has(g,j)=true; pk_t(g,j)=t(k(i)); pk_x(g,j)=module_x(g,k(i));
+        end
+    end
+end
 end
 function save_fig(fig,d,tag)
 exportgraphics(fig,fullfile(d,[tag '.png']),'Resolution',200);

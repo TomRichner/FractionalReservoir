@@ -1,5 +1,5 @@
 function out = fig_burst_mode(cfg)
-%FIG_BURST_MODE Figure 8 A to C on their own: why the bursting network bursts, and why sustained input stops it.
+%FIG_BURST_MODE Figure 8 G and H on their own: why the bursting network bursts, and why sustained input stops it.
 %
 %   out = FIG_BURST_MODE('run_dir', d)
 %
@@ -38,11 +38,11 @@ end
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 W = 7.0; Ht = 4.9;
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.5 0.5 W Ht], 'Visible', vis);
-P = bm_fig8_panels(fig, [0 0.05 W Ht - 0.3], R);
+P = bm_fig8_panels(fig, [0 0.05 W Ht - 0.3], R, 'left', 0.75);   % room for the input's name, written across
 fs_letter = 12;
-panel_letter(fig, P.ax_A(1), 'A', 0.02, fs_letter);
-panel_letter(fig, P.ax_B(1), 'B', P.ax_B(1).Position(1) - 0.5, fs_letter);
-panel_letter(fig, P.ax_C(1), 'C', 0.02, fs_letter, 0.2);
+% Figure 8's letters since 2026-11-22: G the time course with its zoom, H the planes.
+panel_letter(fig, P.ax_A(1), 'G', 0.02, fs_letter);
+panel_letter(fig, P.ax_C(1), 'H', 0.02, fs_letter, 0.2);
 
 fig_tag = 'Fig_Burst_Mode';
 out = struct('figs', fig, 'files', {{}}, 'source', B.index_file);

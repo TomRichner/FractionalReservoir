@@ -1,5 +1,5 @@
 function files = stim_fig8_compose(r, B, out_dir, tag, clinical_note, model_note, visible)
-%STIM_FIG8_COMPOSE Figure 8 in the new order, on the common canvas: the bursting network's panels above the clinical and modular panels.
+%STIM_FIG8_COMPOSE Figure 8 on the common canvas: the patients, the modular model, then the bursting example.
 %
 %   files = stim_fig8_compose(r, B, out_dir, tag, clinical_note, model_note, visible)
 %
@@ -8,38 +8,38 @@ function files = stim_fig8_compose(r, B, out_dir, tag, clinical_note, model_note
 %       rate and PSD)
 % B     bm_load_runs' struct (the burst_mode stage; B.R{1} is drawn)
 %
-% THE COMMON CANVAS (Plan 2, canvas standard, Tom 2026-11-22: "the figures
-% should have similar canvas widths so that the letters appear
-% proportionally the same"). The figure is manuscript_style's canvas_w
-% (13 in) wide and at most canvas_max_h tall, its type by role (canvas_type:
-% tick labels, legends and text tick_fs, axis names label_fs, titles
-% title_fs, letters letter_fs). Until then it was 7 in wide with 9-pt type
-% and 12-pt letters, its panels stacked in the full width one under the
-% other, and the canvas shrunk to the screen with every size scaled by as
-% much. Now the same nine panels in the same order, laid out again:
+% THE ORDER (Tom, 2026-11-22, Plan 2 notes on Figure 8, note 1: "I do want
+% the real data first, the human data first, followed by model data"):
 %
-%   A, B, C  the bursting network (bm_fig8_panels, drawn into the top band
-%            with the room for 14-pt type): A the whole run, B one burst
-%            beside it, C the five complex planes under them
-%   D | E/F  the clinical example traces, no stimulation beside
-%            stimulation (left), the IED rate (E) over the SOZ PSD (F) at
-%            the right
-%   G | H/I  the same for the modular model
+%   A | B/C  the patients: SEEG traces, no stimulation beside stimulation
+%            (left); the IED rate (B) over the SOZ spectrum (C) at the right
+%   D | E/F  the same three for the modular model
+%   G        the bursting example: the time course and, at its right, the
+%            zoom on one burst (bm_fig8_panels), with one key above
+%   H        its five complex planes
 %
-% The clinical and modular axes are fig_stim_combined's, copied with their
-% legends and placed in inches here; nothing in the clinical repository is
-% changed. fig_stim_combined thinned their lines and marks for its 7-in
-% canvas (times 0.6, scatter 0.35); here that is undone, so that no hairline
-% stands beside 14-pt type. The titles, tick labels and legend entries are
-% put in sentence case and lose their counts (restyle_titles); the
-% provenance file lists the originals.
+% No panels I or J. Until 2026-11-22 the bursting example came first (A to
+% C) and the patients and the model followed (D to I).
 %
-% A figure taller than the screen is exported whole by save_figure_stable
-% (save_some_figs_to_folder_2 prints it at its own size), as every composite
-% is; the canvas is no longer scaled.
+% THE CANVAS: manuscript_style's canvas_w (9 in) wide and at most
+% canvas_max_h (11.8 in) tall, type by role (canvas_type). Laid out for
+% 9 in, in inches, bottom up. The rate and spectrum panels sit in a narrow
+% right column (the rate panels have no legends now, notes 9 and 14), so
+% the traces have most of the width.
+%
+% The clinical and modular axes are fig_stim_combined's, copied and placed
+% here; nothing in the clinical repository is changed. The patient panel
+% (cscs_stim_stability, 2026-11-22) comes with its titles, 5 s of signal,
+% marks, circles and scale bar as Tom accepted them: none of these is
+% restyled here beyond the type sizes by role. fig_stim_combined thinned
+% lines and marks for its 7-in canvas (times 0.6, scatter 0.35); that is
+% undone here. Titles and tick labels are put in sentence case without
+% counts (restyle_titles); the provenance file lists the originals. Each
+% spectrum (C, F) gets a labelled tick at every decade it spans, at least
+% two (psd_decades; Tom saw a single labelled tick).
 %
 % Called by ied_stim_fig_combined; the output holds clinical recordings
-% (never git add -f).
+% (never git add -f; images stay under figs/).
 %
 % See also: ied_stim_fig_combined, fig_stim_combined, bm_fig8_panels, canvas_type
 
@@ -48,28 +48,38 @@ old = r.fig;
 guard = onCleanup(@() close_if(old));
 
 %% Geometry (inches), bottom up
+% The right column sets the height of the upper four rows: rate over
+% spectrum, the rate's condition names on one line under it, the patient
+% spectrum's tick labels only (its x label is the model spectrum's, under
+% F). G and H take what remains of canvas_max_h.
 W = st.canvas_w;
-xT = [1.0, 0.304 * W]; wT = 0.204 * W;                    % trace columns of D and G (names left of the first)
-xR = 0.673 * W; wR = W - 0.15 - xR;                  % right column: E, F, H, I
-wLg = 1.75;                                      % E's and H's keys, right of their axes
-hR = 1.6;                                       % E, F, H, I axes height
-yI = 0.75;                 yH = yI + hR + 0.85;
-topG = yH + hR;            yG = 1.05;            % G's traces down to its scale bar
-yF = topG + 0.35 + 0.75;   yE = yF + hR + 0.85;
-topD = yE + hR;            yD = yF + 0.3;
-band = [0.1, topD + 0.45, W - 0.2, 6.25];        % A to C
-Ht = band(2) + band(4) + 0.3;
-assert(Ht <= st.canvas_max_h, 'stim_fig8_compose:Tall', 'Figure 8 would be %.2f in tall (canvas_max_h %.2f).', Ht, st.canvas_max_h);
+hR = 1.0;          % rate and spectrum axes
+gR = 0.45;         % between them: the rate panel's condition names, one line
+xlabC = 0.32;      % under C: tick labels
+xlabF = 0.58;      % under F: tick labels and the x label
+wR = 1.6; xR = W - 0.22 - wR;                    % right column: B, C, E, F (room right for the "100" under C and F)
+xN = 0.95;                                       % left edge of the traces (channel names left of it)
+gT = 0.2; wT = (xR - 1.5 - xN - gT) / 2;         % two trace strips; the stimulation strip's bars and the
+xT = [xN, xN + wT + gT];                         % rate panels' y labels right of them
+rest = 0.1 + 0.15 + xlabF + 2 * hR + gR + 0.35 + xlabC + 2 * hR + gR + 0.42;
+hBand = st.canvas_max_h - 0.05 - rest;           % G and H
+band = [0.1, 0.1, W - 0.2, hBand];
+yF = band(2) + hBand + 0.15 + xlabF;  yE = yF + hR + gR;  topM = yE + hR;
+yD = yF + 0.1;
+yC = topM + 0.35 + xlabC;             yB = yC + hR + gR;  topP = yB + hR;
+yA = yC + 0.1;
+Ht = topP + 0.42;
+assert(Ht <= st.canvas_max_h + 1e-9, 'stim_fig8_compose:Tall', 'Figure 8 would be %.2f in tall (canvas_max_h %.2f).', Ht, st.canvas_max_h);
 
 vis = 'off'; if visible; vis = 'on'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.2 0.2 W Ht], 'Visible', vis);
 setappdata(fig, 'composite_size', [W Ht]);
 
-%% A to C
+%% G and H
 P = bm_fig8_panels(fig, band, B.R{1}, 'font_size', st.tick_fs, 'annot_size', st.tick_fs, 'line_scale', 1.8, ...
-    'left', 1.05, 'c_title', 0.35, 'ab_room', 1.05, 'plane_gap', 0.3);
+    'left', 1.05, 'c_title', 0.35, 'ab_room', 0.62, 'plane_gap', 0.25, 'key_room', 0.34);
 
-%% D to I: fig_stim_combined's axes, placed
+%% A to F: fig_stim_combined's axes, placed
 ax = findall(old, 'Type', 'axes');
 set(ax, 'Units', 'normalized');
 p = cell2mat(get(ax, 'Position'));
@@ -77,15 +87,15 @@ p = cell2mat(get(ax, 'Position'));
 ax = ax(order);
 assert(numel(ax) == 8, 'stim_fig8_compose:Axes', 'Expected the 8 axes of the mirror layout, found %d.', numel(ax));
 lgs = findall(old, 'Type', 'legend');
-place = {ax(1), [xT(1), yD, wT, topD - yD]; ax(2), [xT(2), yD, wT, topD - yD]; ...       % D
-         ax(3), [xR, yE, wR - wLg, hR]; ax(4), [xR, yF, wR, hR]; ...                     % E, F
-         ax(5), [xT(1), yG, wT, topG - yG]; ax(6), [xT(2), yG, wT, topG - yG]; ...       % G
-         ax(7), [xR, yH, wR - wLg, hR]; ax(8), [xR, yI, wR, hR]};                        % H, I
+place = {ax(1), [xT(1), yA, wT, topP - yA]; ax(2), [xT(2), yA, wT, topP - yA]; ...       % A
+         ax(3), [xR, yB, wR, hR]; ax(4), [xR, yC, wR, hR]; ...                            % B, C
+         ax(5), [xT(1), yD, wT, topM - yD]; ax(6), [xT(2), yD, wT, topM - yD]; ...       % D
+         ax(7), [xR, yE, wR, hR]; ax(8), [xR, yF, wR, hR]};                               % E, F
 new_ax = gobjects(1, 8); new_lg = cell(1, 8);
 for k = 1:8
     a = place{k, 1};
     lg = lgs(arrayfun(@(l) isequal(l.Axes, a), lgs));
-    if isempty(lg)
+    if isempty(lg) || ismember(k, [3 7])         % B and E: no legends (note 9)
         na = copyobj(a, fig);
     else
         h = copyobj([lg(1) a], fig); na = h(2); new_lg{k} = h(1);
@@ -96,52 +106,46 @@ end
 unthin(new_ax);
 changes = restyle_titles(new_ax, [new_lg{:}]);
 
-%% Type by role, then the keys, the rate axes and the letters
+%% Type by role, then the rate axes, the spectra and the letters
 canvas_type(fig, fig8_type_exceptions());
+set([P.ax_A P.ax_B], 'LineWidth', st.axis_lw);   % bm_fig8_panels scales its axis lines with line_scale
 drawnow;
-for k = [3 7]                                    % E and H: rates as % of no stimulation
+for k = [3 7]                                    % B and E: rates as % of no stimulation
     a = new_ax(k);
-    % Every other tick: at 14 pt the nine labels 0 to 200 % ran into each other.
+    % Three labelled ticks: at 14 pt the nine labels 0 to 200 % ran into each other.
     keep = ismember(a.YTickLabel, {'0', '10%', '100%'});
     if any(keep); set(a, 'YTick', a.YTick(keep), 'YTickLabel', a.YTickLabel(keep)); end
-    % The condition names under the ticks, the long one on two lines: on one
-    % line MATLAB turned them by 30 degrees into the panel below, and a tick
-    % label cannot hold two lines (a newline makes it two labels), so they
-    % are text in the axes, at tick-label size.
-    names = a.XTickLabel; xt = a.XTick;
-    a.XTickLabel = {};
-    for j = 1:numel(xt)
-        words = strsplit(names{j}, ' ');
-        if numel(words) > 1; s = {strjoin(words(1:end - 1), ' '), words{end}}; else; s = names{j}; end
-        text(a, (xt(j) - a.XLim(1)) / diff(a.XLim), -0.05, s, 'Units', 'normalized', 'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', ...
-            'FontSize', manuscript_style().tick_fs, 'Clipping', 'off', 'Tag', 'fig8_condition_label');
-    end
+    % The condition names short, on one line: at 1.6 in "No stimulation"
+    % and "Stimulation" ran into each other even on two lines.
+    a.XTickLabel = {'No stim.', 'Stim.'};
+    a.XTickLabelRotation = 0;
 end
-for k = [2 6]                                    % D and G: the amplitude bar's label right of the bar
+% The y names on two lines no longer than the 1 in axes, so that the
+% names of B and C (E and F) do not run into each other: "% of no
+% stimulation" is said by the gray 100 % line and by the caption.
+new_ax(3).YLabel.String = {'IED rate', '(%)'};
+new_ax(7).YLabel.String = {'Event rate', '(%)'};
+new_ax(4).YLabel.String = {'SOZ PSD', '(\muV^2/Hz)'};
+new_ax(8).YLabel.String = {'PSD', '(a.u.^2/Hz)'};
+for k = [4 8]                                    % C and F
     a = new_ax(k);
-    for t = findall(a, 'Type', 'text')'
-        if strcmp(t.HorizontalAlignment, 'right') && ~isempty(regexp(char(t.String), '^\d.*V$', 'once'))
-            t.Position(1) = a.XLim(2) + 0.015 * diff(a.XLim);
-            t.HorizontalAlignment = 'left'; t.Clipping = 'off';
-        end
-    end
+    psd_decades(a);
+    % Decades only on the frequency axis, upright: five or six labels were
+    % turned by MATLAB on a 1.6 in axis.
+    xd = 10 .^ (ceil(log10(a.XLim(1)) - 1e-9):floor(log10(a.XLim(2)) + 1e-9));
+    set(a, 'XTick', xd, 'XTickLabel', arrayfun(@(v) sprintf('%g', v), xd, 'UniformOutput', false), ...
+        'XTickLabelRotation', 0, 'XMinorTick', 'off');
+    % No key: on a 1.6 x 1 in axes it lay on the spectra wherever it was
+    % put, and the colors are those of the traces' titles (purple no
+    % stimulation, green stimulation).
+    if ~isempty(new_lg{k}); delete(new_lg{k}); new_lg{k} = []; end
 end
-for k = [3 7]                                    % E's and H's keys right of their axes
-    lg = new_lg{k};
-    if isempty(lg); continue; end
-    lg.Units = 'inches'; lg.Location = 'none';
-    q = new_ax(k).Position;
-    lg.Position(1:2) = [q(1) + q(3) + 0.15, q(2) + (q(4) - lg.Position(4)) / 2];
-end
-for k = [4 8]                                    % the PSD keys inside, bottom left
-    if ~isempty(new_lg{k}); new_lg{k}.Location = 'southwest'; end
-end
-lx = 0.05;                                       % letters of the left column at the canvas edge
-lx_r = xR - 1.3;                                % of the right column, left of the y labels
-letter(fig, 'A', lx, P.ax_A(1)); letter(fig, 'B', P.ax_B(1).Position(1) - 0.75, P.ax_B(1));
-letter(fig, 'C', lx, P.ax_C(1), 0.33);
-letter(fig, 'D', lx, new_ax(1), 0.3); letter(fig, 'E', lx_r, new_ax(3)); letter(fig, 'F', lx_r, new_ax(4));
-letter(fig, 'G', lx, new_ax(5), 0.3); letter(fig, 'H', lx_r, new_ax(7)); letter(fig, 'I', lx_r, new_ax(8));
+new_ax(4).XLabel.String = '';                    % C: the frequency axis is named under F
+xl = xR - 1.45;                                  % the letters of the right column, left of the two-line y labels
+letter(fig, 'A', 0.05, new_ax(1), 0.08); letter(fig, 'B', xl, new_ax(3)); letter(fig, 'C', xl, new_ax(4));
+letter(fig, 'D', 0.05, new_ax(5), 0.08); letter(fig, 'E', xl, new_ax(7)); letter(fig, 'F', xl, new_ax(8));
+letter(fig, 'G', 0.05, P.ax_A(1), 0.06);
+letter(fig, 'H', 0.05, P.ax_C(1), 0.3);
 
 %% Save
 if ~isfolder(out_dir); mkdir(out_dir); end
@@ -150,7 +154,7 @@ save_figure_stable(out_dir, tag, fig);
 prov = fullfile(out_dir, [tag '_provenance.md']);
 write_provenance(prov, r, B, clinical_note, model_note, W, Ht, changes);
 tbl = fullfile(out_dir, [tag '_table.md']);
-bm_write_table(tbl, B, P.info, 'Figure 8 A to C');
+bm_write_table(tbl, B, P.info, 'Figure 8 G and H');
 files = [fullfile(out_dir, strcat(tag, {'.png', '.fig', '.svg'})), {prov, tbl}];
 if ~visible; close(fig); end
 end
@@ -161,6 +165,23 @@ function ex = fig8_type_exceptions()
 % None: the channel and row names, scale bars and event marks of the
 % traces are tick-sized text like every other.
 ex = cell(0, 2);
+end
+
+function psd_decades(a)
+% A labelled tick at every decade the spectrum's axis spans, and at least
+% two: when it spans fewer, the limits are widened outward to whole
+% decades. More than four decades: a tick at every other one, so that the
+% labels do not crowd a short axis.
+lo = floor(log10(a.YLim(1)) + 1e-9); hi = ceil(log10(a.YLim(2)) - 1e-9);
+e = ceil(log10(a.YLim(1)) - 1e-9):floor(log10(a.YLim(2)) + 1e-9);
+if numel(e) < 2
+    a.YLim = 10 .^ [lo hi];
+    e = lo:hi;
+end
+if numel(e) > 4; e = e(mod(e - e(end), 2) == 0); end
+a.YTick = 10 .^ e;
+a.YTickLabel = arrayfun(@(k) sprintf('10^{%d}', k), e, 'UniformOutput', false);
+a.YMinorTick = 'off';
 end
 
 function letter(fig, ch, x_in, ax, raise)
@@ -197,9 +218,9 @@ end
 
 function write_provenance(file, r, B, clinical_note, model_note, W, Ht, changes)
 fid = fopen(file, 'w'); guard = onCleanup(@() fclose(fid));
-fprintf(fid, ['# Figure 8 (new order) provenance\n\nWritten by `scripts/paper/stim_fig8_compose.m` (through ' ...
-    '`ied_stim_fig_combined`) on %s. Panels D to I are the axes of `fig_stim_combined` (mirror layout), copied, ' ...
-    'placed on the common canvas and given its type by role; A to C are drawn from the burst_mode stage by ' ...
+fprintf(fid, ['# Figure 8 provenance\n\nWritten by `scripts/paper/stim_fig8_compose.m` (through ' ...
+    '`ied_stim_fig_combined`) on %s. Panels A to F are the axes of `fig_stim_combined` (mirror layout), copied, ' ...
+    'placed on the common canvas and given its type by role; G and H are drawn from the burst_mode stage by ' ...
     '`bm_fig8_panels`.\n\nContains clinical recordings: do not add to git (`git add -f`) or publish outside ' ...
     'the manuscript.\n\n## Sources\n\n'], char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm')));
 src = r.sources;
@@ -208,14 +229,15 @@ fprintf(fid, '- Clinical traces: `%s`\n- Clinical rate: `%s`\n- Clinical PSD: `%
     src.traces, src.rate, src.psd, src.model);
 fprintf(fid, '- Clinical note: %s\n- Model note: %s\n', clinical_note, model_note);
 fprintf(fid, '\n## Panel letters\n\n| Letter | Shows | Source |\n|---|---|---|\n');
-fprintf(fid, ['| (A) | bursting network: input; mean E and I rates, adaptation frozen dashed; real part of the ' ...
-    'rightmost mode, gains frozen and full Jacobian (1/s) | burst_mode, bm_fig8_panels |\n' ...
-    '| (B) | one burst: the mode crosses the boundary before the rates take off | same |\n' ...
-    '| (C) | eigenvalues of M as rates: structure, quiet, before burst, burst, stimulation | same |\n']);
-m = r.letters; new = 'DEFGHI';
+m = r.letters;
 for k = 1:size(m, 1)
-    fprintf(fid, '| (%s) | %s | %s (was %s) |\n', new(k), m{k, 2}, m{k, 3}, m{k, 1});
+    fprintf(fid, '| (%s) | %s | %s |\n', m{k, 1}, m{k, 2}, m{k, 3});
 end
+fprintf(fid, ['| (G) | bursting network: input; mean E and I rates; real part of the rightmost mode, gains frozen ' ...
+    'and full Jacobian (1/s); after the step, dashed, the same network without the step (no-stimulation ' ...
+    'continuation, same noise); at the right, one burst: the mode crosses the boundary before the rates take ' ...
+    'off | burst_mode, bm_fig8_panels |\n' ...
+    '| (H) | eigenvalues of M as rates: structure, quiet, before burst, burst, stimulation | same |\n']);
 if ~isempty(changes)
     fprintf(fid, ['\n## Titles restyled on the composite\n\nThe saved panel figures carry these titles, tick labels ' ...
         'and legend entries; the composite shows them in sentence case, without counts (an empty new title: the ' ...
@@ -231,12 +253,10 @@ end
 function changes = restyle_titles(axs, lgs)
 % The titles, the condition tick labels and the legend entries of the
 % clinical and modular panels, as the paper's style has them: sentence
-% case, no counts and no parentheses (polish list, 2026-11-22). They are
-% written in the saved panel figures that fig_stim_combined loads (the
-% clinical ones in another repository), so they are restyled here, on the
-% composite. A title that only states a statistic and a count ("Median, IQR
-% over subjects (n = 12)") leaves the panel; the provenance file keeps every
-% original. Returns the changes, n x 2 {was, is}.
+% case, no counts and no parentheses (polish list, 2026-11-22). A title
+% that only states a statistic and a count ("Median, IQR over subjects
+% (n = 12)") leaves the panel; the provenance file keeps every original.
+% Returns the changes, n x 2 {was, is}.
 changes = cell(0, 2);
 for ax = axs(:)'
     was = ax.Title.String;
@@ -253,7 +273,7 @@ for ax = axs(:)'
         end
     end
 end
-for lg = lgs(:)'                              % D to I only: "Full Jacobian" of A keeps its capital
+for lg = lgs(:)'
     lab = lg.String;
     new = cellfun(@restyled, lab, 'UniformOutput', false);
     if ~isequal(new, lab)
