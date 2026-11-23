@@ -28,20 +28,26 @@ function out = fig_supp7_grouped(cfg)
 %        structure the outlier_structures stage did not run is left out of
 %        B and named in the table.
 %
-% LAYOUT (Plan 2 canvas standard, 2026-11-22). The figure is canvas_w wide:
-% A on top, centered at cfg.width_a (0.88 of the row; at the full width it would be
-% 9.5 in tall), B under it across the width (cfg.width_b, cfg.height_b).
-% Until then A and B stood side by side (15.4 in wide, a white band under
-% A where B ran longer; before the polish of that morning stacked at their
-% own sizes, 19 by 20 in). Side by side on 13 in, B's three rows overlapped
-% their y labels and A's panels came down to 2.3 in.
+% LAYOUT (Plan 3, the 9 in canvas, 2026-11-22). The figure is canvas_w wide
+% and both blocks are DRAWN at the width of their place (A through its
+% fig_w, B through its fig_size), so nothing is scaled when they are
+% copied: A on top across the width, so that its three columns hold the
+% condition titles side by side; B under it across the width,
+% cfg.height_b tall, its structure names turned cfg.label_rotation degrees
+% (less than the stand-alone figure's 35, so that the three rows keep the
+% height their two-line axis names need). Under Plan 2 the layout made for
+% 13 in was shrunk onto 9 in (A scaled to 0.88 of the row): the condition
+% titles ran into each other and the frozen modes of the reference network
+% sat on the tick label "5". Before that A and B stood side by side
+% (15.4 in wide).
 %
 % The panels are the source figures' own drawings (composite_figure).
 % Fig_Supp7_Grouped_table.md: a caption paragraph and their sidecars.
 %
 % Options: run_dir, out_dir, save, visible, verbose, preset_name (unused),
-% conditions, networks (the rows of A), seed, fig_tag, width_a, width_b, height_b,
-% gallery (true: B draws the gallery's structures when the run has them).
+% conditions, networks (the rows of A), seed, fig_tag, height_b,
+% label_rotation, gallery (true: B draws the gallery's structures when the
+% run has them).
 %
 % See also: fig_outlier_slow_variables, fig_ostruct_summary, composite_figure,
 %           cx_gallery_names, fig_supp3_connectivity_gallery
@@ -57,9 +63,8 @@ arguments
     cfg.networks                  = {'reference', 'EEx1p5'}
     cfg.seed double               = []
     cfg.fig_tag     (1,:) char    = 'Fig_Supp7_Grouped'
-    cfg.width_a     (1,1) double  = NaN   % inches; NaN = 0.88 of the row (A centered: at the full width it is 0.75 of the width tall)
-    cfg.width_b     (1,1) double  = NaN   % inches; NaN = canvas_w less the margins
-    cfg.height_b    (1,1) double  = 6.0   % inches
+    cfg.height_b    (1,1) double  = 5.7   % inches, B with its structure names
+    cfg.label_rotation (1,1) double = 28  % degrees, the structure names under B
     cfg.gallery     (1,1) logical = true
 end
 
@@ -78,30 +83,31 @@ end
 
 function out = build(cfg, out_dir)
 
-% The common canvas (Plan 2, canvas standard). A's source keeps room above
-% its titles and below its bottom row; the negative top margin and the
-% row gap take back what would stand white.
-st = manuscript_style(); MARGIN = [0.15 0.15 -0.3 0.15];
+% The common canvas (manuscript_style canvas_w). Both source figures are
+% DRAWN at the width of their block, so nothing is scaled when they are
+% copied (as fig_main5_mechanism). A's source keeps room for its titles
+% above the panels, where the letter goes: the negative top margin takes
+% the letters' strip back.
+st = manuscript_style(); MARGIN = [0.15 0.1 -0.31 0.05];
+width = st.canvas_w - MARGIN(1) - MARGIN(2);
+width_a = width; width_b = width;
 
 % Smaller marks than the stand-alone figure's 7 pt: at this width they
 % would reach the tick labels beside the origin.
 [f_slow, t_slow, o_slow] = composite_part(@fig_outlier_slow_variables, cfg, 'networks', cfg.networks, 'seed', cfg.seed, ...
-    'mark_size', 5.5);
-row_w = st.canvas_w - MARGIN(1) - MARGIN(2);
-width_a = cfg.width_a; if isnan(width_a); width_a = 0.88 * row_w; end
-width_b = cfg.width_b; if isnan(width_b); width_b = row_w; end
+    'mark_size', 5.5, 'fig_w', width_a);
 
 % (B): the gallery's structures, when the run has a gallery; drawn at its
 % place's size (its three rows share the structures' axis).
 [keys, labels, missing, gallery_file] = gallery_networks(cfg);
-b_args = {'fig_size', [width_b, cfg.height_b]};
+b_args = {'fig_size', [width_b, cfg.height_b], 'label_rotation', cfg.label_rotation};
 if ~isempty(keys); b_args = [b_args, {'networks', keys, 'labels', labels}]; end
 [f_sum, t_sum, o_sum] = composite_part(@fig_ostruct_summary, cfg, b_args{:});
 
 [fig, B] = composite_figure({struct('fig', f_slow, 'width', width_a), struct('fig', f_sum, 'width', width_b)}, ...
-    'visible', cfg.visible, 'margin', MARGIN, 'width', st.canvas_w, 'align', 'center', 'row_gap', -0.25);
-composite_letter(fig, B{1}(1), 'A', [], 'dy', -0.3);    % at the height of the condition titles
-composite_letter(fig, B{2}(1), 'B');
+    'visible', cfg.visible, 'margin', MARGIN, 'width', st.canvas_w, 'row_gap', -0.1);
+composite_letter(fig, B{1}(1), 'A', [], 'dy', -0.27);   % at the height of the condition titles
+composite_letter(fig, B{2}(1), 'B', [], 'dy', -0.1);
 canvas_type(fig, supp7_type_exceptions());
 
 if isempty(keys)

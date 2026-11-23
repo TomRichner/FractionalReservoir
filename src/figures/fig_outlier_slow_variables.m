@@ -45,7 +45,15 @@ function out = fig_outlier_slow_variables(cfg)
 % the stability boundary. Ticks only where the spectrum is not: on the
 % real axis right of zero, on the imaginary axis one tick near each end
 % (the window is a cut through the bulk, which fills its left side, so
-% there are no ticks on the negative real axis).
+% there are no ticks on the negative real axis). A tick whose LABEL an
+% open or filled circle of any panel would lie on is left out of every
+% panel (the panels share their ticks; the sidecar names it): at 9 in the
+% frozen modes of the reference network sat on the "5".
+%
+% SIZE: the figure is manuscript_style canvas_w wide (or fig_w, which a
+% composite passes: its block's width), so it is drawn at the size it is
+% printed; three columns of that width hold the condition titles side by
+% side. The height follows from the window (1:1).
 %
 % Text on the figure: the condition names, in their colors, the network
 % names, the axis names and ticks. Fig_Outlier_Slow_Variables_table.md has
@@ -80,6 +88,7 @@ arguments
     cfg.show_filtered (1,1) logical = true    % the eigenvalues below x_thr, faint gray, under the network modes
     cfg.filtered_color (1,3) double = [0.62 0.62 0.62]
     cfg.filtered_alpha (1,1) double = 0.18
+    cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
 end
 
 setup_paths();
@@ -111,9 +120,28 @@ axes_args = {'re_lim', re_lim, 'im_lim', im_lim, 're_ticks', re_ticks, 'im_ticks
 g = complex_plane_axes([], axes_args{:});
 
 %% Panels placed by hand (inches): identical sizes, 1:1
-fig_w = 13; left = 0.6; right = 0.15; col_gap = 0.35; top_m = 0.5; row_gap = 0.45; bottom = 0.5;
+% The width is the common canvas (manuscript_style canvas_w) or the block a
+% composite gives it. The margins are what the type needs, in inches: the
+% network name left of the first column, the condition titles above; the
+% columns as close as the titles allow.
+fig_w = cfg.fig_w; if isempty(fig_w); fig_w = st.canvas_w; end
+pt_in = 1 / 72;
+left = 0.5; right = 0.05; col_gap = 0.22; row_gap = 0.25; bottom = 0.08;
+top_m = 0.1 + 1.25 * st.title_fs * pt_in;
 pw = (fig_w - left - right - (n_cond - 1) * col_gap) / n_cond;
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
+% The ticks whose label a mark of any panel would lie on are left out of
+% every panel; one tick stays on each axis (the last).
+m_all = arrayfun(@(d) [with_conjugates(d.frozen), with_conjugates(d.cont)], drawn, 'UniformOutput', false);
+[hidden_re, hidden_im] = covered_ticks(g, [m_all{:}], cfg.mark_size, st.tick_fs, diff(g.x_lim) / pw);
+if ~isempty(hidden_re) && numel(hidden_re) == numel(g.re_ticks); hidden_re = hidden_re(1:end - 1); end
+if ~isempty(hidden_im) && numel(hidden_im) == numel(g.im_ticks); hidden_im = hidden_im(1:end - 1); end
+if ~isempty(hidden_re) || ~isempty(hidden_im)
+    axes_args = {'re_lim', re_lim, 'im_lim', im_lim, 're_ticks', setdiff(g.re_ticks, hidden_re), ...
+        'im_ticks', setdiff(g.im_ticks, hidden_im), 'font_size', st.tick_fs, 'line_width', st.axis_lw};
+    g = complex_plane_axes([], axes_args{:});
+end
+g.hidden_re_ticks = hidden_re; g.hidden_im_ticks = hidden_im;
 fig_h = top_m + n_net * ph + (n_net - 1) * row_gap + bottom;
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w fig_h], 'Visible', vis);
@@ -221,8 +249,8 @@ if cfg.save
             'identical in every panel, no break: real axis [%.3g, %.3g] 1/s, imaginary axis [%.3g, %.3g] 1/s. The ' ...
             'imaginary axis is the stability boundary. The view is a cut: the spectrum continues to the left, above ' ...
             'and below. Ticks only right of zero on the real axis and near the ends of the imaginary axis, clear of ' ...
-            'the bulk. Marks (open or filled) outside the view, per panel in reading order: %s. Data: `%s`.\n\n'], ...
-            g.re_lim, g.y_lim, strjoin(arrayfun(@(v) sprintf('%d', v), reshape(n_marks_out.', 1, []), 'UniformOutput', false), ', '), F.file);
+            'the bulk. %s Marks (open or filled) outside the view, per panel in reading order: %s. Data: `%s`.\n\n'], ...
+            g.re_lim, g.y_lim, hidden_ticks_text(g), strjoin(arrayfun(@(v) sprintf('%d', v), reshape(n_marks_out.', 1, []), 'UniformOutput', false), ', '), F.file);
         fprintf(fid, ['Per panel, over the %d seed(s) of the index: each run gives the median over its calibration ' ...
             'states, and the table the median of those over seeds with [min, max]. `frozen` is the real part of the ' ...
             'rightmost frozen-gain rate; `continuation` the real and imaginary part of the full-Jacobian eigenvalue ' ...
@@ -279,6 +307,48 @@ R = ospec_load_run(folder, runs(k, :));
 if ~R.has_dense || isempty(R.dense); return; end
 lam = double([R.dense.lam]); xf = double([R.dense.xfrac]);
 z = reshape(lam(xf < d.x_thr & isfinite(lam)), 1, []);
+end
+
+function [hidden_re, hidden_im] = covered_ticks(g, z, mark_size, fs, units_per_inch)
+% The ticks whose LABEL an open or filled circle would lie on. The label
+% boxes are those of complex_plane_axes: under the real axis, centered on
+% the tick; left of the imaginary axis, centered on the tick's height.
+% Sizes from the font (a digit is about 0.56 em wide), a little generous,
+% plus the marker's radius. (fig_outlier_plane does the same for its dots
+% and diamonds.)
+pt = units_per_inch / 72;                            % one point, in axis units
+tl = 0.018 * diff(g.y_lim);                          % complex_plane_axes' tick length
+z = z(isfinite(z));
+x = real(z); y = imag(z);                            % no break in this figure: the plotted x is the real part
+r = (mark_size / 2 + 1) * pt;                        % the marker and its edge
+label_w = @(t) 0.56 * fs * pt * (numel(sprintf('%g', abs(t))) + (t < 0));
+label_h = 0.85 * fs * pt;
+top = -1.5 * tl - 0.1 * fs * pt;                     % the glyphs begin a little under the top of the text box
+hidden_re = [];
+for t = g.re_ticks
+    if any(abs(x - t) <= label_w(t) / 2 + r & y <= top + r & y >= top - label_h - r)
+        hidden_re(end + 1) = t; %#ok<AGROW>
+    end
+end
+hidden_im = [];
+for t = g.im_ticks
+    if any(x <= -1.6 * tl + r & x >= -1.6 * tl - label_w(t) - r & abs(y - t) <= label_h / 2 + r)
+        hidden_im(end + 1) = t; %#ok<AGROW>
+    end
+end
+end
+
+function s = hidden_ticks_text(g)
+% The sidecar's sentence on the ticks left out.
+if isempty(g.hidden_re_ticks) && isempty(g.hidden_im_ticks)
+    s = 'No tick was left out under a mark.';
+    return;
+end
+parts = {};
+if ~isempty(g.hidden_re_ticks); parts{end + 1} = ['on the real axis at ' strjoin(compose('%g', g.hidden_re_ticks), ', ') ' 1/s']; end
+if ~isempty(g.hidden_im_ticks); parts{end + 1} = ['on the imaginary axis at ' strjoin(compose('%g', g.hidden_im_ticks), ', ') ' 1/s']; end
+s = ['TICKS LEFT OUT, in every panel, because an open or filled circle of some panel lies where the tick''s label ' ...
+    'would be: ' strjoin(parts, ' and ') '. The window is unchanged.'];
 end
 
 function z = with_conjugates(z)
