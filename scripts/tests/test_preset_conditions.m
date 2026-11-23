@@ -122,15 +122,15 @@ all_passed = check('no_adaptation is identical across the 3- and 7-cond presets'
 % Titles are mostly structural, with deliberate exceptions: the paper's adapting
 % regimes are titled in the manuscript's words rather than by their counts.
 % Since 2026-11-12 (FD-007) the paper's MTS is the CHAIN, sfa3_stdc2, which
-% took "Multiple-Timescale Adaptation" over from the product sfa3_std2; the
+% took "Multiple-timescale adaptation" over from the product sfa3_std2; the
 % product's title says what it is.
 t = srnn_condition_titles();
 all_passed = check(sprintf('sfa1_std1 -> "%s"', t('sfa1_std1')), ...
-    strcmp(t('sfa1_std1'), 'Single-Timescale Adaptation')) && all_passed;
+    strcmp(t('sfa1_std1'), 'Single-timescale adaptation')) && all_passed;
 all_passed = check(sprintf('sfa3_stdc2 -> "%s"', t('sfa3_stdc2')), ...
-    strcmp(t('sfa3_stdc2'), 'Multiple-Timescale Adaptation')) && all_passed;
+    strcmp(t('sfa3_stdc2'), 'Multiple-timescale adaptation')) && all_passed;
 all_passed = check(sprintf('sfa3_std2 -> "%s"', t('sfa3_std2')), ...
-    strcmp(t('sfa3_std2'), 'Multiple-Timescale Adaptation (product)')) && all_passed;
+    strcmp(t('sfa3_std2'), 'Multiple-timescale adaptation (product)')) && all_passed;
 all_passed = check('the three adapting regimes are titled differently', ...
     numel(unique({t('sfa1_std1'), t('sfa3_stdc2'), t('sfa3_std2')})) == 3) && all_passed;
 % Legacy names stay in the map, or a figure regenerated from a run saved before

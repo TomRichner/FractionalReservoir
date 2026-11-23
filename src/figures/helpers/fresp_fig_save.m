@@ -34,7 +34,7 @@ for r = 1:size(rows, 1)
     lines{r} = sprintf('| %s |', strjoin(cells, ' | '));
 end
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if ~isfield(cfg, 'images') || cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');

@@ -14,6 +14,19 @@ function out = ied_stim_fig_combined(opts)
 % The output holds clinical recordings: it lands under figs/ (gitignored);
 % never force-add it to git. Replaces scripts/paper/make_fig_stim_combined*.m
 % and their 'stage' switch (retired 2026-11-17).
+%
+% THE NEW ORDER (Tom, 2026-11-21; Plan 2, package E). With burst_mode_dir
+% set (a run directory holding the burst_mode stage, burst_mode/), the
+% figure is Figure 8 of figures_main_supp_appen.md: A to C the bursting
+% network (bm_fig8_panels: input, rates and the network mode; one burst;
+% the complex plane as rates), D to F the clinical panels (the mirror
+% layout's A to C), G to I the modular model (its D to F). The mirror
+% figure is drawn by fig_stim_combined as before, unsaved, and moved whole
+% into the lower part of a taller canvas (stim_fig8_compose), so the
+% clinical and modular panels are exactly the present figure's. Written as
+% <tag>.{png,fig,svg} (tag Fig_Main8_Stim by default), <tag>_provenance.md
+% and <tag>_table.md (the burst_mode numbers). With burst_mode_dir empty
+% the present figure (Fig_Stim_Combined) is drawn, unchanged.
 arguments
     opts.data_dir (1,:) char = ''       % unused; the standard field of a bundle entry
     opts.out_dir (1,:) char {mustBeNonempty}
@@ -25,6 +38,8 @@ arguments
     opts.clinical_psd_fig (1,:) char = ''
     opts.run_name (1,:) char = ''
     opts.sim struct = struct()
+    opts.burst_mode_dir (1,:) char = ''  % a run directory with burst_mode/: the new order
+    opts.tag (1,:) char = ''             % '' = Fig_Stim_Combined, or Fig_Main8_Stim in the new order
 end
 panels = fullfile(opts.clinical_dir, 'panels');
 assert(isfolder(panels), 'ied_stim_fig_combined:NoPanels', ...
@@ -43,10 +58,19 @@ if all(isfield(s, {'amplitude','seeds','n_no','n_stim','block_len','fs'}))
 else
     model_note = sprintf('IED model block run %s', opts.run_name);
 end
-r = fig_stim_combined(panels, opts.model_fig, 'out_dir', opts.out_dir, 'layout', 'mirror', ...
-    'clinical_files', opts.clinical_files, 'clinical_psd_fig', opts.clinical_psd_fig, ...
-    'clinical_note', clinical_note, 'model_note', model_note, 'visible', opts.visible);
-out = struct('files', {fullfile(opts.out_dir, r.files)}, 'out_dir', opts.out_dir);
+common = {'layout', 'mirror', 'clinical_files', opts.clinical_files, 'clinical_psd_fig', opts.clinical_psd_fig, ...
+    'clinical_note', clinical_note, 'model_note', model_note};
+if isempty(opts.burst_mode_dir)
+    tag = opts.tag; if isempty(tag); tag = 'Fig_Stim_Combined'; end
+    r = fig_stim_combined(panels, opts.model_fig, 'out_dir', opts.out_dir, 'tag', tag, common{:}, 'visible', opts.visible);
+    out = struct('files', {fullfile(opts.out_dir, r.files)}, 'out_dir', opts.out_dir);
+    return
+end
+tag = opts.tag; if isempty(tag); tag = 'Fig_Main8_Stim'; end
+B = bm_load_runs(opts.burst_mode_dir);          % errors (resolve_data_file) when the stage has not run there
+r = fig_stim_combined(panels, opts.model_fig, common{:}, 'save', false, 'visible', false);
+files = stim_fig8_compose(r, B, opts.out_dir, tag, clinical_note, model_note, opts.visible);
+out = struct('files', {files}, 'out_dir', opts.out_dir);
 end
 
 function d = strip_sep(d)

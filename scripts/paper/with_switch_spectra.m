@@ -1,14 +1,14 @@
 function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s, opts)
 % WITH_SWITCH_SPECTRA Figure 3 with its heat map on the switching run, one top-K pass throughout (FD-034).
 %
-%   cfg = WITH_SWITCH_SPECTRA(cfg)                 K = 100, 40 states
+%   cfg = WITH_SWITCH_SPECTRA(cfg)                 K = 150, 40 states
 %   cfg = WITH_SWITCH_SPECTRA(cfg, K, n_samples)
 %   cfg = WITH_SWITCH_SPECTRA(cfg, K, n_samples, first_state_s)
 %   cfg = WITH_SWITCH_SPECTRA(..., 'as_default', true)   the paper's Figure 3 (below)
 %
 % THE mu7chain BUNDLES' DEFAULT since FD-046 (Tom, 2026-11-20: "we will use
 % the switching version"; docs/Plan_Figure3_update.md, step 6):
-% mu7chain_config ends with with_switch_spectra(cfg, 100, 40, 1,
+% mu7chain_config ends with with_switch_spectra(cfg, cfg.local_lyapunov_K (150 since 2026-11-21), 40, 1,
 % 'as_default', true). Without 'as_default' it is the opt-in it was
 % (FD-034), adding versions beside the registered entries. In the registered Figure 3 the expansion
 % row comes from the local-Lyapunov stage (a switching-input run) and the
@@ -40,7 +40,7 @@ function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s, opts)
 %     docs/Plan_Figure3_update.md; Tom has not decided on moving the
 %     states, 2026-11-20).
 %   * registry entries, each after the entry it is a version of, in a
-%     directory of its own, none in_paper:
+%     directory of its own, all in the group 'appendix' (none in_paper):
 %       fig_eig_heatmap_switch     the density of the switching run with the
 %                                  Ritz overlay and its inset
 %       fig_main3_grouped_switch   the composite: input, expansion, heat map
@@ -53,12 +53,16 @@ function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s, opts)
 %                                  registers fig_eig_real_histogram)
 %     The entries they are versions of are untouched.
 %   * WITH 'as_default', true, the paper's Figure 3 is the switching one:
-%     the entry fig_main3_grouped (its name, its in_paper) draws the
-%     four-row composite (input, expansion, heat map with the Ritz overlay
-%     and inset, and row (D), the real-axis histogram), and the baseline
-%     composite it drew until then is kept, right after it, as
-%     fig_main3_grouped_baseline, not in_paper (it still reads the
-%     eig_heatmap stage). fig_main3_grouped_switch and _switch_hist are not
+%     the entry fig_main3_grouped (its name, its group and in_paper) draws the
+%     four-row composite (input, expansion, heat map WITHOUT the Ritz
+%     overlay, and row (D), the real-axis histogram with its three labels;
+%     the figure plan of 2026-11-21: "Heat map, no Ritz overlay, no
+%     inset"), followed by fig_main3_grouped_ritz, the same composite with
+%     the overlay and inset, in the appendix (Fig_Main3_Grouped_ritz.png),
+%     and then by the baseline composite it drew until FD-046, as
+%     fig_main3_grouped_baseline, in the group 'appendix' (it still reads the
+%     eig_heatmap stage). (Until 2026-11-21 the paper's entry carried the
+%     overlay and inset.) fig_main3_grouped_switch and _switch_hist are not
 %     added (the first is not chosen, the second would be fig_main3_grouped
 %     itself); fig_eig_heatmap_switch and fig_eig_real_histogram_switch are
 %     added as above. THE FILE NAMES (the merge of FD-031 and FD-046,
@@ -85,7 +89,7 @@ function cfg = with_switch_spectra(cfg, K, n_samples, first_state_s, opts)
 %           fig_main3_stability, run_all_paper_analyses
 arguments
     cfg (1,1) struct
-    K (1,1) double {mustBeInteger, mustBePositive} = 100
+    K (1,1) double {mustBeInteger, mustBePositive} = 150   % Tom, 2026-11-21: "go with 150" (100 from 2026-11-20)
     n_samples (1,1) double {mustBeInteger, mustBeGreaterThanOrEqual(n_samples, 2)} = 40
     first_state_s (1,1) double = 1
     opts.as_default (1,1) logical = false
@@ -98,7 +102,7 @@ if ~isempty(missing)
         'The config''s registry lacks %s, which the added entries are versions of.', strjoin(missing, ', '));
 end
 added = {'fig_eig_heatmap_switch', 'fig_main3_grouped_switch'};
-if any(ismember([added, {'fig_main3_grouped_baseline'}], names))
+if any(ismember([added, {'fig_main3_grouped_baseline', 'fig_main3_grouped_ritz'}], names))
     error('with_switch_spectra:AlreadyAdded', 'This config already carries the switching-run entries.');
 end
 cfg.local_lyapunov_K = K;
@@ -112,30 +116,31 @@ end
 heat = cfg.figures{strcmp(names, 'fig_eig_heatmap')};
 main3 = cfg.figures{strcmp(names, 'fig_main3_grouped')};
 overlay = {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset', true};
-added_heat = struct('name', added{1}, 'fn', heat.fn, 'in_paper', false, 'args', {[heat.args, overlay]});
-added_main3 = struct('name', added{2}, 'fn', main3.fn, 'in_paper', false, ...
-    'args', {[main3.args, overlay, {'show_lambda_row', false}]});
-added_main3_hist = struct('name', [added{2} '_hist'], 'fn', main3.fn, 'in_paper', false, ...
-    'args', {[main3.args, overlay, {'show_lambda_row', false, 'real_histogram_row', true}]});
+added_heat = paper_figure_entry(added{1}, heat.fn, 'appendix', [heat.args, overlay]);
+added_main3 = paper_figure_entry(added{2}, main3.fn, 'appendix', ...
+    [main3.args, overlay, {'show_lambda_row', false}]);
+added_main3_hist = paper_figure_entry([added{2} '_hist'], main3.fn, 'appendix', ...
+    [main3.args, overlay, {'show_lambda_row', false, 'real_histogram_row', true}]);
 has_hist = ismember('fig_eig_real_histogram', names);
 if has_hist
     hist0 = cfg.figures{strcmp(names, 'fig_eig_real_histogram')};
-    added_hist = struct('name', 'fig_eig_real_histogram_switch', 'fn', hist0.fn, 'in_paper', false, ...
-        'args', {[hist0.args, {'spectra_source', 'local_lyapunov'}]});
+    added_hist = paper_figure_entry('fig_eig_real_histogram_switch', hist0.fn, 'appendix', ...
+        [hist0.args, {'spectra_source', 'local_lyapunov'}]);
 end
 
 if opts.as_default
     % The paper's name and flag on the four-row switching composite; the
     % baseline composite kept beside it under a name of its own.
-    paper_main3 = added_main3_hist;
-    paper_main3.name = main3.name;
+    % The paper's entry: no overlay (row D's labels are on by default).
+    paper_main3 = paper_figure_entry(main3.name, main3.fn, entry_group(main3), [main3.args, ...
+        {'spectra_source', 'local_lyapunov', 'show_lambda_row', false, 'real_histogram_row', true, ...
+         'fig_tag', 'Fig_Main3_Grouped'}]);
     paper_main3.in_paper = main3.in_paper;
-    paper_main3.args = [paper_main3.args, {'fig_tag', 'Fig_Main3_Grouped'}];
-    baseline = main3;
-    baseline.name = 'fig_main3_grouped_baseline';
-    baseline.in_paper = false;
-    baseline.args = [baseline.args, {'fig_tag', 'Fig_Main3_Grouped_baseline'}];
-    main3_entries = {paper_main3, baseline};
+    ritz_main3 = paper_figure_entry('fig_main3_grouped_ritz', main3.fn, 'appendix', [main3.args, overlay, ...
+        {'show_lambda_row', false, 'real_histogram_row', true, 'fig_tag', 'Fig_Main3_Grouped_ritz'}]);
+    baseline = paper_figure_entry('fig_main3_grouped_baseline', main3.fn, 'appendix', ...
+        [main3.args, {'fig_tag', 'Fig_Main3_Grouped_baseline'}]);
+    main3_entries = {paper_main3, ritz_main3, baseline};
 else
     main3_entries = {main3, added_main3, added_main3_hist};
 end
@@ -150,4 +155,18 @@ for k = 1:numel(cfg.figures)
     if has_hist && strcmp(names{k}, 'fig_eig_real_histogram'); F{end + 1} = added_hist; end %#ok<AGROW>
 end
 cfg.figures = F;
+end
+
+%% ------------------------------------------------------------------------
+function g = entry_group(e)
+% The group of a registry entry (paper_figure_groups); an entry built before
+% the groups existed (a bundle that does not use paper_figure_entry) is read
+% from its in_paper flag.
+if isfield(e, 'group')
+    g = e.group;
+elseif e.in_paper
+    g = 'main';
+else
+    g = 'appendix';
+end
 end

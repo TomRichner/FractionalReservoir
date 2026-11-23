@@ -62,13 +62,22 @@ fig=figure('Visible','off','Color','w','Position',[40 40 round(1000*N/3) 850]);
 tl=tiledlayout(fig,6,N,'TileSpacing','compact','Padding','compact');
 fields={'u','x','r','syn','sfa','std'};
 labels={'input u','x','raw rate r','synaptic output','SFA feedback','depression factor'};
+% Each column's traces in its condition's manuscript_style colour, the
+% title too (Plan 2, package A, 2026-11-21: no condition in black; every
+% trace was black until then). The input row is the stimulus, the same in
+% every column, and stays black. A condition the style does not know draws
+% in black, as before.
+st=manuscript_style();
 for c=1:N
     r=R(c);
+    col=[0 0 0];
+    if isKey(st.condition_color,r.name), col=st.condition_color(r.name); end
     for j=1:6
-        ax=nexttile(tl,(j-1)*N+c); plot(ax,r.t,r.(fields{j})','k','LineWidth',1.4);
+        trace_col=col; if j==1, trace_col=[0 0 0]; end
+        ax=nexttile(tl,(j-1)*N+c); plot(ax,r.t,r.(fields{j})','Color',trace_col,'LineWidth',1.4);
         xlim(ax,D.settings.display_window); box(ax,'off');
         if c==1, ylabel(ax,labels{j}); end
-        if j==1, title(ax,titles{c},'FontWeight','normal'); end
+        if j==1, title(ax,titles{c},'FontWeight','normal','Color',col); end
         if j==6
             xlabel(ax,'time (s)');
             note=factor_note(r);

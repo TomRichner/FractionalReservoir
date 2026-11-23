@@ -23,7 +23,7 @@
 %      resolve_data_file, and the default source is untouched by the option.
 %      The fourth row ('real_histogram_row'): one histogram and one dotted
 %      reference per column, under the plot box of the heat map above it and
-%      on its x limits, no text on it, a taller canvas of the same width, a
+%      on its x limits, only the named labels on it, the same canvas, a
 %      _table.md with the row's caption sentence; fig_eig_real_histogram
 %      with 'spectra_source', 'local_lyapunov'; the gains the stage saves
 %      (disk_by_cond). With the lambda_1 row it errors :HistogramRow.
@@ -31,12 +31,12 @@
 %      and gains at the shared states, bit for bit.
 %   5. with_switch_spectra: the mu7chain bundles carry it by default since
 %      FD-046 ('essential' and 'fast' are exactly the config without it, put
-%      back by undo_switch below, with with_switch_spectra(cfg, 100, 40, 1,
+%      back by undo_switch below, with with_switch_spectra(cfg, 150, 40, 1,
 %      'as_default', true) applied: fig_main3_grouped the four-row
 %      switching composite, the baseline composite beside it). As the
-%      opt-in (on the config without it): it sets K = 100 and 40 states (or
+%      opt-in (on the config without it): it sets K = 150 (100 until 2026-11-21) and 40 states (or
 %      those given) and adds exactly four entries, each after the entry it
-%      is a version of, none in_paper, every other entry unchanged; it
+%      is a version of, all 'appendix' (none in_paper), every other entry unchanged; it
 %      names the first state only when the accumulation window opens
 %      before it; twice errors :AlreadyAdded, a config without the entries
 %      :MissingEntry.
@@ -120,30 +120,46 @@ evalc(['g4 = fig_grouped_main(3, ''run_dir'', on_dir, ''out_dir'', fullfile(on_d
 tag4 = 'Fig_Main3_Grouped_switch_ritz_inset_realhist';   % no _noC since the merge with FD-031: no lambda_1 row is the default
 ok = any(strcmp(g4.files, [tag4 '.png'])) && isfile(fullfile(on_dir, 'g4', [tag4 '_table.md'])) && ...
     n_tagged(g4.figs, 'eig_real_histogram') == numel(C) && n_tagged(g4.figs, 'uniform_disk_reference') == numel(C) && ...
-    g4.figs.Position(3) == g_pos(3) && g4.figs.Position(4) > g_pos(4) && numel(findall(g4.figs, 'Tag', 'row_letter')) == 4;
+    g4.figs.Position(3) == g_pos(3) && g4.figs.Position(4) == g_pos(4) && numel(findall(g4.figs, 'Tag', 'row_letter')) == 4;
 for c = 1:numel(C)
     heat = findall(g4.figs, 'Tag', sprintf('stability_r3_c%d', c)); hx = findall(g4.figs, 'Tag', sprintf('stability_r4_c%d', c));
     ok = ok && isscalar(heat) && isscalar(hx);
     if ok
         pb = plot_box_position(heat);
         ok = isequal(hx.XLim, heat.XLim) && max(abs(hx.Position([1 3]) - pb([1 3]))) < 1e-6 && ...
-            hx.Position(2) + hx.Position(4) < pb(2) && isempty(findobj(hx, 'Type', 'text'));
+            hx.Position(2) + hx.Position(4) < pb(2) && ...
+            isempty(findobj(hx, 'Type', 'text', '-not', 'Tag', 'histogram_label'));   % only the named labels
     end
 end
 if ok
     tbl = fileread(fullfile(on_dir, 'g4', [tag4 '_table.md']));
     ok = contains(tbl, 'Row (D)') && contains(tbl, 'radius drawn: `gain`') && contains(tbl, 'switching-input run');
 end
+% The three labels of row (D), once each, at the figure's text size; the lambda_1
+% label above row (B) at that size too (Plan 2, package C).
+labs = findall(g4.figs, 'Tag', 'histogram_label'); lam = findall(g4.figs, 'Tag', 'accumulated_lambda_value');
+ok = ok && numel(labs) == 3 && all([labs.FontSize] == 14) && numel(lam) == numel(C) && all([lam.FontSize] == 14);
 close(g4.figs);
+evalc('m4 = fig_main3_stability(on_dir, {}, ''spectra_source'', ''local_lyapunov'', ''real_histogram_row'', true, ''histogram_labels'', false);');
+ok = ok && n_tagged(m4.figs, 'histogram_label') == 0 && n_tagged(m4.figs, 'ritz_density') == 0 && n_tagged(m4.figs, 'ritz_inset') == 0;
+close(m4.figs);
 evalc(['rh = fig_eig_real_histogram(''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''rh''), ''visible'', false, ' ...
     '''spectra_source'', ''local_lyapunov'');']);
 ok = ok && any(strcmp(rh.files, 'fig_eig_real_histogram_switch.png')) && strcmp(rh.reference(1).mode, 'gain') && ...
-    isfile(fullfile(on_dir, 'rh', 'fig_eig_real_histogram_switch_table.md'));
+    isfile(fullfile(on_dir, 'rh', 'fig_eig_real_histogram_switch_table.md')) && n_tagged(rh.figs, 'histogram_label') == 0;
 close(rh.figs);
 G = D.disk_by_cond{end};
 ok = ok && numel(D.disk_by_cond) == numel(C) && G.n == 40 && numel(G.rms_gain) == n_s && ...
     all(G.rms_gain > 0 & G.rms_gain < 1) && max(abs(G.t(:)' - (1:10))) < 1e-9;
-all_passed = check('the histogram row: (D) under each heat map''s plot box on its x limits, no text on it, table written; the stand-alone histogram; the saved gains', ok) && all_passed;
+all_passed = check('the histogram row: (D) under each heat map''s plot box on its x limits, no text on it but the three named labels (none when switched off, none on the stand-alone figure), table written; the stand-alone histogram; the saved gains', ok) && all_passed;
+% fig_local_lyapunov: the stage's accumulation window and K, read from the run (Plan 2, package C).
+evalc('ll = fig_local_lyapunov(''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''ll''), ''visible'', false);');
+ok = isequal(ll.window, B.settings.lya_T_interval) && isequal(ll.window, [1 10]) && ll.K == K && ...
+    contains(ll.table_text, sprintf('K = %d tracked', K)) && contains(ll.table_text, '[1, 10] s, the stage''s accumulation window') && ...
+    isempty(findobj(ll.figs, 'Type', 'text')) && isfile(fullfile(on_dir, 'll', 'Fig_Local_Lyapunov_table.md')) && ...
+    ll.figs.Position(4) <= 1000;
+close(ll.figs);
+all_passed = check('fig_local_lyapunov: the run''s accumulation window and K, no text on the panels, the table, a canvas that fits the screen', ok) && all_passed;
 all_passed = check('the histogram row needs the layout without the lambda_1 row', ...
     throws_prefix(@() fig_main3_stability(on_dir, {}, 'real_histogram_row', true, 'show_lambda_row', true), ...
     'fig_main3_stability:HistogramRow')) && all_passed;   % named: no lambda_1 row is the default since the merge with FD-031
@@ -170,10 +186,10 @@ rmdir(base, 's');
 ok = true;
 for mode = {'essential', 'fast'}
     c = mu7chain_config(mode{1});
-    ok = ok && isequal(with_switch_spectra(undo_switch(c), 100, 40, 1, 'as_default', true), c) && ...
-        c.local_lyapunov_K == 100 && c.local_lyapunov_spectra_n_samples == 40 && c.local_lyapunov_spectra_start_s == 1;
+    ok = ok && isequal(with_switch_spectra(undo_switch(c), 150, 40, 1, 'as_default', true), c) && ...
+        c.local_lyapunov_K == 150 && c.local_lyapunov_spectra_n_samples == 40 && c.local_lyapunov_spectra_start_s == 1;
 end
-all_passed = check('mu7chain_config carries the switching Figure 3 by default (K = 100, 40 states from 1 s)', ok) && all_passed;
+all_passed = check('mu7chain_config carries the switching Figure 3 by default (K = 150, 40 states from 1 s)', ok) && all_passed;
 base_cfg = undo_switch(mu7chain_config('essential'));
 cfg = with_switch_spectra(base_cfg);
 names0 = cellfun(@(f) f.name, base_cfg.figures, 'UniformOutput', false);
@@ -183,11 +199,11 @@ c2 = with_switch_spectra(base_cfg, 30, 8);
 ih = find(strcmp(names, 'fig_eig_heatmap')); im = find(strcmp(names, 'fig_main3_grouped'));
 extra = {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset', true};
 h0 = base_cfg.figures{strcmp(names0, 'fig_eig_heatmap')}; m0 = base_cfg.figures{strcmp(names0, 'fig_main3_grouped')};
-all_passed = check('with_switch_spectra: K = 100 and 40 states by default, given values kept', ...
-    cfg.local_lyapunov_K == 100 && cfg.local_lyapunov_spectra_n_samples == 40 && ...
+all_passed = check('with_switch_spectra: K = 150 and 40 states by default, given values kept', ...
+    cfg.local_lyapunov_K == 150 && cfg.local_lyapunov_spectra_n_samples == 40 && ...
     c2.local_lyapunov_K == 30 && c2.local_lyapunov_spectra_n_samples == 8) && all_passed;
 ir = find(strcmp(names, 'fig_eig_real_histogram')); r0 = base_cfg.figures{strcmp(names0, 'fig_eig_real_histogram')};
-all_passed = check('four entries added after the entries they are versions of, none in_paper, the rest unchanged', ...
+all_passed = check('four entries added after the entries they are versions of, all appendix, the rest unchanged', ...
     numel(names) == numel(names0) + 4 && strcmp(names{ih + 1}, added{1}) && strcmp(names{im + 1}, added{2}) && ...
     strcmp(names{im + 2}, added{3}) && strcmp(names{ir + 1}, added{4}) && ...
     isequal(cfg.figures(~ismember(names, added)), base_cfg.figures) && ...
@@ -200,12 +216,12 @@ all_passed = check('four entries added after the entries they are versions of, n
     isequal(rmfield(drop_start(cfg), {'figures', 'local_lyapunov_K', 'local_lyapunov_spectra_n_samples'}), ...
             rmfield(base_cfg, {'figures', 'local_lyapunov_K'}))) && all_passed;
 all_passed = check('as_default: the paper''s name on the four-row composite, the baseline beside it', ...
-    isequal(with_switch_spectra(base_cfg, 100, 40, 1, 'as_default', true), mu7chain_config('essential'))) && all_passed;
+    isequal(with_switch_spectra(base_cfg, 150, 40, 1, 'as_default', true), mu7chain_config('essential'))) && all_passed;
 % The first state: left to the stage when the window opens at or after it, named when it opens before.
 % (Whatever the bundle's own accumulation start is.)
 early = base_cfg; early.local_lyapunov_accumulation_start_s = 0;
 late = base_cfg; late.local_lyapunov_accumulation_start_s = 1;
-c3 = with_switch_spectra(early); c4 = with_switch_spectra(early, 100, 40, 2); c5 = with_switch_spectra(late);
+c3 = with_switch_spectra(early); c4 = with_switch_spectra(early, 150, 40, 2); c5 = with_switch_spectra(late);
 all_passed = check('first state: not set for a window from 1 s, 1 s (or the value given) for a window from 0 s', ...
     ~isfield(c5, 'local_lyapunov_spectra_start_s') && ...
     c3.local_lyapunov_spectra_start_s == 1 && c4.local_lyapunov_spectra_start_s == 2) && all_passed;
@@ -228,17 +244,19 @@ end
 
 function c = undo_switch(c)
 % A mu7chain config as it was before with_switch_spectra became its default:
-% without the switching entries, fig_main3_grouped the baseline composite,
-% and no spectra settings (K stays the bundle's 100).
+% without the switching entries (fig_main3_grouped_ritz, the overlay version of
+% 2026-11-21, among them), fig_main3_grouped the baseline composite,
+% and no spectra settings (K stays the bundle's, 150 since 2026-11-21).
 names = cellfun(@(f) f.name, c.figures, 'UniformOutput', false);
 base = c.figures{strcmp(names, 'fig_main3_grouped_baseline')};
 base.name = 'fig_main3_grouped';
 base.in_paper = true;
+base.group = 'main';
 % as_default names the baseline's file (fig_tag, last in its args); before it, the entry had none.
 assert(isequal(base.args(end - 1:end), {'fig_tag', 'Fig_Main3_Grouped_baseline'}));
 base.args = base.args(1:end - 2);
 c.figures{strcmp(names, 'fig_main3_grouped')} = base;
-c.figures = c.figures(~ismember(names, {'fig_main3_grouped_baseline', 'fig_eig_heatmap_switch', ...
+c.figures = c.figures(~ismember(names, {'fig_main3_grouped_baseline', 'fig_main3_grouped_ritz', 'fig_eig_heatmap_switch', ...
     'fig_eig_real_histogram_switch'}));
 c = rmfield(c, {'local_lyapunov_spectra_n_samples', 'local_lyapunov_spectra_start_s'});
 end

@@ -32,6 +32,9 @@ function test_bundle_fs_plumbing()
 %     eigenvalue_density simulate nothing and are only checked to be
 %     reached. All five are stubbed like the others: the dry run of a
 %     mu7chain bundle would otherwise run them for real, at 500 neurons;
+%     and Plan 2's concept_examples and uncoupled_reference, stubbed the
+%     same way and checked at fs 500 with 'sra1' (until they were, the
+%     dry runs ran both for real, 29 minutes);
 %   * numerics, the one stage that keeps its own rates and solvers, gets
 %     neither;
 %   * run_manifest records fs = 500 and ode_solver = 'sra1';
@@ -78,6 +81,7 @@ PLUMBED = {'eig_heatmap', 'lyapunov_spectrum', 'transient_gain', 'local_lyapunov
            'memory_capacity', 'mc_example'};
 OWN_RATE = {'numerics'};
 OPT_IN_PLUMBED = {'lyapunov_spectrum_n80', 'outlier_spectra', 'outlier_structures'};   % plans read cfg.fs, cfg.ode_solver
+OPT_IN_PLAN2 = {'concept_examples', 'uncoupled_reference'};   % Plan 2: plans read cfg.fs, cfg.ode_solver (the second the joint sample's way)
 OPT_IN_NO_SIM = {'frequency_response', 'eigenvalue_density'};                         % read outlier_spectra's output only
 SWEEPS = {'sensitivity', 'tau_sensitivity', 'param_space'};
 
@@ -93,7 +97,7 @@ for bundle = {'mu7chain_config', 'mu7chain_AC_config', 'mu7chain_gainbias_config
         % errored is caught by run_all_paper_analyses and would otherwise
         % pass here by being absent.
         plan = paper_stage_plan(cfg);
-        for s = intersect([PLUMBED, OWN_RATE, OPT_IN_PLUMBED, OPT_IN_NO_SIM, ...
+        for s = intersect([PLUMBED, OWN_RATE, OPT_IN_PLUMBED, OPT_IN_PLAN2, OPT_IN_NO_SIM, ...
                 {'paper_illustrations', 'mc_gain_sweep', 'noise_switch'}], plan.stages)
             assert(any(strcmp({L.stage}, s{1})), '%s: selected stage %s never ran (see FAILED in the log)', label, s{1});
         end
@@ -104,7 +108,7 @@ for bundle = {'mu7chain_config', 'mu7chain_AC_config', 'mu7chain_gainbias_config
             assert(all(ismember([OPT_IN_PLUMBED, OPT_IN_NO_SIM], plan.stages)), ...
                 '%s: the spectral stages and the 80-neuron spectrum are this bundle''s default', label);
         end
-        for k = find(ismember({L.stage}, [SWEEPS, PLUMBED, OPT_IN_PLUMBED, {'paper_illustrations', 'noise_switch'}]))
+        for k = find(ismember({L.stage}, [SWEEPS, PLUMBED, OPT_IN_PLUMBED, OPT_IN_PLAN2, {'paper_illustrations', 'noise_switch'}]))
             assert(isequal(L(k).fs, FS) && strcmp(L(k).solver, SOLVER), ...
                 '%s: %s was handed fs %s and ode_solver ''%s'', not %d and %s', ...
                 label, L(k).stage, mat2str(L(k).fs), L(k).solver, FS, SOLVER);
@@ -283,6 +287,7 @@ for name = {'run_sensitivity_analysis', 'run_tau_sensitivity_analysis', 'run_par
         'run_memory_capacity_example', 'run_paper_illustrations', 'run_mc_gain_sweep_stage', ...
         'run_noise_switch_stage', 'run_lyapunov_spectrum_n80_stage', 'run_outlier_spectra_stage', ...
         'run_frequency_response_stage', 'run_eigenvalue_density_stage', 'run_outlier_structures_stage', ...
+        'run_concept_examples_stage', 'run_uncoupled_reference_stage', ...
         'pool_restart', 'build_from_preset'}
     w = which(name{1});
     assert(strcmp(fileparts(w), stub_dir), ...
@@ -385,6 +390,13 @@ for st = {'outlier_spectra', 'outlier_structures'}
     put(d, ['run_' st{1} '_stage'], {sprintf('function out = run_%s_stage(cfg, run_dir, plan)', st{1}), ...
         sprintf('stub_log(''%s'', plan.fs, plan.ode_solver);', st{1}), 'out = ''stub'';', 'end'});
 end
+% Plan 2 (2026-11-21): concept_examples (its plan's fs and ode_solver) and
+% uncoupled_reference (the joint sample's resolved model settings). Without
+% these stubs the dry runs ran both for real at 500 neurons, six times (29 min).
+put(d, 'run_concept_examples_stage', {'function out = run_concept_examples_stage(cfg, run_dir, plan)', ...
+    'stub_log(''concept_examples'', plan.fs, plan.ode_solver);', 'out = ''stub'';', 'end'});
+put(d, 'run_uncoupled_reference_stage', {'function out = run_uncoupled_reference_stage(cfg, run_dir, plan)', ...
+    'stub_log(''uncoupled_reference'', plan.ctx.model_defaults.fs, plan.ctx.model_defaults.ode_solver);', 'out = ''stub'';', 'end'});
 for st = {'frequency_response', 'eigenvalue_density'}
     put(d, ['run_' st{1} '_stage'], {sprintf('function out = run_%s_stage(cfg, run_dir, plan)', st{1}), ...
         sprintf('stub_log(''%s'', [], '''');', st{1}), 'out = ''stub'';', 'end'});

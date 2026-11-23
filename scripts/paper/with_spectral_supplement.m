@@ -45,8 +45,10 @@ function cfg = with_spectral_supplement(cfg)
 %     (paper_stage_names), since an empty selection never runs an opt-in
 %     stage. The two reading stages' plans refuse a bundle that names them
 %     without outlier_spectra, so the stages are added together.
-%   * appends the figure entries of PARTS to cfg.figures, none in_paper
-%     (Tom has not chosen among them; the plan's section 2: supplementary
+%   * appends the figure entries of PARTS to cfg.figures, all 'appendix'
+%     (until the supplementary composites of Plan 2 are wired in, which
+%     reuse them as panels; earlier: none in_paper, the plan's section 2:
+%     supplementary
 %     candidates). The density figures are made for two networks: the
 %     reference under the function's own name, and E-to-E x 1.5 (the
 %     network outlier_spectra's index calls 'EEx1p5') under that name with
@@ -56,6 +58,17 @@ function cfg = with_spectral_supplement(cfg)
 %     conditions): at 'essential' the four-condition set draws product MTS,
 %     which that stage does not run, and an entry's own args override the
 %     bundle-wide list (as the single-neuron entry's do).
+%   * then the COMPOSITES of the figure plan that read these stages (Plan 2,
+%     integration, 2026-11-21; COMPOSITES below), each with the same
+%     conditions rule, and each only when cfg.stages names every stage it
+%     reads (so 'essential', which skips transient_gain, has no Figure 6):
+%       fig_main5_grouped   main        fig_main5_mechanism (outlier_spectra)
+%       fig_main6_grouped   main        fig_main6_amplification
+%                                       (frequency_response; transient_gain
+%                                       and eig_heatmap of the same run)
+%       fig_supp6_grouped   supplement  eigenvalue_density
+%       fig_supp7_grouped   supplement  outlier_spectra, outlier_structures
+%       fig_supp8_grouped   supplement  frequency_response
 %
 % TO ADD A STAGE OR FIGURES: a row of PARTS. A new stage is a row with its
 % name, its entries and the plan that says which conditions it simulates
@@ -145,7 +158,34 @@ for p = 1:size(PARTS, 1)
     for k = 1:size(entries, 1)
         args = entries{k, 3};
         if entries{k, 4} && ~isempty(draws); args = [args, {'conditions', draws}]; end %#ok<AGROW>
-        cfg.figures{end + 1} = struct('name', entries{k, 1}, 'fn', entries{k, 2}, 'in_paper', false, 'args', {args});
+        cfg.figures{end + 1} = paper_figure_entry(entries{k, 1}, entries{k, 2}, 'appendix', args);
     end
+end
+
+%% The composites of the figure plan that read these stages
+% {name, function, group, args, the stages it reads}. Conditions as above,
+% from outlier_spectra's plan (every composite here draws its runs, or
+% runs made at its calibration states).
+COMPOSITES = { ...
+    'fig_main5_grouped', @fig_main5_mechanism,     'main',       {'fig_tag', 'Fig_Main5_Grouped'}, {'outlier_spectra'}; ...
+    'fig_main6_grouped', @fig_main6_amplification, 'main',       {'fig_tag', 'Fig_Main6_Grouped'}, ...
+        {'frequency_response', 'transient_gain', 'eig_heatmap'}; ...
+    'fig_supp6_grouped', @fig_supp6_grouped,       'supplement', {}, {'eigenvalue_density'}; ...
+    'fig_supp7_grouped', @fig_supp7_grouped,       'supplement', {}, {'outlier_spectra', 'outlier_structures'}; ...
+    'fig_supp8_grouped', @fig_supp8_grouped,       'supplement', {}, {'frequency_response'}};
+already = intersect(COMPOSITES(:, 1), names);
+if ~isempty(already)
+    error('with_spectral_supplement:AlreadyAdded', 'cfg.figures already holds %s.', strjoin(already, ', '));
+end
+draws = {};
+if has_conditions
+    plan = outlier_spectra_stage_plan(cfg);
+    draws = intersect(cfg.conditions, plan.conditions, 'stable');
+end
+for k = 1:size(COMPOSITES, 1)
+    if ~all(ismember(COMPOSITES{k, 5}, cfg.stages)); continue; end
+    args = COMPOSITES{k, 4};
+    if ~isempty(draws); args = [args, {'conditions', draws}]; end %#ok<AGROW>
+    cfg.figures{end + 1} = paper_figure_entry(COMPOSITES{k, 1}, COMPOSITES{k, 2}, COMPOSITES{k, 3}, args);
 end
 end

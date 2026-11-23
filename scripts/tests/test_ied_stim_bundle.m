@@ -1,19 +1,27 @@
-% TEST_IED_STIM_BUNDLE The ied_stim bundle's registry and guards (FD-031 items 4, 5, 14). No simulation.
+% TEST_IED_STIM_BUNDLE The ied_stim bundle's registry and guards (FD-031 items 4, 5, 14; Plan 2). No simulation.
 %
 % Fails if a registered figure of the IED stimulation run is removed (the
-% model source figure, the standalone rate figure, the supplementary
-% state-change figure, Fig 8), if Fig 8 stops reading the run's own model
-% figure or the one clinical setting, if fs leaves 500 Hz for new runs, or
-% if the run-folder guards stop refusing a mismatched folder.
+% model source figure, the standalone rate figure, the state-change
+% figure, the old and the new Figure 8, S10, the appendix figures of
+% burst_mode and the network mode), if a figure's group changes (Figure 8
+% main, S10 supplement, the rest appendix), if Figure 8 stops reading the
+% run's own model figure or the one clinical setting, if a figure of the
+% bundle reads another bundle's run (burst_mode is this bundle's, in its
+% own run directory: Plan 2, integration), if the burst_mode stage's config
+% leaves this bundle's rate and the paper's integrator, if fs leaves
+% 500 Hz for new runs, or if the run-folder guards stop refusing a
+% mismatched folder.
 
 % ---- registry -------------------------------------------------------------
-want = {'fig_ied_stim_blocks', 'fig_ied_stim_blocks_rate', ...
-        'fig_ied_stim_blocks_supp_state', 'Fig_Stim_Combined'};
+want = {'fig_ied_stim_blocks', 'fig_ied_stim_blocks_rate', 'fig_ied_stim_blocks_supp_state', ...
+        'Fig_Stim_Combined', 'Fig_Main8_Stim', 'fig_supp10_grouped', 'fig_burst_mode', 'fig_ied_network_mode'};
+groups = {'appendix', 'appendix', 'appendix', 'appendix', 'main', 'supplement', 'appendix', 'appendix'};
 for mode = {'essential', 'fast', 'production', 'stim_blocks_20261117'}
     cfg = ied_stim_config(mode{1});
     F = [cfg.figures{:}]; names = {F.name};
     assert(isequal(names, want), 'registry of %s: %s', mode{1}, strjoin(names, ', '));
-    assert(F(3).in_paper && F(4).in_paper, 'supplement and Fig 8 must be in_paper');
+    assert(isequal({F.group}, groups) && isequal([F.in_paper], ismember(groups, {'main', 'supplement'})), ...
+        '%s: Figure 8 is main, S10 supplement, the rest appendix', mode{1});
     a = struct(F(4).args{:});
     assert(strcmp(a.model_fig, fullfile(cfg.fig_root, 'fig_ied_stim_blocks', 'fig_ied_stim_blocks.fig')), ...
         'Fig 8 must read the run''s own model figure');
@@ -22,7 +30,25 @@ for mode = {'essential', 'fast', 'production', 'stim_blocks_20261117'}
     assert(contains(cfg.fig_root, fullfile('figs', 'IED_model', cfg.run_name)));
     w = cellfun(@(e) e.args{2}, cfg.figures(1:3), 'UniformOutput', false);
     assert(isequal(w, {'main', 'rate', 'supp_state'}));
+    a5 = struct(F(5).args{:});
+    assert(isequal(rmfield(a5, {'burst_mode_dir', 'tag'}), a), 'new Fig 8 reads the same model and clinical sources');
+    assert(strcmp(a5.tag, 'Fig_Main8_Stim'));
+    % Self-contained: burst_mode is in this bundle's run directory.
+    assert(strcmp(cfg.burst_mode_dir, cfg.run_dir) && strcmp(a5.burst_mode_dir, cfg.run_dir), ...
+        '%s: Figure 8 A to C must read this bundle''s run directory', mode{1});
+    a6 = struct(F(6).args{:}); a7 = struct(F(7).args{:});
+    assert(strcmp(a6.ied_run_dir, cfg.run_dir) && strcmp(a6.burst_dir, cfg.run_dir) && strcmp(a7.burst_dir, cfg.run_dir), ...
+        '%s: S10 and fig_burst_mode must read this bundle''s run directory', mode{1});
+    bm = burst_mode_stage_plan(cfg.burst_mode_stage);
+    assert(bm.fs == cfg.sim.fs && strcmp(bm.ode_solver, 'sra1') && strcmp(bm.folder, 'burst_mode'), ...
+        '%s: the burst_mode stage runs at the bundle''s rate with SRA1', mode{1});
+    ied_network_mode_stage_plan(cfg);                % every mode has a size
 end
+assert(burst_mode_stage_plan(ied_stim_config('essential').burst_mode_stage).n_seeds == 3 && ...
+    burst_mode_stage_plan(ied_stim_config('fast').burst_mode_stage).n_seeds == 9);
+c = ied_stim_config('fast', 'burst_mode_dir', 'X:/paper_run');
+a = struct(c.figures{5}.args{:});
+assert(strcmp(a.burst_mode_dir, 'X:/paper_run'), 'burst_mode_dir override must reach the new Fig 8');
 assert(endsWith(ied_stim_config().clinical_dir, 'manuscript_stim/tica_awake_best'), ...
     'clinical default is tica_awake_best (Tom, 2026-11-17)');
 c = ied_stim_config('fast', 'clinical_dir', 'X:/elsewhere');

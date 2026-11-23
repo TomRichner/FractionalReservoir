@@ -36,6 +36,7 @@ arguments
     cfg.data_file   (1,:) char    = ''
     cfg.out_dir     (1,:) char    = ''
     cfg.save        (1,1) logical = true
+    cfg.images      (1,1) logical = true    % false with save: write the _table.md only (the composite figures)
     cfg.visible     (1,1) logical = true
     cfg.run_dir     (1,:) char    = ''
     cfg.preset_name (1,:) char    = ''    % unused
@@ -54,10 +55,10 @@ ax_style = {'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'Tick
 mrow = @(r, M, name) mean(r.(M)(strcmp(r.measure_names, name), :), 'omitnan');
 band_lbl = sprintf('%g to 0 s^{-1}', -S.band / S.tau_d);
 panels = { ...
-    @(r) mrow(r, 'm_M', 'shell') / uniform_shell, @(r) mrow(r, 'm_theory', 'shell') / uniform_shell, 'rim occupancy / uniform disk'; ...
-    @(r) mrow(r, 'm_M', 'n_band'),                @(r) mrow(r, 'm_uniform', 'n_band'),               ['eigenvalues, ' band_lbl]; ...
-    @(r) mrow(r, 'm_M', 'n_unstable'),            @(r) mean(r.full.n_unstable),                     'eigenvalues above 0'; ...
-    @(r) mean(r.full.n_band_x),                   @(r) NaN,                                         ['full Jacobian, ' band_lbl]};
+    @(r) mrow(r, 'm_M', 'shell') / uniform_shell, @(r) mrow(r, 'm_theory', 'shell') / uniform_shell, 'Rim occupancy / uniform disk'; ...
+    @(r) mrow(r, 'm_M', 'n_band'),                @(r) mrow(r, 'm_uniform', 'n_band'),               ['Eigenvalues, ' band_lbl]; ...
+    @(r) mrow(r, 'm_M', 'n_unstable'),            @(r) mean(r.full.n_unstable),                     'Eigenvalues above 0'; ...
+    @(r) mean(r.full.n_band_x),                   @(r) NaN,                                         ['Full Jacobian, ' band_lbl]};
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Visible', vis, 'Color', 'w', 'Units', 'centimeters', 'Position', [2 2 34 11]);
@@ -91,7 +92,7 @@ runs = [F.by_cond{:}];
 rows = arrayfun(@(r) table_row(r, uniform_shell), runs, 'UniformOutput', false);
 out = struct('figs', fig, 'files', {{}}, 'source', F.file);
 if cfg.save
-    save_figure_stable(out_dir, fig_tag, fig);
+    if cfg.images; save_figure_stable(out_dir, fig_tag, fig); end
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
     fid = fopen(fullfile(out_dir, table_name), 'w');

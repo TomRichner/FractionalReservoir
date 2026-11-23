@@ -26,16 +26,22 @@
 %   * the bundle's defaults of FD-046, in every mode: the four spectral
 %     stages (outlier_spectra, frequency_response, eigenvalue_density,
 %     outlier_structures) after lyapunov_spectrum_n80, their plans accept
-%     the bundle, their figure entries are appended (none in_paper; the
+%     the bundle, their figure entries are appended (all 'appendix'; the
 %     density figures also for EEx1p5; fig_ostruct_plane once per group;
 %     the conditions the entry's stage simulates), outlier_spectra gives
 %     'reference' and 'EEx1p5' the dense pass that three of its figures
 %     need, and Figure 3 is
 %     the switching version: fig_main3_grouped (in_paper) is the four-row
-%     switching composite, the baseline composite is
-%     fig_main3_grouped_baseline (not in_paper), K = 100 and 40 states from
-%     1 s; the A + C bundle inherits all of it; the regression bundle gets
-%     none of it.
+%     switching composite without the Ritz overlay, followed by
+%     fig_main3_grouped_ritz (the same with the overlay and inset,
+%     'appendix') and the baseline composite fig_main3_grouped_baseline
+%     ('appendix'), K = 150 and 40 states from 1 s; the A + C bundle
+%     inherits all of it; the regression bundle gets none of it;
+%   * Plan 2 (2026-11-21): the opt-in stages concept_examples and
+%     uncoupled_reference follow lyapunov_spectrum_n80 in every mode; the
+%     paper's main Figures 1 to 6 and S1 to S8 are registered with the
+%     functions of the figure plan (Figures 7, 8, S9, S10 are in the AC and
+%     stimulation bundles; test_paper_figure_groups counts them).
 %
 % Asserts; silent until it throws, then prints one PASS line.
 % See also: mu7chain_config, mu7chain_run, test_preset_conditions
@@ -75,8 +81,9 @@ assert(threw, 'an unknown run mode must be refused');
 % four spectral stages (FD-046, with_spectral_supplement).
 spectral = {'outlier_spectra', 'frequency_response', 'eigenvalue_density', 'outlier_structures'};
 n_spec = numel(spectral);
+plan2_stages = {'concept_examples', 'uncoupled_reference'};   % Plan 2, every mode
 for k = {cfg3, cfg4, cfg_med}
-    assert(isequal(k{1}.stages, [paper_stage_names(), {'lyapunov_spectrum_n80'}, spectral]) && ...
+    assert(isequal(k{1}.stages, [paper_stage_names(), {'lyapunov_spectrum_n80'}, plan2_stages, spectral]) && ...
         isempty(k{1}.sweeps) && isempty(k{1}.eig_heatmap_examples));
 end
 % FD-030: the conditions SIMULATED and the sets DRAWN, by mode. Every mode
@@ -127,13 +134,31 @@ for c = {cfg3, cfg4}
     k = c{1};
     names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
     assert(numel(unique(names)) == numel(names), 'duplicate registry entry');
-    grouped = k.figures(startsWith(names, 'fig_main') & endsWith(names, '_grouped'));
-    assert(numel(grouped) == 6);   % groups 1-6; the 7 and 8 placeholders are out (FD-031 item 3)
-    for g = 1:numel(grouped)
-        a = grouped{g}.args;
-        src = a{find(strcmp(a(1:2:end), 'source_fig_root')) * 2};
+    % The paper's main Figures 1 to 6 and S1 to S8, with the functions of
+    % the figure plan (Plan 2); Figure 7 and S9 are the A + C bundle's.
+    want = {'fig_main1_grouped', 'fig_main1_concept_networks'; 'fig_main2_grouped', 'fig_main2_grouped'; ...
+        'fig_main3_grouped', 'fig_main3_grouped'; 'fig_main4_grouped', 'fig_main4_connectivity'; ...
+        'fig_main5_grouped', 'fig_main5_mechanism'; 'fig_main6_grouped', 'fig_main6_amplification'; ...
+        'fig_supp1_grouped', 'fig_supp1_grouped'; 'fig_supp2_grouped', 'fig_supp2_grouped'; ...
+        'fig_supp3_grouped', 'fig_supp3_connectivity_gallery'; 'fig_supp4_grouped', 'fig_supp4_grouped'; ...
+        'fig_supp5_grouped', 'fig_supp5_grouped'; 'fig_supp6_grouped', 'fig_supp6_grouped'; ...
+        'fig_supp7_grouped', 'fig_supp7_grouped'; 'fig_supp8_grouped', 'fig_supp8_grouped'};
+    for w = 1:size(want, 1)
+        e = k.figures(strcmp(names, want{w, 1}));
+        group = 'supplement';
+        if startsWith(want{w, 1}, 'fig_main'); group = 'main'; end
+        assert(isscalar(e) && strcmp(func2str(e{1}.fn), want{w, 2}) && strcmp(e{1}.group, group), ...
+            '%s: %s', k.fig_root, want{w, 1});
+    end
+    assert(~any(ismember({'fig_main7_grouped', 'fig_supp9_grouped'}, names)), 'Figure 7 and S9 are the A + C bundle''s');
+    % Every entry that reads source figures reads them from its own set's root.
+    for g = 1:numel(k.figures)
+        a = k.figures{g}.args;
+        at = find(strcmp(a(1:2:end), 'source_fig_root'));
+        if isempty(at); continue; end
+        src = a{at * 2};
         assert(strcmp(src, k.fig_root), '%s reads %s, not its own %s', ...
-            grouped{g}.name, src, k.fig_root);
+            k.figures{g}.name, src, k.fig_root);
     end
 end
 % The same registry as the manuscript bundle's, entry for entry, plus the
@@ -144,15 +169,18 @@ end
 ref_cfg = mu7revisedMedium_config();
 % (FD-046) Also the spectral supplement's entries, the switching Figure 3's
 % stand-alone versions and the baseline composite kept beside it.
+% (Plan 2) And the composites that read the spectral stages, and the
+% appendix version of Figure 3 with the Ritz overlay.
 chain_only = {'fig_std_1TS_vs_MTS', 'fig_lyapunov_ranked_spectrum', 'fig_eig_real_histogram', ...
-    'fig_eig_heatmap_switch', 'fig_eig_real_histogram_switch', 'fig_main3_grouped_baseline'};
+    'fig_eig_heatmap_switch', 'fig_eig_real_histogram_switch', 'fig_main3_grouped_ritz', 'fig_main3_grouped_baseline', ...
+    'fig_main5_grouped', 'fig_main6_grouped', 'fig_supp6_grouped', 'fig_supp7_grouped', 'fig_supp8_grouped'};
 chain_only = [chain_only, spectral_entry_names()];
 for c = {cfg3, cfg4}
     nm = cellfun(@(f) f.name, c{1}.figures, 'UniformOutput', false);
     assert(isequal(nm(~ismember(nm, chain_only)), ...
                    cellfun(@(f) f.name, ref_cfg.figures, 'UniformOutput', false)));
     e = c{1}.figures{strcmp(nm, 'fig_std_1TS_vs_MTS')};
-    assert(e.in_paper && isequal(e.args, {'preset_name', main_name}));
+    assert(strcmp(e.group, 'appendix') && ~e.in_paper && isequal(e.args, {'preset_name', main_name}));   % a panel of S1 (Plan 2)
 end
 
 % FD-016: a fixed sample seed, valid for run_all_paper_analyses.
@@ -175,7 +203,8 @@ for m = run_mode_names()
             % plans accept the bundle (the reading stages refuse a bundle
             % without outlier_spectra).
             i80 = find(strcmp(k.stages, 'lyapunov_spectrum_n80'));
-            assert(isscalar(i80) && isequal(k.stages(i80 + 1:i80 + n_spec), spectral), '%s: the stages', tag);
+            assert(isscalar(i80) && isequal(k.stages(i80 + 1:i80 + 2), plan2_stages) && ...
+                isequal(k.stages(i80 + 3:i80 + 2 + n_spec), spectral), '%s: the stages', tag);
             assert(isequal(paper_stage_plan(k).stages(end - (n_spec - 1) - 2 * ac:end - 2 * ac), spectral), '%s: run order', tag);
             pl = outlier_spectra_stage_plan(k);
             frequency_response_stage_plan(k); eigenvalue_density_stage_plan(k);
@@ -195,7 +224,7 @@ for m = run_mode_names()
             assert(all(present) && all(diff(at) == 1), '%s: the spectral entries, in order', tag);
             for e = k.figures(at)
                 f = e{1};
-                assert(~f.in_paper && isa(f.fn, 'function_handle'), '%s: %s', tag, f.name);
+                assert(~f.in_paper && strcmp(f.group, 'appendix') && isa(f.fn, 'function_handle'), '%s: %s', tag, f.name);
                 a = f.args;
                 if strcmp(f.name, 'fig_eigdens_theory_check')
                     assert(isempty(a), '%s: %s args', tag, f.name);
@@ -216,22 +245,30 @@ for m = run_mode_names()
                 end
             end
             % Figure 3: the switching composite under the paper's name; the
-            % baseline beside it; K = 100 and 40 states at 1, 2, ..., 40 s.
+            % baseline beside it; K = 150 and 40 states at 1, 2, ..., 40 s.
             m3 = k.figures{strcmp(names, 'fig_main3_grouped')};
+            r3 = k.figures{strcmp(names, 'fig_main3_grouped_ritz')};
             b3 = k.figures{strcmp(names, 'fig_main3_grouped_baseline')};
-            assert(m3.in_paper && ~b3.in_paper && isequal(m3.fn, b3.fn) && ...
-                find(strcmp(names, 'fig_main3_grouped_baseline')) == find(strcmp(names, 'fig_main3_grouped')) + 1, '%s: Figure 3 entries', tag);
-            % The registry names both files (fig_tag): the paper's composite
+            i3 = find(strcmp(names, 'fig_main3_grouped'));
+            assert(m3.in_paper && strcmp(m3.group, 'main') && ~b3.in_paper && strcmp(b3.group, 'appendix') && ...
+                ~r3.in_paper && strcmp(r3.group, 'appendix') && isequal(m3.fn, b3.fn) && isequal(m3.fn, r3.fn) && ...
+                find(strcmp(names, 'fig_main3_grouped_ritz')) == i3 + 1 && ...
+                find(strcmp(names, 'fig_main3_grouped_baseline')) == i3 + 2, '%s: Figure 3 entries', tag);
+            % The registry names the files (fig_tag): the paper's composite
             % is Fig_Main3_Grouped.png, the name FD-031 gave Figure 3 and the
-            % manuscript's figure_sources.json points at; the baseline
-            % (FD-031's layout on the eig_heatmap run) has a name of its own.
+            % manuscript's figure_sources.json points at, WITHOUT the Ritz
+            % overlay (the figure plan of 2026-11-21); the version with it is
+            % Fig_Main3_Grouped_ritz; the baseline (FD-031's layout on the
+            % eig_heatmap run) has a name of its own.
             assert(isequal(b3.args(end - 1:end), {'fig_tag', 'Fig_Main3_Grouped_baseline'}) && ...
-                isequal(m3.args, [b3.args(1:end - 2), {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset', true, ...
-                'show_lambda_row', false, 'real_histogram_row', true, 'fig_tag', 'Fig_Main3_Grouped'}]), ...
+                isequal(m3.args, [b3.args(1:end - 2), {'spectra_source', 'local_lyapunov', ...
+                'show_lambda_row', false, 'real_histogram_row', true, 'fig_tag', 'Fig_Main3_Grouped'}]) && ...
+                isequal(r3.args, [b3.args(1:end - 2), {'spectra_source', 'local_lyapunov', 'ritz_overlay', true, 'ritz_inset', true, ...
+                'show_lambda_row', false, 'real_histogram_row', true, 'fig_tag', 'Fig_Main3_Grouped_ritz'}]), ...
                 '%s: the four-row switching composite', tag);
             assert(~any(ismember({'fig_main3_grouped_switch', 'fig_main3_grouped_switch_hist'}, names)) && ...
                 all(ismember({'fig_eig_heatmap_switch', 'fig_eig_real_histogram_switch'}, names)), '%s: switching versions', tag);
-            assert(k.local_lyapunov_K == 100 && k.local_lyapunov_spectra_n_samples == 40 && ...
+            assert(k.local_lyapunov_K == 150 && k.local_lyapunov_spectra_n_samples == 40 && ...
                 k.local_lyapunov_spectra_start_s == 1 && k.local_lyapunov_accumulation_start_s == 0 && ...
                 k.local_lyapunov_warmup_s == 10 && k.local_lyapunov_simulation_start_s == -15, '%s: the timing', tag);
         end
@@ -332,7 +369,7 @@ assert(isequal(st.condition_color('sfa3_std2'), [0 0.7 0]));
 assert(isequal(st.condition_color('sfa3_stdc2'), [0.000 0.447 0.698]));
 assert(strcmp(st.condition_short('sfa3_stdc2'), 'SFA+STD'));
 assert(strcmp(st.condition_short('sfa3_std2'), 'SFA+prodSTD'));
-assert(strcmp(st.condition_title('sfa3_stdc2'), 'Multiple-Timescale Adaptation'));
+assert(strcmp(st.condition_title('sfa3_stdc2'), 'Multiple-timescale adaptation'));
 % The four drawn colours are distinct, and so are the titles.
 cols = cell2mat(cellfun(@(n) st.condition_color(n), four_names, 'UniformOutput', false)');
 assert(size(unique(cols, 'rows'), 1) == 4);

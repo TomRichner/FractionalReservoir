@@ -70,7 +70,18 @@ function results = make_all_paper_figures(cfg)
 % manifest (conditions_run, FD-030); a cfg.conditions naming any other is
 % refused before anything is drawn (make_all_paper_figures:ConditionsNotRun).
 %
-% See also: paper_config, run_all_paper_analyses, resolve_run_dir, select_conditions
+% THE THREE GROUPS (Plan 2, package A, 2026-11-21). Each entry of a paper
+% bundle carries a group, 'main', 'supplement' or 'appendix'
+% (paper_figure_entry; the groups and their limits are paper_figure_groups).
+% When every entry of the registry has one, the pass writes
+% <fig_root>/figure_groups.md (per group: the entries drawn with their
+% files, and what failed, against the group's limit) and its summary line
+% counts by group ('main 8/8, supplement 0/0, appendix 51/55') in place of
+% the in-paper count. A registry without groups (the regression bundle and
+% the older bundles) gets neither, so its output is as before.
+%
+% See also: paper_config, run_all_paper_analyses, resolve_run_dir, select_conditions,
+%           paper_figure_groups, paper_figure_entry
 
 arguments
     cfg = paper_config()
@@ -335,6 +346,24 @@ catch ME
         'Could not write the manifest: %s', ME.message);
 end
 
+%% The three groups: figure_groups.md (Plan 2, package A, 2026-11-21)
+% For a paper bundle, whose every entry carries a group (paper_figure_entry):
+% per group, the entries drawn, their files and what failed, against the
+% group's limit (paper_figure_groups). A registry without groups (the
+% regression bundle, the older bundles) writes nothing here and prints the
+% summary line it always did, so its output is unchanged. After a partial
+% pass the results are the whole set (merged above), so the file is too.
+grouped = is_grouped_registry(cfg.figures);
+if grouped
+    result_groups = groups_of_results(results, cfg.figures);
+    try
+        write_figure_groups(fig_root, cfg, results, result_groups, partial);
+    catch ME
+        warning('make_all_paper_figures:GroupsFailed', ...
+            'Could not write figure_groups.md: %s', ME.message);
+    end
+end
+
 %% The scrollable report, last
 % report.md links every PNG under fig_root in explorer order, and report.pdf is
 % pandoc's render of it. AFTER the manifest, because the report echoes the
@@ -354,8 +383,14 @@ n_paper = sum([results.in_paper]);
 n_paper_ok = sum([results.ok] & [results.in_paper]);
 
 vprintf(verbose, 'verbose', '\n========================================================\n');
-vprintf(verbose, 'near-none', 'PAPER FIGURES COMPLETE in %.1f min: %d/%d succeeded (%d/%d in-paper), output %s\n', ...
-    toc(t_all)/60, n_ok, numel(results), n_paper_ok, n_paper, fig_root);
+if grouped
+    % The counts by group: drawn/registered for each, against its limit.
+    vprintf(verbose, 'near-none', 'PAPER FIGURES COMPLETE in %.1f min: %d/%d succeeded (%s), output %s\n', ...
+        toc(t_all)/60, n_ok, numel(results), group_counts_text(results, result_groups), fig_root);
+else
+    vprintf(verbose, 'near-none', 'PAPER FIGURES COMPLETE in %.1f min: %d/%d succeeded (%d/%d in-paper), output %s\n', ...
+        toc(t_all)/60, n_ok, numel(results), n_paper_ok, n_paper, fig_root);
+end
 if partial
     vprintf(verbose, 'minimal', '  (a partial pass: %d entr%s drawn now, the other rows are the earlier manifest''s)\n', ...
         n, plural_y(n));
@@ -524,4 +559,103 @@ for k = 1:numel(h)
         close(h(k));
     end
 end
+end
+
+%% ------------------------------------------------------------------------
+%% The three groups (Plan 2, package A). paper_figure_groups names them and
+%% their limits; nothing below lists a group.
+function tf = is_grouped_registry(figures)
+% True when every registry entry carries a group (a paper bundle).
+tf = ~isempty(figures) && all(cellfun(@(f) isfield(f, 'group') && ~isempty(f.group), figures));
+end
+
+function g = groups_of_results(results, figures)
+% The group of each result row, from the registry entry of the same name; a
+% row the registry no longer holds (kept from an earlier manifest after a
+% partial pass) is '' and reported as such.
+names = cellfun(@(f) f.name, figures, 'UniformOutput', false);
+groups = cellfun(@(f) f.group, figures, 'UniformOutput', false);
+g = repmat({''}, 1, numel(results));
+for k = 1:numel(results)
+    i = find(strcmp(names, results(k).name), 1);
+    if ~isempty(i); g{k} = groups{i}; end
+end
+end
+
+function s = group_counts_text(results, result_groups)
+% 'main 6/6, supplement 0/0, appendix 48/51': drawn/registered per group.
+G = paper_figure_groups();
+parts = cell(1, numel(G));
+for j = 1:numel(G)
+    in = strcmp(result_groups, G(j).name);
+    parts{j} = sprintf('%s %d/%d', G(j).name, nnz([results(in).ok]), nnz(in));
+end
+s = strjoin(parts, ', ');
+end
+
+function write_figure_groups(fig_root, cfg, results, result_groups, partial)
+% <fig_root>/figure_groups.md: per group (paper_figure_groups), the entries
+% drawn with their files, and the ones that failed with the error, against
+% the group's limit. The limit is the paper's, counted over the bundles that
+% make it (test_paper_figure_groups guards that); a bundle alone can be over
+% it only if the registry is wrong, which the file says.
+G = paper_figure_groups();
+f = fullfile(fig_root, 'figure_groups.md');
+fid = fopen(f, 'w');
+assert(fid > 0, 'make_all_paper_figures:GroupsFile', 'Cannot write %s.', f);
+closer = onCleanup(@() fclose(fid));
+fprintf(fid, '# Figure groups\n\n');
+fprintf(fid, 'Generated %s by `make_all_paper_figures`', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm')));
+if partial; fprintf(fid, ' (after a partial pass: rows not redrawn are the earlier manifest''s)'); end
+fprintf(fid, '.\n\n');
+meta = {'preset_name', 'run_mode', 'figure_set'};
+for m = meta
+    if isfield(cfg, m{1}) && ~isempty(cfg.(m{1}))
+        fprintf(fid, '- %s: `%s`\n', m{1}, cfg.(m{1}));
+    end
+end
+fprintf(fid, ['\nGroups and limits from `paper_figure_groups` (the figure plan, Tom, 2026-11-21). ' ...
+    'A limit is the paper''s, over every bundle that makes it; `test_paper_figure_groups` checks it.\n\n']);
+fprintf(fid, '| Group | Limit | Registered | Drawn | Failed |\n|---|---|---|---|---|\n');
+for j = 1:numel(G)
+    in = strcmp(result_groups, G(j).name);
+    fprintf(fid, '| %s | %s | %d | %d | %d |\n', G(j).name, limit_text(G(j).limit), nnz(in), ...
+        nnz([results(in).ok]), nnz(in) - nnz([results(in).ok]));
+end
+orphan = cellfun(@isempty, result_groups);
+if any(orphan)
+    fprintf(fid, '| (not in the registry) | | %d | %d | %d |\n', nnz(orphan), ...
+        nnz([results(orphan).ok]), nnz(orphan) - nnz([results(orphan).ok]));
+end
+for j = 1:numel(G)
+    in = find(strcmp(result_groups, G(j).name));
+    fprintf(fid, '\n## %s (%d', G(j).title, numel(in));
+    if isfinite(G(j).limit); fprintf(fid, ' of at most %d', G(j).limit); end
+    fprintf(fid, ')\n\n');
+    if isfinite(G(j).limit) && numel(in) > G(j).limit
+        fprintf(fid, '**Over the limit in this bundle alone.**\n\n');
+    end
+    if isempty(in); fprintf(fid, 'None registered.\n'); continue; end
+    fprintf(fid, '| Entry | Result | Files |\n|---|---|---|\n');
+    for k = in
+        r = results(k);
+        if r.ok
+            files = strjoin(strcat('`', r.name, '/', r.files, '`'), ', ');
+            fprintf(fid, '| `%s` | drawn | %s |\n', r.name, files);
+        else
+            fprintf(fid, '| `%s` | **failed** | %s |\n', r.name, md_cell(r.err));
+        end
+    end
+end
+end
+
+function s = limit_text(limit)
+if isfinite(limit); s = sprintf('%d', limit); else; s = 'none'; end
+end
+
+function s = md_cell(t)
+% One line of text for a markdown table cell.
+s = regexprep(char(t), '\s+', ' ');
+s = strrep(s, '|', '\|');
+if numel(s) > 300; s = [s(1:297) '...']; end
 end
