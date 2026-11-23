@@ -63,21 +63,23 @@ end
 
 function out = build(cfg, out_dir)
 
-[f_plane, t_plane, o_plane] = composite_part(@fig_outlier_plane, cfg, 'networks', cfg.networks, 'seed', cfg.seed);
-[f_dose, t_dose] = composite_part(@fig_outlier_dose, cfg);
-% The common canvas (Plan 2, canvas standard; manuscript_style canvas_w):
-% both blocks scaled to its width less the margins. Only positions scale;
-% the type is set by role below (canvas_type).
+% The common canvas (Plan 2, canvas standard; manuscript_style canvas_w).
+% Both source figures are DRAWN at the width of their block (fig_w), so
+% nothing is scaled when they are copied: the layout is the one made for
+% this width, not a larger one shrunk (Plan 3, Figure 5 note 1).
 st = manuscript_style();
-margin = [0.15 0.15 -0.2 0.15];
+margin = [0.15 0.1 -0.31 0.1];
 width = st.canvas_w - margin(1) - margin(2);
+[f_plane, t_plane, o_plane] = composite_part(@fig_outlier_plane, cfg, 'networks', cfg.networks, 'seed', cfg.seed, ...
+    'fig_w', width);
+[f_dose, t_dose] = composite_part(@fig_outlier_dose, cfg, 'fig_w', width);
 [fig, B] = composite_figure({struct('fig', f_plane, 'width', width), struct('fig', f_dose, 'width', width)}, ...
-    'visible', cfg.visible, 'margin', margin, 'width', st.canvas_w);
+    'visible', cfg.visible, 'margin', margin, 'width', st.canvas_w, 'row_gap', 0.12);
 % (A) at the height of the condition titles, beside the first panel: the
-% plane figure keeps half an inch for its titles above the panels, and a
-% letter in the strip above that sat far from the panel (polish list,
-% 2026-11-22). The top margin is taken back by as much.
-composite_letter(fig, B{1}(1), 'A', 'dy', -0.36);
+% plane figure keeps room for its titles above the panels, and a letter in
+% the strip above that sat far from the panel (polish list, 2026-11-22). The
+% top margin takes the strip back.
+composite_letter(fig, B{1}(1), 'A', 'dy', -0.27);
 dose_ax = B{2}(1).ax;
 letters = 'BCD';
 for k = 1:min(3, numel(dose_ax))
@@ -104,5 +106,7 @@ end
 
 function ex = main5_type_exceptions()
 % The type that may differ from its role's size (canvas_audit), with why.
-ex = {'^[EI] \| axes fig_outlier_plane_inset', 'E and I marks inside the response-curve insets (inset_mark_fs): at 14 pt they cover the points they label'};
+% None since Plan 3: the insets are large enough for the E and I marks at
+% tick_fs (they were 11 pt, the one exception, while the insets were small).
+ex = cell(0, 2);
 end
