@@ -270,9 +270,20 @@ if cfg.save
     % canvas with small type and the .fig was saved at that size. Not
     % reproduced at the start of the session; the cause was not found. Detect
     % the resize, restore the size and export again.
+    % Figures 2 and 3 (groups 2, 3) are exported as the composites are
+    % (save_some_figs_to_folder_2's png_resolution): 600 dpi, lowered so the
+    % longer side stays within 4000 px, and an SVG beside the PNG (Plan 3 fix
+    % X1: they came out at a fixed 200 dpi, about 1800 px wide, and with no
+    % SVG, since cfg.svg is off by default). The appendix groups keep 200 dpi.
+    res=200; want_svg=cfg.svg;
+    if ismember(group,[2 3])
+        px=getpixelposition(fig);
+        res=min(600,floor(4000*get(groot,'ScreenPixelsPerInch')/max(px(3:4))));
+        want_svg=true;
+    end
     pos=fig.Position;
     for attempt=1:3
-        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,pad{:});
+        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',res,pad{:});
         if isequal(fig.Position(3:4),pos(3:4)), break; end
         fig.Position=pos; drawnow;
         if attempt==3
@@ -281,7 +292,7 @@ if cfg.save
         end
     end
     savefig(fig,fullfile(outdir,[tag '.fig']));
-    if cfg.svg
+    if want_svg
         exportgraphics(fig,fullfile(outdir,[tag '.svg']),'ContentType','vector',pad{:});
         if ~isequal(fig.Position(3:4),pos(3:4)), fig.Position=pos; end
     end
