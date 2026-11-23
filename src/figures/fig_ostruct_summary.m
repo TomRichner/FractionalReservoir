@@ -153,7 +153,8 @@ for p = 1:3
         ylim(ax, [0 1.05]);
         ylabel(ax, {'Responsive', 'fraction'}, 'FontSize', st.label_fs);
     else
-        yline(ax, 0, '--', 'Color', 'k', 'LineWidth', 1.0);
+        % The zero line of manuscript_style (Plan 3 review: black here, green elsewhere).
+        yline(ax, 0, '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw, 'Alpha', 1, 'Layer', 'bottom');
         ylabel(ax, {'Mode rate', '(s^{-1})'}, 'FontSize', st.label_fs);
     end
     set(ax, 'XTick', 1:n_net, 'XTickLabel', {}, 'XLim', [0.4, n_net + 0.6], 'FontSize', st.tick_fs, ...

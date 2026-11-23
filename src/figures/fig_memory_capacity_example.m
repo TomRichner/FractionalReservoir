@@ -95,7 +95,8 @@ recon_name = full_adaptation_condition( ...
     cellfun(@(n) struct('name', n), condition_names, 'UniformOutput', false));
 recon_cond = find(strcmp(condition_names, recon_name), 1);
 recon_delays = [1, 5, 10, 15];  % hold-delay indices to show (labeled in seconds): 0.3, 1.5, 3.0, 4.5 s at T_hold=0.3
-recon_ylim   = [-0.6, 0.6];     % shared y-limits across all reconstruction panels
+recon_ylim   = [-0.6, 0.6];     % shared y-limits across all reconstruction panels: widened below
+                                % to the traces' own range (Plan 3 review: at +/-0.6 they were cut flat)
 line_w       = 2;               % (a)/(b) curve width (matches the reference figure)
 
 %% ==================== Combined figure ====================
@@ -153,6 +154,15 @@ recon_ax   = gobjects(1, nR);
 tl_c = tiledlayout(tl, nR, 1, 'TileSpacing', 'tight', 'Padding', 'none');
 tl_c.Layout.Tile     = 19;       % top-left tile of the (c) block (row 10, col 1)
 tl_c.Layout.TileSpan = [15 2];   % span rows 10-24 x 2 cols
+% One y range for the four panels that holds every drawn sample of target
+% and readout (in the first recon_win s), at least recon_ylim.
+for k = 1:nR
+    p = mcr.predictions(recon_delays(k));
+    t_delay = mcr.t_pred(p.t_indices);
+    in_win = t_delay <= t_delay(1) + recon_win;
+    peak = max(abs([reshape(p.y_true(in_win), [], 1); reshape(p.y_pred(in_win), [], 1)]));
+    recon_ylim = [-1 1] * max(recon_ylim(2), 1.04 * peak);
+end
 for k = 1:nR
     d = recon_delays(k);
     p = mcr.predictions(d);
@@ -193,7 +203,7 @@ for k = 1:nR
             'HorizontalAlignment', 'center', 'VerticalAlignment', 'top', ...
             'FontSize', 12, 'Clipping', 'off');
         % Amplitude label just right of the vertical bar, rotated -90 deg.
-        text(xc + 0.03 * diff(xl), (yb + ya) / 2, sprintf('%g AU', scalebar_au), ...
+        text(xc + 0.03 * diff(xl), (yb + ya) / 2, sprintf('%g a.u.', scalebar_au), ...
             'Rotation', 90, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
             'FontSize', 12, 'Clipping', 'off');
     end

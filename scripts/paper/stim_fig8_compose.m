@@ -50,12 +50,12 @@ guard = onCleanup(@() close_if(old));
 %% Geometry (inches), bottom up
 % The right column sets the height of the upper four rows: rate over
 % spectrum, the rate's condition names on one line under it, the patient
-% spectrum's tick labels only (its x label is the model spectrum's, under
-% F). G and H take what remains of canvas_max_h.
+% spectrum's tick labels and x label (each spectrum names its frequency
+% axis since the Plan 3 review). G and H take what remains of canvas_max_h.
 W = st.canvas_w;
 hR = 1.0;          % rate and spectrum axes
 gR = 0.45;         % between them: the rate panel's condition names, one line
-xlabC = 0.32;      % under C: tick labels
+xlabC = 0.58;      % under C: tick labels and the x label (Plan 3 review: C had none)
 xlabF = 0.58;      % under F: tick labels and the x label
 wR = 1.6; xR = W - 0.22 - wR;                    % right column: B, C, E, F (room right for the "100" under C and F)
 xN = 0.95;                                       % left edge of the traces (channel names left of it)
@@ -140,7 +140,7 @@ for k = [4 8]                                    % C and F
     % stimulation, green stimulation).
     if ~isempty(new_lg{k}); delete(new_lg{k}); new_lg{k} = []; end
 end
-new_ax(4).XLabel.String = '';                    % C: the frequency axis is named under F
+new_ax(4).XLabel.String = new_ax(8).XLabel.String;   % C: its own frequency name (Plan 3 review), as F
 xl = xR - 1.45;                                  % the letters of the right column, left of the two-line y labels
 letter(fig, 'A', 0.05, new_ax(1), 0.08); letter(fig, 'B', xl, new_ax(3)); letter(fig, 'C', xl, new_ax(4));
 letter(fig, 'D', 0.05, new_ax(5), 0.08); letter(fig, 'E', xl, new_ax(7)); letter(fig, 'F', xl, new_ax(8));

@@ -121,7 +121,8 @@ C = T.copy(mc_axes(3), fig, false); ax_c = C.axes;
 %% Geometry (pixels)
 % The top row: four panels, each with room at its left for its y label and
 % tick labels (MARGIN); (C) is wider, for the condition names under it.
-MARGIN = [114 82 50 60]; GAP = 8; RIGHT = 20;   % (A): a y label of three lines
+MARGIN = [114 82 50 60]; GAP = 8; RIGHT = 36;   % (A): a y label of three lines; RIGHT: room for (D)'s
+                                                % x label, whose sigma_u touched the edge at 20 (Plan 3 review)
 WC = 236;
 w_rest = (W - sum(MARGIN) - 3 * GAP - RIGHT - WC) / 3;
 widths = [w_rest w_rest WC w_rest];

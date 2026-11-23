@@ -78,7 +78,9 @@ panels = { ...
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Visible', vis, 'Color', 'w', 'Units', 'centimeters', 'Position', [2 2 34 11]);
 if all(isfinite(cfg.fig_size)); fig.Units = 'inches'; fig.Position(3:4) = cfg.fig_size; end
-tl = tiledlayout(fig, 1, size(panels, 1), 'TileSpacing', 'compact', 'Padding', 'compact');
+% 'loose' between the panels (Plan 3 review: at 'compact' the two-line y name of a
+% panel sat as close to the panel left of it as to its own axis, in S6 C).
+tl = tiledlayout(fig, 1, size(panels, 1), 'TileSpacing', 'loose', 'Padding', 'compact');
 for q = 1:size(panels, 1)
     ax = nexttile(tl); hold(ax, 'on');
     ax.Tag = sprintf('eigdens_measures_%d', q);

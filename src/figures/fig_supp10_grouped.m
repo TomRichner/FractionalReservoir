@@ -52,8 +52,12 @@ st = manuscript_style();
 R = B.R{1}; T = B.runs;
 H = R.t_step;
 ec = [st.E_color; st.I_color];                    % the manuscript's one E and one I color
-mode_col = 0.6 * st.condition_color(R.condition);
-fg_col = [0.62 0.62 0.62];
+% The two modes in Figure 8 G's colors (Plan 3 review: they were mauve and
+% gray here, black and pale pink there): the full Jacobian's black, the
+% frozen-gain mode the condition's hue made pale (bm_fig8_panels' rule).
+cond_col = st.condition_color(R.condition);
+mode_col = [0 0 0];
+fg_col = cond_col + 0.35 * (1 - cond_col);
 purple = [0.494 0.247 0.596]; green = [0 0.62 0.45];
 lw = st.line_lw; thin = 0.6 * st.line_lw;         % traces; connecting and reference lines
 
@@ -77,7 +81,8 @@ hC2 = 2.05;                                       % C right: room above it for i
 y1 = y2 + h2 + 1.1; h1 = 3.0;                     % row 1 (A, B): above row 2's letters and B's time axis
 Ht = y1 + h1 + 0.5;
 xL = 1.0; wL = 2.6;                               % A and C left
-xB = xL + wL + 1.45; wB = W - 0.15 - xB;          % B: room for its two-line y label
+xB = xL + wL + 1.45; wB = W - 0.3 - xB;           % B: room for its two-line y label, and right of it
+                                                  % for half its last tick label (the "65" touched the edge)
 wD = 1.6; xD = W - 0.15 - wD;                     % D
 wC2 = 1.6; xC2 = xD - 0.9 - wC2;                  % C right, its y label clear of C left
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.5 0.5 W Ht], 'Visible', vis);
@@ -136,7 +141,10 @@ for r = 1:3
         lgB = legend(axB(r), [hi hz], {'Intact', 'Adaptation frozen'}, 'Orientation', 'horizontal', ...
             'Box', 'off', 'AutoUpdate', 'off');
         lgB.ItemTokenSize = [24 10];
-        ylim(axB(r), [0 1]);
+        % Room above the frozen arm (about 0.93) for the key, which sits
+        % at the top of the axes, lower than the panel letters (Plan 3
+        % review: it touched the top edge and sat just above that trace).
+        ylim(axB(r), [0 1.15]); yticks(axB(r), [0 0.5 1]);
     end
 end
 xlabel(axB(3), 'Time (s)');
@@ -192,7 +200,7 @@ set(lab, 'Units', 'normalized');
 xs = arrayfun(@(t) t.Position(1), lab);
 for k = 1:3; lab(k).Position(1) = min(xs); end
 set([lgB lgC], 'Units', 'inches', 'Location', 'none');
-lgB.Position(1:2) = [xB + wB - lgB.Position(3), y1 + h1 + 0.02];   % above B, at its right end
+lgB.Position(1:2) = [xB + wB - lgB.Position(3), y1 + h1 - 0.06];   % at B's top, at its right end
 lgC.Position(1:2) = [xC2, y2 + hC2 + 0.05];                        % above C right, at its left edge
 letter(fig, 'A', 0.05, y1 + h1 + 0.05); letter(fig, 'B', xB - 1.4, y1 + h1 + 0.05);
 letter(fig, 'C', 0.05, y2 + h2 + 0.05); letter(fig, 'D', xD - 0.95, y2 + h2 + 0.05);
