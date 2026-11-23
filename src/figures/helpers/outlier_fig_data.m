@@ -251,7 +251,7 @@ end
 function s = net_label(name)
 tok = regexp(name, '^EEx(\d+)p(\d+)$', 'tokens', 'once');
 if ~isempty(tok)
-    s = sprintf('E-to-E \\times %s.%s', tok{1}, tok{2});
+    s = sprintf('E-to-E %s %s.%s', char(215), tok{1}, tok{2});   % the sign itself, as Figure 5 and S3 write it (TeX's times set it with wide spaces)
 elseif strcmp(name, 'reference')
     s = 'Reference';
 else

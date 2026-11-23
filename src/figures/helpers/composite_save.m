@@ -19,6 +19,7 @@ out = struct('figs', fig, 'files', {{}}, 'source', {sources});
 if ~cfg.save; return; end
 sz = getappdata(fig, 'composite_size');
 if ~isempty(sz) && any(abs(fig.Position(3:4) - sz) > 1e-6); fig.Position(3:4) = sz; drawnow; end
+true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
 save_figure_stable(out_dir, fig_tag, fig);
 out.files = existing_outputs(out_dir, fig_tag);
 name = [fig_tag '_table.md'];

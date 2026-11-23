@@ -70,7 +70,8 @@ sct_entry = registry_entry(bundle.figures, 'fig_mc_vs_lambda1');
 S_ex  = fig_memory_capacity_example('run_dir', cfg.run_dir, 'conditions', names, quiet{:});
 S_map = fig_mc_gain_bias_maps('run_dir', cfg.mc_run_dir, 'conditions', names, quiet{:}, ...
     map_entry.args{:}, 'rows', {'responsive'});
-S_sct = fig_mc_vs_lambda1('run_dir', cfg.mc_run_dir, 'conditions', names, quiet{:}, sct_entry.args{:});
+S_sct = fig_mc_vs_lambda1('run_dir', cfg.mc_run_dir, 'conditions', names, quiet{:}, sct_entry.args{:}, ...
+    'size_legend_round', true);   % the size key in round values (-4, -2, ..., 6), not the grid's -2.33, -0.667
 src_figs = [S_ex.figs(:); S_map.figs(:); S_sct.figs(:)];
 cleanup = onCleanup(@() T.close(src_figs));
 

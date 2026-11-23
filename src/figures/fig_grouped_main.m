@@ -263,6 +263,7 @@ if cfg.save
     end
     % PNG plus editable MATLAB figure: local-rate traces make SVG needlessly large.
     drawnow;
+    true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
     if ismember(group,[1 2 3 4 5 6 8]), pad={'Padding',20}; else, pad={}; end
     % exportgraphics was seen (2026-11-12, worker session, invisible figures,
     % 3630 x 1222 monitor layout) to resize the figure to 1313 x 1008 during
