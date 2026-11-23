@@ -49,9 +49,18 @@ s.title_fs = 14;
 % labels have the same size relative to the figure in every figure. The
 % drawing fills the width (the cropped image is within canvas_tol of it).
 % Height is free up to canvas_max_h, a page at the same scale.
-s.canvas_w     = 13;     % inches
-s.canvas_tol   = 0.5;    % inches the cropped image may fall short of canvas_w
-s.canvas_max_h = 17;     % inches
+%
+% 9 in, not the working width of 13 in (Tom, 2026-11-22, during the figure
+% review: "in general, we should probably get all figures down to a canvas
+% width of 9 inches"; on Figure 5, 13 in read as too big a canvas, with the
+% panel letters too small). The type sizes stay in points, so letters and
+% labels are about 13/9 = 1.4 times larger relative to the figure, and every
+% layout is made again for the narrower canvas, not scaled. canvas_max_h and
+% canvas_tol keep their proportion to the width (17 and 0.5 at 13 in).
+% Read these numbers from here; never type them into a figure function.
+s.canvas_w     = 9;      % inches
+s.canvas_tol   = 0.35;   % inches the cropped image may fall short of canvas_w
+s.canvas_max_h = 11.8;   % inches
 s.letter_fs    = 14;     % panel letters, (A), (B), ...
 
 % --- Line weights
