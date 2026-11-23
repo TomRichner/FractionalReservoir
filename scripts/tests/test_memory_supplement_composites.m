@@ -149,7 +149,7 @@ jobs = { ...   function, its own arguments, the panel letters, the file tag
     @fig_supp1_grouped, {'preset_name', chain_preset, 'pulse_conditions', pulse},              'ABC',    'Fig_Supp1_Grouped'; ...
     @fig_supp2_grouped, {'conditions', three},                                                 'ABC',    'Fig_Supp2_Grouped'; ...
     @fig_supp4_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp4_Grouped'; ...
-    @fig_supp5_grouped, {'preset_name', reg_preset, 'conditions', three},                      'ABC',    'Fig_Supp5_Grouped'; ...
+    @fig_supp5_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp5_Grouped'; ...
     @fig_supp9_grouped, {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'},  'ABCDE',  'Fig_Supp9_Grouped'};
 ppi = get(groot, 'ScreenPixelsPerInch');
 for j = 1:size(jobs, 1)
@@ -242,22 +242,21 @@ switch name
     case 'fig_supp4_grouped'
         n = n + check(isscalar(findall(fig, 'Tag', 'composite_crop_margin')), 'S4: a margin is kept under the bottom row''s x labels');
     case 'fig_supp5_grouped'
-        vals = ax(arrayfun(@(h) isstruct(h.UserData) && isfield(h.UserData, 'values'), ax));
-        ok = numel(vals) == 3;
-        for k = 1:numel(vals)
-            h = findall(vals(k), 'Type', 'histogram');
-            v = vals(k).UserData.values;
-            ok = ok && isscalar(h) && abs(sum(h.Values) - 1) < 1e-9 && ...                  % nothing gathered, nothing dropped
-                max(abs(v)) <= 10^max(abs(vals(k).XLim)) * 0.1 && ~isempty(vals(k).XTickLabel);
-        end
-        n = n + check(ok, 'S5 (A): three symmetric-log histograms that hold every value of the sample');
+        % (A) is the firing-rate histogram stacked by E:I weight ratio, with
+        % one color bar (Plan 3: the lambda_1 histogram is main Figure 4B).
+        rate = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Firing Rate'), ax));
+        cb = findall(fig, 'Type', 'colorbar');
+        ok = numel(rate) == 3 && all(arrayfun(@(h) ~isempty(findall(h, 'Type', 'patch')), rate)) && ...
+            isscalar(cb) && strcmp(cb.Label.String, 'E:I weight ratio') && isempty(findall(fig, 'Type', 'image')) && ...
+            ~any(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Lyapunov'), ax));
+        n = n + check(ok, 'S5 (A): three firing-rate histograms colored by E:I weight ratio, one color bar, no lambda_1 histogram');
         lg = findall(fig, 'Type', 'legend');
         ok = isscalar(lg);
         if ok
             lg.Units = 'pixels'; own = lg.Axes; own.Units = 'pixels';
             ok = lg.Position(2) >= own.Position(2) + own.Position(4) - 1 && isequal(lg.String, {'Local', 'Accumulated'});
         end
-        n = n + check(ok, 'S5 (C): one key, above its panel, clear of the data');
+        n = n + check(ok, 'S5 (B): one key, above its panel, clear of the data');
     case 'fig_supp9_grouped'
         boxed = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Lyapunov') && strcmp(h.Box, 'on'), ax));
         n = n + check(isempty(boxed), 'S9 (E): the scatter panels are open, not boxed');

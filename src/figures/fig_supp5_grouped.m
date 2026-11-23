@@ -3,43 +3,33 @@ function out = fig_supp5_grouped(cfg)
 %
 %   out = FIG_SUPP5_GROUPED('run_dir', d, 'preset_name', p, 'out_dir', o)
 %
-% The figure plan of 2026-11-21 (figures_main_supp_appen.md, S5), for the
-% medians and the share of contracting configurations that the Results
-% quote. One column per condition; every panel is drawn by the function
-% that owns it, invisibly and unsaved, and copied here (composite_tools).
-%   (A) the distribution of lambda_1 over the jointly varied configurations
-%       (the param_space sample): the lambda_1 sheet of
-%       fig_param_space_allStd, asked for on its SYMMETRIC-LOG axis
-%       ('lle_scale', 'symlog': linear within about +-0.1 1/s, logarithmic
-%       beyond, every value at its place). Until 2026-11-22 it was that
-%       sheet's window of +-1.5 1/s with everything beyond gathered into
-%       the two end bins, which hid the distribution without adaptation
-%       (three quarters of it in the left end bin). The table gives each
-%       column's quartiles and the share below zero.
-%   (B) the distribution of the mean firing rate over the same
-%       configurations: its mean-rate sheet.
-%   (C) local against accumulated growth rates: fig_local_vs_finite_lle
+% The figure plan of 2026-11-21 (figures_main_supp_appen.md, S5), revised
+% after Tom's review of 2026-11-22 (Plan2_figure_feedback.md, S5; Plan3.md,
+% phase 0, question 12). One column per condition; every panel is drawn by
+% the function that owns it, invisibly and unsaved, and copied here
+% (composite_tools).
+%   (A) the distribution of the mean firing rate over the jointly varied
+%       configurations (the param_space sample), stacked by the E:I WEIGHT
+%       ratio of each network: the mean-rate sheet of
+%       fig_EI_weights_param_space, as it was shown before the flat
+%       condition colors (note 1), with its E:I color bar.
+%   (B) local against accumulated growth rates: fig_local_vs_finite_lle
 %       (the local rate pooled over time and networks, light, under the
 %       finite-time lambda_1 per network, dark). NOTE that this function
 %       draws the networks NEAR THE PRESET (every 1-D sweep at its level
 %       nearest the preset's value), not the joint sample, which it reads
 %       for its table only; the panel is the source's as it stands.
-% The histograms of (A) and (B) are gray in the source; here each takes its
-% condition's colour (manuscript_style, by name), as the plan's style rule
-% asks, so the three rows agree.
-%
-% THE RUN DIRECTORY IS WRITTEN TO, briefly: fig_param_space_allStd makes
-% its histograms in a prep folder <run_dir>/replot_param_space_<date> and,
-% called without save, leaves it there. This function removes the prep
-% folders that appeared during its call.
+% The histogram of lambda_1 over the joint sample, colored by E:I weight
+% ratio, is main Figure 4B since Plan 3, so it is not repeated here (it was
+% panel A, on a symmetric-log axis in flat condition colors, until then).
 %
 % Options: run_dir, preset_name, conditions (empty = all the run holds),
 % out_dir, save, visible, fig_tag.
 %
 % out: figs, files, source, panels (letter -> source function).
 %
-% See also: composite_tools, composite_save, fig_param_space_allStd,
-%           fig_local_vs_finite_lle, sweep_metrics
+% See also: composite_tools, composite_save, fig_EI_weights_param_space,
+%           fig_local_vs_finite_lle, fig_main4_connectivity
 
 arguments
     cfg.run_dir     (1,:) char    = ''
@@ -55,38 +45,45 @@ setup_paths();
 T = composite_tools();
 st = manuscript_style();
 quiet = {'save', false, 'visible', false, 'verbose', cfg.verbose};
-ps_args = [{'run_dir', cfg.run_dir, 'conditions', cfg.conditions}, quiet];
-if ~isempty(cfg.preset_name); ps_args = [ps_args, {'preset_name', cfg.preset_name}]; end
+ei_args = [{'run_dir', cfg.run_dir, 'conditions', cfg.conditions}, quiet];
+if ~isempty(cfg.preset_name); ei_args = [ei_args, {'preset_name', cfg.preset_name}]; end
 
 %% The source figures
-prep_before = prep_folders(cfg.run_dir);
-tidy = onCleanup(@() remove_new_prep(cfg.run_dir, prep_before));
-S_ps  = fig_param_space_allStd(ps_args{:}, 'lle_scale', 'symlog');
-cleanup_ps = onCleanup(@() T.close(S_ps.figs));
+S_ei = fig_EI_weights_param_space(ei_args{:});
+cleanup_ei = onCleanup(@() T.close(S_ei.figs));
 S_loc = fig_local_vs_finite_lle('run_dir', cfg.run_dir, 'conditions', cfg.conditions, quiet{:});
 cleanup_loc = onCleanup(@() T.close(S_loc.figs));
 specs = sweep_metrics();
 specs = specs([specs.in_sheets]);
-measures = {'LLE', 'mean_rate'};
-[found, sheet] = ismember(measures, {specs.field});
-assert(all(found) && numel(S_ps.figs) >= max(sheet), 'fig_supp5_grouped:Sheets', ...
-    'fig_param_space_allStd returned no sheet for %s.', strjoin(measures(~found), ', '));
+sheet = find(strcmp({specs.field}, 'mean_rate'));
+assert(isscalar(sheet) && numel(S_ei.figs) >= sheet, 'fig_supp5_grouped:Sheets', ...
+    'fig_EI_weights_param_space returned no mean-rate sheet.');
 
-%% The canvas: three rows of one panel per condition
-W = 1100; H = 890;             % under 0.9 of the workstation screen
+%% The canvas: two rows of one panel per condition, laid out on canvas_w itself
+W = round(st.canvas_w * get(groot, 'ScreenPixelsPerInch'));
+H = 590;
 fig = T.canvas(W, H, cfg.visible);
-X0 = 100; GAP = 50; RH = 170;
-ROW_Y = [650 380 80];          % 30 px more above (C) than between (A) and (B): its key sits there
-ax = cell(1, 3);
-src = {S_ps.figs(sheet(1)), S_ps.figs(sheet(2)), S_loc.figs};
-nc = 0;
-for r = 1:3
+X0 = 78; GAP = 46; RH = 170;
+CB_W = 92;                     % the color bar of (A), its ticks and its label, on the right
+ROW_Y = [345 72];
+ax = cell(1, 2);
+src = {S_ei.figs(sheet), S_loc.figs};
+nc = 0; names = {}; bar_axes = gobjects(0);
+for r = 1:2
     Cp = T.copy(src{r}, fig);
-    [~, order] = sort(arrayfun(@(a) a.Position(1), Cp.axes));
-    ax{r} = Cp.axes(order);
+    a = Cp.axes;
+    if r == 1
+        % The sheet's color bar is an image axes of its own: kept aside,
+        % replaced below by a color bar of the same ticks.
+        is_bar = arrayfun(@(h) ~isempty(findall(h, 'Type', 'image')), a);
+        bar_axes = a(is_bar);
+        a = a(~is_bar);
+    end
+    [~, order] = sort(arrayfun(@(h) h.Position(1), a));
+    ax{r} = a(order);
     if r == 1
         nc = numel(ax{r});
-        CW = (W - X0 - 15 - (nc - 1) * GAP) / nc;
+        CW = (W - X0 - CB_W - (nc - 1) * GAP) / nc;
         names = condition_names(ax{r}, cfg.conditions);
     end
     assert(numel(ax{r}) == nc, 'fig_supp5_grouped:Columns', ...
@@ -94,119 +91,130 @@ for r = 1:3
     for c = 1:nc
         ax{r}(c).Position = [X0 + (c - 1) * (CW + GAP), ROW_Y(r), CW, RH];
     end
-    if r == 3
-        % One key for the two histograms of (C), made below: the source's
+    if r == 2
+        % One key for the two histograms of (B), made below: the source's
         % own (one per panel, inside it) go.
         delete(Cp.legends);
     end
 end
+assert(isscalar(bar_axes), 'fig_supp5_grouped:ColorBar', ...
+    'Expected the one color bar of fig_EI_weights_param_space''s sheet, found %d.', numel(bar_axes));
 
 %% Style
 T.style(fig);
-for r = 1:3
+for r = 1:2
     for c = 1:nc
         title(ax{r}(c), '');
-        if c > 1; ylabel(ax{r}(c), ''); end
+        ylabel(ax{r}(c), '');
         box(ax{r}(c), 'off');
     end
 end
 T.retitle(ax{1}, names, true);
-% (A), (B): each histogram in its condition's colour.
-for r = 1:2
-    for c = 1:nc
-        h = findall(ax{r}(c), 'Type', 'histogram');
-        if isKey(st.condition_color, names{c})
-            set(h, 'FaceColor', st.condition_color(names{c}), 'EdgeColor', 'none', 'FaceAlpha', 0.75);
-        end
-    end
-    ylabel(ax{r}(1), 'Probability');
-end
+ylabel(ax{1}(1), 'Probability');
+ylabel(ax{2}(1), 'Density');
 for c = 1:nc
-    xlabel(ax{1}(c), 'Lyapunov Exp., \lambda_1 (s^{-1})', 'Interpreter', 'tex');
-    xlabel(ax{2}(c), 'Mean Firing Rate');
-    xlabel(ax{3}(c), 'Growth Rate (s^{-1})', 'Interpreter', 'tex');
+    xlabel(ax{1}(c), st.label_rate);
+    xlabel(ax{2}(c), 'Growth rate (s^{-1})', 'Interpreter', 'tex');
 end
-ylabel(ax{3}(1), 'Density');
-% The key of (C): light for the local rate, dark for the accumulated one,
-% in neutral grays (it serves the three columns, each in its own colour),
-% on one line ABOVE the first panel. Until 2026-11-22 it was the first
-% panel's own legend in its upper right corner, where it covered that
-% panel's median line and tallest bars.
-hold(ax{3}(1), 'on');
-key = [patch(ax{3}(1), NaN, NaN, [0.82 0.82 0.82], 'EdgeColor', 'none'), ...
-       patch(ax{3}(1), NaN, NaN, [0.40 0.40 0.40], 'EdgeColor', 'none')];
-hold(ax{3}(1), 'off');
-legends = legend(ax{3}(1), key, {'Local', 'Accumulated'}, 'Box', 'off', 'FontSize', st.tick_fs, ...   % the caption says what is pooled
+% The color bar of (A): the sheet's map, limits, ticks and label, as a
+% color bar of the last panel at the right of the row.
+cb = ei_colorbar(ax{1}(end), bar_axes, [W - CB_W + 10, ROW_Y(1), 13, RH]);
+delete(bar_axes);
+% The key of (B): light for the local rate, dark for the accumulated one,
+% in neutral grays (it serves every column, each in its own colour), on one
+% line ABOVE the first panel, where it covers no data.
+hold(ax{2}(1), 'on');
+key = [patch(ax{2}(1), NaN, NaN, [0.82 0.82 0.82], 'EdgeColor', 'none'), ...
+       patch(ax{2}(1), NaN, NaN, [0.40 0.40 0.40], 'EdgeColor', 'none')];
+hold(ax{2}(1), 'off');
+legends = legend(ax{2}(1), key, {'Local', 'Accumulated'}, 'Box', 'off', 'FontSize', st.tick_fs, ...   % the caption says what is pooled
     'Orientation', 'horizontal', 'NumColumns', 2, 'Units', 'pixels', 'Location', 'none', 'AutoUpdate', 'off');
 legends.ItemTokenSize = [22 18];
 for pass = 1:2
     drawnow;
     p = legends.Position;
-    q = ax{3}(1).Position;
+    q = ax{2}(1).Position;
     legends.Position = [q(1), q(2) + q(4) + 4, p(3), p(4)];
 end
-
-%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.margin(fig, 6);
 T.style(fig);                % again: the labels and titles set since take their roles' sizes
-T.fit(fig);
+T.fit(fig);                  % laid out on canvas_w already: nothing moves
 
-%% Panel letters
-T.letter(ax{1}(1), 'A', -85, 42);
-T.letter(ax{2}(1), 'B', -85, 18);
-T.letter(ax{3}(1), 'C', -85, 18);
+%% Panel letters, at the height of the titles of (A) and of the key of (B)
+T.letter(ax{1}(1), 'A', 4 - X0, 44);
+T.letter(ax{2}(1), 'B', 4 - X0, 8);
 
 %% Save
 panels = struct( ...
-    'A', 'fig_param_space_allStd (lambda_1 sheet): distribution of lambda_1 over the joint sample, per condition', ...
-    'B', 'fig_param_space_allStd (mean-rate sheet): distribution of the mean firing rate over the joint sample', ...
-    'C', 'fig_local_vs_finite_lle: local against accumulated growth rates, the networks near the preset');
-sources = {S_ps.source, S_loc.source};
+    'A', ['fig_EI_weights_param_space (mean-rate sheet): distribution of the mean firing rate over the joint sample, ' ...
+          'stacked by E:I weight ratio, per condition'], ...
+    'B', 'fig_local_vs_finite_lle: local against accumulated growth rates, the networks near the preset');
+sources = {S_ei.source, S_loc.source};
 parts = cell(0, 2);
 if cfg.save
-    f = fieldnames(panels);
-    what = {'Histogram of lambda_1 over the configurations (bin centres and probabilities)', ...
-        'Histogram of the mean firing rate over the configurations (bin centres and probabilities)', ...
-        'Densities of the local rate (pooled) and of the finite-time lambda_1 per network'};
-    for r = 1:3
-        for c = 1:nc
-            body = T.axes_table(ax{r}(c), what{r});
-            if r == 1; body = [values_summary(ax{r}(c)), body]; end
-            parts(end + 1, :) = {sprintf('Panel %s, %s (%s)', f{r}, names{c}, strtok(panels.(f{r}), ' ')), body}; %#ok<AGROW>
-        end
+    psa = ParamSpaceAnalysis2.from_dir(S_ei.source);
+    for c = 1:nc
+        parts(end + 1, :) = {sprintf('Panel A, %s (fig_EI_weights_param_space)', names{c}), ...
+            rate_summary(psa, names{c})}; %#ok<AGROW>
+    end
+    for c = 1:nc
+        parts(end + 1, :) = {sprintf('Panel B, %s (fig_local_vs_finite_lle)', names{c}), ...
+            T.axes_table(ax{2}(c), 'Densities of the local rate (pooled) and of the finite-time lambda_1 per network')}; %#ok<AGROW>
     end
 end
 caption = sprintf(['Supplementary Figure S5, the joint sample (drawn by fig_supp5_grouped; run `%s`; conditions %s), ' ...
-    'one column per condition. (A) Distribution of the leading Lyapunov exponent lambda_1 over the jointly varied ' ...
-    'configurations, on a symmetric-log axis (linear within about 0.1 1/s of zero, logarithmic beyond; 40 bins of ' ...
-    'equal width on that axis, probability per bin; every value at its place, none gathered; dashed: ' ...
-    'lambda_1 = 0). (B) Distribution of the mean firing rate over the same configurations. (C) Local against ' ...
-    'accumulated growth rates for the networks near the preset (every 1-D sweep at its level nearest the ' ...
-    'preset''s value): density of the local rate of the leading direction pooled over time and networks (light) ' ...
-    'and of the finite-time lambda_1 per network (dark), with its median as a line; dotted: zero; the key above ' ...
-    'the first panel is in gray and holds for the three columns. The histograms of (A) and (B) are gray in ' ...
-    'fig_param_space_allStd and take the condition colours here. Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
+    'one column per condition. (A) Distribution of the mean firing rate over the jointly varied configurations ' ...
+    '(probability per bin), each bin stacked by the E:I weight ratio of its networks (the summed excitatory ' ...
+    'against the summed inhibitory weight, color bar; ratios beyond 1:10 and 10:1 take the end colors). ' ...
+    '(B) Local against accumulated growth rates for the networks near the preset (every 1-D sweep at its level ' ...
+    'nearest the preset''s value): density of the local rate of the leading direction pooled over time and ' ...
+    'networks (light) and of the finite-time lambda_1 per network (dark), with its median as a line; dotted: ' ...
+    'zero; the key above the first panel is in gray and holds for every column. The distribution of lambda_1 ' ...
+    'over the joint sample is main Figure 4B. Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
     cfg.run_dir, strjoin(names, ', '), getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Supplementary Figure S5: the joint sample', caption, parts, sources);
 out.panels = panels;
+out.colorbar = cb;
 end
 
 %% ------------------------------------------------------------------------
-function txt = values_summary(ax)
-% The values behind a symmetric-log lambda_1 panel (fig_param_space_allStd
-% leaves them in the axes' UserData), as a paragraph for the table; '' for
-% a panel drawn the old way. The x of the series below it is in the axis'
-% own coordinate, sign(x) log10(1 + |x| / 0.1).
-txt = '';
-u = ax.UserData;
-if ~(isstruct(u) && isfield(u, 'values')) || isempty(u.values); return; end
-v = u.values(:);
+function cb = ei_colorbar(ax, bar_axes, rect)
+% A color bar of ax at rect (pixels) with the map, limits, ticks and label
+% of the sheet's image axes bar_axes (fig_EI_weights_param_space draws its
+% color bar as an image).
+img = findall(bar_axes, 'Type', 'image');
+colormap(ax, colormap(bar_axes));
+clim(ax, [min(img(1).YData), max(img(1).YData)]);
+cb = colorbar(ax, 'Units', 'pixels');
+cb.Location = 'manual';
+cb.Position = rect;
+cb.Ticks = bar_axes.YTick;
+cb.TickLabels = bar_axes.YTickLabel;
+cb.Label.String = bar_axes.YLabel.String;
+cb.Box = 'off';
+end
+
+function txt = rate_summary(psa, name)
+% The mean firing rates of one condition over the joint sample, as a
+% paragraph for the table: what the stacked histogram of (A) is made of.
+v = [];
+if isfield(psa.results, name)
+    rc = psa.results.(name);
+    for k = 1:numel(rc)
+        r = rc{k};
+        if isstruct(r) && isfield(r, 'success') && r.success && isfield(r, 'mean_rate') && isfinite(r.mean_rate)
+            v(end + 1) = r.mean_rate; %#ok<AGROW>
+        end
+    end
+end
+if isempty(v); txt = sprintf('No successful configuration of %s.\n', name); return; end
 q = prctile(v, [25 50 75]);
-txt = sprintf(['lambda_1 over the %d configurations of `%s` (1/s): median %.3g, quartiles %.3g to %.3g, range %.3g to ' ...
-    '%.3g; share below zero %.3g; share beyond the old window of +-1.5: %.3g below, %.3g above. Axis: %s; the ' ...
-    'x of the series listed next is in that coordinate, sign(x) log10(1 + |x| / 0.1).\n\n'], ...
-    numel(v), u.condition, q(2), q(1), q(3), min(v), max(v), mean(v < 0), mean(v < -1.5), mean(v > 1.5), u.scale);
+txt = sprintf(['Mean firing rate over the %d configurations of `%s`: median %.3g, quartiles %.3g to %.3g, ' ...
+    'range %.3g to %.3g; share below 0.02 (quiet) %.3g, above 0.9 (saturated) %.3g. The color of each ' ...
+    'network is its E:I weight ratio (fig_EI_weights_param_space).\n'], ...
+    numel(v), name, q(2), q(1), q(3), min(v), max(v), mean(v < 0.02), mean(v > 0.9));
 end
 
 function names = condition_names(axs, requested)
@@ -219,18 +227,4 @@ if ~isempty(requested) && ~((ischar(requested) || isstring(requested)) && all(st
     return
 end
 names = grouped_condition_label(arrayfun(@(a) {a.Title.String}, axs), 'name_of_title');
-end
-
-function d = prep_folders(run_dir)
-listing = dir(fullfile(run_dir, 'replot_param_space_*'));
-d = {listing([listing.isdir]).name};
-end
-
-function remove_new_prep(run_dir, before)
-now_there = prep_folders(run_dir);
-added = setdiff(now_there, before);
-for k = 1:numel(added)
-    d = fullfile(run_dir, added{k});
-    if isfolder(d); rmdir(d, 's'); end
-end
 end
