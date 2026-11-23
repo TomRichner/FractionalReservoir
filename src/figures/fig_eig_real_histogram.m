@@ -52,8 +52,16 @@ function out = fig_eig_real_histogram(cfg)
 % which holds the same disk_by_cond), saved with _switch in the tag; it is
 % row (D) of fig_main3_stability's 'real_histogram_row'.
 %
+% REFERENCE (default true: this figure is the histogram against the disk).
+% false leaves the dotted curve out, and with it its key; the table and
+% out.reference are the same either way. The paper's Figure 3, row (D), is
+% drawn without it since 2026-11-22 (Tom's review: no dotted curve, no key,
+% no labels; fig_main3_stability's histogram_reference and
+% histogram_labels, both off by default).
+%
 % LABELS (Tom, 2026-11-21; default false: no text on the panels). true writes
-% the labels of the paper's Figure 3, row (D), one per panel, placed so that
+% the labels the paper's Figure 3, row (D), had until 2026-11-22 (Tom took
+% them out in his review; they stay an option), one per panel, placed so that
 % none touches a bar, the spike, the dotted curve or an axis (a panel of the
 % composite is about 30 characters of 14-point text wide and six lines
 % tall, so they are broken over short lines):
@@ -114,7 +122,8 @@ arguments
     cfg.count_scale (1,:) char {mustBeMember(cfg.count_scale, {'log', 'clipped'})} = 'log'
     cfg.n_bins      (1,1) double {mustBeInteger, mustBePositive} = 200
     cfg.spectra_source (1,:) char {mustBeMember(cfg.spectra_source, {'eig_heatmap', 'local_lyapunov'})} = 'eig_heatmap'   % which stage sampled the states (FD-034)
-    cfg.labels      (1,1) logical = false   % the four labels of Figure 3, row (D)
+    cfg.labels      (1,1) logical = false   % the labels of row (D) as Figure 3 had them until 2026-11-22
+    cfg.reference   (1,1) logical = true    % the dotted curve of the uniform disk
 end
 setup_paths();
 out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
@@ -223,15 +232,19 @@ for i = 1:n_cond
             cc = max(c, base);
             patch(ax(i), [xs(1); xs(:); xs(end)], [base; reshape([cc; cc], [], 1); base], col, ...
                 'FaceAlpha', 0.55, 'EdgeColor', 'none', 'Tag', 'eig_real_histogram');
-            ee = e; ee(ee < base) = NaN;
-            plot(ax(i), centers, ee, ':', 'Color', [0 0 0], 'LineWidth', 1.6, 'Tag', 'uniform_disk_reference');
+            if cfg.reference
+                ee = e; ee(ee < base) = NaN;
+                plot(ax(i), centers, ee, ':', 'Color', [0 0 0], 'LineWidth', 1.6, 'Tag', 'uniform_disk_reference');
+            end
             set(ax(i), 'YScale', 'log'); ylim(ax(i), [base, top_log]);
         case 'clipped'
             top = 1.5 * max(e);
             cc = min(c, top);
             patch(ax(i), [xs(1); xs(:); xs(end)], [0; reshape([cc; cc], [], 1); 0], col, ...
                 'FaceAlpha', 0.55, 'EdgeColor', 'none', 'Tag', 'eig_real_histogram');
-            plot(ax(i), centers, e, ':', 'Color', [0 0 0], 'LineWidth', 1.6, 'Tag', 'uniform_disk_reference');
+            if cfg.reference
+                plot(ax(i), centers, e, ':', 'Color', [0 0 0], 'LineWidth', 1.6, 'Tag', 'uniform_disk_reference');
+            end
             over = c > top;
             plot(ax(i), centers(over), top * ones(1, nnz(over)), '^', 'Color', col, 'MarkerFaceColor', col, ...
                 'MarkerSize', 4, 'Tag', 'clipped_bar');
@@ -242,7 +255,7 @@ for i = 1:n_cond
     xlim(ax(i), re_lim); box(ax(i), 'off'); set(ax(i), 'TickDir', 'out');
     title(ax(i), titles{i}, 'FontWeight', 'normal', 'FontSize', 14, 'Color', col);
     xlabel(ax(i), 'Re(\lambda) (s^{-1})');   % the backslash was missing: the stand-alone figure read "Re(ambda)"
-    if i == 1; ylabel(ax(i), 'Eigenvalues per state'); end
+    if i == 1; ylabel(ax(i), 'Eigenvalues per snapshot'); end   % a sampled time point is a snapshot, not a state (Tom, 2026-11-22)
 end
 
 if cfg.labels
@@ -314,13 +327,15 @@ if cfg.labels
         end
     end
     % The key to the dotted curve, right of the last panel.
-    if strcmp(ref(n_cond).mode, 'gain')
-        key_words = {'{\bf\cdot\cdot\cdot} uniform', 'disk, same', 'radius'};
-    else
-        key_words = {'{\bf\cdot\cdot\cdot} uniform', 'disk'};
+    if cfg.reference
+        if strcmp(ref(n_cond).mode, 'gain')
+            key_words = {'{\bf\cdot\cdot\cdot} uniform', 'disk, same', 'radius'};
+        else
+            key_words = {'{\bf\cdot\cdot\cdot} uniform', 'disk'};
+        end
+        text(ax(n_cond), re_lim(2) + 0.05 * span, top_log, key_words, 'HorizontalAlignment', 'left', ...
+            'Interpreter', 'tex', lab{:}, 'Tag', 'histogram_key');
     end
-    text(ax(n_cond), re_lim(2) + 0.05 * span, top_log, key_words, 'HorizontalAlignment', 'left', ...
-        'Interpreter', 'tex', lab{:}, 'Tag', 'histogram_key');
     % Room for the key on this figure (a composite that copies the panels
     % has its own margin there).
     tl.Units = 'normalized'; tl.OuterPosition = [0 0 1 - KEY_WIDTH_PX / fig.Position(3) 1];
@@ -342,10 +357,11 @@ if strcmp(cfg.spectra_source, 'local_lyapunov')
         D.lya_T_interval(1));
     L{end + 1} = '';
 end
+not_drawn = ''; if ~cfg.reference; not_drawn = ' (reference false: the curve is not drawn on this figure)'; end
 L{end + 1} = sprintf(['Histogram: Re(lambda) of the eigenvalues of the full Jacobian at the sampled states, counts per state, ' ...
     '%d bins of width %.4g 1/s over [%.4g, %.4g] 1/s (the density figure''s window). Dotted curve: the projection of a ' ...
-    'uniform disk holding n eigenvalues, radius drawn: `%s`. Count axis: `%s`.'], cfg.n_bins, width, re_lim(1), re_lim(2), ...
-    mode, cfg.count_scale);
+    'uniform disk holding n eigenvalues, radius drawn: `%s`%s. Count axis: `%s`.'], cfg.n_bins, width, re_lim(1), re_lim(2), ...
+    mode, not_drawn, cfg.count_scale);
 L{end + 1} = '';
 L{end + 1} = ['| Condition | eigenvalues per state | n in the disk | center c (1/s) | radius drawn (1/s) | radius, unit gain | ' ...
     'radius, rms gain | rms gain | outside the disk''s real-axis extent | Re > 0 | Re(lambda) 0.1 and 99.9 percentiles | ' ...
