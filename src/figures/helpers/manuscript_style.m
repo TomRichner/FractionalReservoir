@@ -219,12 +219,22 @@ s.condition_short = containers.Map(cond_short(:, 1), cond_short(:, 2));
 % as Tom accepted on 2026-11-20. The many-neuron palettes
 % (excitatory_colormap, inhibitory_colormap) are a different thing: shades
 % that tell the neurons of one type apart.
-s.E_color = [0.8500 0.3250 0.0980];
+% 2026-11-23 (Tom, on the decisions page: "Red and blue families everywhere"):
+% E is now the first anchor of excitatory_colormap (pure red) and I the first
+% of inhibitory_colormap, so a single E or I mark is in the same family as the
+% many-neuron traces and the weight images. Until then E was the model's
+% orange-red type color (SRNNCellTypePairs.type_colors).
+s.E_color = [1.0000 0.0000 0.0000];
 s.I_color = [0.0000 0.4470 0.7410];
 
 % --- Metric labels, so the axis of a given quantity reads the same everywhere.
-s.label_lle  = '\lambda_1';
-s.label_rate = 'Mean Pop. Firing Rate';
+% 2026-11-23 (Tom): one name for the leading exponent, "Growth rate, lambda_1"
+% wherever it fits (label_growth) and "lambda_1" where it does not (label_lle);
+% add the unit, (s^{-1}), where the axis has one. Axis labels are in sentence
+% case, like titles.
+s.label_lle    = '\lambda_1';
+s.label_growth = 'Growth rate, \lambda_1';
+s.label_rate   = 'Mean pop. firing rate';
 
 % --- Saving
 s.save_types = {'png', 'svg', 'fig'};
