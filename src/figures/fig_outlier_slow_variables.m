@@ -89,6 +89,8 @@ arguments
     cfg.filtered_color (1,3) double = [0.62 0.62 0.62]
     cfg.filtered_alpha (1,1) double = 0.18
     cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
+    cfg.panel_w double = []                 % inches; [] = the panels fill the width. Smaller: the same columns (titles), wider gaps, shorter rows (S7, FD-057)
+    cfg.row_gap (1,1) double = 0.25         % inches between the network rows
 end
 
 setup_paths();
@@ -126,9 +128,15 @@ g = complex_plane_axes([], axes_args{:});
 % columns as close as the titles allow.
 fig_w = cfg.fig_w; if isempty(fig_w); fig_w = st.canvas_w; end
 pt_in = 1 / 72;
-left = 0.5; right = 0.05; col_gap = 0.22; row_gap = 0.25; bottom = 0.08;
+left = 0.5; right = 0.05; col_gap = 0.22; row_gap = cfg.row_gap; bottom = 0.08;
 top_m = 0.1 + 1.25 * st.title_fs * pt_in;
 pw = (fig_w - left - right - (n_cond - 1) * col_gap) / n_cond;
+if ~isempty(cfg.panel_w) && cfg.panel_w < pw
+    % Smaller planes in the same columns: each panel centered in its column,
+    % so the condition titles keep their room and the rows get shorter.
+    pw_col = pw; pw = cfg.panel_w;
+    left = left + (pw_col - pw) / 2; col_gap = col_gap + (pw_col - pw);
+end
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
 % The ticks whose label a mark of any panel would lie on are left out of
 % every panel; one tick stays on each axis (the last).
@@ -155,6 +163,21 @@ for w = 1:n_net
         if w == n_net; names{2} = 'Re (s^{-1})'; end
         if c == 1;     names{4} = 'Im (s^{-1})'; end
         cp = complex_plane_axes(ax, axes_args{:}, names{:});
+        if w == n_net && ~isempty(cfg.panel_w)
+            % A narrow plane (panel_w): the Re name, set flush right, would
+            % cross the imaginary axis; set it from the axis rightward
+            % instead (it may reach into the wider column gap).
+            hr = findall(ax, 'Type', 'text', 'Tag', 'complex_plane_axes');
+            hr = hr(arrayfun(@(h) any(strcmp(cellstr(h.String), names{2})), hr));
+            set(ax, 'XLim', cp.x_lim, 'YLim', cp.y_lim);
+            for h = hr(:)'
+                e = h.Extent;
+                if e(1) < cp.x(0)
+                    h.HorizontalAlignment = 'left';
+                    h.Position(1) = cp.x(0) + 0.03 * diff(cp.x_lim);
+                end
+            end
+        end
         d = P{w, c};
         if ~isempty(d)
             col = F.colors{c};

@@ -34,7 +34,9 @@ function plan = outlier_spectra_stage_plan(cfg)
 % and in every mode: 500 neurons (the preset's), 60 s of settling, 12
 % calibration states, the full-Jacobian series and the dense spectra for
 % reference and E-to-E x 1.5 only. Tom, 2026-11-20: more seeds, and a much
-% longer window for the dwell-time figure. THE NUMBERS ABOVE 'fast' ARE THE
+% longer window for the dwell-time figure. full_window_s and full_dt_sample
+% go to the LONG networks only (long_networks: the reference, since
+% 2026-11-23, FD-057), not to every full network. THE NUMBERS ABOVE 'fast' ARE THE
 % WORKER'S PROPOSAL FROM ESTIMATED COST (FD-040's report), to be confirmed
 % by timing on the workstation: nothing at this size was run on the
 % MacBook.
@@ -44,10 +46,30 @@ function plan = outlier_spectra_stage_plan(cfg)
 %                   ospec_network's names (the preset, and its E-to-E block
 %                   mean times 1.1, 1.25, 1.5, 1.75: the dose)
 %   full_networks   {'reference', 'EEx1p5'}: the networks that get the
-%                   long window (full_window_s, full_dt_sample), the
-%                   full-Jacobian series and the dense spectra at the
-%                   calibration states. The others get window_s and
-%                   dt_sample and neither pass.
+%                   full-Jacobian series (every dt_full) and the dense
+%                   spectra at the calibration states. The others get
+%                   window_s and dt_sample and neither pass.
+%   long_networks   {'reference'} (those of it among full_networks): the
+%                   full networks that get the LONG window (full_window_s,
+%                   full_dt_sample). A full network NOT named here keeps
+%                   both passes but over the SHORT window at the short
+%                   window's step: window_s at dt_sample (20 s at 0.01 s in
+%                   every mode), its full-Jacobian series every dt_full
+%                   (0.1 s: 200 states) and its dense spectra at the n_cal
+%                   states. That is exactly the run the `fast` mode makes.
+%                   Why these steps: full_dt_sample was coarsened to 0.05 s
+%                   only to pay for 200 s (see full_dt_sample); a 20 s window
+%                   has no such cost, so it keeps the 10 ms step of every
+%                   other 20 s run, and the full pass keeps dt_full, which
+%                   no mode changes. Tom, 2026-11-23 (FD-057): the dwell-time
+%                   figure shows the reference only, so E-to-E x 1.5 needs
+%                   no long window; it stays a full network because
+%                   fig_outlier_slow_variables (S7) and the eigenvalue_density
+%                   and frequency_response stages (S6) read its dense
+%                   spectra. Keeping E-to-E x 1.5 short is the lead's
+%                   inference, not Tom's words: to give it the long window
+%                   again set this knob to {'reference', 'EEx1p5'}. Every
+%                   name must be in full_networks.
 %   conditions      those of {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}
 %                   the bundle simulates
 %   n_seeds         the table's. Seeds are the first n_seeds rows of
@@ -56,9 +78,9 @@ function plan = outlier_spectra_stage_plan(cfg)
 %                   on it), then the pairs [k k+1] the other stages use
 %   T_settle        60 s before the window
 %   window_s        20 s: the measured window of the other networks
-%   full_window_s   the table's: the measured window of full_networks
+%   full_window_s   the table's: the measured window of long_networks
 %   dt_sample       0.01 s: sampling step of the frozen-gain series
-%   full_dt_sample  the table's: the same for full_networks. 0.05 s at
+%   full_dt_sample  the table's: the same for long_networks. 0.05 s at
 %                   200 s keeps the frozen-gain pass of a long run at the
 %                   cost of two short ones; excursions shorter than 50 ms
 %                   are then missed or merged in those runs (the
@@ -93,7 +115,7 @@ function plan = outlier_spectra_stage_plan(cfg)
 % in the mu7chain bundles both are the values the stage always used.
 %
 % EVERY RUN OF ONE NETWORK GROUP USES ONE LENGTH. Runs of different length
-% on one seed are different noise realizations, so a full_networks run at
+% on one seed are different noise realizations, so a long_networks run at
 % 260 s is not the first 80 s of anything else.
 %
 % THE PLAN
@@ -119,7 +141,7 @@ SIZES = {   'essential',     2,       20,        20,            0.01; ...
             'medium',       10,       20,       200,            0.05; ...
             'medium2',      10,       20,       200,            0.05; ...
             'production',   10,       20,       200,            0.05};
-KNOBS = {'networks', 'full_networks', 'conditions', 'n_seeds', 'seeds', 'T_settle', 'window_s', ...
+KNOBS = {'networks', 'full_networks', 'long_networks', 'conditions', 'n_seeds', 'seeds', 'T_settle', 'window_s', ...
     'full_window_s', 'dt_sample', 'full_dt_sample', 'n_cal', 'n_null', 'n_shuffle', 'n_top', 'n_keep', ...
     'dt_vectors', 'dt_mode', 'dt_full', 'k_full', 'x_thr', 'lya_K', 'lya_window_s', 'fs', 'chunk_s', 'n_override'};
 PREFIX = 'outlier_spectra_';
@@ -164,6 +186,7 @@ row = SIZES(strcmp(SIZES(:, 1), cfg.run_mode), :);
 P = struct();
 P.networks       = knob_cellstr(cfg, [PREFIX 'networks'], {'reference', 'EEx1p1', 'EEx1p25', 'EEx1p5', 'EEx1p75'});
 P.full_networks  = knob_cellstr(cfg, [PREFIX 'full_networks'], intersect({'reference', 'EEx1p5'}, P.networks, 'stable'));
+P.long_networks  = knob_cellstr(cfg, [PREFIX 'long_networks'], intersect({'reference'}, P.full_networks, 'stable'));
 P.n_seeds        = knob('n_seeds', row{2});
 P.T_settle       = knob('T_settle', 60);
 P.window_s       = knob('window_s', row{3});
@@ -243,6 +266,10 @@ missing = setdiff(P.full_networks, P.networks);
 if ~isempty(missing)
     bad_config('cfg.%sfull_networks names %s, which cfg.%snetworks does not.', PREFIX, strjoin(missing, ', '), PREFIX);
 end
+missing = setdiff(P.long_networks, P.full_networks);
+if ~isempty(missing)
+    bad_config('cfg.%slong_networks names %s, which cfg.%sfull_networks does not.', PREFIX, strjoin(missing, ', '), PREFIX);
+end
 
 %% The conditions
 preset_conditions = cellfun(@(c) c.name, conditions, 'UniformOutput', false);
@@ -282,7 +309,7 @@ for s = 1:P.n_seeds
             r = struct('network', P.networks{w}, 'condition', P.conditions{c}, 'seed', P.seeds(s, :), ...
                 'window_s', P.window_s, 'dt_sample', P.dt_sample, 'full', is_full, ...
                 'file', ospec_run_name(P.networks{w}, P.conditions{c}, P.seeds(s, :)));
-            if is_full
+            if ismember(P.networks{w}, P.long_networks)
                 r.window_s = P.full_window_s;
                 r.dt_sample = P.full_dt_sample;
             end

@@ -23,11 +23,14 @@ function cfg = with_spectral_supplement(cfg)
 %                            in outlier_spectra_stage_plan,
 %                            knobs cfg.outlier_spectra_*). Its own four
 %                            figures (FD-045): fig_outlier_plane, _dose,
-%                            _slow_variables, _dwell. The plane, the
-%                            slow-variables and the dwell figure draw the
-%                            networks 'reference' and 'EEx1p5' and need
-%                            their dense pass and full-Jacobian series,
-%                            which the stage's default full_networks gives
+%                            _slow_variables, _dwell. The plane and the
+%                            slow-variables figure draw the networks
+%                            'reference' and 'EEx1p5', the dwell figure the
+%                            reference only (Tom, 2026-11-23, FD-057, over
+%                            the long window the stage's long_networks
+%                            gives it); they need the dense pass and the
+%                            full-Jacobian series, which the stage's
+%                            default full_networks gives
 %                            (a bundle that changes that knob loses them)
 %       frequency_response   at outlier_spectra's calibration states (FD-041;
 %                            cfg.frequency_response)

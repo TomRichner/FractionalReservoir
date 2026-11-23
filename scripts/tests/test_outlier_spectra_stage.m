@@ -6,10 +6,12 @@
 % Checks:
 %   1. The plan in EVERY run mode, from mu7chain_config: five networks,
 %      the three conditions, 2 seeds and a 20 s window at essential and
-%      fast, 10 seeds and 200 s at 50 ms for reference and E-to-E x 1.5
-%      above; seeds outermost, the exploration's seed [7 8] first; the
-%      knobs are taken; bad settings are refused (an unknown knob, an
-%      unknown network, a full network that is not a network, a condition
+%      fast, 10 seeds and 200 s at 50 ms for the reference above (FD-057:
+%      E-to-E x 1.5 keeps its full passes over 20 s at 10 ms; the knob
+%      long_networks gives it 200 s again); seeds outermost, the
+%      exploration's seed [7 8] first; the knobs are taken; bad settings
+%      are refused (an unknown knob, an unknown network, a full network
+%      that is not a network, a long network that is not full, a condition
 %      the preset does not state, more seeds than seed rows, a noise-free
 %      preset, a size below 20, a sampling step below the integration
 %      step, no preset).
@@ -69,9 +71,12 @@ for m = 1:size(sizes, 1)
         '%s: the runs', md);
     r = pl.runs;
     is_full = ismember({r.network}, {'reference', 'EEx1p5'});
-    assert(isequal([r.full], is_full) && all([r(is_full).window_s] == full_window) && ...
-        all([r(~is_full).window_s] == 20) && all([r(is_full).dt_sample] == full_dt) && ...
-        all([r(~is_full).dt_sample] == 0.01), '%s: the long window goes to the full networks only', md);
+    is_long = strcmp({r.network}, 'reference');         % FD-057: the long window for the reference only
+    assert(isequal(pl.long_networks, {'reference'}), '%s: the long networks', md);
+    assert(isequal([r.full], is_full) && all([r(is_long).window_s] == full_window) && ...
+        all([r(~is_long).window_s] == 20) && all([r(is_long).dt_sample] == full_dt) && ...
+        all([r(~is_long).dt_sample] == 0.01), ...
+        '%s: the long window goes to the reference only; E-to-E x 1.5 keeps the full passes over 20 s at 10 ms', md);
     first = r(1:15);                                   % seeds outermost: the first 15 runs are seed [7 8]
     assert(all(arrayfun(@(x) isequal(x.seed, [7 8]), first)) && numel(unique({r.file})) == numel(r));
 end
@@ -88,11 +93,19 @@ c.outlier_spectra_full_window_s = 40;
 pl = outlier_spectra_stage_plan(c);
 assert(numel(pl.runs) == 6 && isequal(pl.seeds, [11 12; 13 14; 15 16]) && isempty(pl.full_networks) && ...
     ~any([pl.runs.full]) && all([pl.runs.window_s] == 20) && isequal(pl.conditions, {'sfa1_std1'}), 'the knobs are taken');
+% The long window back on E-to-E x 1.5: one line (FD-057).
+c = mu7chain_config('fastmedium');
+c.outlier_spectra_long_networks = {'reference', 'EEx1p5'};
+pl = outlier_spectra_stage_plan(c);
+r = pl.runs; is_full = ismember({r.network}, {'reference', 'EEx1p5'});
+assert(all([r(is_full).window_s] == 200) && all([r(is_full).dt_sample] == 0.05) && all([r(~is_full).window_s] == 20), ...
+    'long_networks gives E-to-E x 1.5 the long window again');
 
 refused = { ...
     @(b) setfield(b, 'outlier_spectra_n_seed', 2), ...                           an unknown knob (a typo)
     @(b) setfield(b, 'outlier_spectra_networks', {'reference', 'EEx1.5'}), ...   not a network name
     @(b) setfield(b, 'outlier_spectra_full_networks', {'EEx2p0'}), ...           full, but not a network
+    @(b) setfield(b, 'outlier_spectra_long_networks', {'EEx1p25'}), ...          long, but not a full network
     @(b) setfield(b, 'outlier_spectra_conditions', {'sfa9'}), ...                not a condition of the preset
     @(b) setfield(setfield(b, 'outlier_spectra_seeds', [1 2]), 'outlier_spectra_n_seeds', 2), ...   more seeds than seed rows
     @(b) setfield(b, 'preset_name', b.mc_preset), ...                            noise-free
