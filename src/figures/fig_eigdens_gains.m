@@ -62,7 +62,7 @@ for c = 1:n_c
 end
 set(ax, ax_style{:}, 'XLim', [0 g_max], 'YLim', [0 1], 'YTick', 0:0.2:1);
 xlabel(ax, 'Gain d', 'FontSize', st.label_fs);
-ylabel(ax, 'Fraction of neurons with gain \leq d', 'FontSize', st.label_fs);
+ylabel(ax, {'Fraction of neurons', 'with gain \leq d'}, 'FontSize', st.label_fs);
 
 ax = nexttile(tl); hold(ax, 'on');
 plot(ax, [0 1], [0 1], ':', 'Color', gray, 'LineWidth', 1.8);
@@ -70,8 +70,8 @@ for c = 1:n_c
     rs = F.by_cond{c};
     plot(ax, 1 - [rs.p0], [rs.pr], '.', 'Color', F.colors{c}, 'MarkerSize', 12);
 end
-set(ax, ax_style{:}, 'XLim', [0 1], 'YLim', [0 1], 'XTick', 0:0.2:1, 'YTick', 0:0.2:1);
-xlabel(ax, 'Fraction of neurons with nonzero gain', 'FontSize', st.label_fs);
+set(ax, ax_style{:}, 'XLim', [0 1], 'YLim', [0 1], 'XTick', 0:0.5:1, 'YTick', 0:0.2:1, 'XTickLabelRotation', 0);   % three x ticks: a panel of S6 is about 1.5 in wide
+xlabel(ax, {'Fraction of neurons', 'with nonzero gain'}, 'FontSize', st.label_fs);
 ylabel(ax, '\langle d^2 \rangle^2 / \langle d^4 \rangle', 'FontSize', st.label_fs);
 
 fig_tag = ['Fig_Eigdens_Gains' F.suffix];

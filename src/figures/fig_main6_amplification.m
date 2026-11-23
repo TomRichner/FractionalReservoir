@@ -92,15 +92,16 @@ if isempty(tr_dir); tr_dir = cfg.run_dir; end
 % The common canvas (Plan 2, canvas standard): every row is canvas_w less
 % composite_figure's side margins; the type is set by role at the end
 % (canvas_type).
-st = manuscript_style(); MARGIN = [0.15 0.15 0.1 0.15];
+st = manuscript_style(); MARGIN = [0.15 0.15 0.1 0.45];   % room at the foot for the Re name of (E), under its tick labels
 ROW_W = st.canvas_w - MARGIN(1) - MARGIN(2); ppi = get(groot, 'ScreenPixelsPerInch');
 [f_ab, t_ab, src_ab] = draw_margin_and_gain(cfg, tr_dir, ROW_W);
 [f_net, t_net, o_net] = composite_part(@fig_freqresp_network, cfg, 'networks', {cfg.network}, 'panels', [1 3], ...
-    'bulk_bars', false, 'fig_size', round([ROW_W * ppi, 340]));
-[f_plane, t_plane] = composite_part(@fig_freqresp_plane, cfg, 'networks', {cfg.network}, 'seed', cfg.seed);
+    'bulk_bars', false, 'fig_size', round([ROW_W * ppi, 2.65 * ppi]));   % 2.65 in tall: the figure fits canvas_max_h
+[f_plane, t_plane] = composite_part(@fig_freqresp_plane, cfg, 'networks', {cfg.network}, 'seed', cfg.seed, ...
+    're_label_side', 'below');   % above the axis it sat on the edge curve of the last panel at 9 in
 
 [fig, B] = composite_figure({struct('fig', f_ab, 'width', ROW_W), struct('fig', f_net, 'width', ROW_W), ...
-    struct('fig', f_plane, 'width', ROW_W)}, 'visible', cfg.visible, 'margin', MARGIN, 'width', st.canvas_w);
+    struct('fig', f_plane, 'width', ROW_W)}, 'visible', cfg.visible, 'margin', MARGIN, 'row_gap', 0.2, 'width', st.canvas_w);
 ab = B{1}(1).ax;                                     % margin, then the gain panels, left to right
 composite_letter(fig, B{1}(1), 'A', ab(1));
 composite_letter(fig, B{1}(1), 'B', ab(2));
@@ -110,19 +111,28 @@ composite_letter(fig, B{2}(1), 'D', net(2));
 composite_letter(fig, B{3}(1), 'E');
 canvas_type(fig);
 
+% The dendritic time constant, for the caption's corner frequency (Tom's
+% question on panel C, 2026-11-22).
+src_net = o_net.source; if iscell(src_net); src_net = src_net{1}; end
+R = load(src_net, 'runs');
+tau_d = R.runs(1).tau_d;
+clear R
 caption = sprintf(['Main Figure 6. (A) Non-normal margin of the dendritic block of the Jacobian, numerical minus ' ...
     'spectral abscissa, per sampled state and condition: line 5 to 95 %%, box the interquartile range, bar the median. ' ...
     '(B) Gain of the active dendritic propagator against time after a perturbation, medians over the regular ' ...
     'states, for five directions (legend); the first %g s of the saved horizon; dashed gray: unity. (C) Bulk radius ' ...
     'of the effective connectivity M(i omega) against frequency, network `%s`: median over seeds and calibration ' ...
-    'states, quartiles as a band; gray: |1 + i omega tau_d|, the modulus an eigenvalue must reach for a mode at that ' ...
-    'frequency to be marginal. (D) Loop gain, the bulk radius over that modulus; above 1 (gray line) the bulk holds ' ...
+    'states, quartiles as a band. In plain words, the bulk radius of M(i omega) is the radius of the effective ' ...
+    'connectivity as a perturbation at that frequency sees it: the slow variables follow a slow perturbation and ' ...
+    'not a fast one. Gray: |1 + i omega tau_d|, the threshold, the modulus an eigenvalue must reach for a mode at that ' ...
+    'frequency to be marginal; it is 1 at low frequency and rises above 1/(2 pi tau_d) = %.2g Hz (tau_d = %g s) ' ...
+    'because the dendrite filters fast input, so a fast mode needs a larger radius to grow. (D) Loop gain, the bulk radius over that modulus; above 1 (gray line) the bulk holds ' ...
     'growing modes at that frequency; triangles: the frequency of the leftover mode (the bars of the stand-alone ' ...
     'figure, the rotation rates of the frozen bulk, are not drawn here; their numbers are in the table below). (E) The same in the complex plane, network `%s`, one seed and state: gray dots the ' ...
     'full Jacobian''s eigenvalues (upper half plane), dashed the edge of the bulk with the adaptive variables frozen, ' ...
     'colored line the edge once they respond, filled dot the leftover mode. Conditions in their colors throughout. ' ...
     '(A) and (B) are read from `%s`; (C) to (E) from the stage frequency_response of `%s`.'], ...
-    cfg.gain_window_s, cfg.network, cfg.network, tr_dir, cfg.run_dir);
+    cfg.gain_window_s, cfg.network, 1 / (2 * pi * tau_d), tau_d, cfg.network, tr_dir, cfg.run_dir);
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Main Figure 6: selective amplification', caption, ...
     {'Panels A and B (eig_heatmap, transient_gain)', t_ab; 'Panels C and D (fig_freqresp_network, panels 1 and 3)', t_net; ...
     'Panel E (fig_freqresp_plane)', t_plane}, [src_ab, {o_net.source}]);
@@ -149,11 +159,14 @@ G = load(f_gain, 'results', 'settings');
 results = G.results(g_idx);
 n_m = numel(m_names); n_g = numel(g_names);
 
-% Geometry (inches).
-fig_h = 4.35; bottom = 1.45; ph = 2.25;
-m_left = 1.0; m_w = 0.55 + 0.5 * n_m;
-g_left = m_left + m_w + 1.25; g_gap = 0.4;
-g_w = (fig_w - 0.2 - g_left - (n_g - 1) * g_gap) / n_g;
+% Geometry (inches), made for the 9 in canvas (Plan 3, 2026-11-22): the
+% margin panel narrow (0.4 in per condition), the gain panels as wide as
+% the rest allows, one axis name under the middle gain panel (three of them
+% ran into each other at this width), the key under (B).
+fig_h = 3.6; bottom = 1.3; ph = 1.7;
+m_left = 0.95; m_w = 0.4 * n_m;
+g_left = m_left + m_w + 0.95; g_gap = 0.25;
+g_w = (fig_w - 0.1 - g_left - (n_g - 1) * g_gap) / n_g;
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w fig_h], 'Visible', 'off');
 ax_style = {'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out', ...
     'TitleFontSizeMultiplier', 1, 'LabelFontSizeMultiplier', 1};
@@ -176,7 +189,7 @@ for i = 1:n_m
 end
 y_hi = max(100, 25 * ceil(1.05 * top / 25));        % [0, 100] with ticks at 0 to 75, as the former Figure 5A; wider if the data need it
 set(ax, ax_style{:}, 'XLim', [0.4, n_m + 0.6], 'XTick', 1:n_m, 'XTickLabel', ticks, 'TickLabelInterpreter', 'tex', ...
-    'XTickLabelRotation', 30, 'YLim', [0 y_hi], 'YTick', 0:25:(y_hi - 25));
+    'XTickLabelRotation', 45, 'YLim', [0 y_hi], 'YTick', 0:25:(y_hi - 25));
 ylabel(ax, {'Non-normal amplification', 'margin (s^{-1})'}, 'FontSize', st.tick_fs);
 
 % (B) the directional gains.
@@ -209,19 +222,27 @@ for i = 1:n_g
     unity = yline(ax, 1, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 1.2);
     set(ax, ax_style{:}, 'YScale', 'log', 'XLim', [0 cfg.gain_window_s], 'XTick', 0:1:cfg.gain_window_s, 'YMinorTick', 'off');
     title(ax, two_lines(g_names{i}), 'FontWeight', 'normal', 'FontSize', st.tick_fs, 'Color', st.condition_color(g_names{i}));
-    xlabel(ax, 'Time after perturbation (s)', 'FontSize', st.tick_fs);
+    if i == ceil(n_g / 2)
+        xlabel(ax, 'Time after perturbation (s)', 'FontSize', st.tick_fs);
+    end
     if i == 1
         ylabel(ax, 'Active dendritic gain', 'FontSize', st.tick_fs);
     end
 end
 linkaxes(gain_ax, 'y');
+% The decades, every other one when there are many: at 1.7 in MATLAB's own
+% choice kept only 10^0 (9 in canvas, 2026-11-22).
+yl = gain_ax(1).YLim;
+dec = ceil(log10(yl(1))):floor(log10(yl(2)));
+if numel(dec) > 3; dec = dec(mod(dec, 2) == 0); end
+set(gain_ax, 'YTick', 10 .^ dec);
 set(gain_ax(2:end), 'YTickLabel', []);
 lg = legend(gain_ax(min(2, n_g)), [hh unity], [labels {'Unity gain'}], 'NumColumns', 3, 'Box', 'off', ...
     'FontSize', st.tick_fs, 'Units', 'inches');
 drawnow;
 p = lg.Position;
 x_mid = g_left + (n_g * g_w + (n_g - 1) * g_gap) / 2;
-lg.Position = [min(max(x_mid - p(3) / 2, 0.1), fig_w - p(3) - 0.05), 0.08, p(3), p(4)];
+lg.Position = [min(max(x_mid - p(3) / 2, 0.1), fig_w - p(3) - 0.05), 0.02, p(3), p(4)];
 
 txt = sprintf(['# Numbers of panels A and B\n\nPanel A: the non-normal margin omega(J_xx) - alpha(J_xx) in 1/s over the ' ...
     'states the stage eig_heatmap sampled (`%s`).\n\n%s\n\nPanel B: the gain of the active dendritic propagator, ' ...
