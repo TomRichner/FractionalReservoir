@@ -222,6 +222,7 @@ out = struct('figs', fig, 'files', {{}}, 'source', C.file, 'window', g, 'far', {
     'add_clim', add_clim, 'n_out', n_out, 'titles', {titles}, ...
     'axes', struct('image', ax_img, 'added', ax_add, 'spectrum', ax_spec));
 if cfg.save
+    true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
     save_figure_stable(out_dir, fig_tag, fig);
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];

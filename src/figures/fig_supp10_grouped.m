@@ -220,6 +220,7 @@ letter(fig, 'C', 0.05, y2 + h2 + 0.05); letter(fig, 'D', xD - 0.95, y2 + h2 + 0.
 fig_tag = 'Fig_Supp10_Grouped';
 out = struct('figs', fig, 'files', {{}}, 'source', {{B.index_file, ied_file}});
 if cfg.save
+    true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
     save_figure_stable(out_dir, fig_tag, fig);
     out.files = existing_outputs(out_dir, fig_tag);
     tfile = fullfile(out_dir, [fig_tag '_table.md']);

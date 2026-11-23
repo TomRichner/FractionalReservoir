@@ -413,6 +413,7 @@ out = struct('figs', fig, 'files', {{}}, 'source', C.file, 'window', g, 'far', {
     'y_lims', y_lims, 'n_left', n_left, 'n_far', n_far, 'n_crossed', n_crossed, 'n_out', n_out, 'titles', {titles}, ...
     'add_clim', add_clim, 'axes', struct('image', ax_img, 'added', ax_add, 'spectrum', ax_spec, 'activity', ax_act, 'concepts', A.axes));
 if cfg.save
+    true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
     save_figure_stable(out_dir, fig_tag, fig);
     out.files = existing_outputs(out_dir, fig_tag);
     table_name = [fig_tag '_table.md'];
