@@ -27,6 +27,13 @@ function C = cx_load(run_dir, data_file, who)
 %   lowrank_rate where the added low-rank structure was built to put its
 %                eigenvalue (1/s; NaN when nothing was added)
 %   sample       weight_image_sample's struct (W, idx, type, density, ...)
+%   added_part   what the structure added to the balanced matrix of its own
+%                draw, from the construction (run_concept_examples_stage):
+%                kind ('none', 'blockmean', 'lowrank'), W (the added matrix
+%                on the piece's neurons), base_W (the balanced matrix on
+%                them, sample.W - W), delta_mu (2 x 2, post x pre: the shift
+%                of every connection of a block), max_abs (over the whole
+%                network). Files written before 2026-11-22 lack it.
 % AND OF EVERY EXAMPLE
 %   t (1 x nt), trace_idx, trace_type (1 E, 2 I), x_trace, rate_trace,
 %   S_c_trace, S_a, activation, rate_E, rate_I (population means over
