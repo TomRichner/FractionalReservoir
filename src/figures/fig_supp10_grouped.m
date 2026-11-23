@@ -63,18 +63,23 @@ lw = st.line_lw; thin = 0.6 * st.line_lw;         % traces; connecting and refer
 % It is laid out again at canvas_w with the type by role (tick_fs,
 % label_fs, letter_fs; canvas_type at the end) and the lines and marks to
 % go with it, not enlarged: two rows, A beside B, then C (two parts) and D.
-% Geometry in inches.
+% LAID OUT FOR 9 IN (Plan 3, 2026-11-22; Tom: "fine as it is", nothing it
+% shows changed). The 13-in layout had been carried to 9 in by shares of
+% the width: A's category names turned by 30 degrees, B's two-line y label
+% ran into A, and B's key reached the canvas edge. Now the columns are
+% placed in inches: A wide enough for its three names upright, B with room
+% for its two-line label; in the lower row C's two parts and D each with
+% room for their y labels.
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 W = st.canvas_w;
-y2 = 1.0; h2 = 2.8;                               % row 2 (C, D): axes bottom and height
-hC2 = 2.2;                                        % C right: room above it for its key
-y1 = y2 + h2 + 1.1; h1 = 3.2;                     % row 1 (A, B): above row 2's letters and B's time axis
-Ht = y1 + h1 + 0.55;
-% Horizontal places as shares of the canvas, so that a wider or narrower
-% canvas_w moves the columns with it; the room for labels stays in inches.
-xL = 1.05; wL = 0.277 * W;                       % left column (A, C left)
-xB = 0.469 * W; wB = W - 0.2 - xB;                     % B, C right
-xD = 0.758 * W; wD = W - 0.2 - xD;
+y2 = 0.95; h2 = 2.6;                              % row 2 (C, D): axes bottom and height
+hC2 = 2.05;                                       % C right: room above it for its key
+y1 = y2 + h2 + 1.1; h1 = 3.0;                     % row 1 (A, B): above row 2's letters and B's time axis
+Ht = y1 + h1 + 0.5;
+xL = 1.0; wL = 2.6;                               % A and C left
+xB = xL + wL + 1.45; wB = W - 0.15 - xB;          % B: room for its two-line y label
+wD = 1.6; xD = W - 0.15 - wD;                     % D
+wC2 = 1.6; xC2 = xD - 0.9 - wC2;                  % C right, its y label clear of C left
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.5 0.5 W Ht], 'Visible', vis);
 mk = @(p) axes(fig, 'Units', 'inches', 'Position', p);
 
@@ -96,7 +101,7 @@ for c = 1:3
     plot(axA, [c - 0.3, c + 0.3], median(pct(:, c)) * [1 1], '-', 'Color', 0.55 * green, 'LineWidth', 1.5 * lw);
 end
 yline(axA, 0, ':', 'Color', [0 0 0], 'LineWidth', st.axis_lw);
-xlim(axA, [0.4 3.6]); xticks(axA, 1:3); xticklabels(axA, {'Rate', 'SFA', 'Depression'});
+xlim(axA, [0.5 3.5]); xticks(axA, 1:3); axA.XTickLabelRotation = 0; xticklabels(axA, {'Rate', 'SFA', 'Depression'});
 ylabel(axA, 'Change with stimulation (%)');
 
 %% B: onset, adaptation intact against frozen
@@ -148,7 +153,7 @@ axC1.XTickLabelRotation = 0;
 xlabel(axC1, 'Network (seed)'); ylabel(axC1, 'Bursts before the step');
 lg = legend(axC1, [h1s h2s], {'Bursts', 'Preceded by a crossing'}, 'Location', 'northwest', 'Box', 'off');
 lg.ItemTokenSize = [12 12];
-axC2 = mk([xB y2 0.185 * W hC2]); hold(axC2, 'on');
+axC2 = mk([xC2 y2 wC2 hC2]); hold(axC2, 'on');
 pairs = {T.frac_beyond_before_frozen_gain, T.frac_beyond_during_frozen_gain, fg_col; ...
     T.frac_beyond_before_full, T.frac_beyond_during_full, mode_col};
 hc = gobjects(1, 2);
@@ -188,8 +193,8 @@ xs = arrayfun(@(t) t.Position(1), lab);
 for k = 1:3; lab(k).Position(1) = min(xs); end
 set([lgB lgC], 'Units', 'inches', 'Location', 'none');
 lgB.Position(1:2) = [xB + wB - lgB.Position(3), y1 + h1 + 0.02];   % above B, at its right end
-lgC.Position(1:2) = [xB, y2 + hC2 + 0.05];                         % above C right, at its left edge
-letter(fig, 'A', 0.05, y1 + h1 + 0.05); letter(fig, 'B', xB - 0.95, y1 + h1 + 0.05);
+lgC.Position(1:2) = [xC2, y2 + hC2 + 0.05];                        % above C right, at its left edge
+letter(fig, 'A', 0.05, y1 + h1 + 0.05); letter(fig, 'B', xB - 1.4, y1 + h1 + 0.05);
 letter(fig, 'C', 0.05, y2 + h2 + 0.05); letter(fig, 'D', xD - 0.95, y2 + h2 + 0.05);
 
 fig_tag = 'Fig_Supp10_Grouped';
