@@ -25,6 +25,11 @@ classdef SRNNNumericsProbe < SRNNCellTypePairs
     % every run's provenance for something no sweep sets. Precedent for the
     % pattern: SRNNPairsTestAccess (test-only) and SRNN_ESN_reservoir.
     %
+    % A fourth door (2026-11-23): set_lyapunov_start_vector gives Benettin
+    % and QR one initial tangent direction, through the parent's protected
+    % hook lyapunov_start_vector (empty there, so every other model keeps
+    % its starts bit for bit).
+    %
     % See also: run_numerics_verification, coarsen_noise, sde_fixed_step,
     %           SRNNCellTypePairs
 
@@ -35,9 +40,33 @@ classdef SRNNNumericsProbe < SRNNCellTypePairs
         % The noise struct the last run() consumed, kept after run() clears
         % noise_increments. Empty for a deterministic run.
         consumed_noise = []
+        % The initial tangent direction for lya_method 'benettin' and 'qr'
+        % (set_lyapunov_start_vector). Empty keeps the parent's starts
+        % (Benettin a randn draw, QR eye(N)). Added 2026-11-23 for
+        % sub-experiment C, whose two estimators must follow one vector
+        % (Tom's review of S2 panel B): a local rate belongs to its vector.
+        lya_start_vector = []
     end
 
     methods
+        function set_lyapunov_start_vector(obj, v)
+            % SET_LYAPUNOV_START_VECTOR Start the next run's Benettin
+            % perturbation, or the first column of its QR basis, along v
+            % (N_sys_eqs x 1, normalised by the method). [] clears it.
+            if ~isempty(v)
+                if ~obj.is_built
+                    error('SRNNNumericsProbe:NotBuilt', ...
+                        'Call build() before set_lyapunov_start_vector() (the size is N_sys_eqs).');
+                end
+                if numel(v) ~= obj.N_sys_eqs || ~all(isfinite(v(:))) || norm(v) == 0
+                    error('SRNNNumericsProbe:BadStartVector', ...
+                        'The start vector must be %d finite entries, not all zero.', obj.N_sys_eqs);
+                end
+                v = v(:);
+            end
+            obj.lya_start_vector = v;
+        end
+
         function set_noise(obj, nz)
             % SET_NOISE Make the next run() consume this Brownian path.
             %   The struct must lie on THIS model's grid: fs equal to obj.fs and
@@ -124,6 +153,13 @@ classdef SRNNNumericsProbe < SRNNCellTypePairs
         function disarm_noise(obj)
             % DISARM_NOISE Drop the (large) noise tensor once the segments are done.
             obj.noise_increments = [];
+        end
+    end
+
+    methods (Access = protected)
+        function v0 = lyapunov_start_vector(obj)
+            % The parent's hook (empty there): the vector set_lyapunov_start_vector stored.
+            v0 = obj.lya_start_vector;
         end
     end
 end

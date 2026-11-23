@@ -27,7 +27,8 @@
 %      every inset and names the drawn seed (the stage's first) in its
 %      sidecar; Figure 6's frequency panels are the reference network only,
 %      carry their own frequency-axis labels, and leave out the middle
-%      panel; S6 draws one cumulative panel per network, titled.
+%      panel; S6 draws one cumulative panel per network, titled; S7 has
+%      panel C, the dwell time of the reference, with its key (FD-057).
 %   5. The source figures' new options: fig_freqresp_network networks and
 %      panels (the table still has every network's row it was asked for),
 %      fig_freqresp_plane networks and sentence-case titles, a network the
@@ -242,8 +243,13 @@ assert(numel(findall(o.figs, 'Tag', 'eigdens_box')) == 4 * numel(conditions), 'f
 close(o.figs);
 
 % S7
-o = draw(@fig_supp7_grouped, common, fullfile(fig_dir, 'supp7'), 'Fig_Supp7_Grouped', 'AB', ...
-    {'Panel A (fig_outlier_slow_variables)', 'Panel B (fig_ostruct_summary)'});
+o = draw(@fig_supp7_grouped, common, fullfile(fig_dir, 'supp7'), 'Fig_Supp7_Grouped', 'ABC', ...
+    {'Panel A (fig_outlier_slow_variables)', 'Panel B (fig_ostruct_summary)', 'Panel C (fig_outlier_dwell)'});
+% Panel C (Tom, 2026-11-23, FD-057): the dwell time of the reference, with its key of the two line styles.
+lg = findall(o.figs, 'Type', 'legend');
+assert(any(arrayfun(@(l) isequal(l.String, {'Gains frozen', 'Full Jacobian'}), lg)), 'S7 (C): the key of the line styles');
+assert(contains(fileread(fullfile(fig_dir, 'supp7', 'Fig_Supp7_Grouped_table.md')), '(C) How long the rightmost eigenvalue'), ...
+    'S7: the caption paragraph of panel C');
 % Without a gallery in the run, B draws every network of the stage under the stage's names.
 assert(isempty(o.gallery_keys) && numel(findall(o.figs, 'Tag', 'slow_variables_filtered')) >= 1, ...
     'S7: no gallery, the stage''s own list; the filtered eigenvalues are drawn in A');

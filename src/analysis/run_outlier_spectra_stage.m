@@ -80,10 +80,20 @@ end
 pool = pool_ensure();
 n_workers = 0;
 if ~isempty(pool); n_workers = pool.NumWorkers; end
+% The windows as the runs have them (only the long networks differ from
+% plan.window_s, FD-057), and the networks with the full-Jacobian passes.
+other = runs([runs.window_s] ~= plan.window_s);
+window_txt = '';
+if ~isempty(other)
+    [w_other, i_first] = unique([other.window_s], 'stable');
+    parts = arrayfun(@(k) sprintf('%g s for %s', w_other(k), strjoin(unique({other([other.window_s] == w_other(k)).network}, ...
+        'stable'), ', ')), 1:numel(i_first), 'UniformOutput', false);
+    window_txt = [' (' strjoin(parts, '; ') ')'];
+end
 vprintf(verbose, 'minimal', ...
-    '  outlier_spectra: %d run(s) = %d network(s) x %d condition(s) x %d seed(s); window %g s (%g s for %s); %d worker(s)\n', ...
-    n_runs, numel(plan.networks), numel(plan.conditions), plan.n_seeds, plan.window_s, ...
-    plan.full_window_s, strjoin_or(plan.full_networks, 'none'), n_workers);
+    '  outlier_spectra: %d run(s) = %d network(s) x %d condition(s) x %d seed(s); window %g s%s; full Jacobian for %s; %d worker(s)\n', ...
+    n_runs, numel(plan.networks), numel(plan.conditions), plan.n_seeds, plan.window_s, window_txt, ...
+    strjoin_or(unique({runs([runs.full]).network}, 'stable'), 'none'), n_workers);
 
 % The long runs first: with one run handed out at a time, a worker that
 % finishes a short run takes the next one, and no long run is left for last.
