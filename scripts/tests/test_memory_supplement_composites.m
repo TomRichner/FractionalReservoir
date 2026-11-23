@@ -1,7 +1,9 @@
 %% TEST_MEMORY_SUPPLEMENT_COMPOSITES The composites of Plan 2 package F build from a small run, and their two new pieces work.
 %
-% Main Figure 7 (fig_main7_memory) and supplementary S1, S2, S4, S5, S9
-% (fig_supp<k>_grouped), the responsive-share row of fig_mc_gain_bias_maps
+% Main Figure 7 (fig_main7_memory), supplementary S1, S2, S4, S5, S9
+% (fig_supp<k>_grouped) and the leading-direction supplement
+% (fig_supp_leading_grouped; not yet numbered),
+% the responsive-share row of fig_mc_gain_bias_maps
 % and the steps of composite_tools. No simulation.
 %
 % THE FIXTURE. The stages of the 100-neuron regression run
@@ -150,7 +152,8 @@ jobs = { ...   function, its own arguments, the panel letters, the file tag
     @fig_supp2_grouped, {'conditions', three},                                                 'ABC',    'Fig_Supp2_Grouped'; ...
     @fig_supp4_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp4_Grouped'; ...
     @fig_supp5_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp5_Grouped'; ...
-    @fig_supp9_grouped, {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'},  'ABCDE',  'Fig_Supp9_Grouped'};
+    @fig_supp9_grouped, {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'},  'ABC',    'Fig_Supp9_Grouped'; ...
+    @fig_supp_leading_grouped, {'preset_name', reg_preset, 'conditions', three},               'ABC',    'Fig_Supp_Leading_Grouped'};
 ppi = get(groot, 'ScreenPixelsPerInch');
 for j = 1:size(jobs, 1)
     fn = jobs{j, 1}; args = [base, jobs{j, 2}]; letters = jobs{j, 3}; tag = jobs{j, 4};
@@ -201,7 +204,7 @@ n_fail = n_fail + check(isequal(sort({dir(run_dir).name}), listing_before), ...
 %% 5. a run without the stages
 empty_run = fullfile(tmp, 'empty'); mkdir(empty_run);
 ids = cellfun(@(f) error_of(@() f('run_dir', empty_run, 'save', false, 'conditions', three, 'verbose', 'near-none')), ...
-    {@fig_main7_memory, @fig_supp2_grouped, @fig_supp4_grouped, @fig_supp5_grouped, @fig_supp9_grouped, ...
+    {@fig_main7_memory, @fig_supp2_grouped, @fig_supp4_grouped, @fig_supp5_grouped, @fig_supp9_grouped, @fig_supp_leading_grouped, ...
      @(varargin) fig_supp1_grouped(varargin{:}, 'preset_name', chain_preset)}, 'UniformOutput', false);
 n_fail = n_fail + check(all(~cellfun(@isempty, ids)), ...
     sprintf('a run directory without the stages is an error for every composite (%s)', strjoin(unique(ids), ', ')));
@@ -322,7 +325,7 @@ switch name
         n = n + check(ok, 'S5 (B): one key, above its panel, clear of the data');
     case 'fig_supp9_grouped'
         boxed = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'Lyapunov') && strcmp(h.Box, 'on'), ax));
-        n = n + check(isempty(boxed), 'S9 (E): the scatter panels are open, not boxed');
+        n = n + check(isempty(boxed), 'S9 (C): the scatter panels are open, not boxed');
         key = findall(fig, 'Tag', 'mc_sweep_scatter_size_legend');
         ok = isscalar(key);
         if ok
@@ -333,16 +336,29 @@ switch name
             e = sortrows(cell2mat(arrayfun(@(t) t.Extent, tx, 'UniformOutput', false)), 1);
             ok = size(e, 1) >= 2 && all(e(2:end, 1) - (e(1:end - 1, 1) + e(1:end - 1, 3)) > 2);
         end
-        n = n + check(ok, 'S9 (E): the labels of the marker-size key do not run into each other');
+        n = n + check(ok, 'S9 (C): the labels of the marker-size key do not run into each other');
+        % Tom's review of 2026-11-22 (Plan2_figure_feedback.md, S9): memory
+        % only. The leading-direction shares and the cumulative capacity
+        % have left; the responsive-share maps mark self-coupling 0.
+        words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')) + " " + ...
+            string(strjoin(cellstr(h.YLabel.String), ' ')), ax);
+        n = n + check(~any(contains(words, 'SFA Time')) && ~any(contains(words, 'Cumulative')) && ...
+            isempty(findall(fig, 'Type', 'legend')), 'S9: memory only (no leading-direction shares, no cumulative capacity, no key)');
+        maps = ax(arrayfun(@(h) ~isempty(findall(h, 'Type', 'surface')), ax));     % fig_mc_gain_bias_maps draws its cells as a surface
+        n = n + check(numel(maps) == 3 && all(arrayfun(@(h) any(h.YTick == 0), maps)), ...
+            'S9 (B): the self-coupling axis of every map is marked at 0');
+    case 'fig_supp_leading_grouped'
+        % The three panels on the leading direction (Plan 3, question 10).
         lg = findall(fig, 'Type', 'legend');
-        state = lg(arrayfun(@(l) any(strcmp(l.String, 'SFA')), lg));
-        ok = isscalar(state);
-        if ok
-            state.Units = 'pixels'; own = state.Axes; own.Units = 'pixels';
-            ok = state.Position(1) >= own.Position(1) + own.Position(3) && ...
-                state.Position(2) >= own.Position(2) && state.Position(2) + state.Position(4) <= own.Position(2) + own.Position(4) + 1;
-        end
-        n = n + check(ok, 'S9 (B): its key is beside it, level with it');
+        ok = isscalar(lg) && any(startsWith(lg.String, 'Spike-frequency')) && ~any(strcmp(lg.String, 'SFA'));
+        n = n + check(ok, 'leading (B): one key, spike-frequency adaptation written out');
+        tau = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'SFA Time'), ax));
+        ok = numel(tau) == 2 && isequal(tau(1).XLim, tau(2).XLim);
+        n = n + check(ok, 'leading (A), (B): both against the longest SFA time constant, on one x range');
+        c = ax(startsWith(get(ax, {'Tag'}), 'leading_direction_c'));
+        ok = numel(c) == 3 && isempty(findall(fig, 'Tag', 'uncoupled_reference')) && ...
+            all(arrayfun(@(h) isscalar(findall(h, 'Tag', 'leading_direction_points')), c));
+        n = n + check(ok, 'leading (C): one panel per condition, no line at the uncoupled rate');
 end
 end
 
@@ -361,8 +377,11 @@ end
 
 function n = main7_polish_check(fig, names)
 % Polish of 2026-11-22. (C): the conditions by name, not '1TS' and 'MTS'.
-% (D): gain tick labels under the memory-capacity maps too. (E): the
+% (E): gain tick labels under the memory-capacity maps too. (D): the
 % labelled noise ticks read their values, and the axis has a break.
+% Tom's review of 2026-11-22 (Figure 7 notes 1 to 6): four panels in the
+% top row, no lambda_1 against the SFA time constant, self-coupling 0
+% marked on every map.
 ticks = findall(fig, 'Tag', 'main7_horizon_tick');
 words = arrayfun(@(t) string(strjoin(cellstr(t.String), '')), ticks);
 full = string(erase(grouped_condition_label(names, 'tick'), ' '));
@@ -371,7 +390,18 @@ n = check(numel(ticks) == numel(names) && all(ismember(full, words)) && ...
 top = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r1_c%d', c)), 1:3);
 bottom = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r2_c%d', c)), 1:3);
 n = n + check(all(arrayfun(@(a, b) ~isempty(a.XTickLabel) && isequal(a.XTickLabel, b.XTickLabel), top, bottom)), ...
-    '(D) carries the gain tick labels of (F)');
+    '(E) carries the gain tick labels of (F)');
+n = n + check(all(arrayfun(@(a) any(a.YTick == 0) && any(a.YTick < 0) && any(a.YTick > 0), [top bottom])), ...
+    '(E), (F): the self-coupling axis is marked at 0 as well as at its ends');
+ax = findall(fig, 'Type', 'axes');
+maps = [top bottom];
+others = ax(~ismember(ax, maps));
+set(others, 'Units', 'pixels');
+y = arrayfun(@(a) a.Position(2), others);
+n = n + check(numel(others) == 4 && max(y) - min(y) < 1 && min(y) > max(arrayfun(@(a) getpixelposition(a, true) * [0; 1; 0; 1], top)), ...
+    'the top row holds four panels, level, above the maps');
+words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')), ax);
+n = n + check(~any(contains(words, 'SFA Time')), 'lambda_1 against the longest SFA time constant has left Figure 7');
 brk = findall(fig, 'Tag', 'main7_noise_break');
 ok = ~isempty(brk);
 if ok
@@ -381,7 +411,7 @@ if ok
     ok = ~isempty(levels) && numel(shown) >= 2 && ...
         all(arrayfun(@(k) strcmp(lbl{k}, sprintf('%g', levels(k))), shown)) && ~any(contains(lbl, 'times'));
 end
-n = n + check(ok, '(E) labels its noise ticks with their values and marks the break after 0');
+n = n + check(ok, '(D) labels its noise ticks with their values and marks the break after 0');
 end
 
 function n = gain_panel_check(fig, run_dir, names)

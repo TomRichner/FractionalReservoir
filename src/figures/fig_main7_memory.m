@@ -51,7 +51,7 @@ function out = fig_main7_memory(cfg)
 arguments
     cfg.run_dir     (1,:) char    = ''
     cfg.mc_run_dir  (1,:) char    = ''
-    cfg.preset_name (1,:) char    = ''          %#ok<INUSA> accepted for a uniform call
+    cfg.preset_name (1,:) char    = ''          % accepted for a uniform call
     cfg.run_mode    (1,:) char    = 'fastmedium'
     cfg.figure_set  (1,:) char    = '3cond'
     cfg.conditions                = {}
