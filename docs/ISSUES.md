@@ -2464,3 +2464,54 @@ takes about 35 minutes; run it in pieces.
      free physical memory in every stage.
 - **Depends on:** the end of the present run (for the measured peaks), and
   Tom's agreement on items 1 and 2 before any stage is changed.
+
+### FD-055 CPU priority of a large pool: twelve workers at normal priority starve everything else on the machine
+
+- **Status:** open. Logged at Tom's request, 2026-11-22, while the `fastmedium`
+  run was going. The run was not changed; the priority of its worker processes
+  was, by hand (below).
+- **Serves:** every long run on a shared machine, and whatever else has to be
+  done on that machine while it goes (this time: MATLAB workers of agents
+  redrawing figures, Plan 3).
+- **What happened.** The machine has 14 logical processors. The run's pool
+  holds 12 workers, all at normal priority and all busy, so the total load sat
+  at 100%. Three to five other MATLAB sessions (one each, no pool) were drawing
+  figures at the same time and had two processors between them and the
+  system. Their calls were slow, a PowerShell query of the load took over two
+  minutes, and Tom saw the figure work lagging.
+- **What was done, by hand, about 22:45.** The 12 pool worker processes (the
+  children of the client, `MATLAB.exe -parallelserver`) were set to
+  below-normal priority from PowerShell, without stopping anything:
+  `(Get-Process -Id <pid>).PriorityClass = 'BelowNormal'` for each. The
+  client stayed at normal priority, so the run's own bookkeeping is not
+  starved. Tom, a little later: "seems much more responsive."
+- **What it means.** Below normal does not cap the pool: the workers take
+  every processor nobody else wants and give one up when another process asks.
+  Nothing is paused.
+- **Not measured:** how much the run slows while other work is going. To be
+  read from the rate of the memory-grid stage before and after 22:45 when the
+  run ends.
+- **Known limits of the hand fix:** a pool that a stage starts again comes up
+  at normal priority; nothing records that the priority was changed; it is
+  Windows only.
+- **Proposed by Tom:** set the CPU priority to below normal for any session
+  that uses a parallel pool of more than 8 workers.
+- **Done means:**
+  1. The pool module (`pool_set` / `pool_ensure` / `pool_restart`,
+     MatlabAgenticOrg) sets its workers to below-normal priority when the pool
+     has more than a threshold of workers (8 unless told otherwise), each time
+     a pool is created or restarted, and says so in what it prints. The
+     threshold and the choice are settings, with an off switch.
+  2. It is done from inside MATLAB on the workers themselves (for example
+     `parfevalOnAll` with
+     `System.Diagnostics.Process.GetCurrentProcess().PriorityClass`), so it
+     needs no outside script and survives a pool restart; on a system where
+     that is not available it does nothing and says so.
+  3. The client's priority is left alone.
+  4. A test at small size: a pool above the threshold reports below normal on
+     every worker, one at or below it reports normal.
+  5. The slowdown is measured once on a real stage and written here.
+- **Depends on:** Tom's agreement on the threshold and on where the code
+  lives (the pool module is in another repository). Related: FD-054 (memory in
+  the same run); the two together say what a large pool costs the rest of the
+  machine.
