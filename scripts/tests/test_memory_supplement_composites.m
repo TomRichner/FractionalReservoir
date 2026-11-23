@@ -292,12 +292,26 @@ switch name
         n_wide = 0;
         for k = 1:numel(ax_b)
             kids = findall(ax_b(k), 'Type', 'line');
+            kids = kids(arrayfun(@(h) any(isfinite(h.YData)), kids));   % not the key's samples (NaN proxies)
             is_thin = arrayfun(@(h) h.LineWidth == 0.8, kids);
             ok = ok && nnz(is_thin) == 1 && nnz(~is_thin) == 1 && find(is_thin) < find(~is_thin) && ...   % the QR line over Benettin's
                 (isequal(ax_b(k).YLim, [-4 4]) || isequal(ax_b(k).YLim, [-15 5]));
             n_wide = n_wide + isequal(ax_b(k).YLim, [-15 5]);
         end
         n = n + check(ok && n_wide == 1, 'S2 (B): one thin QR line on top of Benettin''s thick one; -15 to 5 without adaptation, plus or minus 4 with');
+        % Plan 3 review: the keys' samples in neutral grays (they apply to
+        % every column), and at least two labelled decades on each axis of (A).
+        ok = ~isempty(lg);
+        for k = 1:numel(lg)
+            s = lg(k).PlotChildren;
+            s = s(isprop(s, 'Color'));
+            c = vertcat(s.Color);
+            ok = ok && all(max(c, [], 2) - min(c, [], 2) < 0.05);
+        end
+        n = n + check(ok, 'S2: the keys'' samples are gray, not a condition''s colour');
+        ax_a = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.XLabel.String), ' '), 'Step (s)'), ax));
+        n = n + check(numel(ax_a) == 3 && all(arrayfun(@(h) nnz(h.YTick >= h.YLim(1) & h.YTick <= h.YLim(2)) >= 2, ax_a)), ...
+            'S2 (A): at least two labelled decades on every y axis');
         ax_c = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.XLabel.String), ' '), 'Snapshot'), ax));
         ok = numel(ax_c) == 3 && all(arrayfun(@(h) isequal(h.YLim, [1e-12 1e-8]), ax_c)) && ...
             isempty(findall(fig, 'Tag', 'numerics_jacobian_threshold')) && isempty(findall(ax_c, 'Type', 'constantline')) && ...
@@ -342,8 +356,23 @@ switch name
         % have left; the responsive-share maps mark self-coupling 0.
         words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')) + " " + ...
             string(strjoin(cellstr(h.YLabel.String), ' ')), ax);
+        lgs = findall(fig, 'Type', 'legend');
         n = n + check(~any(contains(words, 'SFA Time')) && ~any(contains(words, 'Cumulative')) && ...
-            isempty(findall(fig, 'Type', 'legend')), 'S9: memory only (no leading-direction shares, no cumulative capacity, no key)');
+            isscalar(lgs) && isequal(cellstr(lgs.String), {'Input', 'Reconstruction'}), ...
+            'S9: memory only (no leading-direction shares, no cumulative capacity); one key, (A)''s input and reconstruction');
+        % Plan 3 review: (A)'s traces inside their axes, the scale bar in
+        % a.u., and no explanatory note on the figure.
+        tr_ax = ax(arrayfun(@(h) startsWith(strjoin(cellstr(h.Title.String), ' '), 'delay'), ax));
+        inside = true;
+        for k = 1:numel(tr_ax)
+            for l = findall(tr_ax(k), 'Type', 'line')'
+                y = l.YData(isfinite(l.YData));
+                if numel(y) > 10; inside = inside && min(y) > tr_ax(k).YLim(1) && max(y) < tr_ax(k).YLim(2); end
+            end
+        end
+        txt = arrayfun(@(t) strjoin(cellstr(t.String), ' '), findall(fig, 'Type', 'text'), 'UniformOutput', false);
+        n = n + check(numel(tr_ax) == 4 && inside && any(strcmp(txt, '1 a.u.')) && ~any(contains(txt, 'AU')) && ...
+            ~any(contains(txt, 'drawn at the edge')), 'S9 (A): traces not cut, "1 a.u."; (C): no note on the clipped mark');
         maps = ax(arrayfun(@(h) ~isempty(findall(h, 'Type', 'surface')), ax));     % fig_mc_gain_bias_maps draws its cells as a surface
         n = n + check(numel(maps) == 3 && all(arrayfun(@(h) any(h.YTick == 0), maps)), ...
             'S9 (B): the self-coupling axis of every map is marked at 0');

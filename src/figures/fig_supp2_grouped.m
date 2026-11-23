@@ -149,6 +149,10 @@ for c = 1:nc
     xl = sort(ax{1}(c).XLim);
     if strcmp(ax{1}(c).XScale, 'log') && xl(1) > 0; ax{1}(c).XLim = [xl(1) / 1.12, xl(2) * 1.12]; end
     ax{1}(c).XTickLabelRotation = 0;
+    % At least two labelled decades, and room below the lowest marker (Plan 3
+    % review: one labelled decade per axis, and the noise-free markers at the
+    % smallest step sat on the x axis).
+    if strcmp(ax{1}(c).YScale, 'log'); ax{1}(c).YLim = decade_limits(ax{1}(c)); end
 end
 % (B): zoomed, even where that clips the first transient.
 ylabel(ax{2}(1), {'Local Lyapunov', 'Exponent (s^{-1})'}, 'Interpreter', 'tex');
@@ -176,6 +180,7 @@ end
 % The keys: in sentence case, in one line where that fits the canvas, centred under their rows.
 for v = 1:3
     if isempty(lg{v}); continue; end
+    lg{v} = neutral_key(lg{v});
     lg{v}.String = T.sentence(lg{v}.String);
     set(lg{v}, 'Units', 'pixels', 'Location', 'none', 'Orientation', 'horizontal', 'NumColumns', numel(lg{v}.String));
     lg{v}.ItemTokenSize = [22 18];
@@ -257,6 +262,59 @@ if yl(1) == -yl(2)
 else
     t = ceil(yl(1) / 5) * 5 : 5 : floor(yl(2) / 5) * 5;
 end
+end
+
+function lg = neutral_key(lg)
+% The key of a row with its samples in dark gray (Plan 3 review: they were
+% drawn in the first column's colour, the no-adaptation red, though the key
+% applies to all three columns). Each entry becomes a proxy with the line
+% style, marker and widths of its object; a sample already gray (no hue)
+% keeps its colour, and a marker face that is not the line's colour (open,
+% white) keeps its face. The data keep their condition colours.
+dark = [0.25 0.25 0.25];
+ax = lg.Axes; h = lg.PlotChildren; str = lg.String;
+hold(ax, 'on');
+px = gobjects(1, numel(h));
+for k = 1:numel(h)
+    if isa(h(k), 'matlab.graphics.chart.decoration.ConstantLine')   % a level (Benettin lambda_1): a plain line sample
+        c = h(k).Color;
+        if max(c) - min(c) > 0.05; c = dark; end
+        px(k) = plot(ax, NaN, NaN, 'LineStyle', h(k).LineStyle, 'LineWidth', h(k).LineWidth, 'Color', c);
+        continue
+    end
+    if ~isa(h(k), 'matlab.graphics.chart.primitive.Line'); px(k) = h(k); continue; end
+    c = h(k).Color;
+    if max(c) - min(c) > 0.05; col = dark; else; col = c; end
+    face = h(k).MarkerFaceColor;
+    if isnumeric(face) && isequal(face, c); face = col; end
+    px(k) = plot(ax, NaN, NaN, 'LineStyle', h(k).LineStyle, 'LineWidth', h(k).LineWidth, 'Color', col, ...
+        'Marker', h(k).Marker, 'MarkerSize', h(k).MarkerSize, 'MarkerFaceColor', face, ...
+        'MarkerEdgeColor', marker_edge(h(k), c, col));
+end
+props = {'FontSize', lg.FontSize, 'Box', lg.Box, 'Interpreter', lg.Interpreter};
+delete(lg);
+lg = legend(ax, px, str, props{:}, 'AutoUpdate', 'off');
+end
+
+function e = marker_edge(h, c, col)
+e = h.MarkerEdgeColor;
+if isnumeric(e) && isequal(e, c); e = col; end
+end
+
+function yl = decade_limits(ax)
+% The whole decades around every drawn value of a log axis, with a tenth
+% of a decade to spare at each end (the markers clear the axis lines), so
+% that at least two decades are labelled; a tick and a label at each.
+y = [];
+for h = findall(ax, 'Type', 'line')'
+    v = h.YData(isfinite(h.YData) & h.YData > 0);
+    y = [y, v(:)']; %#ok<AGROW>
+end
+if isempty(y); yl = ax.YLim; return; end
+lo = floor(log10(min(y)) - 0.1); hi = ceil(log10(max(y)) + 0.1);
+if hi - lo < 1; hi = lo + 1; end
+yl = 10 .^ [lo hi];
+set(ax, 'YTick', 10 .^ (lo:hi), 'YTickLabelMode', 'auto', 'YMinorTick', 'on');
 end
 
 function t = decade_ticks(yl)
