@@ -2659,6 +2659,11 @@ takes about 35 minutes; run it in pieces.
   - Plans: `essential` and `fast` identical run by run; in `fastmedium`,
     `medium`, `medium2`, `production` the 30 E-to-E x 1.5 runs go from 200 s
     at 0.05 s to 20 s at 0.01 s, nothing else (`ow_plan_compare`).
+  - The dwell-time figure became **S7 panel C** on Tom's word (2026-11-23: "I
+    want the dwell-time figure promoted to supplement as part of S7"):
+    `fig_supp7_grouped` draws the reference network's panel with a key of the
+    two line styles; A and B were made shorter to keep S7 within 11.8 in
+    (11.70 in on the `fast` run). The stand-alone `fig_outlier_dwell` stays.
 - **To confirm on the next run:** the stage's wall time, estimated at about
   254 min on 12 workers (extrapolated from the measured per-pass times,
   `ow_cost_fd057`), bounded by the longest reference run with multiple
