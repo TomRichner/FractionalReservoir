@@ -34,9 +34,10 @@ function out = fig_EI_weights_param_space(cfg)
 % and never W, so each grid point's network is REBUILT: psa.rebuild_model(res)
 % reconstructs the constructor call the sweep made, including
 % rng_seeds = [network_seed, network_seed + 1], and build() then redraws exactly
-% the same W. It costs about 9 s for 64 points and is cached per config_idx,
-% because the network is a property of the grid point and is shared by all the
-% adaptation conditions run at it.
+% the same W. It costs up to about 2 s a network at n = 1000, so each value is
+% remembered for the MATLAB session (ei_weight_fraction): the network is a
+% property of the grid point and is shared by all the adaptation conditions
+% run at it, and by fig_lle_vs_rate.
 %
 % Note the ratio is invariant to both level_of_chaos and rescale_by_abscissa:
 % each is a scalar multiplying all of W, so it cancels between numerator and
@@ -101,11 +102,11 @@ ps_dir  = fullfile(ps_dirs(1).folder, ps_dirs(1).name);
 % that happens, so the clamping is never silent.
 W_CLIM = [1/11, 10/11];
 
-% Rebuilding a network is the expensive part, so cache it. The network depends
-% only on the grid POSITION (network_seed = config_idx*100 + offset), so all
-% seven adaptation conditions at one grid point share a single rebuild.
-cache = containers.Map('KeyType', 'double', 'ValueType', 'double');
-color_fcn = @(psa, res) ei_weight_fraction(psa, res, cache, cfg.verbose);
+% Rebuilding a network is the expensive part: ei_weight_fraction remembers
+% each network's value for the MATLAB session (shared with fig_lle_vs_rate,
+% which main Figure 4 draws beside this), and every adaptation condition run
+% at one grid point shares the one rebuild.
+color_fcn = @(psa, res) ei_weight_fraction(psa, res, cfg.verbose);
 
 vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] rebuilding networks to weigh E against I...\n');
 t_rebuild = tic;
@@ -116,8 +117,7 @@ specs = specs([specs.in_sheets]);
     'ColorBy', 'E:I weight balance', 'ColorFcn', color_fcn, 'CLim', W_CLIM, ...
     'ColorLabel', 'excitatory weight fraction', ...
     'Conditions', cfg.conditions, 'Verbose', cfg.verbose);
-vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] %d networks rebuilt in %.1f s\n', ...
-    cache.Count, toc(t_rebuild));
+vprintf(cfg.verbose, 'verbose', '[fig_EI_weights_param_space] weight balances in %.1f s\n', toc(t_rebuild));
 
 % One styled sheet per registry measure (ei_metric_sheet holds the layout
 % shared with fig_EI_param_space); the colorbar is copied for each sheet.
@@ -184,27 +184,3 @@ if cfg.save
 end
 end
 
-function v = ei_weight_fraction(psa, res, cache, verbose)
-% The realized E:I weight balance of the network at this grid point, cached
-% per config_idx (the network is shared by every condition run at a point).
-key = res.config_idx;
-if isKey(cache, key)
-    v = cache(key);
-    return
-end
-m = psa.rebuild_model(res);
-m.verbose = verbose;   % the model prints its build report only at 'verbose'
-m.build();
-ti = m.type_indices;
-assert(numel(ti) >= 2, ...
-    'ei_weight_fraction needs at least two cell types; got %d.', numel(ti));
-S_E = full(sum(sum(m.W(:, ti{1}))));
-S_I = full(sum(sum(m.W(:, ti{2}))));
-denom = abs(S_E) + abs(S_I);
-if denom == 0
-    v = 0.5;   % a zero W has no balance; centre it rather than divide by zero
-else
-    v = abs(S_E) / denom;
-end
-cache(key) = v; %#ok<NASGU>  handle object: this mutates the caller's map
-end
