@@ -2465,6 +2465,39 @@ takes about 35 minutes; run it in pieces.
 - **Depends on:** the end of the present run (for the measured peaks), and
   Tom's agreement on items 1 and 2 before any stage is changed.
 
+**Measured, 2026-11-24 (the run ended 2026-11-23 22:57).** A sampler ran once a minute from 2026-11-22
+11:46 (the end of `dc_lle`) to 2026-11-23 22:30, when the system stopped it for low memory:
+`data/p2_fastmedium_launch/memory_log.csv`, 2168 samples. Stages 1 to 7 ran before it started. Per stage, on
+the 63.4 GB workstation with 12 pool workers (GB; "free" is the lowest sample):
+
+| Stage | Samples | Largest worker | All MATLAB | Free, lowest | Commit, highest |
+|---|---|---|---|---|---|
+| `dc_lle` (its last 6 minutes only) | 6 | 7.26 | 33.7 | 22.7 | 61.6 |
+| `paper_illustrations` | 3 | 0.65 | 14.9 | 34.2 | 42.4 |
+| `lyapunov_spectrum_n80` | 5 | 1.30 | 15.5 | 32.8 | 43.6 |
+| `concept_examples` | 1 | 0.64 | 13.6 | 36.3 | 39.9 |
+| `uncoupled_reference` | 3 | 1.20 | 19.0 | 31.5 | 45.2 |
+| `outlier_spectra` | 404 | 4.07 | 47.7 | 3.7 | 73.8 |
+| `frequency_response` | 18 | 1.72 | 13.4 | 35.0 | 40.1 |
+| `eigenvalue_density` | 2 | 2.20 | 13.8 | 35.2 | 40.3 |
+| `outlier_structures` | 152 | 2.26 | 34.5 | 13.9 | 71.7 |
+| `mc_gain_sweep` | 1532 | 1.47 | 32.4 | 10.8 | 69.2 |
+| `noise_switch` | 42 | 1.47 | 16.0 | 24.8 | 49.0 |
+
+So after `dc_lle` (87 GB, above) the stage that comes nearest the limit is `outlier_spectra` (4 GB a worker
+while its long runs simulate; free memory down to 3.7 GB), and the 24-hour `mc_gain_sweep` is modest.
+
+**The stimulation bundle is a third case, and it is not in the log.** `ied_stim_run('production')` started at
+22:30 on the same pool; its 12 workers took 4.2 to 4.3 GB each at once (55 GB of MATLAB). Free memory fell to
+zero about every two minutes, with 10,000 to 38,000 pages a second, and came back to about 25 GB when a batch
+of blocks was written (samples taken by hand, 22:31 to 22:33). It finished in 27 minutes. Claude Code stopped
+the session's background commands for low memory at that point, the sampler among them. Eight workers would
+need about 34 GB.
+
+Since then: `outlier_spectra` gives its 200 s window to the reference network only (FD-057), which halves the
+number of its 4 GB runs. Still open: a worker count per stage from a memory estimate (`dc_lle`,
+`outlier_spectra`, the stimulation bundle), or a check of free memory before a stage opens its batch.
+
 ### FD-055 CPU priority of a large pool: twelve workers at normal priority starve everything else on the machine
 
 - **Status:** open. Logged at Tom's request, 2026-11-22, while the `fastmedium`
