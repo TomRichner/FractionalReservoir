@@ -29,7 +29,9 @@ function out = fig_outlier_plane(cfg)
 %             gains, the MEDIAN over the drawn states, no finite-size factor
 %   thin dashed circle  that radius times the run's kappa: how far the
 %             rightmost eigenvalue of a structureless matrix with the same
-%             gains reaches (95th percentile of the null draws)
+%             gains reaches (95th percentile of the null draws).
+%             dashed_circle = false leaves it out (main Figure 5; Tom,
+%             2026-11-22); the window is still sized from that radius.
 %   diamond   where the rightmost eigenvalue would be with every gain equal
 %             (the rms gain): the outlier the weights alone make. Median
 %             over the drawn states.
@@ -47,21 +49,37 @@ function out = fig_outlier_plane(cfg)
 % drawn; the table counts them, over every seed, and the caption paragraph
 % names them.
 %
-% THE INSET, lower right of each panel (inset = false leaves it out): the
+% SIZE: the figure is manuscript_style canvas_w wide (or fig_w, which a
+% composite sets to its block), laid out for that width, never a wider
+% layout shrunk. Real-axis tick labels sit low enough to clear a diamond on
+% the axis, and ticks whose labels would run together at this width are
+% left out from the left (the sidecar names them).
+%
+% THE INSET, lower right of each panel (inset = false leaves it out): its
+% top right corner at the panel's right edge, inset_height radii above the
+% panel's bottom edge; it is inset_box inches large and hangs down and left
+% from that corner, below the panel if need be (Tom, 2026-11-22: "bigger";
+% the rows are spaced for it: inset_clear inches from an inset's bottom to
+% the top of the row below, 0.08 by default). The
 % firing-rate nonlinearity, the piecewise sigmoid centered on 0, and one
 % dot per neuron per drawn state at the neuron's operating point, from the
 % stage's saved states (nothing is re-simulated). Horizontal: u, the
 % argument of the nonlinearity relative to the neuron's own setpoint.
 % Vertical: the rate plus a one-sided random offset, excitatory neurons
 % from the curve UP and inhibitory ones from the curve DOWN (inset_jitter),
-% in the established E and I colors (excitatory_colormap(1),
-% inhibitory_colormap(1)). Neurons beyond |u| = inset_u_lim are drawn in a
+% in the manuscript's one E and one I color (manuscript_style E_color,
+% I_color; until 2026-11-22 the dark rose and teal of
+% excitatory_colormap(1) / inhibitory_colormap(1)). Neurons beyond |u| = inset_u_lim are drawn in a
 % short strip past a gap in the floor or ceiling line: "further out", not
 % how far. The only text on it: the letters E and I (inset_marks), each in
-% its cell-type color on its side of the curve.
+% its cell-type color on its side of the curve, at tick_fs (11 pt while the
+% insets were small); inset_mark_pull (0 by default; 0.3 in Figure 5)
+% moves each letter toward the curve by that share of its white gap.
 %
 % Text on the figure: the condition names above the columns, in their
 % colors, the network names beside the rows, the axis names and ticks.
+% The Re name is above the real axis at its right end in the bottom row
+% (below it is the inset).
 % Fig_Outlier_Plane_table.md has a caption paragraph and, per panel, as
 % the median and range over ALL seeds of the index: the radius, kappa, the
 % detachment, the diamond, the marked eigenvalues per state (all, right of
@@ -99,9 +117,14 @@ arguments
     cfg.inset_size (1,1) double   = 1.5
     cfg.inset_alpha (1,1) double  = 0.2
     cfg.inset_seed (1,1) double   = 1
-    cfg.inset_height (1,1) double {mustBePositive} = 0.62   % in largest dashed radii
+    cfg.inset_height (1,1) double {mustBePositive} = 0.62   % the inset's TOP, in largest dashed radii above the panel's bottom edge
+    cfg.inset_box (1,2) double {mustBePositive} = [1.3 1.05] % the inset's [width height], inches, hanging from its top right corner
     cfg.inset_marks (1,1) logical = true    % the letters E and I on the inset
-    cfg.inset_mark_fs (1,1) double = 11
+    cfg.inset_mark_fs double = []           % [] = manuscript_style tick_fs
+    cfg.inset_mark_pull (1,1) double {mustBeNonnegative, mustBeLessThan(cfg.inset_mark_pull, 1)} = 0   % share of the white gap between each letter and the curve taken out (0: as placed)
+    cfg.inset_clear (1,1) double {mustBeNonnegative} = 0.08   % inches from an inset's bottom to the top of the row below
+    cfg.dashed_circle (1,1) logical = true  % the thin dashed circle (kappa times the bulk radius); false leaves it out
+    cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
 end
 
 setup_paths();
@@ -141,13 +164,57 @@ if ~isempty(W.far_lim); axes_args = [axes_args, {'gap', W.gap}]; end
 g = complex_plane_axes([], axes_args{:});
 
 %% Panels placed by hand (inches): identical sizes, 1:1
-fig_w = 13; left = 0.6; right = 0.12; col_gap = 0.3; top_m = 0.5; row_gap = 0.35; bottom = 0.15;
+% The width is the common canvas (manuscript_style canvas_w) or the block a
+% composite gives it, so the figure is drawn at the size it is printed.
+fig_w = cfg.fig_w; if isempty(fig_w); fig_w = st.canvas_w; end
+if isempty(cfg.inset_mark_fs); cfg.inset_mark_fs = st.tick_fs; end
+left = 0.5; right = 0.05; col_gap = 0.22; bottom = 0.08;
 pw = (fig_w - left - right - (n_cond - 1) * col_gap) / n_cond;
 ph = pw * diff(g.y_lim) / diff(g.x_lim);
+pt_in = 1 / 72;
+% A tick whose label a dot or a diamond of ANY panel would lie on is left out
+% of every panel (the panels share their ticks); the sidecar names it.
+% The real-axis tick labels sit low enough to clear a diamond on the axis
+% (MarkerSize 9 reaches about 6.5 pt from its center), not at the 1.5 tick
+% lengths of complex_plane_axes, where at 9 in every far tick was under one.
+re_label_y = -max(1.5 * 0.018 * diff(g.y_lim), 7.5 / 72 * diff(g.x_lim) / pw);
+[hidden_re, hidden_im] = covered_ticks(g, P, cfg, st.tick_fs, diff(g.x_lim) / pw, re_label_y);
+% Of the real-axis ticks left, the labels must not run into each other at
+% this width (the far segment beyond a break held 30, 35 and 40 within half
+% an inch): from the left, a tick is kept when its label clears the last
+% one kept. The sidecar names those left out.
+[keep_re, thinned_re] = spaced_ticks(g, setdiff(g.re_ticks, hidden_re), st.tick_fs, pw / diff(g.x_lim));
+if ~isempty(thinned_re) || ~isempty(hidden_re)
+    axes_args = [axes_args, {'re_ticks', keep_re}];
+    g = complex_plane_axes([], axes_args{:});
+end
+g.thinned_re_ticks = thinned_re;
+% Above the panels: the condition titles, raised clear of the top tick label.
+% A title longer than a short phrase goes on two lines, its last word on the
+% second, as at this width in most figures ("Multiple-timescale
+% adaptation" ran to the canvas edge; Plan 3 fix X8). The strip above the
+% panels grows by the extra line; the rows of the planes keep their gap.
+titles = cell(1, n_cond);
+for c = 1:n_cond
+    t = F.titles{c}; k = find(t == ' ', 1, 'last');
+    if ~isempty(k) && numel(t) > 16; t = {t(1:k - 1), t(k + 1:end)}; end
+    titles{c} = t;
+end
+n_title_lines = max(cellfun(@(t) numel(cellstr(t)), titles));
+top_m = 0.5 * st.tick_fs * pt_in + 0.06 + 1.25 * n_title_lines * st.title_fs * pt_in;
+% The inset hangs from its top right corner (inset_height radii above the
+% panel's bottom edge, at its right edge) and may reach below the panel; the
+% space under each row is what it needs.
+drop = 0;
+if cfg.inset; drop = max(0, cfg.inset_box(2) - cfg.inset_height * rad_max * pw / diff(g.x_lim)); end
+row_gap = max(0.3, drop + cfg.inset_clear);
+bottom = max(bottom, drop + 0.04);
+g.re_ticks = setdiff(g.re_ticks, hidden_re); g.im_ticks = setdiff(g.im_ticks, hidden_im);
+g.hidden_re_ticks = hidden_re; g.hidden_im_ticks = hidden_im;
 fig_h = top_m + n_net * ph + (n_net - 1) * row_gap + bottom;
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w fig_h], 'Visible', vis);
-ei_col = [excitatory_colormap(1); inhibitory_colormap(1)];
+ei_col = [st.E_color; st.I_color];                % the manuscript's one E and one I color
 rs = RandStream('mt19937ar', 'Seed', cfg.inset_seed);   % private: the jitter does not touch the global stream
 th = linspace(0, 2 * pi, 361);
 n_not_drawn = zeros(n_net, n_cond); n_marked_drawn = zeros(n_net, n_cond);
@@ -156,13 +223,23 @@ for w = 1:n_net
         ax = axes(fig, 'Units', 'inches', 'Position', ...
             [left + (c - 1) * (pw + col_gap), bottom + (n_net - w) * (ph + row_gap), pw, ph]);
         names = {'re_label', '', 'im_label', ''};       % the names once per row and per column
-        if w == n_net; names{2} = 'Re (s^{-1})'; end
         if c == 1;     names{4} = 'Im (s^{-1})'; end
         cp = complex_plane_axes(ax, axes_args{:}, names{:});
+        if w == n_net
+            % Re at the right end of the real axis, ABOVE it, since below it
+            % is the inset; high enough to clear a diamond on the axis.
+            text(ax, cp.x_lim(2), 7.5 * pt_in * diff(cp.x_lim) / pw, 'Re (s^{-1})', 'HorizontalAlignment', 'right', ...
+                'VerticalAlignment', 'bottom', 'FontSize', st.label_fs, 'Interpreter', 'tex', 'Tag', 'complex_plane_axes', ...
+                'HandleVisibility', 'off', 'Clipping', 'off');
+        end
+        remove_ticks(cp, hidden_re, hidden_im);
+        lower_re_labels(cp, re_label_y);
         p = P{w, c};
         if ~isempty(p)
             col = F.colors{c};
-            plot(ax, cp.x(p.center + p.rad_cal * cos(th)), p.rad_cal * sin(th), '--', 'Color', [0.72 0.72 0.72], 'LineWidth', 0.75);
+            if cfg.dashed_circle
+                plot(ax, cp.x(p.center + p.rad_cal * cos(th)), p.rad_cal * sin(th), '--', 'Color', [0.72 0.72 0.72], 'LineWidth', 0.75);
+            end
             plot(ax, cp.x(p.center + p.rad * cos(th)), p.rad * sin(th), '-', 'Color', gray, 'LineWidth', 1.5);
             z = p.d.z(:); is_out = p.is_out(:);
             shown = real(z) >= g.re_lim(1) & real(z) <= last_re(g) & abs(imag(z)) <= g.y_lim(2);
@@ -176,12 +253,16 @@ for w = 1:n_net
         set(ax, 'XLim', cp.x_lim, 'YLim', cp.y_lim);    % plotting must not have moved them
         if cfg.inset && ~isempty(p)
             per = ax.Position(3) / diff(cp.x_lim);      % inches per unit (1:1, so the same for Im)
-            rect = [ax.Position(1) + (W.inset_x - cp.x_lim(1)) * per, ax.Position(2), ...
-                (cp.x_lim(2) - W.inset_x) * per, cfg.inset_height * rad_max * per];
+            % The top right corner where it always was; the box grows down and left.
+            top = ax.Position(2) + cfg.inset_height * rad_max * per;
+            rect = [ax.Position(1) + ax.Position(3) - cfg.inset_box(1), top - cfg.inset_box(2), cfg.inset_box];
             draw_inset(fig, rect, p.d, ei_col, rs, cfg, st.axis_lw);
         end
         if w == 1
-            title(ax, F.titles{c}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', F.colors{c});
+            % Raised above the top tick label of the imaginary axis.
+            title(ax, titles{c}, 'FontSize', st.title_fs, 'FontWeight', 'normal', 'Color', F.colors{c}, ...
+                'Units', 'data', 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center', ...
+                'Position', [mean(cp.x_lim), cp.y_lim(2) + (0.5 * st.tick_fs * pt_in + 0.06) * diff(cp.x_lim) / pw, 0]);
         end
         if c == 1
             set(ax.YLabel, 'String', F.net_labels{w}, 'FontSize', st.label_fs, 'Visible', 'on', 'Color', 'k');
@@ -278,6 +359,22 @@ W.tick_step = cfg.tick_step;
 if isempty(W.tick_step); W.tick_step = nice_step(rad_max / 1.8); end
 end
 
+function [keep, dropped] = spaced_ticks(g, ticks, fs, in_per_unit)
+% Of the real-axis ticks given, those whose labels clear each other, kept
+% from the left: a label is about 0.56 em per character wide and needs
+% 0.1 in beside it.
+keep = []; dropped = []; right_edge = -Inf;
+for t = ticks(:)'
+    w = 0.56 * fs / 72 * (numel(sprintf('%g', abs(t))) + (t < 0));
+    xc = g.x(t) * in_per_unit;
+    if xc - w / 2 >= right_edge + 0.1
+        keep(end + 1) = t; right_edge = xc + w / 2; %#ok<AGROW>
+    else
+        dropped(end + 1) = t; %#ok<AGROW>
+    end
+end
+end
+
 function hi = last_re(g)
 if isempty(g.far_lim); hi = g.re_lim(2); else; hi = g.far_lim(2); end
 end
@@ -311,9 +408,37 @@ if cfg.inset_marks
     % corners of the inset.
     mark = {'FontSize', cfg.inset_mark_fs, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
         'Tag', 'fig_outlier_plane_inset_mark'};
-    text(ax, -0.7 * L, 0.5 + 2 * jit, 'E', 'Color', ei_col(1, :), mark{:});
-    text(ax,  0.7 * L, 0.5 - 2 * jit, 'I', 'Color', ei_col(2, :), mark{:});
+    hE = text(ax, -0.7 * L, 0.5 + 2 * jit, 'E', 'Color', ei_col(1, :), mark{:});
+    hI = text(ax,  0.7 * L, 0.5 - 2 * jit, 'I', 'Color', ei_col(2, :), mark{:});
+    if cfg.inset_mark_pull > 0
+        % Each letter moved toward the curve so that the white gap between
+        % the letter's box and the nearest point of the drawn curve (sigmoid,
+        % floor and ceiling) shrinks by inset_mark_pull, measured in inches
+        % (Tom, 2026-11-23, Figure 5: "the red E and blue I can be closer to
+        % the sigmoid by about 30%"). The letters move along the line to
+        % that nearest point; the inset itself does not move.
+        sl = linspace(0, 1, 60)';
+        P = [uu(:), SRNNCellTypePairs.piecewiseSigmoid(uu(:), d.S_a, 0); ...
+            -L - gap - strip * sl, zeros(60, 1); L + gap + strip * sl, ones(60, 1)];
+        for h = [hE, hI]
+            pull_mark(ax, h, P, rect, cfg.inset_mark_pull);
+        end
+    end
 end
+end
+
+function pull_mark(ax, h, P, rect, pull)
+% Moves the text h toward the polyline points P (data units) so that the gap
+% from its box (Extent) to the nearest point shrinks by the share pull.
+s = [rect(3) / diff(ax.XLim), rect(4) / diff(ax.YLim)];   % inches per data unit
+e = h.Extent;
+lo = e(1:2) .* s; hi = (e(1:2) + e(3:4)) .* s;            % the letter's box, inches
+Q = P .* s;
+B = min(max(Q, lo), hi);                                  % each curve point's nearest point of the box
+[gap_in, k] = min(vecnorm(Q - B, 2, 2));
+if gap_in <= 0; return; end
+step = -pull * (B(k, :) - Q(k, :)) ./ s;                  % toward the curve, data units
+h.Position(1:2) = h.Position(1:2) + step;
 end
 
 function s = panel_numbers(runs, f, re_left, u_lim)
@@ -385,30 +510,39 @@ else
     left_txt = ['EIGENVALUES LEFT OF THE WINDOW ARE NOT DRAWN (there is no break on the left). Over all seeds: ' ...
         strjoin(left_txt, '; ') '.'];
 end
+% The circle kappa times the bulk radius: drawn dashed, or not drawn
+% (dashed_circle = false) though it still sizes the window and the ticks.
+calib = ['that radius times kappa, how far the rightmost eigenvalue of a structureless matrix with the same ' ...
+    'entries and gains reaches (95th percentile of the null draws)'];
+if cfg.dashed_circle
+    dash_txt = ['THIN DASHED CIRCLE: ' calib '.'];
+    dash_name = 'dashed circle';
+else
+    dash_txt = ['NO DASHED CIRCLE is drawn; the window and the ticks are still sized from the circle of ' calib '.'];
+    dash_name = 'such circle';
+end
 fprintf(fid, '# %s\n\n', fig_tag);
 fprintf(fid, ['Rows: the networks (%s). Columns: the conditions. Each panel overlays the %d calibration states of one ' ...
-    'run, network seed [%d %d] (%d neurons; the states are spread evenly over the %g s measured window). DOTS: every ' ...
+    'run, network seed [%d %d] (%d neurons; the states are spread evenly over the measured window, %s). DOTS: every ' ...
     'eigenvalue of the frozen-gain effective connectivity (each neuron''s outgoing weights times its gain at that ' ...
     'state, slow variables held), drawn as a rate (lambda - 1)/tau_d in 1/s, so the imaginary axis is the stability ' ...
     'boundary. SOLID GRAY CIRCLE: the theoretical bulk, centered on -1/tau_d = %.3g 1/s, radius R_eff/tau_d predicted ' ...
-    'from the gains, the median over the drawn states, with no finite-size factor. THIN DASHED CIRCLE: that radius ' ...
-    'times kappa, how far the rightmost eigenvalue of a structureless matrix with the same entries and gains reaches ' ...
-    '(95th percentile of the null draws). OPAQUE, LARGER DOTS: eigenvalues farther from the center than %.3g times the ' ...
+    'from the gains, the median over the drawn states, with no finite-size factor. %s OPAQUE, LARGER DOTS: eigenvalues farther from the center than %.3g times the ' ...
     'theoretical radius of THEIR OWN state, in any direction (so a marked dot can lie inside the drawn median circle ' ...
     'and an unmarked one outside it). OPEN DIAMOND: where the rightmost eigenvalue would be if every neuron had the ' ...
     'same gain (the rms of the observed gains): the outlier the weights alone make (median over the drawn states). ' ...
     'The rightmost eigenvalue of each state is not ringed.\n\n'], strjoin(F.networks, ', '), first.n_cal, seed, first.n, ...
-    first.window_s, c0, f);
+    F.window_txt, c0, dash_txt, f);
 fprintf(fid, ['AXES: through the origin (`complex_plane_axes`), one unit of Re as long as one unit of Im, identical in ' ...
-    'every panel: real axis [%.3g, %.3g] 1/s, imaginary axis [%.3g, %.3g] 1/s; ticks only outside the largest dashed ' ...
-    'circle (radius %.3g 1/s). %s %s\n\n'], g.re_lim, g.y_lim, rad_max, break_txt, left_txt);
+    'every panel: real axis [%.3g, %.3g] 1/s, imaginary axis [%.3g, %.3g] 1/s; ticks only outside the largest %s ' ...
+    '(radius %.3g 1/s). %s %s %s\n\n'], g.re_lim, g.y_lim, dash_name, rad_max, break_txt, left_txt, hidden_ticks_text(g));
 if cfg.inset
     a = first.S_a / 2;
     fprintf(fid, ['INSET (lower right of each panel; the letters E and I mark the two cell types). The black curve is the firing-rate nonlinearity, ' ...
         'the piecewise sigmoid (S_a = %g): rate 0 (floor) below u = %g, quadratic up to %g, slope 1 up to %g, quadratic ' ...
         'up to %g, rate 1 (ceiling) above. Each dot is one neuron at one of the drawn states, at its operating point; ' ...
-        'excitatory neurons in magenta ABOVE the curve, inhibitory ones in teal BELOW it (the cell-type colors of ' ...
-        '`excitatory_colormap(1)` and `inhibitory_colormap(1)`, unrelated to the condition colors). Horizontal: ' ...
+        'excitatory neurons in orange-red ABOVE the curve, inhibitory ones in blue BELOW it (the one E and one I color ' ...
+        'of `manuscript_style`, E_color and I_color; they are not the condition colors). Horizontal: ' ...
         'u = x - (c/K) sum_k a_k - S_c, the argument of the nonlinearity relative to the neuron''s own setpoint, so ' ...
         'that every neuron lies on the one curve; shown from %g to %g. Vertical: the rate, plus a uniform random ' ...
         'offset of 0 to %g away from the curve (up for E, down for I; fixed seed %d): the dots are ON the curve, and ' ...
@@ -455,7 +589,8 @@ for w = 1:n_net
 end
 fprintf(fid, ['\nThe drawn panels (seed [%d %d]): the radii of the two circles, the marked dots in view, and the ' ...
     'eigenvalue dots outside the window on any side (not drawn), totals over the %d states.\n\n'], seed, first.n_cal);
-fprintf(fid, '| network | condition | solid radius (1/s) | dashed radius (1/s) | diamond (1/s) | marked, in view | not drawn |\n');
+if cfg.dashed_circle; dash_col = 'dashed radius (1/s)'; else; dash_col = 'kappa times radius (1/s; not drawn)'; end
+fprintf(fid, '| network | condition | solid radius (1/s) | %s | diamond (1/s) | marked, in view | not drawn |\n', dash_col);
 fprintf(fid, '|---|---|---|---|---|---|---|\n');
 for w = 1:n_net
     for c = 1:n_cond
@@ -490,4 +625,86 @@ function s = nice_step(x)
 e = 10^floor(log10(x));
 m = [1 2 5 10];
 s = e * m(find(m * e <= x, 1, 'last'));
+end
+
+function [hidden_re, hidden_im] = covered_ticks(g, P, cfg, fs, units_per_inch, re_label_y)
+% The ticks whose LABEL a drawn dot or a diamond of any panel would lie on
+% (polish list of 2026-11-22: marked eigenvalues at the left end of the
+% real axis sat on the "-30"). The label boxes are those of
+% complex_plane_axes: under the real axis, centered on the tick; left of
+% the imaginary axis, centered on the tick's height. Sizes from the font
+% (a digit is about 0.56 em wide), a little generous, plus the marker's
+% radius.
+pt = units_per_inch / 72;                            % one point, in axis units
+tl = 0.018 * diff(g.y_lim);                          % complex_plane_axes' tick length
+x = []; y = []; r = [];
+for k = 1:numel(P)
+    p = P{k};
+    if isempty(p); continue; end
+    z = p.d.z(:); is_out = p.is_out(:);
+    keep = real(z) >= g.re_lim(1) & real(z) <= last_re(g) & abs(imag(z)) <= g.y_lim(2);
+    z = z(keep); is_out = is_out(keep);
+    x = [x; g.x(real(z)); g.x(p.diamond)]; %#ok<AGROW>
+    y = [y; imag(z); 0]; %#ok<AGROW>
+    r = [r; (sqrt(cfg.dot_size) / 2) * pt * ~is_out + (sqrt(cfg.outlier_size) / 2) * pt * is_out; 6.5 * pt]; %#ok<AGROW>   % the diamond (MarkerSize 9) reaches about 6.5 pt from its center
+end
+label_w = @(t) 0.56 * fs * pt * (numel(sprintf('%g', abs(t))) + (t < 0));
+label_h = 0.85 * fs * pt;
+top = re_label_y - 0.1 * fs * pt;                       % the glyphs begin a little under the top of the text box
+hidden_re = [];
+for t = g.re_ticks
+    xc = g.x(t); w = label_w(t);
+    if any(abs(x - xc) <= w / 2 + r & y <= top + r & y >= top - label_h - r)
+        hidden_re(end + 1) = t; %#ok<AGROW>
+    end
+end
+hidden_im = [];
+for t = g.im_ticks
+    w = label_w(t);
+    if any(x <= -1.6 * tl + r & x >= -1.6 * tl - w - r & abs(y - t) <= label_h / 2 + r)
+        hidden_im(end + 1) = t; %#ok<AGROW>
+    end
+end
+end
+
+function remove_ticks(cp, hidden_re, hidden_im)
+% Delete the tick marks and labels complex_plane_axes drew at the hidden
+% ticks: each label is a text at the tick's place, its mark the handle
+% drawn just before it.
+h = cp.handles;
+for k = 2:numel(h)
+    if ~isgraphics(h(k), 'text') || iscell(h(k).String) || ~isgraphics(h(k - 1), 'line'); continue; end
+    pos = h(k).Position;
+    is_re = strcmp(h(k).HorizontalAlignment, 'center') && any(abs(cp.x(hidden_re) - pos(1)) < 1e-9);
+    is_im = strcmp(h(k).HorizontalAlignment, 'right') && any(abs(hidden_im - pos(2)) < 1e-9);
+    if is_re || is_im; delete(h([k - 1, k])); end
+end
+end
+
+function s = hidden_ticks_text(g)
+% The sidecar's sentences on the ticks left out.
+thinned = '';
+if ~isempty(g.thinned_re_ticks)
+    thinned = [' Real-axis ticks also left out so that their labels do not run together at this width: ' ...
+        strjoin(compose('%g', g.thinned_re_ticks), ', ') ' 1/s.'];
+end
+if isempty(g.hidden_re_ticks) && isempty(g.hidden_im_ticks)
+    s = ['No tick was left out under a mark.' thinned];
+    return;
+end
+parts = {};
+if ~isempty(g.hidden_re_ticks); parts{end + 1} = ['on the real axis at ' strjoin(compose('%g', g.hidden_re_ticks), ', ') ' 1/s']; end
+if ~isempty(g.hidden_im_ticks); parts{end + 1} = ['on the imaginary axis at ' strjoin(compose('%g', g.hidden_im_ticks), ', ') ' 1/s']; end
+s = ['TICKS LEFT OUT, in every panel, because an eigenvalue dot or a diamond of some panel lies where the tick''s ' ...
+    'label would be: ' strjoin(parts, ' and ') '. The window is unchanged.' thinned];
+end
+
+function lower_re_labels(cp, y)
+% Move the real-axis tick labels complex_plane_axes drew (texts centered on
+% their tick, below the axis) down to y, in data units.
+for h = cp.handles
+    if isgraphics(h, 'text') && ~iscell(h.String) && strcmp(h.HorizontalAlignment, 'center') && h.Position(2) < 0
+        h.Position(2) = y;
+    end
+end
 end

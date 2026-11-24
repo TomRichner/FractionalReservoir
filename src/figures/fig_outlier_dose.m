@@ -48,7 +48,10 @@ function out = fig_outlier_dose(cfg)
 %
 % The left panel's upper limit leaves headroom above the top diamond; a
 % detachment below detachment_floor is drawn at the bottom of the axis.
-% Nothing but axis names on the panels; the conditions are told by color
+% The figure is manuscript_style canvas_w wide (or fig_w, which a composite
+% sets to its block) and fig_h tall; the vertical names are on two lines and
+% the horizontal one, the same for all three panels, is written once, under
+% the middle panel. Nothing but axis names on the panels; the conditions are told by color
 % (the caption paragraph of Fig_Outlier_Dose_table.md names them), and the
 % table gives, per level and condition, median [min, max] over seeds of
 % everything drawn, then the per-seed values.
@@ -68,6 +71,8 @@ arguments
     cfg.seed double               = []    % unused: every seed is drawn
     cfg.spread (1,:) char {mustBeMember(cfg.spread, {'lines', 'band', 'none'})} = 'lines'
     cfg.detachment_floor (1,1) double {mustBePositive} = 0.25   % the lowest value the left panel's log axis shows
+    cfg.fig_w double = []                   % inches; [] = manuscript_style canvas_w (a composite passes its block's width)
+    cfg.fig_h (1,1) double {mustBePositive} = 3.1   % inches
 end
 
 setup_paths();
@@ -101,9 +106,13 @@ diamond = median(reshape(V.rho_uniform_theory, n_net, []), 2, 'omitnan');   % ov
 
 %% Draw
 ykey = {'ratio_theory_med', 'frac_on_E', 'gain_ratio_EI'};
-ylab = {'Detachment, Re \lambda_1 / bulk radius', 'Responsive fraction of E neurons', 'Mean gain, E / I'};
+% Two lines each, so that three panels and their names fit across the
+% common canvas; the horizontal name is the same for all three and is
+% written once, under the middle panel.
+ylab = {{'Detachment,', 'Re \lambda_1 / bulk radius'}, {'Responsive fraction', 'of E neurons'}, 'Mean gain, E / I'};
+fig_w = cfg.fig_w; if isempty(fig_w); fig_w = st.canvas_w; end
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
-fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 14 4.6], 'Visible', vis);
+fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1 1 fig_w cfg.fig_h], 'Visible', vis);
 tl = tiledlayout(fig, 1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 x_pad = 0.06 * max(max(x_seed(:)) - min([x_seed(:); 0]), eps);
 x_lim = [min([0; x_seed(:)]) - x_pad * (min(x_seed(:)) < 0), max(x_seed(:)) + x_pad];
@@ -122,7 +131,6 @@ for p = 1:3
     end
     if p == 1
         yline(ax, 1, '-', 'Color', gray, 'LineWidth', 1.5);
-        plot(ax, x_med, diamond, '-d', 'Color', 'k', 'MarkerSize', 8, 'MarkerFaceColor', 'w', 'LineWidth', 1.25);
     end
     for c = 1:n_cond
         col = F.colors{c};
@@ -149,14 +157,26 @@ for p = 1:3
             'MarkerFaceColor', col, 'MarkerEdgeColor', 'w');
     end
     if p == 1
+        % The equal-gain diamonds on top of the medians (Plan 3 fix X9: the
+        % first one was hidden behind a dot).
+        plot(ax, x_med, diamond, '-d', 'Color', 'k', 'MarkerSize', 8, 'MarkerFaceColor', 'w', 'LineWidth', 1.25, ...
+            'Tag', 'equal_gain_diamonds');
         ticks = 2 .^ (ceil(log2(y_lim(1))):floor(log2(y_lim(2))));
         set(ax, 'YScale', 'log', 'YLim', y_lim, 'YTick', ticks, 'YMinorTick', 'off');
     else
-        ylim(ax, [0, max(1.1, 1.08 * max(Y(:), [], 'omitnan'))]);
+        % Room under 0 for half a marker (MarkerSize 8 pt across), so a median
+        % at 0 is drawn whole above the axis line and its line to the point
+        % before it no longer ends in a stub on the axis (Plan 3 fix X9).
+        y_hi = max(1.1, 1.08 * max(Y(:), [], 'omitnan'));
+        drawnow; px = getpixelposition(ax);
+        r = 0.6 * 8 / 72 * get(groot, 'ScreenPixelsPerInch') / px(4) * y_hi;   % a little over the marker radius, in data units
+        % Ticks in steps of 0.5 from 0 (Tom, 2026-11-23, R7: "0, 0.5, and 1"
+        % on C and D), so a 0-to-1 fraction or ratio reads 0, 0.5, 1.
+        set(ax, 'YLim', [-r, y_hi], 'YTick', 0:0.5:y_hi);
     end
     xlim(ax, x_lim);
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
-    xlabel(ax, 'Structural outlier / bulk radius', 'FontSize', st.label_fs);
+    if p == 2; xlabel(ax, 'Structural outlier / bulk radius', 'FontSize', st.label_fs); end
     ylabel(ax, ylab{p}, 'FontSize', st.label_fs);
 end
 
@@ -198,14 +218,14 @@ fprintf(fid, ['The E-to-E mean at %d levels (%s; `reference` is 1), each placed 
     'over the structural bulk radius, the median across seeds. Below 1 the outlier is inside the bulk. Colors are the ' ...
     'conditions (%s). Thick lines with filled markers: the median across the %d seed(s). %s ' ...
     'LEFT: detachment of the rightmost frozen-gain eigenvalue, its real part over the THEORETICAL radius of the bulk ' ...
-    'R_eff of the same state, with no finite-size enlargement (median over the %g s window of the per-state ratio; ' ...
+    'R_eff of the same state, with no finite-size enlargement (median over the measured window, %s, of the per-state ratio; ' ...
     'log axis; gray line: at the theoretical radius). Open diamonds: the same with uniform gains, the weights alone ' ...
     '(median over seeds and conditions; against the theoretical radius it is nearly the same in every condition). ' ...
     'MIDDLE: the fraction of excitatory neurons off the floor and ceiling of the nonlinearity (nonzero slope). ' ...
     'RIGHT: mean gain of the excitatory neurons over that of the inhibitory ones. The left panel shows %.3g to %.3g; ' ...
     '%d run(s) with a detachment below that are drawn at the bottom of the axis (their values are in the table). ' ...
     '%d neurons. Data: `%s`.\n\n'], ...
-    n_net, strjoin(nets, ', '), strjoin(F.titles, ', '), n_seed, spread_txt, first.window_s, y_lim, n_floor, first.n, F.file);
+    n_net, strjoin(nets, ', '), strjoin(F.titles, ', '), n_seed, spread_txt, F.window_txt, y_lim, n_floor, first.n, F.file);
 fprintf(fid, ['Median over seeds, with [min, max] where they differ. `structural ratio` is the horizontal position; ' ...
     '`uniform` the diamond''s quantity for that condition; `reined` the fraction of the structural detachment the ' ...
     'gains removed, 1 - (detachment - 1)/(uniform - 1), given where the structure has an outlier by the null''s ' ...

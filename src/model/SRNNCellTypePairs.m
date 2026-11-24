@@ -1100,7 +1100,8 @@ classdef SRNNCellTypePairs < handle
                 obj.lya_T_interval, obj.lya_warmup, obj.lya_dt, params, ...
                 obj.ode_opts, ...
                 resolve_solver(obj.ode_solver, obj.noise_increments, 'SRNNCellTypePairs'), rhs, ...
-                obj.lya_K, obj.rng_seeds(1) + 424242, obj.lya_K_auto, obj.lya_K_max, obj.verbose);
+                obj.lya_K, obj.rng_seeds(1) + 424242, obj.lya_K_auto, obj.lya_K_max, obj.verbose, ...
+                obj.lyapunov_start_vector());
             if isfield(obj.lya_results, 'LLE')
                 vprintf(obj.verbose, 'verbose', 'Largest Lyapunov Exponent: %.4f\n', obj.lya_results.LLE);
             end
@@ -1405,6 +1406,15 @@ classdef SRNNCellTypePairs < handle
     end
 
     methods (Access = protected)
+        function v0 = lyapunov_start_vector(obj) %#ok<MANU>
+            % LYAPUNOV_START_VECTOR The initial tangent direction shared by the
+            % 'benettin' and 'qr' methods; empty here, which keeps each
+            % method's own start (Benettin a randn draw from the global
+            % stream, QR eye(N)). SRNNNumericsProbe overrides it: sub-experiment
+            % C of run_numerics_verification starts both from one vector.
+            v0 = [];
+        end
+
         function v = get_block(obj, which_stat, post, pre)
             % GET_BLOCK One entry of a _relative block matrix, expanded first so a
             % 1 x C presynaptic row reads correctly.
@@ -4636,7 +4646,7 @@ classdef SRNNCellTypePairs < handle
     methods (Static, Access = protected)
         function results = compute_lyapunov_exponents_internal(method, S_out, t_out, ...
                 dt, fs, interval, lya_warmup, lya_dt, params, opts, ode_solver, rhs, ...
-                lya_K, topk_seed, lya_K_auto, lya_K_max, verbose)
+                lya_K, topk_seed, lya_K_auto, lya_K_max, verbose, start_vector)
             % method: 'benettin' (K = 1, finite perturbation, same integrator
             % as the trajectory), 'qr' (full spectrum, ode45 on N^2 variational
             % equations; the verified reference), 'topk' (the K = lya_K largest
@@ -4651,6 +4661,13 @@ classdef SRNNCellTypePairs < handle
             % below print only at 'verbose'. Threaded from the instance because
             % this is a static.
             if nargin < 17 || isempty(verbose); verbose = 'minimal'; end
+            % start_vector (optional, N x 1): the initial tangent direction
+            % of 'benettin' (its first perturbation) and of 'qr' (the first
+            % column of its initial basis, the rest an orthonormal
+            % completion), so that the two estimators follow one vector.
+            % Empty (the default) keeps each method's own start exactly.
+            % Ignored by 'topk'.
+            if nargin < 18; start_vector = []; end
             results = struct();
             switch lower(method)
                 case {'benettin', 'qr', 'topk'}
@@ -4702,7 +4719,7 @@ classdef SRNNCellTypePairs < handle
             if strcmpi(method, 'benettin')
                 [LLE, local, finite, times] = SRNNCellTypePairs.benettin_algorithm_internal( ...
                     S_out, t_out, dt, fs, 1e-3, interval, lya_dt, lya_warmup, ...
-                    opts, rhs, ode_solver);
+                    opts, rhs, ode_solver, start_vector);
                 results.LLE = LLE;
                 results.local_lya = local;
                 results.finite_lya = finite;
@@ -4711,7 +4728,7 @@ classdef SRNNCellTypePairs < handle
                 [spectrum, local, finite, times] = ...
                     SRNNCellTypePairs.lyapunov_spectrum_qr_internal( ...
                     S_out, t_out, lya_dt, interval, lya_warmup, params, ...
-                    ode_solver, opts, fs);
+                    ode_solver, opts, fs, start_vector);
                 [spectrum, order] = sort(real(spectrum), 'descend');
                 results.LE_spectrum = spectrum;
                 results.local_LE_spectrum_t = local(:, order);
@@ -4728,7 +4745,9 @@ classdef SRNNCellTypePairs < handle
 
         function [LLE, local_lya, finite_lya, t_lya] = ...
                 benettin_algorithm_internal(X, t, dt, fs, d0, interval, ...
-                lya_dt, lya_warmup, ode_options, dynamics_func, ode_solver)
+                lya_dt, lya_warmup, ode_options, dynamics_func, ode_solver, start_vector)
+            % start_vector (optional): the initial perturbation direction;
+            % empty or absent draws it with randn from the global stream.
             % Accumulation runs over [max(0,interval(1)), interval(2)];
             % iteration starts lya_warmup seconds earlier so the perturbation
             % can align with the leading direction first.
@@ -4742,7 +4761,11 @@ classdef SRNNCellTypePairs < handle
 
             local_lya = zeros(n_intervals, 1);
             finite_lya = nan(n_intervals, 1);
-            perturbation = randn(size(X, 2), 1);
+            if nargin < 12 || isempty(start_vector)
+                perturbation = randn(size(X, 2), 1);
+            else
+                perturbation = start_vector(:);
+            end
             perturbation = d0 .* perturbation ./ norm(perturbation);
             accumulated = 0;
 
@@ -4864,7 +4887,10 @@ classdef SRNNCellTypePairs < handle
 
         function [spectrum, local_spectrum, finite_spectrum, t_lya] = ...
                 lyapunov_spectrum_qr_internal(X, t, lya_dt, interval, ...
-                lya_warmup, params, ~, ode_options, fs)
+                lya_warmup, params, ~, ode_options, fs, start_vector)
+            % start_vector (optional): the first column of the initial basis,
+            % completed to an orthonormal basis by the Householder reflection
+            % that maps e_1 onto it; empty or absent starts from eye(N).
             % Honours lya_T_interval the same way Benettin does: accumulate over
             % [max(0,interval(1)), interval(2)], iterate from lya_warmup seconds
             % earlier so Q can align with the leading subspace first.
@@ -4882,7 +4908,11 @@ classdef SRNNCellTypePairs < handle
             n_intervals = numel(t_lya);
             local_spectrum = zeros(n_intervals, N);
             finite_spectrum = nan(n_intervals, N);
-            Q = eye(N);
+            if nargin < 10 || isempty(start_vector)
+                Q = eye(N);
+            else
+                Q = SRNNCellTypePairs.basis_from_vector(start_vector, N);
+            end
             accumulated = zeros(N, 1);
             elapsed = 0;
             variational_options = odeset(ode_options, 'Jacobian', []);
@@ -4925,6 +4955,23 @@ classdef SRNNCellTypePairs < handle
                     ['No QR segment fell inside lya_T_interval = [%g, %g]; ' ...
                      'the spectrum is all NaN.'], interval(1), interval(2));
                 spectrum = nan(N, 1);
+            end
+        end
+
+        function Q = basis_from_vector(v, N)
+            % An orthonormal N x N basis whose first column is v / |v|: the
+            % Householder reflection that maps e_1 onto it.
+            v = v(:) / norm(v);
+            if numel(v) ~= N
+                error('SRNNCellTypePairs:BadStartVector', ...
+                    'The start vector has %d entries; the system has %d states.', numel(v), N);
+            end
+            w = v;
+            w(1) = w(1) - 1;                % w = v - e_1
+            if norm(w) < eps
+                Q = eye(N);
+            else
+                Q = eye(N) - 2 * (w * w') / (w' * w);
             end
         end
 

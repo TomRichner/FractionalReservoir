@@ -2399,3 +2399,273 @@ takes about 35 minutes; run it in pieces.
   C's integrator guard) and two sheets redrawn that a stray tool call of
   mine interrupted. Stimulation bundle at `essential`: 8 of 8 figures,
   3.7 min.
+
+### FD-054 Memory in a `fastmedium` run: the DC staircase stage took 87 GB on a 63 GB machine
+
+- **Status:** open. Logged at Tom's request, 2026-11-22, while the run was
+  going. Nothing was changed in the run.
+- **Serves:** the paper's runs (every block that `mu7chain_AC_run` feeds). A
+  run that pages is slower than its estimate and can fail for want of memory.
+- **What happened.** `mu7chain_AC_run('fastmedium')`, started 2026-11-22 05:45
+  from `main` at `b3dd9d8`, pool of 12, on the machine with 63.4 GB of RAM.
+  Stage 8 of 18, `dc_lle` (`run_dc_lle_analysis`), brought the machine to
+  0 MB available. Tom saw it in the task manager at about 11:35.
+- **Measured** (Windows counters, not MATLAB's):
+  - The pool's 12 workers started at 11:06:21. At 11:35 each held 7.24 to
+    7.26 GB of private bytes, 87 GB together; all MATLAB processes 98.4 GB.
+  - Free physical memory 1.8 GB, then 1.3 GB. Commit charge 135.7 GB of a
+    limit of 141.4 GB (the page file then grew; limit 151.8 GB). At 11:37:53:
+    available 0 MB, modified page list 41.5 GB, about 58,000 pages per second.
+  - Each worker got 0.4 to 0.6 of a core (2.4 to 3.5 CPU seconds in 6 s), and
+    its resident memory was under 1 GB against a peak of 3.6 to 4.5 GB: the
+    workers were waiting on the page file.
+  - The first round of 12 seeds ended between 11:38 and 11:41, 32 to 35 min
+    after the pool started. Unpaged, a round takes 8 to 10 min (5 seeds in one
+    round: 7.8 min in the `fast` run of 2026-11-21, 9.7 min on 2026-11-13).
+    After it: 41.2 GB free, commit 49.3 GB; the second round is 3 seeds.
+  - No error was raised and the run went on.
+- **Why this stage.** The parfor is over seeds and each seed is one
+  simulation of the whole staircase: 9 levels of 30 s at 400 Hz, 108,000
+  steps, the three conditions one after another inside the seed.
+  `store_full_state` is false, yet a worker holds 7.25 GB, which is about
+  8,400 doubles per step, more than the state. **Which arrays those are has
+  not been traced.** `fastmedium` has 15 seeds, so 12 simulations run at once;
+  `fast` has 5, about 36 GB, which is why the `fast` run showed nothing.
+- **Not the run's:** two MATLAB sessions of agents drawing figures (2.3 and
+  2.6 GB, no pool) and an idle editor session (2.9 GB). The two agents were
+  stopped, which gave back about 5 GB; the cause was the stage. The pool
+  budget of 12 counts workers, not memory. No stage sizes its parfor from
+  memory (two pass a worker limit to parfor for other reasons:
+  `run_outlier_spectra_stage`, `run_mc_gain_sweep_set`). `pool_restart`
+  (MatlabAgenticOrg) prints the client's available RAM and records an earlier
+  episode, August 2026, in which a stage returned "Out of memory" on 88 of
+  195 runs, cause not established.
+- **Not known:** memory per worker of every other stage at this size. The
+  lead's estimate for `outlier_spectra` (3.5 to 4 GB per worker from its 200 s
+  windows, so 42 to 48 GB) is not a measurement. Whether the paper run of
+  2026-11-15 paged is not known; nobody looked.
+- **Being measured now:** a sampler writes one line a minute for the rest of
+  this run (free memory, commit, MATLAB private bytes, the largest pool
+  worker, the stage) to `data/p2_fastmedium_launch/memory_log.csv`. Its peak
+  per stage is to be added here when the run ends.
+- **Done means:**
+  1. The arrays behind the 7.25 GB are named, and the staircase simulation
+     keeps only what its result needs (the local exponent and the level
+     means), or the stage caps its own parfor at what fits.
+  2. A stage whose jobs are large caps its workers from an estimate of memory
+     per job and the machine's RAM (`parfor (..., max_workers)`), so the cap
+     is in the stage and holds on any machine. The estimate is checked against
+     a measured peak in a test at small size.
+  3. The run log records the peak memory of the client and of the largest
+     worker for each stage, next to the stage's time.
+  4. The mode tables that give times (`run_dc_lle_analysis`,
+     `mu7chain_AC_config`, `mu7chain_AC_run`) give memory per worker as well.
+  5. A `fastmedium` run on this machine with a pool of 12 stays above 5 GB of
+     free physical memory in every stage.
+- **Depends on:** the end of the present run (for the measured peaks), and
+  Tom's agreement on items 1 and 2 before any stage is changed.
+
+### FD-055 CPU priority of a large pool: twelve workers at normal priority starve everything else on the machine
+
+- **Status:** open. Logged at Tom's request, 2026-11-22, while the `fastmedium`
+  run was going. The run was not changed; the priority of its worker processes
+  was, by hand (below).
+- **Serves:** every long run on a shared machine, and whatever else has to be
+  done on that machine while it goes (this time: MATLAB workers of agents
+  redrawing figures, Plan 3).
+- **What happened.** The machine has 14 logical processors. The run's pool
+  holds 12 workers, all at normal priority and all busy, so the total load sat
+  at 100%. Three to five other MATLAB sessions (one each, no pool) were drawing
+  figures at the same time and had two processors between them and the
+  system. Their calls were slow, a PowerShell query of the load took over two
+  minutes, and Tom saw the figure work lagging.
+- **What was done, by hand, at 22:39.** The 12 pool worker processes (the
+  children of the client, `MATLAB.exe -parallelserver`) were set to
+  below-normal priority from PowerShell, without stopping anything:
+  `(Get-Process -Id <pid>).PriorityClass = 'BelowNormal'` for each. The
+  client stayed at normal priority, so the run's own bookkeeping is not
+  starved. Tom, a little later: "seems much more responsive."
+- **What it means.** Below normal does not cap the pool: the workers take
+  every processor nobody else wants and give one up when another process asks.
+  Nothing is paused.
+- **Not measured:** how much the run slows while other work is going. To be
+  read from the rate of the memory-grid stage before and after 22:39 when the
+  run ends.
+- **Known limits of the hand fix:** a pool that a stage starts again comes up
+  at normal priority; nothing records that the priority was changed; it is
+  Windows only.
+- **Proposed by Tom:** set the CPU priority to below normal for any session
+  that uses a parallel pool of more than 8 workers.
+- **Done means:**
+  1. The pool module (`pool_set` / `pool_ensure` / `pool_restart`,
+     MatlabAgenticOrg) sets its workers to below-normal priority when the pool
+     has more than a threshold of workers (8 unless told otherwise), each time
+     a pool is created or restarted, and says so in what it prints. The
+     threshold and the choice are settings, with an off switch.
+  2. It is done from inside MATLAB on the workers themselves (for example
+     `parfevalOnAll` with
+     `System.Diagnostics.Process.GetCurrentProcess().PriorityClass`), so it
+     needs no outside script and survives a pool restart; on a system where
+     that is not available it does nothing and says so.
+  3. The client's priority is left alone.
+  4. A test at small size: a pool above the threshold reports below normal on
+     every worker, one at or below it reports normal.
+  5. The slowdown is measured once on a real stage and written here.
+- **Depends on:** Tom's agreement on the threshold and on where the code
+  lives (the pool module is in another repository). Related: FD-054 (memory in
+  the same run); the two together say what a large pool costs the rest of the
+  machine.
+
+### FD-056 Plan 3: the figure revisions after Tom's review of 2026-11-22
+
+- **Status:** in progress. Integration branch `p3` (worktree
+  `../FractionalReservoir_wt_p3`), one branch per package, merged by the lead;
+  `p3` goes to `main` only after the `fastmedium` run ends. The plan, the
+  packages and the lead's decisions are in the manuscript repository's
+  `docs/Advancing_the_narrative/Plan3.md`; Tom's notes, figure by figure, in
+  `Plan2_figure_feedback.md` there. Neither is copied here.
+- **Serves:** the 18 main and supplementary figures of the manuscript, drawn
+  from the `fast` run of 2026-11-21/22 for Tom to look at, then from the
+  larger run.
+- **The canvas:** every main and supplementary figure is 9 in wide
+  (`manuscript_style`: `canvas_w` 9, `canvas_max_h` 11.8, `canvas_tol` 0.35),
+  type unchanged in points by role. One test, `test_canvas_standard`, over
+  the 18 (it replaces `test_canvas_standard_a` and `_b`); the gray column
+  dividers of Figures 2 and 3 are placed from the drawn tick labels
+  (`column_dividers`).
+- **What changed, figure by figure** (registry name in brackets):
+  - Figure 1 (`fig_main1_grouped`): eigenvalues gray and black either side
+    of the boundary, far outliers larger and green; letters by row; the
+    activity row as rates r_i on one 0 to 1 axis; the SFA and STD arrows
+    back; row D closer.
+  - Figure 2 (`fig_main2_grouped`): ticks 0 and 1 on unit axes, tick labels
+    on the left column, row G on plus or minus 1 with adaptation, input axis
+    0 to 0.35; 20 s with the pulse in the middle third, 8 neurons per type,
+    key and letters moved.
+  - Figure 3 (`fig_main3_grouped`): row D simplified (-11 to +3, no disk
+    curve, no labels, "Eigenvalues per snapshot"); inputs colored by E or I;
+    row B on one axis, 0 to 75 bits/s.
+  - Figure 4 (`fig_main4_grouped`): three rows: the sweeps without off-scale
+    markers, lambda_1 by E:I weight ratio, lambda_1 against rate from the
+    joint sample only with a black median line and its key; the former
+    panel C left for the leading-direction figure.
+  - Figure 5 (`fig_main5_grouped`): laid out for 9 in; larger response-curve
+    insets hanging down and left; 40 percent less space under them; no
+    dashed circles.
+  - Figure 6 (`fig_main6_grouped`): laid out for 9 in.
+  - Figure 7 (`fig_main7_grouped`): a top row of four (reconstruction against
+    delay, its cumulative sum, the memory horizon, capacity against input
+    noise), then the two maps with self-coupling 0 marked; the former panel A
+    left for the leading-direction figure.
+  - Figure 8 (`Fig_Main8_Stim`): in progress in package `fig8` (patients
+    first, the new patient panel, 5 s and circles on the model signals,
+    scale bars, the no-stimulation continuation).
+  - S1 (`fig_supp1_grouped`): two panels (shared y axes from 0; the two step
+    responses stacked); its single neuron on the 20 s illustration run.
+  - S2 (`fig_supp2_grouped`): legend wording, the slope-2 line as a band
+    behind the data, panel B zoomed with four traces and QR on top, panel C
+    at 15 time points on 1e-12 to 1e-8 with no threshold.
+  - S3 (`fig_supp3_grouped`): the eigenvalue convention of Figure 1; each
+    structure as the balanced matrix plus what was added.
+  - S4 (`fig_supp4_grouped`): no off-scale markers.
+  - S5 (`fig_supp5_grouped`): histograms stacked by E:I weight ratio; the
+    lambda_1 histogram is now Figure 4B.
+  - S6 (`fig_supp6_grouped`): panel C as box plots with the reference
+    diamonds beside; S8's gain and phase panels as D and E.
+  - S7 (`fig_supp7_grouped`): laid out for 9 in.
+  - The leading direction (`fig_supp_leading_grouped`, new, supplement, not
+    yet numbered): lambda_1 and the leading-direction shares against the
+    longest SFA time constant, the dendritic share against lambda_1 per
+    condition (Figure 7's former A, S9's former B, Figure 4's former C).
+  - S9 (`fig_supp9_grouped`): memory only (reconstructions, the responsive
+    share with self-coupling -4, 0 and 6 marked, capacity against lambda_1).
+  - S10 (`fig_supp10_grouped`): in progress in package `fig8`.
+  - S8 (`fig_supp8_grouped`) is no longer supplementary: one neuron, one gain
+    and one phase panel, registered in the appendix; its panels are S6 D and
+    E.
+- **The registry:** from `fast` upward again 8 main and 10 supplementary
+  figures (`test_paper_figure_groups`, by name and order): main
+  `fig_main1_grouped` to `fig_main7_grouped`, `Fig_Main8_Stim`; supplement
+  `fig_supp1_grouped` to `fig_supp5_grouped`, `fig_supp_leading_grouped`,
+  `fig_supp6_grouped`, `fig_supp7_grouped`, `fig_supp9_grouped` (AC bundle),
+  `fig_supp10_grouped` (stimulation bundle). Function names keep their
+  numbers; the order of first citation in the text sets the final numbers.
+  `essential` draws main 1 to 5 and 8, S1, S3 to S7 and S10 (no tau sweep,
+  so neither S9 nor the leading-direction figure).
+- **Saved data that changed** (each stage's test and the stages exact tier
+  change with it):
+  - `numerics`: the Jacobian check at 15 time points (S2 C).
+  - `concept_examples`: the added part of each structure and the rates
+    (Figure 1, S3).
+  - the illustrations (`paper_illustrations`): 20 s with the step over the
+    middle third, in every mode (`mu7chain_config`:
+    `illustration_display_window`, `illustration_step_window`); this also
+    makes S1 panel A's single-neuron run 20 s.
+  - `burst_mode`: the no-stimulation continuation of each network (Figure 8
+    G), in progress in package `fig8`.
+- **Leftovers, recorded and not cleaned up:** `fig_grouped_main` group 4 has
+  no caller any more (kept for its tests); `draw_offscale_markers.m` was
+  deleted; `fig_ostruct_plane.m` (appendix) still types `fig_w = 12`.
+- **Left for after the long run** (Plan 3, phase 7): the joint sample at 256
+  networks (needs the pool); the stage tests and both exact tiers, once, on
+  `p3` merged into `main`; the stages reference re-captured; the patient
+  panel's branch in the clinical repository (`p3-patient-panel`) merged and
+  its panels made again in the main checkout.
+- **Done means:** the 18 figures accepted by Tom (phases 4 to 6 of the plan),
+  redrawn from the `fastmedium` data, `p3` merged into `main` with the tests
+  above passing.
+
+### FD-057 outlier_spectra: the long window for the reference network only; the dwell-time figure on the reference
+
+- **Status:** done on branch `p3-owin` (commits named in the closing report);
+  the wall time is to be confirmed by the next run at `fastmedium` or above.
+- **Serves:** the supplementary dwell-time figure (`fig_outlier_dwell`, drawn by
+  `scripts/paper/with_spectral_supplement.m` only) and the cost of the stage
+  `outlier_spectra` in every run mode above `fast`.
+- **Asked.** Tom, 2026-11-23, why the stage took 388 min on 12 workers in the
+  `fastmedium` run, and what its 200 s window (reference and E-to-E x 1.5,
+  added 2026-11-20 for the dwell-time figure, FD-039) buys. Then, on the page
+  with the study's figures: "I don't think we need the E to E x 1.5 panel in
+  this plot. We can remove that. The current 200 s excursion time figure for
+  the reference network answers the question sufficiently for me."
+- **Measured** (`scripts/explorations/outlier_window/`, on a copy of the
+  `fastmedium` stage; README there):
+  - The 60 long runs took 89 percent of the stage's worker time (3593 of 4030
+    worker-min); the 20 multiple-timescale long runs about 2800, nearly all in
+    the full-Jacobian pass (3 to 4 s a state at 4000 state variables, against
+    0.13 to 0.15 s for the frozen-gain spectrum).
+  - Truncating the 200 s series to 20, 50 and 100 s: the full-Jacobian dwell
+    quartiles are identical at every length (reference: median 0.8 s with
+    one adaptation timescale, 0.3 s with several; beyond zero throughout
+    without adaptation; E-to-E x 1.5: no excursion with adaptation).
+  - Only two frozen-gain medians need the length: the reference without
+    adaptation (not reached at 20 and 50 s, about 130 s at 200 s with half the
+    excursions cut off) and the reference with multiple timescales (12.7 s at
+    20 s, 2.3 s from 100 s on).
+  - The window-wide quantities of `fig_outlier_dose` and `fig_outlier_plane`
+    change between the first 20 s and 200 s by far less than the spread
+    across seeds.
+- **Changed.**
+  - `fig_outlier_dwell`: `cfg.networks` defaults to `{'reference'}`, one
+    panel on the canvas width; both networks when named.
+  - `outlier_spectra_stage_plan`: knob `outlier_spectra_long_networks`,
+    default `{'reference'}`, the full networks that get `full_window_s` and
+    `full_dt_sample`. E-to-E x 1.5 stays a full network (S6, S7 and
+    `fig_outlier_slow_variables` read its dense spectra) over 20 s at 10 ms,
+    its full pass every 0.1 s. Keeping it short is the lead's inference, not
+    Tom's words; `{'reference', 'EEx1p5'}` gives it 200 s again.
+  - `outlier_fig_data` returns `window_txt`, so the dwell, dose and plane
+    tables name each network's window instead of the first run's.
+  - Plans: `essential` and `fast` identical run by run; in `fastmedium`,
+    `medium`, `medium2`, `production` the 30 E-to-E x 1.5 runs go from 200 s
+    at 0.05 s to 20 s at 0.01 s, nothing else (`ow_plan_compare`).
+  - The dwell-time figure became **S7 panel C** on Tom's word (2026-11-23: "I
+    want the dwell-time figure promoted to supplement as part of S7"):
+    `fig_supp7_grouped` draws the reference network's panel with a key of the
+    two line styles; A and B were made shorter to keep S7 within 11.8 in
+    (11.70 in on the `fast` run). The stand-alone `fig_outlier_dwell` stays.
+- **To confirm on the next run:** the stage's wall time, estimated at about
+  254 min on 12 workers (extrapolated from the measured per-pass times,
+  `ow_cost_fd057`), bounded by the longest reference run with multiple
+  timescales (245 min in `fastmedium`); and that the figures draw from data in
+  which the two full networks have different windows.

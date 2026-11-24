@@ -42,6 +42,27 @@ s.tick_fs  = 14;
 s.label_fs = 15.4;
 s.title_fs = 14;
 
+% --- The common canvas (Tom, 2026-11-22: "The figures should have similar
+% canvas widths so that the letters appear proportionally the same"). Every
+% main and supplementary composite is laid out on one canvas width, with the
+% type sizes above in points and never scaled with a block, so letters and
+% labels have the same size relative to the figure in every figure. The
+% drawing fills the width (the cropped image is within canvas_tol of it).
+% Height is free up to canvas_max_h, a page at the same scale.
+%
+% 9 in, not the working width of 13 in (Tom, 2026-11-22, during the figure
+% review: "in general, we should probably get all figures down to a canvas
+% width of 9 inches"; on Figure 5, 13 in read as too big a canvas, with the
+% panel letters too small). The type sizes stay in points, so letters and
+% labels are about 13/9 = 1.4 times larger relative to the figure, and every
+% layout is made again for the narrower canvas, not scaled. canvas_max_h and
+% canvas_tol keep their proportion to the width (17 and 0.5 at 13 in).
+% Read these numbers from here; never type them into a figure function.
+s.canvas_w     = 9;      % inches
+s.canvas_tol   = 0.35;   % inches the cropped image may fall short of canvas_w
+s.canvas_max_h = 11.8;   % inches
+s.letter_fs    = 14;     % panel letters, (A), (B), ...
+
 % --- Line weights
 s.axis_lw     = 1.0;    % axis lines + tick marks
 s.line_lw     = 2.0;    % data traces
@@ -183,9 +204,37 @@ cond_short = { ...
     'sfa_and_std',      'SFA+STD'};
 s.condition_short = containers.Map(cond_short(:, 1), cond_short(:, 2));
 
+% --- The two cell types. ONE E color and ONE I color for every manuscript
+% figure that marks a neuron, a trace or a statistic by its cell type with a
+% single color (polish list of 2026-11-22: Figure 8 took the model's orange
+% and blue from SRNNCellTypePairs.type_colors, the insets of Figure 5 the
+% dark rose and teal of excitatory_colormap(1) / inhibitory_colormap(1)).
+% E reddish, I bluish (docs/Figure_style_guide.md). The values are the
+% model's own two anchors, SRNNCellTypePairs.type_colors(2), so the model's
+% time-series plots and the manuscript figures agree;
+% test_composite_spectral_figures pins the equality. The I blue is close to
+% the multiple-timescale condition blue and the E orange-red lies between
+% the no-adaptation red and the single-timescale yellow: a figure that uses
+% both encodings keeps them apart on the panel (an inset, a separate axes),
+% as Tom accepted on 2026-11-20. The many-neuron palettes
+% (excitatory_colormap, inhibitory_colormap) are a different thing: shades
+% that tell the neurons of one type apart.
+% 2026-11-23 (Tom, on the decisions page: "Red and blue families everywhere"):
+% E is now the first anchor of excitatory_colormap (pure red) and I the first
+% of inhibitory_colormap, so a single E or I mark is in the same family as the
+% many-neuron traces and the weight images. Until then E was the model's
+% orange-red type color (SRNNCellTypePairs.type_colors).
+s.E_color = [1.0000 0.0000 0.0000];
+s.I_color = [0.0000 0.4470 0.7410];
+
 % --- Metric labels, so the axis of a given quantity reads the same everywhere.
-s.label_lle  = '\lambda_1';
-s.label_rate = 'Mean Pop. Firing Rate';
+% 2026-11-23 (Tom): one name for the leading exponent, "Growth rate, lambda_1"
+% wherever it fits (label_growth) and "lambda_1" where it does not (label_lle);
+% add the unit, (s^{-1}), where the axis has one. Axis labels are in sentence
+% case, like titles.
+s.label_lle    = '\lambda_1';
+s.label_growth = 'Growth rate, \lambda_1';
+s.label_rate   = 'Mean pop. firing rate';
 
 % --- Saving
 s.save_types = {'png', 'svg', 'fig'};

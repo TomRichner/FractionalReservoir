@@ -1,7 +1,9 @@
 %% TEST_MEMORY_SUPPLEMENT_COMPOSITES The composites of Plan 2 package F build from a small run, and their two new pieces work.
 %
-% Main Figure 7 (fig_main7_memory) and supplementary S1, S2, S4, S5, S9
-% (fig_supp<k>_grouped), the responsive-share row of fig_mc_gain_bias_maps
+% Main Figure 7 (fig_main7_memory), supplementary S1, S2, S4, S5, S9
+% (fig_supp<k>_grouped) and the leading-direction supplement
+% (fig_supp_leading_grouped; not yet numbered),
+% the responsive-share row of fig_mc_gain_bias_maps
 % and the steps of composite_tools. No simulation.
 %
 % THE FIXTURE. The stages of the 100-neuron regression run
@@ -108,6 +110,12 @@ n_fail = n_fail + check(strcmp(h.String, '(A)') && h.FontSize == 14 && strcmp(h.
 tl = T.condition_title('sfa3_stdc2', true);
 n_fail = n_fail + check(strcmp(T.condition_title('no_adaptation'), 'No adaptation') && ...
     isequal(tl, {'Multiple-timescale', 'adaptation'}), 'tools: condition titles in sentence case, two lines when asked');
+n_fail = n_fail + check(isequal(T.sentence({'noise-free', 'n_a = 3', '\lambda_1', 'Kept', 'top-20 mismatch'}), ...
+    {'Noise-free', 'n_a = 3', '\lambda_1', 'Kept', 'Top-20 mismatch'}) && strcmp(T.sentence('slope 2'), 'Slope 2'), ...
+    'tools: sentence capitalizes a first word and leaves a symbol');
+m = T.margin(dst, 4);
+n_fail = n_fail + check(isscalar(findall(dst, 'Tag', 'composite_crop_margin')) && ~isequal(m.Color, [1 1 1]) && min(m.Color) > 0.98, ...
+    'tools: margin puts one almost-white line on the canvas (the crop counts it, the eye does not)');
 close([src dst]);
 
 %% The fixture run
@@ -140,11 +148,12 @@ pulse = pulse(1:min(3, numel(pulse)));
 base = {'run_dir', run_dir, 'visible', false, 'verbose', 'near-none'};
 jobs = { ...   function, its own arguments, the panel letters, the file tag
     @fig_main7_memory,  {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'}, 'ABCDEF', 'Fig_Main7_Grouped'; ...
-    @fig_supp1_grouped, {'preset_name', chain_preset, 'pulse_conditions', pulse},              'ABC',    'Fig_Supp1_Grouped'; ...
+    @fig_supp1_grouped, {'preset_name', chain_preset, 'pulse_conditions', pulse},              'AB',     'Fig_Supp1_Grouped'; ...
     @fig_supp2_grouped, {'conditions', three},                                                 'ABC',    'Fig_Supp2_Grouped'; ...
     @fig_supp4_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp4_Grouped'; ...
-    @fig_supp5_grouped, {'preset_name', reg_preset, 'conditions', three},                      'ABC',    'Fig_Supp5_Grouped'; ...
-    @fig_supp9_grouped, {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'},  'ABCD',   'Fig_Supp9_Grouped'};
+    @fig_supp5_grouped, {'preset_name', reg_preset, 'conditions', three},                      'AB',     'Fig_Supp5_Grouped'; ...
+    @fig_supp9_grouped, {'preset_name', reg_preset, 'conditions', three, 'run_mode', 'fast'},  'ABC',    'Fig_Supp9_Grouped'; ...
+    @fig_supp_leading_grouped, {'preset_name', reg_preset, 'conditions', three},               'ABC',    'Fig_Supp_Leading_Grouped'};
 ppi = get(groot, 'ScreenPixelsPerInch');
 for j = 1:size(jobs, 1)
     fn = jobs{j, 1}; args = [base, jobs{j, 2}]; letters = jobs{j, 3}; tag = jobs{j, 4};
@@ -161,6 +170,8 @@ for j = 1:size(jobs, 1)
         isequal(sort(fieldnames(o.panels))', num2cell(letters));
     n_fail = n_fail + check(ok, sprintf('%s builds: one figure, letters %s, a source named for each, no file', name, letters));
     if strcmp(name, 'fig_supp4_grouped'); n_fail = n_fail + gain_panel_check(o.figs, run_dir, three); end
+    if strcmp(name, 'fig_main7_memory'); n_fail = n_fail + main7_polish_check(o.figs, three); end
+    n_fail = n_fail + polish_checks(name, o.figs, pulse);
     canvas = o.figs.Position(3:4);
     close(o.figs);
     n_fail = n_fail + check(isempty(setdiff(findall(groot, 'Type', 'figure'), open_before)), ...
@@ -193,7 +204,7 @@ n_fail = n_fail + check(isequal(sort({dir(run_dir).name}), listing_before), ...
 %% 5. a run without the stages
 empty_run = fullfile(tmp, 'empty'); mkdir(empty_run);
 ids = cellfun(@(f) error_of(@() f('run_dir', empty_run, 'save', false, 'conditions', three, 'verbose', 'near-none')), ...
-    {@fig_main7_memory, @fig_supp2_grouped, @fig_supp4_grouped, @fig_supp5_grouped, @fig_supp9_grouped, ...
+    {@fig_main7_memory, @fig_supp2_grouped, @fig_supp4_grouped, @fig_supp5_grouped, @fig_supp9_grouped, @fig_supp_leading_grouped, ...
      @(varargin) fig_supp1_grouped(varargin{:}, 'preset_name', chain_preset)}, 'UniformOutput', false);
 n_fail = n_fail + check(all(~cellfun(@isempty, ids)), ...
     sprintf('a run directory without the stages is an error for every composite (%s)', strjoin(unique(ids), ', ')));
@@ -202,6 +213,190 @@ close(setdiff(findall(groot, 'Type', 'figure'), figs_before));
 finish(n_fail);
 
 %% ------------------------------------------------------------------------
+function n = polish_checks(name, fig, pulse)
+% What the polish of 2026-11-22 (Plan 2, group 3) put into the composites.
+n = 0;
+st = manuscript_style();
+cond = cell2mat(cellfun(@(k) st.condition_color(k), {'no_adaptation', 'sfa1_std1', 'sfa3_stdc2'}', 'UniformOutput', false));
+ax = findall(fig, 'Type', 'axes');
+switch name
+    case 'fig_supp1_grouped'
+        % (A): a single mechanism is in a colour of its own, full strength,
+        % and its column is titled by the mechanism.
+        for want = {'sfa1_std0', 'SFA alone'; 'sfa0_std1', 'Depression alone'}'
+            if ~ismember(want{1}, pulse); continue; end
+            a = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.Title.String), ' '), want{2}), ax));
+            ok = isscalar(a);
+            if ok
+                col = a.Title.Color;
+                g = composite_grid_column(ax, a);
+                traces = findall(g, 'Type', 'line');
+                cols = unique(vertcat(traces.Color), 'rows');
+                ok = ~ismember(col, cond, 'rows') && max(col) - min(col) > 0.4 && ...       % not a condition's, not pale
+                    all(ismember(cols, [col; 0 0 0], 'rows'));
+            end
+            n = n + check(ok, sprintf('S1 (A): the %s column is titled ''%s'' and drawn in one colour that is no condition''s', want{1}, want{2}));
+        end
+        % Tom's review of 2026-11-22 (Plan2_figure_feedback.md, S1): two
+        % panels. (B) is the two widest axes, one above the other.
+        set(ax, 'Units', 'pixels');
+        P = vertcat(ax.Position);
+        is_b = P(:, 3) > 1.5 * min(P(:, 3));
+        b = ax(is_b); a = ax(~is_b);
+        ok = numel(b) == 2 && abs(b(1).Position(1) - b(2).Position(1)) < 1 && abs(b(1).Position(3) - b(2).Position(3)) < 1 && ...
+            abs(b(1).Position(2) - b(2).Position(2)) > b(1).Position(4);
+        n = n + check(ok, 'S1 (B): the two step responses, one above the other');
+        % (A): every row on one y axis from 0, two ticks, the first at 0.
+        [~, ~, row] = unique(round(P(~is_b, 2)));
+        ok = numel(a) == 3 * numel(pulse) && max(row) == 3;
+        for r = 1:max(row)
+            g = a(row == r);
+            ok = ok && all(arrayfun(@(h) isequal(h.YLim, g(1).YLim) && h.YLim(1) == 0 && numel(h.YTick) == 2 && h.YTick(1) == 0, g));
+        end
+        n = n + check(ok, 'S1 (A): the columns of a row share one y axis that starts at 0, with ticks at 0 and one round value');
+        lg = findall(fig, 'Type', 'legend');
+        ok = isscalar(lg);
+        if ok
+            s = cellstr(lg.String);
+            kids = findall(lg.Axes, 'Type', 'line');
+            ok = any(strcmp(s, 'Rate r(t)')) && any(strcmp(s, 'Steady state')) && ~any(contains(s, 'Undepressed')) && ...
+                ~any(contains(s, 'n_a')) && any(strcmp(s, 'Reserve b_2 (chain)')) == any(strcmp({kids.Tag}, 'std_step_reserve'));
+            lg.Units = 'pixels';
+            ok = ok && lg.Position(1) >= b(1).Position(1) + b(1).Position(3);
+        end
+        n = n + check(ok, 'S1 (B): one key, beside the plots, with the entries they use (no undepressed line, no SFA entries)');
+    case 'fig_supp2_grouped'
+        % (B): the QR lines are neutral (gray), never a condition's hue.
+        thin = findall(fig, 'Type', 'line', 'LineWidth', 0.8);
+        c = vertcat(thin.Color);
+        n = n + check(~isempty(c) && all(max(c, [], 2) - min(c, [], 2) < 1e-12), 'S2 (B): the QR local rates are drawn in grays');
+        % Tom's review of 2026-11-22 (Plan2_figure_feedback.md, S2).
+        lg = findall(fig, 'Type', 'legend');
+        all_keys = {};
+        for k = 1:numel(lg); all_keys = [all_keys, cellstr(lg(k).String)]; end %#ok<AGROW>
+        n = n + check(any(strcmp(all_keys, 'Slope 1.5 (SRA1 lower bound)')) && ~any(contains(all_keys, 'strong')), ...
+            'S2 (A): the 1.5 reference is the lower bound of SRA1');
+        band = findall(fig, 'Tag', 'numerics_slope2_band');
+        ok = numel(band) == 3;
+        for k = 1:numel(band)
+            kids = findall(band(k).Parent, 'Type', 'line');          % top of the stack first
+            data = kids(arrayfun(@(h) ~strcmp(h.Marker, 'none'), kids));
+            ok = ok && isequal(kids(end), band(k)) && band(k).LineWidth > 2 * max([data.LineWidth]) && min(band(k).Color) > 0.6;
+        end
+        n = n + check(ok, 'S2 (A): the slope-2 reference is a wide pale band behind the data, in every column');
+        b_key = lg(arrayfun(@(l) any(strcmp(l.String, 'QR \lambda_1')), lg));
+        n = n + check(isscalar(b_key) && isequal(b_key.String, {'Benettin local \lambda_1', 'Benettin \lambda_1', 'QR local \lambda_1', 'QR \lambda_1'}), ...
+            'S2 (B): four traces in the key, Benettin''s two and the QR method''s two');
+        ax_b = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.XLabel.String), ' '), 'Time (s)'), ax));
+        ok = numel(ax_b) == 3;
+        n_wide = 0;
+        for k = 1:numel(ax_b)
+            kids = findall(ax_b(k), 'Type', 'line');
+            kids = kids(arrayfun(@(h) any(isfinite(h.YData)), kids));   % not the key's samples (NaN proxies)
+            is_thin = arrayfun(@(h) h.LineWidth == 0.8, kids);
+            ok = ok && nnz(is_thin) == 1 && nnz(~is_thin) == 1 && find(is_thin) < find(~is_thin) && ...   % the QR line over Benettin's
+                (isequal(ax_b(k).YLim, [-4 4]) || isequal(ax_b(k).YLim, [-15 5]));
+            n_wide = n_wide + isequal(ax_b(k).YLim, [-15 5]);
+        end
+        n = n + check(ok && n_wide == 1, 'S2 (B): one thin QR line on top of Benettin''s thick one; -15 to 5 without adaptation, plus or minus 4 with');
+        % Plan 3 review: the keys' samples in neutral grays (they apply to
+        % every column), and at least two labelled decades on each axis of (A).
+        ok = ~isempty(lg);
+        for k = 1:numel(lg)
+            s = lg(k).PlotChildren;
+            s = s(isprop(s, 'Color'));
+            c = vertcat(s.Color);
+            ok = ok && all(max(c, [], 2) - min(c, [], 2) < 0.05);
+        end
+        n = n + check(ok, 'S2: the keys'' samples are gray, not a condition''s colour');
+        ax_a = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.XLabel.String), ' '), 'Step (s)'), ax));
+        n = n + check(numel(ax_a) == 3 && all(arrayfun(@(h) nnz(h.YTick >= h.YLim(1) & h.YTick <= h.YLim(2)) >= 2, ax_a)), ...
+            'S2 (A): at least two labelled decades on every y axis');
+        ax_c = ax(arrayfun(@(h) strcmp(strjoin(cellstr(h.XLabel.String), ' '), 'Snapshot'), ax));
+        ok = numel(ax_c) == 3 && all(arrayfun(@(h) isequal(h.YLim, [1e-12 1e-8]), ax_c)) && ...
+            isempty(findall(fig, 'Tag', 'numerics_jacobian_threshold')) && isempty(findall(ax_c, 'Type', 'constantline')) && ...
+            ~any(contains(lower(all_keys), 'threshold'));
+        n = n + check(ok, 'S2 (C): three panels on 1e-12 to 1e-8, named by snapshot, with no threshold in the panel or the key');
+        words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')), ax);
+        n = n + check(~any(contains(lower(words), 'state')), 'S2: no axis calls a sampled time point a state');
+    case 'fig_supp4_grouped'
+        n = n + check(isscalar(findall(fig, 'Tag', 'composite_crop_margin')), 'S4: a margin is kept under the bottom row''s x labels');
+    case 'fig_supp5_grouped'
+        % (A) is the firing-rate histogram stacked by E:I weight ratio, with
+        % one color bar (Plan 3: the lambda_1 histogram is main Figure 4B).
+        rate = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'firing rate', 'IgnoreCase', true), ax));
+        cb = findall(fig, 'Type', 'colorbar');
+        ok = numel(rate) == 3 && all(arrayfun(@(h) ~isempty(findall(h, 'Type', 'patch')), rate)) && ...
+            isscalar(cb) && strcmp(cb.Label.String, 'E:I weight ratio') && isempty(findall(fig, 'Type', 'image')) && ...
+            ~any(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'lambda'), ax));   % lambda_1 by any name (G3)
+        n = n + check(ok, 'S5 (A): three firing-rate histograms colored by E:I weight ratio, one color bar, no lambda_1 histogram');
+        lg = findall(fig, 'Type', 'legend');
+        ok = isscalar(lg);
+        if ok
+            lg.Units = 'pixels'; own = lg.Axes; own.Units = 'pixels';
+            ok = lg.Position(2) >= own.Position(2) + own.Position(4) - 1 && isequal(lg.String, {'Local', 'Accumulated'});
+        end
+        n = n + check(ok, 'S5 (B): one key, above its panel, clear of the data');
+    case 'fig_supp9_grouped'
+        boxed = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'lambda') && strcmp(h.Box, 'on'), ax));   % 'Growth rate, lambda_1' since G3
+        n = n + check(isempty(boxed), 'S9 (C): the scatter panels are open, not boxed');
+        key = findall(fig, 'Tag', 'mc_sweep_scatter_size_legend');
+        ok = isscalar(key);
+        if ok
+            drawnow;
+            tx = findall(key, 'Type', 'text');
+            tx = tx(arrayfun(@(t) strcmp(t.VerticalAlignment, 'top'), tx));
+            set(tx, 'Units', 'pixels');
+            e = sortrows(cell2mat(arrayfun(@(t) t.Extent, tx, 'UniformOutput', false)), 1);
+            ok = size(e, 1) >= 2 && all(e(2:end, 1) - (e(1:end - 1, 1) + e(1:end - 1, 3)) > 2);
+        end
+        n = n + check(ok, 'S9 (C): the labels of the marker-size key do not run into each other');
+        % Tom's review of 2026-11-22 (Plan2_figure_feedback.md, S9): memory
+        % only. The leading-direction shares and the cumulative capacity
+        % have left; the responsive-share maps mark self-coupling 0.
+        words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')) + " " + ...
+            string(strjoin(cellstr(h.YLabel.String), ' ')), ax);
+        lgs = findall(fig, 'Type', 'legend');
+        n = n + check(~any(contains(words, 'SFA time', 'IgnoreCase', true)) && ~any(contains(words, 'Cumulative')) && ...
+            isscalar(lgs) && isequal(cellstr(lgs.String), {'Input', 'Reconstruction'}), ...
+            'S9: memory only (no leading-direction shares, no cumulative capacity); one key, (A)''s input and reconstruction');
+        % Plan 3 review: (A)'s traces inside their axes, the scale bar in
+        % a.u., and no explanatory note on the figure.
+        tr_ax = ax(arrayfun(@(h) startsWith(strjoin(cellstr(h.Title.String), ' '), 'delay'), ax));
+        inside = true;
+        for k = 1:numel(tr_ax)
+            for l = findall(tr_ax(k), 'Type', 'line')'
+                y = l.YData(isfinite(l.YData));
+                if numel(y) > 10; inside = inside && min(y) > tr_ax(k).YLim(1) && max(y) < tr_ax(k).YLim(2); end
+            end
+        end
+        txt = arrayfun(@(t) strjoin(cellstr(t.String), ' '), findall(fig, 'Type', 'text'), 'UniformOutput', false);
+        n = n + check(numel(tr_ax) == 4 && inside && any(strcmp(txt, '1 a.u.')) && ~any(contains(txt, 'AU')) && ...
+            ~any(contains(txt, 'drawn at the edge')), 'S9 (A): traces not cut, "1 a.u."; (C): no note on the clipped mark');
+        maps = ax(arrayfun(@(h) ~isempty(findall(h, 'Type', 'surface')), ax));     % fig_mc_gain_bias_maps draws its cells as a surface
+        n = n + check(numel(maps) == 3 && all(arrayfun(@(h) any(h.YTick == 0), maps)), ...
+            'S9 (B): the self-coupling axis of every map is marked at 0');
+    case 'fig_supp_leading_grouped'
+        % The three panels on the leading direction (Plan 3, question 10).
+        lg = findall(fig, 'Type', 'legend');
+        ok = isscalar(lg) && any(startsWith(lg.String, 'Spike-frequency')) && ~any(strcmp(lg.String, 'SFA'));
+        n = n + check(ok, 'leading (B): one key, spike-frequency adaptation written out');
+        tau = ax(arrayfun(@(h) contains(strjoin(cellstr(h.XLabel.String), ' '), 'SFA time', 'IgnoreCase', true), ax));
+        ok = numel(tau) == 2 && isequal(tau(1).XLim, tau(2).XLim);
+        n = n + check(ok, 'leading (A), (B): both against the longest SFA time constant, on one x range');
+        c = ax(startsWith(get(ax, {'Tag'}), 'leading_direction_c'));
+        ok = numel(c) == 3 && isempty(findall(fig, 'Tag', 'uncoupled_reference')) && ...
+            all(arrayfun(@(h) isscalar(findall(h, 'Tag', 'leading_direction_points')), c));
+        n = n + check(ok, 'leading (C): one panel per condition, no line at the uncoupled rate');
+end
+end
+
+function g = composite_grid_column(ax, a)
+% The axes of ax in the column of a (the same left edge, within 2 px).
+set(ax, 'Units', 'pixels');
+g = ax(arrayfun(@(h) abs(h.Position(1) - a.Position(1)) < 2 && h.Position(3) == a.Position(3), ax));
+end
+
 function finish(n_fail)
 if n_fail > 0
     error('test_memory_supplement_composites:Failed', '%d check(s) failed.', n_fail);
@@ -209,11 +404,51 @@ end
 fprintf('test_memory_supplement_composites: all checks PASS\n');
 end
 
+function n = main7_polish_check(fig, names)
+% Polish of 2026-11-22 and Tom's answers of 2026-11-23. (C): the conditions
+% as "No adaptation", "STS" and "MTS" (one text per tick). (E): gain tick
+% labels under the memory-capacity maps too. (D): no break; the noise
+% levels at their values on a linear axis from 0, labelled 0, 0.01, 0.02.
+% Tom's review of 2026-11-22 (Figure 7 notes 1 to 6): four panels in the
+% top row, no lambda_1 against the SFA time constant, self-coupling 0
+% marked on every map.
+ticks = findall(fig, 'Tag', 'main7_horizon_tick');
+words = arrayfun(@(t) string(strjoin(cellstr(t.String), ' ')), ticks);
+want = regexprep(grouped_condition_label(names, 'tick'), {'^Single-timescale$', '^Multiple-timescale$'}, {'STS', 'MTS'});
+n = check(numel(ticks) == numel(names) && all(ismember(string(want), words)) && ...
+    isempty(findall(fig, 'Type', 'text', 'String', '1TS')), '(C) names its conditions as No adaptation, STS, MTS, one text per tick');
+top = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r1_c%d', c)), 1:3);
+bottom = arrayfun(@(c) findobj(fig, 'Tag', sprintf('main_mc_r2_c%d', c)), 1:3);
+n = n + check(all(arrayfun(@(a, b) ~isempty(a.XTickLabel) && isequal(a.XTickLabel, b.XTickLabel), top, bottom)), ...
+    '(E) carries the gain tick labels of (F)');
+n = n + check(all(arrayfun(@(a) any(a.YTick == 0) && any(a.YTick < 0) && any(a.YTick > 0), [top bottom])), ...
+    '(E), (F): the self-coupling axis is marked at 0 as well as at its ends');
+ax = findall(fig, 'Type', 'axes');
+maps = [top bottom];
+others = ax(~ismember(ax, maps));
+set(others, 'Units', 'pixels');
+y = arrayfun(@(a) a.Position(2), others);
+n = n + check(numel(others) == 4 && max(y) - min(y) < 1 && min(y) > max(arrayfun(@(a) getpixelposition(a, true) * [0; 1; 0; 1], top)), ...
+    'the top row holds four panels, level, above the maps');
+words = arrayfun(@(h) string(strjoin(cellstr(h.XLabel.String), ' ')), ax);
+n = n + check(~any(contains(words, 'SFA time', 'IgnoreCase', true)), 'lambda_1 against the longest SFA time constant has left Figure 7');
+ok = isempty(findall(fig, 'Tag', 'main7_noise_break'));
+noise = ax(arrayfun(@(a) ~isempty(getappdata(a, 'noise_levels')), ax));
+if ok && isscalar(noise)
+    levels = getappdata(noise, 'noise_levels');
+    ok = strcmp(noise.XScale, 'linear') && isequal(noise.XLim, [0 max(levels)]) && ...
+        isequal(noise.XTick, [0 0.01 0.02]) && isequal(reshape(cellstr(noise.XTickLabel), 1, []), {'0', '0.01', '0.02'});
+else
+    ok = false;
+end
+n = n + check(ok, '(D) no break: the noise levels at their values on a linear axis, ticks 0, 0.01, 0.02');
+end
+
 function n = gain_panel_check(fig, run_dir, names)
-% The 'All Weights' panel of block (A): its three lines are the medians of
+% The 'All weights' panel of block (A): its three lines are the medians of
 % lambda_1 over the repetitions at each level of the gain sweep.
 ax = findall(fig, 'Type', 'axes');
-ax = ax(arrayfun(@(a) strcmp(strjoin(cellstr(a.XLabel.String), ' '), 'All Weights'), ax));
+ax = ax(arrayfun(@(a) strcmp(strjoin(cellstr(a.XLabel.String), ' '), 'All weights'), ax));   % sentence case (Tom, 2026-11-23)
 ok = numel(ax) == 2;
 if ok
     [~, top] = max(arrayfun(@(a) a.Position(2), ax));

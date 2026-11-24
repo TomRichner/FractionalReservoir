@@ -39,6 +39,9 @@ function F = outlier_fig_data(cfg, caller, kind, want)
 %                     the 1 x 2 pair)
 %   D                 n_net x n_cond x n_seed cell: the reduced run, or []
 %                     where the index has no finished run
+%   window_txt        the measured window(s) for a caption, from the runs
+%                     ('20 s', or '200 s (reference), 20 s (EEx1p5)': the
+%                     networks need not share one window, FD-057)
 %   n_failed          runs of the selection the index marks as not finished
 %   st                manuscript_style()
 %
@@ -133,6 +136,26 @@ for k = 1:height(runs)
     d.window_s = R.window_s; d.n_cal = numel(R.cal.t);
     F.D{w, c, s} = d;
 end
+F.window_txt = window_text(F.D, nets);
+end
+
+function s = window_text(D, nets)
+% The measured windows of the loaded runs, for a caption: '20 s' when every
+% run has one length, else '200 s (reference), 20 s (EEx1p1, ...)'. The
+% networks need not share one window (FD-057: only long_networks get the
+% long one), so a caption must not take the first run's for all.
+win = nan(1, numel(nets));
+for w = 1:numel(nets)
+    r = D(w, :, :); r = r(~cellfun(@isempty, r));
+    if ~isempty(r); win(w) = max(cellfun(@(d) d.window_s, r)); end
+end
+u = unique(win(~isnan(win)), 'stable');
+if isscalar(u)
+    s = sprintf('%g s', u);
+    return
+end
+parts = arrayfun(@(v) sprintf('%g s (%s)', v, strjoin(nets(win == v), ', ')), sort(u, 'descend'), 'UniformOutput', false);
+s = strjoin(parts, ', ');
 end
 
 %% ------------------------------------------------------------------------
@@ -228,7 +251,7 @@ end
 function s = net_label(name)
 tok = regexp(name, '^EEx(\d+)p(\d+)$', 'tokens', 'once');
 if ~isempty(tok)
-    s = sprintf('E-to-E \\times %s.%s', tok{1}, tok{2});
+    s = sprintf('E-to-E %s %s.%s', char(215), tok{1}, tok{2});   % the sign itself, as Figure 5 and S3 write it (TeX's times set it with wide spaces)
 elseif strcmp(name, 'reference')
     s = 'Reference';
 else

@@ -23,7 +23,8 @@
 %      numbers it reports equal to what the run files hold (the marked
 %      eigenvalues per state counted again in units of W against each
 %      state's own radius; the dose values against ospec_measures; the
-%      dwell counts against ospec_excursions).
+%      dwell counts against ospec_excursions). The dwell figure draws the
+%      reference alone by default and both full networks when named (FD-057).
 %   4. Each errors on an EMPTY run directory and on no run directory
 %      (resolve_data_file: no fallback), on a network the index lacks, on
 %      a seed it lacks; the slow-variables figure on a network without
@@ -107,6 +108,25 @@ insets = findall(o.figs, 'Tag', 'fig_outlier_plane_inset');
 assert(numel(insets) == 6, 'one inset per panel');
 dots = findall(insets(1), 'Type', 'scatter');
 assert(numel(dots.XData) == 60 * 3, 'one dot per neuron per state in the inset');
+% Polish of 2026-11-22: no eigenvalue dot lies on a tick label (a tick whose
+% label would be covered in any panel is left out of every panel).
+assert(isempty(intersect(o.window.re_ticks, o.window.hidden_re_ticks)) && ...
+    isempty(intersect(o.window.im_ticks, o.window.hidden_im_ticks)), 'a hidden tick is not among the ticks drawn');
+txt = fileread(fullfile(fig_dir, 'plane', 'Fig_Outlier_Plane_table.md'));
+assert(contains(txt, 'TICKS LEFT OUT') ~= (isempty(o.window.hidden_re_ticks) && isempty(o.window.hidden_im_ticks)), ...
+    'the sidecar says which ticks were left out, or that none was');
+n_covered = 0;
+panels = setdiff(findall(o.figs, 'Type', 'axes'), insets);
+for a = panels'
+    sc = findall(a, 'Type', 'scatter');
+    x = [sc.XData]; y = [sc.YData];
+    for t = findall(a, 'Type', 'text', 'Tag', 'complex_plane_axes')'
+        if iscell(t.String) || isempty(regexp(t.String, ['^[\d.' char(8722) ']+$'], 'once')); continue; end   % tick labels only
+        e = t.Extent; pad = 0.15 * e(4);                   % the glyphs are a little inside the text box
+        n_covered = n_covered + nnz(x > e(1) & x < e(1) + e(3) & y > e(2) + pad & y < e(2) + e(4) - pad);
+    end
+end
+assert(n_covered == 0, '%d eigenvalue dot(s) lie on a tick label', n_covered);
 close(o.figs);
 
 o2 = draw(@fig_outlier_plane, [common, {'seed', [1 2], 'outlier_factor', 1.3, 'inset', false, 'networks', {'EEx1p5'}, ...
@@ -165,7 +185,18 @@ s0 = o.numbers{1, 1};                                   % no adaptation: the ful
 assert(max(abs(s0.cont_ov - 1)) < 1e-6 && max(abs(s0.cont_re - s0.frozen_re)) < 1e-3, 'without slow variables the two coincide');
 assert(o.window.re_lim(1) < 0 && o.window.re_lim(2) > 0 && all(o.window.re_ticks > 0) && isempty(o.window.far_lim), ...
     'through the origin, no break, real ticks right of zero only');
+% The common canvas: canvas_w wide unless a composite passes fig_w; a tick
+% whose label a mark would lie on is left out, never the last of its axis.
+sty = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - sty.canvas_w) < 1e-6, 'the stand-alone figure is canvas_w wide (%.2f in)', o.figs.Position(3));
+assert(isempty(intersect(o.window.re_ticks, o.window.hidden_re_ticks)) && ~isempty(o.window.re_ticks) && ...
+    isempty(intersect(o.window.im_ticks, o.window.hidden_im_ticks)) && ~isempty(o.window.im_ticks), ...
+    'ticks under a mark are left out; one stays on each axis');
 close(o.figs);
+o2 = fig_outlier_slow_variables(common{:}, 'save', false, 'visible', false, 'fig_w', 6);
+o2.figs.Units = 'inches';
+assert(abs(o2.figs.Position(3) - 6) < 1e-6, 'fig_w sets the width');
+close(o2.figs);
 o2 = draw(@fig_outlier_slow_variables, [common, {'seed', 1, 'x_thr', 0.3, 're_lim', [-14 10], 'im_lim', [-9 9], ...
     'networks', {'reference'}, 'conditions', {'sfa1_std1'}}], fullfile(fig_dir, 'slow_opts'), 'Fig_Outlier_Slow_Variables');
 assert(isequal(o2.window.re_lim, [-14 10]) && isequal(o2.window.y_lim, [-9 9]) && isequal(size(o2.numbers), [1 1]));
@@ -175,8 +206,14 @@ assert(throws(@() fig_outlier_slow_variables(common{:}, 'save', false, 'networks
     'fig_outlier_slow_variables:NeedsDense'));
 
 %% 3d. fig_outlier_dwell
+% The reference only by default (Tom, 2026-11-23, FD-057), one panel on the canvas width.
+st_ = manuscript_style();
 o = draw(@fig_outlier_dwell, common, fullfile(fig_dir, 'dwell'), 'Fig_Outlier_Dwell');
-assert(isequal(size(o.curves), [2 3 2]));
+assert(isequal(size(o.curves), [1 3 2]) && isscalar(findall(o.figs, 'Type', 'axes')) && ...
+    abs(o.figs.Position(3) - st_.canvas_w) < 1e-9, 'the dwell figure: the reference alone, one panel, canvas_w wide');
+close(o.figs);
+o = draw(@fig_outlier_dwell, [common, {'networks', {'reference', 'EEx1p5'}}], fullfile(fig_dir, 'dwell_both'), 'Fig_Outlier_Dwell');
+assert(isequal(size(o.curves), [2 3 2]) && numel(findall(o.figs, 'Type', 'axes')) == 2, 'both networks when named');
 q = o.curves{1, 3, 1};                                  % reference, multiple timescales, frozen gains
 Ra = ospec_load_run(tmp, struct('network', 'reference', 'condition', 'sfa3_stdc2', 'seed', [7 8]));
 Ea = ospec_excursions(Ra.t, Ra.rate_top);

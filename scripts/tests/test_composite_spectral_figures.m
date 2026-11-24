@@ -27,7 +27,8 @@
 %      every inset and names the drawn seed (the stage's first) in its
 %      sidecar; Figure 6's frequency panels are the reference network only,
 %      carry their own frequency-axis labels, and leave out the middle
-%      panel; S6 draws one cumulative panel per network, titled.
+%      panel; S6 draws one cumulative panel per network, titled; S7 has
+%      panel C, the dwell time of the reference, with its key (FD-057).
 %   5. The source figures' new options: fig_freqresp_network networks and
 %      panels (the table still has every network's row it was asked for),
 %      fig_freqresp_plane networks and sentence-case titles, a network the
@@ -139,16 +140,33 @@ insets = findall(o.figs, 'Tag', 'fig_outlier_plane_inset');
 marks = findall(o.figs, 'Tag', 'fig_outlier_plane_inset_mark');
 assert(numel(insets) == 6 && numel(marks) == 12, 'six insets, each with an E and an I');
 assert(isequal(sort(get(marks, 'String')), sort(repmat({'E'; 'I'}, 6, 1))));
-ei = [excitatory_colormap(1); inhibitory_colormap(1)];
+st_ei = manuscript_style();
+ei = [st_ei.E_color; st_ei.I_color];
+% Tom, 2026-11-23 (G2): the first anchors of the many-neuron color maps
+% (inhibitory_colormap rounds MATLAB's default blue to two places); until
+% then the model's type colors, SRNNCellTypePairs.type_colors.
+e_map = excitatory_colormap(8); i_map = inhibitory_colormap(8);
+assert(isequal(ei(1, :), e_map(1, :)) && max(abs(ei(2, :) - i_map(1, :))) < 0.005, ...
+    'the manuscript''s one E and one I color are the first anchors of excitatory_colormap and inhibitory_colormap');
 for k = 1:numel(marks)
-    assert(isequal(marks(k).Color, ei(1 + strcmp(marks(k).String, 'I'), :)), 'the marks are in the cell-type colors');
+    assert(isequal(marks(k).Color, ei(1 + strcmp(marks(k).String, 'I'), :)), 'the marks are in the manuscript_style E and I colors');
 end
+for k = 1:numel(insets)
+    sc = findall(insets(k), 'Type', 'scatter');
+    assert(all(ismember(sc.CData, ei, 'rows')), 'the inset dots are in the manuscript_style E and I colors');
+end
+la = findall(o.figs, 'Tag', 'panel_letter_A');
+assert(isscalar(la), 'one letter (A)');
+fig_px = getpixelposition(o.figs);
+top_px = max(arrayfun(@(a) sum(subsref(getpixelposition(a, true), substruct('()', {[2 4]}))), findall(o.figs, 'Type', 'axes')));
+gap_in = (la.Position(2) * fig_px(4) - top_px) / get(groot, 'ScreenPixelsPerInch');
+assert(gap_in < 0.45, '(A) sits %.2f in above the top of its panels: within half an inch', gap_in);
 runs = ospec_read_index(tmp);
 first_seed = [runs.seed1(1), runs.seed2(1)];
 txt = fileread(fullfile(fig_dir, 'main5', 'Fig_Main5_Grouped_table.md'));
 assert(isequal(o.seed, first_seed) && contains(txt, sprintf('network seed [%d %d], the first of the stage', first_seed)), ...
     'the seed drawn in A is the stage''s first and the sidecar says so');
-titles = arrayfun(@(a) string(a.Title.String), findall(o.figs, 'Type', 'axes'));
+titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), findall(o.figs, 'Type', 'axes'));   % two-line titles (Plan 3 fix X8)
 assert(all(ismember(["No adaptation", "Single-timescale adaptation", "Multiple-timescale adaptation"], titles)), 'sentence-case titles');
 close(o.figs);
 o = fig_main5_mechanism(common{:}, 'seed', [2 3], 'networks', {'EEx1p5'}, 'save', false);
@@ -164,6 +182,16 @@ assert(isequal(sort(get(net_ax, 'Tag')), {'freqresp_network_reference_c1'; 'freq
 for k = 1:2
     assert(strcmp(net_ax(k).XLabel.String, 'Frequency (Hz)') && ~isempty(net_ax(k).XTickLabel), 'C and D carry their own frequency axis');
 end
+% Polish of 2026-11-22 (9 in canvas: 0.8 of the width, the rest is the y axis name and tick labels left of C): C and D fill the width; no bars at the foot of D; one unit on both axes of E.
+o.figs.Units = 'inches'; set(net_ax, 'Units', 'inches');
+span = max(arrayfun(@(a) sum(a.Position([1 3])), net_ax)) - min(arrayfun(@(a) a.Position(1), net_ax));
+assert(span > 0.8 * o.figs.Position(3), 'C and D together take the width of the figure (%.2f of %.2f in)', span, o.figs.Position(3));
+assert(isempty(findall(net_ax, 'Type', 'line', 'LineWidth', 3)), 'no bulk-rotation bars on D in the main figure');
+mk = findall(net_ax, 'Tag', 'leftover_mode_mark');
+assert(~isempty(mk) && numel(unique(round([mk.YData], 9))) == numel(mk), 'D: the leftover-mode triangles one above the other (Plan 3 fix X10)');
+labels = get(findall(o.figs, 'Type', 'text', 'Tag', 'complex_plane_axes'), 'String');   % a cell for a name of two lines
+labels = string(strtrim(cellfun(@(s) strjoin(cellstr(s), ' '), labels, 'UniformOutput', false)));
+assert(any(labels == "Im (s^{-1})") && any(labels == "Re (s^{-1})") && ~any(contains(labels, "rad")), 'E: s^-1 on both axes');
 plane_ax = findall(o.figs, '-regexp', 'Tag', '^freqresp_plane_');
 assert(numel(plane_ax) == 3 && all(startsWith(get(plane_ax, 'Tag'), 'freqresp_plane_reference_')), 'E: the reference network, one panel per condition');
 gain_ax = findall(o.figs, '-regexp', 'Tag', '^main6_gain_');
@@ -171,26 +199,122 @@ assert(numel(gain_ax) == 3 && isscalar(findall(o.figs, 'Tag', 'main6_margin')) &
     'A and B: one margin panel, a gain panel per selected condition, one legend');
 txt = fileread(fullfile(fig_dir, 'main6', 'Fig_Main6_Grouped_table.md'));
 assert(contains(txt, '| no_adaptation | Worst case |') && ~contains(txt, 'sfa3_std2'), 'the numbers of A and B, the selected conditions only');
+assert(contains(txt, 'radius of the effective connectivity as a perturbation at that frequency sees it') && ...
+    contains(txt, 'because the dendrite filters fast input'), 'the caption answers Tom''s question on panel C (notes of 2026-11-22)');
+st = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6 && o.figs.Position(4) <= st.canvas_max_h, ...
+    'Figure 6 is on the common canvas (%.2f x %.2f in)', o.figs.Position(3:4));
 close(o.figs);
 assert(throws(@() fig_main6_amplification(common{:}, 'network', 'EEx9p9', 'save', false), 'fresp_pick_networks:NoSuchNetwork'));
 
 % S6
-o = draw(@fig_supp6_grouped, common, fullfile(fig_dir, 'supp6'), 'Fig_Supp6_Grouped', 'ABC', ...
-    {'Panel A (fig_eigdens_gains, reference)', 'Panel B, panel 1', 'Panel B, panel 2', 'Panel C (fig_eigdens_measures, reference)'});
+o = draw(@fig_supp6_grouped, common, fullfile(fig_dir, 'supp6'), 'Fig_Supp6_Grouped', 'ABCDE', ...
+    {'Panel A (fig_eigdens_gains, reference)', 'Panel B, panel 1', 'Panel B, panel 2', 'Panel C (fig_eigdens_measures, reference)', ...
+    'Panels D and E (fig_freqresp_single_neuron, neuron 1'});
 titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), findall(o.figs, 'Type', 'axes'));
 assert(nnz(titles == "Reference") == 1 && nnz(contains(titles, "E-to-E")) == 1, 'B: one cumulative panel per network, titled by it');
-assert(numel(findall(o.figs, 'Type', 'axes')) == 2 + 2 + 4, 'A two panels, B two, C four');
+assert(numel(findall(o.figs, 'Type', 'axes')) == 2 + 2 + 4 + 2, 'A two panels, B two, C four, D and E one each');
+assert(isscalar(findall(o.figs, 'Tag', 'freqresp_single_gain_1')) && isscalar(findall(o.figs, 'Tag', 'freqresp_single_phase_1')), ...
+    'D and E: the gain and the phase of neuron 1 (the E neuron of median rate)');
+% C (Tom's notes, S6 note 3): a box per condition and panel, the reference
+% diamonds in a column of their own right of the box, never on it.
+for q = 1:4
+    ax = findall(o.figs, 'Tag', sprintf('eigdens_measures_%d', q));
+    boxes = findall(ax, 'Tag', 'eigdens_box');
+    assert(isscalar(ax) && numel(boxes) == numel(conditions), 'C panel %d: one box per condition', q);
+    refs = findall(ax, 'Tag', 'eigdens_reference');
+    assert((q == 4) == isempty(refs), 'C panel %d: reference diamonds in panels 1 to 3 only', q);
+    for r = reshape(refs, 1, [])
+        c = round(r.XData(1));
+        bx = boxes(arrayfun(@(b) abs(mean(b.XData) - (c - 0.14)) < 1e-9, boxes));
+        assert(isscalar(bx) && min(r.XData) > max(bx.XData), 'C panel %d, condition %d: the diamonds are right of the box', q, c);
+    end
+end
+lg = findall(o.figs, 'Type', 'legend');
+assert(isscalar(lg) && all(ismember({'Spike-frequency adaptation and depression', 'Spike-frequency adaptation alone', 'Depression alone'}, lg.String)), ...
+    'S6 (D, E): the key names spike-frequency adaptation as such');
+st = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6 && o.figs.Position(4) <= st.canvas_max_h, ...
+    'S6 is on the common canvas (%.2f x %.2f in)', o.figs.Position(3:4));
+close(o.figs);
+% A box over the networks, whatever their number (ten in the larger run).
+o = fig_eigdens_measures('run_dir', tmp, 'visible', false, 'save', false);
+assert(numel(findall(o.figs, 'Tag', 'eigdens_box')) == 4 * numel(conditions), 'fig_eigdens_measures: a box per condition and panel');
 close(o.figs);
 
 % S7
-o = draw(@fig_supp7_grouped, common, fullfile(fig_dir, 'supp7'), 'Fig_Supp7_Grouped', 'AB', ...
-    {'Panel A (fig_outlier_slow_variables)', 'Panel B (fig_ostruct_summary)'});
+o = draw(@fig_supp7_grouped, common, fullfile(fig_dir, 'supp7'), 'Fig_Supp7_Grouped', 'ABC', ...
+    {'Panel A (fig_outlier_slow_variables)', 'Panel B (fig_ostruct_summary)', 'Panel C (fig_outlier_dwell)'});
+% Panel C (Tom, 2026-11-23, FD-057): the dwell time of the reference, with its key of the two line styles.
+lg = findall(o.figs, 'Type', 'legend');
+assert(any(arrayfun(@(l) isequal(l.String, {'Gains frozen', 'Full Jacobian'}), lg)), 'S7 (C): the key of the line styles');
+assert(contains(fileread(fullfile(fig_dir, 'supp7', 'Fig_Supp7_Grouped_table.md')), '(C) How long the rightmost eigenvalue'), ...
+    'S7: the caption paragraph of panel C');
+% Without a gallery in the run, B draws every network of the stage under the stage's names.
+assert(isempty(o.gallery_keys) && numel(findall(o.figs, 'Tag', 'slow_variables_filtered')) >= 1, ...
+    'S7: no gallery, the stage''s own list; the filtered eigenvalues are drawn in A');
+% The common canvas (Plan 2, 2026-11-22) replaces the polish's "under 0.9
+% of the screen": canvas_w wide, at most canvas_max_h tall.
+st = manuscript_style(); o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6 && o.figs.Position(4) <= st.canvas_max_h, ...
+    'S7 is on the common canvas (%.1f x %.1f in)', o.figs.Position(3), o.figs.Position(4));
 close(o.figs);
+% With a gallery (the concept_examples stage, tiny), B draws the gallery's
+% structures that the outlier_structures stage ran, in the gallery's order
+% and under S3's titles, and names the others.
+cg = mu7chain_AC_config('fast');
+cg.verbose = 'near-none';
+cg.concept_examples_n_override = 80; cg.concept_examples_T = 2; cg.concept_examples_lya_from = 1;
+cg.concept_examples_n_trace = 3; cg.concept_examples_n_image = 20;
+cg.concept_examples_examples = {'decay', 'reference', 0.15, []};
+cg.concept_examples_gallery = {'lowrank_real', 'lrA1p5W0p0', 1, []; 'balanced', 'reference', 1, []; ...
+    'II_up', 'IIx1p25', 1, []; 'local_outlier', 'reference', 1, [27 28]};
+evalc('run_concept_examples_stage(cg, tmp, concept_examples_stage_plan(cg));');
+o = fig_supp7_grouped(common{:}, 'out_dir', fullfile(fig_dir, 'supp7g'));
+Fs = ostruct_figure_data(struct('data_file', '', 'run_dir', tmp, 'conditions', {{}}), 'test');
+g_keys = {'lrA1p5W0p0', 'reference', 'IIx1p25', 'reference_w27'};            % the gallery, as keys of the outlier_structures stage
+g_titles = {'Real low-rank mode', 'Reference', 'I-to-I up', 'Local outlier'};
+in = ismember(g_keys, Fs.keys);
+assert(any(in) && ~all(in), 'the tiny stage holds some of the gallery''s structures (%s of %s)', strjoin(g_keys(in), ', '), strjoin(Fs.keys(:)', ', '));
+assert(isequal(o.gallery_keys, g_keys(in)) && isequal(o.gallery_labels, g_titles(in)) && isequal(o.gallery_missing, g_titles(~in)), ...
+    'S7 (B): the gallery''s structures that the stage ran, in the gallery''s order, under its titles (drawn: %s)', strjoin(o.gallery_keys, ', '));
+ax = findall(o.figs, 'Type', 'axes');
+named = ax(arrayfun(@(a) isequal(reshape(cellstr(a.XTickLabel), 1, []), g_titles(in)), ax));
+assert(isscalar(named) && isequal(named.XLim, [0.4, nnz(in) + 0.6]), 'S7 (B): those networks drawn, named under the bottom row');
+txt = fileread(fullfile(fig_dir, 'supp7g', 'Fig_Supp7_Grouped_table.md'));
+assert(contains(txt, 'NOT IN PANEL B') && contains(txt, strjoin(g_titles(~in), ', ')) && ...
+    contains(txt, sprintf('DRAWN HERE: %d of the stage''s %d networks', nnz(in), numel(Fs.keys))), ...
+    'S7: the sidecar says which structures B draws and which it cannot');
+close(o.figs);
+o = fig_supp7_grouped(common{:}, 'save', false, 'gallery', false);
+assert(isempty(o.gallery_keys), 'gallery false: the stage''s own list');
+close(o.figs);
+rmdir(fullfile(tmp, 'concept_examples'), 's');
+% The default gallery is made of networks the outlier_structures stage runs by default.
+pg = concept_examples_stage_plan(mu7chain_AC_config('fast'));
+[~, okeys] = cx_gallery_names(pg.gallery, pg.seed);
+po = outlier_structures_stage_plan(mu7chain_AC_config('fast'));
+assert(numel(okeys) == 8 && all(ismember(okeys, {po.networks.key})) && numel(unique({po.networks(ismember({po.networks.key}, okeys)).group})) == 3, ...
+    'every structure of the default gallery is tested by the outlier_structures stage, across its three groups');
 
 % S8
 o = draw(@fig_supp8_grouped, common, fullfile(fig_dir, 'supp8'), 'Fig_Supp8_Grouped', 'AB', ...
-    {'Panel A (fig_freqresp_single_neuron)', 'Panel B (fig_freqresp_phase)'});
-assert(numel(findall(o.figs, 'Type', 'axes')) == 7, 'A six panels, B one');
+    {'Panels A and B (fig_freqresp_single_neuron, neuron 1'});
+ax = findall(o.figs, 'Type', 'axes');
+assert(numel(ax) == 2 && isscalar(findall(o.figs, 'Tag', 'freqresp_single_gain_1')) && isscalar(findall(o.figs, 'Tag', 'freqresp_single_phase_1')), ...
+    'S8 (Tom''s notes of 2026-11-22): one gain panel and one phase panel, the E neuron of median rate');
+lg = findall(o.figs, 'Type', 'legend');
+assert(isscalar(lg) && all(ismember({'Spike-frequency adaptation and depression', 'Spike-frequency adaptation alone', 'Depression alone'}, lg.String)), ...
+    'S8: one key that names the three line styles, spike-frequency adaptation as such');
+hA = findall(o.figs, 'Tag', 'panel_letter_A'); hB = findall(o.figs, 'Tag', 'panel_letter_B');
+assert(hB.Position(1) > hA.Position(1) + 0.2, 'S8: (B) at the phase panel, right of (A)');
+txt = fileread(fullfile(fig_dir, 'supp8', 'Fig_Supp8_Grouped_table.md'));
+assert(contains(txt, '| E median |') && contains(txt, '| I median |') && contains(txt, '| E driven |'), ...
+    'S8: the neurons not drawn are in the table');
+close(o.figs);
+% The stand-alone figure keeps its three columns by default.
+o = fig_freqresp_single_neuron('run_dir', tmp, 'visible', false, 'save', false);
+assert(numel(findall(o.figs, 'Type', 'axes')) == 6, 'fig_freqresp_single_neuron: three neurons by default');
 close(o.figs);
 
 %% 5. The source figures' new options
@@ -220,11 +344,22 @@ close(o.figs);
 o = fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false);
 F = ostruct_figure_data(struct('data_file', '', 'run_dir', tmp, 'conditions', {{}}), 'test');
 ax = findall(o.figs, 'Type', 'axes');
-top = ax(arrayfun(@(a) contains(a.YLabel.String, 'bulk radius'), ax));
+top = ax(arrayfun(@(a) contains(strjoin(cellstr(a.YLabel.String), ' '), 'bulk radius'), ax));
 lo = min([F.lo.mode_rho(:); -1], [], 'omitnan'); hi = max([F.hi.mode_rho_uniform(:); F.hi.mode_rho(:); 1], [], 'omitnan');
 assert(isscalar(top) && strcmp(top.YScale, 'linear') && top.YLim(1) < lo && top.YLim(2) > hi, ...
     'every detachment is inside the axis (%.3g to %.3g in [%.3g, %.3g])', lo, hi, top.YLim);
+assert(isequal(top.XLim, [0.4, numel(F.keys) + 0.6]), 'the default draws every network of the stage');
 close(o.figs);
+% Some networks, in the order given, under the labels given.
+o = fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false, 'networks', F.keys([3 1]), 'labels', {'third', 'first'}, ...
+    'fig_size', [6 7], 'compact', true);
+ax = findall(o.figs, 'Type', 'axes');
+assert(all(arrayfun(@(a) isequal(a.XLim, [0.4 2.6]), ax)) && any(arrayfun(@(a) isequal(cellstr(a.XTickLabel)', {'third', 'first'}), ax)) && ...
+    max(abs(o.figs.Position(3:4) - [6 7])) < 0.05, 'networks, labels and fig_size are taken');
+close(o.figs);
+assert(throws(@() fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false, 'networks', {'nope'}), 'fig_ostruct_summary:NoNetwork'));
+assert(throws(@() fig_ostruct_summary('run_dir', tmp, 'visible', false, 'save', false, 'networks', F.keys(1), 'labels', {'a', 'b'}), ...
+    'fig_ostruct_summary:Labels'));
 
 %% 6. Errors, never a fallback; nothing left open
 fns = {@fig_main5_mechanism, @fig_main6_amplification, @fig_supp6_grouped, @fig_supp7_grouped, @fig_supp8_grouped};

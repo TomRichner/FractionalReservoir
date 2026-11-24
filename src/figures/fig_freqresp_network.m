@@ -37,6 +37,7 @@ function out = fig_freqresp_network(cfg)
 % over seeds and states, in Hz), for the conditions with slow variables;
 % bars at the bottom: the range of rotation rates of the frozen bulk, from
 % the lowest frequency drawn to R_frozen / (2 pi tau_d), per condition.
+% (bulk_bars = false leaves the bars out; the table keeps their numbers.)
 % The three columns each share one y range over the rows.
 %
 % NOTHING BUT THE DRAWING ON THE PANELS. Fig_Freqresp_Network_table.md
@@ -60,6 +61,8 @@ arguments
     cfg.conditions                = {}    % names to draw, in order; empty = all the run holds (select_conditions)
     cfg.networks                  = {}    % networks (rows) to draw, in order; empty = all the stage ran
     cfg.panels      (1,:) double {mustBeMember(cfg.panels, [1 2 3])} = [1 2 3]   % columns: 1 bulk radius, 2 rightmost real part, 3 loop gain
+    cfg.bulk_bars   (1,1) logical = true    % the bars at the foot of the loop-gain panel (false: Main Figure 6, where nothing on the panel explains them)
+    cfg.fig_size    double        = []      % [width height] of the figure in pixels; [] = 1250 x 350 per row for three panels, narrower in proportion for fewer
 end
 
 setup_paths();
@@ -73,7 +76,9 @@ gray = [0.6 0.6 0.6];
 
 vis = 'on'; if ~cfg.visible; vis = 'off'; end
 panels = unique(cfg.panels, 'stable'); n_p = numel(panels);
-fig = figure('Color', 'w', 'Position', [80 80 round(1250 * n_p / 3), 350 * n_net], 'Visible', vis);
+fig_size = cfg.fig_size;
+if isempty(fig_size); fig_size = [round(1250 * n_p / 3), 350 * n_net]; end
+fig = figure('Color', 'w', 'Position', [80 80 fig_size(1:2)], 'Visible', vis);
 % A column that is not asked for is drawn on a scrap figure and thrown
 % away: the table needs all three, and the drawing code stays one piece.
 scrap = figure('Visible', 'off'); scrap_closer = onCleanup(@() close(scrap));
@@ -144,13 +149,27 @@ for w = 1:n_net
             median(real(P.K_inf1)), median(real(P.K_zero1)), max(K1_gain)}; %#ok<AGROW>
     end
 end
+% The leftover-mode triangles ABOVE the curves, one above the other in the
+% order of the conditions (Plan 3 fix X10: at 0.95 of the top they sat on
+% the no-adaptation curve and its band, and the multiple-timescale triangle
+% hid the single-timescale one at the same frequency). The loop-gain axis
+% grows to hold them; y_curves is the top it had for the curves.
+y_curves = y_hi(3);
+has_mark = cellfun(@(m) m.has_slow && isfinite(m.f_cont) && m.f_cont > 0, marks);
+mark_step = 0.1 * y_curves;
+y_hi(3) = y_curves + mark_step * (max([sum(has_mark, 2); 0]) + 0.6);
 for w = 1:n_net
+    k_mark = 0;
     for c = 1:n_cond
         m = marks{w, c};
-        y_bar = (0.025 + 0.022 * (c - 1)) * y_hi(3);
-        plot(ax(w, 3), [m.f1, m.f_bulk], [y_bar y_bar], '-', 'Color', m.col, 'LineWidth', 3);
+        y_bar = (0.025 + 0.022 * (c - 1)) * y_curves;
+        if cfg.bulk_bars
+            plot(ax(w, 3), [m.f1, m.f_bulk], [y_bar y_bar], '-', 'Color', m.col, 'LineWidth', 3);
+        end
         if m.has_slow && isfinite(m.f_cont) && m.f_cont > 0
-            plot(ax(w, 3), m.f_cont, 0.95 * y_hi(3), 'v', 'Color', m.col, 'MarkerFaceColor', m.col, 'MarkerSize', 8);
+            k_mark = k_mark + 1;
+            plot(ax(w, 3), m.f_cont, y_curves + k_mark * mark_step, 'v', 'Color', m.col, 'MarkerFaceColor', m.col, ...
+                'MarkerSize', 8, 'Tag', 'leftover_mode_mark');
         end
     end
     yline(ax(w, 2), 1, '-', 'Color', gray, 'LineWidth', 1.0);
@@ -158,7 +177,7 @@ for w = 1:n_net
     for c = 1:3
         set(ax(w, c), 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out', ...
             'Layer', 'top', 'XScale', 'log', 'XLim', D.settings.f([1 end]), 'XTick', decade_ticks(D.settings.f), ...
-            'XMinorTick', 'off', 'YLim', [y_lo(c), y_hi(c)]);
+            'XMinorTick', 'off', 'YLim', [y_lo(c), y_hi(c)], 'YTick', few_ticks(y_lo(c), y_hi(c)));
         if w == n_net
             xlabel(ax(w, c), 'Frequency (Hz)', 'FontSize', st.label_fs);
         else
@@ -231,4 +250,16 @@ end
 
 function t = decade_ticks(f)
 t = 10 .^ (ceil(log10(f(1)) - 1e-9):floor(log10(f(end)) + 1e-9));
+end
+
+function t = few_ticks(lo, hi)
+% At most four y ticks, on the finest step of 1, 2 or 5 times a power of ten
+% that gives no more (Tom, 2026-11-23, G5: "fewer ticks", "three or four at most
+% where that still reads"). A 0-to-2 axis reads 0, 1, 2.
+e = floor(log10(max(hi - lo, eps)));
+steps = kron(10 .^ (e - 1:e + 1), [1 2 5]);
+for step = steps
+    t = step * (ceil(lo / step - 1e-9):floor(hi / step + 1e-9));
+    if numel(t) <= 4; return; end
+end
 end

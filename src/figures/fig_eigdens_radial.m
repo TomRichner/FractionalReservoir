@@ -49,6 +49,7 @@ arguments
     cfg.preset_name (1,:) char    = ''    % unused; the networks are in the data
     cfg.network     (1,:) char    = 'reference'
     cfg.panels      (1,:) cell    = {'cumulative', 'density'}   % which of the two panels, left to right
+    cfg.fig_size    (1,2) double  = [NaN NaN]   % inches [w h]; NaN = 13 cm per panel by 11 cm (fig_supp6_grouped lays it out at its width)
     cfg.conditions                = {}
 end
 
@@ -68,6 +69,7 @@ if isempty(panels) || numel(panels) ~= numel(cfg.panels)
     error('fig_eigdens_radial:Panels', 'panels holds ''cumulative'' and/or ''density''.');
 end
 fig = figure('Visible', vis, 'Color', 'w', 'Units', 'centimeters', 'Position', [2 2 13 * numel(panels) 11]);
+if all(isfinite(cfg.fig_size)); fig.Units = 'inches'; fig.Position(3:4) = cfg.fig_size; end
 tl = tiledlayout(fig, 1, numel(panels), 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % Left: cumulative fraction within r.
@@ -82,9 +84,9 @@ end
 for c = 1:n_c
     plot(ax, u, med_iqr(stack(F.by_cond{c}, 'cdf_theory')), '--', 'Color', 'k', 'LineWidth', 1.1);
 end
-set(ax, ax_style{:}, 'XLim', [0 1.2], 'YLim', [0 1], 'XTick', 0:0.2:1.2, 'YTick', 0:0.2:1);
+set(ax, ax_style{:}, 'XLim', [0 1.2], 'YLim', [0 1], 'XTick', 0:0.5:1, 'YTick', 0:0.5:1, 'XTickLabelRotation', 0);   % three x ticks: a panel of S6 is about 1.3 in wide
 xlabel(ax, 'r / R_{eff}', 'FontSize', st.label_fs);
-ylabel(ax, 'Fraction of eigenvalues within r', 'FontSize', st.label_fs);
+ylabel(ax, {'Fraction of eigenvalues', 'within r'}, 'FontSize', st.label_fs);
 end
 
 % Right: density relative to a uniform disk.

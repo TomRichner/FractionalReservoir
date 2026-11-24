@@ -18,8 +18,44 @@ dead end.
 
 ## Current work (as of 2026-11-12)
 
-**Since 2026-11-21 the work in hand is Plan 2, the figures of the new figure
-plan** (Tom, 2026-11-21). The plan and its status are in the manuscript
+**Since 2026-11-22 the work in hand is Plan 3, the figure revisions after
+Tom's review** of all 18 main and supplementary figures. Read, in the
+manuscript repository under
+`../StochasticPlasticDynamicalSystemPaper/docs/Advancing_the_narrative/`:
+`Plan3.md` (the plan: workers, branches, waves, the checks at the end),
+`Plan2_figure_feedback.md` (Tom's notes figure by figure, with the rules
+for every figure at its foot: this is the specification) and
+`Plan3_worker_brief.md` (the rules for a worker). In short: the integration
+branch is `p3` in `../FractionalReservoir_wt_p3`, one worktree and branch
+per package (`../FractionalReservoir_wt_p3_<name>`, `p3-<name>`); every
+main and supplementary figure on one 9 in canvas with the type sizes of
+`manuscript_style`; no pool while the long run goes; nothing merged into
+`main` and nothing written in the main checkout until that run ends.
+
+**2026-11-23, the third round.** Phases 1 to 6 of Plan 3 are done. Tom then
+answered the open questions and decisions; the record is `Plan3_round3.md`
+beside `Plan3.md` (his answers as rules G1 to G6 for every figure and items
+by figure, the packages `p3-r3a` to `p3-r3d`, `p3-s2fix`, their status, and
+what is left for the consistency pass). Read it after `Plan3.md`. The rules
+it added, all in `manuscript_style`: axis labels in sentence case; `E_color`
+pure red and `I_color` blue (the first anchors of `excitatory_colormap` and
+`inhibitory_colormap`); the leading exponent is "Growth rate, lambda_1"
+(`label_growth`) where it fits and "lambda_1" (`label_lle`) where it does
+not; the two reference networks are "Reference" and "E-to-E x 1.5"; ticks
+case by case, fewer where they can be. The figures of this round are in
+`../FractionalReservoir_wt_p3/figs/p3_r3/` (not in git; Figure 8 holds
+patient recordings and never leaves the machine). Two investigations are on
+side branches, scripts and README only: `p3-s2b`
+(`scripts/explorations/s2b_estimators/`: in the multiple-timescale network
+the leading exponents are nearly equal, so a local growth rate depends on
+the vector it started from; the accumulated lambda_1 does not) and `p3-owin`
+(`scripts/explorations/outlier_window/`: what the 200 s window of
+`outlier_spectra` buys and costs). Still to do: the last answers, one final
+redraw of all 18 from the merged branch with the tests run once, then
+Phase 7 of `Plan3.md` when the long run ends.
+
+Plan 3 revises what Plan 2 built. **From 2026-11-21 that was Plan 2, the
+figures of the new figure plan** (Tom, 2026-11-21). The plan and its status are in the manuscript
 repository:
 `../StochasticPlasticDynamicalSystemPaper/docs/Advancing_the_narrative/Plan2.md`.
 The specification of every figure (main, supplement, appendix; panel by

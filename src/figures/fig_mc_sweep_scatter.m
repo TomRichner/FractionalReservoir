@@ -87,6 +87,7 @@ arguments
     cfg.size_range     (1,2) double {mustBePositive} = [8 160]   % marker area (points^2) at 0 and at size_max
     cfg.size_max       double {mustBeScalarOrEmpty, mustBePositive} = []   % |value| drawn at the largest area
     cfg.size_legend    double        = []         % values shown in the size legend
+    cfg.size_legend_round (1,1) logical = false  % true: round values (1, 2 or 5 times a power of ten) over the levels' range, in place of the levels
     cfg.clip           (1,1) struct  = struct()   % per quantity name, a clip replacing the registry's
     cfg.overlay        struct        = struct('x', {}, 'y', {}, 'label', {}, 'conditions', {})
     cfg.stats_position (1,2) double  = [0.56 0.70]   % normalized, top left corner of the statistics box
@@ -248,6 +249,7 @@ if sized
         caption{2} = sprintf('%s; open squares: %s, drawn at the edge', caption{2}, clip_text);
     end
     legend_values = cfg.size_legend;
+    if isempty(legend_values) && cfg.size_legend_round; legend_values = round_size_legend(Qs); end
     if isempty(legend_values); legend_values = default_size_legend(Qs, size_max); end
     draw_size_legend(tl, Qs, legend_values, marker_area, clip_text, CLIPPED_SQUARE_AREA, st);
 elseif ~isempty(clip_text)
@@ -375,4 +377,20 @@ function rho = spearman(x, y)
 % than three points.
 if numel(x) < 3; rho = NaN; return; end
 rho = corr(x(:), y(:), 'Type', 'Spearman');
+end
+
+function v = round_size_legend(Qs)
+% Round values for the size legend over the range of the grid's levels (or
+% of the values drawn): the multiples of the coarsest step of 1, 2 or 5
+% times a power of ten that gives at least four inside the range (so no
+% value is drawn past the largest area; -4 to 6 gives -4, -2, ..., 6). The marker areas
+% still come from the panels' own mapping, so only the values shown change
+% (S9 C, 2026-11-23: its key showed the grid's levels, -2.33, -0.667 ...).
+if ~isempty(Qs.levels); lim = [min(Qs.levels) max(Qs.levels)];
+else; lim = [min(Qs.values) max(Qs.values)]; end
+e = floor(log10(max(diff(lim), eps)));
+for step = fliplr(kron(10 .^ (e - 1:e), [1 2 5]))
+    v = step * (ceil(lim(1) / step - 1e-9):floor(lim(2) / step + 1e-9));
+    if numel(v) >= 4; return; end
+end
 end

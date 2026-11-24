@@ -1,5 +1,5 @@
 function F = grouped_figure_registry(preset_name, source_fig_root, pytorch_file, human_psd_file)
-% GROUPED_FIGURE_REGISTRY The composite figures of block A, in their groups: main Figures 1 to 4, supplementary S1 to S5, and the old composites in the appendix.
+% GROUPED_FIGURE_REGISTRY The composite figures of block A, in their groups: main Figures 1 to 4, supplementary S1 to S5 and the leading-direction figure, and the old composites in the appendix.
 %
 %   F = GROUPED_FIGURE_REGISTRY(preset_name, source_fig_root)
 %   F = GROUPED_FIGURE_REGISTRY(preset_name, source_fig_root, pytorch_file, human_psd_file)
@@ -9,8 +9,10 @@ function F = grouped_figure_registry(preset_name, source_fig_root, pytorch_file,
 % The groups are the figure plan's (the manuscript repository's
 % docs/Advancing_the_narrative/figures_main_supp_appen.md; Plan 2,
 % integration, 2026-11-21). Where the other composites are registered:
-%   with_spectral_supplement   main Figures 5 and 6, S6, S7, S8 (they read
-%                              the spectral stages)
+%   with_spectral_supplement   main Figures 5 and 6, S6, S7 (they read
+%                              the spectral stages); fig_supp8_grouped is
+%                              appendix since Plan 3 (its two panels are
+%                              S6 D and E)
 %   with_switch_spectra        rewrites fig_main3_grouped into the paper's
 %                              switching Figure 3 and adds its appendix
 %                              versions (fig_main3_grouped_ritz, _baseline)
@@ -25,12 +27,22 @@ function F = grouped_figure_registry(preset_name, source_fig_root, pytorch_file,
 %   fig_main3_grouped   main   fig_grouped_main group 3 (fig_main3_grouped);
 %                              with_switch_spectra makes it the switching
 %                              composite with row D and no Ritz overlay
-%   fig_main4_grouped   main   fig_main4_connectivity: the sweeps, the joint
-%                              sample, and panel C (leading direction against
-%                              lambda_1 with the uncoupled reference)
+%   fig_main4_grouped   main   fig_main4_connectivity: the sweeps (A),
+%                              lambda_1 by E:I weight ratio (B), lambda_1
+%                              against rate (C), B and C from the joint
+%                              sample (Plan 3)
 %   fig_supp1_grouped .. fig_supp5_grouped   supplement   S1 to S5
 %                              (fig_supp3_grouped is
 %                              fig_supp3_connectivity_gallery)
+%   fig_supp_leading_grouped   supplement   what the leading direction is
+%                              made of (Plan 3, question 10): lambda_1 and
+%                              the leading-direction shares against the
+%                              longest SFA time constant (the tau sweep),
+%                              the dendritic share against lambda_1 (the
+%                              joint sample). Not numbered yet: the order
+%                              of first citation in the text sets the
+%                              supplement's numbers; function names keep
+%                              theirs until then
 %   the OLD COMPOSITES that left the main group, appendix, each drawn by
 %   fig_grouped_main_appendix (fig_grouped_main's groups 1, 5, 6, 7, 8) under
 %   a tag of its own, so no file of theirs carries a paper figure's name:
@@ -62,6 +74,7 @@ F = { ...
     paper_figure_entry('fig_supp3_grouped', @fig_supp3_connectivity_gallery, 'supplement', P), ...
     paper_figure_entry('fig_supp4_grouped', @fig_supp4_grouped, 'supplement', P), ...
     paper_figure_entry('fig_supp5_grouped', @fig_supp5_grouped, 'supplement', P), ...
+    paper_figure_entry('fig_supp_leading_grouped', @fig_supp_leading_grouped, 'supplement', P), ...
     legacy('fig_main1_concepts_old',    1, 'Fig_Main1_Concepts_old', old), ...
     legacy('fig_main5_transient_old',   5, 'Fig_Main5_Transient_old', old), ...
     legacy('fig_main6_memory_old',      6, 'Fig_Main6_Memory_old', old), ...

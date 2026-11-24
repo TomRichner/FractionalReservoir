@@ -153,7 +153,7 @@ GAIN_TICKS = [0.05 0.25 1 5];             % Tom, 2026-11-17
 gain_lbl = maps(2, 1).XLabel.String;
 % The maps' own label carries '(R_W)'; here it is the name and the symbol
 % only, set in this function and not in the shared default (Tom, 2026-11-17).
-s_lbl = 'Self-Coupling, s';
+s_lbl = 'Self-coupling, s';                 % sentence case (Tom, 2026-11-23, G1)
 for c = 1:nc
     col = maps(1, c).Title.Color;           % the condition colour the source used
     title(maps(1, c), titles{c}, 'FontWeight', 'normal', 'FontSize', 14, 'Color', col, ...
@@ -179,18 +179,20 @@ for c = 1:nc
             ax.YLabel.String = '';
         end
         if r == 2
-            xlabel(ax, title_case(gain_lbl), 'FontSize', 14);
+            xlabel(ax, sentence_case(gain_lbl), 'FontSize', 14);
         end
     end
 end
-cb_mc.Label.String = 'Memory Capacity';
-cb_l.Label.String = 'Lyapunov Exp., \lambda_1 (s^{-1})';
+% Sentence case (G1) and the growth rate by its one name (G3; Tom, 2026-11-23).
+st_ms = manuscript_style();
+cb_mc.Label.String = 'Memory capacity';
+cb_l.Label.String = [st_ms.label_growth ' (s^{-1})'];
 set([cb_mc.Label cb_l.Label], 'FontSize', 14, 'Interpreter', 'tex');
 % (C)
 noise_lbl = axb.XLabel.String;
 title(axb, '');
-xlabel(axb, title_case(noise_lbl), 'FontSize', 14);
-ylabel(axb, 'Memory Capacity', 'FontSize', 14);
+xlabel(axb, sentence_case(noise_lbl), 'FontSize', 14);
+ylabel(axb, 'Memory capacity', 'FontSize', 14);
 % sigma_u: the levels are read back from the source labels (0 at the
 % broken-axis position, then log-spaced). The 0 and every fourth level
 % back from the last are labelled, in scientific notation to one
@@ -234,6 +236,7 @@ out = struct('figs', fig, 'files', {{}}, 'source', {[{A.source}, B.source]}, 'la
     struct('A', 'gain x self-coupling maps: memory capacity (top row)', ...
            'B', 'gain x self-coupling maps: lambda_1 (bottom row)', ...
            'C', 'memory capacity against input noise sigma_u'));
+out.noise_levels = u_levels(:)';                % sigma_u at the ticks of the noise panel, left to right
 if cfg.save
     outdir = default_out_dir(cfg.out_dir, mfilename('fullpath'));
     if ~isfolder(outdir); mkdir(outdir); end
@@ -287,17 +290,21 @@ if abs(m) >= 10; m = m / 10; e = e + 1; end
 s = sprintf('%d\\times10^{%d}', m, e);
 end
 
-function s = title_case(s)
-% Capitalise each word of an axis label (house style: 'Longest SFA Time
-% Constant (s)'), leaving symbols such as \sigma_u alone.
+function s = sentence_case(s)
+% An axis label in sentence case (Tom, 2026-11-23, G1; it was Title Case):
+% the first letter capitalised; a later word in Title Case (a capital, then
+% lowercase letters only) lowered. Symbols (\sigma_u, the one-letter s) and
+% abbreviations (all capitals) keep their case.
 if iscell(s); s = strjoin(s, ' '); end
 w = strsplit(s, ' ');
 for k = 1:numel(w)
-    % A one-letter word is a symbol (the self-coupling s): left as it is.
-    if numel(w{k}) > 1 && isletter(w{k}(1)); w{k}(1) = upper(w{k}(1)); end
+    if k == 1
+        if isletter(w{k}(1)); w{k}(1) = upper(w{k}(1)); end
+    elseif ~isempty(regexp(w{k}, '^[A-Z][a-z]+[,.]?$', 'once'))
+        w{k}(1) = lower(w{k}(1));
+    end
 end
 s = strjoin(w, ' ');
-s = regexprep(s, '(\w)-([a-z])', '$1-${upper($2)}');
 end
 
 function close_valid(h)

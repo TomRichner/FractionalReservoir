@@ -115,6 +115,17 @@ R.frozen = series(Sf, t(fsel), params, ws, keep_ev);
 R.frozen.t_freeze = t(k);
 R.frozen.bursts = bm_detect_bursts(R.frozen.t, R.frozen.rate(:, 1), plan.burst);
 
+%% No-stimulation continuation (Figure 8 G; Tom, 2026-11-22)
+% The same network with the same input noise (dc_staircase_stimulus seeds
+% its noise with the network's seed, independently of the levels) and the
+% same integrator noise, under the staircase [0 0]: what the run would have
+% done with no step. Before the step it is the intact run (checked:
+% R.check.nostim_pre_step_mismatch). Kept from frozen_pre_s before the
+% step, as the frozen arm; the full Jacobian's network mode every dt_full.
+R.nostim = nostim_continuation(plan, seed, solver_args, H, t, Sx, ws);
+R.check.nostim_pre_step_mismatch = R.nostim.pre_step_mismatch;
+R.nostim = rmfield(R.nostim, 'pre_step_mismatch');
+
 %% M check at one baseline state: M = I + tau_d J_xx, read back as W diag(d)
 kc = sel(find(t(sel) >= min(20, H / 2), 1));
 [Mf, d, J] = ospec_effective_matrix(Sx(kc, :)', params, ws);
@@ -147,6 +158,32 @@ R.summary = summary_row(R);
 end
 
 %% ------------------------------------------------------------------------
+function N = nostim_continuation(plan, seed, solver_args, H, t, Sx, ws)
+% The run again under the staircase [0 0]; its series from H - frozen_pre_s.
+ic0 = struct('dc_levels', [0 0], 'hold_dur', H, 'ramp_dur', 0, ...
+    'noise_intensity', plan.noise_intensity, 'intrinsic_drive', [], 'generator', @dc_staircase_stimulus);
+m0 = build_from_preset(plan.preset_name, plan.condition, ...
+    'input_config', ic0, 'u_ex_scale', 1.0, 'fs', plan.fs, 'T_range', [0, 2 * H], ...
+    'rng_seeds', seed, 'lya_method', 'none', 'store_full_state', true, 'plot_deci', 1, solver_args{:});
+m0.run();
+params = m0.get_params();
+t0 = m0.t_out(:); S0 = m0.S_out;
+if numel(t0) ~= numel(t) || max(abs(t0 - t)) > 1e-9
+    error('bm_run_network:NoStimGrid', 'The no-stimulation run is not on the intact run''s time grid.');
+end
+pre = t < H;
+step = round(plan.dt_sample * plan.fs);
+step_f = round(plan.dt_full / plan.dt_sample);
+sel = (1:step:numel(t))';
+sel = sel(t(sel) >= H - plan.frozen_pre_s);
+N = series(S0(sel, :), t(sel), params, ws, false);
+N.u = interp1(m0.t_ex(:), mean(m0.u_ex, 1)', t(sel), 'linear', 'extrap')';
+N.bursts = bm_detect_bursts(N.t, N.rate(:, 1), plan.burst);
+coarse = sel(1:step_f:end);
+N.full = full_series(S0(coarse, :), t(coarse), params, ws, plan.x_thr);
+N.pre_step_mismatch = max(abs(S0(pre, :) - Sx(pre, :)), [], 'all');
+end
+
 function Q = series(S, ts, params, ws, keep_ev)
 % Frozen-gain spectrum, rates, gains, adaptation and depression at each row of S.
 ns = size(S, 1); n = params.n; C = params.n_cellTypes;
@@ -222,7 +259,7 @@ end
 function T = summary_row(R)
 g = R.meas.frozen_gain; f = R.meas.full; a = R.meas.frozen_arm;
 win = @(Q, w) Q.t >= R.windows.(w)(1) & Q.t < R.windows.(w)(2);
-kb = win(R.intact, 'before'); kd = win(R.intact, 'during'); kf = win(R.frozen, 'during');
+kb = win(R.intact, 'before'); kd = win(R.intact, 'during'); kf = win(R.frozen, 'during'); kn = win(R.nostim, 'during');
 T = table(R.seed(1), R.seed(2), g.before.n_bursts, g.during.n_bursts, ...
     g.before.n_cross, g.before.n_bursts_with_cross, g.before.median_lead, ...
     f.before.n_cross, f.before.n_bursts_with_cross, f.before.median_lead, ...
@@ -230,7 +267,8 @@ T = table(R.seed(1), R.seed(2), g.before.n_bursts, g.during.n_bursts, ...
     g.during.max_re, f.during.max_re, a.during.frac_beyond, a.during.n_bursts, ...
     mean(R.intact.rate(kb, 1)), mean(R.intact.rate(kd, 1)), mean(R.frozen.rate(kf, 1)), ...
     mean(R.intact.dbar(kb, 1, 1)), mean(R.intact.dbar(kd, 1, 1)), ...
-    R.sync.rho_before, R.sync.rho_during, R.sync.rho_during_frozen, R.seconds, ...
+    R.sync.rho_before, R.sync.rho_during, R.sync.rho_during_frozen, ...
+    mean(R.nostim.rate(kn, 1)), nnz(R.nostim.bursts.t_on >= R.windows.during(1) & R.nostim.bursts.t_on < R.windows.during(2)), R.seconds, ...
     'VariableNames', {'seed1', 'seed2', 'n_bursts_before', 'n_bursts_during', ...
     'n_cross_before_frozen_gain', 'n_bursts_with_cross_frozen_gain', 'median_lead_frozen_gain', ...
     'n_cross_before_full', 'n_bursts_with_cross_full', 'median_lead_full', ...
@@ -239,5 +277,6 @@ T = table(R.seed(1), R.seed(2), g.before.n_bursts, g.during.n_bursts, ...
     'max_re_during_frozen_gain', 'max_re_during_full', ...
     'frac_beyond_during_frozen_arm', 'n_bursts_during_frozen_arm', ...
     'rate_E_before', 'rate_E_during', 'rate_E_during_frozen_arm', ...
-    'gain_EE_before', 'gain_EE_during', 'rho_before', 'rho_during', 'rho_during_frozen_arm', 'seconds'});
+    'gain_EE_before', 'gain_EE_during', 'rho_before', 'rho_during', 'rho_during_frozen_arm', ...
+    'rate_E_during_nostim', 'n_bursts_during_nostim', 'seconds'});
 end

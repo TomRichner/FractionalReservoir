@@ -324,10 +324,14 @@ cfg.local_lyapunov_warmup_s = 10;
 cfg.local_lyapunov_simulation_start_s = -15; % alignment [-10,0]
 cfg.illustration_lya_start_s = 0; % first finite estimate after the [0,0.05] s segment
 cfg.illustration_lya_warmup_s = 10; % alignment over [-10,0] s; simulation starts -15
-cfg.illustration_display_window = [0 30];
-% The step occupies the MIDDLE THIRD of the display window, [10 20] s, and
-% 25 neurons of each type are saved (50 drawn).
-cfg.illustration_step_window = [10 20];
+% 20 s shown, in every run mode (Tom, 2026-11-22, second round on Figure 2:
+% 30 s made the figure too tight left to right). Was [0 30] with the step
+% over [10 20] s. The single-neuron illustration of the same stage (S1,
+% panel A) shares this window.
+cfg.illustration_display_window = [0 20];
+% The step occupies the MIDDLE THIRD of the display window, [20/3 40/3] s
+% (about 6.7 to 13.3 s), and 25 neurons of each type are saved.
+cfg.illustration_step_window = [20/3 40/3];
 cfg.illustration_neurons_per_type = 25;
 cfg.transient_gain_horizon_s = 5;
 cfg.transient_gain_duration_s = 40; % sample starts [25,35] s, 5-s horizon
@@ -347,9 +351,11 @@ cfg.panelA_gammas = [0.9, 1.6, 2.5];
 % manuscript repository's figures_main_supp_appen.md): every entry is
 % 'main', 'supplement' or 'appendix', and in_paper is derived from it (main
 % and supplement). The main figures here are the grouped composites
-% (grouped_figure_registry: main Figures 1 to 4, supplementary S1 to S5,
+% (grouped_figure_registry: main Figures 1 to 4, supplementary S1 to S5
+% and the leading-direction figure,
 % the old composites in the appendix; with_spectral_supplement adds main 5
-% and 6 and S6 to S8, mu7chain_AC_config main 7 and S9). Every single
+% and 6 and S6, S7 (and S8 in the appendix since Plan 3: its panels are
+% S6 D and E), mu7chain_AC_config main 7 and S9). Every single
 % figure below is 'appendix': it is in the plan's appendix, or a panel of a
 % supplementary composite. Until 2026-11-21 several of them were in_paper
 % true, as panels of the old supplement.
@@ -455,8 +461,10 @@ F = [F, grouped_figure_registry(cfg.preset_name, cfg.fig_root)];
 %                                     the preset's adaptation models
 %   fig_supp4_grouped                 the 1-D sweeps
 %   fig_supp5_grouped                 the joint sample and the 1-D sweeps
-% (main Figure 5 and S6 to S8 are added by with_spectral_supplement in
-% every mode; Figures 6 and 7, S2 and S9 need stages this mode skips.)
+% (main Figure 5, S6, S7 and, in the appendix, S8 are added by
+% with_spectral_supplement in
+% every mode; Figures 6 and 7, S2, S9 and fig_supp_leading_grouped need
+% stages this mode skips: the leading-direction figure reads the tau sweep.)
 if is_essential
     keep = {'fig_sensitivity_analysis_allStd', 'fig_sensitivity_medians', ...
             'fig_param_space_allStd', 'fig_EI_weights_param_space', 'fig_lle_vs_rate', ...

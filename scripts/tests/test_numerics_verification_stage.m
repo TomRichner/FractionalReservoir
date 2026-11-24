@@ -6,7 +6,7 @@
 %   2. 'fast' with 1 reshoot trial and 2 LLE/QR trials into a temp run
 %      directory: the .mat has results / cond_names / condition_titles /
 %      settings / verdict; every condition carries reshoot, lle, qr, jacobian
-%      (3 states, finite rel_fro_err, eig_err, max_abs_err, n_excluded >= 0,
+%      (15 time points, finite rel_fro_err, eig_err, max_abs_err, n_excluded >= 0,
 %      N = the reduced network's state count) and a summary with
 %      jac_rel_fro_max / jac_eig_err_max / jac_excluded_total;
 %      settings.acceptance carries the pre-registered thresholds (fixed_on
@@ -18,6 +18,10 @@
 %      numerics_verdict.md exists and names every check.
 %   3. The figure variants 'solver', 'lya_method', 'ensemble' and 'jacobian'
 %      write files; 'jacobian' errors NoJacobian on a .mat without the field.
+%   4. 'jacobian_only' on the finished run, at 4 time points: the reshoot,
+%      lle and qr results are untouched, the Jacobian check has 4 entries
+%      whose last equals the full run's last, settings.n_jac is 4 with
+%      n_jac_at_run 15; a run mode other than the saved run's is refused.
 %
 % RUNTIME: the fast cost table still builds n = 500 networks for checks A/B
 % (one seed, T_free 6 s at 400/800/1600 Hz plus an ode45 reference at 1e-10)
@@ -52,7 +56,7 @@ all_passed = check('every condition carries reshoot, lle, qr, jacobian, summary'
 jac_ok = true; sum_ok = true;
 for i = 1:numel(R)
     Jc = R(i).jacobian;
-    jac_ok = jac_ok && numel(Jc) == 3 && all(isfield(Jc, {'rel_fro_err', 'eig_err', 'max_abs_err', 'n_excluded', 'N', 't', 'h'})) && ...
+    jac_ok = jac_ok && numel(Jc) == 15 && D.settings.n_jac == 15 && all(isfield(Jc, {'rel_fro_err', 'eig_err', 'max_abs_err', 'n_excluded', 'N', 't', 'h'})) && ...
         all(isfinite([Jc.rel_fro_err])) && all(isfinite([Jc.eig_err])) && all([Jc.n_excluded] >= 0) && ...
         all([Jc.N] == Jc(1).N) && all(isfinite([Jc.t]));   % T_small starts negative, so t can be < 0
     S = R(i).summary;
@@ -61,7 +65,7 @@ for i = 1:numel(R)
     fprintf('  %-14s Jacobian rel Frobenius %s, eig %s, excluded %s\n', R(i).name, ...
         mat2str([Jc.rel_fro_err], 2), mat2str([Jc.eig_err], 2), mat2str([Jc.n_excluded]));
 end
-all_passed = check('jacobian: 3 states per condition with finite errors', jac_ok) && all_passed;
+all_passed = check('jacobian: 15 time points per condition with finite errors', jac_ok) && all_passed;
 all_passed = check('summary carries the Jacobian scalars', sum_ok) && all_passed;
 acc = D.settings.acceptance;
 all_passed = check('settings.acceptance carries the pre-registered thresholds', ...
@@ -108,6 +112,25 @@ save(fullfile(old_dir, 'numerics_verification_data.mat'), '-struct', 'D2', '-v7.
 all_passed = check('jacobian variant errors NoJacobian on a run without the field', ...
     throws_id(@() fig_numerics_verification('run_dir', fullfile(run_dir, 'old'), 'variant', 'jacobian', 'save', false, 'visible', false), ...
     'fig_numerics_verification:NoJacobian')) && all_passed;
+
+%% Check J alone on the finished run
+evalc(['mat2 = run_numerics_verification(''preset_name'', P, ''run_mode'', ''fast'', ' ...
+    '''out_dir'', fullfile(run_dir, ''numerics_verification''), ''jacobian_only'', true, ''n_jac_time_points'', 4);']);
+D4 = load(mat2);
+keep_ok = strcmp(mat2, mat_file) && isequaln(rmfield(D4.results, {'jacobian', 'summary'}), rmfield(D.results, {'jacobian', 'summary'}));
+jac4_ok = D4.settings.n_jac == 4 && D4.settings.n_jac_at_run == 15;
+for i = 1:numel(D4.results)
+    J4 = D4.results(i).jacobian; J15 = D.results(i).jacobian;
+    % The last time point is the end of the same run in both samplings.
+    jac4_ok = jac4_ok && numel(J4) == 4 && J4(end).t == J15(end).t && J4(end).rel_fro_err == J15(end).rel_fro_err && ...
+        D4.results(i).summary.jac_rel_fro_max == max([J4.rel_fro_err]) && D4.verdict.per_condition(i).J.pass == 1;
+end
+all_passed = check('jacobian_only keeps the saved reshoot, lle and qr results as they were', keep_ok) && all_passed;
+all_passed = check('jacobian_only: 4 time points asked for, 4 saved, the last one the run''s end as before; summary and verdict follow', jac4_ok) && all_passed;
+all_passed = check('jacobian_only refuses a run mode that is not the saved run''s', ...
+    throws_id(@() run_numerics_verification('preset_name', P, 'run_mode', 'medium', ...
+    'out_dir', fullfile(run_dir, 'numerics_verification'), 'jacobian_only', true), ...
+    'run_numerics_verification:JacobianOnlyMismatch')) && all_passed;
 rmdir(run_dir, 's');
 
 fprintf('\n');

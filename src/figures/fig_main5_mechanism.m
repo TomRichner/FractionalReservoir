@@ -63,23 +63,46 @@ end
 
 function out = build(cfg, out_dir)
 
-[f_plane, t_plane, o_plane] = composite_part(@fig_outlier_plane, cfg, 'networks', cfg.networks, 'seed', cfg.seed);
-[f_dose, t_dose] = composite_part(@fig_outlier_dose, cfg);
-width = f_plane.Position(3);                         % inches: fig_outlier_plane lays itself out in inches
-[fig, B] = composite_figure({struct('fig', f_plane, 'width', []), struct('fig', f_dose, 'width', width)}, ...
-    'visible', cfg.visible);
-composite_letter(fig, B{1}(1), 'A');
+% The common canvas (Plan 2, canvas standard; manuscript_style canvas_w).
+% Both source figures are DRAWN at the width of their block (fig_w), so
+% nothing is scaled when they are copied: the layout is the one made for
+% this width, not a larger one shrunk (Plan 3, Figure 5 note 1).
+st = manuscript_style();
+margin = [0.15 0.1 -0.31 0.1];
+width = st.canvas_w - margin(1) - margin(2);
+% Tom, 2026-11-22 (second round): the white space under the response-curve
+% insets 40 percent smaller, both under the first row of (A) and under its
+% second row before (B) to (D); and no dashed radius circles in (A), the
+% solid bulk circle kept (the window is still sized from that radius).
+% Measured from the lowest inset dot to the top of the next row of axes:
+% 0.126 in under row 1 and 0.790 in under row 2 before. The first is set
+% by inset_clear (0.08 -> 0.03 in, inset box to the next row), the second
+% by the composite's row gap (0.12 -> -0.196 in; the plane figure's own
+% bottom margin under its insets and the letters' strip above (B) to (D)
+% stay as they were). Tom, 2026-11-23 (third round): the letters E and I
+% on the insets about 30 percent closer to the curve (inset_mark_pull).
+[f_plane, t_plane, o_plane] = composite_part(@fig_outlier_plane, cfg, 'networks', cfg.networks, 'seed', cfg.seed, ...
+    'fig_w', width, 'dashed_circle', false, 'inset_clear', 0.03, 'inset_mark_pull', 0.3);
+[f_dose, t_dose] = composite_part(@fig_outlier_dose, cfg, 'fig_w', width);
+[fig, B] = composite_figure({struct('fig', f_plane, 'width', width), struct('fig', f_dose, 'width', width)}, ...
+    'visible', cfg.visible, 'margin', margin, 'width', st.canvas_w, 'row_gap', 0.12 - 0.316);
+% (A) at the height of the condition titles, beside the first panel: the
+% plane figure keeps room for its titles above the panels, and a letter in
+% the strip above that sat far from the panel (polish list, 2026-11-22). The
+% top margin takes the strip back.
+composite_letter(fig, B{1}(1), 'A', 'dy', -0.27);
 dose_ax = B{2}(1).ax;
 letters = 'BCD';
 for k = 1:min(3, numel(dose_ax))
-    composite_letter(fig, B{2}(1), letters(k), dose_ax(k));
+    composite_letter(fig, B{2}(1), letters(k), dose_ax(k), 'dy', -0.12);
 end
+canvas_type(fig, main5_type_exceptions());
 
 caption = sprintf(['Main Figure 5. (A) What adaptation does to the effective connectivity: eigenvalues of W D (each ' ...
     'neuron''s outgoing weights times its gain, slow variables held) drawn as rates in 1/s, so the imaginary axis is ' ...
     'the stability boundary; rows: the networks %s; columns: the conditions in their colors. ONE SEED IS DRAWN in (A): ' ...
     'network seed [%d %d], the first of the stage''s index unless another was asked for. Solid gray circle: the ' ...
-    'theoretical bulk; open diamond: where the mode would be with every gain equal, beyond a break in the real axis ' ...
+    'theoretical bulk (the dashed calibrated radius of the appendix figure is not drawn here); open diamond: where the mode would be with every gain equal, beyond a break in the real axis ' ...
     'when far out. Inset of each panel: the neurons on their response curve, excitatory above the curve (E) and ' ...
     'inhibitory below it (I). (B) to (D), every seed of the stage: against the structural outlier over the bulk ' ...
     'radius, (B) the detachment of the rightmost frozen-gain eigenvalue with the equal-gain diamonds, (C) the ' ...
@@ -89,4 +112,12 @@ caption = sprintf(['Main Figure 5. (A) What adaptation does to the effective con
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Main Figure 5: mechanism', caption, ...
     {'Panel A (fig_outlier_plane)', t_plane; 'Panels B to D (fig_outlier_dose)', t_dose}, {o_plane.source});
 out.seed = o_plane.seed;
+out.type_exceptions = main5_type_exceptions();   % for the canvas test (canvas_audit)
+end
+
+function ex = main5_type_exceptions()
+% The type that may differ from its role's size (canvas_audit), with why.
+% None since Plan 3: the insets are large enough for the E and I marks at
+% tick_fs (they were 11 pt, the one exception, while the insets were small).
+ex = cell(0, 2);
 end

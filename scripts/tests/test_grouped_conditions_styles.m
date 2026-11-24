@@ -74,12 +74,12 @@ for set_ = {three, four}
     n_fail = n_fail + check(ok, ['style 4: rate panels titled and coloured by name, ' tag]);
     lg = findall(f, 'Type', 'legend');
     s = lg.String;
-    ok = numel(s) == N + 1 && strcmp(s{end}, 'Zero Growth');
+    ok = numel(s) == N + 1 && strcmp(s{end}, 'Zero growth');
     for c = 1:N
         ok = ok && endsWith(s{c}, st.condition_title(names{c})) && ...
             contains(s{c}, sprintf('%.6f,%.6f,%.6f', st.condition_color(names{c})));
     end
-    n_fail = n_fail + check(ok, ['style 4: legend entries by name, in order, plus Zero Growth, ' tag]);
+    n_fail = n_fail + check(ok, ['style 4: legend entries by name, in order, plus Zero growth, ' tag]);
     close(f);
 
     % ---- group 5: one margin panel + N gain panels

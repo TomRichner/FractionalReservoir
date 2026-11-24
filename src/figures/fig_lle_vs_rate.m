@@ -24,12 +24,18 @@ function out = fig_lle_vs_rate(cfg)
 % read off; the panels no longer outline those subgroups.
 %
 % Per job the fields read are LLE, mean_rate, config_idx and network_seed
-% (the last two to rebuild the network for its weight balance, cached per grid
-% point exactly as fig_EI_weights_param_space does). Failed jobs are skipped.
-% Every network is one plain filled circle on the blue-grey-red weight-balance
-% map (blue_gray_red_colormap); the y window is the data's within +/-5 1/s and
-% points beyond it simply fall outside the axes (no clamping, no triangles;
-% TR, 2026-09-15). The line under the points, in the condition's colour, is the median per rate bin.
+% (the last two to rebuild the network for its weight balance; ei_weight_fraction,
+% shared with fig_EI_weights_param_space, remembers it for the session).
+% Failed jobs are skipped. Every network is one plain filled circle on the
+% blue-grey-red weight-balance map (blue_gray_red_colormap); the y window is
+% the data's within +/-5 1/s and points beyond it simply fall outside the
+% axes (no clamping, no triangles; TR, 2026-09-15). The line ON the points
+% is the median of lambda_1 per bin of rate (ten bins of 0.1, a bin with
+% at least three networks), in one color in every panel (median_color,
+% black; Plan 3, 2026-11-22), plain, with no white halo under it (Tom,
+% 2026-11-23: "I don't want it to be black on top of white"), tagged 'rate_bin_median',
+% DisplayName 'Median per rate bin'. With include_sweeps false (main
+% Figure 4, panel C) only the joint sample is drawn, every dot one size.
 %
 % WHICH CONDITIONS ARE DRAWN: cfg.conditions (FD-006; the pattern every figure
 % follows). A cell of condition names, drawn as one panel each, LEFT TO RIGHT
@@ -62,6 +68,8 @@ arguments
     cfg.saturated_rate (1,1) double  = 0.9    % table only
     cfg.lle_clamp      (1,1) double  = 5      % y window bound; points are NOT clamped
     cfg.conditions                   = {}     % names to draw, in order; empty = all the run holds (select_conditions)
+    cfg.median_color   (1,3) double  = [0 0 0]   % the rate-bin median, the same in every panel
+    cfg.median_lw      (1,1) double {mustBePositive} = 2.5
 end
 
 setup_paths();
@@ -103,12 +111,10 @@ requested = cellstr(requested);        % char / string / cell -> cellstr
 selecting = ~isempty(requested);
 held = {};   % every condition name the run holds, in first-seen order
 t_load = tic;
-n_rebuilt = 0;
 for d = 1:numel(dirs)
     if ~isfile(fullfile(dirs{d}, 'psa_object.mat')); continue; end
     psa = ParamSpaceAnalysis2.from_dir(dirs{d});
     if d > 1; sweep_names{end + 1} = strjoin(setdiff(psa.grid_params, {'reps'}, 'stable'), ','); end %#ok<AGROW>
-    cache = containers.Map('KeyType', 'double', 'ValueType', 'double');   % per PSA: config_idx is per grid
     cn = cellfun(@(c) c.name, psa.conditions, 'UniformOutput', false);
     held = [held, cn(~ismember(cn, held))]; %#ok<AGROW>
     if selecting; cn = cn(ismember(cn, requested)); end   % skip loading what is not drawn
@@ -124,12 +130,11 @@ for d = 1:numel(dirs)
         rate.(name) = [rate.(name); cellfun(@(r) r.mean_rate, R(:))];
         b = nan(numel(R), 1);
         for k = 1:numel(R)
-            b(k) = ei_weight_fraction(psa, R{k}, cache, cfg.verbose);
+            b(k) = ei_weight_fraction(psa, R{k}, cfg.verbose);
         end
         be.(name)  = [be.(name); b];
         src.(name) = [src.(name); src_id * ones(numel(R), 1)];
     end
-    n_rebuilt = n_rebuilt + cache.Count;
     src_id = src_id + 1;
 end
 if selecting
@@ -148,7 +153,7 @@ n_cond = numel(cond_names);
 if n_cond == 0
     error('fig_lle_vs_rate:NoJobs', 'No successful jobs found under %s.', cfg.run_dir);
 end
-vprintf(cfg.verbose, 'verbose', '[lle_vs_rate] %d networks rebuilt for the weight balance in %.1f s\n', n_rebuilt, toc(t_load));
+vprintf(cfg.verbose, 'verbose', '[lle_vs_rate] weight balances in %.1f s\n', toc(t_load));
 
 %% Figure
 fig = figure('Color', 'w', 'Position', [80 80 400 * n_cond + 80, 440]);
@@ -168,19 +173,24 @@ for i = 1:n_cond
     ax = nexttile(tl); hold(ax, 'on');
     quiet = x < cfg.quiet_rate; sat = x > cfg.saturated_rate;   % table only
     sz = 30 * (s == 1) + 12 * (s > 1);
-    % running median in rate bins, drawn FIRST so it sits under the points
+    % running median in rate bins
     bm = nan(1, numel(bin_edges) - 1); bx = bm;
     for b = 1:numel(bm)
         in = x >= bin_edges(b) & x < bin_edges(b + 1);
         if b == numel(bm); in = in | x == 1; end
         if nnz(in) >= 3; bm(b) = median(y(in)); bx(b) = median(x(in)); end
     end
-    % In the condition's colour (Plan 2, package A, 2026-11-21: no condition
-    % in gray); it was light gray until then.
-    plot(ax, bx(~isnan(bm)), bm(~isnan(bm)), '-', 'Color', st.condition_color(name), 'LineWidth', 2.2);
     yline(ax, 0, '--', 'Color', [0 0.6 0], 'LineWidth', 1.4);
     % every network: a plain filled circle, no edge; out-of-window points fall off the axes
     scatter(ax, x, y, sz, c, 'filled');
+    % The median ON TOP of the points, in one color in every panel (black by
+    % default; Tom, 2026-11-22, Figure 4 note 3: in the condition's colour
+    % and under the points it could not be made out in the
+    % multiple-timescale panel). No white halo under it (Tom, 2026-11-23:
+    % "I just want the median line to be black").
+    keep = ~isnan(bm);
+    plot(ax, bx(keep), bm(keep), '-', 'Color', cfg.median_color, 'LineWidth', cfg.median_lw, ...
+        'Tag', 'rate_bin_median', 'DisplayName', 'Median per rate bin');
     hold(ax, 'off'); box(ax, 'off');
     colormap(ax, blue_gray_red_colormap());
     set(ax, 'CLim', W_CLIM, 'FontSize', st.tick_fs, 'XLim', [-0.02 1.02], 'YLim', y_lim);
@@ -252,28 +262,3 @@ if c; s = a; else; s = b; end
 end
 
 
-function v = ei_weight_fraction(psa, res, cache, verbose)
-% Copied from fig_EI_weights_param_space: the realised E:I weight balance of
-% the network at this grid point, cached per config_idx (the network is shared
-% by every condition run at a point). |sum W_E| / (|sum W_E| + |sum W_I|).
-key = res.config_idx;
-if isKey(cache, key)
-    v = cache(key);
-    return
-end
-m = psa.rebuild_model(res);
-m.verbose = verbose;   % the model prints its build report only at 'verbose'
-m.build();
-ti = m.type_indices;
-assert(numel(ti) >= 2, ...
-    'ei_weight_fraction needs at least two cell types; got %d.', numel(ti));
-S_E = full(sum(sum(m.W(:, ti{1}))));
-S_I = full(sum(sum(m.W(:, ti{2}))));
-denom = abs(S_E) + abs(S_I);
-if denom == 0
-    v = 0.5;
-else
-    v = abs(S_E) / denom;
-end
-cache(key) = v; %#ok<NASGU>  handle object: this mutates the caller's map
-end

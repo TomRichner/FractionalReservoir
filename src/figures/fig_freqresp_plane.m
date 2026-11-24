@@ -42,6 +42,9 @@ function out = fig_freqresp_plane(cfg)
 %   re_lim, im_lim   the window, [-12 8] 1/s and [0 22] rad/s (the stage's
 %             complex grid must cover it for the edge to be drawn across it)
 %   tick_step 4
+%   re_label_side  'above' (default) or 'below' (complex_plane_axes): where
+%             the Re name sits at the right end of the real axis; 'below'
+%             needs room under the figure (Figure 6 keeps it)
 %
 % See also: run_frequency_response_stage, fresp_run_one, complex_plane_axes,
 %           fig_freqresp_network, manuscript_style
@@ -61,6 +64,7 @@ arguments
     cfg.re_lim      (1,2) double  = [-12 8]
     cfg.im_lim      (1,2) double  = [0 22]    % the top tick (20) sits below the top end, clear of the column title
     cfg.tick_step   (1,1) double  = 4
+    cfg.re_label_side (1,:) char {mustBeMember(cfg.re_label_side, {'above', 'below'})} = 'above'
 end
 
 setup_paths();
@@ -110,7 +114,7 @@ for w = 1:n_net
         % The axis names once: Re in the last panel, Im in the first.
         re_label = ''; im_label = '';
         if w == n_net && c == n_cond; re_label = 'Re (s^{-1})'; end   % once: in the first columns it sat on the edge curves
-        if c == 1 && w == 1; im_label = 'Im (rad/s)'; end
+        if c == 1 && w == 1; im_label = 'Im (s^{-1})'; end   % one unit on both axes (polish list, 2026-11-22; it read rad/s)
         cp = complex_plane_axes(ax, axes_args{:}, 're_label', re_label, 'im_label', im_label);
 
         lam = double(p.lam);
@@ -169,7 +173,7 @@ caption = [ ...
     'Cross (only where the frozen mean part has an eigenvalue outside the frozen bulk): the root of kappa(z) = 1 + tau_d z, ' ...
     'kappa the leading eigenvalue of the mean part K(z) (`fresp_outlier_root`): where the population mode should be from the mean gains alone. ' ...
     'The axes are drawn through the origin, so the imaginary axis is the stability boundary; one scale in every panel; ticks outside the largest frozen circle only. ' ...
-    sprintf('The window is Re in [%g, %g] 1/s, Im in [%g, %g] rad/s; eigenvalues outside it (the band of slow single-neuron modes on the far negative real axis, any far-left real eigenvalue) are not drawn and are counted in the table. ', ...
+    sprintf('The window is Re in [%g, %g] 1/s, Im in [%g, %g] 1/s (an angular rate, radians per second; both axes are labeled s^-1); eigenvalues outside it (the band of slow single-neuron modes on the far negative real axis, any far-left real eigenvalue) are not drawn and are counted in the table. ', ...
         cfg.re_lim, cfg.im_lim) ...
     'The structure hugging the negative real axis is the band of slow single-neuron modes (poles of the gains), not network modes; the prediction is a bulk edge for large networks and individual eigenvalues scatter about it. ' ...
     sprintf('Table: "predicted edge" is the rightmost point of the region R(z) >= |1 + tau_d z| (grid of %.3g 1/s by %.3g rad/s, real part from -8 to %.3g 1/s; a value at the grid''s right end means the region runs past it).', ...
@@ -185,7 +189,7 @@ function args = plane_axes_args(cfg, center, radius, st)
 % axis, that axis gets the default ticks instead of none.
 args = {'re_lim', cfg.re_lim, 'im_lim', cfg.im_lim, 'tick_step', cfg.tick_step, ...
     'font_size', st.tick_fs, 'line_width', st.axis_lw, ...
-    're_label_side', 'above'};          % below would fall off the bottom row's tile
+    're_label_side', cfg.re_label_side};   % 'above' by default: below would fall off the bottom row's tile
 mult = @(lim) (ceil(lim(1) / cfg.tick_step):floor(lim(2) / cfg.tick_step)) * cfg.tick_step;
 re_t = mult(cfg.re_lim); re_t = re_t(re_t ~= 0 & abs(re_t - center) >= radius);
 im_t = mult(cfg.im_lim); im_t = im_t(im_t ~= 0 & abs(im_t) >= radius);

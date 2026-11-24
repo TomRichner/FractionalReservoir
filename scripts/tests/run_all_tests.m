@@ -150,6 +150,8 @@ function names = slow_test_names()
         'test_memory_supplement_composites' %  91 s  Figure 7, S1, S2, S4, S5, S9 from small runs
         'test_burst_mode_stage'             %  41 s  the burst_mode stage and Figure 8 A to C, S10 (4 workers)
         'test_concept_examples_stage'       %  37 s  the concept_examples stage, Figure 1 and S3 at 80 neurons
+        % Plan 3 (2026-11-22):
+        'test_canvas_standard'              % ~15 min  all 18 main and supplementary figures from the fast run, against the common canvas
         };
 end
 

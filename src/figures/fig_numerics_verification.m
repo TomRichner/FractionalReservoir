@@ -7,7 +7,7 @@ function out = fig_numerics_verification(cfg)
 %
 % 'jacobian' (2026-09-14): per condition, the relative Frobenius error and the
 % top-20 eigenvalue mismatch between the analytic Jacobian and central finite
-% differences at each sampled state of the reduced network (check J), log y,
+% differences at each sampled time point (snapshot) of the reduced network (check J), log y,
 % with the pre-registered acceptance thresholds as lines. Tag
 % Fig_Numerics_Jacobian; needs a run that carries results.jacobian.
 %
@@ -177,17 +177,27 @@ for i = 1:n_cond
     dt  = 1 ./ [R(i).free.fs];
     e0  = [R(i).free.err_long_total_rms];
     p0  = polyfit(log(dt), log(e0), 1);
-    loglog(ax, dt, e0, 'o-', 'Color', col, 'MarkerFaceColor', col, 'LineWidth', st.line_lw, ...
+    % The slope-2 reference is drawn FIRST, wide and pale, so that it lies
+    % behind the data as a band (Tom's review of S2, 2026-11-22). It is
+    % anchored on the last point and the noise-free data follow it to within
+    % half a percent, so as a thin dotted line drawn after the data it could
+    % not be seen at all.
+    h_ref2 = loglog(ax, dt, e0(end) * (dt / dt(end)).^2, '-', 'Color', [0.80 0.80 0.80], 'LineWidth', 4 * st.line_lw, ...
+        'DisplayName', 'slope 2 (RK2 drift)', 'Tag', 'numerics_slope2_band');
+    h_free = loglog(ax, dt, e0, 'o-', 'Color', col, 'MarkerFaceColor', col, 'LineWidth', st.line_lw, ...
         'DisplayName', sprintf('noise-free, slope %.2f', p0(1)));
-    loglog(ax, dt, e0(end) * (dt / dt(end)).^2, ':', 'Color', [0.4 0.4 0.4], 'LineWidth', 1, ...
-        'DisplayName', 'slope 2 (RK2 drift)');
+    h_key = [h_free, h_ref2];
     if ~isempty(R(i).noisy)
         e1 = [R(i).noisy.err_long_total_rms];
         p1 = polyfit(log(dt), log(e1), 1);
-        loglog(ax, dt, e1, 's--', 'Color', col, 'MarkerFaceColor', 'w', 'LineWidth', st.line_lw, ...
+        h_noisy = loglog(ax, dt, e1, 's--', 'Color', col, 'MarkerFaceColor', 'w', 'LineWidth', st.line_lw, ...
             'DisplayName', sprintf('noise \\sigma_u = %g, slope %.2f', S.sigma_u_noise, p1(1)));
-        loglog(ax, dt, e1(end) * (dt / dt(end)).^1.5, '-.', 'Color', [0.4 0.4 0.4], 'LineWidth', 1, ...
-            'DisplayName', 'slope 1.5 (SRA1 strong)');
+        % 1.5 is the order SRA1 guarantees with additive noise, a lower
+        % bound: where the drift error (order 2) dominates, the measured
+        % slope is steeper.
+        h_ref15 = loglog(ax, dt, e1(end) * (dt / dt(end)).^1.5, '-.', 'Color', [0.4 0.4 0.4], 'LineWidth', 1, ...
+            'DisplayName', 'slope 1.5 (SRA1 lower bound)');
+        h_key = [h_key, h_noisy, h_ref15]; %#ok<AGROW>
     end
     hold(ax, 'off');
     set(ax, 'XScale', 'log', 'YScale', 'log', 'FontSize', st.tick_fs, 'XDir', 'reverse');
@@ -197,7 +207,7 @@ for i = 1:n_cond
         ylabel(ax, sprintf('rms |error| over %g s', S.seg_long), 'FontSize', st.label_fs);
     end
     title(ax, 'convergence of the reshooting error', 'FontWeight', 'normal', 'FontSize', st.title_fs);
-    legend(ax, 'Location', 'best', 'FontSize', st.tick_fs - 2);
+    legend(ax, h_key, 'Location', 'best', 'FontSize', st.tick_fs - 2);
 end
 
 % The preset name is a line of its own in every sheet title (2026-11-12): the
@@ -222,16 +232,31 @@ for i = 1:n_cond
     % Row 1: local exponents overlay
     ax = nexttile(tl, i);
     hold(ax, 'on');
-    cmap = parula(K);
+    % A neutral ramp, dark (lambda_1) to light (lambda_K). It was parula
+    % until 2026-11-22: its blue-to-yellow ran through the blue and the
+    % yellowish of the adapting conditions, so the QR lines could not be
+    % told from Benettin's, which is drawn in the condition's colour.
+    % DRAWING ORDER (Tom's review of S2, 2026-11-22): Benettin's thick
+    % coloured lines first, the thin QR lines on top of them, so that one
+    % can see whether the two estimators overlap. Until then the thick
+    % line was drawn last and hid the QR line it was to be compared with.
+    cmap = repmat(linspace(0.25, 0.82, K)', 1, 3);
+    cmap(1, :) = 0.25;                 % lambda_1 dark also when it is the only one drawn (linspace of one point gives the light end)
+    plot(ax, Q.benettin.t_lya, Q.benettin.local_lya, 'Color', col, 'LineWidth', 1.6, ...
+        'DisplayName', 'Benettin local \lambda_1');
+    yline(ax, LLE_b, '--', 'Color', col, 'LineWidth', 1.2, 'DisplayName', 'Benettin \lambda_1');
     for j = K:-1:1
-        h = plot(ax, Q.qr.t_lya, Q.qr.local_LE_spectrum_t(:, j), 'Color', cmap(j, :), 'LineWidth', 0.8, ...
+        y = Q.qr.local_LE_spectrum_t(:, j);
+        % "QR local lambda_1" is the column that started from Benettin's
+        % vector where the stage saved it (local_start, since 2026-11-23):
+        % a local rate belongs to its vector, so only that column is
+        % Benettin's to compare with. Older runs: the first sorted column.
+        if j == 1 && isfield(Q.qr, 'local_start'); y = Q.qr.local_start; end
+        h = plot(ax, Q.qr.t_lya, y, 'Color', cmap(j, :), 'LineWidth', 0.8, ...
             'HandleVisibility', 'off');
-        if j == K; set(h, 'DisplayName', sprintf('QR local \\lambda_{%d}', K), 'HandleVisibility', 'on'); end
+        if j == K && K > 1; set(h, 'DisplayName', sprintf('QR local \\lambda_{%d}', K), 'HandleVisibility', 'on'); end
         if j == 1; set(h, 'DisplayName', 'QR local \lambda_1', 'HandleVisibility', 'on'); end
     end
-    plot(ax, Q.benettin.t_lya, Q.benettin.local_lya, 'Color', col, 'LineWidth', 1.6, ...
-        'DisplayName', 'Benettin local');
-    yline(ax, LLE_b, '--', 'Color', col, 'LineWidth', 1.2, 'DisplayName', 'Benettin LLE');
     yline(ax, LLE_q, ':', 'Color', [0 0 0], 'LineWidth', 1.2, 'DisplayName', 'QR \lambda_1');
     hold(ax, 'off');
     set(ax, 'FontSize', st.tick_fs);
@@ -385,7 +410,7 @@ title(tl, {sprintf('Per-trial comparisons: %d seeds for the LLE rows, %d for the
 end
 
 function fig = plot_jacobian(R, S, st, n_cond, visible)
-% Check J: analytic vs finite-difference Jacobian, per sampled state.
+% Check J: analytic vs finite-difference Jacobian, per sampled time point (snapshot).
 fig = figure('Position', [100, 80, 380 * n_cond, 420], 'Visible', onoff(visible));
 tl  = tiledlayout(fig, 1, n_cond, 'TileSpacing', 'compact', 'Padding', 'compact');
 acc = struct('J_rel_fro_max', 1e-6, 'J_eig_err_max', 1e-6);
@@ -399,11 +424,13 @@ for i = 1:n_cond
         'DisplayName', 'relative Frobenius error');
     plot(ax, k, [Jc.eig_err], 's--', 'Color', col, 'MarkerFaceColor', 'w', 'LineWidth', st.line_lw, ...
         'DisplayName', 'top-20 eigenvalue mismatch');
-    yline(ax, acc.J_rel_fro_max, ':', 'Color', [0.3 0.3 0.3], 'DisplayName', sprintf('threshold %.0e', acc.J_rel_fro_max));
+    yline(ax, acc.J_rel_fro_max, ':', 'Color', [0.3 0.3 0.3], 'DisplayName', sprintf('threshold %.0e', acc.J_rel_fro_max), 'Tag', 'numerics_jacobian_threshold');
     hold(ax, 'off');
-    set(ax, 'YScale', 'log', 'FontSize', st.tick_fs, 'XTick', k);
+    xt = k;
+    if numel(k) > 6; xt = unique([1, 5:5:numel(k)]); end      % 15 snapshots: 1, 5, 10, 15
+    set(ax, 'YScale', 'log', 'FontSize', st.tick_fs, 'XTick', xt);
     xlim(ax, [0.5, numel(Jc) + 0.5]);
-    xlabel(ax, sprintf('sampled state (n = %d, N = %d)', Jc(1).n, Jc(1).N), 'FontSize', st.label_fs);
+    xlabel(ax, sprintf('snapshot (n = %d, N = %d)', Jc(1).n, Jc(1).N), 'FontSize', st.label_fs);
     if i == 1; ylabel(ax, 'error', 'FontSize', st.label_fs); end
     title(ax, {R(i).title, sprintf('%d kink rows excluded, h = %.0e', sum([Jc.n_excluded]), Jc(1).h)}, ...
         'FontWeight', 'normal', 'FontSize', st.title_fs);

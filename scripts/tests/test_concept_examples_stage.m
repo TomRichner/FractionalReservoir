@@ -37,6 +37,16 @@ assert(isequal({pl.examples.key}, {'decay', 'irregular', 'runaway', 'oscillation
 assert(isequal({pl.examples.name}, {'reference', 'reference', 'EEx1p5', 'lrA2p5W1p0'}), 'their networks');
 assert(isequal([pl.examples.level_of_chaos], [0.15 1 1 1]), 'their levels');
 assert(numel(pl.gallery) == 8 && isequal(pl.gallery(6).seed, [27 28]) && isequal(pl.gallery(1).seed, [7 8]), 'the gallery');
+% The gallery shows structures the outlier_structures stage tests (S7 panel
+% B summarizes them): the same names and weight seeds, and no 'E-to-E down',
+% which that stage does not run.
+assert(isequal({pl.gallery.name}, {'reference', 'EEx1p5', 'EIx0p9', 'IIx1p25', 'EEx1p6-EIx1p33-IEx1p33', 'reference', ...
+    'lrA1p5W0p0', 'lrA1p4W1p0'}), 'the gallery''s networks');
+[g_titles, g_keys] = cx_gallery_names(pl.gallery, pl.seed);
+po = outlier_structures_stage_plan(cfg);
+assert(all(ismember(g_keys, {po.networks.key})) && strcmp(g_keys{6}, 'reference_w27'), 'every gallery structure is a network of outlier_structures');
+assert(isequal(g_titles, {'Reference', ['E-to-E ' char(215) ' 1.5'], 'I-to-E down', 'I-to-I up', 'E-I loop', 'Local outlier', 'Real low-rank mode', ...
+    'Rotating low-rank mode'}), 'the tiles'' titles');
 assert(pl.T == 12 && pl.dt_sample == 0.01 && pl.n_trace == 5 && pl.n_image == 30 && pl.lya && pl.n_override == 0, 'knobs');
 bad = {{'concept_examples_bogus', 1}, {'concept_examples_n_image', 31}, {'concept_examples_lya_from', 20}, ...
     {'concept_examples_examples', {'a', 'notAName', 1, []}}, {'concept_examples_dt_sample', 0.0031}};
@@ -100,9 +110,50 @@ assert(any(strcmp(o1.files, 'Fig_Main1_Concept_Networks.png')) && any(strcmp(o1.
 assert(o1.n_far(2) >= 1, 'the E-to-E outlier beyond the break');
 tab = fileread(fullfile(fd, 'f1', 'Fig_Main1_Concept_Networks_table.md'));
 assert(contains(tab, 'EEx1p5') && contains(tab, 'lambda_1'), 'its table');
+% Tom, 2026-11-22: eigenvalues left of the boundary gray, right of it
+% black, an outlier far to the right larger and green; what is not drawn is
+% said in the table; the diagrams' axis names and the added mode's title in
+% sentence case; letters by row (A to D); the arrows Increasing SFA and
+% Increasing STD in row D. Tom, 2026-11-23: row C back to the potential x_i
+% (the runaway column with a y range of its own), at most four y ticks;
+% row A as S3 (balanced + added where something was added); arrows on the
+% discs too.
+n_dots = @(hs) sum(arrayfun(@(h) numel(h.XData), hs));
+for k = 1:numel(o1.axes.spectrum)
+    ax = o1.axes.spectrum(k);
+    hc = findobj(ax, 'Tag', 'eig_crossed'); hl = findobj(ax, 'Tag', 'eig_left'); ho = findobj(ax, 'Tag', 'eig_outlier');
+    ev_k = C.examples(k).ev;
+    assert(o1.n_crossed(k) == nnz(real(ev_k) > 0), 'column %d: the count right of the boundary', k);
+    assert(n_dots(hc) + n_dots(hl) + n_dots(ho) == numel(ev_k) - o1.n_left(k) && n_dots(ho) == o1.n_out(k), ...
+        'column %d: every eigenvalue the window holds drawn once, the outliers on their own', k);
+    assert(n_dots(hc) <= nnz(real(ev_k) > 0), 'column %d: black only right of the boundary', k);
+    assert(all(arrayfun(@(h) isequal(h.CData(1, :), [0 0 0]), hc)) && ...
+        all(arrayfun(@(h) h.CData(1, 1) > 0 && h.CData(1, 1) < 1 && all(h.CData(1, :) == h.CData(1, 1)), hl)) && ...
+        all(arrayfun(@(h) h.CData(1, 2) > h.CData(1, 1) && h.CData(1, 2) > h.CData(1, 3), ho)), ...
+        'column %d: black right of the boundary, gray left of it, the outliers green', k);
+end
+assert(strcmp(o1.axes.activity(1).YLabel.String, 'x_i') && all(arrayfun(@(ax) numel(ax.YTick) <= 4, o1.axes.activity)), ...
+    'row C: the potential x_i, at most four ticks');
+assert(isequal(isgraphics(o1.axes.added), o1.add_clim > 0) && ...
+    numel(findall(o1.figs, 'Tag', 'plus')) == nnz(o1.add_clim > 0), 'row A: an added image and a plus sign where something was added');
+assert(~isempty(findall(o1.figs, 'Tag', 'arrow_sfa_discs')) && ~isempty(findall(o1.figs, 'Tag', 'text_std_discs')), 'row D: the arrows on the discs');
+assert(all(arrayfun(@(L) ~isempty(findall(o1.figs, 'Tag', ['letter_' L])), 'ABCD')), 'letters by row, A to D');
+assert(~isempty(findall(o1.figs, 'Tag', 'text_sfa')) && ~isempty(findall(o1.figs, 'Tag', 'arrow_std')), 'row D: the arrows');
+assert(contains(tab, 'Eigenvalues right of the boundary') && ...
+    (contains(tab, 'Not drawn (left of the window') == any(o1.n_left > 0)) && ...
+    (contains(tab, 'Every eigenvalue is drawn') == ~any(o1.n_left > 0)), 'the table says what is not drawn');
+assert(strcmp(o1.axes.concepts(1).XLabel.String, 'Dendritic potential') && ...
+    strcmp(o1.axes.concepts(3).YLabel.String, 'Synaptic output'), 'panel B: axis names in sentence case');
+assert(any(strcmp(o1.titles, 'Added rotating mode')) == any(strcmp({C.examples.key}, 'oscillation')), 'the added mode''s title');
 close(o1.figs);
 o3 = fig_supp3_connectivity_gallery('run_dir', tmp, 'out_dir', fullfile(fd, 's3'), 'visible', false);
 assert(any(strcmp(o3.files, 'Fig_Supp3_Connectivity_Gallery.png')) && numel(o3.axes.spectrum) == 3, 'S3 written');
+% S3 (Tom, 2026-11-22): balanced plus added, the added matrix on its own
+% color range; a tile with nothing added shows one image.
+has_add = o3.add_clim > 0;
+assert(isequal(isgraphics(o3.axes.added), has_add) && ~has_add(1) && any(has_add), ...
+    'S3: an added image exactly where something was added, none on the balanced tile');
+assert(numel(findall(o3.figs, 'Tag', 'plus')) == nnz(has_add), 'S3: one plus sign per added image');
 close(o3.figs);
 empty = fullfile(tmp, 'empty'); mkdir(empty);
 for f = {@fig_main1_concept_networks, @fig_supp3_connectivity_gallery}

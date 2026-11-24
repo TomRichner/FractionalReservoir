@@ -69,6 +69,9 @@ for k = 1:2
     assert(all(imag(R.full.net) >= 0));
     assert(xor(k == 1, all(R.full.is_coarse)), 'dense full-Jacobian grid in the first network only');
     assert(isempty(R.intact.ev) == (k > 1));
+    % The no-stimulation continuation (Figure 8 G): the intact run before the step.
+    assert(R.check.nostim_pre_step_mismatch == 0 && R.nostim.t(1) < R.t_step && all(R.nostim.u < R.dc_level / 2), ...
+        'no-stimulation continuation, network %d', k);
 end
 R = B.R{1};
 assert(B.runs.n_bursts_before(1) >= 1, 'the first network bursts before the step');
@@ -79,6 +82,52 @@ assert(throws(@() bm_load_runs(tempname), ''), 'the loader refuses a run without
 %% 3. The figures
 out_dir = fullfile(run_dir, 'figs');
 o = fig_burst_mode('run_dir', run_dir, 'out_dir', fullfile(out_dir, 'a'), 'visible', false);
+% Polish of 2026-11-22: E and I in the manuscript's colors; the two modes
+% told apart by color and width. Plan 3 (Figure 8 G): one key, above the
+% time course, with the no-stimulation continuation dashed; the
+% adaptation-frozen arm is not drawn.
+st = manuscript_style();
+% Tom, 2026-11-23 (G2, "red and blue families everywhere"): E and I are the
+% first anchors of the many-neuron color maps (until then the model's two
+% type colors, SRNNCellTypePairs.type_colors). The I blue is MATLAB's
+% default blue, which inhibitory_colormap rounds to two places.
+e_map = excitatory_colormap(8); i_map = inhibitory_colormap(8);
+assert(isequal(st.E_color, e_map(1, :)) && max(abs(st.I_color - i_map(1, :))) < 0.005, ...
+    'the manuscript''s E and I colors are the first anchors of excitatory_colormap and inhibitory_colormap');
+lg = findall(o.figs, 'Type', 'legend');
+assert(isscalar(lg), 'one key on G');
+names = lg.String; h = lg.PlotChildren; ax = lg.Axes;
+assert(isequal(names, {'E', 'I', 'Gains frozen', 'Full Jacobian'}), 'the key of G');
+assert(isequal(h(1).Color, st.E_color) && isequal(h(2).Color, st.I_color), 'E and I traces in the manuscript_style colors');
+assert(~isequal(h(3).Color, h(4).Color) && h(3).LineWidth >= 2 * h(4).LineWidth, ...
+    'gains frozen and full Jacobian differ in color and in width');
+% "Without stimulation" is the key's last entry, drawn beside the legend in
+% the tight dash (a legend can only show MATLAB's own '--'; R9).
+key_ax = findall(o.figs, 'Tag', 'fig8_key_dash');
+key_txt = findall(o.figs, 'Tag', 'fig8_key_text');
+assert(isscalar(key_ax) && isscalar(key_txt) && strcmp(key_txt.String, 'Without stimulation') && ...
+    isscalar(findall(key_ax, 'Tag', 'tight_dash')), 'the key''s "Without stimulation" in the tight dash');
+set(lg, 'Units', 'inches');
+vis = findall(o.figs, 'Type', 'axes', 'Visible', 'on');
+top = max(arrayfun(@(a) a.Position(2) + a.Position(4), vis'));
+assert(lg.Position(2) >= top - 1e-6, 'the key sits above the time course');
+% Tom, 2026-11-23 (R9): after the step only the E rate and the full
+% Jacobian's mode continue, each in its own line's color, in a tight dash
+% (solid line objects broken by NaN gaps, Tag tight_dash), under the
+% stimulated traces; nothing in MATLAB's '--' any more.
+cont = findall(ax, 'Tag', 'tight_dash');
+assert(isscalar(cont) && isequal(cont.Color, st.E_color) && any(isnan(cont.YData)), ...
+    'the E rate without stimulation in the E color, tight-dashed');
+kids = allchild(ax); assert(kids(end) == cont, 'the continuation under the stimulated traces');
+mode_ax = vis(arrayfun(@(a) startsWith(strjoin(cellstr(a.YLabel.String), ' '), 'Re'), vis));
+cont_m = findall(mode_ax, 'Tag', 'tight_dash');
+assert(isscalar(cont_m) && isequal(cont_m.Color, [0 0 0]), ...
+    'one continued mode (the full Jacobian''s), in its own black, tight-dashed');
+assert(isempty(findall(o.figs, 'Type', 'line', 'LineStyle', '--')), 'no MATLAB dash left in G');
+% R10: the zoom's window as a thin gray outline over the 100 s run, no band.
+box = findall(o.figs, 'Tag', 'fig8_zoom_box');
+assert(isscalar(box) && strcmp(box.FaceColor, 'none'), 'a thin gray box shows the zoom''s window');
+assert(isempty(findall(mode_ax, 'Type', 'patch')), 'no filled band on the 100 s run');
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode.png')) && isfile(fullfile(out_dir, 'a', 'Fig_Burst_Mode_table.md')));
 ied = fullfile(run_dir, 'ied'); mkdir(ied);
@@ -87,6 +136,24 @@ rows = table([42; 42; 73; 73], [1; 2; 1; 2], [false; true; false; true], [0.10; 
     'VariableNames', {'seed', 'block', 'stim', 'mean_rate', 'sfa_feedback', 'depression'});
 save(fullfile(ied, 'summary.mat'), 'rows');
 o = fig_supp10_grouped('run_dir', run_dir, 'ied_run_dir', ied, 'out_dir', fullfile(out_dir, 'b'), 'visible', false);
+% Panel B: no trace leaves its axes (the depression trace used to dip under the floor).
+axs = findall(o.figs, 'Type', 'axes');
+n_dep = 0;
+for k = 1:numel(axs)
+    ln = findall(axs(k), 'Type', 'line');
+    y = arrayfun(@(l) [min(l.YData), max(l.YData)], ln, 'UniformOutput', false);
+    y = vertcat(y{:});
+    if isempty(y) || ~startsWith(strjoin(cellstr(axs(k).YLabel.String), ' '), 'Depr'); continue; end
+    n_dep = n_dep + 1;
+    assert(axs(k).YLim(1) < min(y(:, 1)) && axs(k).YLim(2) >= max(y(:, 2)), 'S10 (B): the depression traces are inside their axes');
+end
+assert(n_dep == 1, 'S10 (B): one depression panel checked, found %d', n_dep);
+% The common canvas (Plan 2): canvas_w wide, type by role.
+st = manuscript_style();
+o.figs.Units = 'inches';
+assert(abs(o.figs.Position(3) - st.canvas_w) < 1e-6, 'S10 is canvas_w wide');
+A = canvas_audit(o.figs);
+assert(all(A.ok), 'S10: type by role; off: %s', strjoin(A.name(~A.ok), '; '));
 close(o.figs);
 assert(isfile(fullfile(out_dir, 'b', 'Fig_Supp10_Grouped.png')) && isfile(fullfile(out_dir, 'b', 'Fig_Supp10_Grouped_table.md')));
 assert(throws(@() fig_supp10_grouped('run_dir', run_dir, 'ied_run_dir', tempname, 'save', false, 'visible', false), ''), ...
@@ -102,9 +169,18 @@ if isfolder(fullfile(c8.clinical_dir, 'panels')) && isfile(fullfile(legacy, 'sum
         'model_fig', fullfile(mdir, 'fig_ied_stim_blocks.fig'), 'clinical_dir', c8.clinical_dir, ...
         'burst_mode_dir', run_dir);
     info = imfinfo(o.files{1});
-    assert(info.Width >= 2000 && info.Height > 1.6 * info.Width, 'Figure 8 is a tall 7-in page at 300 dpi: %d x %d', ...
-        info.Width, info.Height);
+    st = manuscript_style();
+    dpi = info.XResolution * 0.0254;                 % the PNG's resolution is in pixels per meter
+    assert(abs(info.Width / dpi - st.canvas_w) <= st.canvas_tol && info.Height / dpi <= st.canvas_max_h + 0.01, ...
+        'Figure 8 is on the common canvas: %.2f x %.2f in', info.Width / dpi, info.Height / dpi);
     assert(all(cellfun(@isfile, o.files)));
+    % Titles of the clinical and modular panels: sentence case, no counts.
+    f8 = openfig(o.files{2}, 'invisible');
+    titles = arrayfun(@(a) string(strjoin(cellstr(a.Title.String), ' ')), findall(f8, 'Type', 'axes'));
+    close(f8);
+    assert(all(ismember(["No stimulation", "Stimulation", "Model, no stimulation", "Model, stimulation"], titles)) && ...
+        ~any(contains(titles, ["(", "Median", "No Stimulation"])), 'Figure 8: sentence-case titles without counts');
+    assert(contains(fileread(o.files{4}), 'Titles restyled on the composite'), 'the provenance lists the original titles');
 else
     note = ' (new Figure 8 skipped: no clinical panels or no 2026-11-17 model run on this machine)';
 end

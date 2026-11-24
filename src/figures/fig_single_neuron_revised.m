@@ -62,16 +62,23 @@ fig=figure('Visible','off','Color','w','Position',[40 40 round(1000*N/3) 850]);
 tl=tiledlayout(fig,6,N,'TileSpacing','compact','Padding','compact');
 fields={'u','x','r','syn','sfa','std'};
 labels={'input u','x','raw rate r','synaptic output','SFA feedback','depression factor'};
-% Each column's traces in its condition's manuscript_style colour, the
-% title too (Plan 2, package A, 2026-11-21: no condition in black; every
-% trace was black until then). The input row is the stimulus, the same in
-% every column, and stays black. A condition the style does not know draws
+% Each column's traces in one colour, the title too (Plan 2, package A,
+% 2026-11-21: no condition in black; every trace was black until then). The
+% input row is the stimulus, the same in every column, and stays black.
+% WHICH COLOUR (column_color). A column that isolates ONE mechanism (SFA
+% alone, depression alone) is not one of the paper's conditions, so it does
+% not take a condition colour: until 2026-11-22 these two were drawn in the
+% pale variants manuscript_style keeps for them, which read as washed-out
+% versions of the single- and multiple-timescale conditions. They are now
+% full-strength colours of their own, neither a condition colour nor an E or
+% I colour: SFA alone purple, depression alone bluish green (the depression
+% colour of S9's state-variable panel). Every other column takes its
+% condition's manuscript_style colour; a name the style does not know draws
 % in black, as before.
 st=manuscript_style();
 for c=1:N
     r=R(c);
-    col=[0 0 0];
-    if isKey(st.condition_color,r.name), col=st.condition_color(r.name); end
+    col=column_color(r.name,st);
     for j=1:6
         trace_col=col; if j==1, trace_col=[0 0 0]; end
         ax=nexttile(tl,(j-1)*N+c); plot(ax,r.t,r.(fields{j})','Color',trace_col,'LineWidth',1.4);
@@ -134,6 +141,22 @@ for k=1:numel(sn_names)
     end
 end
 keep=find(keep);
+end
+
+function col=column_color(name,st)
+% The colour of a column: a single mechanism's own colour, else the
+% condition's (see the note where it is called).
+SFA_ALONE=[142 68 173]/255;          % purple
+DEPRESSION_ALONE=[0 158 115]/255;    % bluish green
+col=[0 0 0];
+m=mechanisms(name);
+if ~isempty(m) && m.sfa && ~(m.product || m.chain)
+    col=SFA_ALONE;
+elseif ~isempty(m) && ~m.sfa && (m.product || m.chain)
+    col=DEPRESSION_ALONE;
+elseif isKey(st.condition_color,name)
+    col=st.condition_color(name);
+end
 end
 
 function m=mechanisms(name)

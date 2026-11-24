@@ -50,13 +50,21 @@ function mat_file = run_numerics_verification(cfg)
 %      times whatever the precision, which is why A exists.
 %
 %   J. ANALYTIC JACOBIAN vs CENTRAL FINITE DIFFERENCES (added 2026-09-14) on the
-%      reduced network of C: three states from the second half of one run,
+%      reduced network of C: at n_jac_time_points time points (snapshots),
+%      evenly spaced over the second half of one run (15 in every run mode
+%      since 2026-11-22, Tom's review of S2; 3 before),
 %      compute_Jacobian_fast against SRNNCellTypePairs.finite_difference_jacobian
 %      (h = 1e-6). Dendritic rows/columns whose effective argument lies within
 %      10 h of a piecewise-activation breakpoint are excluded (the derivative
 %      jumps there, so a central difference is meaningless) and counted. The
 %      manuscript states this check was done once during validation; it is now
 %      part of every run of this stage, with the errors saved.
+%      'jacobian_only', true runs this check ALONE on a finished run: the
+%      saved results of A, B, L and C in out_dir are kept as they are, J is
+%      computed again at the current number of time points, and the summary,
+%      the verdict and numerics_verdict.md are rewritten. It needs no pool
+%      (one reduced-network run per condition). The preset and the run mode
+%      must be the saved run's.
 %
 %   ACCEPTANCE CRITERIA are fixed in code (the `acceptance` struct below,
 %   dated 2026-09-14, written BEFORE the runs that use them) and evaluated into
@@ -71,6 +79,25 @@ function mat_file = run_numerics_verification(cfg)
 %      it had only ever been checked on SRNNModel2 (test_benettin_vs_qr). Both
 %      methods run on the same fiducial trajectory (same seeds); the largest
 %      QR exponent should match the Benettin LLE.
+%      ONE START VECTOR (2026-11-23, Tom's review of S2 panel B): Benettin's
+%      initial perturbation and the first column of QR's initial basis are
+%      the same unit vector, drawn with randn from a private stream
+%      RandStream('mt19937ar', 'Seed', seeds(1) + 515151) (the global stream
+%      the network is drawn from is not touched), the rest of the QR basis
+%      its Householder completion. Until then Benettin started from a randn
+%      draw and QR from eye(N), so the local rates compared were those of
+%      two different vectors: a local rate belongs to its vector until the
+%      vector has aligned with the leading direction, which takes about
+%      1/(lambda_1 - lambda_2) and, for the nearly equal leading exponents
+%      of the multiple-timescale network, far longer than the run
+%      (scripts/explorations/s2b_estimators on branch p3-s2b). The vector
+%      is saved (results(i).qr(k).start_vector, .start_vector_how), and
+%      qr.local_start / qr.LE_start are the local rates and exponent of the
+%      QR column that started from it (qr.start_col its index after the
+%      sort by exponent). top-K keeps its own seeded basis.
+%      'qr_only', true reruns C ALONE on a finished run, as 'jacobian_only'
+%      does J: everything else in the .mat is kept; the summary, the
+%      verdict and numerics_verdict.md follow. Serial unless a pool is open.
 %
 % TRIALS, AND WHICH SUB-EXPERIMENTS GET HOW MANY. Each trial is a new network:
 % rng_seeds = [k, k+1], which draws W, the stimulus, the initial state and the
@@ -134,7 +161,10 @@ arguments
     cfg.n_trials_lle     (1,1) double  = 0     % 0 -> per run_mode
     cfg.n_workers        (1,1) double  = 0     % NOT USED since FD-017: the pool is the session's allocation (pool_set)
     cfg.conditions                     = {}    % the preset's conditions to check, by name; {} = all (FD-030)
-    cfg.reverdict        (1,1) logical = false % true: no compute; re-evaluate the saved results in out_dir
+    cfg.n_jac_time_points (1,1) double = 0     % 0 -> per run_mode (15 in every mode): the time points of check J
+    cfg.jacobian_only    (1,1) logical = false % true: run check J alone on the saved run in out_dir (see J in the header)
+    cfg.qr_only          (1,1) logical = false % true: run sub-experiment C alone on the saved run in out_dir (see C in the header)
+    cfg.reverdict        (1,1) logical = false% true: no compute; re-evaluate the saved results in out_dir
                                                % against the CURRENT acceptance struct, rewrite
                                                % numerics_verdict.md and update verdict/settings in the .mat
 end
@@ -146,7 +176,7 @@ setup_paths();
 % every mode in run_mode_names().
 switch cfg.run_mode
     case {'essential', 'fast'}      % 'essential' takes 'fast's sizes (run_mode_names)
-        T_free = 6;  T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_reshoot = 1;  n_lle = 2;
+        T_free = 6;  T_lle = 10;  T_noisy = 3;    n_small = 30;  T_small = [-8, 4];   max_restarts = 400;  n_reshoot = 1;  n_lle = 2;   n_jac_time_points = 15;
     case 'fastmedium'
         % Between the two (Tom, 2026-11-14; about 20 min of the mu7chain_AC
         % bundle). The header says fast windows fail L and C by design, so L
@@ -155,11 +185,11 @@ switch cfg.run_mode
         % cost little wall time: medium's 5 reshoot trials, and 6 LLE trials
         % (L runs 2 x 6 = 12 jobs, C 6). Fast took 11.1 min (2026-11-13);
         % with L and C about twice as long, about 18 min.
-        T_free = 6;  T_lle = 20;  T_noisy = 3;    n_small = 30;  T_small = [-10, 10]; max_restarts = 400;  n_reshoot = 5;  n_lle = 6;
+        T_free = 6;  T_lle = 20;  T_noisy = 3;    n_small = 30;  T_small = [-10, 10]; max_restarts = 400;  n_reshoot = 5;  n_lle = 6;   n_jac_time_points = 15;
     case {'medium', 'medium2'}
-        T_free = 12;  T_lle = 20;  T_noisy = 4.5;  n_small = 40;  T_small = [-10, 10]; max_restarts = 800;  n_reshoot = 5;  n_lle = 25;
+        T_free = 12;  T_lle = 20;  T_noisy = 4.5;  n_small = 40;  T_small = [-10, 10]; max_restarts = 800;  n_reshoot = 5;  n_lle = 25;  n_jac_time_points = 15;
     case 'production'
-        T_free = 20;  T_lle = 40;  T_noisy = 4.5;  n_small = 60;  T_small = [-10, 20]; max_restarts = 1500; n_reshoot = 5;  n_lle = 30;
+        T_free = 20;  T_lle = 40;  T_noisy = 4.5;  n_small = 60;  T_small = [-10, 20]; max_restarts = 1500; n_reshoot = 5;  n_lle = 30;  n_jac_time_points = 15;
     otherwise
         error('run_numerics_verification:badMode', ...
             'Unknown run_mode ''%s'' (expected %s).', ...
@@ -167,6 +197,7 @@ switch cfg.run_mode
 end
 if cfg.n_trials_reshoot > 0; n_reshoot = cfg.n_trials_reshoot; end
 if cfg.n_trials_lle     > 0; n_lle     = cfg.n_trials_lle;     end
+if cfg.n_jac_time_points > 0; n_jac_time_points = cfg.n_jac_time_points; end
 
 P = struct();                        % everything a worker needs, broadcast once
 P.preset_name  = cfg.preset_name;
@@ -190,7 +221,7 @@ P.K_small      = 20;                 % top-K on the reduced network (sub-experim
 P.max_restarts = max_restarts;
 P.win_free  = [T_free  / 3 + 0.3, 2 * T_free  / 3 - 0.01];   % inside the stim-on third, see header
 P.win_noisy = [T_noisy / 3 + 0.3, 2 * T_noisy / 3 - 0.01];
-P.n_jac     = 3;                     % states per condition for check J
+P.n_jac     = n_jac_time_points;     % time points (snapshots) per condition for check J; saved as settings.n_jac
 P.h_jac     = 1e-6;                  % central-difference step
 P.jac_kink_margin = 10 * P.h_jac;    % exclude x rows within this of a breakpoint
 
@@ -261,6 +292,15 @@ if cfg.reverdict
     vprintf(cfg.verbose, 'minimal', '%s', verdict_md);
     save(mat_file, 'verdict', 'settings', '-append');
     vprintf(cfg.verbose, 'minimal', '[numerics_verification] reverdict -> %s\n', mat_file);
+    return
+end
+
+if cfg.jacobian_only
+    mat_file = jacobian_only(cfg, P, acceptance, out_dir);
+    return
+end
+if cfg.qr_only
+    mat_file = qr_only(cfg, P, acceptance, out_dir);
     return
 end
 
@@ -337,7 +377,7 @@ for i = 1:n_cond
 
     %% J. analytic Jacobian vs central finite differences, reduced network ---
     t0 = tic;
-    vprintf(cfg.verbose, 'verbose', '  [J] Jacobian vs finite differences on n = %d, %d states ...\n', n_small, P.n_jac);
+    vprintf(cfg.verbose, 'verbose', '  [J] Jacobian vs finite differences on n = %d, %d time points ...\n', n_small, P.n_jac);
     res(i).jacobian = jacobian_trial(P, cname, [1, 2]);
     vprintf(cfg.verbose, 'verbose', '  [J] done in %.0f s\n', toc(t0));
 
@@ -457,8 +497,9 @@ end
 
 function Q = qr_trial(P, cname, seeds)
 % Sub-experiment C for one reduced network: Benettin then QR on the same
-% fiducial trajectory.
-Q = struct('seeds', seeds, 'n', P.n_small, 'T_range', P.T_small, 'benettin', [], 'qr', [], 'topk', []);
+% fiducial trajectory, both started from one vector (see C in the header).
+Q = struct('seeds', seeds, 'n', P.n_small, 'T_range', P.T_small, 'benettin', [], 'qr', [], 'topk', [], ...
+    'start_vector', [], 'start_vector_how', '');
 for method = {'benettin', 'qr', 'topk'}
     mth = method{1};
     model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, 'verbose', P.verbose, ...
@@ -467,6 +508,10 @@ for method = {'benettin', 'qr', 'topk'}
         'sigma_u_noise', 0, 'ode_solver', 'ode45', 'fs', P.fs_lle, ...
         'T_range', P.T_small, 'lya_method', mth, 'lya_K', P.K_small, ...
         'lya_T_interval', [0, P.T_small(2)], 'lya_warmup', P.lya_small_warmup);
+    if isempty(Q.start_vector)
+        [Q.start_vector, Q.start_vector_how] = shared_start_vector(seeds, model.N_sys_eqs);
+    end
+    if ~strcmp(mth, 'topk'); model.set_lyapunov_start_vector(Q.start_vector); end
     t0 = tic;
     model.run();
     r = model.lya_results;
@@ -474,8 +519,12 @@ for method = {'benettin', 'qr', 'topk'}
         case 'benettin'
             Q.benettin = struct('LLE', r.LLE, 't_lya', r.t_lya, 'local_lya', r.local_lya, 'seconds', toc(t0));
         case 'qr'
+            % The columns are sorted by exponent; the one that started
+            % from the shared vector is kept by name (start_col its place).
+            col = find(r.sort_idx == 1, 1);
             Q.qr = struct('LE_spectrum', r.LE_spectrum, 't_lya', r.t_lya, ...
                 'local_LE_spectrum_t', r.local_LE_spectrum_t, ...
+                'start_col', col, 'local_start', r.local_LE_spectrum_t(:, col), 'LE_start', r.LE_spectrum(col), ...
                 'N_sys_eqs', model.N_sys_eqs, 'seconds', toc(t0));
         case 'topk'
             % The K largest by the discrete QR method (lyapunov_topk), the
@@ -671,9 +720,106 @@ if isfield(S, 'jac_rel_fro_max')
 end
 end
 
+function mat_file = jacobian_only(cfg, P, acceptance, out_dir)
+% Check J alone on a finished run: results(i).jacobian computed again at
+% P.n_jac time points, everything else in the .mat as it was saved. The
+% summary's Jacobian scalars, the verdict and numerics_verdict.md follow.
+mat_file = fullfile(out_dir, 'numerics_verification_data.mat');
+if ~isfile(mat_file)
+    error('run_numerics_verification:noSavedRun', 'No saved run at %s.', mat_file);
+end
+D = load(mat_file, 'results', 'settings');
+settings = D.settings;
+res = D.results;
+same = strcmp(settings.preset_name, cfg.preset_name) && strcmp(settings.run_mode, cfg.run_mode) && ...
+    settings.n_small == P.n_small && isequal(settings.T_small, P.T_small) && settings.h_jac == P.h_jac;
+if ~same
+    error('run_numerics_verification:JacobianOnlyMismatch', ...
+        ['The saved run is preset ''%s'', run mode ''%s'' (n_small %d, T_small %s); this call is preset ''%s'', ' ...
+         'run mode ''%s'' (n_small %d, T_small %s). Check J alone must be run as the saved run was.'], ...
+        settings.preset_name, settings.run_mode, settings.n_small, mat2str(settings.T_small), ...
+        cfg.preset_name, cfg.run_mode, P.n_small, mat2str(P.T_small));
+end
+vprintf(cfg.verbose, 'minimal', '[numerics_verification] check J alone, %d time points, on %s\n', P.n_jac, mat_file);
+t_stage = tic;
+for i = 1:numel(res)
+    res(i).jacobian = jacobian_trial(P, res(i).name, [1, 2]);
+    res(i).summary  = summarise(res(i).reshoot, res(i).lle, res(i).qr, res(i).jacobian, P.fs_lle);
+end
+settings.n_jac_at_run = settings.n_jac;      % what the full run sampled
+settings.n_jac = P.n_jac;
+settings.jacobian_only_minutes = toc(t_stage) / 60;
+if ~isfield(settings, 'acceptance_at_run'); settings.acceptance_at_run = settings.acceptance; end
+settings.acceptance = acceptance;
+verdict = evaluate_acceptance(res, acceptance, settings.sigma_u_noise > 0);
+verdict_md = write_verdict(fullfile(out_dir, 'numerics_verdict.md'), verdict, res, settings);
+vprintf(cfg.verbose, 'minimal', '%s', verdict_md);
+results = res;
+save(mat_file, 'results', 'verdict', 'settings', '-append');
+vprintf(cfg.verbose, 'minimal', '[numerics_verification] check J alone: %.1f min -> %s\n', settings.jacobian_only_minutes, mat_file);
+end
+
+function [v, how] = shared_start_vector(seeds, N)
+% The one start vector of sub-experiment C (see C in the header): a unit
+% randn vector from a private stream seeded from the network's seed, so the
+% global stream the network is drawn from is not touched.
+seed = seeds(1) + 515151;
+stream = RandStream('mt19937ar', 'Seed', seed);
+v = randn(stream, N, 1);
+v = v / norm(v);
+how = sprintf(['randn(RandStream(''mt19937ar'', ''Seed'', %d), %d, 1) normalised (seed = rng_seeds(1) + 515151); ' ...
+    'Benettin''s initial perturbation and the first column of the QR initial basis (Householder completion)'], seed, N);
+end
+
+function mat_file = qr_only(cfg, P, acceptance, out_dir)
+% Sub-experiment C alone on a finished run: results(i).qr computed again for
+% the saved run's seeds (the n_trials_lle of the run), everything else in the
+% .mat as it was saved. The summary, the verdict and numerics_verdict.md follow.
+mat_file = fullfile(out_dir, 'numerics_verification_data.mat');
+if ~isfile(mat_file)
+    error('run_numerics_verification:noSavedRun', 'No saved run at %s.', mat_file);
+end
+D = load(mat_file, 'results', 'settings');
+settings = D.settings;
+res = D.results;
+same = strcmp(settings.preset_name, cfg.preset_name) && strcmp(settings.run_mode, cfg.run_mode) && ...
+    settings.n_small == P.n_small && isequal(settings.T_small, P.T_small) && settings.K_small == P.K_small;
+if ~same
+    error('run_numerics_verification:QrOnlyMismatch', ...
+        ['The saved run is preset ''%s'', run mode ''%s'' (n_small %d, T_small %s); this call is preset ''%s'', ' ...
+         'run mode ''%s'' (n_small %d, T_small %s). Sub-experiment C alone must be run as the saved run was.'], ...
+        settings.preset_name, settings.run_mode, settings.n_small, mat2str(settings.T_small), ...
+        cfg.preset_name, cfg.run_mode, P.n_small, mat2str(P.T_small));
+end
+n_lle = settings.n_trials_lle;
+vprintf(cfg.verbose, 'minimal', '[numerics_verification] sub-experiment C alone, %d seed(s) per condition, on %s\n', n_lle, mat_file);
+t_stage = tic;
+for i = 1:numel(res)
+    Q = cell(1, n_lle);
+    cname = res(i).name;
+    parfor k = 1:n_lle
+        Q{k} = qr_trial(P, cname, [k, k + 1]);
+    end
+    res(i).qr = [Q{:}];
+    res(i).summary = summarise(res(i).reshoot, res(i).lle, res(i).qr, res(i).jacobian, P.fs_lle);
+    print_summary(res(i).summary, res(i).title, cfg.verbose);
+end
+settings.qr_only_minutes = toc(t_stage) / 60;
+settings.qr_start = 'shared start vector (see C in the header of run_numerics_verification)';
+if ~isfield(settings, 'acceptance_at_run'); settings.acceptance_at_run = settings.acceptance; end
+settings.acceptance = acceptance;
+verdict = evaluate_acceptance(res, acceptance, settings.sigma_u_noise > 0);
+verdict_md = write_verdict(fullfile(out_dir, 'numerics_verdict.md'), verdict, res, settings);
+vprintf(cfg.verbose, 'minimal', '%s', verdict_md);
+results = res;
+save(mat_file, 'results', 'verdict', 'settings', '-append');
+vprintf(cfg.verbose, 'minimal', '[numerics_verification] sub-experiment C alone: %.1f min -> %s\n', settings.qr_only_minutes, mat_file);
+end
+
 function Jc = jacobian_trial(P, cname, seeds)
 % Sub-experiment J: analytic Jacobian against central finite differences at
-% P.n_jac states of one reduced-network run (the network of C, seeds [1 2]).
+% P.n_jac time points (snapshots) of one reduced-network run (the network of
+% C, seeds [1 2]), evenly spaced over its second half, the last at its end.
 model = build_probe(P.preset_name, cname, 'rng_seeds', seeds, 'verbose', P.verbose, ...
     'n', P.n_small, 'indegree', max(2, round(0.2 * P.n_small)), ...
     'F_tracks_network', true, ...
@@ -796,7 +942,7 @@ claims = { ...
 L = {};
 L{end+1} = sprintf('# Numerics verification verdict (%s, %s)', settings.preset_name, settings.run_mode);
 L{end+1} = '';
-L{end+1} = sprintf('Acceptance criteria fixed on %s, before the run. Trials: %d reshoot, %d LLE/QR; %d Jacobian states per condition.', ...
+L{end+1} = sprintf('Acceptance criteria fixed on %s, before the run. Trials: %d reshoot, %d LLE/QR; the Jacobian at %d time points per condition.', ...
     V.fixed_on, settings.n_trials_reshoot, settings.n_trials_lle, settings.n_jac);
 if isfield(V, 'amendments')
     for k = 1:numel(V.amendments)

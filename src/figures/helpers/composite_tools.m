@@ -26,9 +26,12 @@ function T = composite_tools()
 % than the screen, and the same <tag>_table.md), and the letters look the
 % same as composite_letter's.
 %
-%   canvas(W, H, visible)      a white figure of W x H pixels, with the
-%                              size recorded for composite_save
-%                              ('composite_size'). Keep it under 0.9 of the
+%   canvas(W, H, visible)      a white figure canvas_w wide (manuscript_style)
+%                              and H pixels tall, with the size recorded
+%                              for composite_save ('composite_size'). W is
+%                              the width the caller lays its panels out
+%                              on, in pixels; fit stretches that layout
+%                              across the canvas. Keep it under 0.9 of the
 %                              screen height where the panels allow: a
 %                              taller figure is exported by printing, on an
 %                              uncropped canvas.
@@ -50,10 +53,23 @@ function T = composite_tools()
 %                              their positions (top row first).
 %   letter(ax, ch, dx, dy)     the panel letter '(A)' at (dx, dy) pixels from
 %                              the top-left corner of the plot box of ax
-%                              (default -70, 30), 14 pt, normal weight.
-%   style(fig)                 the house type: 14 pt everywhere, axes line
-%                              width 1, titles in normal weight, no boxes
-%                              around legends.
+%                              (default -70, 30), letter_fs, normal weight.
+%   style(fig)                 the house type, by role (manuscript_style):
+%                              tick labels, legends and free text tick_fs,
+%                              axis and colour-bar labels label_fs, titles
+%                              title_fs in normal weight; axes lines
+%                              axis_lw; no boxes around legends.
+%   fit(fig)                   the common canvas (Plan 2, 2026-11-22): the
+%                              figure becomes canvas_w wide and what is laid
+%                              out in pixels on the canvas's own width is
+%                              stretched across it, horizontally only. Axes
+%                              take the new left edge and width; a legend
+%                              or colour bar keeps its size while its anchor
+%                              follows (a legend its centre, a colour bar
+%                              its left edge); type is never scaled. Call
+%                              it once the layout is done and before the
+%                              letters, so that a letter keeps its offset
+%                              in pixels from its panel.
 %   axes_table(ax, what)       the numbers drawn in an axes as markdown, for
 %                              a section of composite_save's table: a line
 %                              saying what it is, then one row per line,
@@ -68,23 +84,45 @@ function T = composite_tools()
 %                              sentence case and the condition's colour
 %                              (manuscript_style), in normal weight.
 %   close(figs)                closes the ones that still exist.
+%   sentence(strings)          legend entries or titles with their first
+%                              word capitalized ('noise-free' becomes
+%                              'Noise-free'); text that opens with a
+%                              symbol ('n_a = 3', 'lambda_1') is left.
+%   margin(fig, px)            keeps the canvas down to px pixels above its
+%                              bottom edge in the cropped export.
+%                              exportgraphics crops to the drawn pixels,
+%                              so a bottom row's x labels end 2 px from
+%                              the image edge (S4, 2026-11-22). A short
+%                              line at mid-width, px above the bottom, in
+%                              a white that is not the background's
+%                              (0.99), is counted by the crop and is not
+%                              seen. A line in the background's own white
+%                              is not counted (tried).
 %
 % See also: composite_save, composite_figure, fig_main7_memory, fig_grouped_main
 
 T = struct('canvas', @canvas, 'copy', @copy_graphics, 'place', @place_block, 'grid', @axes_grid, ...
     'letter', @panel_letter, 'style', @house_style, ...
     'axes_table', @axes_table, 'grid_table', @grid_table, ...
-    'condition_title', @condition_title, 'retitle', @retitle, 'close', @close_valid);
+    'condition_title', @condition_title, 'retitle', @retitle, 'close', @close_valid, ...
+    'sentence', @sentence_case, 'margin', @crop_margin, 'fit', @fit_width);
 end
 
 %% ------------------------------------------------------------------------
 function fig = canvas(W, H, visible)
+% The window is made canvas_w wide at once; W is the width the caller lays
+% out on, which fit stretches across canvas_w. (Widening the window later
+% was tried, 2026-11-22: an export in a run of several cut the PNG at the
+% old width, the right-hand legends cut through.)
 vis = 'off';
 if visible; vis = 'on'; end
-fig = figure('Visible', vis, 'Color', 'w', 'Units', 'pixels', 'Position', [40 40 W H]);
+st = manuscript_style();
+W1 = round(st.canvas_w * get(groot, 'ScreenPixelsPerInch'));
+fig = figure('Visible', vis, 'Color', 'w', 'Units', 'pixels', 'Position', [40 40 W1 H]);
 % composite_save puts this size back before it saves (a window larger than
 % the screen can be shrunk by MATLAB at a moment of its choosing).
-setappdata(fig, 'composite_size', [W H]);
+setappdata(fig, 'composite_size', [W1 H]);
+setappdata(fig, 'composite_layout_width', W);
 drawnow;
 end
 
@@ -168,21 +206,67 @@ function h = panel_letter(ax, ch, dx, dy)
 if nargin < 3 || isempty(dx); dx = -70; end
 if nargin < 4 || isempty(dy); dy = 30; end
 p = getpixelposition(ax);
+st = manuscript_style();
 h = text(ax, dx / p(3), 1 + dy / p(4), sprintf('(%s)', ch), 'Units', 'normalized', 'Clipping', 'off', ...
-    'FontSize', 14, 'FontWeight', 'normal', 'Interpreter', 'none', 'Tag', 'composite_panel_letter', ...
+    'FontSize', st.letter_fs, 'FontWeight', 'normal', 'Interpreter', 'none', 'Tag', 'composite_panel_letter', ...
     'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
 end
 
 function house_style(fig)
+% Type by role (Plan2_canvas_standard.md): everything at tick_fs first, then
+% each piece of type its role's size by the shared canvas_type (axis names
+% and colour-bar labels label_fs, titles title_fs, panel letters
+% letter_fs; the roles are canvas_audit's, the ones test_canvas_standard
+% checks), each set on the label itself (the multipliers are 1).
+st = manuscript_style();
 ax = findall(fig, '-isa', 'matlab.graphics.axis.Axes');
-set(ax, 'FontSize', 14, 'LineWidth', 1, 'TitleFontSizeMultiplier', 1, 'LabelFontSizeMultiplier', 1);
+set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'TitleFontSizeMultiplier', 1, 'LabelFontSizeMultiplier', 1);
+set(findall(fig, '-property', 'FontSize'), 'FontSize', st.tick_fs);
 for k = 1:numel(ax)
     ax(k).Title.FontWeight = 'normal';
     if isprop(ax(k), 'Subtitle'); ax(k).Subtitle.FontWeight = 'normal'; end
 end
-set(findall(fig, '-property', 'FontSize'), 'FontSize', 14);
+canvas_type(fig);
 set(findall(fig, 'Type', 'legend'), 'Box', 'off');
-set(findall(fig, 'Type', 'colorbar'), 'Box', 'off', 'LineWidth', 1);
+set(findall(fig, 'Type', 'colorbar'), 'Box', 'off', 'LineWidth', st.axis_lw);
+end
+
+function fit_width(fig)
+% Stretch a layout made on the canvas's own width across canvas_w (see the header).
+st = manuscript_style();
+W1 = round(st.canvas_w * get(groot, 'ScreenPixelsPerInch'));
+fig.Units = 'pixels';
+W0 = getappdata(fig, 'composite_layout_width');
+if isempty(W0); W0 = fig.Position(3); end
+s = W1 / W0;
+setappdata(fig, 'composite_layout_width', W1);      % a second call does nothing
+if abs(s - 1) < 1e-9; return; end
+h = findall(fig, '-isa', 'matlab.graphics.axis.Axes', '-or', 'Type', 'legend', '-or', 'Type', 'colorbar');
+% A legend or colour bar that MATLAB places beside its axes follows them.
+placed = arrayfun(@(o) ~isa(o, 'matlab.graphics.axis.Axes') && ~any(strcmp(o.Location, {'none', 'manual'})), h);
+h = h(~placed);
+units = get(h, {'Units'});
+P = zeros(numel(h), 4);
+for k = 1:numel(h)
+    h(k).Units = 'pixels';
+    P(k, :) = h(k).Position;
+end
+sz = getappdata(fig, 'composite_size');
+if ~isempty(sz) && any(abs(fig.Position(3:4) - sz) > 1e-6); fig.Position(3:4) = sz; end
+drawnow;
+for k = 1:numel(h)
+    p = P(k, :);
+    if isa(h(k), 'matlab.graphics.axis.Axes')
+        q = [p(1) * s, p(2), p(3) * s, p(4)];
+    elseif isa(h(k), 'matlab.graphics.illustration.Legend')
+        q = [(p(1) + p(3) / 2) * s - p(3) / 2, p(2), p(3), p(4)];
+    else
+        q = [p(1) * s, p(2), p(3), p(4)];
+    end
+    h(k).Position = q;
+    if ~strcmp(units{k}, 'pixels'); h(k).Units = units{k}; end
+end
+drawnow;
 end
 
 function txt = axes_table(ax, what)
@@ -273,4 +357,24 @@ for k = 1:numel(axs)
     title(axs(k), condition_title(names{k}, two_line), 'FontWeight', 'normal', 'FontSize', 14, ...
         'Color', color, 'Interpreter', 'tex');
 end
+end
+
+function s = sentence_case(s)
+% The first word capitalized when the text opens with two lowercase letters
+% (a word; 'n_a' and 'lambda' are symbols and stay).
+was_char = ischar(s);
+s = cellstr(s);
+for k = 1:numel(s)
+    if ~isempty(regexp(s{k}, '^[a-z][a-z]', 'once')); s{k}(1) = upper(s{k}(1)); end
+end
+if was_char; s = s{1}; end
+end
+
+function h = crop_margin(fig, px)
+% An almost-white line at mid-width, px above the canvas bottom (see the header).
+if nargin < 2; px = 2; end
+p = getpixelposition(fig);
+y = px / p(4);
+h = annotation(fig, 'line', 0.5 + [0, 3 / p(3)], [y y], 'Color', [0.99 0.99 0.99], 'LineWidth', 0.5, ...
+    'Tag', 'composite_crop_margin');
 end

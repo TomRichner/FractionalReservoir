@@ -22,6 +22,12 @@ function out = fig_sensitivity_medians(cfg)
 %      Adaptation median, which runs to -10 1/s on this network, stayed
 %      visible; TR reversed that: the fixed ruler is what the paper wants, and
 %      the fully-stable extreme of No Adaptation is off the scale by design.
+%      NO OFF-SCALE MARKERS (Tom, 2026-11-22, Figure 4 note 2: "that is how
+%      we had it previously"). From the polish list of 2026-11-22 until
+%      Plan 3 a triangle on the top or bottom edge marked each sweep value
+%      whose median had left the window; the triangles, their option and
+%      their helper (draw_offscale_markers) are gone, and no figure draws
+%      them.
 %   2. SIX PARAMETERS, not seven. level_of_chaos ("Synaptic Gain") is dropped so
 %      the rest fit 2 x 3; it is the least surprising of the seven, since it
 %      simply scales W.
@@ -89,7 +95,7 @@ row_style = containers.Map( ...
      'mu_IE_relative', 'mu_II_relative'}, ...
     {struct('xlabel', 'E:I neuron ratio', 'xticks', [0.2 0.5 0.8], ...
                                           'xticklabels', {{'100:400','250:250','400:100'}}), ...
-     struct('xlabel', 'Network Size',     'xticks', [100 500 1000], 'xticklabels', {{}}), ...
+     struct('xlabel', 'Network size',     'xticks', [100 500 1000], 'xticklabels', {{}}), ...
      struct('xlabel', 'E\rightarrowE',    'xticks', [], 'xticklabels', {{}}), ...   % routes read PRE -> POST (TR, 2026-09-15)
      struct('xlabel', 'I\rightarrowE',    'xticks', [], 'xticklabels', {{}}), ...   % mu_EI: post E <- pre I
      struct('xlabel', 'E\rightarrowI',    'xticks', [], 'xticklabels', {{}}), ...   % mu_IE: post I <- pre E

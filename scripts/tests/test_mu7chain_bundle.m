@@ -134,19 +134,23 @@ for c = {cfg3, cfg4}
     k = c{1};
     names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
     assert(numel(unique(names)) == numel(names), 'duplicate registry entry');
-    % The paper's main Figures 1 to 6 and S1 to S8, with the functions of
-    % the figure plan (Plan 2); Figure 7 and S9 are the A + C bundle's.
+    % The paper's main Figures 1 to 6, S1 to S7 and the leading-direction
+    % figure, with the functions of the figure plan (Plan 2, Plan 3); S8 is
+    % appendix since Plan 3 (its panels are S6 D and E); Figure 7 and S9 are
+    % the A + C bundle's.
     want = {'fig_main1_grouped', 'fig_main1_concept_networks'; 'fig_main2_grouped', 'fig_main2_grouped'; ...
         'fig_main3_grouped', 'fig_main3_grouped'; 'fig_main4_grouped', 'fig_main4_connectivity'; ...
         'fig_main5_grouped', 'fig_main5_mechanism'; 'fig_main6_grouped', 'fig_main6_amplification'; ...
         'fig_supp1_grouped', 'fig_supp1_grouped'; 'fig_supp2_grouped', 'fig_supp2_grouped'; ...
         'fig_supp3_grouped', 'fig_supp3_connectivity_gallery'; 'fig_supp4_grouped', 'fig_supp4_grouped'; ...
-        'fig_supp5_grouped', 'fig_supp5_grouped'; 'fig_supp6_grouped', 'fig_supp6_grouped'; ...
+        'fig_supp5_grouped', 'fig_supp5_grouped'; 'fig_supp_leading_grouped', 'fig_supp_leading_grouped'; ...
+        'fig_supp6_grouped', 'fig_supp6_grouped'; ...
         'fig_supp7_grouped', 'fig_supp7_grouped'; 'fig_supp8_grouped', 'fig_supp8_grouped'};
     for w = 1:size(want, 1)
         e = k.figures(strcmp(names, want{w, 1}));
         group = 'supplement';
         if startsWith(want{w, 1}, 'fig_main'); group = 'main'; end
+        if strcmp(want{w, 1}, 'fig_supp8_grouped'); group = 'appendix'; end
         assert(isscalar(e) && strcmp(func2str(e{1}.fn), want{w, 2}) && strcmp(e{1}.group, group), ...
             '%s: %s', k.fig_root, want{w, 1});
     end
@@ -210,13 +214,19 @@ for m = run_mode_names()
             frequency_response_stage_plan(k); eigenvalue_density_stage_plan(k);
             ps = outlier_structures_stage_plan(k);
             assert(isequal(pl.conditions, three_spec) && isequal(ps.conditions, three_spec), '%s: the stages'' conditions', tag);
-            % fig_outlier_plane, _slow_variables and _dwell draw 'reference'
-            % and 'EEx1p5' and need their dense pass and full-Jacobian
-            % series: the stage's default full_networks, every run of them.
+            % fig_outlier_plane and _slow_variables draw 'reference' and
+            % 'EEx1p5' and need their dense pass and full-Jacobian series:
+            % the stage's default full_networks, every run of them. The
+            % dwell figure draws the reference only, over the long window
+            % (FD-057: long_networks).
             dense_nets = {'reference', 'EEx1p5'};
             assert(isequal(pl.full_networks, dense_nets) && all(ismember(dense_nets, pl.networks)) && ...
                 all([pl.runs(ismember({pl.runs.network}, dense_nets)).full]) && ...
                 ~any([pl.runs(~ismember({pl.runs.network}, dense_nets)).full]), '%s: the dense pass of reference and EEx1p5', tag);
+            assert(isequal(pl.long_networks, {'reference'}) && ...
+                all([pl.runs(strcmp({pl.runs.network}, 'reference')).window_s] == pl.full_window_s) && ...
+                all([pl.runs(~strcmp({pl.runs.network}, 'reference')).window_s] == pl.window_s), ...
+                '%s: the long window for the reference only', tag);
             % The entries, none in the paper, each with the conditions it can draw.
             names = cellfun(@(f) f.name, k.figures, 'UniformOutput', false);
             want = spectral_entry_names();

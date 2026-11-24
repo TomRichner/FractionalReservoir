@@ -29,7 +29,9 @@ function out = fig_local_vs_finite_lle(cfg)
 %
 % Layout, ONE row, one column per condition (near-default set): density of
 % the local rate pooled over time and jobs (light fill) with the finite-time
-% lambda_1 across jobs on top (dark bars, median line); zero line; shared x.
+% lambda_1 across jobs on top (dark bars); zero line; shared x. No line at the
+% median of the dark bars (Tom, 2026-11-23: "I cannot see the line... You
+% should remove it."); the median is in the table.
 % The text gives the share of local-rate samples > 0, the share of jobs with
 % lambda_1 < 0 and the median lambda_1.
 %
@@ -136,9 +138,9 @@ for i = 1:n_cond
     if ~isempty(lle)
         histogram(ax, lle, edges, 'Normalization', 'pdf', 'FaceColor', col, ...
             'EdgeColor', 'none', 'FaceAlpha', 0.75);
-        xline(ax, median(lle), '-', 'Color', col, 'LineWidth', 2);
     end
-    xline(ax, 0, ':', 'Color', [0.2 0.2 0.2], 'LineWidth', 1.2);
+    % The zero line of manuscript_style (Plan 3 review: a black dotted line here, green dashed elsewhere).
+    xline(ax, 0, '--', 'Color', st.zeroline_color, 'LineWidth', st.zeroline_lw, 'Alpha', 1);
     hold(ax, 'off'); box(ax, 'off');
     set(ax, 'FontSize', st.tick_fs, 'XLim', x_lim, 'XTick', [-2 0 2]);
     title(ax, st.condition_title(name), 'FontWeight', 'normal', 'FontSize', st.title_fs);

@@ -21,9 +21,12 @@
 %      Fig_Main3_Grouped_switch_ritz_inset with one density image and one
 %      inset per panel. On a run without the spectra both error through
 %      resolve_data_file, and the default source is untouched by the option.
-%      The fourth row ('real_histogram_row'): one histogram and one dotted
-%      reference per column, under the plot box of the heat map above it and
-%      on its x limits, only the named labels on it, the same canvas, a
+%      The fourth row ('real_histogram_row'): one histogram per column,
+%      under the heat map at the column's width, from -11 to +3 s^-1, with
+%      no dotted curve and no text (the curve, its key and the three labels
+%      are options, checked too); row (B) on 0 to 75 bits/s in every column;
+%      the inputs of row (A) in the E and I color maps; the canvas
+%      manuscript_style's width; a
 %      _table.md with the row's caption sentence; fig_eig_real_histogram
 %      with 'spectra_source', 'local_lyapunov'; the gains the stage saves
 %      (disk_by_cond). With the lambda_1 row it errors :HistogramRow.
@@ -115,43 +118,91 @@ close(g.figs);
 all_passed = check('figures from the switching run: tags with _switch, the overlay and inset per panel, the shared-pass table', ok) && all_passed;
 
 % The fourth row (the real-axis histogram) and the stand-alone histogram.
+% As the paper draws it since Tom's review of 2026-11-22: no dotted curve,
+% no key, no labels, no leaders; x from -11 to +3 s^-1; one y axis, 0 to 75
+% bits/s, in every column of row (B); the inputs of row (A) in the E and I
+% line color maps; manuscript_style's canvas width and type by role.
 evalc(['g4 = fig_grouped_main(3, ''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''g4''), ''show_lambda_row'', false, ' ...
     '''spectra_source'', ''local_lyapunov'', ''ritz_overlay'', true, ''ritz_inset'', true, ''real_histogram_row'', true);']);
 tag4 = 'Fig_Main3_Grouped_switch_ritz_inset_realhist';   % no _noC since the merge with FD-031: no lambda_1 row is the default
+st = manuscript_style(); canvas_px = st.canvas_w * get(groot, 'ScreenPixelsPerInch');
 ok = any(strcmp(g4.files, [tag4 '.png'])) && isfile(fullfile(on_dir, 'g4', [tag4 '_table.md'])) && ...
-    n_tagged(g4.figs, 'eig_real_histogram') == numel(C) && n_tagged(g4.figs, 'uniform_disk_reference') == numel(C) && ...
-    g4.figs.Position(3) == g_pos(3) && g4.figs.Position(4) == g_pos(4) && numel(findall(g4.figs, 'Tag', 'row_letter')) == 4;
+    n_tagged(g4.figs, 'eig_real_histogram') == numel(C) && n_tagged(g4.figs, 'uniform_disk_reference') == 0 && ...
+    n_tagged(g4.figs, 'histogram_label') == 0 && n_tagged(g4.figs, 'histogram_key') == 0 && ...
+    n_tagged(g4.figs, 'histogram_leader') == 0 && ...
+    abs(g4.figs.Position(3) - canvas_px) < 1 && abs(g_pos(3) - canvas_px) < 1 && ...
+    numel(findall(g4.figs, 'Tag', 'row_letter')) == 4;
 for c = 1:numel(C)
     heat = findall(g4.figs, 'Tag', sprintf('stability_r3_c%d', c)); hx = findall(g4.figs, 'Tag', sprintf('stability_r4_c%d', c));
-    ok = ok && isscalar(heat) && isscalar(hx);
+    ex = findall(g4.figs, 'Tag', sprintf('stability_r2_c%d', c)); in = findall(g4.figs, 'Tag', sprintf('stability_r1_c%d', c));
+    ok = ok && isscalar(heat) && isscalar(hx) && isscalar(ex) && isscalar(in);
     if ok
-        pb = plot_box_position(heat);
-        ok = isequal(hx.XLim, heat.XLim) && max(abs(hx.Position([1 3]) - pb([1 3]))) < 1e-6 && ...
-            hx.Position(2) + hx.Position(4) < pb(2) && ...
-            isempty(findobj(hx, 'Type', 'text', '-not', 'Tag', 'histogram_label'));   % only the named labels
+        le = findobj(in, 'Tag', 'input_E'); li = findobj(in, 'Tag', 'input_I');
+        want_label = ''; if c == 1; want_label = 'Eigenvalues per snapshot'; end
+        ok = isequal(hx.XLim, [-11 3]) && max(abs(hx.Position([1 3]) - heat.Position([1 3]))) < 1e-6 && ...
+            hx.Position(2) + hx.Position(4) < heat.Position(2) && isempty(findobj(hx, 'Type', 'text')) && ...
+            isequal(ex.YLim, [0 75]) && hx.LineWidth == st.axis_lw && heat.LineWidth == st.axis_lw && ...
+            strcmp(strjoin(cellstr(hx.YLabel.String), ' '), want_label) && ...
+            ~isempty(le) && ~isempty(li) && ...
+            all(ismember(vertcat(le.Color), excitatory_colormap(numel(le)), 'rows')) && ...
+            all(ismember(vertcat(li.Color), inhibitory_colormap(numel(li)), 'rows'));
     end
 end
 if ok
     tbl = fileread(fullfile(on_dir, 'g4', [tag4 '_table.md']));
-    ok = contains(tbl, 'Row (D)') && contains(tbl, 'radius drawn: `gain`') && contains(tbl, 'switching-input run');
+    ok = contains(tbl, 'Row (D)') && contains(tbl, 'radius drawn: `gain`') && contains(tbl, 'switching-input run') && ...
+        contains(tbl, 'per snapshot') && ~contains(tbl, 'Dotted: the projection of that uniform disk');
 end
-% The three labels of row (D), once each, at the figure's text size; the lambda_1
-% label above row (B) at that size too (Plan 2, package C).
-labs = findall(g4.figs, 'Tag', 'histogram_label'); lam = findall(g4.figs, 'Tag', 'accumulated_lambda_value');
-ok = ok && numel(labs) == 3 && all([labs.FontSize] == 14) && numel(lam) == numel(C) && all([lam.FontSize] == 14);
+% The lambda_1 label above row (B) at the figure's text size (Plan 2, package C).
+lam = findall(g4.figs, 'Tag', 'accumulated_lambda_value');
+ok = ok && numel(lam) == numel(C) && all([lam.FontSize] == st.tick_fs);
 close(g4.figs);
-evalc('m4 = fig_main3_stability(on_dir, {}, ''spectra_source'', ''local_lyapunov'', ''real_histogram_row'', true, ''histogram_labels'', false);');
-ok = ok && n_tagged(m4.figs, 'histogram_label') == 0 && n_tagged(m4.figs, 'ritz_density') == 0 && n_tagged(m4.figs, 'ritz_inset') == 0;
+% What Tom took out stays an option: the dotted curve with its key, and the
+% three labels, each once with a leader to what it names, its end computed
+% from the histogram (the spike at -1/tau_d, the plateau on the far side of
+% the spike from zero, the pile of slow eigenvalues between the spike and
+% zero). They are placed on the heat map's real axis, so they need
+% 'histogram_xlim', [].
+evalc(['m5 = fig_main3_stability(on_dir, {}, ''spectra_source'', ''local_lyapunov'', ''real_histogram_row'', true, ' ...
+    '''histogram_labels'', true, ''histogram_reference'', true, ''histogram_xlim'', []);']);
+labs = findall(m5.figs, 'Tag', 'histogram_label'); keys = findall(m5.figs, 'Tag', 'histogram_key');
+lead = findall(m5.figs, 'Tag', 'histogram_leader');
+ok = ok && numel(labs) == 3 && all([labs.FontSize] == st.tick_fs) && isscalar(keys) && keys.FontSize == st.tick_fs && ...
+    contains(strjoin(cellstr(keys.String), ' '), 'uniform') && n_tagged(m5.figs, 'uniform_disk_reference') == numel(C) && ...
+    numel(lead) == 3;
+for c = 1:numel(C)
+    heat = findall(m5.figs, 'Tag', sprintf('stability_r3_c%d', c)); hx = findall(m5.figs, 'Tag', sprintf('stability_r4_c%d', c));
+    lb = findobj(hx, 'Tag', 'histogram_label'); ky = findobj(hx, 'Tag', 'histogram_key');
+    ok = ok && isequal(hx.XLim, heat.XLim) && numel(ky) == (c == numel(C)) && (isempty(ky) || ky.Position(1) > hx.XLim(2));
+    for q = 1:numel(lb)
+        ok = ok && strcmp(lb(q).HorizontalAlignment, 'right') && lb(q).Position(1) < 0 && ...
+            lb(q).Position(1) > hx.XLim(1) + 0.2 * diff(hx.XLim);
+    end
+end
+if ok
+    U = [lead.UserData]; tg = {U.target}; x_end = arrayfun(@(h) h.XData(2), lead)';
+    c_leak = -1 / D.disk_by_cond{1}.tau_d;
+    ok = isequal(sort(tg), {'pile', 'plateau', 'spike'}) && abs(x_end(strcmp(tg, 'spike')) - c_leak) < 1e-9 && ...
+        x_end(strcmp(tg, 'plateau')) < c_leak && x_end(strcmp(tg, 'pile')) > c_leak && ...
+        all(arrayfun(@(h) all(h.YData > h.Parent.YLim(1) & h.YData < h.Parent.YLim(2)), lead));
+end
+close(m5.figs);
+ok = ok && throws_prefix(@() fig_main3_stability(on_dir, {}, 'spectra_source', 'local_lyapunov', 'real_histogram_row', true, ...
+    'histogram_labels', true), 'fig_main3_stability:HistogramLabels');
+evalc('m4 = fig_main3_stability(on_dir, {}, ''spectra_source'', ''local_lyapunov'', ''real_histogram_row'', true);');
+ok = ok && n_tagged(m4.figs, 'histogram_label') == 0 && n_tagged(m4.figs, 'histogram_leader') == 0 && ...
+    n_tagged(m4.figs, 'uniform_disk_reference') == 0 && n_tagged(m4.figs, 'ritz_density') == 0 && n_tagged(m4.figs, 'ritz_inset') == 0;
 close(m4.figs);
 evalc(['rh = fig_eig_real_histogram(''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''rh''), ''visible'', false, ' ...
     '''spectra_source'', ''local_lyapunov'');']);
 ok = ok && any(strcmp(rh.files, 'fig_eig_real_histogram_switch.png')) && strcmp(rh.reference(1).mode, 'gain') && ...
-    isfile(fullfile(on_dir, 'rh', 'fig_eig_real_histogram_switch_table.md')) && n_tagged(rh.figs, 'histogram_label') == 0;
+    isfile(fullfile(on_dir, 'rh', 'fig_eig_real_histogram_switch_table.md')) && n_tagged(rh.figs, 'histogram_label') == 0 && ...
+    n_tagged(rh.figs, 'uniform_disk_reference') == numel(C);   % the stand-alone figure keeps its dotted curve
 close(rh.figs);
 G = D.disk_by_cond{end};
 ok = ok && numel(D.disk_by_cond) == numel(C) && G.n == 40 && numel(G.rms_gain) == n_s && ...
     all(G.rms_gain > 0 & G.rms_gain < 1) && max(abs(G.t(:)' - (1:10))) < 1e-9;
-all_passed = check('the histogram row: (D) under each heat map''s plot box on its x limits, no text on it but the three named labels (none when switched off, none on the stand-alone figure), table written; the stand-alone histogram; the saved gains', ok) && all_passed;
+all_passed = check('the histogram row: (D) under each heat map at the column''s width, from -11 to +3 s^-1, no dotted curve and no text on it (the curve, its key and the three labels with their leaders as options; the curve on the stand-alone figure); row (B) on 0 to 75; inputs in the E and I color maps; the canvas width; table written; the saved gains', ok) && all_passed;
 % fig_local_lyapunov: the stage's accumulation window and K, read from the run (Plan 2, package C).
 evalc('ll = fig_local_lyapunov(''run_dir'', on_dir, ''out_dir'', fullfile(on_dir, ''ll''), ''visible'', false);');
 ok = isequal(ll.window, B.settings.lya_T_interval) && isequal(ll.window, [1 10]) && ll.K == K && ...

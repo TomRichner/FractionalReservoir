@@ -18,6 +18,11 @@ function [fig, B] = composite_figure(rows, opts)
 %                    own width. The block is the source scaled uniformly to
 %                    that width, so 1:1 panels stay 1:1. Text keeps its
 %                    point size (only positions scale).
+%            strip   (optional) inches kept free above this row for its
+%                    letter, in place of opts.strip; [] or absent: opts.strip.
+%                    0 for a row whose source keeps a title strip of its own
+%                    where the letter goes (S7 panel C). The row takes the
+%                    largest of its blocks' values.
 %
 % Options
 %   visible   false
@@ -25,7 +30,12 @@ function [fig, B] = composite_figure(rows, opts)
 %   row_gap   inches between rows (0.25)
 %   col_gap   inches between the blocks of a row (0.35)
 %   strip     inches kept free above every row for its panel letters (0.32)
-%   align     'left' (default) or 'center': rows narrower than the widest
+%   align     'left' (default) or 'center': rows narrower than the canvas
+%             centered in it
+%   width     inches: the figure is this wide, whatever its rows need (the
+%             common canvas, manuscript_style canvas_w; a warning when the
+%             rows need more). [] (default): as wide as the widest row.
+%             The caller sizes the blocks (their width field) to fill it.
 %
 % Returns the figure (units inches) and B, a cell like rows, of structs
 %   rect      [x y w h] of the block on the figure, inches
@@ -50,14 +60,19 @@ arguments
     opts.col_gap (1,1) double = 0.35
     opts.strip (1,1) double = 0.32
     opts.align (1,:) char {mustBeMember(opts.align, {'left', 'center'})} = 'left'
+    opts.width double = []
 end
 
 ppi = get(groot, 'ScreenPixelsPerInch');
 n_rows = numel(rows);
-row_w = zeros(1, n_rows); row_h = zeros(1, n_rows);
+row_w = zeros(1, n_rows); row_h = zeros(1, n_rows); row_strip = opts.strip * ones(1, n_rows);
 S = cell(1, n_rows);
 for r = 1:n_rows
     blocks = rows{r};
+    if isfield(blocks, 'strip')
+        v = [blocks.strip];
+        if ~isempty(v); row_strip(r) = max(v); end
+    end
     S{r} = struct('scale', {}, 'w', {}, 'h', {});
     for k = 1:numel(blocks)
         drawnow;
@@ -72,7 +87,14 @@ for r = 1:n_rows
 end
 m = opts.margin;
 fig_w = m(1) + max(row_w) + m(2);
-fig_h = m(3) + sum(row_h) + n_rows * opts.strip + (n_rows - 1) * opts.row_gap + m(4);
+if ~isempty(opts.width)
+    if fig_w > opts.width + 1e-6
+        warning('composite_figure:TooWide', 'The rows need %.2f in; the canvas is %.2f in wide.', fig_w, opts.width);
+    end
+    fig_w = opts.width;
+end
+span = fig_w - m(1) - m(2);                          % the width the rows are aligned in
+fig_h = m(3) + sum(row_h) + sum(row_strip) + (n_rows - 1) * opts.row_gap + m(4);
 vis = 'off'; if opts.visible; vis = 'on'; end
 fig = figure('Color', 'w', 'Units', 'inches', 'Position', [0.5 0.5 fig_w fig_h], 'Visible', vis);
 % The size the layout is made for. A window larger than the screen can be
@@ -85,9 +107,9 @@ B = cell(1, n_rows);
 y_top = fig_h - m(3);
 for r = 1:n_rows
     blocks = rows{r};
-    y_top = y_top - opts.strip;                      % the letters' strip
+    y_top = y_top - row_strip(r);                    % the letters' strip
     x = m(1);
-    if strcmp(opts.align, 'center'); x = m(1) + (max(row_w) - row_w(r)) / 2; end
+    if strcmp(opts.align, 'center'); x = m(1) + (span - row_w(r)) / 2; end
     for k = 1:numel(blocks)
         s = S{r}(k);
         rect = [x, y_top - s.h, s.w, s.h];

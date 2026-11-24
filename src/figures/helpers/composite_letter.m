@@ -5,7 +5,7 @@ function h = composite_letter(fig, block, letter, ax, opts)
 %   COMPOSITE_LETTER(fig, B{2}(1), 'C', ax)        at the left edge of ax (its tick labels and axis name included)
 %   COMPOSITE_LETTER(..., 'dx', -0.1)              moved, inches
 %
-% Parenthesized capital, regular weight, the size of the tick labels
+% Parenthesized capital, regular weight, letter_fs of manuscript_style
 % (docs/Figure_style_guide.md). The letter's bottom sits at the block's top
 % edge; composite_figure keeps a strip free there.
 %
@@ -33,6 +33,6 @@ fp = fig.Position;                                   % inches
 x = max(x + opts.dx, 0.02);
 y = block.top + 0.02 + opts.dy;
 h = annotation(fig, 'textbox', [x / fp(3), y / fp(4), 0.6 / fp(3), 0.28 / fp(4)], 'String', sprintf('(%s)', letter), ...
-    'LineStyle', 'none', 'FontSize', st.tick_fs, 'FontWeight', 'normal', 'Margin', 0, ...
+    'LineStyle', 'none', 'FontSize', st.letter_fs, 'FontWeight', 'normal', 'Margin', 0, ...
     'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left', 'Tag', ['panel_letter_' letter]);
 end

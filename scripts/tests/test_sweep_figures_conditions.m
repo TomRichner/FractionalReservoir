@@ -55,7 +55,13 @@ out = fig_sensitivity_medians(base{:}, 'preset_name', preset, 'save', false);
 n_fail = n_fail + check(isequal(legend_text(out.figs(1)), ...
     cellfun(@(c) st.condition_title(c), {'no_adaptation', 'sfa1_std1', 'sfa3_std2'}, 'UniformOutput', false)), ...
     'medians, no selection: the preset''s three, in its order');
+% No off-scale markers (Tom, 2026-11-22, Figure 4 note 2): the curves are
+% simply clipped by the y window, and the option that drew them is gone.
+n_fail = n_fail + check(isempty(findall(out.figs, 'Tag', 'offscale_marker')), ...
+    'medians: no off-scale markers, the curves simply clipped');
 close(out.figs);
+id = error_of(@() fig_sensitivity_medians(base{:}, 'preset_name', preset, 'save', false, 'offscale_markers', true));
+n_fail = n_fail + check(~isempty(id), 'medians: the off-scale option is gone');
 out = fig_sensitivity_medians(base{:}, 'preset_name', preset, 'save', false, 'conditions', sel);
 n_fail = n_fail + check(isequal(legend_text(out.figs(1)), want_sel), ...
     'medians, subset: exactly the selection, in the requested order');

@@ -169,8 +169,16 @@ xl = struct('A',0.005,'B',0.005,'C',xC-0.085,'D',0.005,'E',0.330-0.085,'F',xC-0.
 sf = openfig(src.traces,'invisible'); guard1 = onCleanup(@()close_if(sf));
 drop_texts(sf,opts.drop_text);
 ax = findall(sf,'Type','axes');
-a_no = place(pick(ax,@(a)strcmp(strtrim(char(a.Title.String)),'No Stimulation')),pos.cl_trace_no);
-a_st = place(pick(ax,@(a)strcmp(strtrim(char(a.Title.String)),'Stimulation')),pos.cl_trace_st);
+% The trace axes by their Tags (traces_nostim, traces_stim: the patient
+% panel of 2026-11-22, titled "SEEG, no stimulation" and "SEEG,
+% stimulation"), or, in panel files made before, by their titles.
+if any(strcmp({ax.Tag},'traces_nostim'))
+    a_no = place(pick(ax,@(a)strcmp(a.Tag,'traces_nostim')),pos.cl_trace_no);
+    a_st = place(pick(ax,@(a)strcmp(a.Tag,'traces_stim')),pos.cl_trace_st);
+else
+    a_no = place(pick(ax,@(a)strcmp(strtrim(char(a.Title.String)),'No Stimulation')),pos.cl_trace_no);
+    a_st = place(pick(ax,@(a)strcmp(strtrim(char(a.Title.String)),'Stimulation')),pos.cl_trace_st);
+end
 close_if(sf);
 
 sf = openfig(src.rate,'invisible');
@@ -333,11 +341,13 @@ if ~opts.visible, close(fig); out.fig = []; end
             aa.YAxis.TickLabelColor = [0 0 0]; aa.TickLength = [0 0];
         end
         m_tr_st.YTickLabel = {};
-        xlm = m_tr_st.XLim; ylm = m_tr_st.YLim; x1 = xlm(2); x0 = x1-opts.time_bar;
-        yb = ylm(1)-0.04*diff(ylm);
-        line(m_tr_st,[x0 x1],[yb yb],'Color','k','LineWidth',1,'Clipping','off');
-        text(m_tr_st,(x0+x1)/2,yb,sprintf('%g s',opts.time_bar),'HorizontalAlignment','center', ...
-            'VerticalAlignment','top','FontSize',opts.annot_size,'FontName','Helvetica','Clipping','off');
+        if isempty(findall(m_tr_st,'Tag','scalebar'))   % a model figure without its own time bar (before 2026-11-22)
+            xlm = m_tr_st.XLim; ylm = m_tr_st.YLim; x1 = xlm(2); x0 = x1-opts.time_bar;
+            yb = ylm(1)-0.04*diff(ylm);
+            line(m_tr_st,[x0 x1],[yb yb],'Color','k','LineWidth',1,'Clipping','off');
+            text(m_tr_st,(x0+x1)/2,yb,sprintf('%g s',opts.time_bar),'HorizontalAlignment','center', ...
+                'VerticalAlignment','top','FontSize',opts.annot_size,'FontName','Helvetica','Clipping','off');
+        end
         if numel(m_rate.XTickLabel)==2 && contains(ylab(m_rate),'Events per Minute')
             m_rate.XTickLabel = {'No Stimulation','Stimulation'};
         end

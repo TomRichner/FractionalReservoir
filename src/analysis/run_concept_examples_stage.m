@@ -22,6 +22,15 @@ function detail = run_concept_examples_stage(cfg, run_dir, plan)
 %     neurons, half E and half I, from the private stream plan.image_seed)
 %   - for a network with added low-rank structure, where the addition was
 %     built to put its eigenvalue (as a rate)
+%   - WHAT THE STRUCTURE ADDED to the balanced matrix of its own draw, from
+%     the construction (added_part; S3 draws it beside the balanced piece):
+%     for a block-mean network the change of the block means on the
+%     network's own connections, level_of_chaos x S o (M - M_balanced) (S
+%     the sparsity mask, M the block-mean matrix of RMTBlocks; the random
+%     part and the mask are the same draw, so this is exactly W minus the
+%     balanced W of the same seed); for an added low-rank structure
+%     U G U' (OspecNet.build_network); for a network with nothing put in
+%     (the reference, or a local outlier of its own draw) nothing
 % and for each EXAMPLE only, a run of the unadapted network over [0, T]
 % from the class's initial state with the preset's noise (OspecNet's
 % run_sampled, the class's integrator, every plan.dt_sample seconds):
@@ -129,6 +138,44 @@ r.K_struct = ws.K_struct;
 r.K_eig_rate = (ws.K_struct_eig - 1) / tau;
 r.lowrank_rate = lowrank_rate;              % NaN: nothing added
 r.sample = weight_image_sample(ws.Wf, ws.type_of, plan.n_image, plan.image_seed);
+r.added_part = added_part(plan, model, ws, r.sample);
+end
+
+function a = added_part(plan, model, ws, sample)
+% What the network's structure added to the balanced matrix of its draw, on
+% the neurons of the weight piece. a.kind 'none' | 'blockmean' | 'lowrank'
+% (joined by '+' when both); a.W the added matrix on the piece (post, pre);
+% a.base_W the balanced matrix on the piece (sample.W - a.W); a.delta_mu
+% (post, pre) the shift of every connection of a block (0 where the block
+% is unchanged); a.max_abs the largest |entry| of the added matrix over the
+% whole network.
+p = srnn_param_preset(plan.preset_name);
+rel = model.mu_tilde_relative;
+if ~isequal(size(rel), [2 2]) || ~isequal(size(p.mu_tilde_relative), [2 2])
+    error('run_concept_examples_stage:Blocks', 'The block-mean change needs 2 x 2 relative block means.');
+end
+% mu_tilde = relative x F (the weight unit), so the balanced matrix's block
+% means are the preset's relative means times the same F.
+F = model.mu_tilde ./ rel;
+F(rel == 0) = 0;
+dmu = model.level_of_chaos * (model.mu_tilde - p.mu_tilde_relative .* F);
+dmu(abs(dmu) < 1e-12 * max(abs(model.mu_tilde(:)))) = 0;
+kinds = {};
+n = size(ws.Wf, 1);
+A_full = zeros(n);
+if any(dmu(:) ~= 0)
+    t = ws.type_of;
+    A_full = full(ws.Wf ~= 0) .* dmu(t, t);   % every connection of a block shifted by its block's change
+    kinds{end + 1} = 'blockmean';
+end
+if ~isempty(model.added)
+    A_full = A_full + model.added.U * model.added.G * model.added.U';
+    kinds{end + 1} = 'lowrank';
+end
+kind = 'none';
+if ~isempty(kinds); kind = strjoin(kinds, '+'); end
+Wa = A_full(sample.idx, sample.idx);
+a = struct('kind', kind, 'W', Wa, 'base_W', sample.W - Wa, 'delta_mu', dmu, 'max_abs', max(abs(A_full(:))));
 end
 
 function r = add_run(r, plan, model, params)

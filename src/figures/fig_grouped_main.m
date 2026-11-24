@@ -27,8 +27,10 @@ function out = fig_grouped_main(group, cfg)
 % WHO CALLS WHICH GROUP (Plan 2, integration, 2026-11-21; one path each):
 %   2, 3      fig_main2_grouped, fig_main3_grouped: the paper's Figures 2
 %             and 3 (registry entries of the same names)
-%   4         fig_main4_connectivity, for panels A and B of the paper's
-%             Figure 4 (entry fig_main4_grouped)
+%   4         nobody since Plan 3 (2026-11-22): the old grouped Figure 4
+%             (sweeps over the rate panels, 13 in layout), kept for its
+%             tests; the paper's Figure 4 is fig_main4_connectivity, built
+%             from the source figures with composite_tools
 %   1,5,6,7,8 fig_grouped_main_appendix: the old composites, appendix
 %             entries (grouped_figure_registry); the paper's Figures 1, 5,
 %             6, 7 and 8 are other functions now
@@ -68,8 +70,8 @@ arguments
     % Group 3 only (Tom, 2026-11-20): a fourth row, (D), under the heat map:
     % the eigenvalues projected on the real axis against a uniform disk
     % (fig_main3_stability's real_histogram_row; needs show_lambda_row
-    % false). Saved with _realhist appended to the tag, on a taller canvas,
-    % with the numbers in <tag>_table.md.
+    % false). Saved with _realhist appended to the tag, with the numbers in
+    % <tag>_table.md.
     cfg.real_histogram_row (1,1) logical = false
     % The file name stem, when the registry names it (as fig_main_mc_grouped's
     % fig_tag, FD-031). '' (the default) names the file by its options:
@@ -101,16 +103,34 @@ switch group
         sources=a.source; notes=a.notes;
     case 2
         a=fig_main2_dynamics(cfg.run_dir,cfg.source_fig_root,cfg.conditions);
-        % N columns at the three-column pitch: the canvas widens with them.
-        fig.Position(3)=fig.Position(3)*a.width_scale;
+        % The common canvas (manuscript_style's canvas_w; N columns keep the
+        % three-column pitch, so the canvas widens with them). The sheet is
+        % drawn at the full canvas and is copied below onto all of it (no
+        % 0.95 frame since the second round of 2026-11-22), so its layout in
+        % inches and its type in points are kept.
+        % A new figure of that size, not the first one resized: an invisible
+        % figure resized after its creation was seen to go back to the size
+        % it was created with (1300 x 950) on about every other call.
+        cst=manuscript_style();
+        close(fig);
+        fig=figure('Visible',onoff(cfg.visible),'Color','w','Position', ...
+            [40 40 round(cst.canvas_w*get(groot,'ScreenPixelsPerInch')*a.width_scale) round(a.figs.Position(4))]);
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 3
         a=fig_main3_stability(cfg.run_dir,cfg.conditions,'show_lambda_row',cfg.show_lambda_row, ...
             'ritz_overlay',cfg.ritz_overlay,'ritz_k',cfg.ritz_k,'ritz_scaling',cfg.ritz_scaling,'ritz_inset',cfg.ritz_inset,'ritz_style',cfg.ritz_style, ...
             'spectra_source',cfg.spectra_source,'real_histogram_row',cfg.real_histogram_row);
-        fig.Position(3)=fig.Position(3)*a.width_scale;
-        if cfg.real_histogram_row, fig.Position(4)=fig.Position(4)*a.height_scale; table_text=a.table_text; end
+        % fig_main3_stability's own canvas (manuscript_style's canvas_w for
+        % three columns, the height its rows need): the layout is made for
+        % it. A NEW figure of that size, not this one resized: an invisible
+        % figure resized after creation was seen to go back to the size it
+        % was created with when the panels were copied into it (2026-11-22,
+        % worker sessions, here and in group 2). The flattened figure below
+        % is created at this figure's size, and its size is checked there.
+        canvas_px=a.figs.Position(3:4);
+        close(fig); fig=figure('Visible',onoff(cfg.visible),'Color','w','Position',[40 40 canvas_px]);
+        if cfg.real_histogram_row, table_text=a.table_text; end
         native(a.figs,[0 0 1 1]); close(a.figs);
         sources=a.source; notes=a.notes;
     case 4
@@ -193,7 +213,7 @@ switch group
 end
 % Flatten layout containers into ordinary native axes for portable export.
 flat=figure('Visible','off','Color','w','Position',fig.Position);
-if ismember(group,[1 2 3])
+if ismember(group,[1 3])     % Figure 2's sheet is the whole canvas (second round, 2026-11-22)
     copy_axes(fig,flat,[.025 .025 .95 .95]);
 else
     copy_axes(fig,flat,[0 0 1 1]);
@@ -202,21 +222,15 @@ close(fig); fig=flat;
 if ismember(group,[1 2 3 8])
     set(findall(fig,'-property','FontSize'),'FontSize',14);
     if group==2
-        tt=findall(fig,'Type','axes','-regexp','Tag','^dynamics_r1_c\d+$');
-        for k=1:numel(tt), tt(k).Title.FontSize=16; end
+        % Type by role (manuscript_style: axis labels label_fs, titles
+        % title_fs, panel letters letter_fs), after the line above.
+        canvas_type(fig);
     elseif group==3
-        tt=findall(fig,'Type','axes','-regexp','Tag','^stability_r1_c\d+$');
-        for k=1:numel(tt), tt(k).Title.FontSize=16; end
+        drawnow;
+        assert(max(abs(fig.Position(3:4)-canvas_px))<1,'fig_grouped_main:CanvasShrunk', ...
+            'Figure 3 is %g x %g px, not the %g x %g px of its layout (larger than the screen?).',fig.Position(3:4),canvas_px);
+        canvas_type(fig);   % type by role (manuscript_style), as fig_main3_stability set it
         set(findall(fig,'Tag','ritz_inset'),'FontSize',9); set(findall(fig,'-regexp','Tag','^ritz_(annotation|tick_label)$'),'FontSize',9);
-        if cfg.real_histogram_row
-            % Each histogram under the plot box of the heat map above it, as
-            % that box is on THIS canvas (fig_main3_stability's is another shape).
-            hx=findall(fig,'Type','axes','-regexp','Tag','^stability_r4_c\d+$');
-            for k=1:numel(hx)
-                heat=findall(fig,'Type','axes','Tag',strrep(hx(k).Tag,'_r4_','_r3_'));
-                pb=plot_box_position(heat); hx(k).Position([1 3])=pb([1 3]);
-            end
-        end
     end
 else
     set(findall(fig,'Type','axes'),'FontSize',10);
@@ -235,6 +249,10 @@ if group==3 && cfg.ritz_overlay
 end
 if group==3 && cfg.real_histogram_row, tag=[tag '_realhist']; end
 if ~isempty(cfg.fig_tag), tag=cfg.fig_tag; end   % the registry's name wins over the name by options
+% The column dividers of groups 2 and 3, placed again on this canvas: the
+% panels were copied from a figure of another size, where type in points
+% took another share of the width (column_dividers; none in other groups).
+drawnow; column_dividers(fig);
 out=struct('figs',fig,'files',{{}},'source',{sources});
 if cfg.save
     if ~isfolder(outdir), mkdir(outdir); end
@@ -245,6 +263,7 @@ if cfg.save
     end
     % PNG plus editable MATLAB figure: local-rate traces make SVG needlessly large.
     drawnow;
+    true_minus_ticks(fig);   % the true minus on every numeric tick label, last before export
     if ismember(group,[1 2 3 4 5 6 8]), pad={'Padding',20}; else, pad={}; end
     % exportgraphics was seen (2026-11-12, worker session, invisible figures,
     % 3630 x 1222 monitor layout) to resize the figure to 1313 x 1008 during
@@ -252,9 +271,21 @@ if cfg.save
     % canvas with small type and the .fig was saved at that size. Not
     % reproduced at the start of the session; the cause was not found. Detect
     % the resize, restore the size and export again.
+    % Figures 2 and 3 (groups 2, 3) are exported as the composites are
+    % (save_some_figs_to_folder_2's png_resolution): 600 dpi, lowered so the
+    % longer side stays within 4000 px, and an SVG beside the PNG (Plan 3 fix
+    % X1: they came out at a fixed 200 dpi, about 1800 px wide, and with no
+    % SVG, since cfg.svg is off by default). The appendix groups keep 200 dpi.
+    res=200; want_svg=cfg.svg;
+    if ismember(group,[2 3])
+        pad=canvas_export_args();   % Figures 2 and 3: the whole canvas, untrimmed, like the other 16
+        px=getpixelposition(fig);
+        res=min(600,floor(4000*get(groot,'ScreenPixelsPerInch')/max(px(3:4))));
+        want_svg=true;
+    end
     pos=fig.Position;
     for attempt=1:3
-        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',200,pad{:});
+        exportgraphics(fig,fullfile(outdir,[tag '.png']),'Resolution',res,pad{:});
         if isequal(fig.Position(3:4),pos(3:4)), break; end
         fig.Position=pos; drawnow;
         if attempt==3
@@ -263,7 +294,7 @@ if cfg.save
         end
     end
     savefig(fig,fullfile(outdir,[tag '.fig']));
-    if cfg.svg
+    if want_svg
         exportgraphics(fig,fullfile(outdir,[tag '.svg']),'ContentType','vector',pad{:});
         if ~isequal(fig.Position(3:4),pos(3:4)), fig.Position=pos; end
     end

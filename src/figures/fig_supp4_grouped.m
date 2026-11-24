@@ -61,12 +61,20 @@ measures = {'LLE', 'mean_rate'};
 assert(all(found) && numel(S.figs) >= max(sheet), 'fig_supp4_grouped:Sheets', ...
     'fig_sensitivity_medians returned no sheet for %s.', strjoin(measures(~found), ', '));
 
-%% The canvas: two blocks of 2 x 4 slots
-W = 1100; H = 935;
+%% The canvas: two blocks of 2 x 4 slots, laid out on canvas_w itself
+% (Plan 3, 2026-11-22: made again for the 9 in canvas, not stretched; laid
+% out on 1100 px and stretched to 864 the tick labels of neighbouring
+% panels ran together and the legend reached past the right edge).
+st = manuscript_style();
+W = round(st.canvas_w * get(groot, 'ScreenPixelsPerInch')); H = 935;
 fig = T.canvas(W, H, cfg.visible);
-X0 = 95; CW = 190; GAP = 68; RH = 140;
+X0 = 68; RH = 140;
+% The first gap is the widest: the last count of the E:I neuron ratio
+% (400:100) and the first network size (100) meet in it.
+GAP = [70 46 46];
+CW = (W - X0 - 8 - sum(GAP)) / 4;
 ROW_Y = [745 530; 295 80];                 % ROW_Y(block, row)
-slot = @(b, r, c) [X0 + (c - 1) * (CW + GAP), ROW_Y(b, r), CW, RH];
+slot = @(b, r, c) [X0 + (c - 1) * CW + sum(GAP(1:c - 1)), ROW_Y(b, r), CW, RH];
 
 ax = cell(1, 2);        % ax{b}(1:7): ratio, size, gain, EE, IE, EI, II
 legends = gobjects(0);
@@ -76,7 +84,10 @@ for b = 1:2
     G = T.grid(findall(src, 'Type', 'axes'));
     assert(isequal(size(G), [2 3]), 'fig_supp4_grouped:Panels', ...
         'Expected the 2 x 3 panels of fig_sensitivity_medians, found %d x %d.', size(G, 1), size(G, 2));
-    y_label = G(1, 1).YLabel.String;
+    % The unit as s^-1 and the rate named as in Figure 4 (Plan 3 fix X6;
+    % sweep_metrics, which other figures read, keeps its own wording).
+    y_label = strrep(G(1, 1).YLabel.String, '(1/s)', '(s^{-1})');
+    if strcmp(y_label, 'Mean Firing Rate'); y_label = st.label_rate; end
     order = [G(1, 1); G(1, 2); G(1, 3); G(2, 1); G(2, 2); G(2, 3)];   % ratio, size, EE, IE, EI, II
     Cp = T.copy(order, fig, b == 1);         % the legend comes with the first block only
     a = Cp.axes;
@@ -93,8 +104,19 @@ for b = 1:2
     ax{b} = [a(1); a(2); gain; a(3:6)];
     set(ax{b}, 'Units', 'pixels');
     for k = 1:7; ylabel(ax{b}(k), ''); ax{b}(k).XTickLabelRotation = 0; end
+    % A label of words on two lines: at label_fs 'Mean Firing Rate' was
+    % longer than the 140-px panel it names.
+    if ischar(y_label) && ~contains(y_label, '\') && numel(strsplit(y_label)) > 1
+        w = strsplit(y_label);
+        y_label = {strjoin(w(1:floor(end / 2)), ' '), strjoin(w(floor(end / 2) + 1:end), ' ')};
+    end
     ylabel(ax{b}(1), y_label, 'Interpreter', 'tex');
     ylabel(ax{b}(4), y_label, 'Interpreter', 'tex');
+    % The E:I neuron counts at the two ends only (the middle tick unlabelled):
+    % three counts do not fit a quarter of the canvas.
+    if numel(ax{b}(1).XTick) == 3
+        lab = cellstr(ax{b}(1).XTickLabel); lab{2} = ''; ax{b}(1).XTickLabel = lab;
+    end
 end
 
 %% Style
@@ -102,7 +124,7 @@ T.style(fig);
 if ~isempty(legends)
     lg = legends(1);
     if ~isempty(names)
-        lg.String = cellfun(@(n) T.condition_title(n), names, 'UniformOutput', false);
+        lg.String = cellfun(@(n) strjoin(cellstr(T.condition_title(n, true)), newline), names, 'UniformOutput', false);
     end
     set(lg, 'Units', 'pixels', 'Location', 'none', 'Orientation', 'vertical', 'NumColumns', 1);
     lg.ItemTokenSize = [18 18];
@@ -113,14 +135,23 @@ if ~isempty(legends)
     end
 end
 
+% The x labels of (B)'s bottom row are the lowest thing drawn, and the
+% cropped export ended on them (flush with the image edge, 2026-11-22):
+% keep a margin under them.
+T.margin(fig, 6);
+
+%% The common canvas: the layout above, made on W px, stretched across canvas_w
+T.style(fig);                % again: the labels and titles set since take their roles' sizes
+T.fit(fig);
+
 %% Panel letters
-T.letter(ax{1}(1), 'A', -85, 18);
-T.letter(ax{2}(1), 'B', -85, 18);
+T.letter(ax{1}(1), 'A', 4 - X0, 18);
+T.letter(ax{2}(1), 'B', 4 - X0, 18);
 
 %% Save
 panels = struct( ...
     'A', ['fig_sensitivity_medians (lambda_1 sheet, six panels) and, drawn here by the same rule, the gain sweep ' ...
-          '(level_of_chaos, ''All Weights'')'], ...
+          '(level_of_chaos, ''All weights'')'], ...
     'B', 'fig_sensitivity_medians (mean-rate sheet, six panels) and the gain sweep drawn here');
 sources = {S.source};
 parts = cell(0, 2);
@@ -145,8 +176,8 @@ caption = sprintf(['Supplementary Figure S4, sensitivity to each connectivity pa
     'connectivity, read presynaptic to postsynaptic, as percent departure from the preset. The y window is ' ...
     'fixed, so a curve that leaves it is clipped. (B) The mean firing rate for the same seven sweeps. The gain ' ...
     'panel of each block is drawn by this function from the saved sweep, by the rule of fig_sensitivity_medians ' ...
-    '(which omits it), in the style of the panels beside it. Canvas %d x %d px, text 14 pt.'], ...
-    cfg.run_dir, strjoin(names, ', '), W, H);
+    '(which omits it), in the style of the panels beside it. Canvas %d x %d px (canvas_w of manuscript_style), type in points by role.'], ...
+    cfg.run_dir, strjoin(names, ', '), getappdata(fig, 'composite_size'));
 out_dir = '';
 if cfg.save; out_dir = default_out_dir(cfg.out_dir, mfilename('fullpath')); end
 out = composite_save(fig, cfg, out_dir, cfg.fig_tag, 'Supplementary Figure S4: sensitivity to each connectivity parameter', ...
@@ -222,13 +253,13 @@ set(ax, 'YTick', donor.YTick, 'FontSize', donor.FontSize, 'Box', 'off', 'LineWid
     'TickDir', donor.TickDir);
 default = preset_default_values(run_dir, {param});
 if isKey(default, param) && default(param) ~= 0
-    apply_percent_axis(ax, default(param), 'All Weights', donor.XLabel.FontSize, [-50 0 50]);
+    apply_percent_axis(ax, default(param), 'All weights', donor.XLabel.FontSize, [-50 0 50]);
     if ~isempty(mark)
         frac = diff(mark(1).YData) / diff(donor.YLim);
         mark_default_value(ax, default(param), mark(1).Color, mark(1).LineWidth, frac);
     end
 else
-    xlabel(ax, 'All Weights');
+    xlabel(ax, 'All weights');
 end
 end
 
