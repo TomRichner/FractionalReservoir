@@ -178,6 +178,23 @@ for p = 1:3
     set(ax, 'FontSize', st.tick_fs, 'LineWidth', st.axis_lw, 'Box', 'off', 'TickDir', 'out');
     if p == 2; xlabel(ax, 'Structural outlier / bulk radius', 'FontSize', st.label_fs); end
     ylabel(ax, ylab{p}, 'FontSize', st.label_fs);
+    axs(p) = ax; %#ok<AGROW>
+end
+% The y names sit at the same distance from their tick labels, measured on
+% their text boxes, whose side toward the axis is the descent of the line
+% nearest it. B and C end in a line whose glyphs do not use it ("of E
+% neurons"; B's subscript makes the box deeper still), so their ink keeps
+% that much more clearance than a one-line name with descenders: D's "g"
+% and comma came close to its "0.5". Such a name is moved off by the
+% descent (about 0.21 em), so it has the clearance of the others.
+drawnow;
+for p = 1:numel(axs)
+    near = cellstr(axs(p).YLabel.String); near = near{end};
+    if ~isempty(regexp(near, '[gjpqy,;]', 'once')) && ~contains(near, '_')
+        h = axs(p).YLabel; h.Units = 'points';
+        h.Position(1) = h.Position(1) - 0.21 * st.label_fs;
+        h.Units = 'data';
+    end
 end
 
 fig_tag = 'Fig_Outlier_Dose';
