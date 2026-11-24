@@ -198,14 +198,16 @@ ylabel(sct(1), 'Memory capacity');
 set(sct, 'Box', 'off');                  % open axes, as every other panel (the source boxes them)
 if ~isempty(Cs.colorbars)
     Cs.colorbars.Label.String = 'Gain';
-    % The gain bar labelled at its ends and its middle level (0.05, 0.5, 5
-    % on its log scale) only: its seven labels (0.108, 0.232, 1.08, ...)
-    % were more than read comfortably (G5, Tom 2026-11-23).
-    k = numel(Cs.colorbars.Ticks);
-    if k > 3
-        keep = unique([1, ceil(k / 2), k]);
-        set(Cs.colorbars, 'Ticks', Cs.colorbars.Ticks(keep), 'TickLabels', Cs.colorbars.TickLabels(keep));
-    end
+    % Three round ticks chosen from the bar's own range, on its own scale
+    % (G5, Tom 2026-11-23: its seven level labels, 0.108, 0.232, 1.08, ...,
+    % were more than read comfortably). They were the source's first,
+    % middle and last level labels, which read 0.05, 0.5, 5 on the fast
+    % grid but 0.05, 0.315, 5 on the larger one (2026-11-24).
+    cb = Cs.colorbars;
+    lbl = str2double(cellstr(cb.TickLabels));
+    is_log = ~isempty(cb.Ticks) && all(abs(lbl(:)' ./ 10 .^ cb.Ticks - 1) < 0.01);   % labels 10^tick: a log10 bar
+    [tv, tl] = round_bar_ticks(cb.Limits, is_log);
+    set(cb, 'Ticks', tv, 'TickLabels', tl);
 end
 clip_note = '';
 if any(is_key)
@@ -324,4 +326,35 @@ for k = 1:numel(ax)
     lines{k} = sprintf('- %s: %s', strjoin(cellstr(ax(k).Title.String), ' '), ...
         strjoin(cellstr(t(1).String), '; '));
 end
+end
+
+function [ticks, labels] = round_bar_ticks(lim, is_log)
+% Three round ticks inside a colour bar's limits, on its scale. Log bar
+% (ticks in log10 units): the ends are the round values (1, 2 or 5 times a
+% power of ten) nearest inside the limits, the middle the round value
+% nearest their middle in log10 (0.05 to 5 gives 0.5); labelled with the
+% values themselves. Linear bar: the ends and the middle are multiples of
+% the coarsest step of 1, 2 or 5 times a power of ten that has them inside.
+tol = 1e-9 * max(1, max(abs(lim)));
+if is_log
+    e = floor(lim(1)) - 1:ceil(lim(2)) + 1;
+    cand = sort(reshape([1; 2; 5] * 10 .^ e, 1, []));
+    cand = cand(log10(cand) >= lim(1) - tol & log10(cand) <= lim(2) + tol);
+    if numel(cand) < 3; ticks = log10(cand); labels = compose('%g', cand); return; end
+    [~, m] = min(abs(log10(cand(2:end - 1)) - mean(log10(cand([1 end])))));
+    vals = cand([1, m + 1, end]);
+    ticks = log10(vals);
+else
+    vals = lim;
+    for s = reshape([5; 2; 1] * 10 .^ (floor(log10(diff(lim))):-1:floor(log10(diff(lim))) - 3), 1, [])
+        a = s * ceil(lim(1) / s - 1e-9); b = s * floor(lim(2) / s + 1e-9);
+        n = round((b - a) / s);
+        if n >= 2 && mod(n, 2) == 0
+            vals = [a, (a + b) / 2, b];
+            break;
+        end
+    end
+    ticks = vals;
+end
+labels = compose('%g', vals);
 end
