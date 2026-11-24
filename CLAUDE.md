@@ -32,6 +32,8 @@ main and supplementary figure on one 9 in canvas with the type sizes of
 `manuscript_style`; no pool while the long run goes; nothing merged into
 `main` and nothing written in the main checkout until that run ends.
 
+**2026-11-24: Plan 3 is merged.** `main` holds `p3` and the fixes that followed; the slow tests passed on it (canvas test on all 18, the quick suite, both exact tiers). The `fastmedium` run (main bundle) and the `production` stimulation bundle finished on 2026-11-23; four stages whose saved fields changed were rerun in their folders (`numerics_verification`, `concept_examples`, the illustration stages, `burst_mode`; the old outputs are in `data/p3_phase7/before_rerun/`), and the 18 figures drawn from them are in `figs/p3_fastmedium/` and in the manuscript repository's `figures_latest/`. The worktrees named below are history.
+
 **2026-11-23, the third round.** Phases 1 to 6 of Plan 3 are done. Tom then
 answered the open questions and decisions; the record is `Plan3_round3.md`
 beside `Plan3.md` (his answers as rules G1 to G6 for every figure and items
