@@ -74,6 +74,17 @@ function cp = complex_plane_axes(ax, opts)
 %                the real axis, which is where the outliers of these plots
 %                are. 'above': just above the axis line at its right end
 %                (it then collides with a mark near the end of the axis).
+%                'right': under the tick labels, from the right end of the
+%                real axis rightward, outside the window, where no eigenvalue
+%                of the window can be (the caller leaves room for it there).
+%   im_label_y   the height (Im, data units) of the BOTTOM of the Im name,
+%                which stays right of the top of the imaginary axis; it
+%                may reach above the window (the caller leaves room for
+%                it there). Default []: the name hangs from the top of the
+%                window, inside it.
+%   re_tick_labels, im_tick_labels   false: the tick marks without their
+%                labels, for panels that share one window and carry the
+%                labels on the outer ones only (default true)
 %   font_size (12), line_width (1), color ([0 0 0])
 %
 % RETURNS cp, a struct:
@@ -111,7 +122,10 @@ arguments
     opts.tick_min_sep double = []
     opts.re_label (1,:) char = 'Re (s^{-1})'
     opts.im_label (1,:) char = 'Im (s^{-1})'
-    opts.re_label_side (1,:) char {mustBeMember(opts.re_label_side, {'below', 'above'})} = 'below'
+    opts.re_label_side (1,:) char {mustBeMember(opts.re_label_side, {'below', 'above', 'right'})} = 'below'
+    opts.im_label_y double = []
+    opts.re_tick_labels (1,1) logical = true
+    opts.im_tick_labels (1,1) logical = true
     opts.font_size (1,1) double = 12
     opts.line_width (1,1) double = 1
     opts.color (1,3) double = [0 0 0]
@@ -240,28 +254,41 @@ end
 for t = G.re_ticks
     xp = map_re(G, t);
     h(end + 1) = plot(ax, [xp xp], [0 -tl], '-', line_args{:}); %#ok<AGROW>
-    h(end + 1) = text(ax, xp, -1.5 * tl, tick_label(t), 'HorizontalAlignment', 'center', ...
-        'VerticalAlignment', 'top', text_args{:}); %#ok<AGROW>
+    if opts.re_tick_labels
+        h(end + 1) = text(ax, xp, -1.5 * tl, tick_label(t), 'HorizontalAlignment', 'center', ...
+            'VerticalAlignment', 'top', text_args{:}); %#ok<AGROW>
+    end
 end
 for t = G.im_ticks
     h(end + 1) = plot(ax, [0 -tl], [t t], '-', line_args{:}); %#ok<AGROW>
-    h(end + 1) = text(ax, -1.6 * tl, t, tick_label(t), 'HorizontalAlignment', 'right', ...
-        'VerticalAlignment', 'middle', text_args{:}); %#ok<AGROW>
+    if opts.im_tick_labels
+        h(end + 1) = text(ax, -1.6 * tl, t, tick_label(t), 'HorizontalAlignment', 'right', ...
+            'VerticalAlignment', 'middle', text_args{:}); %#ok<AGROW>
+    end
 end
 
 % The names, at the ends.
 if ~isempty(opts.re_label)
-    if strcmp(opts.re_label_side, 'below')              % a blank first line: under the tick labels, whatever the scale
-        h(end + 1) = text(ax, x_end, -1.5 * tl, {' ', opts.re_label}, 'HorizontalAlignment', 'right', ...
-            'VerticalAlignment', 'top', text_args{:});
-    else
-        h(end + 1) = text(ax, x_end, 1.2 * tl, opts.re_label, 'HorizontalAlignment', 'right', ...
-            'VerticalAlignment', 'bottom', text_args{:});
+    switch opts.re_label_side
+        case 'below'                                    % a blank first line: under the tick labels, whatever the scale
+            h(end + 1) = text(ax, x_end, -1.5 * tl, {' ', opts.re_label}, 'HorizontalAlignment', 'right', ...
+                'VerticalAlignment', 'top', text_args{:});
+        case 'above'
+            h(end + 1) = text(ax, x_end, 1.2 * tl, opts.re_label, 'HorizontalAlignment', 'right', ...
+                'VerticalAlignment', 'bottom', text_args{:});
+        case 'right'                                    % from the end of the axis rightward, under the tick labels
+            h(end + 1) = text(ax, x_end, -1.5 * tl, {' ', opts.re_label}, 'HorizontalAlignment', 'left', ...
+                'VerticalAlignment', 'top', text_args{:});
     end
 end
 if ~isempty(opts.im_label)
-    h(end + 1) = text(ax, 1.2 * tl, G.im_lim(2), opts.im_label, 'HorizontalAlignment', 'left', ...
-        'VerticalAlignment', 'top', text_args{:});
+    if ~isempty(opts.im_label_y)                        % set by the caller: clear of what is drawn under it
+        h(end + 1) = text(ax, 1.2 * tl, opts.im_label_y, opts.im_label, 'HorizontalAlignment', 'left', ...
+            'VerticalAlignment', 'bottom', text_args{:});
+    else
+        h(end + 1) = text(ax, 1.2 * tl, G.im_lim(2), opts.im_label, 'HorizontalAlignment', 'left', ...
+            'VerticalAlignment', 'top', text_args{:});
+    end
 end
 cp.handles = h;
 end
