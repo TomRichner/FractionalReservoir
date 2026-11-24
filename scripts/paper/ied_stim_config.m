@@ -122,7 +122,7 @@ cfg.visible_figures = overrides.visible_figures;
 
 %% The clinical figure folder (the one setting) and its panel files
 cfg.clinical_dir = pick(overrides.clinical_dir, ...
-    'C:/Users/m218089/Desktop/gitlab_repos/cscs_stim_stability/results/manuscript_stim/tica_awake_best');
+    'C:/Users/m218089/Desktop/gitlab_repos/cscs_stim_stability/results/manuscript_stim/tica_awake_best_fig8_drawn_only');
 cfg.clinical_files = struct('traces', 'Fig_Awake_Main_PanelD.fig', ...
     'rate', 'Fig_Awake_Main_PanelA_Normalized.fig', 'psd', 'Fig_Awake_Main_PanelB_PSD.fig');
 % '' = panels/<clinical_files.psd>. A full path takes the PSD panel from
